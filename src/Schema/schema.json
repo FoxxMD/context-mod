@@ -1,0 +1,128 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "definitions": {
+        "ActionConfig": {
+            "type": "object"
+        },
+        "AuthorParam": {
+            "properties": {
+                "flairCssClass": {
+                    "items": {
+                        "type": "string"
+                    },
+                    "type": "array"
+                },
+                "flairText": {
+                    "items": {
+                        "type": "string"
+                    },
+                    "type": "array"
+                },
+                "isMod": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "items": {
+                        "type": "string"
+                    },
+                    "type": "array"
+                }
+            },
+            "type": "object"
+        },
+        "CheckJSONConfig": {
+            "properties": {
+                "actions": {
+                    "items": {
+                        "$ref": "#/definitions/ActionConfig"
+                    },
+                    "type": "array"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "kind": {
+                    "enum": [
+                        "comment",
+                        "submission"
+                    ],
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "ruleJoin": {
+                    "enum": [
+                        "AND",
+                        "OR"
+                    ],
+                    "type": "string"
+                },
+                "rules": {
+                    "items": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/definitions/RuleConfig"
+                            },
+                            {
+                                "$ref": "#/definitions/RuleSetConfig"
+                            }
+                        ]
+                    },
+                    "type": "array"
+                }
+            },
+            "type": "object"
+        },
+        "RuleConfig": {
+            "properties": {
+                "authors": {
+                    "properties": {
+                        "exclude": {
+                            "items": {
+                                "$ref": "#/definitions/AuthorParam"
+                            },
+                            "type": "array"
+                        },
+                        "include": {
+                            "items": {
+                                "$ref": "#/definitions/AuthorParam"
+                            },
+                            "type": "array"
+                        }
+                    },
+                    "type": "object"
+                }
+            },
+            "type": "object"
+        },
+        "RuleSetConfig": {
+            "properties": {
+                "condition": {
+                    "enum": [
+                        "AND",
+                        "OR"
+                    ],
+                    "type": "string"
+                },
+                "rules": {
+                    "items": {
+                        "$ref": "#/definitions/RuleConfig"
+                    },
+                    "type": "array"
+                }
+            },
+            "type": "object"
+        }
+    },
+    "properties": {
+        "checks": {
+            "items": {
+                "$ref": "#/definitions/CheckJSONConfig"
+            },
+            "type": "array"
+        }
+    },
+    "type": "object"
+}
+

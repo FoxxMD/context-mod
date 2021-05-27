@@ -1,0 +1,33 @@
+{
+  "name": "redditcontextbot",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no tests installed\" && exit 1",
+    "build": "tsc",
+    "start": "node server.js",
+    "guard": "ts-auto-guard src/JsonConfig.ts",
+    "schema": "typescript-json-schema src/JsonConfig.ts JSONConfig --out src/Schema/schema.json"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "dayjs": "^1.10.5",
+    "minimist": "^1.2.5",
+    "p-event": "^4.2.0",
+    "safe-stable-stringify": "^1.1.1",
+    "snoostorm": "^1.5.2",
+    "snoowrap": "^1.23.0",
+    "winston": "^3.3.3",
+    "winston-daily-rotate-file": "^4.5.5"
+  },
+  "devDependencies": {
+    "@tsconfig/node14": "^1.0.0",
+    "@types/minimist": "^1.2.1",
+    "@types/node": "^15.6.1",
+    "ts-auto-guard": "*",
+    "typescript-json-schema": "^0.50.1"
+  }
+}

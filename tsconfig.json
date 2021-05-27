@@ -1,0 +1,20 @@
+{
+  "extends": "@tsconfig/node14/tsconfig.json",
+  "compilerOptions": {
+    "sourceMap": true
+  },
+//  "compilerOptions": {
+//    "module": "es6",
+//    "moduleResolution": "node",
+//    "target": "es6",
+//    "sourceMap": true,
+//    "allowSyntheticDefaultImports": true
+//  },
+  "include": [
+    "**/*.ts",
+    "**/*.tsx"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
+}
