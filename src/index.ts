@@ -34,8 +34,8 @@ const logPath = logDir ?? `${process.cwd()}/logs`;
 const rotateTransport = new winston.transports.DailyRotateFile({
     dirname: logPath,
     createSymlink: true,
-    symlinkName: 'streamSave-current.log',
-    filename: 'streamSave-%DATE%.log',
+    symlinkName: 'contextBot-current.log',
+    filename: 'contextBot-%DATE%.log',
     datePattern: 'YYYY-MM-DD',
     maxSize: '5m'
 });
