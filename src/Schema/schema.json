@@ -1,29 +1,38 @@
 {
     "$schema": "http://json-schema.org/draft-07/schema#",
     "definitions": {
-        "ActionConfig": {
-            "type": "object"
-        },
-        "AuthorParam": {
+        "ActionJSONConfig": {
             "properties": {
-                "flairCssClass": {
-                    "items": {
-                        "type": "string"
-                    },
-                    "type": "array"
-                },
-                "flairText": {
-                    "items": {
-                        "type": "string"
-                    },
-                    "type": "array"
-                },
-                "isMod": {
-                    "type": "boolean"
+                "kind": {
+                    "enum": [
+                        "comment",
+                        "flair",
+                        "lock",
+                        "remove",
+                        "report"
+                    ],
+                    "type": "string"
                 },
                 "name": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "kind"
+            ],
+            "type": "object"
+        },
+        "AuthorOptions": {
+            "properties": {
+                "exclude": {
                     "items": {
-                        "type": "string"
+                        "$ref": "#/definitions/IAuthor"
+                    },
+                    "type": "array"
+                },
+                "include": {
+                    "items": {
+                        "$ref": "#/definitions/IAuthor"
                     },
                     "type": "array"
                 }
@@ -34,7 +43,17 @@
             "properties": {
                 "actions": {
                     "items": {
-                        "$ref": "#/definitions/ActionConfig"
+                        "anyOf": [
+                            {
+                                "$ref": "#/definitions/ActionJSONConfig"
+                            },
+                            {
+                                "$ref": "#/definitions/FlairActionJSONConfig"
+                            },
+                            {
+                                "$ref": "#/definitions/CommentActionJSONConfig"
+                            }
+                        ]
                     },
                     "type": "array"
                 },
@@ -62,41 +81,220 @@
                     "items": {
                         "anyOf": [
                             {
-                                "$ref": "#/definitions/RuleConfig"
+                                "$ref": "#/definitions/RuleJSONConfig"
                             },
                             {
-                                "$ref": "#/definitions/RuleSetConfig"
+                                "$ref": "#/definitions/RecentActivityRuleJSONConfig"
+                            },
+                            {
+                                "$ref": "#/definitions/RepeatSubmissionJSONConfig"
+                            },
+                            {
+                                "$ref": "#/definitions/RuleSetJSONConfig"
                             }
                         ]
                     },
                     "type": "array"
                 }
             },
+            "required": [
+                "actions",
+                "kind",
+                "name",
+                "rules"
+            ],
             "type": "object"
         },
-        "RuleConfig": {
+        "CommentActionJSONConfig": {
             "properties": {
-                "authors": {
-                    "properties": {
-                        "exclude": {
-                            "items": {
-                                "$ref": "#/definitions/AuthorParam"
-                            },
-                            "type": "array"
-                        },
-                        "include": {
-                            "items": {
-                                "$ref": "#/definitions/AuthorParam"
-                            },
-                            "type": "array"
-                        }
+                "content": {
+                    "type": "string"
+                },
+                "distinguish": {
+                    "type": "boolean"
+                },
+                "kind": {
+                    "enum": [
+                        "comment",
+                        "flair",
+                        "lock",
+                        "remove",
+                        "report"
+                    ],
+                    "type": "string"
+                },
+                "lock": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "sticky": {
+                    "type": "boolean"
+                }
+            },
+            "required": [
+                "content",
+                "kind"
+            ],
+            "type": "object"
+        },
+        "FlairActionJSONConfig": {
+            "properties": {
+                "css": {
+                    "type": "string"
+                },
+                "kind": {
+                    "enum": [
+                        "comment",
+                        "flair",
+                        "lock",
+                        "remove",
+                        "report"
+                    ],
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "text": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "kind"
+            ],
+            "type": "object"
+        },
+        "IAuthor": {
+            "properties": {
+                "flairCssClass": {
+                    "items": {
+                        "type": "string"
                     },
-                    "type": "object"
+                    "type": "array"
+                },
+                "flairText": {
+                    "items": {
+                        "type": "string"
+                    },
+                    "type": "array"
+                },
+                "isMod": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "items": {
+                        "type": "string"
+                    },
+                    "type": "array"
                 }
             },
             "type": "object"
         },
-        "RuleSetConfig": {
+        "RecentActivityRuleJSONConfig": {
+            "properties": {
+                "authors": {
+                    "$ref": "#/definitions/AuthorOptions"
+                },
+                "kind": {
+                    "enum": [
+                        "recentActivity",
+                        "repeatSubmission"
+                    ],
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "thresholds": {
+                    "items": {
+                        "$ref": "#/definitions/SubThreshold"
+                    },
+                    "type": "array"
+                },
+                "window": {
+                    "type": [
+                        "string",
+                        "number"
+                    ]
+                }
+            },
+            "required": [
+                "kind",
+                "thresholds",
+                "window"
+            ],
+            "type": "object"
+        },
+        "RepeatSubmissionJSONConfig": {
+            "properties": {
+                "authors": {
+                    "$ref": "#/definitions/AuthorOptions"
+                },
+                "exclude": {
+                    "items": {
+                        "type": "string"
+                    },
+                    "type": "array"
+                },
+                "gapAllowance": {
+                    "type": "number"
+                },
+                "include": {
+                    "items": {
+                        "type": "string"
+                    },
+                    "type": "array"
+                },
+                "kind": {
+                    "enum": [
+                        "recentActivity",
+                        "repeatSubmission"
+                    ],
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "threshold": {
+                    "type": "number"
+                },
+                "window": {
+                    "type": [
+                        "string",
+                        "number"
+                    ]
+                }
+            },
+            "required": [
+                "kind",
+                "threshold"
+            ],
+            "type": "object"
+        },
+        "RuleJSONConfig": {
+            "properties": {
+                "authors": {
+                    "$ref": "#/definitions/AuthorOptions"
+                },
+                "kind": {
+                    "enum": [
+                        "recentActivity",
+                        "repeatSubmission"
+                    ],
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "kind"
+            ],
+            "type": "object"
+        },
+        "RuleSetJSONConfig": {
             "properties": {
                 "condition": {
                     "enum": [
@@ -107,11 +305,33 @@
                 },
                 "rules": {
                     "items": {
-                        "$ref": "#/definitions/RuleConfig"
+                        "$ref": "#/definitions/RuleJSONConfig"
                     },
                     "type": "array"
                 }
             },
+            "required": [
+                "condition",
+                "rules"
+            ],
+            "type": "object"
+        },
+        "SubThreshold": {
+            "properties": {
+                "count": {
+                    "type": "number"
+                },
+                "subreddits": {
+                    "items": {
+                        "type": "string"
+                    },
+                    "type": "array"
+                }
+            },
+            "required": [
+                "count",
+                "subreddits"
+            ],
             "type": "object"
         }
     },
@@ -123,6 +343,9 @@
             "type": "array"
         }
     },
+    "required": [
+        "checks"
+    ],
     "type": "object"
 }
 

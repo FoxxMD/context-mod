@@ -3,6 +3,7 @@ import Action from "./index";
 import Snoowrap, {Comment, Submission} from "snoowrap";
 
 export class RemoveAction extends Action {
+    name?: string = 'Remove';
     async handle(item: Comment|Submission, client: Snoowrap): Promise<void> {
     }
 }

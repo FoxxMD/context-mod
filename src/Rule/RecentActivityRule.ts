@@ -4,11 +4,16 @@ import {Comment, Submission} from "snoowrap";
 export class RecentActivityRule extends Rule {
     window: string | number;
     thresholds: SubThreshold[];
+    name: string = 'Recent Activity';
 
     constructor(options: RecentActivityRuleOptions) {
         super(options);
         this.window = options.window;
         this.thresholds = options.thresholds;
+    }
+
+    getDefaultName(): string {
+        return 'Repeat Submission';
     }
 
     async passes(item: Submission|Comment): Promise<[boolean, Rule[]]> {

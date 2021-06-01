@@ -16,6 +16,8 @@ export function isRuleSetConfig(obj: any, _argumentName?: string): obj is RuleSe
             (e !== null &&
                 typeof e === "object" ||
                 typeof e === "function") &&
+            (typeof e.name === "undefined" ||
+                typeof e.name === "string") &&
             (typeof e.authors === "undefined" ||
                 (e.authors !== null &&
                     typeof e.authors === "object" ||
@@ -76,6 +78,8 @@ export function isRuleSetConfig(obj: any, _argumentName?: string): obj is RuleSe
             (e !== null &&
                 typeof e === "object" ||
                 typeof e === "function") &&
+            (typeof e.name === "undefined" ||
+                typeof e.name === "string") &&
             (typeof e.authors === "undefined" ||
                 (e.authors !== null &&
                     typeof e.authors === "object" ||

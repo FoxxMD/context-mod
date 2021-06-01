@@ -5,9 +5,10 @@ import Snoowrap, {Comment, Submission} from "snoowrap";
 export class FlairAction extends Action {
     text?: string;
     css?: string;
+    name?: string = 'Flair';
 
     constructor(options: FlairActionOptions) {
-        super();
+        super(options);
         if (options.text === undefined && options.css === undefined) {
             throw new Error('Must define either text or css on FlairAction');
         }

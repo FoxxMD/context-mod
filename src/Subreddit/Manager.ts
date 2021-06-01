@@ -35,12 +35,19 @@ export class Manager {
             subStream.on('item', async (item) => {
                 for (const check of this.submissionChecks) {
                     this.logger.debug(`Running Check ${check.name} on Submission (ID ${item.id})`);
-                    const [passed, rules] = await check.passes(item);
-                    const invokedRules = rules.map(x => x.name).join(' | ');
-                    if (passed) {
-                        this.logger.debug(`Check ${check.name} passed with invoked Rules: ${invokedRules}`);
-                    } else {
-                        this.logger.debug(`Check ${check.name} failed on invoked Rule(s): ${invokedRules}`);
+                    const newItem = this.client.getSubmission('npac0x');
+                    let passed = false;
+                    try {
+                        const [passed, rules] = await check.passes(newItem);
+                        const invokedRules = rules.map(x => x.name).join(' | ');
+                        if (passed) {
+                            this.logger.debug(`Check ${check.name} passed with invoked Rules: ${invokedRules}`);
+                        } else {
+                            this.logger.debug(`Check ${check.name} failed on invoked Rule(s): ${invokedRules}`);
+                        }
+
+                    } catch (e) {
+                        this.logger.warn(`Check ${check.name} on Submission (ID ${item.id}) failed with error: ${e.message}`, e);
                     }
 
                     if (passed) {

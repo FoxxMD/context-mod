@@ -4,9 +4,10 @@ import Snoowrap, {Comment, Submission} from "snoowrap";
 
 export class ReportAction extends Action {
     content: string;
+    name?: string = 'Report';
 
     constructor(options: ReportActionOptions) {
-        super();
+        super(options);
         this.content = options.content;
     }
 

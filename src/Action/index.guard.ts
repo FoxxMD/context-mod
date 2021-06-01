@@ -9,6 +9,8 @@ export function isActionConfig(obj: any, _argumentName?: string): obj is ActionJ
         (obj !== null &&
             typeof obj === "object" ||
             typeof obj === "function") &&
+        (typeof obj.name === "undefined" ||
+            typeof obj.name === "string") &&
         (obj.kind === "comment" ||
             obj.kind === "lock" ||
             obj.kind === "remove" ||

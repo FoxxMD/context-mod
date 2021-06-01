@@ -1,12 +1,17 @@
 import {RuleSet, IRuleSet, RuleSetJSONConfig} from "../Rule/RuleSet";
-import {IRule, Rule, ruleFactory, RuleJSONConfig} from "../Rule";
-import Action, {ActionConfig, actionFactory, ActionJSONConfig} from "../Action";
+import {IRule, Passable, Rule, RuleJSONConfig} from "../Rule";
+import Action, {ActionConfig, ActionJSONConfig} from "../Action";
 import {isRuleSetConfig} from "../Rule/RuleSet.guard";
 import {isRuleConfig} from "../Rule/index.guard";
 import {Logger} from "winston";
 import {isActionConfig} from "../Action/index.guard";
-import {Passable} from "../Rule/Passable";
 import Snoowrap, {Comment, Submission} from "snoowrap";
+import {RecentActivityRuleJSONConfig} from "../Rule/RecentActivityRule";
+import {RepeatSubmissionJSONConfig} from "../Rule/SubmissionRule/RepeatSubmissionRule";
+import {FlairActionJSONConfig} from "../Action/SubmissionAction/FlairAction";
+import {CommentActionJSONConfig} from "../Action/CommentAction";
+import {actionFactory} from "../Action/ActionFactory";
+import {ruleFactory} from "../Rule/RuleFactory";
 
 export class Check implements ICheck {
     actions: Action[] = [];
@@ -88,6 +93,6 @@ export interface CheckOptions extends ICheck {
 /** @see {isCheckConfig} ts-auto-guard:type-guard */
 export interface CheckJSONConfig extends ICheck {
     kind: 'submission' | 'comment'
-    rules: Array<RuleSetJSONConfig | RuleJSONConfig>
-    actions: ActionJSONConfig[]
+    rules: Array<RuleSetJSONConfig | RuleJSONConfig | RecentActivityRuleJSONConfig | RepeatSubmissionJSONConfig>
+    actions: Array<ActionJSONConfig | FlairActionJSONConfig | CommentActionJSONConfig>
 }

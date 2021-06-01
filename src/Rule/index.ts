@@ -1,27 +1,45 @@
-import {RecentActivityRule, RecentActivityRuleJSONConfig} from "./RecentActivityRule";
-import RepeatSubmissionRule, {RepeatSubmissionJSONConfig} from "./SubmissionRule/RepeatSubmissionRule";
 import {Comment, Submission} from "snoowrap";
-import {Passable} from "./Passable";
+import {Logger} from "winston";
+import {createLabelledLogger} from "../util";
 
 export interface RuleOptions {
-    name: string;
+    name?: string;
     authors?: AuthorOptions;
+    logger?: Logger
+    loggerPrefix?: string
+}
+
+export interface Passable {
+    passes(item: Comment | Submission): Promise<[boolean, Rule[]]>;
 }
 
 export abstract class Rule implements IRule, Passable {
     name: string;
+    logger: Logger
     authors: AuthorOptions = {exclude: [], include: []};
 
     constructor(options: RuleOptions) {
-        this.name = options.name;
+        const {
+            name = this.getDefaultName(),
+            loggerPrefix = '',
+            logger,
+        } = options;
+        this.name = name || 'Rule';
         if (options.authors !== undefined) {
             const {exclude = [], include = []} = options.authors;
             this.authors.exclude = exclude.map(x => new Author(x));
             this.authors.include = include.map(x => new Author(x));
         }
+        if (logger === undefined) {
+            const prefix = `${loggerPrefix}|${this.name}`;
+            this.logger = createLabelledLogger(prefix, prefix);
+        } else {
+            this.logger = logger;
+        }
     }
 
-    abstract passes(item: Comment|Submission): Promise<[boolean, Rule[]]>;
+    abstract passes(item: Comment | Submission): Promise<[boolean, Rule[]]>;
+    abstract getDefaultName(): string;
 }
 
 export class Author implements IAuthor {
@@ -51,7 +69,7 @@ export interface IAuthor {
 }
 
 export interface IRule {
-    name: string
+    name?: string
     authors?: AuthorOptions
 }
 
@@ -60,14 +78,3 @@ export interface RuleJSONConfig extends IRule {
     kind: 'recentActivity' | 'repeatSubmission'
 }
 
-export function ruleFactory
-(config: RuleJSONConfig): Rule {
-    switch (config.kind) {
-        case 'recentActivity':
-            return new RecentActivityRule(config as RecentActivityRuleJSONConfig);
-        case 'repeatSubmission':
-            return new RepeatSubmissionRule(config as RepeatSubmissionJSONConfig);
-        default:
-            throw new Error('rule "kind" was not recognized.');
-    }
-}

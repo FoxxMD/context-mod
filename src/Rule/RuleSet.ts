@@ -1,7 +1,7 @@
-import {IRule, Rule, ruleFactory, RuleJSONConfig} from "./index";
+import {IRule, Passable, Rule, RuleJSONConfig} from "./index";
 import {isRuleConfig} from "./index.guard";
-import {Passable} from "./Passable";
 import {Comment, Submission} from "snoowrap";
+import {ruleFactory} from "./RuleFactory";
 
 export class RuleSet implements IRuleSet, Passable {
     rules: Rule[] = [];

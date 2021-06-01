@@ -6,9 +6,10 @@ export class CommentAction extends Action {
     lock: boolean = false;
     sticky: boolean = false;
     distinguish: boolean = false;
+    name?: string = 'Comment';
 
     constructor(options: CommentActionOptions) {
-        super();
+        super(options);
         const {
             content,
             lock = false,

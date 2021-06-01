@@ -14,6 +14,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "ajv": "^6.12.6",
     "dayjs": "^1.10.5",
     "minimist": "^1.2.5",
     "p-event": "^4.2.0",

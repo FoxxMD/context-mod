@@ -139,8 +139,10 @@ try {
             try {
                 const builder = new ConfigBuilder({subreddit: sub});
                 const [subChecks, commentChecks] = builder.buildFromJson(json);
-                subSchedule.push(new Manager(sub, client, subChecks, commentChecks));
-                logger.info(`[${sub.display_name}] Found ${subChecks.length} submission checks and ${commentChecks.length} comment checks`);
+                if(subChecks.length > 0 || commentChecks.length > 0) {
+                    subSchedule.push(new Manager(sub, client, subChecks, commentChecks));
+                    logger.info(`[${sub.display_name}] Found ${subChecks.length} submission checks and ${commentChecks.length} comment checks`);
+                }
             } catch (err) {
                 logger.error(`Config for ${sub.display_name} was not valid`);
             }

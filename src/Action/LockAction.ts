@@ -3,6 +3,7 @@ import Action from "./index";
 import Snoowrap, {Comment, Submission} from "snoowrap";
 
 export class LockAction extends Action {
+    name?: string = 'Lock';
     async handle(item: Comment|Submission, client: Snoowrap): Promise<void> {
     }
 }

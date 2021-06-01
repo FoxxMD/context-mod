@@ -2,17 +2,17 @@
  * Generated type guards for "JsonConfig.ts".
  * WARNING: Do not manually change this file.
  */
-import { isCheckConfig } from "./Check/index.guard";
 import { JSONConfig } from "./JsonConfig";
+import Ajv from 'ajv';
+import * as schema from './Schema/schema.json';
 
-export function isJsonConfig(obj: any, _argumentName?: string): obj is JSONConfig {
-    return (
-        (obj !== null &&
-            typeof obj === "object" ||
-            typeof obj === "function") &&
-        Array.isArray(obj.checks) &&
-        obj.checks.every((e: any) =>
-            isCheckConfig(e) as boolean
-        )
-    )
+const ajv = new Ajv();
+
+export function isJsonConfig(obj: any): obj is JSONConfig {
+    const valid = ajv.validate(schema, obj);
+    if(valid) {
+        return true;
+    } else {
+        throw new Error('Invalid json schema')
+    }
 }
