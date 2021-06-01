@@ -380,3 +380,5 @@ dist
 .yarn/install-state.gz
 .pnp.*
 
+**/src/**/*.js
+**/src/**/*.map
