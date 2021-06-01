@@ -1,4 +1,4 @@
-import {ActionJSONConfig, ActionConfig} from "./index";
+import {ActionJSONConfig, ActionConfig, ActionOptions} from "./index";
 import Action from "./index";
 import Snoowrap, {Comment, Submission} from "snoowrap";
 
@@ -15,7 +15,7 @@ export class ReportAction extends Action {
     }
 }
 
-export interface ReportActionOptions extends ActionConfig {
+export interface ReportActionOptions extends ActionOptions {
     content: string,
 }
 
