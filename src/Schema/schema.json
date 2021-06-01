@@ -81,9 +81,6 @@
                     "items": {
                         "anyOf": [
                             {
-                                "$ref": "#/definitions/RuleJSONConfig"
-                            },
-                            {
                                 "$ref": "#/definitions/RecentActivityRuleJSONConfig"
                             },
                             {
@@ -204,6 +201,13 @@
                     ],
                     "type": "string"
                 },
+                "lookAt": {
+                    "enum": [
+                        "comments",
+                        "submissions"
+                    ],
+                    "type": "string"
+                },
                 "name": {
                     "type": "string"
                 },
@@ -212,6 +216,9 @@
                         "$ref": "#/definitions/SubThreshold"
                     },
                     "type": "array"
+                },
+                "usePostAsReference": {
+                    "type": "boolean"
                 },
                 "window": {
                     "type": [
@@ -222,8 +229,7 @@
             },
             "required": [
                 "kind",
-                "thresholds",
-                "window"
+                "thresholds"
             ],
             "type": "object"
         },
@@ -260,6 +266,9 @@
                 "threshold": {
                     "type": "number"
                 },
+                "usePostAsReference": {
+                    "type": "boolean"
+                },
                 "window": {
                     "type": [
                         "string",
@@ -270,27 +279,6 @@
             "required": [
                 "kind",
                 "threshold"
-            ],
-            "type": "object"
-        },
-        "RuleJSONConfig": {
-            "properties": {
-                "authors": {
-                    "$ref": "#/definitions/AuthorOptions"
-                },
-                "kind": {
-                    "enum": [
-                        "recentActivity",
-                        "repeatSubmission"
-                    ],
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                }
-            },
-            "required": [
-                "kind"
             ],
             "type": "object"
         },
@@ -305,7 +293,14 @@
                 },
                 "rules": {
                     "items": {
-                        "$ref": "#/definitions/RuleJSONConfig"
+                        "anyOf": [
+                            {
+                                "$ref": "#/definitions/RecentActivityRuleJSONConfig"
+                            },
+                            {
+                                "$ref": "#/definitions/RepeatSubmissionJSONConfig"
+                            }
+                        ]
                     },
                     "type": "array"
                 }
@@ -329,7 +324,6 @@
                 }
             },
             "required": [
-                "count",
                 "subreddits"
             ],
             "type": "object"

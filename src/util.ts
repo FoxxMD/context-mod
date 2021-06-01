@@ -61,16 +61,47 @@ export const createLabelledLogger = (name = 'default', label = 'App') => {
     return winston.loggers.get(name);
 }
 
+export interface groupByOptions {
+    lowercase?: boolean
+}
+
 /**
  * Group array of objects by given keys
  * @param keys keys to be grouped by
+ * @param opts
  * @param array objects to be grouped
  * @returns an object with objects in `array` grouped by `keys`
  * @see <https://gist.github.com/mikaello/06a76bca33e5d79cdd80c162d7774e9c>
  */
-export const groupBy = <T>(keys: (keyof T)[]) => (array: T[]): Record<string, T[]> =>
-    array.reduce((objectsByKeyValue, obj) => {
-        const value = keys.map((key) => obj[key]).join('-');
+export const groupBy = <T>(keys: (keyof T)[], opts: groupByOptions = {}) => (array: T[]): Record<string, T[]> => {
+    const {lowercase = false} = opts;
+    return array.reduce((objectsByKeyValue, obj) => {
+        let value = keys.map((key) => obj[key]).join('-');
+        if (lowercase) {
+            value = value.toLowerCase();
+        }
         objectsByKeyValue[value] = (objectsByKeyValue[value] || []).concat(obj);
         return objectsByKeyValue;
-    }, {} as Record<string, T[]>);
+    }, {} as Record<string, T[]>)
+};
+
+
+/**
+ * @see https://stackoverflow.com/a/61033353/1469797
+ */
+const REGEX_YOUTUBE: RegExp = /(?:https?:\/\/)?(?:www\.)?youtu(?:\.be\/|be.com\/\S*(?:watch|embed)(?:(?:(?=\/[^&\s\?]+(?!\S))\/)|(?:\S*v=|v\/)))([^&\s\?]+)/g;
+
+export const parseUsableLinkIdentifier = (regexes: RegExp[] = [REGEX_YOUTUBE]) => (val?: string): (string | undefined) => {
+    if (val === undefined) {
+        return val;
+    }
+    for (const reg of regexes) {
+        const matches = [...val.matchAll(reg)];
+        if (matches.length > 0) {
+            // use first capture group
+            // TODO make this configurable at some point?
+            return matches[0][matches[0].length - 1];
+        }
+    }
+    return val;
+}

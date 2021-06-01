@@ -2,25 +2,10 @@ import {SubmissionRule, SubmissionRuleJSONConfig} from "./index";
 import {Rule, RuleOptions} from "../index";
 import {Submission} from "snoowrap";
 import {getAuthorSubmissions} from "../../Utils/SnoowrapUtils";
-import {groupBy} from "../../util";
+import {groupBy, parseUsableLinkIdentifier as linkParser} from "../../util";
 
 const groupByUrl = groupBy(['urlIdentifier']);
-
-// https://stackoverflow.com/a/61033353/1469797
-const ytRegex = /(?:https?:\/\/)?(?:www\.)?youtu(?:\.be\/|be.com\/\S*(?:watch|embed)(?:(?:(?=\/[^&\s\?]+(?!\S))\/)|(?:\S*v=|v\/)))([^&\s\?]+)/g;
-
-const parseUseableLinkIdentifier = (val?: string): (string | undefined) => {
-    if (val === undefined) {
-        return val;
-    }
-    const matches = [...val.matchAll(ytRegex)];
-    if (matches.length === 0) {
-        return val;
-    }
-    // use first capture group
-    // TODO make this configurable at some point?
-    return matches[0][matches[0].length - 1];
-}
+const parseUsableLinkIdentifier = linkParser()
 
 export class RepeatSubmissionRule extends SubmissionRule {
     threshold: number;
@@ -63,11 +48,11 @@ export class RepeatSubmissionRule extends SubmissionRule {
         if (this.gapAllowance !== undefined) {
             let consecutivePosts = referenceUrl !== undefined ? 1 : 0;
             let gap = 0;
-            let lastUrl = parseUseableLinkIdentifier(referenceUrl);
+            let lastUrl = parseUsableLinkIdentifier(referenceUrl);
             // start with second post since first is the one we triggered on (prob)
             for (const sub of submissions.slice(1)) {
                 if (sub.url !== undefined) {
-                    const regUrl = parseUseableLinkIdentifier(sub.url);
+                    const regUrl = parseUsableLinkIdentifier(sub.url);
                     if (lastUrl === undefined || lastUrl === regUrl) {
                         consecutivePosts++;
                         gap = 0;
@@ -97,11 +82,11 @@ export class RepeatSubmissionRule extends SubmissionRule {
         // otherwise we can just group all occurrences together
         const groupedPosts = groupByUrl(submissions.map(x => ({
             ...x,
-            urlIdentifier: parseUseableLinkIdentifier(x.url)
+            urlIdentifier: parseUsableLinkIdentifier(x.url)
         })));
         let groupsToCheck = [];
         if (this.usePostAsReference) {
-            const identifier = parseUseableLinkIdentifier(referenceUrl);
+            const identifier = parseUsableLinkIdentifier(referenceUrl);
             const {[identifier as string]: refGroup = []} = groupedPosts;
             groupsToCheck.push(refGroup);
         } else {

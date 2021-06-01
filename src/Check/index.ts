@@ -93,6 +93,6 @@ export interface CheckOptions extends ICheck {
 /** @see {isCheckConfig} ts-auto-guard:type-guard */
 export interface CheckJSONConfig extends ICheck {
     kind: 'submission' | 'comment'
-    rules: Array<RuleSetJSONConfig | RuleJSONConfig | RecentActivityRuleJSONConfig | RepeatSubmissionJSONConfig>
+    rules: Array<RuleSetJSONConfig | RecentActivityRuleJSONConfig | RepeatSubmissionJSONConfig>
     actions: Array<ActionJSONConfig | FlairActionJSONConfig | CommentActionJSONConfig>
 }

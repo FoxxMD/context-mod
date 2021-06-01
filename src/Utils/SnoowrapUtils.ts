@@ -50,7 +50,7 @@ export async function getAuthorActivities(user: RedditUser, options: AuthorTyped
         }
     let hitEnd = listing.isFinished;
     while (!hitEnd) {
-        items = items.concat(listing.toJSON());
+        items = items.concat(listing);
         if (typeof window === 'number') {
             hitEnd = items.length >= window
         } else {

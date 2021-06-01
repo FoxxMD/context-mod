@@ -2,6 +2,8 @@ import {IRule, Passable, Rule, RuleJSONConfig} from "./index";
 import {isRuleConfig} from "./index.guard";
 import {Comment, Submission} from "snoowrap";
 import {ruleFactory} from "./RuleFactory";
+import {RecentActivityRuleJSONConfig} from "./RecentActivityRule";
+import {RepeatSubmissionJSONConfig} from "./SubmissionRule/RepeatSubmissionRule";
 
 export class RuleSet implements IRuleSet, Passable {
     rules: Rule[] = [];
@@ -44,5 +46,5 @@ export interface RuleSetOptions extends IRuleSet {
 
 /** @see {isRuleSetConfig} ts-auto-guard:type-guard */
 export interface RuleSetJSONConfig extends IRuleSet {
-    rules: RuleJSONConfig[]
+    rules: Array<RecentActivityRuleJSONConfig | RepeatSubmissionJSONConfig>
 }

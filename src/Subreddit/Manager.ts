@@ -35,12 +35,13 @@ export class Manager {
             subStream.on('item', async (item) => {
                 for (const check of this.submissionChecks) {
                     this.logger.debug(`Running Check ${check.name} on Submission (ID ${item.id})`);
-                    const newItem = this.client.getSubmission('npac0x');
+                    const newItem = this.client.getSubmission('np85nc');
                     let passed = false;
                     try {
-                        const [passed, rules] = await check.passes(newItem);
+                        const [checkPassed, rules] = await check.passes(newItem);
+                        passed = checkPassed;
                         const invokedRules = rules.map(x => x.name).join(' | ');
-                        if (passed) {
+                        if (checkPassed) {
                             this.logger.debug(`Check ${check.name} passed with invoked Rules: ${invokedRules}`);
                         } else {
                             this.logger.debug(`Check ${check.name} failed on invoked Rule(s): ${invokedRules}`);
@@ -50,7 +51,7 @@ export class Manager {
                         this.logger.warn(`Check ${check.name} on Submission (ID ${item.id}) failed with error: ${e.message}`, e);
                     }
 
-                    if (passed) {
+                    if (!passed) {
                         // TODO give actions a name
                         await check.runActions(item, this.client);
                         this.logger.debug(`Ran actions for Check ${check.name}`);
