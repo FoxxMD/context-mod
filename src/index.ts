@@ -115,7 +115,7 @@ try {
             subsToRun = availSubs;
         }
 
-        let subSchedule = [];
+        let subSchedule: Manager[] = [];
 
         // get configs for subs we want to run on and build/validate them
         for (const sub of subsToRun) {

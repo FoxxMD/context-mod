@@ -47,17 +47,6 @@ export class ConfigBuilder {
             this.logger.error('Json config was not valid. Please use schema to check validity.', ajv.errors);
             this.logger.error(ajv.errors);
         }
-        // if (isJsonConfig(config)) {
-        //     for (const jCheck of config.checks) {
-        //         if (jCheck.kind === 'comment') {
-        //             commentChecks.push(new CommentCheck(jCheck));
-        //         } else if (jCheck.kind === 'submission') {
-        //             subChecks.push(new SubmissionCheck(jCheck));
-        //         }
-        //     }
-        // } else {
-        //     this.logger.error('Json config was not valid. Please use schema to check validity.');
-        // }
 
         return [subChecks, commentChecks];
     }

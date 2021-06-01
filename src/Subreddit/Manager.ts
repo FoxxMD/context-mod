@@ -1,4 +1,4 @@
-import Snoowrap, {Subreddit} from "snoowrap";
+import Snoowrap, {Comment, Submission, Subreddit} from "snoowrap";
 import {Logger} from "winston";
 import {SubmissionCheck} from "../Check/SubmissionCheck";
 import {CommentCheck} from "../Check/CommentCheck";
@@ -22,6 +22,35 @@ export class Manager {
         this.logger.info(`Found Checks -- Submission: ${this.submissionChecks.length} | Comment: ${this.commentChecks.length}`);
     }
 
+    async runChecks(checkType: ('Comment'|'Submission'), item: (Submission|Comment)): Promise<void> {
+        const checks = checkType === 'Comment' ? this.commentChecks : this.submissionChecks;
+        const itemId = await item.id;
+        for(const check of checks) {
+            this.logger.debug(`Running Check ${check.name} on ${checkType} (ID ${itemId})`);
+            let triggered = false;
+            try {
+                const [checkTriggered, rules] = await check.run(item);
+                triggered = checkTriggered;
+                const invokedRules = rules.map(x => x.name).join(' | ');
+                if (checkTriggered) {
+                    this.logger.debug(`Check ${check.name} was triggered with invoked Rules: ${invokedRules}`);
+                } else {
+                    this.logger.debug(`Check ${check.name} was not triggered using invoked Rule(s): ${invokedRules}`);
+                }
+
+            } catch (e) {
+                this.logger.warn(`Check ${check.name} on Submission (ID ${itemId}) failed with error: ${e.message}`, e);
+            }
+
+            if (triggered) {
+                // TODO give actions a name
+                await check.runActions(item, this.client);
+                this.logger.debug(`Ran actions for Check ${check.name}`);
+                break;
+            }
+        }
+    }
+
     async handle(): Promise<void> {
         let subStream;
         let cStream;
@@ -32,33 +61,8 @@ export class Manager {
                 pollTime: 5000,
             });
 
-            subStream.on('item', async (item) => {
-                for (const check of this.submissionChecks) {
-                    this.logger.debug(`Running Check ${check.name} on Submission (ID ${item.id})`);
-                    const newItem = this.client.getSubmission('np85nc');
-                    let passed = false;
-                    try {
-                        const [checkPassed, rules] = await check.passes(newItem);
-                        passed = checkPassed;
-                        const invokedRules = rules.map(x => x.name).join(' | ');
-                        if (checkPassed) {
-                            this.logger.debug(`Check ${check.name} passed with invoked Rules: ${invokedRules}`);
-                        } else {
-                            this.logger.debug(`Check ${check.name} failed on invoked Rule(s): ${invokedRules}`);
-                        }
-
-                    } catch (e) {
-                        this.logger.warn(`Check ${check.name} on Submission (ID ${item.id}) failed with error: ${e.message}`, e);
-                    }
-
-                    if (!passed) {
-                        // TODO give actions a name
-                        await check.runActions(item, this.client);
-                        this.logger.debug(`Ran actions for Check ${check.name}`);
-                        break;
-                    }
-                }
-            });
+            // this.client.getSubmission('np85nc')
+            subStream.on('item', async (item) => await this.runChecks('Submission', item));
         }
 
         if (this.commentChecks.length > 0) {
@@ -68,25 +72,7 @@ export class Manager {
                 pollTime: 5000,
             });
 
-            cStream.on('item', async (item) => {
-                for (const check of this.commentChecks) {
-                    this.logger.debug(`Running Check ${check.name} on Comment (ID ${item.id})`);
-                    const [passed, rules] = await check.passes(item);
-                    const invokedRules = rules.map(x => x.name).join(' | ');
-                    if (passed) {
-                        this.logger.debug(`Check ${check.name} passed with invoked Rules: ${invokedRules}`);
-                    } else {
-                        this.logger.debug(`Check ${check.name} failed on invoked Rule(s): ${invokedRules}`);
-                    }
-
-                    if (passed) {
-                        // TODO give actions a name
-                        await check.runActions(item, this.client);
-                        this.logger.debug(`Ran actions for Check ${check.name}`);
-                        break;
-                    }
-                }
-            });
+            cStream.on('item', async (item) => await this.runChecks('Comment', item));
         }
 
         if (subStream !== undefined) {

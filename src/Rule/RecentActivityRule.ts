@@ -29,7 +29,7 @@ export class RecentActivityRule extends Rule {
         return 'Recent Activity';
     }
 
-    async passes(item: Submission | Comment): Promise<[boolean, Rule[]]> {
+    async run(item: Submission | Comment): Promise<[boolean, Rule[]]> {
         let activities;
 
         switch (this.lookAt) {

@@ -1,11 +1,11 @@
-import {IRule, Passable, Rule, RuleJSONConfig} from "./index";
+import {IRule, Triggerable, Rule, RuleJSONConfig} from "./index";
 import {isRuleConfig} from "./index.guard";
 import {Comment, Submission} from "snoowrap";
 import {ruleFactory} from "./RuleFactory";
 import {RecentActivityRuleJSONConfig} from "./RecentActivityRule";
 import {RepeatSubmissionJSONConfig} from "./SubmissionRule/RepeatSubmissionRule";
 
-export class RuleSet implements IRuleSet, Passable {
+export class RuleSet implements IRuleSet, Triggerable {
     rules: Rule[] = [];
     condition: 'OR' | 'AND';
 
@@ -20,9 +20,9 @@ export class RuleSet implements IRuleSet, Passable {
         }
     }
 
-    async passes(item: Comment|Submission): Promise<[boolean, Rule[]]> {
+    async run(item: Comment|Submission): Promise<[boolean, Rule[]]> {
         for(const r of this.rules) {
-            const [passed, _] = await r.passes(item);
+            const [passed, _] = await r.run(item);
             if(passed) {
                 if(this.condition === 'OR') {
                     return [true, [r]];

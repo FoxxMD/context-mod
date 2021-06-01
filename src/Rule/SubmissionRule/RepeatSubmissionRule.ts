@@ -37,7 +37,7 @@ export class RepeatSubmissionRule extends SubmissionRule {
         return 'Repeat Submission';
     }
 
-    async passes(item: Submission): Promise<[boolean, Rule[]]> {
+    async run(item: Submission): Promise<[boolean, Rule[]]> {
         const referenceUrl = await item.url;
         if (referenceUrl === undefined && this.usePostAsReference) {
             throw new Error(`Cannot run Rule ${this.name} because submission is not a link`);
@@ -73,10 +73,10 @@ export class RepeatSubmissionRule extends SubmissionRule {
                 }
                 if (consecutivePosts >= this.threshold) {
                     this.logger.debug(`Threshold of ${this.threshold} repeats triggered for submission with url ${sub.url}`);
-                    return Promise.resolve([false, [this]]);
+                    return Promise.resolve([true, [this]]);
                 }
             }
-            return Promise.resolve([true, [this]]);
+            return Promise.resolve([false, [this]]);
         }
 
         // otherwise we can just group all occurrences together
@@ -96,10 +96,10 @@ export class RepeatSubmissionRule extends SubmissionRule {
             if (group.length >= this.threshold) {
                 // @ts-ignore
                 this.logger.debug(`Threshold of ${this.threshold} repeats triggered for submission with url ${group[0].url}`);
-                return Promise.resolve([false, [this]]);
+                return Promise.resolve([true, [this]]);
             }
         }
-        return Promise.resolve([true, [this]]);
+        return Promise.resolve([false, [this]]);
     }
 }
 

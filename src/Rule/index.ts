@@ -9,11 +9,11 @@ export interface RuleOptions {
     loggerPrefix?: string
 }
 
-export interface Passable {
-    passes(item: Comment | Submission): Promise<[boolean, Rule[]]>;
+export interface Triggerable {
+    run(item: Comment | Submission): Promise<[boolean, Rule[]]>;
 }
 
-export abstract class Rule implements IRule, Passable {
+export abstract class Rule implements IRule, Triggerable {
     name: string;
     logger: Logger
     authors: AuthorOptions = {exclude: [], include: []};
@@ -38,7 +38,7 @@ export abstract class Rule implements IRule, Passable {
         }
     }
 
-    abstract passes(item: Comment | Submission): Promise<[boolean, Rule[]]>;
+    abstract run(item: Comment | Submission): Promise<[boolean, Rule[]]>;
     abstract getDefaultName(): string;
 }
 

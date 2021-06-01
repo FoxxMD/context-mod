@@ -1,5 +1,5 @@
 import {RuleSet, IRuleSet, RuleSetJSONConfig} from "../Rule/RuleSet";
-import {IRule, Passable, Rule, RuleJSONConfig} from "../Rule";
+import {IRule, Triggerable, Rule, RuleJSONConfig} from "../Rule";
 import Action, {ActionConfig, ActionJSONConfig} from "../Action";
 import {isRuleSetConfig} from "../Rule/RuleSet.guard";
 import {isRuleConfig} from "../Rule/index.guard";
@@ -55,10 +55,10 @@ export class Check implements ICheck {
 
     }
 
-    async passes(item: Submission | Comment): Promise<[boolean, Rule[]]> {
+    async run(item: Submission | Comment): Promise<[boolean, Rule[]]> {
         let allRules: Rule[] = [];
         for (const r of this.rules) {
-            const [passed, rules] = await r.passes(item);
+            const [passed, rules] = await r.run(item);
             if (passed) {
                 if (this.ruleJoin === 'OR') {
                     return [true, rules];
