@@ -48,7 +48,7 @@ export async function getAuthorActivities(user: RedditUser, options: AuthorTyped
                 listing = await user.getOverview({limit: chunkSize});
                 break;
         }
-    let hitEnd = listing.isFinished;
+    let hitEnd = false;
     while (!hitEnd) {
         items = items.concat(listing);
         if (typeof window === 'number') {
