@@ -17,6 +17,7 @@
     "ajv": "^6.12.6",
     "dayjs": "^1.10.5",
     "minimist": "^1.2.5",
+    "mustache": "^4.2.0",
     "p-event": "^4.2.0",
     "safe-stable-stringify": "^1.1.1",
     "snoostorm": "^1.5.2",
@@ -27,6 +28,7 @@
   "devDependencies": {
     "@tsconfig/node14": "^1.0.0",
     "@types/minimist": "^1.2.1",
+    "@types/mustache": "^4.1.1",
     "@types/node": "^15.6.1",
     "ts-auto-guard": "*",
     "typescript-json-schema": "^0.50.1"

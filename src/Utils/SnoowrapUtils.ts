@@ -1,6 +1,8 @@
-import {Comment, RedditUser, Submission} from "snoowrap";
+import {Comment, RedditUser} from "snoowrap";
+import Submission from "snoowrap/dist/objects/Submission";
 import {Duration, DurationUnitsObjectType} from "dayjs/plugin/duration";
 import dayjs, {Dayjs} from "dayjs";
+import Mustache from "mustache";
 
 export interface AuthorTypedActivitiesOptions extends AuthorActivitiesOptions {
     type?: 'comment' | 'submission',
@@ -10,7 +12,7 @@ export interface AuthorActivitiesOptions {
     window: number | string | Duration | DurationUnitsObjectType
 }
 
-export async function getAuthorActivities(user: RedditUser, options: AuthorTypedActivitiesOptions): Promise<Array<Submission|Comment>>  {
+export async function getAuthorActivities(user: RedditUser, options: AuthorTypedActivitiesOptions): Promise<Array<Submission | Comment>> {
 
     let window: number | Dayjs,
         chunkSize = 30;
@@ -33,21 +35,21 @@ export async function getAuthorActivities(user: RedditUser, options: AuthorTyped
         // use whichever is smaller so we only do one api request if window is smaller than default chunk size
         chunkSize = Math.min(chunkSize, window);
     }
-    let items: Array<Submission|Comment> = [];
+    let items: Array<Submission | Comment> = [];
     let lastItemDate;
     //let count = 1;
     let listing;
-        switch (options.type) {
-            case 'comment':
-                listing = await user.getComments({limit: chunkSize});
-                break;
-            case 'submission':
-                listing = await user.getSubmissions({limit: chunkSize});
-                break;
-            default:
-                listing = await user.getOverview({limit: chunkSize});
-                break;
-        }
+    switch (options.type) {
+        case 'comment':
+            listing = await user.getComments({limit: chunkSize});
+            break;
+        case 'submission':
+            listing = await user.getSubmissions({limit: chunkSize});
+            break;
+        default:
+            listing = await user.getOverview({limit: chunkSize});
+            break;
+    }
     let hitEnd = false;
     while (!hitEnd) {
         items = items.concat(listing);
@@ -61,10 +63,10 @@ export async function getAuthorActivities(user: RedditUser, options: AuthorTyped
                 hitEnd = true;
             }
         }
-        if(!hitEnd) {
+        if (!hitEnd) {
             hitEnd = listing.isFinished;
         }
-        if(!hitEnd) {
+        if (!hitEnd) {
             listing.fetchMore({amount: chunkSize});
         }
     }
@@ -77,4 +79,18 @@ export const getAuthorComments = async (user: RedditUser, options: AuthorActivit
 
 export const getAuthorSubmissions = async (user: RedditUser, options: AuthorActivitiesOptions): Promise<Submission[]> => {
     return await getAuthorActivities(user, {...options, type: 'submission'}) as unknown as Promise<Submission[]>;
+}
+
+export const renderContent = async (content: string, data: (Submission | Comment), additionalData = {}) => {
+    const templateData: any = {
+        kind: data instanceof Submission ? 'submission' : 'comment',
+        author: await data.author.name,
+        permalink: data.permalink,
+    }
+    if (data instanceof Submission) {
+        templateData.url = data.url;
+        templateData.title = data.title;
+    }
+
+    return Mustache.render(content, {...templateData, ...additionalData});
 }

@@ -83,12 +83,7 @@ if (subredditsArg.length === 0) {
         const client = new snoowrap(creds);
         client.config({warnings: true, retryErrorCodes: [500], maxRetryAttempts: 2, debug: logLevel === 'debug'});
 
-        // const me = client.getMe().then(text => {
-        //     console.log(text);
-        // }).catch(err => {
-        //     console.log(err);
-        // })
-        // const myName = me.name;
+        //const me = await client.getMe().name;
 
 // determine which subreddits this account has appropriate access to
         let availSubs = [];

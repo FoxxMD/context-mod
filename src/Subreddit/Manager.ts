@@ -84,8 +84,10 @@ export class Manager {
             });
 
 
-            this.streamSub.once('listing', () => {
+            this.streamSub.once('listing', async(listing) => {
                 this.subListedOnce = true;
+                // for debugging
+                await this.runChecks('Submission', listing[0]);
             });
             this.streamSub.on('item', async (item) => {
                 if(!this.subListedOnce) {
