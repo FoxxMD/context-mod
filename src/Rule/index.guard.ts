@@ -66,6 +66,7 @@ export function isRuleConfig(obj: any, _argumentName?: string): obj is RuleJSONC
                         e.isMod === true)
                 ))) &&
         (obj.kind === "recentActivity" ||
-            obj.kind === "repeatSubmission")
+            obj.kind === "repeatSubmission" ||
+            obj.kind === "author")
     )
 }

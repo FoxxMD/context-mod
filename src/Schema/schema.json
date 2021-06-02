@@ -39,6 +39,42 @@
             },
             "type": "object"
         },
+        "AuthorRuleJSONConfig": {
+            "properties": {
+                "authors": {
+                    "$ref": "#/definitions/AuthorOptions"
+                },
+                "exclude": {
+                    "items": {
+                        "$ref": "#/definitions/IAuthor"
+                    },
+                    "type": "array"
+                },
+                "include": {
+                    "items": {
+                        "$ref": "#/definitions/IAuthor"
+                    },
+                    "type": "array"
+                },
+                "kind": {
+                    "enum": [
+                        "author",
+                        "recentActivity",
+                        "repeatSubmission"
+                    ],
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "exclude",
+                "include",
+                "kind"
+            ],
+            "type": "object"
+        },
         "CheckJSONConfig": {
             "properties": {
                 "actions": {
@@ -85,6 +121,9 @@
                             },
                             {
                                 "$ref": "#/definitions/RepeatSubmissionJSONConfig"
+                            },
+                            {
+                                "$ref": "#/definitions/AuthorRuleJSONConfig"
                             },
                             {
                                 "$ref": "#/definitions/RuleSetJSONConfig"
@@ -196,6 +235,7 @@
                 },
                 "kind": {
                     "enum": [
+                        "author",
                         "recentActivity",
                         "repeatSubmission"
                     ],
@@ -255,6 +295,7 @@
                 },
                 "kind": {
                     "enum": [
+                        "author",
                         "recentActivity",
                         "repeatSubmission"
                     ],

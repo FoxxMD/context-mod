@@ -145,6 +145,6 @@ export interface IRule {
 
 /** @see {isRuleConfig} ts-auto-guard:type-guard */
 export interface RuleJSONConfig extends IRule {
-    kind: 'recentActivity' | 'repeatSubmission'
+    kind: 'recentActivity' | 'repeatSubmission' | 'author'
 }
 

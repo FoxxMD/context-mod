@@ -1,7 +1,6 @@
 import {Logger} from "winston";
 import {createLabelledLogger} from "./util";
 import {Subreddit} from "snoowrap";
-import {isJsonConfig} from "./JsonConfig.guard";
 import {CommentCheck} from "./Check/CommentCheck";
 import {SubmissionCheck} from "./Check/SubmissionCheck";
 

@@ -13,6 +13,7 @@ import {CommentActionJSONConfig} from "../Action/CommentAction";
 import {actionFactory} from "../Action/ActionFactory";
 import {ruleFactory} from "../Rule/RuleFactory";
 import {determineNewResults} from "../util";
+import {AuthorRuleJSONConfig} from "../Rule/AuthorRule";
 
 export class Check implements ICheck {
     actions: Action[] = [];
@@ -103,6 +104,6 @@ export interface CheckOptions extends ICheck {
 /** @see {isCheckConfig} ts-auto-guard:type-guard */
 export interface CheckJSONConfig extends ICheck {
     kind: 'submission' | 'comment'
-    rules: Array<RuleSetJSONConfig | RecentActivityRuleJSONConfig | RepeatSubmissionJSONConfig>
+    rules: Array<RuleSetJSONConfig | RecentActivityRuleJSONConfig | RepeatSubmissionJSONConfig | AuthorRuleJSONConfig>
     actions: Array<ActionJSONConfig | FlairActionJSONConfig | CommentActionJSONConfig>
 }

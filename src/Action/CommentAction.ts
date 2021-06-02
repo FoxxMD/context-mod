@@ -58,13 +58,16 @@ export class CommentAction extends Action {
     }
 }
 
-export interface CommentActionOptions extends ActionOptions {
+export interface CommentActionConfig {
     content: string,
     lock?: boolean,
     sticky?: boolean,
     distinguish?: boolean,
 }
 
-export interface CommentActionJSONConfig extends CommentActionOptions, ActionJSONConfig {
+export interface CommentActionOptions extends CommentActionConfig,ActionOptions {
+}
+
+export interface CommentActionJSONConfig extends CommentActionConfig, ActionJSONConfig {
 
 }
