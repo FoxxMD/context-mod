@@ -5,6 +5,10 @@ import Snoowrap, {Comment, Submission} from "snoowrap";
 export class LockAction extends Action {
     name?: string = 'Lock';
     async handle(item: Comment|Submission, client: Snoowrap): Promise<void> {
+        if (item instanceof Submission) {
+            // @ts-ignore
+            await item.lock();
+        }
     }
 }
 

@@ -3,8 +3,8 @@ import Action, {ActionJSONConfig} from "../index";
 import Snoowrap, {Comment, Submission} from "snoowrap";
 
 export class FlairAction extends Action {
-    text?: string;
-    css?: string;
+    text: string;
+    css: string;
     name?: string = 'Flair';
 
     constructor(options: FlairActionOptions) {
@@ -12,11 +12,15 @@ export class FlairAction extends Action {
         if (options.text === undefined && options.css === undefined) {
             throw new Error('Must define either text or css on FlairAction');
         }
-        this.text = options.text;
-        this.css = options.css;
+        this.text = options.text || '';
+        this.css = options.css || '';
     }
 
     async handle(item: Comment | Submission, client: Snoowrap): Promise<void> {
+        if (item instanceof Submission) {
+            // @ts-ignore
+            await item.assignFlair({text: this.text, cssClass: this.css})
+        }
     }
 }
 

@@ -11,7 +11,9 @@ export class ReportAction extends Action {
         this.content = options.content;
     }
 
-    async handle(item: Comment|Submission, client: Snoowrap): Promise<void> {
+    async handle(item: Comment | Submission, client: Snoowrap): Promise<void> {
+        // @ts-ignore
+        await item.report({reason: content});
     }
 }
 
