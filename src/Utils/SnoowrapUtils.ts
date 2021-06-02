@@ -3,6 +3,7 @@ import Submission from "snoowrap/dist/objects/Submission";
 import {Duration, DurationUnitsObjectType} from "dayjs/plugin/duration";
 import dayjs, {Dayjs} from "dayjs";
 import Mustache from "mustache";
+import {AuthorOptions, IAuthor} from "../Rule";
 
 export interface AuthorTypedActivitiesOptions extends AuthorActivitiesOptions {
     type?: 'comment' | 'submission',
@@ -93,4 +94,65 @@ export const renderContent = async (content: string, data: (Submission | Comment
     }
 
     return Mustache.render(content, {...templateData, ...additionalData});
+}
+
+export const testAuthorCriteria = async (item: (Comment|Submission), authorOpts: IAuthor, include = true) => {
+    // @ts-ignore
+    const author: RedditUser = await item.author;
+    for(const k of Object.keys(authorOpts)) {
+        switch(k) {
+            case 'name':
+               const authPass = () => {
+                   // @ts-ignore
+                   for (const n of authorOpts[k]) {
+                       if (n.toLowerCase() === author.name.toLowerCase()) {
+                          return true;
+                       }
+                   }
+                   return false;
+               }
+               if((include && !authPass) || (!include && authPass)) {
+                   return false;
+               }
+               break;
+            case 'flairCssClass':
+                const css = await item.author_flair_css_class;
+                const cssPass = () => {
+                    // @ts-ignore
+                    for(const c of authorOpts[k]) {
+                        if(c === css) {
+                            return;
+                        }
+                    }
+                    return false;
+                }
+                if((include && !cssPass) || (!include && cssPass)) {
+                    return false;
+                }
+                break;
+            case 'flairText':
+                const text = await item.author_flair_text;
+                const textPass = () => {
+                    // @ts-ignore
+                    for(const c of authorOpts[k]) {
+                        if(c === text) {
+                            return
+                        }
+                    }
+                    return false;
+                }
+                if((include && !textPass) || (!include && textPass)) {
+                    return false;
+                }
+                break;
+            case 'isMod':
+                const mods: RedditUser[] = await item.subreddit.getModerators();
+                const isModerator = mods.some(x => x.name === item.author.name);
+                const modMatch = authorOpts.isMod === isModerator;
+                if((include && !modMatch) || (!include && !modMatch)) {
+                    return false;
+                }
+        }
+    }
+    return true;
 }

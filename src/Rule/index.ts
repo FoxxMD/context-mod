@@ -1,6 +1,7 @@
-import {Comment, Submission} from "snoowrap";
+import {Comment, RedditUser, Submission} from "snoowrap";
 import {Logger} from "winston";
 import {createLabelledLogger} from "../util";
+import {testAuthorCriteria} from "../Utils/SnoowrapUtils";
 
 export interface RuleOptions {
     name?: string;
@@ -16,20 +17,25 @@ export interface Triggerable {
 export abstract class Rule implements IRule, Triggerable {
     name: string;
     logger: Logger
-    authors: AuthorOptions = {exclude: [], include: []};
+    authors: AuthorOptions;
 
     constructor(options: RuleOptions) {
         const {
             name = this.getDefaultName(),
             loggerPrefix = '',
             logger,
+            authors: {
+                include = [],
+                exclude = [],
+            } = {},
         } = options;
         this.name = name || 'Rule';
-        if (options.authors !== undefined) {
-            const {exclude = [], include = []} = options.authors;
-            this.authors.exclude = exclude.map(x => new Author(x));
-            this.authors.include = include.map(x => new Author(x));
+
+        this.authors = {
+            exclude: exclude.map(x => new Author(x)),
+            include: include.map(x => new Author(x)),
         }
+
         if (logger === undefined) {
             const prefix = `${loggerPrefix}|${this.name}`;
             this.logger = createLabelledLogger(prefix, prefix);
@@ -38,7 +44,26 @@ export abstract class Rule implements IRule, Triggerable {
         }
     }
 
-    abstract run(item: Comment | Submission): Promise<[boolean, Rule[]]>;
+    async run(item: Comment | Submission): Promise<[boolean, Rule[]]> {
+        let author: RedditUser;
+        if(this.authors.include !== undefined && this.authors.include.length > 0) {
+            for(const auth of this.authors.include) {
+                if(await testAuthorCriteria(item, auth)) {
+                    return Promise.resolve([true, [this]]);
+                }
+            }
+            return Promise.resolve([false, [this]]);
+        }
+        if(this.authors.exclude !== undefined && this.authors.exclude.length > 0) {
+            for(const auth of this.authors.exclude) {
+                if(await testAuthorCriteria(item, auth, false)) {
+                    return Promise.resolve([true, [this]]);
+                }
+            }
+            return Promise.resolve([false, [this]]);
+        }
+        return Promise.resolve([true, [this]]);
+    }
     abstract getDefaultName(): string;
 }
 
