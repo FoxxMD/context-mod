@@ -1,5 +1,5 @@
 import {RuleSet, IRuleSet, RuleSetJSONConfig} from "../Rule/RuleSet";
-import {IRule, Triggerable, Rule, RuleJSONConfig} from "../Rule";
+import {IRule, Triggerable, Rule, RuleJSONConfig, RuleResult} from "../Rule";
 import Action, {ActionConfig, ActionJSONConfig} from "../Action";
 import {isRuleSetConfig} from "../Rule/RuleSet.guard";
 import {isRuleConfig} from "../Rule/index.guard";
@@ -12,6 +12,7 @@ import {FlairActionJSONConfig} from "../Action/SubmissionAction/FlairAction";
 import {CommentActionJSONConfig} from "../Action/CommentAction";
 import {actionFactory} from "../Action/ActionFactory";
 import {ruleFactory} from "../Rule/RuleFactory";
+import {determineNewResults} from "../util";
 
 export class Check implements ICheck {
     actions: Action[] = [];
@@ -55,21 +56,30 @@ export class Check implements ICheck {
 
     }
 
-    async run(item: Submission | Comment): Promise<[boolean, Rule[]]> {
-        let allRules: Rule[] = [];
+    async run(item: Submission | Comment, existingResults: RuleResult[] = []): Promise<[boolean, RuleResult[]]> {
+        let allResults: RuleResult[] = [];
+        let runOne = false;
         for (const r of this.rules) {
-            const [passed, rules] = await r.run(item);
+            const combinedResults = [...existingResults, ...allResults];
+            const [passed, results] = await r.run(item, combinedResults);
+            //allResults = allResults.concat(determineNewResults(combinedResults, results));
+            allResults = allResults.concat(results);
+            if (passed === null) {
+                continue;
+            }
+            runOne = true;
             if (passed) {
                 if (this.ruleJoin === 'OR') {
-                    return [true, rules];
-                } else {
-                    allRules = allRules.concat(rules);
+                    return [true, allResults];
                 }
             } else if (this.ruleJoin === 'AND') {
-                return [false, rules];
+                return [false, allResults];
             }
         }
-        return [true, allRules];
+        if (!runOne) {
+            return [false, allResults];
+        }
+        return [true, allResults];
     }
 
     async runActions(item: Submission | Comment, client: Snoowrap): Promise<void> {

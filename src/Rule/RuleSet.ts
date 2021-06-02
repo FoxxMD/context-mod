@@ -1,9 +1,10 @@
-import {IRule, Triggerable, Rule, RuleJSONConfig} from "./index";
+import {IRule, Triggerable, Rule, RuleJSONConfig, RuleResult} from "./index";
 import {isRuleConfig} from "./index.guard";
 import {Comment, Submission} from "snoowrap";
 import {ruleFactory} from "./RuleFactory";
 import {RecentActivityRuleJSONConfig} from "./RecentActivityRule";
 import {RepeatSubmissionJSONConfig} from "./SubmissionRule/RepeatSubmissionRule";
+import {determineNewResults, findResultByPremise} from "../util";
 
 export class RuleSet implements IRuleSet, Triggerable {
     rules: Rule[] = [];
@@ -20,18 +21,32 @@ export class RuleSet implements IRuleSet, Triggerable {
         }
     }
 
-    async run(item: Comment|Submission): Promise<[boolean, Rule[]]> {
-        for(const r of this.rules) {
-            const [passed, _] = await r.run(item);
-            if(passed) {
-                if(this.condition === 'OR') {
-                    return [true, [r]];
+    async run(item: Comment | Submission, existingResults: RuleResult[] = []): Promise<[boolean, RuleResult[]]> {
+        let results: RuleResult[] = [];
+        let runOne = false;
+        for (const r of this.rules) {
+            const combinedResults = [...existingResults, ...results];
+            const [passed, [result]] = await r.run(item, combinedResults);
+            //results = results.concat(determineNewResults(combinedResults, result));
+             results.push(result);
+            // skip rule if author check failed
+            if (passed === null) {
+                continue;
+            }
+            runOne = true;
+            if (passed) {
+                if (this.condition === 'OR') {
+                    return [true, results];
                 }
-            } else if(this.condition === 'AND') {
-                return [false, [r]];
+            } else if (this.condition === 'AND') {
+                return [false, results];
             }
         }
-        return [true, this.rules];
+        // if no rules were run it's the same as if nothing was triggered
+        if (!runOne) {
+            return [false, results];
+        }
+        return [true, results];
     }
 }
 

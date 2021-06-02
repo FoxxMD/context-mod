@@ -1,5 +1,5 @@
 import {SubmissionRule, SubmissionRuleJSONConfig} from "./index";
-import {Rule, RuleOptions} from "../index";
+import {Rule, RuleOptions, RulePremise, RuleResult} from "../index";
 import {Submission} from "snoowrap";
 import {getAuthorSubmissions} from "../../Utils/SnoowrapUtils";
 import {groupBy, parseUsableLinkIdentifier as linkParser} from "../../util";
@@ -33,11 +33,22 @@ export class RepeatSubmissionRule extends SubmissionRule {
         this.exclude = exclude;
     }
 
-    getDefaultName(): string {
+    getKind(): string {
         return 'Repeat Submission';
     }
 
-    async run(item: Submission): Promise<[boolean, Rule[]]> {
+    getSpecificPremise(): object {
+        return {
+            threshold: this.threshold,
+            window: this.window,
+            gapAllowance: this.gapAllowance,
+            usePostAsReference: this.usePostAsReference,
+            include: this.include,
+            exclude: this.exclude,
+        }
+    }
+
+    async process(item: Submission): Promise<[boolean, RuleResult[]]> {
         const referenceUrl = await item.url;
         if (referenceUrl === undefined && this.usePostAsReference) {
             throw new Error(`Cannot run Rule ${this.name} because submission is not a link`);
@@ -72,11 +83,12 @@ export class RepeatSubmissionRule extends SubmissionRule {
                     }
                 }
                 if (consecutivePosts >= this.threshold) {
-                    this.logger.debug(`Threshold of ${this.threshold} repeats triggered for submission with url ${sub.url}`);
-                    return Promise.resolve([true, [this]]);
+                    const result = `Threshold of ${this.threshold} repeats triggered for submission with url ${sub.url}`;
+                    this.logger.debug(result);
+                    return Promise.resolve([true, [this.getResult(true, {result})]]);
                 }
             }
-            return Promise.resolve([false, [this]]);
+            return Promise.resolve([false, [this.getResult(false)]]);
         }
 
         // otherwise we can just group all occurrences together
@@ -95,11 +107,12 @@ export class RepeatSubmissionRule extends SubmissionRule {
         for (const group of groupsToCheck) {
             if (group.length >= this.threshold) {
                 // @ts-ignore
-                this.logger.debug(`Threshold of ${this.threshold} repeats triggered for submission with url ${group[0].url}`);
-                return Promise.resolve([true, [this]]);
+                const result = `Threshold of ${this.threshold} repeats triggered for submission with url ${group[0].url}`;
+                this.logger.debug(result);
+                return Promise.resolve([true, [this.getResult(true, {result})]]);
             }
         }
-        return Promise.resolve([false, [this]]);
+        return Promise.resolve([false, [this.getResult(false)]]);
     }
 }
 

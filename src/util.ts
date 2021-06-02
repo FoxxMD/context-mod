@@ -1,6 +1,8 @@
 import winston from "winston";
 import jsonStringify from 'safe-stable-stringify';
 import dayjs from 'dayjs';
+import {RulePremise, RuleResult} from "./Rule";
+import deepEqual from "fast-deep-equal";
 
 const {format} = winston;
 const {combine, printf, timestamp, label, splat, errors} = format;
@@ -108,4 +110,38 @@ export const parseUsableLinkIdentifier = (regexes: RegExp[] = [REGEX_YOUTUBE]) =
 
 export function sleep(ms: number) {
     return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+export const findResultByPremise = (premise: RulePremise, results: RuleResult[]): (RuleResult | undefined) => {
+    if (results.length === 0) {
+        return undefined;
+    }
+    return results.find((x) => {
+        return deepEqual(premise, x.premise);
+    })
+}
+
+export const determineNewResults = (existing: RuleResult[], val: RuleResult | RuleResult[]): RuleResult[] => {
+    const requestedResults = Array.isArray(val) ? val : [val];
+    const combined = [...existing];
+    const newResults = [];
+
+    // not sure this should be used since grouped results will be stale as soon as a new result is added --
+    // would need a guarantee all results in val are unique
+    // const groupedResultsByKind = newResults.reduce((grouped, res) => {
+    //     grouped[res.premise.kind] = (grouped[res.premise.kind] || []).concat(res);
+    //     return grouped;
+    // }, {} as Record<string, RuleResult[]>);
+    // for(const kind of Object.keys(groupedResultsByKind)) {
+    //     const relevantExisting = combined.filter(x => x.premise.kind === kind)
+    // }
+
+    for (const result of requestedResults) {
+        const relevantExisting = combined.filter(x => x.premise.kind === result.premise.kind).find(x => deepEqual(x.premise, result.premise));
+        if (relevantExisting === undefined) {
+            combined.push(result);
+            newResults.push(result);
+        }
+    }
+    return newResults;
 }

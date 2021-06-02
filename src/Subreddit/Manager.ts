@@ -2,9 +2,10 @@ import Snoowrap, {Comment, Submission, Subreddit} from "snoowrap";
 import {Logger} from "winston";
 import {SubmissionCheck} from "../Check/SubmissionCheck";
 import {CommentCheck} from "../Check/CommentCheck";
-import {createLabelledLogger, sleep} from "../util";
+import {createLabelledLogger, determineNewResults, sleep} from "../util";
 import {CommentStream, SubmissionStream} from "snoostorm";
 import pEvent from "p-event";
+import {RuleResult} from "../Rule";
 
 export interface ManagerOptions {
     submissions?: {
@@ -43,13 +44,16 @@ export class Manager {
     async runChecks(checkType: ('Comment' | 'Submission'), item: (Submission | Comment)): Promise<void> {
         const checks = checkType === 'Comment' ? this.commentChecks : this.submissionChecks;
         const itemId = await item.id;
+        let allRuleResults: RuleResult[] = [];
+
         for (const check of checks) {
             this.logger.debug(`Running Check ${check.name} on ${checkType} (ID ${itemId})`);
             let triggered = false;
             try {
-                const [checkTriggered, rules] = await check.run(item);
+                const [checkTriggered, checkResults] = await check.run(item, allRuleResults);
+                allRuleResults = allRuleResults.concat(determineNewResults(allRuleResults, checkResults));
                 triggered = checkTriggered;
-                const invokedRules = rules.map(x => x.name).join(' | ');
+                const invokedRules = checkResults.map(x => x.name || x.premise.kind).join(' | ');
                 if (checkTriggered) {
                     this.logger.debug(`Check ${check.name} was triggered with invoked Rules: ${invokedRules}`);
                 } else {

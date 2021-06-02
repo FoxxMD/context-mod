@@ -1,4 +1,4 @@
-import {Rule, RuleJSONConfig, RuleOptions} from "./index";
+import {Rule, RuleJSONConfig, RuleOptions, RulePremise, RuleResult} from "./index";
 import {Comment, VoteableContent} from "snoowrap";
 import Submission from "snoowrap/dist/objects/Submission";
 import {getAuthorActivities, getAuthorComments, getAuthorSubmissions} from "../Utils/SnoowrapUtils";
@@ -25,11 +25,20 @@ export class RecentActivityRule extends Rule {
         this.thresholds = options.thresholds;
     }
 
-    getDefaultName(): string {
+    getKind(): string {
         return 'Recent Activity';
     }
 
-    async run(item: Submission | Comment): Promise<[boolean, Rule[]]> {
+    getSpecificPremise(): object {
+        return {
+            window: this.window,
+            thresholds: this.thresholds,
+            usePostAsReference: this.usePostAsReference,
+            lookAt: this.lookAt
+        }
+    }
+
+    async process(item: Submission | Comment): Promise<[boolean, RuleResult[]]> {
         let activities;
 
         switch (this.lookAt) {
@@ -68,7 +77,7 @@ export class RecentActivityRule extends Rule {
             const s = activity.subreddit.display_name.toLowerCase();
             grouped[s] = (grouped[s] || []).concat(activity);
             return grouped;
-        }, {} as Record<string, (Submission | Comment)[]>)
+        }, {} as Record<string, (Submission | Comment)[]>);
         const triggeredOn = [];
         for (const triggerSet of this.thresholds) {
             const {count: threshold = 1, subreddits = []} = triggerSet;
@@ -82,11 +91,12 @@ export class RecentActivityRule extends Rule {
         }
         if (triggeredOn.length > 0) {
             const friendlyText = triggeredOn.map(x => `${x.subreddit}(${x.count})`).join(' | ');
-            this.logger.debug(`Triggered by: ${friendlyText}`);
-            return Promise.resolve([true, [this]]);
+            const friendly = `Triggered by: ${friendlyText}`;
+            this.logger.debug(friendly);
+            return Promise.resolve([true, [this.getResult(true, {result: friendly, data: triggeredOn})]]);
         }
 
-        return Promise.resolve([false, [this]]);
+        return Promise.resolve([false, [this.getResult(false)]]);
     }
 }
 
