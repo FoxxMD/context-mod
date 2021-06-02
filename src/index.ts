@@ -61,6 +61,8 @@ winston.loggers.add('default', loggerOptions);
 
 const logger = winston.loggers.get('default');
 
+const version = process.env.VERSION || 'dev';
+
 let subredditsArg = subredditsArgs;
 if (subredditsArg.length === 0) {
     // try to get from comma delim env variable
@@ -69,17 +71,17 @@ if (subredditsArg.length === 0) {
         subredditsArg = subenv.split(',');
     }
 }
-
-try {
-    (async function () {
-        const creds = {
-            userAgent: 'contextBot',
-            clientId,
-            clientSecret,
-            refreshToken,
-            accessToken,
-        };
+(async function () {
+    const creds = {
+        userAgent: `web:contextBot:${version}`,
+        clientId,
+        clientSecret,
+        refreshToken,
+        accessToken,
+    };
+    try {
         const client = new snoowrap(creds);
+        client.config({warnings: true, retryErrorCodes: [500], maxRetryAttempts: 2, debug: logLevel === 'debug'});
 
         // const me = client.getMe().then(text => {
         //     console.log(text);
@@ -139,7 +141,7 @@ try {
             try {
                 const builder = new ConfigBuilder({subreddit: sub});
                 const [subChecks, commentChecks] = builder.buildFromJson(json);
-                if(subChecks.length > 0 || commentChecks.length > 0) {
+                if (subChecks.length > 0 || commentChecks.length > 0) {
                     subSchedule.push(new Manager(sub, client, subChecks, commentChecks));
                     logger.info(`[${sub.display_name}] Found ${subChecks.length} submission checks and ${commentChecks.length} comment checks`);
                 }
@@ -150,14 +152,20 @@ try {
 
         const emitter = new EventEmitter();
 
-        for(const manager of subSchedule) {
+        for (const manager of subSchedule) {
             manager.handle();
         }
 
         // never hits so we can run indefinitely
         await pEvent(emitter, 'end');
-    }());
-} catch (err) {
-    debugger;
-    console.log(err);
-}
+    } catch (err) {
+        if(err.name === 'StatusCodeError' && err.response !== undefined) {
+            const authHeader = err.response.headers['www-authenticate'];
+            if(authHeader !== undefined && authHeader.includes('insufficient_scope')) {
+                logger.error('Reddit responded with a 403 insufficient_scope, did you choose the correct scopes?');
+            }
+        }
+        debugger;
+        console.log(err);
+    }
+}());
