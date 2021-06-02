@@ -25,6 +25,11 @@ Some feature highlights:
 * All rules support skipping behavior based on author criteria -- name, css flair/text, and moderator status
 * Docker container support *(coming soon...)*
 
+## Table of Contents
+
+* [How It Works](#how-it-works)
+* [Installation](#installation)
+
 ### How It Works
 
 Context Bot's configuration is made up of an array of **Checks**. Each **Check** consists of :
@@ -46,3 +51,22 @@ ___
 The **Checks** for a subreddit are split up into **Submission Checks** and **Comment Checks** based on their **kind**. Each list of checks is run independently based on when events happen (submission or comment).
 
 When an event occurs all Checks of that type are run in the order they were listed in the configuration. When one check is triggered (an action is performed) the remaining checks will not be run.
+
+## Installation
+
+
+### Locally
+
+Clone this repository somewhere and then install from the working directory
+
+```bash
+git clone https://github.com/FoxxMD/reddit-context-bot.git .
+cd reddit-context-bot
+npm install
+```
+
+### [Docker](https://hub.docker.com/r/foxxmd/reddit-context-bot)
+
+```
+foxxmd/reddit-context-bot:latest
+```
