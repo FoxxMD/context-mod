@@ -2,10 +2,11 @@ import Snoowrap, {Comment, Submission, Subreddit} from "snoowrap";
 import {Logger} from "winston";
 import {SubmissionCheck} from "../Check/SubmissionCheck";
 import {CommentCheck} from "../Check/CommentCheck";
-import {createLabelledLogger, determineNewResults, sleep} from "../util";
+import {createLabelledLogger, determineNewResults, loggerMetaShuffle, mergeArr, sleep} from "../util";
 import {CommentStream, SubmissionStream} from "snoostorm";
 import pEvent from "p-event";
 import {RuleResult} from "../Rule";
+import {ConfigBuilder} from "../ConfigBuilder";
 
 export interface ManagerOptions {
     submissions?: {
@@ -31,14 +32,22 @@ export class Manager {
     commentsListedOnce = false;
     streamComments?: CommentStream;
 
-    constructor(sub: Subreddit, client: Snoowrap, subChecks: SubmissionCheck[], commentChecks: CommentCheck[], opts: ManagerOptions = {}) {
-        this.logger = createLabelledLogger(`Manager ${sub.display_name}`, `Manager ${sub.display_name}`);
+    constructor(sub: Subreddit, client: Snoowrap, logger: Logger, sourceData: object, opts: ManagerOptions = {}) {
+        this.logger = logger.child(loggerMetaShuffle(logger, undefined, [`r/${sub.display_name}`], {truncateLength: 40}), mergeArr);
+
+        const configBuilder = new ConfigBuilder({logger: this.logger});
+        const [subChecks, commentChecks] = configBuilder.buildFromJson(sourceData);
         this.pollOptions = opts;
         this.subreddit = sub;
         this.client = client;
         this.submissionChecks = subChecks;
         this.commentChecks = commentChecks;
-        this.logger.info(`Found Checks -- Submission: ${this.submissionChecks.length} | Comment: ${this.commentChecks.length}`);
+        const checkSummary = `Found Checks -- Submission: ${this.submissionChecks.length} | Comment: ${this.commentChecks.length}`;
+        if (subChecks.length === 0 && commentChecks.length === 0) {
+            this.logger.warn(checkSummary);
+        } else {
+            this.logger.info(checkSummary);
+        }
     }
 
     async runChecks(checkType: ('Comment' | 'Submission'), item: (Submission | Comment)): Promise<void> {
@@ -88,13 +97,13 @@ export class Manager {
             });
 
 
-            this.streamSub.once('listing', async(listing) => {
+            this.streamSub.once('listing', async (listing) => {
                 this.subListedOnce = true;
                 // for debugging
                 await this.runChecks('Submission', listing[0]);
             });
             this.streamSub.on('item', async (item) => {
-                if(!this.subListedOnce) {
+                if (!this.subListedOnce) {
                     return;
                 }
                 await this.runChecks('Submission', item)
@@ -115,7 +124,7 @@ export class Manager {
             });
             this.streamComments.once('listing', () => this.commentsListedOnce = true);
             this.streamComments.on('item', async (item) => {
-                if(!this.commentsListedOnce) {
+                if (!this.commentsListedOnce) {
                     return;
                 }
                 await this.runChecks('Comment', item)

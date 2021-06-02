@@ -1,6 +1,7 @@
-import {Comment, RedditUser, Submission} from "snoowrap";
+import {Comment, RedditUser} from "snoowrap";
+import Submission from "snoowrap/dist/objects/Submission";
 import {Logger} from "winston";
-import {createLabelledLogger, findResultByPremise} from "../util";
+import {createLabelledLogger, findResultByPremise, loggerMetaShuffle, mergeArr} from "../util";
 import {testAuthorCriteria} from "../Utils/SnoowrapUtils";
 
 export interface RuleOptions {
@@ -52,16 +53,18 @@ export abstract class Rule implements IRule, Triggerable {
             include: include.map(x => new Author(x)),
         }
 
+        const ruleUniqueName = this.name === undefined ? this.getKind() : `${this.getKind()} - ${this.name}`;
         if (logger === undefined) {
-            const ruleUniqueName = this.name === undefined ? this.getKind() : `${this.getKind()} - ${this.name}`;
             const prefix = `${loggerPrefix}|${ruleUniqueName}`;
             this.logger = createLabelledLogger(prefix, prefix);
         } else {
-            this.logger = logger;
+            this.logger = logger.child(loggerMetaShuffle(logger, undefined, [ruleUniqueName], {truncateLength: 100}));
         }
     }
 
     async run(item: Comment | Submission, existingResults: RuleResult[] = []): Promise<[(boolean | null), RuleResult[]]> {
+        this.logger = this.logger.child(loggerMetaShuffle(this.logger, `${item instanceof Submission ? 'SUB' : 'COMM'} ${item.id}`), mergeArr);
+        this.logger.debug('Starting rule run');
         const existingResult = findResultByPremise(this.getPremise(), existingResults);
         if (existingResult) {
             return Promise.resolve([existingResult.triggered, [existingResult]]);
@@ -72,6 +75,7 @@ export abstract class Rule implements IRule, Triggerable {
                     return this.process(item);
                 }
             }
+            this.logger.debug('Inclusive author criteria not matched, rule running skipped');
             return Promise.resolve([false, [this.getResult(null, {result: 'Inclusive author criteria not matched, rule running skipped'})]]);
         }
         if (this.authors.exclude !== undefined && this.authors.exclude.length > 0) {
@@ -80,6 +84,7 @@ export abstract class Rule implements IRule, Triggerable {
                     return this.process(item);
                 }
             }
+            this.logger.debug('Exclusive author criteria not matched, rule running skipped');
             return Promise.resolve([false, [this.getResult(null, {result: 'Exclusive author criteria not matched, rule running skipped'})]]);
         }
         return this.process(item);

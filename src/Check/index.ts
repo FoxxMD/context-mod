@@ -12,7 +12,7 @@ import {FlairActionJSONConfig} from "../Action/SubmissionAction/FlairAction";
 import {CommentActionJSONConfig} from "../Action/CommentAction";
 import {actionFactory} from "../Action/ActionFactory";
 import {ruleFactory} from "../Rule/RuleFactory";
-import {determineNewResults} from "../util";
+import {createLabelledLogger, determineNewResults, loggerMetaShuffle, mergeArr} from "../util";
 import {AuthorRuleJSONConfig} from "../Rule/AuthorRule";
 
 export class Check implements ICheck {
@@ -21,8 +21,7 @@ export class Check implements ICheck {
     name: string;
     ruleJoin: "OR" | "AND";
     rules: Array<RuleSet | Rule> = [];
-
-    //logger: Logger;
+    logger: Logger;
 
     constructor(options: CheckOptions) {
         const {
@@ -33,6 +32,13 @@ export class Check implements ICheck {
             actions,
         } = options;
 
+        if (options.logger !== undefined) {
+            // @ts-ignore
+            this.logger = options.logger.child(loggerMetaShuffle(options.logger, undefined, [`CHK ${name}`]), mergeArr);
+        } else {
+            this.logger = createLabelledLogger('Check');
+        }
+
         this.name = name;
         this.description = description;
         this.ruleJoin = ruleJoin;
@@ -42,6 +48,8 @@ export class Check implements ICheck {
             } else if (isRuleSetConfig(r)) {
                 this.rules.push(new RuleSet(r));
             } else if (isRuleConfig(r)) {
+                // @ts-ignore
+                r.logger = this.logger;
                 this.rules.push(ruleFactory(r));
             }
         }
@@ -58,6 +66,7 @@ export class Check implements ICheck {
     }
 
     async run(item: Submission | Comment, existingResults: RuleResult[] = []): Promise<[boolean, RuleResult[]]> {
+        this.logger.debug('Starting check');
         let allResults: RuleResult[] = [];
         let runOne = false;
         for (const r of this.rules) {
@@ -99,6 +108,7 @@ export interface ICheck {
 export interface CheckOptions extends ICheck {
     rules: Array<IRuleSet | IRule>
     actions: ActionConfig[]
+    logger?: Logger
 }
 
 /** @see {isCheckConfig} ts-auto-guard:type-guard */

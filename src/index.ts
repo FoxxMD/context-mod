@@ -1,7 +1,7 @@
 import {InboxStream, CommentStream, SubmissionStream} from "snoostorm";
 import snoowrap from "snoowrap";
 import minimist from 'minimist';
-import winston from 'winston';
+import winston, {Logger} from 'winston';
 import 'winston-daily-rotate-file';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc.js';
@@ -134,14 +134,9 @@ if (subredditsArg.length === 0) {
                 continue;
             }
             try {
-                const builder = new ConfigBuilder({subreddit: sub});
-                const [subChecks, commentChecks] = builder.buildFromJson(json);
-                if (subChecks.length > 0 || commentChecks.length > 0) {
-                    subSchedule.push(new Manager(sub, client, subChecks, commentChecks));
-                    logger.info(`[${sub.display_name}] Found ${subChecks.length} submission checks and ${commentChecks.length} comment checks`);
-                }
+                subSchedule.push(new Manager(sub, client, logger, json));
             } catch (err) {
-                logger.error(`Config for ${sub.display_name} was not valid`);
+                logger.error(`Config for ${sub.display_name} was not valid, will not run for this subreddit`);
             }
         }
 

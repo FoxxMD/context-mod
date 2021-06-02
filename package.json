@@ -16,6 +16,7 @@
   "dependencies": {
     "ajv": "^6.12.6",
     "dayjs": "^1.10.5",
+    "es6-error": "^4.1.1",
     "fast-deep-equal": "^3.1.3",
     "minimist": "^1.2.5",
     "mustache": "^4.2.0",
@@ -23,7 +24,7 @@
     "safe-stable-stringify": "^1.1.1",
     "snoostorm": "^1.5.2",
     "snoowrap": "^1.23.0",
-    "winston": "^3.3.3",
+    "winston": "FoxxMD/winston#9639da027cd4f3b46b055b0193f240639ef53409",
     "winston-daily-rotate-file": "^4.5.5"
   },
   "devDependencies": {

@@ -4,18 +4,27 @@ import {Comment, Submission} from "snoowrap";
 import {ruleFactory} from "./RuleFactory";
 import {RecentActivityRuleJSONConfig} from "./RecentActivityRule";
 import {RepeatSubmissionJSONConfig} from "./SubmissionRule/RepeatSubmissionRule";
-import {determineNewResults, findResultByPremise} from "../util";
+import {createLabelledLogger, determineNewResults, findResultByPremise, loggerMetaShuffle} from "../util";
+import {Logger} from "winston";
 
 export class RuleSet implements IRuleSet, Triggerable {
     rules: Rule[] = [];
     condition: 'OR' | 'AND';
+    logger: Logger;
 
     constructor(options: RuleSetOptions) {
+        if (options.logger !== undefined) {
+            this.logger = options.logger.child(loggerMetaShuffle(options.logger, 'Rule Set'));
+        } else {
+            this.logger = createLabelledLogger('Rule Set');
+        }
         this.condition = options.condition;
         for (const r of options.rules) {
             if (r instanceof Rule) {
                 this.rules.push(r);
             } else if (isRuleConfig(r)) {
+                // @ts-ignore
+                r.logger = this.logger;
                 this.rules.push(ruleFactory(r));
             }
         }
@@ -56,7 +65,8 @@ export interface IRuleSet {
 }
 
 export interface RuleSetOptions extends IRuleSet {
-    rules: Array<IRule | RuleJSONConfig>
+    rules: Array<IRule | RuleJSONConfig>,
+    logger?: Logger
 }
 
 /** @see {isRuleSetConfig} ts-auto-guard:type-guard */

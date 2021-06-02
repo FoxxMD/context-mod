@@ -1,4 +1,4 @@
-import winston from "winston";
+import winston, {Logger} from "winston";
 import jsonStringify from 'safe-stable-stringify';
 import dayjs from 'dayjs';
 import {RulePremise, RuleResult} from "./Rule";
@@ -12,9 +12,20 @@ const SPLAT = Symbol.for('splat')
 const errorsFormat = errors({stack: true});
 const CWD = process.cwd();
 
+export const truncateStringToLength = (length: number, truncStr = '...') => (str: string) => str.length > length ? `${str.slice(0, length)}${truncStr}` : str;
+
+export const loggerMetaShuffle = (logger: Logger, newLeaf: (string | undefined | null) = null, extraLabels: string[] = [], {truncateLength = 15} = {}) => {
+    const labelTrunc = truncateStringToLength(truncateLength);
+    const {labels = [], leaf} = logger.defaultMeta || {};
+    return {
+        labels: labels.concat(extraLabels.map(x => labelTrunc(x))),
+        leaf: newLeaf
+    };
+}
+
 let longestLabel = 3;
 // @ts-ignore
-export const defaultFormat = printf(({level, message, label = 'App', timestamp, [SPLAT]: splatObj, stack, ...rest}) => {
+export const defaultFormat = printf(({level, message, label = 'App', labels = [], leaf, itemId, timestamp, [SPLAT]: splatObj, stack, ...rest}) => {
     let stringifyValue = splatObj !== undefined ? jsonStringify(splatObj) : '';
     if (label.length > longestLabel) {
         longestLabel = label.length;
@@ -31,7 +42,18 @@ export const defaultFormat = printf(({level, message, label = 'App', timestamp, 
         stackMsg = `\n${cleanedStack}`;
     }
 
-    return `${timestamp} ${level.padEnd(7)}: [${label.padEnd(longestLabel)}] ${msg}${stringifyValue !== '' ? ` ${stringifyValue}` : ''}${stackMsg}`;
+    let labelContent = `[${label.padEnd(longestLabel)}]`;
+    if(labels.length > 0 || leaf !== null) {
+        let nodes = labels;
+        if(leaf !== null) {
+            nodes.push(leaf);
+        }
+        //labelContent = `${labels.slice(0, labels.length).map((x: string) => `[${x}]`).join(' ')}`
+        labelContent = `${nodes.map((x: string) => `[${x}]`).join(' ')}`;
+    }
+    //let leafContent = leaf !== undefined ? ` (${leaf})` : '';
+
+    return `${timestamp} ${level.padEnd(7)}: ${labelContent} ${msg}${stringifyValue !== '' ? ` ${stringifyValue}` : ''}${stackMsg}`;
 });
 
 
@@ -144,4 +166,10 @@ export const determineNewResults = (existing: RuleResult[], val: RuleResult | Ru
         }
     }
     return newResults;
+}
+
+export const mergeArr = (objValue: [], srcValue: []): (any[]|undefined) => {
+    if (Array.isArray(objValue)) {
+        return objValue.concat(srcValue);
+    }
 }
