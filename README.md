@@ -79,7 +79,7 @@ foxxmd/reddit-context-bot:latest
 Context Bot's configuration conforms to [JSON Schema](https://json-schema.org/) Draft 7 so you can view all documentation while also interactively writing and validating your config!
 
 Any number of json validators exists but I suggest using [Atlassian JSON Schema Viewer](https://json-schema.app/start):
-* Copy the url from the Raw button on [schema.json](/src/Schema/schema.json)
+* Copy the url from the Raw button on [App.json](/src/Schema/App.json)
 * Paste into the text box on the viewer page and hit **Load Schema**
 
 From there you can drill down into any object, see its requirements, view an example JSON document, and live-edit your configuration on the right-hand side.
