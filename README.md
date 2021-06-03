@@ -73,16 +73,16 @@ npm install
 foxxmd/reddit-context-bot:latest
 ```
 
+Adding [**environmental variables**](#usage) to your `docker run` command will pass them through to the app EX:
+```
+docker run -e "CLIENT_ID=myId" ... foxxmd/reddit-context-bot
+```
 
 ## Configuration
 
 Context Bot's [configuration schema](/src/Schema/App.json) conforms to [JSON Schema](https://json-schema.org/) Draft 7.
 
 I suggest using [Atlassian JSON Schema Viewer](https://json-schema.app/start) ([direct link](https://json-schema.app/view/%23?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Freddit-context-bot%2Fmaster%2Fsrc%2FSchema%2FApp.json)) so you can view all documentation while also interactively writing and validating your config! From there you can drill down into any object, see its requirements, view an example JSON document, and live-edit your configuration on the right-hand side.
-
-### Environmental Variables
-
-Documentation coming soon
 
 ### Example Config
 
@@ -147,7 +147,55 @@ Below is a configuration fulfilling the example given at the start of this readm
 
 ## Usage
 
-Documentation coming soon
+`npm run start [list,of,subreddits] [...--options]`
+
+CLI options take precedence over environmental variables
+
+| CLI              | Environmental Variable | Required | Description                                                                                                                      |
+|------------------|------------------------|----------|----------------------------------------------------------------------------------------------------------------------------------|
+| [First Argument] |                        | No       | Comma-deliminated list of subreddits to run on if you don't want to run all the account has access to.                           |
+| --clientId       | CLIENT_ID              | **Yes**  | Your reddit application client id                                                                                                |
+| --clientSecret   | CLIENT_SECRET          | **Yes**  | Your reddit application client secret                                                                                            |
+| --accessToken    | ACCESS_TOKEN           | **Yes**  | A valid access token retrieved from completing the oauth flow for a user with your application.                                  |
+| --refreshToken   | REFRESH_TOKEN          | **Yes**  | A valid refresh token retrieved from completing the oauth flow for a user with your application.                                 |
+| --logDir         | LOG_DIR                | No       | The absolute path to where logs should be stored. use `false` to turn off log files. Defaults to `CWD/logs`                      |
+| --logLevel       | LOG_LEVEL              | No       | The minimum level to log at. Uses [Winston Log Levels](https://github.com/winstonjs/winston#logging-levels). Defaults to `info`  |
+
+### Reddit App??
+
+To use this bot you must do two things:
+* Create a reddit application
+* Authenticate that application to act as a user (login to the application with an account)
+
+#### Create Application
+
+Visit [your reddit preferences](https://www.reddit.com/prefs/apps) and at the bottom of the page go through the **create an(other) app** process.
+* Choose **script**
+* For redirect uri use https://not-an-aardvark.github.io/reddit-oauth-helper/
+* Write down your **Client ID** and **Client Secret** somewhere
+
+#### Authenticate an Account
+
+Visit https://not-an-aardvark.github.io/reddit-oauth-helper/
+* Input your **Client ID** and **Client Secret** in the text boxes with those names.
+* Choose scopes. **It is very important you check everything on this list or Context Bot will not work correctly**
+    * edit
+    * flair
+    * history
+    * identity
+    * modcontributors
+    * modflair
+    * modposts
+    * modself
+    * mysubreddits
+    * read
+    * report
+    * submit
+    * wikiread
+* Click **Generate tokens*, you will get a popup asking you to approve access (or login) -- **the account you approve access with is the account that Bot will control.**
+* After approving an **Access Token** and **Refresh Token** will be shown at the bottom of the page. Write these down. 
+  
+You should now have all the information you need to start the bot.
 
 ## License
 
