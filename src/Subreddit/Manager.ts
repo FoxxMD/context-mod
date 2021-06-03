@@ -7,23 +7,17 @@ import {CommentStream, SubmissionStream} from "snoostorm";
 import pEvent from "p-event";
 import {RuleResult} from "../Rule";
 import {ConfigBuilder} from "../ConfigBuilder";
+import {PollingOptions} from "../Common/interfaces";
 
 export interface ManagerOptions {
-    submissions?: {
-        limit?: number,
-        interval?: number,
-    },
-    comments?: {
-        limit?: number,
-        interval?: number,
-    }
+    polling?: PollingOptions
 }
 
 export class Manager {
     subreddit: Subreddit;
     client: Snoowrap;
     logger: Logger;
-    pollOptions: ManagerOptions;
+    pollOptions: PollingOptions;
     submissionChecks: SubmissionCheck[];
     commentChecks: CommentCheck[];
 
@@ -37,7 +31,7 @@ export class Manager {
 
         const configBuilder = new ConfigBuilder({logger: this.logger});
         const [subChecks, commentChecks] = configBuilder.buildFromJson(sourceData);
-        this.pollOptions = opts;
+        this.pollOptions = opts.polling || {};
         this.subreddit = sub;
         this.client = client;
         this.submissionChecks = subChecks;

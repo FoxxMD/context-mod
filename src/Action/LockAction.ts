@@ -16,6 +16,9 @@ export interface LockActionConfig extends ActionConfig {
 
 }
 
+/**
+ * Lock the Activity
+ * */
 export interface LockActionJSONConfig extends LockActionConfig, ActionJSONConfig {
 
 }

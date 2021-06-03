@@ -3,25 +3,31 @@ import {Comment, VoteableContent} from "snoowrap";
 import Submission from "snoowrap/dist/objects/Submission";
 import {getAuthorActivities, getAuthorComments, getAuthorSubmissions} from "../Utils/SnoowrapUtils";
 import {parseUsableLinkIdentifier} from "../util";
-import {ActivityWindow, ActivityWindowCriteria, ActivityWindowType} from "../Common/interfaces";
+import {
+    ActivityWindow,
+    ActivityWindowCriteria,
+    ActivityWindowType,
+    ReferenceSubmission,
+    SubredditCriteria
+} from "../Common/interfaces";
 
 const parseLink = parseUsableLinkIdentifier();
 
 export class RecentActivityRule extends Rule {
     window: ActivityWindowType;
     thresholds: SubThreshold[];
-    usePostAsReference: boolean;
+    useSubmissionAsReference: boolean;
     lookAt?: 'comments' | 'submissions';
 
     constructor(options: RecentActivityRuleOptions) {
         super(options);
         const {
             window = 15,
-            usePostAsReference = true,
+            useSubmissionAsReference = true,
             lookAt,
         } = options || {};
         this.lookAt = lookAt;
-        this.usePostAsReference = usePostAsReference;
+        this.useSubmissionAsReference = useSubmissionAsReference;
         this.window = window;
         this.thresholds = options.thresholds;
     }
@@ -34,7 +40,7 @@ export class RecentActivityRule extends Rule {
         return {
             window: this.window,
             thresholds: this.thresholds,
-            usePostAsReference: this.usePostAsReference,
+            useSubmissionAsReference: this.useSubmissionAsReference,
             lookAt: this.lookAt
         }
     }
@@ -56,7 +62,7 @@ export class RecentActivityRule extends Rule {
 
 
         let viableActivity = activities;
-        if (this.usePostAsReference) {
+        if (this.useSubmissionAsReference) {
             if (!(item instanceof Submission)) {
                 this.logger.debug('Cannot use post as reference because triggered item is not a Submission');
             } else if (item.is_self) {
@@ -101,43 +107,35 @@ export class RecentActivityRule extends Rule {
     }
 }
 
-export interface SubThreshold {
-    /**
-     * A list of subreddits (case-insensitive) to look for
-     * @minItems 1
-     * */
-    subreddits: string[],
+export interface SubThreshold extends SubredditCriteria {
     /**
      * The number of activities in each subreddit from the list that will trigger this rule
+     * @default 1
+     * @minimum 1
      * */
     count?: number,
 }
 
-interface RecentActivityConfig extends ActivityWindow {
-    /**
-     * If activity is a Submission and is a link (not self-post) then only look at Submissions that contain this link, otherwise consider all activities.
-     * */
-    usePostAsReference?: boolean,
+interface RecentActivityConfig extends ActivityWindow, ReferenceSubmission {
     /**
      * If present restricts the activities that are considered for count from SubThreshold
      * */
     lookAt?: 'comments' | 'submissions',
     /**
      * A list of subreddits/count criteria that may trigger this rule. ANY SubThreshold will trigger this rule.
+     * @minItems 1
      * */
     thresholds: SubThreshold[],
-
-    /**
-     * @default 15
-     * */
-    window: ActivityWindowType;
 }
 
 export interface RecentActivityRuleOptions extends RecentActivityConfig, RuleOptions {
 }
 
+/**
+ * Checks a user's history for any Activity (Submission/Comment) in the subreddits specified in thresholds
+ * */
 export interface RecentActivityRuleJSONConfig extends RecentActivityConfig, RuleJSONConfig {
-
+    kind: 'recentActivity'
 }
 
 export default RecentActivityRule;

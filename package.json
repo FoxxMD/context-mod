@@ -8,7 +8,7 @@
     "build": "tsc",
     "start": "node server.js",
     "guard": "ts-auto-guard src/JsonConfig.ts",
-    "schema": "typescript-json-schema tsconfig.json JSONConfig --out src/Schema/schema.json --required --tsNodeRegister",
+    "schema": "typescript-json-schema tsconfig.json JSONConfig --out src/Schema/schema.json --required --tsNodeRegister --refs --propOrder",
     "schemaNotWorking": "./node_modules/.bin/ts-json-schema-generator -f tsconfig.json -p src/JsonConfig.ts -t JSONConfig --out src/Schema/vegaSchema.json"
   },
   "keywords": [],

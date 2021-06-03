@@ -1,11 +1,22 @@
-import {Author, AuthorOptions, IAuthor, Rule, RuleJSONConfig, RuleOptions, RuleResult} from "./index";
+import {Author, AuthorOptions, AuthorCriteria, Rule, RuleJSONConfig, RuleOptions, RuleResult} from "./index";
 import {Comment} from "snoowrap";
 import Submission from "snoowrap/dist/objects/Submission";
 import {testAuthorCriteria} from "../Utils/SnoowrapUtils";
 
-export interface AuthorRuleConfig extends AuthorOptions {
-    include: IAuthor[];
-    exclude: IAuthor[];
+/**
+ * Checks the author of the Activity against AuthorCriteria. This differs from a Rule's AuthorOptions as this is a full Rule and will only pass/fail, not skip.
+ * @minProperties 1
+ * @additionalProperties false
+ * */
+export interface AuthorRuleConfig {
+    /**
+     * Will "pass" if any set of AuthorCriteria passes
+     * */
+    include: AuthorCriteria[];
+    /**
+     * Only runs if include is not present. Will "pass" if any of set of the AuthorCriteria does not pass
+     * */
+    exclude: AuthorCriteria[];
 }
 
 export interface AuthorRuleOptions extends AuthorRuleConfig, RuleOptions {
@@ -13,12 +24,12 @@ export interface AuthorRuleOptions extends AuthorRuleConfig, RuleOptions {
 }
 
 export interface AuthorRuleJSONConfig extends AuthorRuleConfig, RuleJSONConfig {
-
+    kind: 'author'
 }
 
 export class AuthorRule extends Rule {
-    include: IAuthor[] = [];
-    exclude: IAuthor[] = [];
+    include: AuthorCriteria[] = [];
+    exclude: AuthorCriteria[] = [];
 
     constructor(options: AuthorRuleOptions) {
         super(options);

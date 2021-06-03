@@ -19,7 +19,7 @@
                             "type": "string"
                         }
                     ],
-                    "description": "An ISO 8601 duration or Day.js duration object",
+                    "description": "An ISO 8601 duration or Day.js duration object.\n\nThe duration will be subtracted from the time when the rule is run to create a time range like this:\n\nendTime = NOW  <----> startTime = (NOW - duration)\n\nEX endTime = 3:00PM <----> startTime = (NOW - 15 minutes) = 2:45PM -- so look for activities between 2:45PM and 3:00PM",
                     "examples": [
                         "PT1M",
                         {
@@ -28,54 +28,107 @@
                     ]
                 }
             },
+            "propertyOrder": [
+                "count",
+                "duration"
+            ],
             "type": "object"
         },
-        "AuthorOptions": {
-            "description": "If present then these Author criteria are checked before running the rule. If criteria fails then the rule is skipped. Note that when used on AuthorRule this becomes pass/fail (no skip)",
+        "AuthorCriteria": {
+            "additionalProperties": false,
+            "description": "Criteria with which to test against the author of an Activity. The outcome of the test is based on:\n\n1. All present properties passing and\n2. If a property is a list then any value from the list matching",
+            "minProperties": 1,
             "properties": {
-                "exclude": {
-                    "description": "Only runs if include is not present. Will \"pass\" if any of set of the Author criteria do not pass",
+                "flairCssClass": {
+                    "description": "A list of (user) flair css class values from the subreddit to match against",
                     "items": {
-                        "$ref": "#/definitions/IAuthor"
+                        "type": "string"
                     },
                     "type": "array"
                 },
-                "include": {
-                    "description": "Will \"pass\" if any set of the Author criteria passes",
+                "flairText": {
+                    "description": "A list of (user) flair text values from the subreddit to match against",
                     "items": {
-                        "$ref": "#/definitions/IAuthor"
+                        "type": "string"
+                    },
+                    "type": "array"
+                },
+                "isMod": {
+                    "description": "Is the author a moderator?",
+                    "type": "boolean"
+                },
+                "name": {
+                    "description": "A list of reddit usernames (case-insensitive) to match against. Do not include the \"u/\" prefix\n\n EX to match against /u/FoxxMD and /u/AnotherUser use [\"FoxxMD\",\"AnotherUser\"]",
+                    "examples": [
+                        "FoxxMD",
+                        "AnotherUser"
+                    ],
+                    "items": {
+                        "type": "string"
                     },
                     "type": "array"
                 }
             },
+            "propertyOrder": [
+                "name",
+                "flairCssClass",
+                "flairText",
+                "isMod"
+            ],
+            "type": "object"
+        },
+        "AuthorOptions": {
+            "additionalProperties": false,
+            "description": "If present then these Author criteria are checked before running the rule. If criteria fails then the rule is skipped.",
+            "minProperties": 1,
+            "properties": {
+                "exclude": {
+                    "description": "Only runs if include is not present. Will \"pass\" if any of set of the AuthorCriteria does not pass",
+                    "items": {
+                        "$ref": "#/definitions/AuthorCriteria"
+                    },
+                    "type": "array"
+                },
+                "include": {
+                    "description": "Will \"pass\" if any set of AuthorCriteria passes",
+                    "items": {
+                        "$ref": "#/definitions/AuthorCriteria"
+                    },
+                    "type": "array"
+                }
+            },
+            "propertyOrder": [
+                "include",
+                "exclude"
+            ],
             "type": "object"
         },
         "AuthorRuleJSONConfig": {
             "properties": {
                 "authors": {
                     "$ref": "#/definitions/AuthorOptions",
-                    "description": "If present then these Author criteria are checked before running the rule. If criteria fails then the rule is skipped. Note this is NOT the same as AuthorRule."
+                    "additionalProperties": false,
+                    "description": "If present then these Author criteria are checked before running the rule. If criteria fails then the rule is skipped.",
+                    "minProperties": 1
                 },
                 "exclude": {
-                    "description": "Only runs if include is not present. Will \"pass\" if any of set of the Author criteria do not pass",
+                    "description": "Only runs if include is not present. Will \"pass\" if any of set of the AuthorCriteria does not pass",
                     "items": {
-                        "$ref": "#/definitions/IAuthor"
+                        "$ref": "#/definitions/AuthorCriteria"
                     },
                     "type": "array"
                 },
                 "include": {
-                    "description": "Will \"pass\" if any set of the Author criteria passes",
+                    "description": "Will \"pass\" if any set of AuthorCriteria passes",
                     "items": {
-                        "$ref": "#/definitions/IAuthor"
+                        "$ref": "#/definitions/AuthorCriteria"
                     },
                     "type": "array"
                 },
                 "kind": {
                     "description": "The kind of rule to run",
                     "enum": [
-                        "author",
-                        "recentActivity",
-                        "repeatSubmission"
+                        "author"
                     ],
                     "type": "string"
                 },
@@ -84,6 +137,13 @@
                     "type": "string"
                 }
             },
+            "propertyOrder": [
+                "kind",
+                "include",
+                "exclude",
+                "name",
+                "authors"
+            ],
             "required": [
                 "exclude",
                 "include",
@@ -118,6 +178,15 @@
                     "minItems": 1,
                     "type": "array"
                 },
+                "condition": {
+                    "default": "AND",
+                    "description": "Under what condition should a set of rules be considered \"successful\"?\n\nIf \"OR\" then ANY triggered rule results in success.\n\nIf \"AND\" then ALL rules must be triggered to result in success.",
+                    "enum": [
+                        "AND",
+                        "OR"
+                    ],
+                    "type": "string"
+                },
                 "description": {
                     "type": "string"
                 },
@@ -131,14 +200,6 @@
                 },
                 "name": {
                     "description": "A friendly name for this check (highly recommended) -- EX \"repeatCrosspostReport\"",
-                    "type": "string"
-                },
-                "ruleJoin": {
-                    "description": "Under what condition should a check's rules be \"successful\"? If 'OR' then ANY triggered rule will cause actions to run. If 'AND' then ALL rules must be triggered for actions to run.",
-                    "enum": [
-                        "AND",
-                        "OR"
-                    ],
                     "type": "string"
                 },
                 "rules": {
@@ -163,6 +224,14 @@
                     "type": "array"
                 }
             },
+            "propertyOrder": [
+                "kind",
+                "rules",
+                "actions",
+                "name",
+                "description",
+                "condition"
+            ],
             "required": [
                 "actions",
                 "kind",
@@ -172,12 +241,19 @@
             "type": "object"
         },
         "CommentActionJSONConfig": {
+            "description": "Reply to the Activity. For a submission the reply will be a top-level comment.",
             "properties": {
                 "content": {
-                    "description": "Content is interpreted as reddit-flavored Markdown. If value starts with 'wiki:' then the proceeding value will be use to get a wiki page\nEX wiki:botconfig/mybot ==> try to get http://reddit.com/mySubredditExample/wiki/botconfig/mybot",
+                    "description": "The Content to submit for this Action. Content is interpreted as reddit-flavored Markdown.\n\nIf value starts with 'wiki:' then the proceeding value will be used to get a wiki page\n\nEX \"wiki:botconfig/mybot\" tries to get https://reddit.com/mySubredditExample/wiki/botconfig/mybot\n\nEX \"this is plain text\"\n\nEX \"this is **bold** markdown text\"",
+                    "examples": [
+                        "this is plain text",
+                        "this is **bold** markdown text",
+                        "wiki:botconfig/acomment"
+                    ],
                     "type": "string"
                 },
                 "distinguish": {
+                    "description": "Distinguish the comment after creation?",
                     "type": "boolean"
                 },
                 "kind": {
@@ -192,6 +268,7 @@
                     "type": "string"
                 },
                 "lock": {
+                    "description": "Lock the comment after creation?",
                     "type": "boolean"
                 },
                 "name": {
@@ -199,9 +276,18 @@
                     "type": "string"
                 },
                 "sticky": {
+                    "description": "Stick the comment after creation?",
                     "type": "boolean"
                 }
             },
+            "propertyOrder": [
+                "lock",
+                "sticky",
+                "distinguish",
+                "content",
+                "kind",
+                "name"
+            ],
             "required": [
                 "content",
                 "kind"
@@ -210,7 +296,7 @@
         },
         "DurationObject": {
             "additionalProperties": false,
-            "description": "A Day.js duration object",
+            "description": "A Day.js duration object\n\nhttps://day.js.org/docs/en/durations/creating",
             "minProperties": 1,
             "properties": {
                 "days": {
@@ -235,10 +321,19 @@
                     "type": "number"
                 }
             },
+            "propertyOrder": [
+                "seconds",
+                "minutes",
+                "hours",
+                "days",
+                "weeks",
+                "months",
+                "years"
+            ],
             "type": "object"
         },
         "FlairActionJSONConfig": {
-            "description": "text and css cannot both be empty",
+            "description": "Flair the Submission",
             "properties": {
                 "css": {
                     "description": "The text of the css class of the flair to apply",
@@ -264,43 +359,19 @@
                     "type": "string"
                 }
             },
+            "propertyOrder": [
+                "text",
+                "css",
+                "name",
+                "kind"
+            ],
             "required": [
                 "kind"
             ],
             "type": "object"
         },
-        "IAuthor": {
-            "description": "Criteria with which to test against the author of a submission/comment. The outcome of the test is based on 1. any list criteria matching and then 2. all present criteria passing",
-            "properties": {
-                "flairCssClass": {
-                    "description": "A list of (user) flair css class values from the subreddit to match against",
-                    "items": {
-                        "type": "string"
-                    },
-                    "type": "array"
-                },
-                "flairText": {
-                    "description": "A list of (user) flair text values from the subreddit to match against",
-                    "items": {
-                        "type": "string"
-                    },
-                    "type": "array"
-                },
-                "isMod": {
-                    "description": "Is the author a moderator?",
-                    "type": "boolean"
-                },
-                "name": {
-                    "description": "A list of reddit usernames (case-insensitive) to match against",
-                    "items": {
-                        "type": "string"
-                    },
-                    "type": "array"
-                }
-            },
-            "type": "object"
-        },
         "LockActionJSONConfig": {
+            "description": "Lock the Activity",
             "properties": {
                 "kind": {
                     "description": "The type of action that will be performed",
@@ -318,23 +389,80 @@
                     "type": "string"
                 }
             },
+            "propertyOrder": [
+                "name",
+                "kind"
+            ],
             "required": [
                 "kind"
             ],
             "type": "object"
         },
+        "PollingOptions": {
+            "description": "You may specify polling options independently for submissions/comments",
+            "properties": {
+                "comments": {
+                    "description": "Polling options for comment events",
+                    "properties": {
+                        "interval": {
+                            "default": 10000,
+                            "description": "Amount of time to wait between requests for new comments\n\nDefaults to 10 seconds",
+                            "format": "milliseconds",
+                            "type": "number"
+                        },
+                        "limit": {
+                            "default": 10,
+                            "description": "The number of new comments to pull on every request",
+                            "type": "number"
+                        }
+                    },
+                    "propertyOrder": [
+                        "limit",
+                        "interval"
+                    ],
+                    "type": "object"
+                },
+                "submissions": {
+                    "description": "Polling options for submission events",
+                    "properties": {
+                        "interval": {
+                            "default": 10000,
+                            "description": "Amount of time to wait between requests to /r/subreddit/new\n\nDefaults to 10 seconds",
+                            "format": "milliseconds",
+                            "type": "number"
+                        },
+                        "limit": {
+                            "default": 10,
+                            "description": "The number of submissions to pull from /r/subreddit/new on every request",
+                            "type": "number"
+                        }
+                    },
+                    "propertyOrder": [
+                        "limit",
+                        "interval"
+                    ],
+                    "type": "object"
+                }
+            },
+            "propertyOrder": [
+                "submissions",
+                "comments"
+            ],
+            "type": "object"
+        },
         "RecentActivityRuleJSONConfig": {
+            "description": "Checks a user's history for any Activity (Submission/Comment) in the subreddits specified in thresholds",
             "properties": {
                 "authors": {
                     "$ref": "#/definitions/AuthorOptions",
-                    "description": "If present then these Author criteria are checked before running the rule. If criteria fails then the rule is skipped. Note this is NOT the same as AuthorRule."
+                    "additionalProperties": false,
+                    "description": "If present then these Author criteria are checked before running the rule. If criteria fails then the rule is skipped.",
+                    "minProperties": 1
                 },
                 "kind": {
                     "description": "The kind of rule to run",
                     "enum": [
-                        "author",
-                        "recentActivity",
-                        "repeatSubmission"
+                        "recentActivity"
                     ],
                     "type": "string"
                 },
@@ -355,14 +483,19 @@
                     "items": {
                         "$ref": "#/definitions/SubThreshold"
                     },
+                    "minItems": 1,
                     "type": "array"
                 },
-                "usePostAsReference": {
+                "useSubmissionAsReference": {
+                    "default": true,
                     "description": "If activity is a Submission and is a link (not self-post) then only look at Submissions that contain this link, otherwise consider all activities.",
                     "type": "boolean"
                 },
                 "window": {
                     "anyOf": [
+                        {
+                            "$ref": "#/definitions/DurationObject"
+                        },
                         {
                             "$ref": "#/definitions/ActivityWindowCriteria"
                         },
@@ -374,17 +507,44 @@
                         }
                     ],
                     "default": 15,
-                    "description": "Criteria for defining what set of activities should be considered. See ActivityWindowCriteria for descriptions of what different data types will do\n//@examples require('./interfaces.ts').windowExample"
+                    "description": "Criteria for defining what set of activities should be considered.\n\nThe value of this property may be either count OR duration -- to use both write it as an ActivityWindowCriteria\n\nSee ActivityWindowCriteria for descriptions of what count/duration do",
+                    "examples": [
+                        15,
+                        "PT1M",
+                        {
+                            "count": 10
+                        },
+                        {
+                            "duration": {
+                                "hours": 5
+                            }
+                        },
+                        {
+                            "count": 5,
+                            "duration": {
+                                "minutes": 15
+                            }
+                        }
+                    ]
                 }
             },
+            "propertyOrder": [
+                "kind",
+                "lookAt",
+                "thresholds",
+                "window",
+                "useSubmissionAsReference",
+                "name",
+                "authors"
+            ],
             "required": [
                 "kind",
-                "thresholds",
-                "window"
+                "thresholds"
             ],
             "type": "object"
         },
         "RemoveActionJSONConfig": {
+            "description": "Remove the Activity",
             "properties": {
                 "kind": {
                     "description": "The type of action that will be performed",
@@ -402,37 +562,55 @@
                     "type": "string"
                 }
             },
+            "propertyOrder": [
+                "name",
+                "kind"
+            ],
             "required": [
                 "kind"
             ],
             "type": "object"
         },
         "RepeatSubmissionJSONConfig": {
+            "description": "Checks a user's history for Submissions with identical content",
             "properties": {
                 "authors": {
                     "$ref": "#/definitions/AuthorOptions",
-                    "description": "If present then these Author criteria are checked before running the rule. If criteria fails then the rule is skipped. Note this is NOT the same as AuthorRule."
+                    "additionalProperties": false,
+                    "description": "If present then these Author criteria are checked before running the rule. If criteria fails then the rule is skipped.",
+                    "minProperties": 1
                 },
                 "exclude": {
+                    "description": "Do not include Submissions from this list of Subreddits.\n\nA list of subreddits (case-insensitive) to look for. Do not include \"r/\" prefix.\n\nEX to match against /r/mealtimevideos and /r/askscience use [\"mealtimevideos\",\"askscience\"]",
+                    "examples": [
+                        "mealtimevideos",
+                        "askscience"
+                    ],
                     "items": {
                         "type": "string"
                     },
+                    "minItems": 1,
                     "type": "array"
                 },
                 "gapAllowance": {
+                    "description": "The number of allowed non-identical Submissions between identical Submissions that can be ignored when checking against the threshold value",
                     "type": "number"
                 },
                 "include": {
+                    "description": "Only include Submissions from this list of Subreddits.\n\nA list of subreddits (case-insensitive) to look for. Do not include \"r/\" prefix.\n\nEX to match against /r/mealtimevideos and /r/askscience use [\"mealtimevideos\",\"askscience\"]",
+                    "examples": [
+                        "mealtimevideos",
+                        "askscience"
+                    ],
                     "items": {
                         "type": "string"
                     },
+                    "minItems": 1,
                     "type": "array"
                 },
                 "kind": {
                     "description": "The kind of rule to run",
                     "enum": [
-                        "author",
-                        "recentActivity",
                         "repeatSubmission"
                     ],
                     "type": "string"
@@ -442,28 +620,73 @@
                     "type": "string"
                 },
                 "threshold": {
+                    "default": 5,
+                    "description": "The number of repeat submissions that will trigger the rule",
                     "type": "number"
                 },
-                "usePostAsReference": {
+                "useSubmissionAsReference": {
+                    "default": true,
                     "description": "If activity is a Submission and is a link (not self-post) then only look at Submissions that contain this link, otherwise consider all activities.",
                     "type": "boolean"
                 },
                 "window": {
-                    "type": [
-                        "string",
-                        "number"
+                    "anyOf": [
+                        {
+                            "$ref": "#/definitions/DurationObject"
+                        },
+                        {
+                            "$ref": "#/definitions/ActivityWindowCriteria"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "number"
+                            ]
+                        }
+                    ],
+                    "default": 15,
+                    "description": "Criteria for defining what set of activities should be considered.\n\nThe value of this property may be either count OR duration -- to use both write it as an ActivityWindowCriteria\n\nSee ActivityWindowCriteria for descriptions of what count/duration do",
+                    "examples": [
+                        15,
+                        "PT1M",
+                        {
+                            "count": 10
+                        },
+                        {
+                            "duration": {
+                                "hours": 5
+                            }
+                        },
+                        {
+                            "count": 5,
+                            "duration": {
+                                "minutes": 15
+                            }
+                        }
                     ]
                 }
             },
-            "required": [
+            "propertyOrder": [
                 "kind",
-                "threshold"
+                "threshold",
+                "gapAllowance",
+                "include",
+                "exclude",
+                "window",
+                "useSubmissionAsReference",
+                "name",
+                "authors"
+            ],
+            "required": [
+                "kind"
             ],
             "type": "object"
         },
         "ReportActionJSONConfig": {
+            "description": "Report the Activity",
             "properties": {
                 "content": {
+                    "description": "The text of the report",
                     "type": "string"
                 },
                 "kind": {
@@ -482,6 +705,11 @@
                     "type": "string"
                 }
             },
+            "propertyOrder": [
+                "content",
+                "kind",
+                "name"
+            ],
             "required": [
                 "content",
                 "kind"
@@ -492,7 +720,8 @@
             "description": "A RuleSet is a \"nested\" set of Rules that can be used to create more complex AND/OR behavior. Think of the outcome of a RuleSet as the result of all of it's Rules (based on condition)",
             "properties": {
                 "condition": {
-                    "description": "Under what condition should a RuleSet's rules be \"successful\"? If 'OR' then ANY triggered rule result in a true outcome. If 'AND' then ALL rules must be triggered for the result to be true.",
+                    "default": "AND",
+                    "description": "Under what condition should a set of rules be considered \"successful\"?\n\nIf \"OR\" then ANY triggered rule results in success.\n\nIf \"AND\" then ALL rules must be triggered to result in success.",
                     "enum": [
                         "AND",
                         "OR"
@@ -513,11 +742,15 @@
                             }
                         ]
                     },
+                    "minItems": 1,
                     "type": "array"
                 }
             },
+            "propertyOrder": [
+                "rules",
+                "condition"
+            ],
             "required": [
-                "condition",
                 "rules"
             ],
             "type": "object"
@@ -525,11 +758,17 @@
         "SubThreshold": {
             "properties": {
                 "count": {
+                    "default": 1,
                     "description": "The number of activities in each subreddit from the list that will trigger this rule",
+                    "minimum": 1,
                     "type": "number"
                 },
                 "subreddits": {
-                    "description": "A list of subreddits (case-insensitive) to look for",
+                    "description": "A list of subreddits (case-insensitive) to look for. Do not include \"r/\" prefix.\n\nEX to match against /r/mealtimevideos and /r/askscience use [\"mealtimevideos\",\"askscience\"]",
+                    "examples": [
+                        "mealtimevideos",
+                        "askscience"
+                    ],
                     "items": {
                         "type": "string"
                     },
@@ -537,6 +776,10 @@
                     "type": "array"
                 }
             },
+            "propertyOrder": [
+                "count",
+                "subreddits"
+            ],
             "required": [
                 "subreddits"
             ],
@@ -545,14 +788,22 @@
     },
     "properties": {
         "checks": {
-            "description": "A list of all the checks that should be run for a subreddit. Checks are split into two lists -- submission or comment -- based on kind and run independently. Checks in each list are run in the order found in the configuration. When a check \"passes\" and actions are performed any subsequent checks are skipped.",
+            "description": "A list of all the checks that should be run for a subreddit.\n\nChecks are split into two lists -- submission or comment -- based on kind and run independently.\n\nChecks in each list are run in the order found in the configuration.\n\nWhen a check \"passes\", and actions are performed, then all subsequent checks are skipped.",
             "items": {
                 "$ref": "#/definitions/CheckJSONConfig"
             },
             "minItems": 1,
             "type": "array"
+        },
+        "polling": {
+            "$ref": "#/definitions/PollingOptions",
+            "description": "You may specify polling options independently for submissions/comments"
         }
     },
+    "propertyOrder": [
+        "checks",
+        "polling"
+    ],
     "required": [
         "checks"
     ],

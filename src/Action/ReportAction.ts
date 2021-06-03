@@ -17,13 +17,19 @@ export class ReportAction extends Action {
     }
 }
 
-export interface ReportActionConfig{
+export interface ReportActionConfig {
+    /**
+     * The text of the report
+     * */
     content: string,
 }
 
-export interface ReportActionOptions extends ReportActionConfig,ActionOptions {
+export interface ReportActionOptions extends ReportActionConfig, ActionOptions {
 }
 
+/**
+ * Report the Activity
+ * */
 export interface ReportActionJSONConfig extends ReportActionConfig, ActionJSONConfig {
 
 }

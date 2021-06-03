@@ -3,7 +3,7 @@ import Submission from "snoowrap/dist/objects/Submission";
 import {Duration, DurationUnitsObjectType} from "dayjs/plugin/duration";
 import dayjs, {Dayjs} from "dayjs";
 import Mustache from "mustache";
-import {AuthorOptions, IAuthor} from "../Rule";
+import {AuthorOptions, AuthorCriteria} from "../Rule";
 import {ActivityWindowCriteria, ActivityWindowType} from "../Common/interfaces";
 
 export interface AuthorTypedActivitiesOptions extends AuthorActivitiesOptions {
@@ -97,7 +97,7 @@ export const renderContent = async (content: string, data: (Submission | Comment
     return Mustache.render(content, {...templateData, ...additionalData});
 }
 
-export const testAuthorCriteria = async (item: (Comment|Submission), authorOpts: IAuthor, include = true) => {
+export const testAuthorCriteria = async (item: (Comment|Submission), authorOpts: AuthorCriteria, include = true) => {
     // @ts-ignore
     const author: RedditUser = await item.author;
     for(const k of Object.keys(authorOpts)) {

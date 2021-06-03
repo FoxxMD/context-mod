@@ -24,6 +24,10 @@ export class FlairAction extends Action {
     }
 }
 
+/**
+ * @minProperties 1
+ * @additionalProperties false
+ * */
 export interface FlairActionOptions extends SubmissionActionConfig {
     /**
      * The text of the flair to apply
@@ -36,7 +40,7 @@ export interface FlairActionOptions extends SubmissionActionConfig {
 }
 
 /**
- * text and css cannot both be empty
+ * Flair the Submission
  * */
 export interface FlairActionJSONConfig extends FlairActionOptions, ActionJSONConfig {
 

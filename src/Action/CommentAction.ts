@@ -3,6 +3,7 @@ import Snoowrap, {Comment} from "snoowrap";
 import Submission from "snoowrap/dist/objects/Submission";
 import dayjs, {Dayjs} from "dayjs";
 import {renderContent} from "../Utils/SnoowrapUtils";
+import {RichContent} from "../Common/interfaces";
 
 export const WIKI_DESCRIM = 'wiki:';
 
@@ -58,20 +59,27 @@ export class CommentAction extends Action {
     }
 }
 
-export interface CommentActionConfig {
+export interface CommentActionConfig extends RichContent {
     /**
-     * Content is interpreted as reddit-flavored Markdown. If value starts with 'wiki:' then the proceeding value will be use to get a wiki page
-     * EX wiki:botconfig/mybot ==> try to get http://reddit.com/mySubredditExample/wiki/botconfig/mybot
-    * */
-    content: string,
+     * Lock the comment after creation?
+     * */
     lock?: boolean,
+    /**
+     * Stick the comment after creation?
+     * */
     sticky?: boolean,
+    /**
+     * Distinguish the comment after creation?
+     * */
     distinguish?: boolean,
 }
 
 export interface CommentActionOptions extends CommentActionConfig,ActionOptions {
 }
 
+/**
+ * Reply to the Activity. For a submission the reply will be a top-level comment.
+ * */
 export interface CommentActionJSONConfig extends CommentActionConfig, ActionJSONConfig {
 
 }

@@ -14,6 +14,9 @@ export interface RemoveActionConfig extends ActionConfig {
 
 }
 
+/**
+ * Remove the Activity
+ * */
 export interface RemoveActionJSONConfig extends RemoveActionConfig, ActionJSONConfig {
 
 }

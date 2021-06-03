@@ -117,13 +117,13 @@ export abstract class Rule implements IRule, Triggerable {
     }
 }
 
-export class Author implements IAuthor {
+export class Author implements AuthorCriteria {
     name?: string[];
     flairCssClass?: string[];
     flairText?: string[];
     isMod?: boolean;
 
-    constructor(options: IAuthor) {
+    constructor(options: AuthorCriteria) {
         this.name = options.name;
         this.flairCssClass = options.flairCssClass;
         this.flairText = options.flairText;
@@ -132,25 +132,36 @@ export class Author implements IAuthor {
 }
 
 /**
- * If present then these Author criteria are checked before running the rule. If criteria fails then the rule is skipped. Note that when used on AuthorRule this becomes pass/fail (no skip)
+ * If present then these Author criteria are checked before running the rule. If criteria fails then the rule is skipped.
+ * @minProperties 1
+ * @additionalProperties false
  * */
 export interface AuthorOptions {
     /**
-     * Only runs if include is not present. Will "pass" if any of set of the Author criteria do not pass
+     * Will "pass" if any set of AuthorCriteria passes
      * */
-    exclude?: IAuthor[];
+    include?: AuthorCriteria[];
     /**
-     * Will "pass" if any set of the Author criteria passes
+     * Only runs if include is not present. Will "pass" if any of set of the AuthorCriteria does not pass
      * */
-    include?: IAuthor[];
+    exclude?: AuthorCriteria[];
 }
 
 /**
- * Criteria with which to test against the author of a submission/comment. The outcome of the test is based on 1. any list criteria matching and then 2. all present criteria passing
+ * Criteria with which to test against the author of an Activity. The outcome of the test is based on:
+ *
+ * 1. All present properties passing and
+ * 2. If a property is a list then any value from the list matching
+ *
+ * @minProperties 1
+ * @additionalProperties false
  * */
-export interface IAuthor {
+export interface AuthorCriteria {
     /**
-     * A list of reddit usernames (case-insensitive) to match against
+     * A list of reddit usernames (case-insensitive) to match against. Do not include the "u/" prefix
+     *
+     *  EX to match against /u/FoxxMD and /u/AnotherUser use ["FoxxMD","AnotherUser"]
+     * @examples ["FoxxMD","AnotherUser"]
      * */
     name?: string[],
     /**
@@ -173,7 +184,7 @@ export interface IRule {
      * */
     name?: string
     /**
-     * If present then these Author criteria are checked before running the rule. If criteria fails then the rule is skipped. Note this is NOT the same as AuthorRule.
+     * If present then these Author criteria are checked before running the rule. If criteria fails then the rule is skipped.
      * */
     authors?: AuthorOptions
 }

@@ -17,12 +17,13 @@ import {AuthorRuleJSONConfig} from "../Rule/AuthorRule";
 import {ReportActionJSONConfig} from "../Action/ReportAction";
 import {LockActionJSONConfig} from "../Action/LockAction";
 import {RemoveActionJSONConfig} from "../Action/RemoveAction";
+import {JoinCondition, JoinOperands} from "../Common/interfaces";
 
 export class Check implements ICheck {
     actions: Action[] = [];
     description?: string;
     name: string;
-    ruleJoin: "OR" | "AND";
+    condition: JoinOperands;
     rules: Array<RuleSet | Rule> = [];
     logger: Logger;
 
@@ -30,9 +31,9 @@ export class Check implements ICheck {
         const {
             name,
             description,
-            ruleJoin = 'AND',
-            rules,
-            actions,
+            condition = 'AND',
+            rules = [],
+            actions = [],
         } = options;
 
         if (options.logger !== undefined) {
@@ -44,7 +45,7 @@ export class Check implements ICheck {
 
         this.name = name;
         this.description = description;
-        this.ruleJoin = ruleJoin;
+        this.condition = condition;
         for (const r of rules) {
             if (r instanceof Rule || r instanceof RuleSet) {
                 this.rules.push(r);
@@ -82,10 +83,10 @@ export class Check implements ICheck {
             }
             runOne = true;
             if (passed) {
-                if (this.ruleJoin === 'OR') {
+                if (this.condition === 'OR') {
                     return [true, allResults];
                 }
-            } else if (this.ruleJoin === 'AND') {
+            } else if (this.condition === 'AND') {
                 return [false, allResults];
             }
         }
@@ -102,16 +103,12 @@ export class Check implements ICheck {
     }
 }
 
-export interface ICheck {
+export interface ICheck extends JoinCondition {
     /**
      * A friendly name for this check (highly recommended) -- EX "repeatCrosspostReport"
      * */
     name: string,
     description?: string,
-    /**
-     * Under what condition should a check's rules be "successful"? If 'OR' then ANY triggered rule will cause actions to run. If 'AND' then ALL rules must be triggered for actions to run.
-     * */
-    ruleJoin?: 'OR' | 'AND',
 }
 
 export interface CheckOptions extends ICheck {

@@ -3,15 +3,16 @@ import {Rule, RuleOptions, RulePremise, RuleResult} from "../index";
 import {Submission} from "snoowrap";
 import {getAuthorSubmissions} from "../../Utils/SnoowrapUtils";
 import {groupBy, parseUsableLinkIdentifier as linkParser} from "../../util";
+import {ActivityWindow, ActivityWindowType, ReferenceSubmission} from "../../Common/interfaces";
 
 const groupByUrl = groupBy(['urlIdentifier']);
 const parseUsableLinkIdentifier = linkParser()
 
 export class RepeatSubmissionRule extends SubmissionRule {
     threshold: number;
-    window: string | number;
+    window: ActivityWindowType;
     gapAllowance?: number;
-    usePostAsReference: boolean;
+    useSubmissionAsReference: boolean;
     include: string[];
     exclude: string[];
 
@@ -21,14 +22,14 @@ export class RepeatSubmissionRule extends SubmissionRule {
             threshold = 5,
             window = 15,
             gapAllowance,
-            usePostAsReference = true,
+            useSubmissionAsReference = true,
             include = [],
             exclude = []
         } = options;
         this.threshold = threshold;
         this.window = window;
         this.gapAllowance = gapAllowance;
-        this.usePostAsReference = usePostAsReference;
+        this.useSubmissionAsReference = useSubmissionAsReference;
         this.include = include;
         this.exclude = exclude;
     }
@@ -42,7 +43,7 @@ export class RepeatSubmissionRule extends SubmissionRule {
             threshold: this.threshold,
             window: this.window,
             gapAllowance: this.gapAllowance,
-            usePostAsReference: this.usePostAsReference,
+            useSubmissionAsReference: this.useSubmissionAsReference,
             include: this.include,
             exclude: this.exclude,
         }
@@ -50,7 +51,7 @@ export class RepeatSubmissionRule extends SubmissionRule {
 
     async process(item: Submission): Promise<[boolean, RuleResult[]]> {
         const referenceUrl = await item.url;
-        if (referenceUrl === undefined && this.usePostAsReference) {
+        if (referenceUrl === undefined && this.useSubmissionAsReference) {
             throw new Error(`Cannot run Rule ${this.name} because submission is not a link`);
         }
         const submissions = await getAuthorSubmissions(item.author, {window: this.window});
@@ -97,7 +98,7 @@ export class RepeatSubmissionRule extends SubmissionRule {
             urlIdentifier: parseUsableLinkIdentifier(x.url)
         })));
         let groupsToCheck = [];
-        if (this.usePostAsReference) {
+        if (this.useSubmissionAsReference) {
             const identifier = parseUsableLinkIdentifier(referenceUrl);
             const {[identifier as string]: refGroup = []} = groupedPosts;
             groupsToCheck.push(refGroup);
@@ -116,24 +117,46 @@ export class RepeatSubmissionRule extends SubmissionRule {
     }
 }
 
-interface RepeatSubmissionConfig {
-    threshold: number,
-    window?: string | number,
+interface RepeatSubmissionConfig extends ActivityWindow, ReferenceSubmission {
+    /**
+     * The number of repeat submissions that will trigger the rule
+     * @default 5
+     * */
+    threshold?: number,
+    /**
+     * The number of allowed non-identical Submissions between identical Submissions that can be ignored when checking against the threshold value
+     * */
     gapAllowance?: number,
     /**
-     * If activity is a Submission and is a link (not self-post) then only look at Submissions that contain this link, otherwise consider all activities.
+     * Only include Submissions from this list of Subreddits.
+     *
+     * A list of subreddits (case-insensitive) to look for. Do not include "r/" prefix.
+     *
+     * EX to match against /r/mealtimevideos and /r/askscience use ["mealtimevideos","askscience"]
+     * @examples ["mealtimevideos","askscience"]
+     * @minItems 1
      * */
-    usePostAsReference?: boolean,
     include?: string[],
+    /**
+     * Do not include Submissions from this list of Subreddits.
+     *
+     * A list of subreddits (case-insensitive) to look for. Do not include "r/" prefix.
+     *
+     * EX to match against /r/mealtimevideos and /r/askscience use ["mealtimevideos","askscience"]
+     * @examples ["mealtimevideos","askscience"]
+     * @minItems 1
+     * */
     exclude?: string[],
 }
 
 export interface RepeatSubmissionOptions extends RepeatSubmissionConfig, RuleOptions {
 
 }
-
+/**
+ * Checks a user's history for Submissions with identical content
+ * */
 export interface RepeatSubmissionJSONConfig extends RepeatSubmissionConfig, SubmissionRuleJSONConfig {
-
+    kind: 'repeatSubmission'
 }
 
 export default RepeatSubmissionRule;

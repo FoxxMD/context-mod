@@ -7,20 +7,22 @@ import {RepeatSubmissionJSONConfig} from "./SubmissionRule/RepeatSubmissionRule"
 import {createLabelledLogger, determineNewResults, findResultByPremise, loggerMetaShuffle} from "../util";
 import {Logger} from "winston";
 import {AuthorRuleJSONConfig} from "./AuthorRule";
+import {JoinCondition, JoinOperands} from "../Common/interfaces";
 
 export class RuleSet implements IRuleSet, Triggerable {
     rules: Rule[] = [];
-    condition: 'OR' | 'AND';
+    condition: JoinOperands;
     logger: Logger;
 
     constructor(options: RuleSetOptions) {
-        if (options.logger !== undefined) {
-            this.logger = options.logger.child(loggerMetaShuffle(options.logger, 'Rule Set'));
+        const {logger, condition = 'AND', rules = []} = options;
+        if (logger !== undefined) {
+            this.logger = logger.child(loggerMetaShuffle(logger, 'Rule Set'));
         } else {
             this.logger = createLabelledLogger('Rule Set');
         }
-        this.condition = options.condition;
-        for (const r of options.rules) {
+        this.condition = condition;
+        for (const r of rules) {
             if (r instanceof Rule) {
                 this.rules.push(r);
             } else if (isRuleConfig(r)) {
@@ -60,11 +62,7 @@ export class RuleSet implements IRuleSet, Triggerable {
     }
 }
 
-export interface IRuleSet {
-    /**
-     * Under what condition should a RuleSet's rules be "successful"? If 'OR' then ANY triggered rule result in a true outcome. If 'AND' then ALL rules must be triggered for the result to be true.
-     * */
-    condition: 'OR' | 'AND',
+export interface IRuleSet extends JoinCondition {
     /**
      * @minItems 1
      * */
@@ -81,5 +79,8 @@ export interface RuleSetOptions extends IRuleSet {
  * @see {isRuleSetConfig} ts-auto-guard:type-guard
  * */
 export interface RuleSetJSONConfig extends IRuleSet {
+    /**
+     * @minItems 1
+     * */
     rules: Array<RecentActivityRuleJSONConfig | RepeatSubmissionJSONConfig | AuthorRuleJSONConfig>
 }
