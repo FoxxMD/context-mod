@@ -6,6 +6,7 @@ import {RecentActivityRuleJSONConfig} from "./RecentActivityRule";
 import {RepeatSubmissionJSONConfig} from "./SubmissionRule/RepeatSubmissionRule";
 import {createLabelledLogger, determineNewResults, findResultByPremise, loggerMetaShuffle} from "../util";
 import {Logger} from "winston";
+import {AuthorRuleJSONConfig} from "./AuthorRule";
 
 export class RuleSet implements IRuleSet, Triggerable {
     rules: Rule[] = [];
@@ -37,7 +38,7 @@ export class RuleSet implements IRuleSet, Triggerable {
             const combinedResults = [...existingResults, ...results];
             const [passed, [result]] = await r.run(item, combinedResults);
             //results = results.concat(determineNewResults(combinedResults, result));
-             results.push(result);
+            results.push(result);
             // skip rule if author check failed
             if (passed === null) {
                 continue;
@@ -60,7 +61,13 @@ export class RuleSet implements IRuleSet, Triggerable {
 }
 
 export interface IRuleSet {
+    /**
+     * Under what condition should a RuleSet's rules be "successful"? If 'OR' then ANY triggered rule result in a true outcome. If 'AND' then ALL rules must be triggered for the result to be true.
+     * */
     condition: 'OR' | 'AND',
+    /**
+     * @minItems 1
+     * */
     rules: IRule[];
 }
 
@@ -69,7 +76,10 @@ export interface RuleSetOptions extends IRuleSet {
     logger?: Logger
 }
 
-/** @see {isRuleSetConfig} ts-auto-guard:type-guard */
+/**
+ * A RuleSet is a "nested" set of Rules that can be used to create more complex AND/OR behavior. Think of the outcome of a RuleSet as the result of all of it's Rules (based on condition)
+ * @see {isRuleSetConfig} ts-auto-guard:type-guard
+ * */
 export interface RuleSetJSONConfig extends IRuleSet {
-    rules: Array<RecentActivityRuleJSONConfig | RepeatSubmissionJSONConfig>
+    rules: Array<RecentActivityRuleJSONConfig | RepeatSubmissionJSONConfig | AuthorRuleJSONConfig>
 }

@@ -25,10 +25,19 @@ export class FlairAction extends Action {
 }
 
 export interface FlairActionOptions extends SubmissionActionConfig {
+    /**
+     * The text of the flair to apply
+    * */
     text?: string,
+    /**
+     * The text of the css class of the flair to apply
+     * */
     css?: string,
 }
 
+/**
+ * text and css cannot both be empty
+ * */
 export interface FlairActionJSONConfig extends FlairActionOptions, ActionJSONConfig {
 
 }

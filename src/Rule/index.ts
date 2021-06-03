@@ -131,25 +131,58 @@ export class Author implements IAuthor {
     }
 }
 
+/**
+ * If present then these Author criteria are checked before running the rule. If criteria fails then the rule is skipped. Note that when used on AuthorRule this becomes pass/fail (no skip)
+ * */
 export interface AuthorOptions {
+    /**
+     * Only runs if include is not present. Will "pass" if any of set of the Author criteria do not pass
+     * */
     exclude?: IAuthor[];
+    /**
+     * Will "pass" if any set of the Author criteria passes
+     * */
     include?: IAuthor[];
 }
 
+/**
+ * Criteria with which to test against the author of a submission/comment. The outcome of the test is based on 1. any list criteria matching and then 2. all present criteria passing
+ * */
 export interface IAuthor {
+    /**
+     * A list of reddit usernames (case-insensitive) to match against
+     * */
     name?: string[],
+    /**
+     * A list of (user) flair css class values from the subreddit to match against
+     * */
     flairCssClass?: string[],
+    /**
+     * A list of (user) flair text values from the subreddit to match against
+     * */
     flairText?: string[],
+    /**
+     * Is the author a moderator?
+     * */
     isMod?: boolean,
 }
 
 export interface IRule {
+    /**
+     * A friendly, descriptive name for this rule. Highly recommended to make it easier to track logs EX "repeatCrosspostRule"
+     * */
     name?: string
+    /**
+     * If present then these Author criteria are checked before running the rule. If criteria fails then the rule is skipped. Note this is NOT the same as AuthorRule.
+     * */
     authors?: AuthorOptions
 }
 
 /** @see {isRuleConfig} ts-auto-guard:type-guard */
 export interface RuleJSONConfig extends IRule {
+    /**
+     * The kind of rule to run
+     */
     kind: 'recentActivity' | 'repeatSubmission' | 'author'
 }
 

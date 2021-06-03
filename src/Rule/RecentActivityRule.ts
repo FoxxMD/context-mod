@@ -101,14 +101,30 @@ export class RecentActivityRule extends Rule {
 }
 
 export interface SubThreshold {
+    /**
+     * A list of subreddits (case-insensitive) to look for
+     * @minItems 1
+     * */
     subreddits: string[],
+    /**
+     * The number of activities in each subreddit from the list that will trigger this rule
+     * */
     count?: number,
 }
 
 interface RecentActivityConfig {
     window?: string | number,
+    /**
+     * If activity is a Submission and is a link (not self-post) then only look at Submissions that contain this link, otherwise consider all activities.
+     * */
     usePostAsReference?: boolean,
+    /**
+    * If present restricts the activities that are considered for count from SubThreshold
+    * */
     lookAt?: 'comments' | 'submissions',
+    /**
+     * A list of subreddits/count criteria that may trigger this rule. ANY SubThreshold will trigger this rule.
+     * */
     thresholds: SubThreshold[],
 }
 

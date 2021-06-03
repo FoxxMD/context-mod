@@ -120,6 +120,9 @@ interface RepeatSubmissionConfig {
     threshold: number,
     window?: string | number,
     gapAllowance?: number,
+    /**
+     * If activity is a Submission and is a link (not self-post) then only look at Submissions that contain this link, otherwise consider all activities.
+     * */
     usePostAsReference?: boolean,
     include?: string[],
     exclude?: string[],

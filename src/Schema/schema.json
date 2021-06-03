@@ -1,36 +1,24 @@
 {
     "$schema": "http://json-schema.org/draft-07/schema#",
     "definitions": {
-        "ActionJSONConfig": {
-            "properties": {
-                "kind": {
-                    "enum": [
-                        "comment",
-                        "flair",
-                        "lock",
-                        "remove",
-                        "report"
-                    ],
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                }
+        "AbstractConfigSetLevels": {
+            "additionalProperties": {
+                "type": "number"
             },
-            "required": [
-                "kind"
-            ],
             "type": "object"
         },
         "AuthorOptions": {
+            "description": "If present then these Author criteria are checked before running the rule. If criteria fails then the rule is skipped. Note that when used on AuthorRule this becomes pass/fail (no skip)",
             "properties": {
                 "exclude": {
+                    "description": "Only runs if include is not present. Will \"pass\" if any of set of the Author criteria do not pass",
                     "items": {
                         "$ref": "#/definitions/IAuthor"
                     },
                     "type": "array"
                 },
                 "include": {
+                    "description": "Will \"pass\" if any set of the Author criteria passes",
                     "items": {
                         "$ref": "#/definitions/IAuthor"
                     },
@@ -42,21 +30,25 @@
         "AuthorRuleJSONConfig": {
             "properties": {
                 "authors": {
-                    "$ref": "#/definitions/AuthorOptions"
+                    "$ref": "#/definitions/AuthorOptions",
+                    "description": "If present then these Author criteria are checked before running the rule. If criteria fails then the rule is skipped. Note this is NOT the same as AuthorRule."
                 },
                 "exclude": {
+                    "description": "Only runs if include is not present. Will \"pass\" if any of set of the Author criteria do not pass",
                     "items": {
                         "$ref": "#/definitions/IAuthor"
                     },
                     "type": "array"
                 },
                 "include": {
+                    "description": "Will \"pass\" if any set of the Author criteria passes",
                     "items": {
                         "$ref": "#/definitions/IAuthor"
                     },
                     "type": "array"
                 },
                 "kind": {
+                    "description": "The kind of rule to run",
                     "enum": [
                         "author",
                         "recentActivity",
@@ -65,6 +57,7 @@
                     "type": "string"
                 },
                 "name": {
+                    "description": "A friendly, descriptive name for this rule. Highly recommended to make it easier to track logs EX \"repeatCrosspostRule\"",
                     "type": "string"
                 }
             },
@@ -76,27 +69,37 @@
             "type": "object"
         },
         "CheckJSONConfig": {
+            "description": "An object consisting of Rules (tests) and Actions to perform if Rules are triggered",
             "properties": {
                 "actions": {
+                    "description": "The actions to run after the check is successfully triggered. ALL actions will run in the order they are listed",
                     "items": {
                         "anyOf": [
-                            {
-                                "$ref": "#/definitions/ActionJSONConfig"
-                            },
                             {
                                 "$ref": "#/definitions/FlairActionJSONConfig"
                             },
                             {
                                 "$ref": "#/definitions/CommentActionJSONConfig"
+                            },
+                            {
+                                "$ref": "#/definitions/LockActionJSONConfig"
+                            },
+                            {
+                                "$ref": "#/definitions/RemoveActionJSONConfig"
+                            },
+                            {
+                                "$ref": "#/definitions/ReportActionJSONConfig"
                             }
                         ]
                     },
+                    "minItems": 1,
                     "type": "array"
                 },
                 "description": {
                     "type": "string"
                 },
                 "kind": {
+                    "description": "The type of event (new submission or new comment) this check should be run against",
                     "enum": [
                         "comment",
                         "submission"
@@ -104,9 +107,11 @@
                     "type": "string"
                 },
                 "name": {
+                    "description": "A friendly name for this check (highly recommended) -- EX \"repeatCrosspostReport\"",
                     "type": "string"
                 },
                 "ruleJoin": {
+                    "description": "Under what condition should a check's rules be \"successful\"? If 'OR' then ANY triggered rule will cause actions to run. If 'AND' then ALL rules must be triggered for actions to run.",
                     "enum": [
                         "AND",
                         "OR"
@@ -114,6 +119,7 @@
                     "type": "string"
                 },
                 "rules": {
+                    "description": "Rules are run in the order found in configuration. Can be Rules or RuleSets",
                     "items": {
                         "anyOf": [
                             {
@@ -130,6 +136,7 @@
                             }
                         ]
                     },
+                    "minItems": 1,
                     "type": "array"
                 }
             },
@@ -144,12 +151,14 @@
         "CommentActionJSONConfig": {
             "properties": {
                 "content": {
+                    "description": "Content is interpreted as reddit-flavored Markdown. If value starts with 'wiki:' then the proceeding value will be use to get a wiki page\nEX wiki:botconfig/mybot ==> try to get http://reddit.com/mySubredditExample/wiki/botconfig/mybot",
                     "type": "string"
                 },
                 "distinguish": {
                     "type": "boolean"
                 },
                 "kind": {
+                    "description": "The type of action that will be performed",
                     "enum": [
                         "comment",
                         "flair",
@@ -163,6 +172,7 @@
                     "type": "boolean"
                 },
                 "name": {
+                    "description": "A friendly name for this Action",
                     "type": "string"
                 },
                 "sticky": {
@@ -175,12 +185,41 @@
             ],
             "type": "object"
         },
+        "ExceptionHandler": {
+            "properties": {
+                "catcher": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/definitions/Function"
+                        },
+                        {
+                            "type": "boolean"
+                        }
+                    ]
+                },
+                "handlers": {
+                    "$ref": "#/definitions/Map<any,any>"
+                },
+                "logger": {
+                    "$ref": "#/definitions/Logger"
+                }
+            },
+            "required": [
+                "catcher",
+                "handlers",
+                "logger"
+            ],
+            "type": "object"
+        },
         "FlairActionJSONConfig": {
+            "description": "text and css cannot both be empty",
             "properties": {
                 "css": {
+                    "description": "The text of the css class of the flair to apply",
                     "type": "string"
                 },
                 "kind": {
+                    "description": "The type of action that will be performed",
                     "enum": [
                         "comment",
                         "flair",
@@ -191,9 +230,11 @@
                     "type": "string"
                 },
                 "name": {
+                    "description": "A friendly name for this Action",
                     "type": "string"
                 },
                 "text": {
+                    "description": "The text of the flair to apply",
                     "type": "string"
                 }
             },
@@ -202,24 +243,71 @@
             ],
             "type": "object"
         },
+        "Format": {
+            "properties": {
+                "options": {
+                    "additionalProperties": true,
+                    "properties": {
+                    },
+                    "type": "object"
+                },
+                "transform": {
+                    "type": "object"
+                }
+            },
+            "required": [
+                "transform"
+            ],
+            "type": "object"
+        },
+        "Function": {
+            "properties": {
+                "arguments": {
+                },
+                "caller": {
+                    "$ref": "#/definitions/Function"
+                },
+                "length": {
+                    "type": "number"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "prototype": {
+                }
+            },
+            "required": [
+                "arguments",
+                "caller",
+                "length",
+                "name",
+                "prototype"
+            ],
+            "type": "object"
+        },
         "IAuthor": {
+            "description": "Criteria with which to test against the author of a submission/comment. The outcome of the test is based on 1. any list criteria matching and then 2. all present criteria passing",
             "properties": {
                 "flairCssClass": {
+                    "description": "A list of (user) flair css class values from the subreddit to match against",
                     "items": {
                         "type": "string"
                     },
                     "type": "array"
                 },
                 "flairText": {
+                    "description": "A list of (user) flair text values from the subreddit to match against",
                     "items": {
                         "type": "string"
                     },
                     "type": "array"
                 },
                 "isMod": {
+                    "description": "Is the author a moderator?",
                     "type": "boolean"
                 },
                 "name": {
+                    "description": "A list of reddit usernames (case-insensitive) to match against",
                     "items": {
                         "type": "string"
                     },
@@ -228,12 +316,263 @@
             },
             "type": "object"
         },
+        "LeveledLogMethod": {
+            "type": "object"
+        },
+        "LockActionJSONConfig": {
+            "properties": {
+                "kind": {
+                    "description": "The type of action that will be performed",
+                    "enum": [
+                        "comment",
+                        "flair",
+                        "lock",
+                        "remove",
+                        "report"
+                    ],
+                    "type": "string"
+                },
+                "name": {
+                    "description": "A friendly name for this Action",
+                    "type": "string"
+                }
+            },
+            "required": [
+                "kind"
+            ],
+            "type": "object"
+        },
+        "LogMethod": {
+            "type": "object"
+        },
+        "Logger": {
+            "properties": {
+                "alert": {
+                    "$ref": "#/definitions/LeveledLogMethod"
+                },
+                "crit": {
+                    "$ref": "#/definitions/LeveledLogMethod"
+                },
+                "data": {
+                    "$ref": "#/definitions/LeveledLogMethod"
+                },
+                "debug": {
+                    "$ref": "#/definitions/LeveledLogMethod"
+                },
+                "defaultMeta": {
+                },
+                "destroyed": {
+                    "type": "boolean"
+                },
+                "emerg": {
+                    "$ref": "#/definitions/LeveledLogMethod"
+                },
+                "error": {
+                    "$ref": "#/definitions/LeveledLogMethod"
+                },
+                "exceptions": {
+                    "$ref": "#/definitions/ExceptionHandler"
+                },
+                "exitOnError": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/definitions/Function"
+                        },
+                        {
+                            "type": "boolean"
+                        }
+                    ]
+                },
+                "format": {
+                    "$ref": "#/definitions/Format"
+                },
+                "help": {
+                    "$ref": "#/definitions/LeveledLogMethod"
+                },
+                "http": {
+                    "$ref": "#/definitions/LeveledLogMethod"
+                },
+                "info": {
+                    "$ref": "#/definitions/LeveledLogMethod"
+                },
+                "input": {
+                    "$ref": "#/definitions/LeveledLogMethod"
+                },
+                "level": {
+                    "type": "string"
+                },
+                "levels": {
+                    "$ref": "#/definitions/AbstractConfigSetLevels"
+                },
+                "log": {
+                    "$ref": "#/definitions/LogMethod"
+                },
+                "notice": {
+                    "$ref": "#/definitions/LeveledLogMethod"
+                },
+                "profilers": {
+                    "additionalProperties": true,
+                    "properties": {
+                    },
+                    "type": "object"
+                },
+                "prompt": {
+                    "$ref": "#/definitions/LeveledLogMethod"
+                },
+                "readable": {
+                    "type": "boolean"
+                },
+                "readableEncoding": {
+                    "anyOf": [
+                        {
+                            "enum": [
+                                "ascii",
+                                "base64",
+                                "base64url",
+                                "binary",
+                                "hex",
+                                "latin1",
+                                "ucs-2",
+                                "ucs2",
+                                "utf-8",
+                                "utf16le",
+                                "utf8"
+                            ],
+                            "type": "string"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "readableEnded": {
+                    "type": "boolean"
+                },
+                "readableFlowing": {
+                    "type": [
+                        "null",
+                        "boolean"
+                    ]
+                },
+                "readableHighWaterMark": {
+                    "type": "number"
+                },
+                "readableLength": {
+                    "type": "number"
+                },
+                "readableObjectMode": {
+                    "type": "boolean"
+                },
+                "silent": {
+                    "type": "boolean"
+                },
+                "silly": {
+                    "$ref": "#/definitions/LeveledLogMethod"
+                },
+                "transports": {
+                    "items": {
+                        "$ref": "#/definitions/TransportStream"
+                    },
+                    "type": "array"
+                },
+                "verbose": {
+                    "$ref": "#/definitions/LeveledLogMethod"
+                },
+                "warn": {
+                    "$ref": "#/definitions/LeveledLogMethod"
+                },
+                "warning": {
+                    "$ref": "#/definitions/LeveledLogMethod"
+                },
+                "writable": {
+                    "type": "boolean"
+                },
+                "writableCorked": {
+                    "type": "number"
+                },
+                "writableEnded": {
+                    "type": "boolean"
+                },
+                "writableFinished": {
+                    "type": "boolean"
+                },
+                "writableHighWaterMark": {
+                    "type": "number"
+                },
+                "writableLength": {
+                    "type": "number"
+                },
+                "writableObjectMode": {
+                    "type": "boolean"
+                }
+            },
+            "required": [
+                "alert",
+                "crit",
+                "data",
+                "debug",
+                "destroyed",
+                "emerg",
+                "error",
+                "exceptions",
+                "exitOnError",
+                "format",
+                "help",
+                "http",
+                "info",
+                "input",
+                "level",
+                "levels",
+                "log",
+                "notice",
+                "profilers",
+                "prompt",
+                "readable",
+                "readableEncoding",
+                "readableEnded",
+                "readableFlowing",
+                "readableHighWaterMark",
+                "readableLength",
+                "readableObjectMode",
+                "silent",
+                "silly",
+                "transports",
+                "verbose",
+                "warn",
+                "warning",
+                "writable",
+                "writableCorked",
+                "writableEnded",
+                "writableFinished",
+                "writableHighWaterMark",
+                "writableLength",
+                "writableObjectMode"
+            ],
+            "type": "object"
+        },
+        "Map<any,any>": {
+            "properties": {
+                "__@toStringTag": {
+                    "type": "string"
+                },
+                "size": {
+                    "type": "number"
+                }
+            },
+            "required": [
+                "__@toStringTag",
+                "size"
+            ],
+            "type": "object"
+        },
         "RecentActivityRuleJSONConfig": {
             "properties": {
                 "authors": {
-                    "$ref": "#/definitions/AuthorOptions"
+                    "$ref": "#/definitions/AuthorOptions",
+                    "description": "If present then these Author criteria are checked before running the rule. If criteria fails then the rule is skipped. Note this is NOT the same as AuthorRule."
                 },
                 "kind": {
+                    "description": "The kind of rule to run",
                     "enum": [
                         "author",
                         "recentActivity",
@@ -242,6 +581,7 @@
                     "type": "string"
                 },
                 "lookAt": {
+                    "description": "If present restricts the activities that are considered for count from SubThreshold",
                     "enum": [
                         "comments",
                         "submissions"
@@ -249,15 +589,18 @@
                     "type": "string"
                 },
                 "name": {
+                    "description": "A friendly, descriptive name for this rule. Highly recommended to make it easier to track logs EX \"repeatCrosspostRule\"",
                     "type": "string"
                 },
                 "thresholds": {
+                    "description": "A list of subreddits/count criteria that may trigger this rule. ANY SubThreshold will trigger this rule.",
                     "items": {
                         "$ref": "#/definitions/SubThreshold"
                     },
                     "type": "array"
                 },
                 "usePostAsReference": {
+                    "description": "If activity is a Submission and is a link (not self-post) then only look at Submissions that contain this link, otherwise consider all activities.",
                     "type": "boolean"
                 },
                 "window": {
@@ -273,10 +616,34 @@
             ],
             "type": "object"
         },
+        "RemoveActionJSONConfig": {
+            "properties": {
+                "kind": {
+                    "description": "The type of action that will be performed",
+                    "enum": [
+                        "comment",
+                        "flair",
+                        "lock",
+                        "remove",
+                        "report"
+                    ],
+                    "type": "string"
+                },
+                "name": {
+                    "description": "A friendly name for this Action",
+                    "type": "string"
+                }
+            },
+            "required": [
+                "kind"
+            ],
+            "type": "object"
+        },
         "RepeatSubmissionJSONConfig": {
             "properties": {
                 "authors": {
-                    "$ref": "#/definitions/AuthorOptions"
+                    "$ref": "#/definitions/AuthorOptions",
+                    "description": "If present then these Author criteria are checked before running the rule. If criteria fails then the rule is skipped. Note this is NOT the same as AuthorRule."
                 },
                 "exclude": {
                     "items": {
@@ -294,6 +661,7 @@
                     "type": "array"
                 },
                 "kind": {
+                    "description": "The kind of rule to run",
                     "enum": [
                         "author",
                         "recentActivity",
@@ -302,12 +670,14 @@
                     "type": "string"
                 },
                 "name": {
+                    "description": "A friendly, descriptive name for this rule. Highly recommended to make it easier to track logs EX \"repeatCrosspostRule\"",
                     "type": "string"
                 },
                 "threshold": {
                     "type": "number"
                 },
                 "usePostAsReference": {
+                    "description": "If activity is a Submission and is a link (not self-post) then only look at Submissions that contain this link, otherwise consider all activities.",
                     "type": "boolean"
                 },
                 "window": {
@@ -323,9 +693,43 @@
             ],
             "type": "object"
         },
+        "ReportActionJSONConfig": {
+            "properties": {
+                "content": {
+                    "type": "string"
+                },
+                "kind": {
+                    "description": "The type of action that will be performed",
+                    "enum": [
+                        "comment",
+                        "flair",
+                        "lock",
+                        "remove",
+                        "report"
+                    ],
+                    "type": "string"
+                },
+                "logger": {
+                    "$ref": "#/definitions/Logger"
+                },
+                "loggerPrefix": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "content",
+                "kind"
+            ],
+            "type": "object"
+        },
         "RuleSetJSONConfig": {
+            "description": "A RuleSet is a \"nested\" set of Rules that can be used to create more complex AND/OR behavior. Think of the outcome of a RuleSet as the result of all of it's Rules (based on condition)",
             "properties": {
                 "condition": {
+                    "description": "Under what condition should a RuleSet's rules be \"successful\"? If 'OR' then ANY triggered rule result in a true outcome. If 'AND' then ALL rules must be triggered for the result to be true.",
                     "enum": [
                         "AND",
                         "OR"
@@ -340,6 +744,9 @@
                             },
                             {
                                 "$ref": "#/definitions/RepeatSubmissionJSONConfig"
+                            },
+                            {
+                                "$ref": "#/definitions/AuthorRuleJSONConfig"
                             }
                         ]
                     },
@@ -355,12 +762,15 @@
         "SubThreshold": {
             "properties": {
                 "count": {
+                    "description": "The number of activities in each subreddit from the list that will trigger this rule",
                     "type": "number"
                 },
                 "subreddits": {
+                    "description": "A list of subreddits (case-insensitive) to look for",
                     "items": {
                         "type": "string"
                     },
+                    "minItems": 1,
                     "type": "array"
                 }
             },
@@ -368,13 +778,66 @@
                 "subreddits"
             ],
             "type": "object"
+        },
+        "TransportStream": {
+            "properties": {
+                "destroyed": {
+                    "type": "boolean"
+                },
+                "format": {
+                    "$ref": "#/definitions/Format"
+                },
+                "handleExceptions": {
+                    "type": "boolean"
+                },
+                "level": {
+                    "type": "string"
+                },
+                "silent": {
+                    "type": "boolean"
+                },
+                "writable": {
+                    "type": "boolean"
+                },
+                "writableCorked": {
+                    "type": "number"
+                },
+                "writableEnded": {
+                    "type": "boolean"
+                },
+                "writableFinished": {
+                    "type": "boolean"
+                },
+                "writableHighWaterMark": {
+                    "type": "number"
+                },
+                "writableLength": {
+                    "type": "number"
+                },
+                "writableObjectMode": {
+                    "type": "boolean"
+                }
+            },
+            "required": [
+                "destroyed",
+                "writable",
+                "writableCorked",
+                "writableEnded",
+                "writableFinished",
+                "writableHighWaterMark",
+                "writableLength",
+                "writableObjectMode"
+            ],
+            "type": "object"
         }
     },
     "properties": {
         "checks": {
+            "description": "A list of all the checks that should be run for a subreddit. Checks are split into two lists -- submission or comment -- based on kind and run independently. Checks in each list are run in the order found in the configuration. When a check \"passes\" and actions are performed any subsequent checks are skipped.",
             "items": {
                 "$ref": "#/definitions/CheckJSONConfig"
             },
+            "minItems": 1,
             "type": "array"
         }
     },

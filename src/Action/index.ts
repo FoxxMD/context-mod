@@ -33,11 +33,17 @@ export interface ActionOptions {
 }
 
 export interface ActionConfig {
+    /**
+     * A friendly name for this Action
+     * */
     name?: string;
 }
 
 /** @see {isActionConfig} ts-auto-guard:type-guard */
 export interface ActionJSONConfig extends ActionConfig {
+    /**
+     * The type of action that will be performed
+     */
     kind: 'comment' | 'lock' | 'remove' | 'report' | 'flair'
 }
 

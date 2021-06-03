@@ -14,6 +14,9 @@ import {actionFactory} from "../Action/ActionFactory";
 import {ruleFactory} from "../Rule/RuleFactory";
 import {createLabelledLogger, determineNewResults, loggerMetaShuffle, mergeArr} from "../util";
 import {AuthorRuleJSONConfig} from "../Rule/AuthorRule";
+import {ReportActionJSONConfig} from "../Action/ReportAction";
+import {LockActionJSONConfig} from "../Action/LockAction";
+import {RemoveActionJSONConfig} from "../Action/RemoveAction";
 
 export class Check implements ICheck {
     actions: Action[] = [];
@@ -100,8 +103,14 @@ export class Check implements ICheck {
 }
 
 export interface ICheck {
+    /**
+     * A friendly name for this check (highly recommended) -- EX "repeatCrosspostReport"
+     * */
     name: string,
     description?: string,
+    /**
+     * Under what condition should a check's rules be "successful"? If 'OR' then ANY triggered rule will cause actions to run. If 'AND' then ALL rules must be triggered for actions to run.
+     * */
     ruleJoin?: 'OR' | 'AND',
 }
 
@@ -111,9 +120,23 @@ export interface CheckOptions extends ICheck {
     logger?: Logger
 }
 
-/** @see {isCheckConfig} ts-auto-guard:type-guard */
+/**
+ * An object consisting of Rules (tests) and Actions to perform if Rules are triggered
+ * @see {isCheckConfig} ts-auto-guard:type-guard
+ * */
 export interface CheckJSONConfig extends ICheck {
+    /**
+     * The type of event (new submission or new comment) this check should be run against
+     */
     kind: 'submission' | 'comment'
+    /**
+     * Rules are run in the order found in configuration. Can be Rules or RuleSets
+     * @minItems 1
+     * */
     rules: Array<RuleSetJSONConfig | RecentActivityRuleJSONConfig | RepeatSubmissionJSONConfig | AuthorRuleJSONConfig>
-    actions: Array<ActionJSONConfig | FlairActionJSONConfig | CommentActionJSONConfig>
+    /**
+     * The actions to run after the check is successfully triggered. ALL actions will run in the order they are listed
+     * @minItems 1
+     * */
+    actions: Array<FlairActionJSONConfig | CommentActionJSONConfig | ReportActionJSONConfig | LockActionJSONConfig | RemoveActionJSONConfig>
 }

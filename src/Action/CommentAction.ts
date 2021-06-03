@@ -59,6 +59,10 @@ export class CommentAction extends Action {
 }
 
 export interface CommentActionConfig {
+    /**
+     * Content is interpreted as reddit-flavored Markdown. If value starts with 'wiki:' then the proceeding value will be use to get a wiki page
+     * EX wiki:botconfig/mybot ==> try to get http://reddit.com/mySubredditExample/wiki/botconfig/mybot
+    * */
     content: string,
     lock?: boolean,
     sticky?: boolean,
