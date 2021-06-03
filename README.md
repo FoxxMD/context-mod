@@ -76,11 +76,9 @@ foxxmd/reddit-context-bot:latest
 
 ## Configuration
 
-Context Bot's configuration conforms to [JSON Schema](https://json-schema.org/) Draft 7 so you can view all documentation while also interactively writing and validating your config!
+Context Bot's [configuration schema](/src/Schema/App.json) conforms to [JSON Schema](https://json-schema.org/) Draft 7.
 
-Any number of json validators exists but I suggest using [Atlassian JSON Schema Viewer](https://json-schema.app/view/%23?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Freddit-context-bot%2Fmaster%2Fsrc%2FSchema%2FApp.json):
-
-From there you can drill down into any object, see its requirements, view an example JSON document, and live-edit your configuration on the right-hand side.
+I suggest using [Atlassian JSON Schema Viewer](https://json-schema.app/start) ([direct link](https://json-schema.app/view/%23?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Freddit-context-bot%2Fmaster%2Fsrc%2FSchema%2FApp.json)) so you can view all documentation while also interactively writing and validating your config! From there you can drill down into any object, see its requirements, view an example JSON document, and live-edit your configuration on the right-hand side.
 
 ### Environmental Variables
 
