@@ -406,8 +406,7 @@
                     "properties": {
                         "interval": {
                             "default": 10000,
-                            "description": "Amount of time to wait between requests for new comments\n\nDefaults to 10 seconds",
-                            "format": "milliseconds",
+                            "description": "Amount of time, in milliseconds, to wait between requests for new comments",
                             "type": "number"
                         },
                         "limit": {
@@ -427,8 +426,7 @@
                     "properties": {
                         "interval": {
                             "default": 10000,
-                            "description": "Amount of time to wait between requests to /r/subreddit/new\n\nDefaults to 10 seconds",
-                            "format": "milliseconds",
+                            "description": "Amount of time, in milliseconds, to wait between requests to /r/subreddit/new",
                             "type": "number"
                         },
                         "limit": {

@@ -1,6 +1,6 @@
 import Snoowrap, {Comment, Submission} from "snoowrap";
 import {Logger} from "winston";
-import {createLabelledLogger} from "../util";
+import {createLabelledLogger, loggerMetaShuffle} from "../util";
 
 export abstract class Action {
     name?: string;
@@ -19,7 +19,7 @@ export abstract class Action {
             const prefix = `${loggerPrefix}|${this.name}`;
             this.logger = createLabelledLogger(prefix, prefix);
         } else {
-            this.logger = logger;
+            this.logger = logger.child(loggerMetaShuffle(logger, name || 'Action', undefined, {truncateLength: 100}));
         }
     }
 

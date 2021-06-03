@@ -1,17 +1,14 @@
-import {InboxStream, CommentStream, SubmissionStream} from "snoostorm";
 import snoowrap from "snoowrap";
 import minimist from 'minimist';
-import winston, {Logger} from 'winston';
+import winston from 'winston';
 import 'winston-daily-rotate-file';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc.js';
 import dduration from 'dayjs/plugin/duration.js';
 import {labelledFormat} from "./util";
-import {ConfigBuilder} from "./ConfigBuilder";
 import EventEmitter from "events";
 import {Manager} from "./Subreddit/Manager";
 import pEvent from "p-event";
-import {JSONConfig} from "./JsonConfig";
 
 dayjs.extend(utc);
 dayjs.extend(dduration);
@@ -119,7 +116,6 @@ if (subredditsArg.length === 0) {
         for (const sub of subsToRun) {
             let content = undefined;
             let json = undefined;
-            let config = undefined;
             try {
                 const wiki = sub.getWikiPage('contextbot');
                 content = await wiki.content_md;

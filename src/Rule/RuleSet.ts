@@ -8,6 +8,10 @@ import {createLabelledLogger, determineNewResults, findResultByPremise, loggerMe
 import {Logger} from "winston";
 import {AuthorRuleJSONConfig} from "./AuthorRule";
 import {JoinCondition, JoinOperands} from "../Common/interfaces";
+import * as RuleSchema from '../Schema/Rule.json';
+import Ajv from 'ajv';
+
+const ajv = new Ajv();
 
 export class RuleSet implements IRuleSet, Triggerable {
     rules: Rule[] = [];
@@ -25,10 +29,15 @@ export class RuleSet implements IRuleSet, Triggerable {
         for (const r of rules) {
             if (r instanceof Rule) {
                 this.rules.push(r);
-            } else if (isRuleConfig(r)) {
-                // @ts-ignore
-                r.logger = this.logger;
-                this.rules.push(ruleFactory(r));
+            } else {
+                const valid = ajv.validate(RuleSchema, r);
+                if (valid) {
+                    // @ts-ignore
+                    r.logger = this.logger;
+                    this.rules.push(ruleFactory(r as RuleJSONConfig));
+                } else {
+                    this.logger.warn('Could not build rule because of JSON errors', {}, {errors: ajv.errors, obj: r});
+                }
             }
         }
     }

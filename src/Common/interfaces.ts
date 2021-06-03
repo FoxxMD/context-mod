@@ -147,9 +147,8 @@ export interface PollingOptions {
          * */
         limit?: number,
         /**
-         * Amount of time to wait between requests to /r/subreddit/new
+         * Amount of time, in milliseconds, to wait between requests to /r/subreddit/new
          *
-         * @format milliseconds
          * @default 10000
          * */
         interval?: number,
@@ -164,9 +163,8 @@ export interface PollingOptions {
          * */
         limit?: number,
         /**
-         * Amount of time to wait between requests for new comments
+         * Amount of time, in milliseconds, to wait between requests for new comments
          *
-         * @format milliseconds
          * @default 10000
          * */
         interval?: number,

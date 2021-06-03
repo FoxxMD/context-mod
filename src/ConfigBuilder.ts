@@ -1,11 +1,10 @@
 import {Logger} from "winston";
 import {createLabelledLogger, loggerMetaShuffle, mergeArr} from "./util";
-import {Subreddit} from "snoowrap";
 import {CommentCheck} from "./Check/CommentCheck";
 import {SubmissionCheck} from "./Check/SubmissionCheck";
 
 import Ajv from 'ajv';
-import * as schema from './Schema/schema.json';
+import * as schema from './Schema/App.json';
 import {JSONConfig} from "./JsonConfig";
 import LoggedError from "./Utils/LoggedError";
 
@@ -13,15 +12,12 @@ const ajv = new Ajv();
 
 export interface ConfigBuilderOptions {
     logger?: Logger,
-    //subreddit: Subreddit,
 }
 
 export class ConfigBuilder {
     logger: Logger;
-    //subreddit: Subreddit;
 
     constructor(options: ConfigBuilderOptions) {
-       // this.subreddit = options.subreddit;
 
         if (options.logger !== undefined) {
             this.logger = options.logger.child(loggerMetaShuffle(options.logger, 'Config'), mergeArr);

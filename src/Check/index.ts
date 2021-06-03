@@ -18,6 +18,12 @@ import {ReportActionJSONConfig} from "../Action/ReportAction";
 import {LockActionJSONConfig} from "../Action/LockAction";
 import {RemoveActionJSONConfig} from "../Action/RemoveAction";
 import {JoinCondition, JoinOperands} from "../Common/interfaces";
+import * as RuleSchema from '../Schema/Rule.json';
+import * as RuleSetSchema from '../Schema/RuleSet.json';
+import * as ActionSchema from '../Schema/Action.json';
+import Ajv from 'ajv';
+
+const ajv = new Ajv();
 
 export class Check implements ICheck {
     actions: Action[] = [];
@@ -49,20 +55,46 @@ export class Check implements ICheck {
         for (const r of rules) {
             if (r instanceof Rule || r instanceof RuleSet) {
                 this.rules.push(r);
-            } else if (isRuleSetConfig(r)) {
-                this.rules.push(new RuleSet(r));
-            } else if (isRuleConfig(r)) {
-                // @ts-ignore
-                r.logger = this.logger;
-                this.rules.push(ruleFactory(r));
+            } else {
+                let valid = ajv.validate(RuleSetSchema, r);
+                let setErrors: any = [];
+                let ruleErrors: any = [];
+                if (valid) {
+                    // @ts-ignore
+                    r.logger = this.logger;
+                    this.rules.push(new RuleSet(r as RuleSetJSONConfig));
+                } else {
+                    setErrors = ajv.errors;
+                    valid = ajv.validate(RuleSchema, r);
+                    if (valid) {
+                        // @ts-ignore
+                        r.logger = this.logger;
+                        this.rules.push(ruleFactory(r as RuleJSONConfig));
+                    } else {
+                        ruleErrors = ajv.errors;
+                        const leastErrorType = setErrors.length < ruleErrors ? 'RuleSet' : 'Rule';
+                        const errors = setErrors.length < ruleErrors ? setErrors : ruleErrors;
+                        this.logger.warn(`Could not parse object as RuleSet or Rule json. ${leastErrorType} validation had least errors`, {}, {
+                            errors,
+                            obj: r
+                        });
+                    }
+                }
             }
         }
 
         for (const a of actions) {
             if (a instanceof Action) {
                 this.actions.push(a);
-            } else if (isActionConfig(a)) {
-                this.actions.push(actionFactory(a));
+            } else {
+                let valid = ajv.validate(ActionSchema, a);
+                if (valid) {
+                    this.actions.push(actionFactory(a as ActionJSONConfig));
+                    // @ts-ignore
+                    a.logger = this.logger;
+                } else {
+                    this.logger.warn('Could not parse object as Action', {}, {error: ajv.errors, obj: a})
+                }
             }
         }
 

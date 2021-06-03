@@ -1,0 +1,105 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "definitions": {
+        "AuthorCriteria": {
+            "additionalProperties": false,
+            "description": "Criteria with which to test against the author of an Activity. The outcome of the test is based on:\n\n1. All present properties passing and\n2. If a property is a list then any value from the list matching",
+            "minProperties": 1,
+            "properties": {
+                "flairCssClass": {
+                    "description": "A list of (user) flair css class values from the subreddit to match against",
+                    "items": {
+                        "type": "string"
+                    },
+                    "type": "array"
+                },
+                "flairText": {
+                    "description": "A list of (user) flair text values from the subreddit to match against",
+                    "items": {
+                        "type": "string"
+                    },
+                    "type": "array"
+                },
+                "isMod": {
+                    "description": "Is the author a moderator?",
+                    "type": "boolean"
+                },
+                "name": {
+                    "description": "A list of reddit usernames (case-insensitive) to match against. Do not include the \"u/\" prefix\n\n EX to match against /u/FoxxMD and /u/AnotherUser use [\"FoxxMD\",\"AnotherUser\"]",
+                    "examples": [
+                        "FoxxMD",
+                        "AnotherUser"
+                    ],
+                    "items": {
+                        "type": "string"
+                    },
+                    "type": "array"
+                }
+            },
+            "propertyOrder": [
+                "name",
+                "flairCssClass",
+                "flairText",
+                "isMod"
+            ],
+            "type": "object"
+        },
+        "AuthorOptions": {
+            "additionalProperties": false,
+            "description": "If present then these Author criteria are checked before running the rule. If criteria fails then the rule is skipped.",
+            "minProperties": 1,
+            "properties": {
+                "exclude": {
+                    "description": "Only runs if include is not present. Will \"pass\" if any of set of the AuthorCriteria does not pass",
+                    "items": {
+                        "$ref": "#/definitions/AuthorCriteria"
+                    },
+                    "type": "array"
+                },
+                "include": {
+                    "description": "Will \"pass\" if any set of AuthorCriteria passes",
+                    "items": {
+                        "$ref": "#/definitions/AuthorCriteria"
+                    },
+                    "type": "array"
+                }
+            },
+            "propertyOrder": [
+                "include",
+                "exclude"
+            ],
+            "type": "object"
+        }
+    },
+    "properties": {
+        "authors": {
+            "$ref": "#/definitions/AuthorOptions",
+            "additionalProperties": false,
+            "description": "If present then these Author criteria are checked before running the rule. If criteria fails then the rule is skipped.",
+            "minProperties": 1
+        },
+        "kind": {
+            "description": "The kind of rule to run",
+            "enum": [
+                "author",
+                "recentActivity",
+                "repeatSubmission"
+            ],
+            "type": "string"
+        },
+        "name": {
+            "description": "A friendly, descriptive name for this rule. Highly recommended to make it easier to track logs EX \"repeatCrosspostRule\"",
+            "type": "string"
+        }
+    },
+    "propertyOrder": [
+        "kind",
+        "name",
+        "authors"
+    ],
+    "required": [
+        "kind"
+    ],
+    "type": "object"
+}
+
