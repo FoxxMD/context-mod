@@ -90,7 +90,64 @@ Documentation coming soon
 
 ### Example Config
 
-Coming soon
+Below is a configuration fulfilling the example given at the start of this readme:
+
+```json
+{
+  "checks": [
+    {
+      "name": "repeatSpam",
+      "kind": "submission",
+      "rules": [
+        {
+          "kind": "repeatSubmission",
+          "gapAllowance": 2,
+          "threshold": 10
+        }
+      ],
+      "actions": [
+        {
+          "kind": "remove"
+        },
+        {
+          "kind": "comment",
+          "content": "Thank you for your submission but we do not allow mass crossposting. Your submission has been removed",
+          "distingish": true
+        }
+      ]
+    },
+    {
+      "name": "selfPromoActivity",
+      "kind": "submission",
+      "rules": [
+        {
+          "kind": "recentActivity",
+          "thresholds": [
+            {
+              "subreddits": [
+                "YouTubeSubscribeBoost",
+                "AdvertiseYourVideos"
+              ]
+            }
+          ]
+        }
+      ],
+      "actions": [
+        {
+          "kind": "report",
+          "content": "CB: self-promo"
+        },
+        {
+          "kind": "comment",
+          "content": "wiki:botconfig/contextbot/reportSelfPromo",
+          "distingish": true
+        }
+      ]
+    }
+  ]
+}
+
+```
 
 ## Usage
 
