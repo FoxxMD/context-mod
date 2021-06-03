@@ -3,11 +3,12 @@ import {Comment, VoteableContent} from "snoowrap";
 import Submission from "snoowrap/dist/objects/Submission";
 import {getAuthorActivities, getAuthorComments, getAuthorSubmissions} from "../Utils/SnoowrapUtils";
 import {parseUsableLinkIdentifier} from "../util";
+import {ActivityWindow, ActivityWindowCriteria, ActivityWindowType} from "../Common/interfaces";
 
 const parseLink = parseUsableLinkIdentifier();
 
 export class RecentActivityRule extends Rule {
-    window: string | number;
+    window: ActivityWindowType;
     thresholds: SubThreshold[];
     usePostAsReference: boolean;
     lookAt?: 'comments' | 'submissions';
@@ -112,20 +113,24 @@ export interface SubThreshold {
     count?: number,
 }
 
-interface RecentActivityConfig {
-    window?: string | number,
+interface RecentActivityConfig extends ActivityWindow {
     /**
      * If activity is a Submission and is a link (not self-post) then only look at Submissions that contain this link, otherwise consider all activities.
      * */
     usePostAsReference?: boolean,
     /**
-    * If present restricts the activities that are considered for count from SubThreshold
-    * */
+     * If present restricts the activities that are considered for count from SubThreshold
+     * */
     lookAt?: 'comments' | 'submissions',
     /**
      * A list of subreddits/count criteria that may trigger this rule. ANY SubThreshold will trigger this rule.
      * */
     thresholds: SubThreshold[],
+
+    /**
+     * @default 15
+     * */
+    window: ActivityWindowType;
 }
 
 export interface RecentActivityRuleOptions extends RecentActivityConfig, RuleOptions {

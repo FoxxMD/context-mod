@@ -3,6 +3,11 @@ import jsonStringify from 'safe-stable-stringify';
 import dayjs from 'dayjs';
 import {RulePremise, RuleResult} from "./Rule";
 import deepEqual from "fast-deep-equal";
+import utc from 'dayjs/plugin/utc.js';
+import dduration from 'dayjs/plugin/duration.js';
+
+dayjs.extend(utc);
+dayjs.extend(dduration);
 
 const {format} = winston;
 const {combine, printf, timestamp, label, splat, errors} = format;

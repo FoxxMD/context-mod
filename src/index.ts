@@ -11,6 +11,7 @@ import {ConfigBuilder} from "./ConfigBuilder";
 import EventEmitter from "events";
 import {Manager} from "./Subreddit/Manager";
 import pEvent from "p-event";
+import {JSONConfig} from "./JsonConfig";
 
 dayjs.extend(utc);
 dayjs.extend(dduration);

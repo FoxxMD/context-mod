@@ -4,13 +4,14 @@ import {Duration, DurationUnitsObjectType} from "dayjs/plugin/duration";
 import dayjs, {Dayjs} from "dayjs";
 import Mustache from "mustache";
 import {AuthorOptions, IAuthor} from "../Rule";
+import {ActivityWindowCriteria, ActivityWindowType} from "../Common/interfaces";
 
 export interface AuthorTypedActivitiesOptions extends AuthorActivitiesOptions {
     type?: 'comment' | 'submission',
 }
 
 export interface AuthorActivitiesOptions {
-    window: number | string | Duration | DurationUnitsObjectType
+    window: ActivityWindowType | Duration
 }
 
 export async function getAuthorActivities(user: RedditUser, options: AuthorTypedActivitiesOptions): Promise<Array<Submission | Comment>> {

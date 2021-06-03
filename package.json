@@ -8,7 +8,8 @@
     "build": "tsc",
     "start": "node server.js",
     "guard": "ts-auto-guard src/JsonConfig.ts",
-    "schema": "typescript-json-schema src/JsonConfig.ts JSONConfig --out src/Schema/schema.json"
+    "schema": "typescript-json-schema tsconfig.json JSONConfig --out src/Schema/schema.json --required --tsNodeRegister",
+    "schemaNotWorking": "./node_modules/.bin/ts-json-schema-generator -f tsconfig.json -p src/JsonConfig.ts -t JSONConfig --out src/Schema/vegaSchema.json"
   },
   "keywords": [],
   "author": "",
@@ -33,6 +34,7 @@
     "@types/mustache": "^4.1.1",
     "@types/node": "^15.6.1",
     "ts-auto-guard": "*",
+    "ts-json-schema-generator": "^0.93.0",
     "typescript-json-schema": "^0.50.1"
   }
 }
