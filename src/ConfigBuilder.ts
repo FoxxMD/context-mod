@@ -7,6 +7,7 @@ import Ajv from 'ajv';
 import * as schema from './Schema/App.json';
 import {JSONConfig} from "./JsonConfig";
 import LoggedError from "./Utils/LoggedError";
+import {ManagerOptions} from "./Subreddit/Manager";
 
 const ajv = new Ajv();
 
@@ -26,13 +27,16 @@ export class ConfigBuilder {
         }
     }
 
-    buildFromJson(config: object): (Array<SubmissionCheck> | Array<CommentCheck>)[] {
+    buildFromJson(config: object): [Array<SubmissionCheck>,Array<CommentCheck>,ManagerOptions] {
         const commentChecks: Array<CommentCheck> = [];
         const subChecks: Array<SubmissionCheck> = [];
         const valid = ajv.validate(schema, config);
+        let managerOptions: ManagerOptions = {};
         if(valid) {
             const validConfig = config as JSONConfig;
-            for (const jCheck of validConfig.checks) {
+            const {checks = [], ...rest} = validConfig;
+            managerOptions = rest;
+            for (const jCheck of checks) {
                 if (jCheck.kind === 'comment') {
                     commentChecks.push(new CommentCheck({...jCheck, logger: this.logger}));
                 } else if (jCheck.kind === 'submission') {
@@ -45,6 +49,6 @@ export class ConfigBuilder {
             throw new LoggedError();
         }
 
-        return [subChecks, commentChecks];
+        return [subChecks, commentChecks, managerOptions];
     }
 }
