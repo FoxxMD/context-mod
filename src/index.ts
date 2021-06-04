@@ -25,6 +25,7 @@ const {
     logDir = process.env.LOG_DIR,
     logLevel = process.env.LOG_LEVEL,
     wikiConfig = process.env.WIKI_CONFIG,
+    snooDebug = process.env.SNOO_DEBUG
 } = argv;
 
 const logPath = logDir ?? `${process.cwd()}/logs`;
@@ -81,8 +82,15 @@ if (subredditsArg.length === 0) {
         accessToken,
     };
     try {
+
+        let shouldDebug = false;
+        if(snooDebug !== undefined) {
+            shouldDebug = snooDebug === true || snooDebug === 'true';
+        } else {
+            shouldDebug = logLevel === 'debug';
+        }
         const client = new snoowrap(creds);
-        client.config({warnings: true, retryErrorCodes: [500], maxRetryAttempts: 2, debug: logLevel === 'debug'});
+        client.config({warnings: true, retryErrorCodes: [500], maxRetryAttempts: 2, debug: shouldDebug});
 
         //const me = await client.getMe().name;
 
