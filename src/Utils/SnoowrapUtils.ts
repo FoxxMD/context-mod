@@ -1,10 +1,11 @@
-import {Comment, RedditUser} from "snoowrap";
+import Snoowrap, {Comment, RedditUser} from "snoowrap";
 import Submission from "snoowrap/dist/objects/Submission";
 import {Duration, DurationUnitsObjectType} from "dayjs/plugin/duration";
 import dayjs, {Dayjs} from "dayjs";
 import Mustache from "mustache";
-import {AuthorOptions, AuthorCriteria} from "../Rule";
+import {AuthorOptions, AuthorCriteria, RuleResult} from "../Rule";
 import {ActivityWindowCriteria, ActivityWindowType} from "../Common/interfaces";
+import {truncateStringToLength} from "../util";
 
 export interface AuthorTypedActivitiesOptions extends AuthorActivitiesOptions {
     type?: 'comment' | 'submission',
@@ -83,7 +84,7 @@ export const getAuthorSubmissions = async (user: RedditUser, options: AuthorActi
     return await getAuthorActivities(user, {...options, type: 'submission'}) as unknown as Promise<Submission[]>;
 }
 
-export const renderContent = async (content: string, data: (Submission | Comment), additionalData = {}) => {
+export const renderContent = async (content: string, data: (Submission | Comment), ruleResults: RuleResult[] = []) => {
     const templateData: any = {
         kind: data instanceof Submission ? 'submission' : 'comment',
         author: await data.author.name,
@@ -93,8 +94,31 @@ export const renderContent = async (content: string, data: (Submission | Comment
         templateData.url = data.url;
         templateData.title = data.title;
     }
+    // normalize rule names and map context data
+    // NOTE: we are relying on users to use unique names for rules. If they don't only the last rule run of kind X will have its results here
+    const normalizedRuleResults = ruleResults.reduce((acc: object, ruleResult) => {
+        const {
+            name, triggered,
+            data = {},
+            result,
+            premise: {
+                kind
+            }
+        } = ruleResult;
+        // remove all non-alphanumeric characters (spaces, dashes, underscore) and set to lowercase
+        // we will set this as the rule property name to make it easy to access results from mustache template
+        const normalName = name.trim().replace(/\W+/g, '').toLowerCase()
+        return {
+            ...acc, [normalName]: {
+                kind,
+                triggered,
+                result,
+                ...data,
+            }
+        };
+    }, {});
 
-    return Mustache.render(content, {...templateData, ...additionalData});
+    return Mustache.render(content, {item: templateData, rules: normalizedRuleResults});
 }
 
 export const testAuthorCriteria = async (item: (Comment|Submission), authorOpts: AuthorCriteria, include = true) => {
@@ -156,4 +180,40 @@ export const testAuthorCriteria = async (item: (Comment|Submission), authorOpts:
         }
     }
     return true;
+}
+
+export interface ItemContent {
+    submissionTitle: string,
+    content: string,
+    author: string,
+}
+
+export const itemContentPeek = async (item: (Comment | Submission), peekLength = 200): Promise<[string, ItemContent]> => {
+    const truncatePeek = truncateStringToLength(peekLength);
+    let content = '';
+    let submissionTitle = '';
+    let peek = '';
+    // @ts-ignore
+    const client = item._r as Snoowrap;
+    const author = item.author.name;
+    if (item instanceof Submission) {
+        submissionTitle = item.title;
+        peek = `${truncatePeek(item.title)} by ${author}`;
+
+    } else if (item instanceof Comment) {
+        content = truncatePeek(item.body)
+        try {
+            // @ts-ignore
+            const client = item._r as Snoowrap;
+            // @ts-ignore
+            const commentSub = await client.getSubmission(item.link_id);
+            const [p, {submissionTitle: subTitle}] = await itemContentPeek(commentSub);
+            submissionTitle = subTitle;
+            peek = `${truncatePeek(content)} in ${p}`;
+        } catch (err) {
+            // possible comment is not on a submission, just swallow
+        }
+    }
+
+    return [peek, {submissionTitle, content, author}];
 }
