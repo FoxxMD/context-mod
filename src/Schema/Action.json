@@ -13,7 +13,8 @@
             "type": "string"
         },
         "name": {
-            "description": "A friendly name for this Action",
+            "description": "An optional, but highly recommended, friendly name for this Action. If not present will default to `kind`.\n\nCan only contain letters, numbers, underscore, spaces, and dashes",
+            "pattern": "^[a-zA-Z]([\\w -]*[\\w])?$",
             "type": "string"
         }
     },

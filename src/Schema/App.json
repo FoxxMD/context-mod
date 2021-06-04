@@ -133,7 +133,8 @@
                     "type": "string"
                 },
                 "name": {
-                    "description": "A friendly, descriptive name for this rule. Highly recommended to make it easier to track logs EX \"repeatCrosspostRule\"",
+                    "description": "An optional, but highly recommended, friendly name for this rule. If not present will default to `kind`.\n\nCan only contain letters, numbers, underscore, spaces, and dashes\n\nname is used to reference Rule result data during Action content templating. See CommentAction or ReportAction for more details.",
+                    "pattern": "^[a-zA-Z]([\\w -]*[\\w])?$",
                     "type": "string"
                 }
             },
@@ -199,7 +200,8 @@
                     "type": "string"
                 },
                 "name": {
-                    "description": "A friendly name for this check (highly recommended) -- EX \"repeatCrosspostReport\"",
+                    "description": "Friendly name for this Check EX \"crosspostSpamCheck\"\n\nCan only contain letters, numbers, underscore, spaces, and dashes",
+                    "pattern": "^[a-zA-Z]([\\w -]*[\\w])?$",
                     "type": "string"
                 },
                 "rules": {
@@ -272,7 +274,8 @@
                     "type": "boolean"
                 },
                 "name": {
-                    "description": "A friendly name for this Action",
+                    "description": "An optional, but highly recommended, friendly name for this Action. If not present will default to `kind`.\n\nCan only contain letters, numbers, underscore, spaces, and dashes",
+                    "pattern": "^[a-zA-Z]([\\w -]*[\\w])?$",
                     "type": "string"
                 },
                 "sticky": {
@@ -351,7 +354,8 @@
                     "type": "string"
                 },
                 "name": {
-                    "description": "A friendly name for this Action",
+                    "description": "An optional, but highly recommended, friendly name for this Action. If not present will default to `kind`.\n\nCan only contain letters, numbers, underscore, spaces, and dashes",
+                    "pattern": "^[a-zA-Z]([\\w -]*[\\w])?$",
                     "type": "string"
                 },
                 "text": {
@@ -385,7 +389,8 @@
                     "type": "string"
                 },
                 "name": {
-                    "description": "A friendly name for this Action",
+                    "description": "An optional, but highly recommended, friendly name for this Action. If not present will default to `kind`.\n\nCan only contain letters, numbers, underscore, spaces, and dashes",
+                    "pattern": "^[a-zA-Z]([\\w -]*[\\w])?$",
                     "type": "string"
                 }
             },
@@ -473,7 +478,8 @@
                     "type": "string"
                 },
                 "name": {
-                    "description": "A friendly, descriptive name for this rule. Highly recommended to make it easier to track logs EX \"repeatCrosspostRule\"",
+                    "description": "An optional, but highly recommended, friendly name for this rule. If not present will default to `kind`.\n\nCan only contain letters, numbers, underscore, spaces, and dashes\n\nname is used to reference Rule result data during Action content templating. See CommentAction or ReportAction for more details.",
+                    "pattern": "^[a-zA-Z]([\\w -]*[\\w])?$",
                     "type": "string"
                 },
                 "thresholds": {
@@ -556,7 +562,8 @@
                     "type": "string"
                 },
                 "name": {
-                    "description": "A friendly name for this Action",
+                    "description": "An optional, but highly recommended, friendly name for this Action. If not present will default to `kind`.\n\nCan only contain letters, numbers, underscore, spaces, and dashes",
+                    "pattern": "^[a-zA-Z]([\\w -]*[\\w])?$",
                     "type": "string"
                 }
             },
@@ -614,7 +621,8 @@
                     "type": "string"
                 },
                 "name": {
-                    "description": "A friendly, descriptive name for this rule. Highly recommended to make it easier to track logs EX \"repeatCrosspostRule\"",
+                    "description": "An optional, but highly recommended, friendly name for this rule. If not present will default to `kind`.\n\nCan only contain letters, numbers, underscore, spaces, and dashes\n\nname is used to reference Rule result data during Action content templating. See CommentAction or ReportAction for more details.",
+                    "pattern": "^[a-zA-Z]([\\w -]*[\\w])?$",
                     "type": "string"
                 },
                 "threshold": {
@@ -684,7 +692,7 @@
             "description": "Report the Activity",
             "properties": {
                 "content": {
-                    "description": "The text of the report",
+                    "description": "The text of the report. If longer than 100 characters will be truncated to \"[content]...\"",
                     "type": "string"
                 },
                 "kind": {
@@ -699,7 +707,8 @@
                     "type": "string"
                 },
                 "name": {
-                    "description": "A friendly name for this Action",
+                    "description": "An optional, but highly recommended, friendly name for this Action. If not present will default to `kind`.\n\nCan only contain letters, numbers, underscore, spaces, and dashes",
+                    "pattern": "^[a-zA-Z]([\\w -]*[\\w])?$",
                     "type": "string"
                 }
             },
