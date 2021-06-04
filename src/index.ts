@@ -21,7 +21,7 @@ const {
     clientId = process.env.CLIENT_ID,
     clientSecret = process.env.CLIENT_SECRET,
     accessToken = process.env.ACCESS_TOKEN,
-    refreshToken = process.env.REFRESHTOKEN,
+    refreshToken = process.env.REFRESH_TOKEN,
     logDir = process.env.LOG_DIR,
     logLevel = process.env.LOG_LEVEL,
 } = argv;
