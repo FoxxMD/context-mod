@@ -128,6 +128,7 @@ The properties of `rules` are accessible using the name, lower-cased, with all s
 #### Quick Templating Tutorial
 
 <details>
+
 As a quick example for how you will most likely be using templating -- wrapping a variable in curly brackets, `{{variable}}`, will cause the variable value to be rendered instead of the brackets:
 ```
 myVariable = 50;
