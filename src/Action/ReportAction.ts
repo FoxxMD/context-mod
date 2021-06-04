@@ -13,7 +13,7 @@ export class ReportAction extends Action {
 
     async handle(item: Comment | Submission, client: Snoowrap): Promise<void> {
         // @ts-ignore
-        await item.report({reason: content});
+        await item.report({reason: this.content});
     }
 }
 
