@@ -56,7 +56,13 @@ export class Manager {
         this.apiLimitWarning = apiLimitWarning;
         this.subreddit = sub;
         this.client = client;
+        for(const sub of subChecks) {
+            this.logger.debug(`Submission Check: ${sub.name}${sub.description !== undefined ? ` ${sub.description}` : ''}`);
+        }
         this.submissionChecks = subChecks;
+        for(const comm of commentChecks) {
+            this.logger.debug(`Comment Check: ${comm.name}${comm.description !== undefined ? ` ${comm.description}` : ''}`);
+        }
         this.commentChecks = commentChecks;
         const checkSummary = `Found Checks -- Submission: ${this.submissionChecks.length} | Comment: ${this.commentChecks.length}`;
         if (subChecks.length === 0 && commentChecks.length === 0) {
