@@ -197,7 +197,7 @@ export const itemContentPeek = async (item: (Comment | Submission), peekLength =
     const author = item.author.name;
     if (item instanceof Submission) {
         submissionTitle = item.title;
-        peek = `${truncatePeek(item.title)} by ${author} ${item.permalink}`;
+        peek = `${truncatePeek(item.title)} by ${author} https://reddit.com${item.permalink}`;
 
     } else if (item instanceof Comment) {
         content = truncatePeek(item.body)
@@ -208,7 +208,7 @@ export const itemContentPeek = async (item: (Comment | Submission), peekLength =
             const commentSub = await client.getSubmission(item.link_id);
             const [p, {submissionTitle: subTitle}] = await itemContentPeek(commentSub);
             submissionTitle = subTitle;
-            peek = `${truncatePeek(content)} in ${subTitle} by ${author} ${item.permalink}`;
+            peek = `${truncatePeek(content)} in ${subTitle} by ${author} https://reddit.com${item.permalink}`;
         } catch (err) {
             // possible comment is not on a submission, just swallow
         }
