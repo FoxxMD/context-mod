@@ -6,18 +6,15 @@ RUN apk update
 
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
-RUN mkdir -p /home/node/app/node_modules && chown -R node:node /home/node
-
-WORKDIR /home/node/app
+WORKDIR /usr/app
 
 COPY package*.json ./
-COPY tsconfig.json ./
-
-USER node
-
-COPY --chown=node:node . .
+COPY tsconfig.json .
 
 RUN npm install
+
+ADD . /usr/app
+
 RUN npm run build
 
 ENV NPM_CONFIG_LOGLEVEL debug
@@ -27,4 +24,4 @@ RUN mkdir -p $log_dir
 VOLUME $log_dir
 ENV LOG_DIR=$log_dir
 
-CMD [ "node", "index.js" ]
+CMD [ "node", "src/index.js" ]
