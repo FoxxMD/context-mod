@@ -15,6 +15,9 @@
     "schema-action": "typescript-json-schema tsconfig.json ActionJSONConfig --out src/Schema/Action.json --required --tsNodeRegister --refs --propOrder",
     "schemaNotWorking": "./node_modules/.bin/ts-json-schema-generator -f tsconfig.json -p src/JsonConfig.ts -t JSONConfig --out src/Schema/vegaSchema.json"
   },
+  "engines": {
+    "node": ">=15"
+  },
   "keywords": [],
   "author": "",
   "license": "ISC",
