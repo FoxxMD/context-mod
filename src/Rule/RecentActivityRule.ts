@@ -97,10 +97,18 @@ export class RecentActivityRule extends Rule {
             }
         }
         if (triggeredOn.length > 0) {
-            const friendlyText = triggeredOn.map(x => `${x.subreddit}(${x.count})`).join(' | ');
+            const friendlyText = triggeredOn.map(x => `${x.subreddit}(${x.count})`).join(', ');
             const friendly = `Triggered by: ${friendlyText}`;
             this.logger.debug(friendly);
-            return Promise.resolve([true, [this.getResult(true, {result: friendly, data: triggeredOn})]]);
+            return Promise.resolve([true, [this.getResult(true, {
+                result: friendly,
+                data: {
+                    triggeredOn,
+                    summary: friendlyText,
+                    subCount: triggeredOn.length,
+                    totalCount: triggeredOn.reduce((cnt, data) => cnt + data.count, 0)
+                }
+            })]]);
         }
 
         return Promise.resolve([false, [this.getResult(false)]]);

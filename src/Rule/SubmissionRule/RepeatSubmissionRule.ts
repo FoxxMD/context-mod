@@ -86,7 +86,14 @@ export class RepeatSubmissionRule extends SubmissionRule {
                 if (consecutivePosts >= this.threshold) {
                     const result = `Threshold of ${this.threshold} repeats triggered for submission with url ${sub.url}`;
                     this.logger.debug(result);
-                    return Promise.resolve([true, [this.getResult(true, {result})]]);
+                    return Promise.resolve([true, [this.getResult(true, {
+                        result,
+                        data: {
+                            count: consecutivePosts,
+                            threshold: this.threshold,
+                            url: sub.url,
+                        }
+                    })]]);
                 }
             }
             return Promise.resolve([false, [this.getResult(false)]]);
@@ -110,7 +117,15 @@ export class RepeatSubmissionRule extends SubmissionRule {
                 // @ts-ignore
                 const result = `Threshold of ${this.threshold} repeats triggered for submission with url ${group[0].url}`;
                 this.logger.debug(result);
-                return Promise.resolve([true, [this.getResult(true, {result})]]);
+                return Promise.resolve([true, [this.getResult(true, {
+                    result,
+                    data: {
+                        count: group.length,
+                        threshold: this.threshold,
+                        // @ts-ignore
+                        url: group[0].url,
+                    }
+                })]]);
             }
         }
         return Promise.resolve([false, [this.getResult(false)]]);
