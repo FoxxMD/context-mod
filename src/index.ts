@@ -24,6 +24,7 @@ const {
     refreshToken = process.env.REFRESH_TOKEN,
     logDir = process.env.LOG_DIR,
     logLevel = process.env.LOG_LEVEL,
+    wikiConfig = process.env.WIKI_CONFIG,
 } = argv;
 
 const logPath = logDir ?? `${process.cwd()}/logs`;
@@ -60,6 +61,8 @@ winston.loggers.add('default', loggerOptions);
 const logger = winston.loggers.get('default');
 
 const version = process.env.VERSION || 'dev';
+
+const wikiLocation = wikiConfig || 'botconfig/contextbot';
 
 let subredditsArg = subredditsArgs;
 if (subredditsArg.length === 0) {
@@ -98,7 +101,7 @@ if (subredditsArg.length === 0) {
 // if user specified subs to run on check they are all subs client can mod
         if (subredditsArgs.length > 0) {
             for (const sub of subredditsArg) {
-                const asub = availSubs.find(x => x.name.toLowerCase() === sub.trim().toLowerCase())
+                const asub = availSubs.find(x => x.display_name.toLowerCase() === sub.trim().toLowerCase())
                 if (asub === undefined) {
                     logger.error(`Will not run on ${sub} because is not modded by, or does not have appropriate permissions to mod with, for this client.`);
                 } else {
@@ -117,7 +120,7 @@ if (subredditsArg.length === 0) {
             let content = undefined;
             let json = undefined;
             try {
-                const wiki = sub.getWikiPage('contextbot');
+                const wiki = sub.getWikiPage(wikiLocation);
                 content = await wiki.content_md;
             } catch (err) {
                 logger.error(`Could not read wiki configuration for ${sub.display_name}. Please ensure the page 'contextbot' exists and is readable -- error: ${err.message}`);
