@@ -191,7 +191,7 @@
             "type": "object"
         },
         "RecentActivityRuleJSONConfig": {
-            "description": "Checks a user's history for any Activity (Submission/Comment) in the subreddits specified in thresholds",
+            "description": "Checks a user's history for any Activity (Submission/Comment) in the subreddits specified in thresholds\n\nAvailable data for [Action templating](https://github.com/FoxxMD/reddit-context-bot#action-templating):\n\n```\nsummary    => comma-deliminated list of subreddits that hit the threshold and their count EX subredditA(1), subredditB(4),...\nsubCount   => Total number of subreddits that hit the threshold\ntotalCount => Total number of all activity occurrences in subreddits\n```",
             "properties": {
                 "authors": {
                     "$ref": "#/definitions/AuthorOptions",
@@ -285,7 +285,7 @@
             "type": "object"
         },
         "RepeatSubmissionJSONConfig": {
-            "description": "Checks a user's history for Submissions with identical content",
+            "description": "Checks a user's history for Submissions with identical content\n\nAvailable data for [Action templating](https://github.com/FoxxMD/reddit-context-bot#action-templating):\n\n```\ncount      => Total number of repeat Submissions\nthreshold  => The threshold you configured for this Rule to trigger\nurl        => Url of the submission that triggered the rule\n```",
             "properties": {
                 "authors": {
                     "$ref": "#/definitions/AuthorOptions",

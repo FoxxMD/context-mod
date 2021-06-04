@@ -169,6 +169,14 @@ export interface RepeatSubmissionOptions extends RepeatSubmissionConfig, RuleOpt
 }
 /**
  * Checks a user's history for Submissions with identical content
+ *
+ * Available data for [Action templating](https://github.com/FoxxMD/reddit-context-bot#action-templating):
+ *
+ * ```
+ * count      => Total number of repeat Submissions
+ * threshold  => The threshold you configured for this Rule to trigger
+ * url        => Url of the submission that triggered the rule
+ * ```
  * */
 export interface RepeatSubmissionJSONConfig extends RepeatSubmissionConfig, SubmissionRuleJSONConfig {
     kind: 'repeatSubmission'
