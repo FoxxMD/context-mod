@@ -25,7 +25,7 @@ Some feature highlights:
 * All rules support skipping behavior based on author criteria -- name, css flair/text, and moderator status
 * Docker container support *(coming soon...)*
 
-## Table of Contents
+# Table of Contents
 
 * [How It Works](#how-it-works)
 * [Installation](#installation)
@@ -88,6 +88,9 @@ I suggest using [Atlassian JSON Schema Viewer](https://json-schema.app/start) ([
 
 Below is a configuration fulfilling the example given at the start of this readme:
 
+<details>
+  <summary>Click to expand configuration</summary>
+
 ```json
 {
   "checks": [
@@ -131,12 +134,7 @@ Below is a configuration fulfilling the example given at the start of this readm
       "actions": [
         {
           "kind": "report",
-          "content": "CB: self-promo"
-        },
-        {
-          "kind": "comment",
-          "content": "wiki:botconfig/contextbot/reportSelfPromo",
-          "distingish": true
+          "content": "User posted link {{rules.recentactivity.totalCount}} times in {{rules.recentactivity.subCount}} SP subs: {{rules.recentactivity.summary}}"
         }
       ]
     }
@@ -144,6 +142,7 @@ Below is a configuration fulfilling the example given at the start of this readm
 }
 
 ```
+</details>
 
 ## Usage
 
@@ -160,6 +159,7 @@ CLI options take precedence over environmental variables
 | --refreshToken   | REFRESH_TOKEN          | **Yes**  | A valid refresh token retrieved from completing the oauth flow for a user with your application.                                 |
 | --logDir         | LOG_DIR                | No       | The absolute path to where logs should be stored. use `false` to turn off log files. Defaults to `CWD/logs`                      |
 | --logLevel       | LOG_LEVEL              | No       | The minimum level to log at. Uses [Winston Log Levels](https://github.com/winstonjs/winston#logging-levels). Defaults to `info`  |
+| --wikiConfig     | WIKI_CONFIG            | No       | The location of the bot configuration in the subreddit wiki. Defaults to `botconfig/contextbox`                                  |
 
 ### Reddit App??
 
