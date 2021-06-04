@@ -1,10 +1,7 @@
 import {RuleSet, IRuleSet, RuleSetJSONConfig} from "../Rule/RuleSet";
 import {IRule, Triggerable, Rule, RuleJSONConfig, RuleResult} from "../Rule";
 import Action, {ActionConfig, ActionJSONConfig} from "../Action";
-import {isRuleSetConfig} from "../Rule/RuleSet.guard";
-import {isRuleConfig} from "../Rule/index.guard";
 import {Logger} from "winston";
-import {isActionConfig} from "../Action/index.guard";
 import Snoowrap, {Comment, Submission} from "snoowrap";
 import {RecentActivityRuleJSONConfig} from "../Rule/RecentActivityRule";
 import {RepeatSubmissionJSONConfig} from "../Rule/SubmissionRule/RepeatSubmissionRule";

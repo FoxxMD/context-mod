@@ -1,5 +1,4 @@
 import {IRule, Triggerable, Rule, RuleJSONConfig, RuleResult} from "./index";
-import {isRuleConfig} from "./index.guard";
 import {Comment, Submission} from "snoowrap";
 import {ruleFactory} from "./RuleFactory";
 import {RecentActivityRuleJSONConfig} from "./RecentActivityRule";
