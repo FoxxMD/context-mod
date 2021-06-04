@@ -78,10 +78,10 @@ export class Manager {
         let allRuleResults: RuleResult[] = [];
         const itemIdentifier = `${checkType} ${itemId}`;
         const [peek, _] = await itemContentPeek(item);
-        this.logger.debug(`New Event: ${itemIdentifier} => ${peek}`);
+        this.logger.info(`New Event: ${itemIdentifier} => ${peek}`);
 
         for (const check of checks) {
-            this.logger.debug(`Running Check ${check.name} on ${itemIdentifier}`);
+            this.logger.debug(`[${itemIdentifier}] Running Check ${check.name}`);
             let triggered = false;
             let currentResults: RuleResult[] = [];
             try {
@@ -91,19 +91,20 @@ export class Manager {
                 triggered = checkTriggered;
                 const invokedRules = checkResults.map(x => x.name || x.premise.kind).join(' | ');
                 if (checkTriggered) {
-                    this.logger.debug(`Check ${check.name} was triggered with invoked Rules: ${invokedRules}`);
+                    this.logger.info(`[${itemIdentifier}] [CHK ${check.name}] Triggered with invoked Rules: ${invokedRules}`);
                 } else {
-                    this.logger.debug(`Check ${check.name} was not triggered using invoked Rule(s): ${invokedRules}`);
+                    this.logger.debug(`[${itemIdentifier}] [CHK ${check.name}] WAS NOT triggered with invoked Rule(s): ${invokedRules}`);
                 }
 
             } catch (e) {
-                this.logger.warn(`Check ${check.name} on Submission (ID ${itemId}) failed with error: ${e.message}`, e);
+                this.logger.warn(`[${itemIdentifier}] [CHK ${check.name}] Failed with error: ${e.message}`, e);
             }
 
             if (triggered) {
+                this.logger.debug(`[${itemIdentifier}] [CHK ${check.name}] Running actions`);
                 // TODO give actions a name
                 await check.runActions(item, currentResults);
-                this.logger.debug(`Ran actions for Check ${check.name}`);
+                this.logger.info(`[${itemIdentifier}] [CHK ${check.name}] Ran actions`);
                 break;
             }
         }

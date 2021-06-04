@@ -64,7 +64,7 @@ export abstract class Rule implements IRule, Triggerable {
 
     async run(item: Comment | Submission, existingResults: RuleResult[] = []): Promise<[(boolean | null), RuleResult[]]> {
         this.logger = this.logger.child(loggerMetaShuffle(this.logger, `${item instanceof Submission ? 'SUB' : 'COMM'} ${item.id}`), mergeArr);
-        this.logger.debug('Starting rule run');
+        this.logger.debug('Starting');
         const existingResult = findResultByPremise(this.getPremise(), existingResults);
         if (existingResult) {
             return Promise.resolve([existingResult.triggered, [{...existingResult, name: this.name}]]);

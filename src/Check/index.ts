@@ -99,7 +99,7 @@ export class Check implements ICheck {
     }
 
     async run(item: Submission | Comment, existingResults: RuleResult[] = []): Promise<[boolean, RuleResult[]]> {
-        this.logger.debug('Starting check');
+        //this.logger.debug('Starting check');
         let allResults: RuleResult[] = [];
         let runOne = false;
         for (const r of this.rules) {
