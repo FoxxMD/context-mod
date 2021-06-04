@@ -794,6 +794,11 @@
         }
     },
     "properties": {
+        "apiLimitWarning": {
+            "default": 250,
+            "description": "When Reddit API limit remaining reaches this number context bot will start warning on every poll interval",
+            "type": "number"
+        },
         "checks": {
             "description": "A list of all the checks that should be run for a subreddit.\n\nChecks are split into two lists -- submission or comment -- based on kind and run independently.\n\nChecks in each list are run in the order found in the configuration.\n\nWhen a check \"passes\", and actions are performed, then all subsequent checks are skipped.",
             "items": {
@@ -802,6 +807,10 @@
             "minItems": 1,
             "type": "array"
         },
+        "heartbeatInterval": {
+            "description": "If present, time in milliseconds between HEARTBEAT log statements with current api limit count. Nice to have to know things are still ticking if there is low activity",
+            "type": "number"
+        },
         "polling": {
             "$ref": "#/definitions/PollingOptions",
             "description": "You may specify polling options independently for submissions/comments"
@@ -809,7 +818,9 @@
     },
     "propertyOrder": [
         "checks",
-        "polling"
+        "polling",
+        "heartbeatInterval",
+        "apiLimitWarning"
     ],
     "required": [
         "checks"

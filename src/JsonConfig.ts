@@ -1,7 +1,7 @@
 import {CheckJSONConfig} from "./Check";
-import {PollingOptions} from "./Common/interfaces";
+import {ManagerOptions} from "./Subreddit/Manager";
 
-export interface JSONConfig {
+export interface JSONConfig extends ManagerOptions {
     /**
      * A list of all the checks that should be run for a subreddit.
      *
@@ -13,5 +13,4 @@ export interface JSONConfig {
      * @minItems 1
      * */
     checks: CheckJSONConfig[]
-    polling?: PollingOptions
 }

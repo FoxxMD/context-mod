@@ -14,9 +14,19 @@ import {ConfigBuilder} from "../ConfigBuilder";
 import {PollingOptions} from "../Common/interfaces";
 import Submission from "snoowrap/dist/objects/Submission";
 import {itemContentPeek} from "../Utils/SnoowrapUtils";
+import dayjs from "dayjs";
 
 export interface ManagerOptions {
     polling?: PollingOptions
+    /**
+     * If present, time in milliseconds between HEARTBEAT log statements with current api limit count. Nice to have to know things are still ticking if there is low activity
+     * */
+    heartbeatInterval?: number
+    /**
+     * When Reddit API limit remaining reaches this number context bot will start warning on every poll interval
+     * @default 250
+     * */
+    apiLimitWarning?: number
 }
 
 export class Manager {
@@ -31,14 +41,19 @@ export class Manager {
     streamSub?: SubmissionStream;
     commentsListedOnce = false;
     streamComments?: CommentStream;
+    heartbeatInterval?: number;
+    lastHeartbeat = dayjs();
+    apiLimitWarning: number;
 
     constructor(sub: Subreddit, client: Snoowrap, logger: Logger, sourceData: object, opts: ManagerOptions = {}) {
         this.logger = logger.child(loggerMetaShuffle(logger, undefined, [`r/${sub.display_name}`], {truncateLength: 40}), mergeArr);
 
         const configBuilder = new ConfigBuilder({logger: this.logger});
         const [subChecks, commentChecks, configManagerOptions] = configBuilder.buildFromJson(sourceData);
-        const {polling = {}} = configManagerOptions || {};
+        const {polling = {}, heartbeatInterval, apiLimitWarning = 250} = configManagerOptions || {};
         this.pollOptions = {...polling, ...opts.polling};
+        this.heartbeatInterval = heartbeatInterval;
+        this.apiLimitWarning = apiLimitWarning;
         this.subreddit = sub;
         this.client = client;
         this.submissionChecks = subChecks;
@@ -88,6 +103,17 @@ export class Manager {
         }
     }
 
+    heartbeat() {
+        const apiRemaining = this.client.ratelimitRemaining;
+        if(this.heartbeatInterval !== undefined && dayjs().diff(this.lastHeartbeat) >= this.heartbeatInterval) {
+            this.logger.info(`HEARTBEAT -- Reddit API Rate Limit remaining: ${apiRemaining}`);
+            this.lastHeartbeat = dayjs();
+        }
+        if(apiRemaining < this.apiLimitWarning) {
+            this.logger.warn(`Reddit API rate limit remaining: ${apiRemaining} (Warning at ${this.apiLimitWarning})`);
+        }
+    }
+
     async handle(): Promise<void> {
         if (this.submissionChecks.length > 0) {
             const {
@@ -114,6 +140,7 @@ export class Manager {
                 }
                 await this.runChecks('Submission', item)
             });
+            this.streamSub.on('listing', (_) => this.heartbeat());
         }
 
         if (this.commentChecks.length > 0) {
@@ -135,6 +162,7 @@ export class Manager {
                 }
                 await this.runChecks('Comment', item)
             });
+            this.streamComments.on('listing', (_) => this.heartbeat());
         }
 
         if (this.streamSub !== undefined) {
