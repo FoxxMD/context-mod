@@ -17,9 +17,9 @@ const SPLAT = Symbol.for('splat')
 const errorsFormat = errors({stack: true});
 const CWD = process.cwd();
 
-export const truncateStringToLength = (length: number, truncStr = '...') => (str: string) => str.length > length ? `${str.slice(0, length)}${truncStr}` : str;
+export const truncateStringToLength = (length: number, truncStr = '...') => (str: string) => str.length > length ? `${str.slice(0, length - truncStr.length - 1)}${truncStr}` : str;
 
-export const loggerMetaShuffle = (logger: Logger, newLeaf: (string | undefined | null) = null, extraLabels: string[] = [], {truncateLength = 15} = {}) => {
+export const loggerMetaShuffle = (logger: Logger, newLeaf: (string | undefined | null) = null, extraLabels: string[] = [], {truncateLength = 50} = {}) => {
     const labelTrunc = truncateStringToLength(truncateLength);
     const {labels = [], leaf} = logger.defaultMeta || {};
     return {
