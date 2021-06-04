@@ -1,6 +1,7 @@
 import Snoowrap, {Comment, Submission} from "snoowrap";
 import {Logger} from "winston";
 import {createLabelledLogger, loggerMetaShuffle} from "../util";
+import {RuleResult} from "../Rule";
 
 export abstract class Action {
     name?: string;
@@ -23,7 +24,7 @@ export abstract class Action {
         }
     }
 
-    abstract handle(item: Comment | Submission, client: Snoowrap): Promise<void>;
+    abstract handle(item: Comment | Submission, ruleResults: RuleResult[]): Promise<void>;
 }
 
 export interface ActionOptions {
@@ -34,7 +35,11 @@ export interface ActionOptions {
 
 export interface ActionConfig {
     /**
-     * A friendly name for this Action
+     * An optional, but highly recommended, friendly name for this Action. If not present will default to `kind`.
+     *
+     * Can only contain letters, numbers, underscore, spaces, and dashes
+     *
+     * @pattern ^[a-zA-Z]([\w -]*[\w])?$
      * */
     name?: string;
 }

@@ -125,16 +125,20 @@ export class Check implements ICheck {
         return [true, allResults];
     }
 
-    async runActions(item: Submission | Comment, client: Snoowrap): Promise<void> {
+    async runActions(item: Submission | Comment, ruleResults: RuleResult[]): Promise<void> {
         for (const a of this.actions) {
-            await a.handle(item, client);
+            await a.handle(item, ruleResults);
         }
     }
 }
 
 export interface ICheck extends JoinCondition {
     /**
-     * A friendly name for this check (highly recommended) -- EX "repeatCrosspostReport"
+     * Friendly name for this Check EX "crosspostSpamCheck"
+     *
+     * Can only contain letters, numbers, underscore, spaces, and dashes
+     *
+     * @pattern ^[a-zA-Z]([\w -]*[\w])?$
      * */
     name: string,
     description?: string,

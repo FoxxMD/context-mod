@@ -1,6 +1,7 @@
 import {SubmissionActionConfig} from "./index";
 import Action, {ActionJSONConfig} from "../index";
 import Snoowrap, {Comment, Submission} from "snoowrap";
+import {RuleResult} from "../../Rule";
 
 export class FlairAction extends Action {
     text: string;
@@ -16,7 +17,7 @@ export class FlairAction extends Action {
         this.css = options.css || '';
     }
 
-    async handle(item: Comment | Submission, client: Snoowrap): Promise<void> {
+    async handle(item: Comment | Submission, ruleResults: RuleResult[]): Promise<void> {
         if (item instanceof Submission) {
             // @ts-ignore
             await item.assignFlair({text: this.text, cssClass: this.css})

@@ -1,13 +1,19 @@
-import Snoowrap, {Comment, Submission, Subreddit} from "snoowrap";
+import Snoowrap, {Comment, Subreddit} from "snoowrap";
 import {Logger} from "winston";
 import {SubmissionCheck} from "../Check/SubmissionCheck";
 import {CommentCheck} from "../Check/CommentCheck";
-import {createLabelledLogger, determineNewResults, loggerMetaShuffle, mergeArr, sleep} from "../util";
+import {
+    determineNewResults,
+    loggerMetaShuffle,
+    mergeArr,
+} from "../util";
 import {CommentStream, SubmissionStream} from "snoostorm";
 import pEvent from "p-event";
 import {RuleResult} from "../Rule";
 import {ConfigBuilder} from "../ConfigBuilder";
 import {PollingOptions} from "../Common/interfaces";
+import Submission from "snoowrap/dist/objects/Submission";
+import {itemContentPeek} from "../Utils/SnoowrapUtils";
 
 export interface ManagerOptions {
     polling?: PollingOptions
@@ -30,8 +36,9 @@ export class Manager {
         this.logger = logger.child(loggerMetaShuffle(logger, undefined, [`r/${sub.display_name}`], {truncateLength: 40}), mergeArr);
 
         const configBuilder = new ConfigBuilder({logger: this.logger});
-        const [subChecks, commentChecks] = configBuilder.buildFromJson(sourceData);
-        this.pollOptions = opts.polling || {};
+        const [subChecks, commentChecks, configManagerOptions] = configBuilder.buildFromJson(sourceData);
+        const {polling = {}} = configManagerOptions || {};
+        this.pollOptions = {...polling, ...opts.polling};
         this.subreddit = sub;
         this.client = client;
         this.submissionChecks = subChecks;
@@ -48,12 +55,17 @@ export class Manager {
         const checks = checkType === 'Comment' ? this.commentChecks : this.submissionChecks;
         const itemId = await item.id;
         let allRuleResults: RuleResult[] = [];
+        const itemIdentifier = `${checkType} ${itemId}`;
+        const [peek, _] = await itemContentPeek(item);
+        this.logger.debug(`New Event: ${itemIdentifier} => ${peek}`);
 
         for (const check of checks) {
-            this.logger.debug(`Running Check ${check.name} on ${checkType} (ID ${itemId})`);
+            this.logger.debug(`Running Check ${check.name} on ${itemIdentifier}`);
             let triggered = false;
+            let currentResults: RuleResult[] = [];
             try {
                 const [checkTriggered, checkResults] = await check.run(item, allRuleResults);
+                currentResults = checkResults;
                 allRuleResults = allRuleResults.concat(determineNewResults(allRuleResults, checkResults));
                 triggered = checkTriggered;
                 const invokedRules = checkResults.map(x => x.name || x.premise.kind).join(' | ');
@@ -69,7 +81,7 @@ export class Manager {
 
             if (triggered) {
                 // TODO give actions a name
-                await check.runActions(item, this.client);
+                await check.runActions(item, currentResults);
                 this.logger.debug(`Ran actions for Check ${check.name}`);
                 break;
             }

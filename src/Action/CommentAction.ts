@@ -4,6 +4,7 @@ import Submission from "snoowrap/dist/objects/Submission";
 import dayjs, {Dayjs} from "dayjs";
 import {renderContent} from "../Utils/SnoowrapUtils";
 import {RichContent} from "../Common/interfaces";
+import {RuleResult} from "../Rule";
 
 export const WIKI_DESCRIM = 'wiki:';
 
@@ -35,7 +36,7 @@ export class CommentAction extends Action {
         this.distinguish = distinguish;
     }
 
-    async handle(item: Comment | Submission, client: Snoowrap): Promise<void> {
+    async handle(item: Comment | Submission, ruleResults: RuleResult[]): Promise<void> {
         if (this.hasWiki && (this.wikiFetched === undefined || Math.abs(dayjs().diff(this.wikiFetched, 'minute')) > 5)) {
             try {
                 const wiki = item.subreddit.getWikiPage(this.wiki as string);
@@ -47,7 +48,7 @@ export class CommentAction extends Action {
             }
         }
         // @ts-ignore
-        const reply: Comment = await item.reply(renderContent(this.content, item));
+        const reply: Comment = await item.reply(renderContent(this.content, item, ruleResults));
         if (this.lock && item instanceof Submission) {
             // @ts-ignore
             await item.lock();

@@ -43,7 +43,7 @@ export class AuthorRule extends Rule {
     }
 
     getKind(): string {
-        return "Author";
+        return "author";
     }
 
     protected getSpecificPremise(): object {

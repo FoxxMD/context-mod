@@ -23,7 +23,7 @@ interface ResultContext {
 
 export interface RuleResult extends ResultContext {
     premise: RulePremise
-    name?: string
+    name: string
     triggered: (boolean | null)
 }
 
@@ -32,13 +32,13 @@ export interface Triggerable {
 }
 
 export abstract class Rule implements IRule, Triggerable {
-    name?: string;
+    name: string;
     logger: Logger
     authors: AuthorOptions;
 
     constructor(options: RuleOptions) {
         const {
-            name,
+            name = this.getKind(),
             loggerPrefix = '',
             logger,
             authors: {
@@ -67,7 +67,7 @@ export abstract class Rule implements IRule, Triggerable {
         this.logger.debug('Starting rule run');
         const existingResult = findResultByPremise(this.getPremise(), existingResults);
         if (existingResult) {
-            return Promise.resolve([existingResult.triggered, [existingResult]]);
+            return Promise.resolve([existingResult.triggered, [{...existingResult, name: this.name}]]);
         }
         if (this.authors.include !== undefined && this.authors.include.length > 0) {
             for (const auth of this.authors.include) {
@@ -180,7 +180,12 @@ export interface AuthorCriteria {
 
 export interface IRule {
     /**
-     * A friendly, descriptive name for this rule. Highly recommended to make it easier to track logs EX "repeatCrosspostRule"
+     * An optional, but highly recommended, friendly name for this rule. If not present will default to `kind`.
+     *
+     * Can only contain letters, numbers, underscore, spaces, and dashes
+     *
+     * name is used to reference Rule result data during Action content templating. See CommentAction or ReportAction for more details.
+     * @pattern ^[a-zA-Z]([\w -]*[\w])?$
      * */
     name?: string
     /**
