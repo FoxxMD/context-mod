@@ -186,6 +186,7 @@ export interface ItemContent {
     submissionTitle: string,
     content: string,
     author: string,
+    permalink: string,
 }
 
 export const itemContentPeek = async (item: (Comment | Submission), peekLength = 200): Promise<[string, ItemContent]> => {
@@ -193,27 +194,25 @@ export const itemContentPeek = async (item: (Comment | Submission), peekLength =
     let content = '';
     let submissionTitle = '';
     let peek = '';
-    // @ts-ignore
-    const client = item._r as Snoowrap;
     const author = item.author.name;
     if (item instanceof Submission) {
         submissionTitle = item.title;
-        peek = `${truncatePeek(item.title)} by ${author}`;
+        peek = `${truncatePeek(item.title)} by ${author} ${item.permalink}`;
 
     } else if (item instanceof Comment) {
         content = truncatePeek(item.body)
         try {
             // @ts-ignore
-            const client = item._r as Snoowrap;
+            const client = item._r as Snoowrap; // protected? idgaf
             // @ts-ignore
             const commentSub = await client.getSubmission(item.link_id);
             const [p, {submissionTitle: subTitle}] = await itemContentPeek(commentSub);
             submissionTitle = subTitle;
-            peek = `${truncatePeek(content)} in ${p}`;
+            peek = `${truncatePeek(content)} in ${subTitle} by ${author} ${item.permalink}`;
         } catch (err) {
             // possible comment is not on a submission, just swallow
         }
     }
 
-    return [peek, {submissionTitle, content, author}];
+    return [peek, {submissionTitle, content, author, permalink: item.permalink}];
 }
