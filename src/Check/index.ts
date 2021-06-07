@@ -19,6 +19,7 @@ import * as RuleSchema from '../Schema/Rule.json';
 import * as RuleSetSchema from '../Schema/RuleSet.json';
 import * as ActionSchema from '../Schema/Action.json';
 import Ajv from 'ajv';
+import {AttributionJSONConfig} from "../Rule/SubmissionRule/AttributionRule";
 
 const ajv = new Ajv();
 
@@ -163,7 +164,7 @@ export interface CheckJSONConfig extends ICheck {
      * Rules are run in the order found in configuration. Can be Rules or RuleSets
      * @minItems 1
      * */
-    rules: Array<RuleSetJSONConfig | RecentActivityRuleJSONConfig | RepeatActivityJSONConfig | AuthorRuleJSONConfig>
+    rules: Array<RuleSetJSONConfig | RecentActivityRuleJSONConfig | RepeatActivityJSONConfig | AuthorRuleJSONConfig | AttributionJSONConfig>
     /**
      * The actions to run after the check is successfully triggered. ALL actions will run in the order they are listed
      * @minItems 1

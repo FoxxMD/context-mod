@@ -81,6 +81,7 @@
         "kind": {
             "description": "The kind of rule to run",
             "enum": [
+                "attribution",
                 "author",
                 "recentActivity",
                 "repeatActivity"

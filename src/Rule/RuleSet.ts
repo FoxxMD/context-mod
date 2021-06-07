@@ -9,6 +9,7 @@ import {AuthorRuleJSONConfig} from "./AuthorRule";
 import {JoinCondition, JoinOperands} from "../Common/interfaces";
 import * as RuleSchema from '../Schema/Rule.json';
 import Ajv from 'ajv';
+import {AttributionJSONConfig} from "./SubmissionRule/AttributionRule";
 
 const ajv = new Ajv();
 
@@ -90,5 +91,5 @@ export interface RuleSetJSONConfig extends IRuleSet {
     /**
      * @minItems 1
      * */
-    rules: Array<RecentActivityRuleJSONConfig | RepeatActivityJSONConfig | AuthorRuleJSONConfig>
+    rules: Array<RecentActivityRuleJSONConfig | RepeatActivityJSONConfig | AuthorRuleJSONConfig | AttributionJSONConfig>
 }
