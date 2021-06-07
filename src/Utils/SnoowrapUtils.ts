@@ -13,12 +13,15 @@ export interface AuthorTypedActivitiesOptions extends AuthorActivitiesOptions {
 
 export interface AuthorActivitiesOptions {
     window: ActivityWindowType | Duration
+    chunkSize?: number
 }
 
 export async function getAuthorActivities(user: RedditUser, options: AuthorTypedActivitiesOptions): Promise<Array<Submission | Comment>> {
 
+    const {chunkSize: cs = 100} = options;
+
     let window: number | Dayjs,
-        chunkSize = 30;
+        chunkSize = Math.min(cs, 100);
     if (typeof options.window !== 'number') {
         const endTime = dayjs();
         let d;
@@ -54,25 +57,36 @@ export async function getAuthorActivities(user: RedditUser, options: AuthorTyped
             break;
     }
     let hitEnd = false;
+    let offset = chunkSize;
     while (!hitEnd) {
-        items = items.concat(listing);
+
         if (typeof window === 'number') {
-            hitEnd = items.length >= window
+            hitEnd = listing.length >= window;
         } else {
-            const lastItem = listing[listing.length - 1];
-            const lastUtc = await lastItem.created_utc
-            lastItemDate = dayjs(lastUtc);
-            if (lastItemDate.isBefore(window)) {
+            const listSlice = listing.slice(offset - chunkSize);
+
+            const truncatedItems = listSlice.filter((x) => {
+                const utc = x.created_utc * 1000;
+                const itemDate = dayjs(utc);
+                // @ts-ignore
+                return window.isBefore(itemDate);
+            });
+            if(truncatedItems.length !== listSlice.length) {
                 hitEnd = true;
             }
+            items = items.concat(truncatedItems);
         }
         if (!hitEnd) {
             hitEnd = listing.isFinished;
         }
         if (!hitEnd) {
-            listing.fetchMore({amount: chunkSize});
+            offset += chunkSize;
+            listing = await listing.fetchMore({amount: chunkSize});
+        } else if(typeof window === 'number') {
+            items = listing.slice(0, window + 1);
         }
     }
+    // TODO truncate items to window size when duration
     return Promise.resolve(items);
 }
 
@@ -215,4 +229,21 @@ export const itemContentPeek = async (item: (Comment | Submission), peekLength =
     }
 
     return [peek, {submissionTitle, content, author, permalink: item.permalink}];
+}
+
+export const getAttributionIdentifier = (sub: Submission, useParentMediaDomain = false) => {
+    let domain = sub.domain;
+    if (!useParentMediaDomain && sub.secure_media?.oembed !== undefined) {
+        const {
+            author_url,
+            author_name,
+        } = sub.secure_media?.oembed;
+        if (author_name !== undefined) {
+            domain = author_name;
+        } else if (author_url !== undefined) {
+            domain = author_url;
+        }
+    }
+
+    return domain;
 }
