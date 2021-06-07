@@ -48,7 +48,7 @@ export const defaultFormat = printf(({level, message, label = 'App', labels = []
     }
 
     let labelContent = `[${label.padEnd(longestLabel)}]`;
-    if(labels.length > 0 || leaf !== null) {
+    if(labels.length > 0 || (leaf !== null && leaf !== undefined)) {
         let nodes = labels;
         if(leaf !== null) {
             nodes.push(leaf);
