@@ -266,7 +266,7 @@ Visit https://not-an-aardvark.github.io/reddit-oauth-helper/
     * report
     * submit
     * wikiread
-* Click **Generate tokens*, you will get a popup asking you to approve access (or login) -- **the account you approve access with is the account that Bot will control.**
+* Click **Generate tokens**, you will get a popup asking you to approve access (or login) -- **the account you approve access with is the account that Bot will control.**
 * After approving an **Access Token** and **Refresh Token** will be shown at the bottom of the page. Write these down. 
   
 You should now have all the information you need to start the bot.
