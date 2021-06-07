@@ -72,7 +72,7 @@ export class Manager {
         }
     }
 
-    async runChecks(checkType: ('Comment' | 'Submission'), item: (Submission | Comment)): Promise<void> {
+    async runChecks(checkType: ('Comment' | 'Submission'), item: (Submission | Comment), checkNames: string[] = []): Promise<void> {
         const checks = checkType === 'Comment' ? this.commentChecks : this.submissionChecks;
         const itemId = await item.id;
         let allRuleResults: RuleResult[] = [];
@@ -81,6 +81,10 @@ export class Manager {
         this.logger.info(`New Event: ${itemIdentifier} => ${peek}`);
 
         for (const check of checks) {
+            if(checkNames.length > 0 && !checkNames.map(x => x.toLowerCase()).some(x => x === check.name.toLowerCase())) {
+                this.logger.debug(`Check ${check} not in array of requested checks to run, skipping`);
+                continue;
+            }
             this.logger.debug(`[${itemIdentifier}] Running Check ${check.name}`);
             let triggered = false;
             let currentResults: RuleResult[] = [];
