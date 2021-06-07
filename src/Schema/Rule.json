@@ -83,7 +83,7 @@
             "enum": [
                 "author",
                 "recentActivity",
-                "repeatSubmission"
+                "repeatActivity"
             ],
             "type": "string"
         },

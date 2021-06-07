@@ -4,7 +4,7 @@ import Action, {ActionConfig, ActionJSONConfig} from "../Action";
 import {Logger} from "winston";
 import Snoowrap, {Comment, Submission} from "snoowrap";
 import {RecentActivityRuleJSONConfig} from "../Rule/RecentActivityRule";
-import {RepeatSubmissionJSONConfig} from "../Rule/SubmissionRule/RepeatSubmissionRule";
+import {RepeatActivityJSONConfig} from "../Rule/SubmissionRule/RepeatActivityRule";
 import {FlairActionJSONConfig} from "../Action/SubmissionAction/FlairAction";
 import {CommentActionJSONConfig} from "../Action/CommentAction";
 import {actionFactory} from "../Action/ActionFactory";
@@ -163,7 +163,7 @@ export interface CheckJSONConfig extends ICheck {
      * Rules are run in the order found in configuration. Can be Rules or RuleSets
      * @minItems 1
      * */
-    rules: Array<RuleSetJSONConfig | RecentActivityRuleJSONConfig | RepeatSubmissionJSONConfig | AuthorRuleJSONConfig>
+    rules: Array<RuleSetJSONConfig | RecentActivityRuleJSONConfig | RepeatActivityJSONConfig | AuthorRuleJSONConfig>
     /**
      * The actions to run after the check is successfully triggered. ALL actions will run in the order they are listed
      * @minItems 1

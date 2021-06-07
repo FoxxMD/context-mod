@@ -1,5 +1,5 @@
 import {RecentActivityRule, RecentActivityRuleJSONConfig} from "./RecentActivityRule";
-import RepeatSubmissionRule, {RepeatSubmissionJSONConfig} from "./SubmissionRule/RepeatSubmissionRule";
+import RepeatActivityRule, {RepeatActivityJSONConfig} from "./SubmissionRule/RepeatActivityRule";
 import {Rule, RuleJSONConfig} from "./index";
 import AuthorRule, {AuthorRuleJSONConfig} from "./AuthorRule";
 
@@ -8,8 +8,8 @@ export function ruleFactory
     switch (config.kind) {
         case 'recentActivity':
             return new RecentActivityRule(config as RecentActivityRuleJSONConfig);
-        case 'repeatSubmission':
-            return new RepeatSubmissionRule(config as RepeatSubmissionJSONConfig);
+        case 'repeatActivity':
+            return new RepeatActivityRule(config as RepeatActivityJSONConfig);
         case 'author':
             return new AuthorRule(config as AuthorRuleJSONConfig);
         default:

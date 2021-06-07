@@ -2,7 +2,7 @@ import {IRule, Triggerable, Rule, RuleJSONConfig, RuleResult} from "./index";
 import {Comment, Submission} from "snoowrap";
 import {ruleFactory} from "./RuleFactory";
 import {RecentActivityRuleJSONConfig} from "./RecentActivityRule";
-import {RepeatSubmissionJSONConfig} from "./SubmissionRule/RepeatSubmissionRule";
+import {RepeatActivityJSONConfig} from "./SubmissionRule/RepeatActivityRule";
 import {createLabelledLogger, determineNewResults, findResultByPremise, loggerMetaShuffle} from "../util";
 import {Logger} from "winston";
 import {AuthorRuleJSONConfig} from "./AuthorRule";
@@ -90,5 +90,5 @@ export interface RuleSetJSONConfig extends IRuleSet {
     /**
      * @minItems 1
      * */
-    rules: Array<RecentActivityRuleJSONConfig | RepeatSubmissionJSONConfig | AuthorRuleJSONConfig>
+    rules: Array<RecentActivityRuleJSONConfig | RepeatActivityJSONConfig | AuthorRuleJSONConfig>
 }

@@ -212,7 +212,7 @@
                                 "$ref": "#/definitions/RecentActivityRuleJSONConfig"
                             },
                             {
-                                "$ref": "#/definitions/RepeatSubmissionJSONConfig"
+                                "$ref": "#/definitions/RepeatActivityJSONConfig"
                             },
                             {
                                 "$ref": "#/definitions/AuthorRuleJSONConfig"
@@ -576,7 +576,7 @@
             ],
             "type": "object"
         },
-        "RepeatSubmissionJSONConfig": {
+        "RepeatActivityJSONConfig": {
             "description": "Checks a user's history for Submissions with identical content\n\nAvailable data for [Action templating](https://github.com/FoxxMD/reddit-context-bot#action-templating):\n\n```\ncount      => Total number of repeat Submissions\nthreshold  => The threshold you configured for this Rule to trigger\nurl        => Url of the submission that triggered the rule\n```",
             "properties": {
                 "authors": {
@@ -616,7 +616,16 @@
                 "kind": {
                     "description": "The kind of rule to run",
                     "enum": [
-                        "repeatSubmission"
+                        "repeatActivity"
+                    ],
+                    "type": "string"
+                },
+                "lookAt": {
+                    "default": "all",
+                    "description": "If present determines which activities to consider for gapAllowance.\n\n* If `submissions` then only the author's submission history is considered IE gapAllowance = 2  ===> can have gap of two submissions between repeats\n* If `all` then the author's entire history (submissions/comments) is considered IE gapAllowance = 2  ===> can only have gap of two activities (submissions or comments) between repeats",
+                    "enum": [
+                        "all",
+                        "submissions"
                     ],
                     "type": "string"
                 },
@@ -678,6 +687,7 @@
                 "gapAllowance",
                 "include",
                 "exclude",
+                "lookAt",
                 "window",
                 "useSubmissionAsReference",
                 "name",
@@ -742,7 +752,7 @@
                                 "$ref": "#/definitions/RecentActivityRuleJSONConfig"
                             },
                             {
-                                "$ref": "#/definitions/RepeatSubmissionJSONConfig"
+                                "$ref": "#/definitions/RepeatActivityJSONConfig"
                             },
                             {
                                 "$ref": "#/definitions/AuthorRuleJSONConfig"
