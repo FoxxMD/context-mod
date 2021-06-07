@@ -118,7 +118,7 @@ The properties of `rules` are accessible using the name, lower-cased, with all s
   },
   {
     // name = repeatsubmission
-    "kind": "repeatSubmission",
+    "kind": "repeatActivity",
   }
 ]
 ```
@@ -167,7 +167,7 @@ Below is a configuration fulfilling the example given at the start of this readm
       "kind": "submission",
       "rules": [
         {
-          "kind": "repeatSubmission",
+          "kind": "repeatActivity",
           "gapAllowance": 2,
           "threshold": 10
         }
@@ -214,20 +214,26 @@ Below is a configuration fulfilling the example given at the start of this readm
 
 ## Usage
 
-`npm run start [list,of,subreddits] [...--options]`
+```
+Usage: index [options] [command]
 
-CLI options take precedence over environmental variables
+Options:
+  -c, --clientId <id>                        Client ID for your Reddit application (default: process.env.CLIENT_ID)
+  -e, --clientSecret <secret>                Client Secret for your Reddit application (default: process.env.CLIENT_SECRET)
+  -a, --accessToken <token>                  Access token retrieved from authenticating an account with your Reddit Application (default: process.env.ACCESS_TOKEN)
+  -r, --refreshToken <token>                 Refresh token retrieved from authenticating an account with your Reddit Application (default: process.env.REFRESH_TOKEN)
+  -s, --subreddits <list...>                 List of subreddits to run on. Bot will run on all subs it has access to if not defined (default: process.env.SUBREDDITS as comma-separated string)
+  -d, --logDir <dir>                         Absolute path to directory to store rotated logs in (default: process.env.LOG_DIR || 'CWD/logs')
+  -l, --logLevel <level>                     Log level (default: process.env.LOG_LEVEL || 'info')
+  -w, --wikiConfig <path>                    Relative url to contextbot wiki page EX https://reddit.com/r/subreddit/wiki/<path> (default: process.env.WIKI_CONFIG || 'botconfig/contextbot')
+  -n, --snooDebug                            Set Snoowrap to debug (default: process.env.SNOO_DEBUG || false)
+  -h, --help                                 display help for command
 
-| CLI              | Environmental Variable | Required | Description                                                                                                                      |
-|------------------|------------------------|----------|----------------------------------------------------------------------------------------------------------------------------------|
-| [First Argument] |                        | No       | Comma-deliminated list of subreddits to run on if you don't want to run all the account has access to.                           |
-| --clientId       | CLIENT_ID              | **Yes**  | Your reddit application client id                                                                                                |
-| --clientSecret   | CLIENT_SECRET          | **Yes**  | Your reddit application client secret                                                                                            |
-| --accessToken    | ACCESS_TOKEN           | **Yes**  | A valid access token retrieved from completing the oauth flow for a user with your application.                                  |
-| --refreshToken   | REFRESH_TOKEN          | **Yes**  | A valid refresh token retrieved from completing the oauth flow for a user with your application.                                 |
-| --logDir         | LOG_DIR                | No       | The absolute path to where logs should be stored. use `false` to turn off log files. Defaults to `CWD/logs`                      |
-| --logLevel       | LOG_LEVEL              | No       | The minimum level to log at. Uses [Winston Log Levels](https://github.com/winstonjs/winston#logging-levels). Defaults to `info`  |
-| --wikiConfig     | WIKI_CONFIG            | No       | The location of the bot configuration in the subreddit wiki. Defaults to `botconfig/contextbox`                                  |
+Commands:
+  run                                        Runs bot normally (unattended)
+  check <type> <activityId> [checkNames...]  Run check(s) on a specific activity, then exits
+  help [command]                             display help for command
+```
 
 ### Reddit App??
 
