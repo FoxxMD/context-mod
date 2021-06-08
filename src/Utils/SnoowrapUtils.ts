@@ -231,6 +231,18 @@ export const itemContentPeek = async (item: (Comment | Submission), peekLength =
     return [peek, {submissionTitle, content, author, permalink: item.permalink}];
 }
 
+// @ts-ignore
+export const getSubmissionFromComment = async (item: Comment): Promise<Submission> => {
+    try {
+        // @ts-ignore
+        const client = item._r as Snoowrap; // protected? idgaf
+        // @ts-ignore
+        return client.getSubmission(item.link_id);
+    } catch (err) {
+        // possible comment is not on a submission, just swallow
+    }
+}
+
 export const getAttributionIdentifier = (sub: Submission, useParentMediaDomain = false) => {
     let domain = sub.domain;
     if (!useParentMediaDomain && sub.secure_media?.oembed !== undefined) {
