@@ -80,7 +80,7 @@ docker run -e "CLIENT_ID=myId" ... foxxmd/reddit-context-bot
 ```
 
 ### [Heroku Quick Deploy](https://heroku.com/about)
-[![Deploy](https://www.herokucdn.com/deploy/button.svg)](https://dashboard.heroku.com/new?template=https://github.com/FoxxMD/reddit-context-bot/tree/heroku)
+[![Deploy](https://www.herokucdn.com/deploy/button.svg)](https://dashboard.heroku.com/new?template=https://github.com/FoxxMD/reddit-context-bot)
 
 
 ## Configuration
