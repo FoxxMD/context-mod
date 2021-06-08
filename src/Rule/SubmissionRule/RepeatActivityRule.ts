@@ -136,7 +136,7 @@ export class RepeatActivityRule extends SubmissionRule {
         if (this.useSubmissionAsReference) {
             applicableGroupedActivities = new Map();
             const referenceSubmissions = identifierGroupedActivities.get(getActivityIdentifier(item));
-            applicableGroupedActivities.set(getActivityIdentifier(item), referenceSubmissions)
+            applicableGroupedActivities.set(getActivityIdentifier(item), referenceSubmissions || [])
         }
 
         const identifiersSummary: SummaryData[] = [];
