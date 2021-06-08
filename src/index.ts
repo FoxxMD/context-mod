@@ -9,11 +9,14 @@ import {Command} from 'commander';
 import {getOptions} from "./Utils/CommandConfig";
 import {App} from "./App";
 import Submission from "snoowrap/dist/objects/Submission";
+import {COMMENT_URL_ID, parseLinkIdentifier, SUBMISSION_URL_ID} from "./util";
 
 dayjs.extend(utc);
 dayjs.extend(dduration);
 dayjs.extend(relTime);
 
+const commentReg = parseLinkIdentifier([COMMENT_URL_ID]);
+const submissionReg = parseLinkIdentifier([SUBMISSION_URL_ID]);
 
 const program = new Command();
 for (const o of getOptions()) {
@@ -33,28 +36,60 @@ for (const o of getOptions()) {
             });
 
         program
-            .command('check <type> <activityId> [checkNames...]')
+            .command('check <activityIdentifier> [type]')
             .description('Run check(s) on a specific activity', {
-                type: `The type of activity ('comment' or 'submission')`,
-                activityId: 'The ID of the Comment or Submission',
-                checkNames: 'An optional list of Checks, by name, that should be run. If none are specified all Checks for the Subreddit the Activity is in will be run'
+                activityIdentifier: 'Either a permalink URL or the ID of the Comment or Submission',
+                type: `If activityIdentifier is not a permalink URL then the type of activity ('comment' or 'submission'). May also specify 'submission' type when using a permalink to a comment to get the Submission`,
             })
-            .action(async (type, activityId, checkNames) => {
+            .option('-h, --checks <checkNames...>', 'An optional list of Checks, by name, that should be run. If none are specified all Checks for the Subreddit the Activity is in will be run')
+            .action(async (activityIdentifier, type, commandOptions = {}) => {
+                const {checks = []} = commandOptions;
                 const app = new App(program.opts());
 
                 let a;
-                if (type === 'comment') {
-                    a = app.client.getComment(activityId);
-                } else {
-                    a = app.client.getSubmission(activityId);
+                const commentId = commentReg(activityIdentifier);
+                if (commentId !== undefined) {
+                    if (type !== 'submission') {
+                        // @ts-ignore
+                        a = await app.client.getComment(commentId);
+                    } else {
+                        // @ts-ignore
+                        a = await app.client.getSubmission(submissionReg(activityIdentifier) as string);
+                    }
                 }
+                if (a === undefined) {
+                    const submissionId = submissionReg(activityIdentifier);
+                    if (submissionId !== undefined) {
+                        if (type === 'comment') {
+                            throw new Error(`Detected URL was for a submission but type was 'comment', cannot get activity`);
+                        } else {
+                            // @ts-ignore
+                            a = await app.client.getSubmission(submissionId);
+                        }
+                    }
+                }
+
+                if (a === undefined) {
+                    // if we get this far then probably not a URL
+                    if (type === undefined) {
+                        throw new Error(`activityIdentifier was not a valid Reddit URL and type was not specified`);
+                    }
+                    if (type === 'comment') {
+                        // @ts-ignore
+                        a = await app.client.getComment(activityIdentifier);
+                    } else {
+                        // @ts-ignore
+                        a = await app.client.getSubmission(activityIdentifier);
+                    }
+                }
+
                 // @ts-ignore
                 const activity = await a.fetch();
                 const sub = await activity.subreddit.display_name;
                 await app.buildManagers([sub]);
                 if (app.subManagers.length > 0) {
                     const manager = app.subManagers.find(x => x.subreddit.display_name === sub) as Manager;
-                    await manager.runChecks(type === 'comment' ? 'Comment' : 'Submission', activity, checkNames);
+                    await manager.runChecks(type === 'comment' ? 'Comment' : 'Submission', activity, checks);
                 }
             });
 

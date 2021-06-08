@@ -232,7 +232,7 @@ Options:
 
 Commands:
   run                                        Runs bot normally (unattended)
-  check <type> <activityId> [checkNames...]  Run check(s) on a specific activity, then exits
+  check <activityId> [type] [checkNames...]  Run check(s) on a specific activity, then exits
   help [command]                             display help for command
 ```
 

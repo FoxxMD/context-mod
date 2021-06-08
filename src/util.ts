@@ -126,6 +126,10 @@ export const groupBy = <T>(keys: (keyof T)[], opts: groupByOptions = {}) => (arr
     }, {} as Record<string, T[]>)
 };
 
+// match /mealtimesvideos/ /comments/ etc... (?:\/.*\/)
+// matches https://old.reddit.com/r  (?:^.+?)(?:reddit.com\/r)
+// (?:^.+?)(?:reddit.com\/r\/.+\/.\/)
+// (?:.*\/)([\d\w]+?)(?:\/*)
 
 /**
  * @see https://stackoverflow.com/a/61033353/1469797
@@ -141,11 +145,28 @@ export const parseUsableLinkIdentifier = (regexes: RegExp[] = [REGEX_YOUTUBE]) =
         if (matches.length > 0) {
             // use first capture group
             // TODO make this configurable at some point?
-            return matches[0][matches[0].length - 1];
+            const captureGroup = matches[0][matches[0].length - 1];
+            if(captureGroup !== '') {
+                return captureGroup;
+            }
         }
     }
     return val;
 }
+
+export const parseLinkIdentifier = (regexes: RegExp[]) => {
+    const u = parseUsableLinkIdentifier(regexes);
+    return (val: string): (string | undefined) => {
+        const id = u(val);
+        if (id === val) {
+            return undefined;
+        }
+        return id;
+    }
+}
+
+export const SUBMISSION_URL_ID: RegExp = /(?:^.+?)(?:reddit.com\/r)(?:\/[\w\d]+){2}(?:\/)([\w\d]*)/g;
+export const COMMENT_URL_ID: RegExp = /(?:^.+?)(?:reddit.com\/r)(?:\/[\w\d]+){4}(?:\/)([\w\d]*)/g;
 
 export function sleep(ms: number) {
     return new Promise(resolve => setTimeout(resolve, ms));
