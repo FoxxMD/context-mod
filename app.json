@@ -24,11 +24,6 @@
       "value": "",
       "required": true
     },
-    "SUBREDDITS": {
-      "description": "If you do not want to run context bot on all subreddits it has moderator access to then specify a comma-deliminated list of subreddits to run on",
-      "value": "",
-      "required": false
-    },
     "WIKI_CONFIG": {
       "description": "Relative url to contextbot wiki page EX https://reddit.com/r/subreddit/wiki/<path>",
       "value": "botconfig/context",
