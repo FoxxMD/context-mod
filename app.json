@@ -1,0 +1,28 @@
+{
+  "name": "Reddit Context Bot",
+  "description": "An event-based, reddit moderation bot built on top of snoowrap and written in typescript",
+  "repository": "https://github.com/FoxxMD/reddit-context-bot",
+  "stack": "container",
+  "env": {
+    "CLIENT_ID": {
+      "description": "Client ID for your Reddit application",
+      "value": "",
+      "required": true
+    },
+    "CLIENT_SECRET": {
+      "description": "Client Secret for your Reddit application",
+      "value": "",
+      "required": true
+    },
+    "REFRESH_TOKEN": {
+      "description": "Refresh token retrieved from authenticating an account with your Reddit Application",
+      "value": "",
+      "required": true
+    },
+    "ACCESS_TOKeN": {
+      "description": "Access token retrieved from authenticating an account with your Reddit Application",
+      "value": "",
+      "required": true
+    }
+  }
+}
