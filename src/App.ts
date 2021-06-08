@@ -1,7 +1,7 @@
 import Snoowrap from "snoowrap";
 import {Manager} from "./Subreddit/Manager";
 import winston, {Logger} from "winston";
-import {labelledFormat} from "./util";
+import {labelledFormat, loggerMetaShuffle} from "./util";
 import snoowrap from "snoowrap";
 import pEvent from "p-event";
 import EventEmitter from "events";
@@ -59,6 +59,16 @@ export class App {
             level: logLevel || 'info',
             format: labelledFormat(),
             transports: myTransports,
+            levels: {
+                error: 0,
+                warn: 1,
+                info: 2,
+                http: 3,
+                verbose: 4,
+                debug: 5,
+                trace: 5,
+                silly: 6
+            }
         };
 
         winston.loggers.add('default', loggerOptions);
@@ -85,7 +95,14 @@ export class App {
 
         let shouldDebug = snooDebug === false && process.env.SNOO_DEBUG === 'true' ? true : snooDebug === true || snooDebug === 'true';
         this.client = new snoowrap(creds);
-        this.client.config({warnings: true, retryErrorCodes: [500], maxRetryAttempts: 2, debug: shouldDebug});
+        this.client.config({
+            warnings: true,
+            maxRetryAttempts: 5,
+            debug: shouldDebug,
+            // @ts-ignore
+            logger: this.logger.child(loggerMetaShuffle(this.logger, undefined, ['Snoowrap'])),
+            continueAfterRatelimitError: true,
+        });
     }
 
     async buildManagers(subreddits: string[] = []) {
