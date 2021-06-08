@@ -26,7 +26,7 @@
     },
     "WIKI_CONFIG": {
       "description": "Relative url to contextbot wiki page EX https://reddit.com/r/subreddit/wiki/<path>",
-      "value": "botconfig/context",
+      "value": "botconfig/contextbot",
       "required": false
     }
   }
