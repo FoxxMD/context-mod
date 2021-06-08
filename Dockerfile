@@ -24,9 +24,4 @@ RUN mkdir -p $log_dir
 VOLUME $log_dir
 ENV LOG_DIR=$log_dir
 
-ENV CLIENT_ID=''
-ENV CLIENT_SECRET=''
-ENV ACCESS_TOKEN=''
-ENV REFRESH_TOKEN=''
-
 CMD [ "node", "src/index.js", "run" ]
