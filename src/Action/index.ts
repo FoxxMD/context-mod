@@ -44,12 +44,15 @@ export interface ActionConfig {
     name?: string;
 }
 
-/** @see {isActionConfig} ts-auto-guard:type-guard */
-export interface ActionJSONConfig extends ActionConfig {
+export interface ActionJson extends ActionConfig {
     /**
      * The type of action that will be performed
      */
     kind: 'comment' | 'lock' | 'remove' | 'report' | 'flair'
+}
+
+export const isActionJson = (obj: object): obj is ActionJson => {
+    return (obj as ActionJson).kind !== undefined;
 }
 
 export default Action;

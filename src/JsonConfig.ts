@@ -1,5 +1,5 @@
-import {CheckJSONConfig} from "./Check";
-import {ManagerOptions} from "./Subreddit/Manager";
+import {CheckJson} from "./Check";
+import {ManagerOptions} from "./Common/interfaces";
 
 export interface JSONConfig extends ManagerOptions {
     /**
@@ -12,5 +12,5 @@ export interface JSONConfig extends ManagerOptions {
      * When a check "passes", and actions are performed, then all subsequent checks are skipped.
      * @minItems 1
      * */
-    checks: CheckJSONConfig[]
+    checks: CheckJson[]
 }

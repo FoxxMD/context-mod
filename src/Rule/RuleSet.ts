@@ -1,15 +1,12 @@
 import {IRule, Triggerable, Rule, RuleJSONConfig, RuleResult} from "./index";
 import {Comment, Submission} from "snoowrap";
 import {ruleFactory} from "./RuleFactory";
-import {RecentActivityRuleJSONConfig} from "./RecentActivityRule";
-import {RepeatActivityJSONConfig} from "./SubmissionRule/RepeatActivityRule";
-import {createLabelledLogger, determineNewResults, findResultByPremise, loggerMetaShuffle} from "../util";
+import {createLabelledLogger, loggerMetaShuffle} from "../util";
 import {Logger} from "winston";
-import {AuthorRuleJSONConfig} from "./AuthorRule";
 import {JoinCondition, JoinOperands} from "../Common/interfaces";
 import * as RuleSchema from '../Schema/Rule.json';
 import Ajv from 'ajv';
-import {AttributionJSONConfig} from "./SubmissionRule/AttributionRule";
+import {RuleJson, RuleObjectJson} from "../Common/types";
 
 const ajv = new Ajv();
 
@@ -84,12 +81,20 @@ export interface RuleSetOptions extends IRuleSet {
 }
 
 /**
- * A RuleSet is a "nested" set of Rules that can be used to create more complex AND/OR behavior. Think of the outcome of a RuleSet as the result of all of it's Rules (based on condition)
- * @see {isRuleSetConfig} ts-auto-guard:type-guard
+ * A RuleSet is a "nested" set of `Rule` objects that can be used to create more complex AND/OR behavior. Think of the outcome of a `RuleSet` as the result of all of its run `Rule` objects (based on `condition`)
  * */
-export interface RuleSetJSONConfig extends IRuleSet {
+export interface RuleSetJson extends JoinCondition {
     /**
+     * Can be `Rule` or the `name` of any **named** `Rule` in your subreddit's configuration
      * @minItems 1
      * */
-    rules: Array<RecentActivityRuleJSONConfig | RepeatActivityJSONConfig | AuthorRuleJSONConfig | AttributionJSONConfig>
+    rules: Array<RuleJson>
+}
+
+export interface RuleSetObjectJson extends RuleSetJson {
+    rules: Array<RuleObjectJson>
+}
+
+export const isRuleSetJSON = (obj: object): obj is RuleSetJson => {
+    return (obj as RuleSetJson).rules !== undefined;
 }

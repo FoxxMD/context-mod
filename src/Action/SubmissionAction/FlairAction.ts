@@ -1,5 +1,5 @@
 import {SubmissionActionConfig} from "./index";
-import Action, {ActionJSONConfig} from "../index";
+import Action, {ActionJson} from "../index";
 import Snoowrap, {Comment, Submission} from "snoowrap";
 import {RuleResult} from "../../Rule";
 
@@ -43,6 +43,6 @@ export interface FlairActionOptions extends SubmissionActionConfig {
 /**
  * Flair the Submission
  * */
-export interface FlairActionJSONConfig extends FlairActionOptions, ActionJSONConfig {
+export interface FlairActionJson extends FlairActionOptions, ActionJson {
 
 }

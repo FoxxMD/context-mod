@@ -23,7 +23,8 @@ Some feature highlights:
 * All text-based actions support [mustache](https://mustache.github.io) templating
 * History-based rules support multiple "valid window" types -- [ISO 8601 Durations](https://en.wikipedia.org/wiki/ISO_8601#Durations), [Day.js Durations](https://day.js.org/docs/en/durations/creating), and submission/comment count limits.
 * All rules support skipping behavior based on author criteria -- name, css flair/text, and moderator status
-* Docker container support *(coming soon...)*
+* Rules and Actions support named references so you write rules/actions once and reference them anywhere
+* Docker container support
 
 # Table of Contents
 

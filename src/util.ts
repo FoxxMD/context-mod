@@ -30,7 +30,19 @@ export const loggerMetaShuffle = (logger: Logger, newLeaf: (string | undefined |
 
 let longestLabel = 3;
 // @ts-ignore
-export const defaultFormat = printf(({level, message, label = 'App', labels = [], leaf, itemId, timestamp, [SPLAT]: splatObj, stack, ...rest}) => {
+export const defaultFormat = printf(({
+                                         level,
+                                         message,
+                                         label = 'App',
+                                         labels = [],
+                                         leaf,
+                                         itemId,
+                                         timestamp,
+                                        // @ts-ignore
+                                         [SPLAT]: splatObj,
+                                         stack,
+                                         ...rest
+                                     }) => {
     let stringifyValue = splatObj !== undefined ? jsonStringify(splatObj) : '';
     if (label.length > longestLabel) {
         longestLabel = label.length;
@@ -48,9 +60,9 @@ export const defaultFormat = printf(({level, message, label = 'App', labels = []
     }
 
     let labelContent = `[${label.padEnd(longestLabel)}]`;
-    if(labels.length > 0 || (leaf !== null && leaf !== undefined)) {
+    if (labels.length > 0 || (leaf !== null && leaf !== undefined)) {
         let nodes = labels;
-        if(leaf !== null) {
+        if (leaf !== null) {
             nodes.push(leaf);
         }
         //labelContent = `${labels.slice(0, labels.length).map((x: string) => `[${x}]`).join(' ')}`
@@ -173,8 +185,12 @@ export const determineNewResults = (existing: RuleResult[], val: RuleResult | Ru
     return newResults;
 }
 
-export const mergeArr = (objValue: [], srcValue: []): (any[]|undefined) => {
+export const mergeArr = (objValue: [], srcValue: []): (any[] | undefined) => {
     if (Array.isArray(objValue)) {
         return objValue.concat(srcValue);
     }
 }
+
+
+
+

@@ -1,25 +1,17 @@
-import {RuleSet, IRuleSet, RuleSetJSONConfig} from "../Rule/RuleSet";
-import {IRule, Triggerable, Rule, RuleJSONConfig, RuleResult} from "../Rule";
-import Action, {ActionConfig, ActionJSONConfig} from "../Action";
+import {RuleSet, IRuleSet, RuleSetJson, RuleSetObjectJson} from "../Rule/RuleSet";
+import {IRule,Rule, RuleJSONConfig, RuleResult} from "../Rule";
+import Action, {ActionConfig, ActionJson} from "../Action";
 import {Logger} from "winston";
-import Snoowrap, {Comment, Submission} from "snoowrap";
-import {RecentActivityRuleJSONConfig} from "../Rule/RecentActivityRule";
-import {RepeatActivityJSONConfig} from "../Rule/SubmissionRule/RepeatActivityRule";
-import {FlairActionJSONConfig} from "../Action/SubmissionAction/FlairAction";
-import {CommentActionJSONConfig} from "../Action/CommentAction";
+import {Comment, Submission} from "snoowrap";
 import {actionFactory} from "../Action/ActionFactory";
 import {ruleFactory} from "../Rule/RuleFactory";
-import {createLabelledLogger, determineNewResults, loggerMetaShuffle, mergeArr} from "../util";
-import {AuthorRuleJSONConfig} from "../Rule/AuthorRule";
-import {ReportActionJSONConfig} from "../Action/ReportAction";
-import {LockActionJSONConfig} from "../Action/LockAction";
-import {RemoveActionJSONConfig} from "../Action/RemoveAction";
+import {createLabelledLogger, loggerMetaShuffle, mergeArr} from "../util";;
 import {JoinCondition, JoinOperands} from "../Common/interfaces";
 import * as RuleSchema from '../Schema/Rule.json';
 import * as RuleSetSchema from '../Schema/RuleSet.json';
 import * as ActionSchema from '../Schema/Action.json';
 import Ajv from 'ajv';
-import {AttributionJSONConfig} from "../Rule/SubmissionRule/AttributionRule";
+import {ActionObjectJson, RuleJson, RuleObjectJson, ActionJson as ActionTypeJson} from "../Common/types";
 
 const ajv = new Ajv();
 
@@ -60,7 +52,7 @@ export class Check implements ICheck {
                 if (valid) {
                     // @ts-ignore
                     r.logger = this.logger;
-                    this.rules.push(new RuleSet(r as RuleSetJSONConfig));
+                    this.rules.push(new RuleSet(r as RuleSetObjectJson));
                 } else {
                     setErrors = ajv.errors;
                     valid = ajv.validate(RuleSchema, r);
@@ -87,7 +79,7 @@ export class Check implements ICheck {
             } else {
                 let valid = ajv.validate(ActionSchema, a);
                 if (valid) {
-                    this.actions.push(actionFactory(a as ActionJSONConfig));
+                    this.actions.push(actionFactory(a as ActionJson));
                     // @ts-ignore
                     a.logger = this.logger;
                 } else {
@@ -151,23 +143,29 @@ export interface CheckOptions extends ICheck {
     logger?: Logger
 }
 
-/**
- * An object consisting of Rules (tests) and Actions to perform if Rules are triggered
- * @see {isCheckConfig} ts-auto-guard:type-guard
- * */
-export interface CheckJSONConfig extends ICheck {
+export interface CheckJson extends ICheck {
     /**
      * The type of event (new submission or new comment) this check should be run against
      */
     kind: 'submission' | 'comment'
     /**
-     * Rules are run in the order found in configuration. Can be Rules or RuleSets
+     * A list of Rules to run. If `Rule` objects are triggered based on `condition` then `Actions` will be performed.
+     *
+     * Can be `Rule`, `RuleSet`, or the `name` of any **named** `Rule` in your subreddit's configuration
      * @minItems 1
      * */
-    rules: Array<RuleSetJSONConfig | RecentActivityRuleJSONConfig | RepeatActivityJSONConfig | AuthorRuleJSONConfig | AttributionJSONConfig>
+    rules: Array<RuleSetJson | RuleJson>
     /**
-     * The actions to run after the check is successfully triggered. ALL actions will run in the order they are listed
+     * The `Actions` to run after the check is successfully triggered. ALL `Actions` will run in the order they are listed
+     *
+     *  Can be `Action` or the `name` of any **named** `Action` in your subreddit's configuration
+     *
      * @minItems 1
      * */
-    actions: Array<FlairActionJSONConfig | CommentActionJSONConfig | ReportActionJSONConfig | LockActionJSONConfig | RemoveActionJSONConfig>
+    actions: Array<ActionTypeJson>
+}
+
+export interface CheckStructuredJson extends CheckJson {
+    rules: Array<RuleSetObjectJson | RuleObjectJson>
+    actions: Array<ActionObjectJson>
 }

@@ -145,15 +145,6 @@
                     "minItems": 1,
                     "type": "array"
                 },
-                "includeInTotal": {
-                    "default": "submissions",
-                    "description": "What activities to use for total count when determining what percentage an attribution comprises\n\nEX:\n\nAuthor has 100 activities, 40 are submissions and 60 are comments\n\n* If `submission` then if 10 submission are for Youtube Channel A then percentage => 10/40 = 25%\n* If `all` then if 10 submission are for Youtube Channel A then percentage => 10/100 = 10%",
-                    "enum": [
-                        "all",
-                        "submissions"
-                    ],
-                    "type": "string"
-                },
                 "includeSelf": {
                     "default": false,
                     "description": "Include reddit `self.*` domains in aggregation?\n\nSelf-posts are aggregated under the domain `self.[subreddit]`. If you wish to include these domains in aggregation set this to `true`",
@@ -192,7 +183,6 @@
                 "criteriaJoin",
                 "include",
                 "exclude",
-                "includeInTotal",
                 "lookAt",
                 "aggregateMediaDomains",
                 "includeSelf",
@@ -608,11 +598,11 @@
             "type": "object"
         }
     },
-    "description": "A RuleSet is a \"nested\" set of Rules that can be used to create more complex AND/OR behavior. Think of the outcome of a RuleSet as the result of all of it's Rules (based on condition)",
+    "description": "A RuleSet is a \"nested\" set of `Rule` objects that can be used to create more complex AND/OR behavior. Think of the outcome of a `RuleSet` as the result of all of its run `Rule` objects (based on `condition`)",
     "properties": {
         "condition": {
             "default": "AND",
-            "description": "Under what condition should a set of rules be considered \"successful\"?\n\nIf \"OR\" then ANY triggered rule results in success.\n\nIf \"AND\" then ALL rules must be triggered to result in success.",
+            "description": "Under what condition should a set of run `Rule` objects be considered \"successful\"?\n\nIf `OR` then **any** triggered `Rule` object results in success.\n\nIf `AND` then **all** `Rule` objects must be triggered to result in success.",
             "enum": [
                 "AND",
                 "OR"
@@ -620,6 +610,7 @@
             "type": "string"
         },
         "rules": {
+            "description": "Can be `Rule` or the `name` of any **named** `Rule` in your subreddit's configuration",
             "items": {
                 "anyOf": [
                     {
@@ -633,6 +624,9 @@
                     },
                     {
                         "$ref": "#/definitions/AttributionJSONConfig"
+                    },
+                    {
+                        "type": "string"
                     }
                 ]
             },

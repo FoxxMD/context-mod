@@ -11,23 +11,10 @@ import {CommentStream, SubmissionStream} from "snoostorm";
 import pEvent from "p-event";
 import {RuleResult} from "../Rule";
 import {ConfigBuilder} from "../ConfigBuilder";
-import {PollingOptions} from "../Common/interfaces";
+import {ManagerOptions, PollingOptions} from "../Common/interfaces";
 import Submission from "snoowrap/dist/objects/Submission";
 import {itemContentPeek} from "../Utils/SnoowrapUtils";
 import dayjs from "dayjs";
-
-export interface ManagerOptions {
-    polling?: PollingOptions
-    /**
-     * If present, time in milliseconds between HEARTBEAT log statements with current api limit count. Nice to have to know things are still ticking if there is low activity
-     * */
-    heartbeatInterval?: number
-    /**
-     * When Reddit API limit remaining reaches this number context bot will start warning on every poll interval
-     * @default 250
-     * */
-    apiLimitWarning?: number
-}
 
 export class Manager {
     subreddit: Subreddit;

@@ -122,11 +122,11 @@ export type JoinOperands = 'OR' | 'AND';
 
 export interface JoinCondition {
     /**
-     * Under what condition should a set of rules be considered "successful"?
+     * Under what condition should a set of run `Rule` objects be considered "successful"?
      *
-     * If "OR" then ANY triggered rule results in success.
+     * If `OR` then **any** triggered `Rule` object results in success.
      *
-     * If "AND" then ALL rules must be triggered to result in success.
+     * If `AND` then **all** `Rule` objects must be triggered to result in success.
      *
      * @default "AND"
      * */
@@ -169,4 +169,17 @@ export interface PollingOptions {
          * */
         interval?: number,
     }
+}
+
+export interface ManagerOptions {
+    polling?: PollingOptions
+    /**
+     * If present, time in milliseconds between HEARTBEAT log statements with current api limit count. Nice to have to know things are still ticking if there is low activity
+     * */
+    heartbeatInterval?: number
+    /**
+     * When Reddit API limit remaining reaches this number context bot will start warning on every poll interval
+     * @default 250
+     * */
+    apiLimitWarning?: number
 }

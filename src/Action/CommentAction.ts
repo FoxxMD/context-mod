@@ -1,4 +1,4 @@
-import Action, {ActionJSONConfig, ActionConfig, ActionOptions} from "./index";
+import Action, {ActionJson, ActionConfig, ActionOptions} from "./index";
 import Snoowrap, {Comment} from "snoowrap";
 import Submission from "snoowrap/dist/objects/Submission";
 import dayjs, {Dayjs} from "dayjs";
@@ -81,6 +81,6 @@ export interface CommentActionOptions extends CommentActionConfig,ActionOptions 
 /**
  * Reply to the Activity. For a submission the reply will be a top-level comment.
  * */
-export interface CommentActionJSONConfig extends CommentActionConfig, ActionJSONConfig {
+export interface CommentActionJson extends CommentActionConfig, ActionJson {
 
 }

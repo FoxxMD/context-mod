@@ -67,6 +67,7 @@ export abstract class Rule implements IRule, Triggerable {
         this.logger.debug('Starting');
         const existingResult = findResultByPremise(this.getPremise(), existingResults);
         if (existingResult) {
+            this.logger.debug('Returning existing result');
             return Promise.resolve([existingResult.triggered, [{...existingResult, name: this.name}]]);
         }
         if (this.authors.include !== undefined && this.authors.include.length > 0) {
@@ -194,7 +195,6 @@ export interface IRule {
     authors?: AuthorOptions
 }
 
-/** @see {isRuleConfig} ts-auto-guard:type-guard */
 export interface RuleJSONConfig extends IRule {
     /**
      * The kind of rule to run

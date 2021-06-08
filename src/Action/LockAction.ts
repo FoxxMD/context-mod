@@ -1,4 +1,4 @@
-import {ActionJSONConfig, ActionConfig} from "./index";
+import {ActionJson, ActionConfig} from "./index";
 import Action from "./index";
 import Snoowrap, {Comment, Submission} from "snoowrap";
 import {RuleResult} from "../Rule";
@@ -20,7 +20,7 @@ export interface LockActionConfig extends ActionConfig {
 /**
  * Lock the Activity
  * */
-export interface LockActionJSONConfig extends LockActionConfig, ActionJSONConfig {
+export interface LockActionJson extends LockActionConfig, ActionJson {
 
 }
 

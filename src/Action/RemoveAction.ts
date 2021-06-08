@@ -1,4 +1,4 @@
-import {ActionJSONConfig, ActionConfig} from "./index";
+import {ActionJson, ActionConfig} from "./index";
 import Action from "./index";
 import Snoowrap, {Comment, Submission} from "snoowrap";
 import {RuleResult} from "../Rule";
@@ -18,6 +18,6 @@ export interface RemoveActionConfig extends ActionConfig {
 /**
  * Remove the Activity
  * */
-export interface RemoveActionJSONConfig extends RemoveActionConfig, ActionJSONConfig {
+export interface RemoveActionJson extends RemoveActionConfig, ActionJson {
 
 }
