@@ -121,6 +121,7 @@ export class AttributionRule extends SubmissionRule {
                 } else if (this.exclude.length > 0) {
                     return !this.exclude.some(x => x === act.subreddit.display_name.toLowerCase())
                 }
+                return true;
             });
 
             if (activities.length < minActivityCount) {
