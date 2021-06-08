@@ -34,6 +34,63 @@
             ],
             "type": "object"
         },
+        "AttributionCriteria": {
+            "properties": {
+                "minActivityCount": {
+                    "default": 5,
+                    "description": "The minimum number of activities (activities defined in `includeInTotal`) that must exist for this criteria to run",
+                    "type": "number"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "threshold": {
+                    "default": "10%",
+                    "description": "The number or percentage to trigger this rule at\n\n* If `threshold` is a `number` then it is the absolute number of attribution instances to trigger at\n* If `threshold` is a `string` with percentage (EX `40%`) then it is the percentage of the total (see `lookAt`) this attribution must reach to trigger",
+                    "type": [
+                        "string",
+                        "number"
+                    ]
+                },
+                "thresholdOn": {
+                    "default": "all",
+                    "description": "What activities to use for total count when determining what percentage an attribution comprises\n\nEX:\n\nAuthor has 100 activities, 40 are submissions and 60 are comments\n\n* If `submission` then if 10 submission are for Youtube Channel A then percentage => 10/40 = 25%\n* If `all` then if 10 submission are for Youtube Channel A then percentage => 10/100 = 10%",
+                    "enum": [
+                        "all",
+                        "submissions"
+                    ],
+                    "type": "string"
+                },
+                "window": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/definitions/DurationObject"
+                        },
+                        {
+                            "$ref": "#/definitions/ActivityWindowCriteria"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "number"
+                            ]
+                        }
+                    ]
+                }
+            },
+            "propertyOrder": [
+                "threshold",
+                "window",
+                "thresholdOn",
+                "minActivityCount",
+                "name"
+            ],
+            "required": [
+                "threshold",
+                "window"
+            ],
+            "type": "object"
+        },
         "AttributionJSONConfig": {
             "description": "Aggregates all of the domain/media accounts attributed to an author's Submission history. If any domain is over the threshold the rule is triggered\n\nAvailable data for [Action templating](https://github.com/FoxxMD/reddit-context-bot#action-templating):\n\n```\ncount      => Total number of repeat Submissions\nthreshold  => The threshold you configured for this Rule to trigger\nurl        => Url of the submission that triggered the rule\n```",
             "properties": {
@@ -47,6 +104,22 @@
                     "additionalProperties": false,
                     "description": "If present then these Author criteria are checked before running the rule. If criteria fails then the rule is skipped.",
                     "minProperties": 1
+                },
+                "criteria": {
+                    "description": "A list threshold-window values to test attribution against\n\nIf none is provided the default set used is:\n\n```\nthreshold: 10%\nwindow: 100\n```",
+                    "items": {
+                        "$ref": "#/definitions/AttributionCriteria"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                },
+                "criteriaJoin": {
+                    "description": "* If `OR` then any set of AttributionCriteria that produce an Attribution over the threshold will trigger the rule.\n* If `AND` then all AttributionCriteria sets must product an Attribution over the threshold to trigger the rule.",
+                    "enum": [
+                        "AND",
+                        "OR"
+                    ],
+                    "type": "string"
                 },
                 "exclude": {
                     "description": "Do not include Submissions from this list of Subreddits.\n\nA list of subreddits (case-insensitive) to look for. Do not include \"r/\" prefix.\n\nEX to match against /r/mealtimevideos and /r/askscience use [\"mealtimevideos\",\"askscience\"]",
@@ -107,66 +180,22 @@
                     "pattern": "^[a-zA-Z]([\\w -]*[\\w])?$",
                     "type": "string"
                 },
-                "threshold": {
-                    "default": "10%",
-                    "description": "The number or percentage to trigger this rule at\n\n* If `threshold` is a `number` then it is the absolute number of attribution instances to trigger at\n* If `threshold` is a `string` with percentage (EX `40%`) then it is the percentage of the total (see `lookAt`) this attribution must reach to trigger",
-                    "type": [
-                        "string",
-                        "number"
-                    ]
-                },
                 "useSubmissionAsReference": {
                     "default": true,
                     "description": "If activity is a Submission and is a link (not self-post) then only look at Submissions that contain this link, otherwise consider all activities.",
                     "type": "boolean"
-                },
-                "window": {
-                    "anyOf": [
-                        {
-                            "$ref": "#/definitions/DurationObject"
-                        },
-                        {
-                            "$ref": "#/definitions/ActivityWindowCriteria"
-                        },
-                        {
-                            "type": [
-                                "string",
-                                "number"
-                            ]
-                        }
-                    ],
-                    "default": 15,
-                    "description": "Criteria for defining what set of activities should be considered.\n\nThe value of this property may be either count OR duration -- to use both write it as an ActivityWindowCriteria\n\nSee ActivityWindowCriteria for descriptions of what count/duration do",
-                    "examples": [
-                        15,
-                        "PT1M",
-                        {
-                            "count": 10
-                        },
-                        {
-                            "duration": {
-                                "hours": 5
-                            }
-                        },
-                        {
-                            "count": 5,
-                            "duration": {
-                                "minutes": 15
-                            }
-                        }
-                    ]
                 }
             },
             "propertyOrder": [
                 "kind",
-                "threshold",
+                "criteria",
+                "criteriaJoin",
                 "include",
                 "exclude",
                 "includeInTotal",
                 "lookAt",
                 "aggregateMediaDomains",
                 "includeSelf",
-                "window",
                 "useSubmissionAsReference",
                 "name",
                 "authors"

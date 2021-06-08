@@ -3,6 +3,7 @@ import 'winston-daily-rotate-file';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc.js';
 import dduration from 'dayjs/plugin/duration.js';
+import relTime from 'dayjs/plugin/relativeTime.js';
 import {Manager} from "./Subreddit/Manager";
 import {Command} from 'commander';
 import {getOptions} from "./Utils/CommandConfig";
@@ -11,6 +12,7 @@ import Submission from "snoowrap/dist/objects/Submission";
 
 dayjs.extend(utc);
 dayjs.extend(dduration);
+dayjs.extend(relTime);
 
 
 const program = new Command();
