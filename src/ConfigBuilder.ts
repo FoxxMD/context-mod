@@ -44,8 +44,19 @@ export class ConfigBuilder {
                 }
             }
         } else {
-            this.logger.error('Json config was not valid. Please use schema to check validity.', ajv.errors);
-            this.logger.error(ajv.errors);
+            this.logger.error('Json config was not valid. Please use schema to check validity.');
+            if(Array.isArray(ajv.errors)) {
+                for(const err of ajv.errors) {
+                    let suffix = '';
+                    // @ts-ignore
+                    if(err.params.allowedValues !== undefined) {
+                        // @ts-ignore
+                        suffix = err.params.allowedValues.join(', ');
+                        suffix = ` [${suffix}]`;
+                    }
+                    this.logger.error(`${err.keyword}: ${err.schemaPath} => ${err.message}${suffix}`);
+                }
+            }
             throw new LoggedError();
         }
 
