@@ -47,7 +47,6 @@ export class AttributionRule extends SubmissionRule {
     lookAt: 'media' | 'all' = 'media';
     include: string[];
     exclude: string[];
-    includeInTotal: 'submissions' | 'all' = 'submissions';
     aggregateMediaDomains: boolean = false;
     includeSelf: boolean = false;
 
@@ -58,7 +57,6 @@ export class AttributionRule extends SubmissionRule {
             criteriaJoin = 'OR',
             include = [],
             exclude = [],
-            includeInTotal = 'submissions',
             lookAt = 'media',
             aggregateMediaDomains = false,
             useSubmissionAsReference = true,
@@ -72,7 +70,6 @@ export class AttributionRule extends SubmissionRule {
         }
         this.include = include.map(x => x.toLowerCase());
         this.exclude = exclude.map(x => x.toLowerCase());
-        this.includeInTotal = includeInTotal;
         this.lookAt = lookAt;
         this.aggregateMediaDomains = aggregateMediaDomains;
         this.includeSelf = includeSelf;
@@ -90,7 +87,6 @@ export class AttributionRule extends SubmissionRule {
             include: this.include,
             exclude: this.exclude,
             lookAt: this.lookAt,
-            includeInTotal: this.includeInTotal,
             aggregateMediaDomains: this.aggregateMediaDomains,
             includeSelf: this.includeSelf,
         }
@@ -247,7 +243,7 @@ export class AttributionRule extends SubmissionRule {
 
         }
 
-        return Promise.resolve([false, []]);
+        return Promise.resolve([false, [this.getResult(false)]]);
     }
 
 }
@@ -294,20 +290,6 @@ interface AttributionConfig extends ReferenceSubmission {
      * @minItems 1
      * */
     exclude?: string[],
-
-    /**
-     * What activities to use for total count when determining what percentage an attribution comprises
-     *
-     * EX:
-     *
-     * Author has 100 activities, 40 are submissions and 60 are comments
-     *
-     * * If `submission` then if 10 submission are for Youtube Channel A then percentage => 10/40 = 25%
-     * * If `all` then if 10 submission are for Youtube Channel A then percentage => 10/100 = 10%
-     *
-     * @default submissions
-     **/
-    includeInTotal?: 'submissions' | 'all',
 
     /**
      * Determines which type of attribution to look at
