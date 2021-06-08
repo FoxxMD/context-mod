@@ -44,11 +44,11 @@ export class Manager {
         this.subreddit = sub;
         this.client = client;
         for(const sub of subChecks) {
-            this.logger.debug(`Submission Check: ${sub.name}${sub.description !== undefined ? ` ${sub.description}` : ''}`);
+            this.logger.info(`Submission Check: ${sub.name}${sub.description !== undefined ? ` ${sub.description}` : ''}`);
         }
         this.submissionChecks = subChecks;
         for(const comm of commentChecks) {
-            this.logger.debug(`Comment Check: ${comm.name}${comm.description !== undefined ? ` ${comm.description}` : ''}`);
+            this.logger.info(`Comment Check: ${comm.name}${comm.description !== undefined ? ` ${comm.description}` : ''}`);
         }
         this.commentChecks = commentChecks;
         const checkSummary = `Found Checks -- Submission: ${this.submissionChecks.length} | Comment: ${this.commentChecks.length}`;
