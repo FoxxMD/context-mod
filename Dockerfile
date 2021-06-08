@@ -24,4 +24,4 @@ RUN mkdir -p $log_dir
 VOLUME $log_dir
 ENV LOG_DIR=$log_dir
 
-CMD [ "node", "src/index.js" ]
+CMD [ "node", "src/index.js", "run" ]
