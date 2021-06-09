@@ -127,6 +127,7 @@ export class Author implements AuthorCriteria {
  * If present then these Author criteria are checked before running the rule. If criteria fails then the rule is skipped.
  * @minProperties 1
  * @additionalProperties false
+ * @TJS-type object
  * */
 export interface AuthorOptions {
     /**

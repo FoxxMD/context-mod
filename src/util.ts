@@ -5,6 +5,7 @@ import {RulePremise, RuleResult} from "./Rule";
 import deepEqual from "fast-deep-equal";
 import utc from 'dayjs/plugin/utc.js';
 import dduration from 'dayjs/plugin/duration.js';
+import Ajv from "ajv";
 
 dayjs.extend(utc);
 dayjs.extend(dduration);
@@ -194,6 +195,8 @@ export const ruleNamesFromResults = (results: RuleResult[]) => {
     return results.map(x => x.name || x.premise.kind).join(' | ')
 }
 
-
+export const createAjvFactory = (logger: Logger) => {
+    return  new Ajv({logger: logger, verbose: true, strict: "log", allowUnionTypes: true});
+}
 
 

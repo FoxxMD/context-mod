@@ -45,10 +45,6 @@
                     ]
                 }
             },
-            "propertyOrder": [
-                "count",
-                "duration"
-            ],
             "type": "object"
         },
         "AttributionCriteria": {
@@ -95,13 +91,6 @@
                     ]
                 }
             },
-            "propertyOrder": [
-                "threshold",
-                "window",
-                "thresholdOn",
-                "minActivityCount",
-                "name"
-            ],
             "required": [
                 "threshold",
                 "window"
@@ -117,10 +106,10 @@
                     "type": "boolean"
                 },
                 "authors": {
-                    "$ref": "#/definitions/AuthorOptions",
                     "additionalProperties": false,
                     "description": "If present then these Author criteria are checked before running the rule. If criteria fails then the rule is skipped.",
-                    "minProperties": 1
+                    "minProperties": 1,
+                    "type": "object"
                 },
                 "criteria": {
                     "description": "A list threshold-window values to test attribution against\n\nIf none is provided the default set used is:\n\n```\nthreshold: 10%\nwindow: 100\n```",
@@ -194,19 +183,6 @@
                     "type": "boolean"
                 }
             },
-            "propertyOrder": [
-                "kind",
-                "criteria",
-                "criteriaJoin",
-                "include",
-                "exclude",
-                "lookAt",
-                "aggregateMediaDomains",
-                "includeSelf",
-                "useSubmissionAsReference",
-                "name",
-                "authors"
-            ],
             "required": [
                 "kind"
             ],
@@ -247,47 +223,15 @@
                     "type": "array"
                 }
             },
-            "propertyOrder": [
-                "name",
-                "flairCssClass",
-                "flairText",
-                "isMod"
-            ],
-            "type": "object"
-        },
-        "AuthorOptions": {
-            "additionalProperties": false,
-            "description": "If present then these Author criteria are checked before running the rule. If criteria fails then the rule is skipped.",
-            "minProperties": 1,
-            "properties": {
-                "exclude": {
-                    "description": "Only runs if include is not present. Will \"pass\" if any of set of the AuthorCriteria does not pass",
-                    "items": {
-                        "$ref": "#/definitions/AuthorCriteria"
-                    },
-                    "type": "array"
-                },
-                "include": {
-                    "description": "Will \"pass\" if any set of AuthorCriteria passes",
-                    "items": {
-                        "$ref": "#/definitions/AuthorCriteria"
-                    },
-                    "type": "array"
-                }
-            },
-            "propertyOrder": [
-                "include",
-                "exclude"
-            ],
             "type": "object"
         },
         "AuthorRuleJSONConfig": {
             "properties": {
                 "authors": {
-                    "$ref": "#/definitions/AuthorOptions",
                     "additionalProperties": false,
                     "description": "If present then these Author criteria are checked before running the rule. If criteria fails then the rule is skipped.",
-                    "minProperties": 1
+                    "minProperties": 1,
+                    "type": "object"
                 },
                 "exclude": {
                     "description": "Only runs if include is not present. Will \"pass\" if any of set of the AuthorCriteria does not pass",
@@ -316,13 +260,6 @@
                     "type": "string"
                 }
             },
-            "propertyOrder": [
-                "kind",
-                "include",
-                "exclude",
-                "name",
-                "authors"
-            ],
             "required": [
                 "exclude",
                 "include",
@@ -357,25 +294,16 @@
                     "type": "number"
                 }
             },
-            "propertyOrder": [
-                "seconds",
-                "minutes",
-                "hours",
-                "days",
-                "weeks",
-                "months",
-                "years"
-            ],
             "type": "object"
         },
         "RecentActivityRuleJSONConfig": {
             "description": "Checks a user's history for any Activity (Submission/Comment) in the subreddits specified in thresholds\n\nAvailable data for [Action templating](https://github.com/FoxxMD/reddit-context-bot#action-templating):\n\n```\nsummary    => comma-deliminated list of subreddits that hit the threshold and their count EX subredditA(1), subredditB(4),...\nsubCount   => Total number of subreddits that hit the threshold\ntotalCount => Total number of all activity occurrences in subreddits\n```",
             "properties": {
                 "authors": {
-                    "$ref": "#/definitions/AuthorOptions",
                     "additionalProperties": false,
                     "description": "If present then these Author criteria are checked before running the rule. If criteria fails then the rule is skipped.",
-                    "minProperties": 1
+                    "minProperties": 1,
+                    "type": "object"
                 },
                 "kind": {
                     "description": "The kind of rule to run",
@@ -447,15 +375,6 @@
                     ]
                 }
             },
-            "propertyOrder": [
-                "kind",
-                "lookAt",
-                "thresholds",
-                "window",
-                "useSubmissionAsReference",
-                "name",
-                "authors"
-            ],
             "required": [
                 "kind",
                 "thresholds"
@@ -466,10 +385,10 @@
             "description": "Checks a user's history for Submissions with identical content\n\nAvailable data for [Action templating](https://github.com/FoxxMD/reddit-context-bot#action-templating):\n\n```\ncount      => Total number of repeat Submissions\nthreshold  => The threshold you configured for this Rule to trigger\nurl        => Url of the submission that triggered the rule\n```",
             "properties": {
                 "authors": {
-                    "$ref": "#/definitions/AuthorOptions",
                     "additionalProperties": false,
                     "description": "If present then these Author criteria are checked before running the rule. If criteria fails then the rule is skipped.",
-                    "minProperties": 1
+                    "minProperties": 1,
+                    "type": "object"
                 },
                 "exclude": {
                     "description": "Do not include Submissions from this list of Subreddits.\n\nA list of subreddits (case-insensitive) to look for. Do not include \"r/\" prefix.\n\nEX to match against /r/mealtimevideos and /r/askscience use [\"mealtimevideos\",\"askscience\"]",
@@ -567,18 +486,6 @@
                     ]
                 }
             },
-            "propertyOrder": [
-                "kind",
-                "threshold",
-                "gapAllowance",
-                "include",
-                "exclude",
-                "lookAt",
-                "window",
-                "useSubmissionAsReference",
-                "name",
-                "authors"
-            ],
             "required": [
                 "kind"
             ],
@@ -605,10 +512,6 @@
                     "type": "array"
                 }
             },
-            "propertyOrder": [
-                "count",
-                "subreddits"
-            ],
             "required": [
                 "subreddits"
             ],

@@ -104,7 +104,6 @@ for (const o of getOptions()) {
                 logger.error('Reddit responded with a 403 insufficient_scope, did you choose the correct scopes?');
             }
         }
-        debugger;
         console.log(err);
     }
 }());

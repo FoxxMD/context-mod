@@ -1,5 +1,5 @@
 import {Logger} from "winston";
-import {mergeArr} from "./util";
+import {createAjvFactory, mergeArr} from "./util";
 import {CommentCheck} from "./Check/CommentCheck";
 import {SubmissionCheck} from "./Check/SubmissionCheck";
 
@@ -13,8 +13,6 @@ import {isRuleSetJSON, RuleSetJson, RuleSetObjectJson} from "./Rule/RuleSet";
 import deepEqual from "fast-deep-equal";
 import {ActionJson, ActionObjectJson, RuleJson, RuleObjectJson} from "./Common/types";
 import {isActionJson} from "./Action";
-
-const ajv = new Ajv();
 
 export interface ConfigBuilderOptions {
     logger: Logger,
@@ -37,6 +35,7 @@ export class ConfigBuilder {
         let namedRules: Map<string,RuleObjectJson> = new Map();
         let namedActions: Map<string,ActionObjectJson> = new Map();
 
+        const ajv = createAjvFactory(this.logger);
         const valid = ajv.validate(schema, config);
         let managerOptions: ManagerOptions = {};
         if(valid) {

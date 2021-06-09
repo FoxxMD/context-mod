@@ -5,15 +5,13 @@ import {Logger} from "winston";
 import {Comment, Submission} from "snoowrap";
 import {actionFactory} from "../Action/ActionFactory";
 import {ruleFactory} from "../Rule/RuleFactory";
-import {mergeArr, ruleNamesFromResults} from "../util";
+import {createAjvFactory, mergeArr, ruleNamesFromResults} from "../util";
 import {JoinCondition, JoinOperands} from "../Common/interfaces";
 import * as RuleSchema from '../Schema/Rule.json';
 import * as RuleSetSchema from '../Schema/RuleSet.json';
 import * as ActionSchema from '../Schema/Action.json';
 import Ajv from 'ajv';
 import {ActionObjectJson, RuleJson, RuleObjectJson, ActionJson as ActionTypeJson} from "../Common/types";
-
-const ajv = new Ajv();
 
 export class Check implements ICheck {
     actions: Action[] = [];
@@ -33,6 +31,8 @@ export class Check implements ICheck {
         } = options;
 
         this.logger = options.logger.child({labels: [`Check ${name}`]}, mergeArr);
+
+        const ajv = createAjvFactory(this.logger);
 
         this.name = name;
         this.description = description;

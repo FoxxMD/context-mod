@@ -1,14 +1,12 @@
 import {IRule, Triggerable, Rule, RuleJSONConfig, RuleResult} from "./index";
 import {Comment, Submission} from "snoowrap";
 import {ruleFactory} from "./RuleFactory";
-import {mergeArr} from "../util";
+import {createAjvFactory, mergeArr} from "../util";
 import {Logger} from "winston";
 import {JoinCondition, JoinOperands} from "../Common/interfaces";
 import * as RuleSchema from '../Schema/Rule.json';
 import Ajv from 'ajv';
 import {RuleJson, RuleObjectJson} from "../Common/types";
-
-const ajv = new Ajv();
 
 export class RuleSet implements IRuleSet, Triggerable {
     rules: Rule[] = [];
@@ -19,6 +17,7 @@ export class RuleSet implements IRuleSet, Triggerable {
         const {logger, condition = 'AND', rules = []} = options;
         this.logger = logger.child({leaf: 'Rule Set'}, mergeArr);
         this.condition = condition;
+        const ajv = createAjvFactory(this.logger);
         for (const r of rules) {
             if (r instanceof Rule) {
                 this.rules.push(r);

@@ -9,10 +9,10 @@
     "start": "node server.js",
     "guard": "ts-auto-guard src/JsonConfig.ts",
     "schema": "npm run -s schema-app & npm run -s schema-ruleset & npm run -s schema-rule & npm run -s schema-action",
-    "schema-app": "typescript-json-schema tsconfig.json JSONConfig --out src/Schema/App.json --required --tsNodeRegister --refs --propOrder",
-    "schema-ruleset": "typescript-json-schema tsconfig.json RuleSetJson --out src/Schema/RuleSet.json --required --tsNodeRegister --refs --propOrder",
-    "schema-rule": "typescript-json-schema tsconfig.json RuleJson --out src/Schema/Rule.json --required --tsNodeRegister --refs --propOrder",
-    "schema-action": "typescript-json-schema tsconfig.json ActionJson --out src/Schema/Action.json --required --tsNodeRegister --refs --propOrder",
+    "schema-app": "typescript-json-schema tsconfig.json JSONConfig --out src/Schema/App.json --required --tsNodeRegister --refs",
+    "schema-ruleset": "typescript-json-schema tsconfig.json RuleSetJson --out src/Schema/RuleSet.json --required --tsNodeRegister --refs",
+    "schema-rule": "typescript-json-schema tsconfig.json RuleJson --out src/Schema/Rule.json --required --tsNodeRegister --refs",
+    "schema-action": "typescript-json-schema tsconfig.json ActionJson --out src/Schema/Action.json --required --tsNodeRegister --refs",
     "schemaNotWorking": "./node_modules/.bin/ts-json-schema-generator -f tsconfig.json -p src/JsonConfig.ts -t JSONConfig --out src/Schema/vegaSchema.json",
     "circular": "madge --circular --extensions ts src/index.ts",
     "circular-graph": "madge --image graph.svg --circular --extensions ts src/index.ts"
@@ -24,7 +24,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "ajv": "^6.12.6",
+    "ajv": "^7.2.4",
     "commander": "^7.2.0",
     "dayjs": "^1.10.5",
     "es6-error": "^4.1.1",
