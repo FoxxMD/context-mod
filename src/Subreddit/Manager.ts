@@ -39,7 +39,7 @@ export class Manager {
     }
 
     constructor(sub: Subreddit, client: Snoowrap, logger: Logger, sourceData: object, opts: ManagerOptions = {}) {
-        const displayLabel = `r/${sub.display_name}`;
+        const displayLabel = `${sub.display_name_prefixed}`;
         this.displayLabel = displayLabel;
         this.currentLabels = [displayLabel];
         const getLabels = this.getCurrentLabels;

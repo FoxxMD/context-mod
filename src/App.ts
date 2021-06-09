@@ -113,7 +113,7 @@ export class App {
             // TODO don't know a way to check permissions yet
             availSubs.push(sub);
         }
-        this.logger.info(`/u/${name} is a moderator of these subreddits: ${availSubs.map(x => x.display_name).join(', ')}`);
+        this.logger.info(`/u/${name} is a moderator of these subreddits: ${availSubs.map(x => x.display_name_prefixed).join(', ')}`);
 
         let subsToRun = [];
         const subsToUse = subreddits.length > 0 ? subreddits : this.subreddits;
@@ -142,20 +142,20 @@ export class App {
                 const wiki = sub.getWikiPage(this.wikiLocation);
                 content = await wiki.content_md;
             } catch (err) {
-                this.logger.error(`[${sub.display_name}] Could not read wiki configuration. Please ensure the page 'contextbot' exists and is readable -- error: ${err.message}`);
+                this.logger.error(`[${sub.display_name_prefixed}] Could not read wiki configuration. Please ensure the page https://reddit.com${sub.url}wiki/${this.wikiLocation} exists and is readable -- error: ${err.message}`);
                 continue;
             }
             try {
                 json = JSON.parse(content);
 
             } catch (err) {
-                this.logger.error(`[${sub.display_name}] Wiki page contents was not valid -- error: ${err.message}`);
+                this.logger.error(`[${sub.display_name_prefixed}] Wiki page contents was not valid -- error: ${err.message}`);
                 continue;
             }
             try {
                 subSchedule.push(new Manager(sub, this.client, this.logger, json));
             } catch (err) {
-                this.logger.error(`[${sub.display_name}] Config was not valid`, undefined, err);
+                this.logger.error(`[${sub.display_name_prefixed}] Config was not valid`, undefined, err);
             }
         }
         this.subManagers = subSchedule;
