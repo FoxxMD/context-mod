@@ -1,5 +1,5 @@
 import {Logger} from "winston";
-import {createLabelledLogger, loggerMetaShuffle, mergeArr} from "./util";
+import {mergeArr} from "./util";
 import {CommentCheck} from "./Check/CommentCheck";
 import {SubmissionCheck} from "./Check/SubmissionCheck";
 
@@ -17,19 +17,17 @@ import {isActionJson} from "./Action";
 const ajv = new Ajv();
 
 export interface ConfigBuilderOptions {
-    logger?: Logger,
+    logger: Logger,
 }
 
 export class ConfigBuilder {
+    configLogger: Logger;
     logger: Logger;
 
     constructor(options: ConfigBuilderOptions) {
 
-        if (options.logger !== undefined) {
-            this.logger = options.logger.child(loggerMetaShuffle(options.logger, 'Config'), mergeArr);
-        } else {
-            this.logger = createLabelledLogger(`Config`, `Config`);
-        }
+        this.configLogger = options.logger.child({leaf: 'Config'}, mergeArr);
+        this.logger = options.logger;
     }
 
     buildFromJson(config: object): [Array<SubmissionCheck>,Array<CommentCheck>,ManagerOptions] {
@@ -66,7 +64,7 @@ export class ConfigBuilder {
                 }
             }
         } else {
-            this.logger.error('Json config was not valid. Please use schema to check validity.');
+            this.configLogger.error('Json config was not valid. Please use schema to check validity.');
             if(Array.isArray(ajv.errors)) {
                 for(const err of ajv.errors) {
                     let suffix = '';
@@ -76,7 +74,7 @@ export class ConfigBuilder {
                         suffix = err.params.allowedValues.join(', ');
                         suffix = ` [${suffix}]`;
                     }
-                    this.logger.error(`${err.keyword}: ${err.schemaPath} => ${err.message}${suffix}`);
+                    this.configLogger.error(`${err.keyword}: ${err.schemaPath} => ${err.message}${suffix}`);
                 }
             }
             throw new LoggedError();

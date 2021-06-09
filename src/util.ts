@@ -19,15 +19,6 @@ const CWD = process.cwd();
 
 export const truncateStringToLength = (length: number, truncStr = '...') => (str: string) => str.length > length ? `${str.slice(0, length - truncStr.length - 1)}${truncStr}` : str;
 
-export const loggerMetaShuffle = (logger: Logger, newLeaf: (string | undefined | null) = null, extraLabels: string[] = [], {truncateLength = 50} = {}) => {
-    const labelTrunc = truncateStringToLength(truncateLength);
-    const {labels = [], leaf} = logger.defaultMeta || {};
-    return {
-        labels: labels.concat(extraLabels.map(x => labelTrunc(x))),
-        leaf: newLeaf
-    };
-}
-
 let longestLabel = 3;
 // @ts-ignore
 export const defaultFormat = printf(({
@@ -62,7 +53,7 @@ export const defaultFormat = printf(({
     let labelContent = `[${label.padEnd(longestLabel)}]`;
     if (labels.length > 0 || (leaf !== null && leaf !== undefined)) {
         let nodes = labels;
-        if (leaf !== null) {
+        if (leaf !== null && leaf !== undefined) {
             nodes.push(leaf);
         }
         //labelContent = `${labels.slice(0, labels.length).map((x: string) => `[${x}]`).join(' ')}`
@@ -87,19 +78,6 @@ export const labelledFormat = (labelName = 'App') => {
         errorsFormat,
         defaultFormat,
     );
-}
-
-export const createLabelledLogger = (name = 'default', label = 'App') => {
-    if (winston.loggers.has(name)) {
-        return winston.loggers.get(name);
-    }
-    const def = winston.loggers.get('default');
-    winston.loggers.add(name, {
-        transports: def.transports,
-        level: def.level,
-        format: labelledFormat(label)
-    });
-    return winston.loggers.get(name);
 }
 
 export interface groupByOptions {
@@ -210,6 +188,10 @@ export const mergeArr = (objValue: [], srcValue: []): (any[] | undefined) => {
     if (Array.isArray(objValue)) {
         return objValue.concat(srcValue);
     }
+}
+
+export const ruleNamesFromResults = (results: RuleResult[]) => {
+    return results.map(x => x.name || x.premise.kind).join(' | ')
 }
 
 

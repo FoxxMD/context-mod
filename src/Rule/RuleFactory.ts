@@ -3,18 +3,24 @@ import RepeatActivityRule, {RepeatActivityJSONConfig} from "./SubmissionRule/Rep
 import {Rule, RuleJSONConfig} from "./index";
 import AuthorRule, {AuthorRuleJSONConfig} from "./AuthorRule";
 import {AttributionJSONConfig, AttributionRule} from "./SubmissionRule/AttributionRule";
+import {Logger} from "winston";
 
 export function ruleFactory
-(config: RuleJSONConfig): Rule {
+(config: RuleJSONConfig, logger: Logger): Rule {
+    let cfg;
     switch (config.kind) {
         case 'recentActivity':
-            return new RecentActivityRule(config as RecentActivityRuleJSONConfig);
+            cfg = config as RecentActivityRuleJSONConfig;
+            return new RecentActivityRule({...cfg, logger});
         case 'repeatActivity':
-            return new RepeatActivityRule(config as RepeatActivityJSONConfig);
+            cfg = config as RepeatActivityJSONConfig;
+            return new RepeatActivityRule({...cfg, logger});
         case 'author':
-            return new AuthorRule(config as AuthorRuleJSONConfig);
+            cfg = config as AuthorRuleJSONConfig;
+            return new AuthorRule({...cfg, logger});
         case 'attribution':
-            return new AttributionRule(config as AttributionJSONConfig);
+            cfg = config as AttributionJSONConfig;
+            return new AttributionRule({...cfg, logger});
         default:
             throw new Error('rule "kind" was not recognized.');
     }

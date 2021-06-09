@@ -4,20 +4,25 @@ import {RemoveAction} from "./RemoveAction";
 import {ReportAction, ReportActionJson} from "./ReportAction";
 import {FlairAction, FlairActionJson} from "./SubmissionAction/FlairAction";
 import Action, {ActionJson} from "./index";
+import {Logger} from "winston";
 
 export function actionFactory
-(config: ActionJson): Action {
+(config: ActionJson, logger: Logger): Action {
+    let cfg;
     switch (config.kind) {
         case 'comment':
-            return new CommentAction(config as CommentActionJson);
+            cfg = config as CommentActionJson;
+            return new CommentAction({...cfg, logger});
         case 'lock':
-            return new LockAction();
+            return new LockAction({logger});
         case 'remove':
-            return new RemoveAction();
+            return new RemoveAction({logger});
         case 'report':
-            return new ReportAction(config as ReportActionJson);
+            cfg = config as ReportActionJson;
+            return new ReportAction({...cfg, logger});
         case 'flair':
-            return new FlairAction(config as FlairActionJson);
+            cfg = config as FlairActionJson;
+            return new FlairAction({...cfg, logger});
         default:
             throw new Error('rule "kind" was not recognized.');
     }

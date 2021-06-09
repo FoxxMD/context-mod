@@ -12,14 +12,17 @@ import {RuleResult} from "../Rule";
 
 export class ReportAction extends Action {
     content: string;
-    name?: string = 'Report';
 
     constructor(options: ReportActionOptions) {
         super(options);
         this.content = options.content || '';
     }
 
-    async handle(item: Comment | Submission, ruleResults: RuleResult[]): Promise<void> {
+    getKind() {
+        return 'Report';
+    }
+
+    async process(item: Comment | Submission, ruleResults: RuleResult[]): Promise<void> {
         const renderedContent = await renderContent(this.content, item, ruleResults);
         //const truncatedContent = reportTrunc(renderedContent);
         // @ts-ignore

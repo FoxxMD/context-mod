@@ -1,10 +1,11 @@
-import Action, {ActionJson, ActionConfig, ActionOptions} from "./index";
-import Snoowrap, {Comment} from "snoowrap";
+import Action, {ActionJson, ActionOptions} from "./index";
+import {Comment} from "snoowrap";
 import Submission from "snoowrap/dist/objects/Submission";
 import dayjs, {Dayjs} from "dayjs";
 import {renderContent} from "../Utils/SnoowrapUtils";
 import {RichContent} from "../Common/interfaces";
 import {RuleResult} from "../Rule";
+import LoggedError from "../Utils/LoggedError";
 
 export const WIKI_DESCRIM = 'wiki:';
 
@@ -16,7 +17,6 @@ export class CommentAction extends Action {
     lock: boolean = false;
     sticky: boolean = false;
     distinguish: boolean = false;
-    name?: string = 'Comment';
 
     constructor(options: CommentActionOptions) {
         super(options);
@@ -36,22 +36,30 @@ export class CommentAction extends Action {
         this.distinguish = distinguish;
     }
 
-    async handle(item: Comment | Submission, ruleResults: RuleResult[]): Promise<void> {
+    getKind() {
+        return 'Comment';
+    }
+
+    async process(item: Comment | Submission, ruleResults: RuleResult[]): Promise<void> {
         if (this.hasWiki && (this.wikiFetched === undefined || Math.abs(dayjs().diff(this.wikiFetched, 'minute')) > 5)) {
             try {
                 const wiki = item.subreddit.getWikiPage(this.wiki as string);
                 this.content = await wiki.content_md;
                 this.wikiFetched = dayjs();
             } catch (err) {
-                this.logger.error(err);
-                throw new Error(`Could not read wiki page. Please ensure the page '${this.wiki}' exists and is readable`);
+                this.logger.error(`Could not read wiki page. Please ensure the page '${this.wiki}' exists and is readable`, err);
+                throw new LoggedError(`Could not read wiki page. Please ensure the page '${this.wiki}' exists and is readable`);
             }
         }
         // @ts-ignore
         const reply: Comment = await item.reply(renderContent(this.content, item, ruleResults));
-        if (this.lock && item instanceof Submission) {
-            // @ts-ignore
-            await item.lock();
+        if (this.lock) {
+            if(item instanceof Submission) {
+                // @ts-ignore
+                await item.lock();
+            } else {
+                this.logger.warn('Snoowrap does not support locking Comments');
+            }
         }
         if (this.distinguish) {
             // @ts-ignore

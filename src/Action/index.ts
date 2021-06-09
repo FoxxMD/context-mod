@@ -1,36 +1,35 @@
-import Snoowrap, {Comment, Submission} from "snoowrap";
+import {Comment, Submission} from "snoowrap";
 import {Logger} from "winston";
-import {createLabelledLogger, loggerMetaShuffle} from "../util";
 import {RuleResult} from "../Rule";
 
 export abstract class Action {
     name?: string;
     logger: Logger;
 
-    constructor(options: ActionOptions = {}) {
+    constructor(options: ActionOptions) {
         const {
-            name,
-            loggerPrefix = '',
+            name = this.getKind(),
             logger,
         } = options;
-        if (name !== undefined) {
-            this.name = name;
-        }
-        if (logger === undefined) {
-            const prefix = `${loggerPrefix}|${this.name}`;
-            this.logger = createLabelledLogger(prefix, prefix);
-        } else {
-            this.logger = logger.child(loggerMetaShuffle(logger, name || 'Action', undefined, {truncateLength: 100}));
-        }
+
+        this.name = name;
+        const uniqueName = this.name === this.getKind() ? this.getKind() : `${this.getKind()} - ${this.name}`;
+        this.logger = logger.child({labels: ['Action', uniqueName]});
     }
 
-    abstract handle(item: Comment | Submission, ruleResults: RuleResult[]): Promise<void>;
+    abstract getKind(): string;
+
+    async handle(item: Comment | Submission, ruleResults: RuleResult[]): Promise<void> {
+        await this.process(item, ruleResults);
+        this.logger.debug('Done');
+    }
+
+    abstract process(item: Comment | Submission, ruleResults: RuleResult[]): Promise<void>;
 }
 
 export interface ActionOptions {
     name?: string;
-    logger?: Logger,
-    loggerPrefix?: string,
+    logger: Logger,
 }
 
 export interface ActionConfig {

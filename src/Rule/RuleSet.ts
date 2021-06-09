@@ -1,7 +1,7 @@
 import {IRule, Triggerable, Rule, RuleJSONConfig, RuleResult} from "./index";
 import {Comment, Submission} from "snoowrap";
 import {ruleFactory} from "./RuleFactory";
-import {createLabelledLogger, loggerMetaShuffle} from "../util";
+import {mergeArr} from "../util";
 import {Logger} from "winston";
 import {JoinCondition, JoinOperands} from "../Common/interfaces";
 import * as RuleSchema from '../Schema/Rule.json';
@@ -17,11 +17,7 @@ export class RuleSet implements IRuleSet, Triggerable {
 
     constructor(options: RuleSetOptions) {
         const {logger, condition = 'AND', rules = []} = options;
-        if (logger !== undefined) {
-            this.logger = logger.child(loggerMetaShuffle(logger, 'Rule Set'));
-        } else {
-            this.logger = createLabelledLogger('Rule Set');
-        }
+        this.logger = logger.child({leaf: 'Rule Set'}, mergeArr);
         this.condition = condition;
         for (const r of rules) {
             if (r instanceof Rule) {
@@ -29,9 +25,7 @@ export class RuleSet implements IRuleSet, Triggerable {
             } else {
                 const valid = ajv.validate(RuleSchema, r);
                 if (valid) {
-                    // @ts-ignore
-                    r.logger = this.logger;
-                    this.rules.push(ruleFactory(r as RuleJSONConfig));
+                    this.rules.push(ruleFactory(r as RuleJSONConfig, logger));
                 } else {
                     this.logger.warn('Could not build rule because of JSON errors', {}, {errors: ajv.errors, obj: r});
                 }
@@ -77,7 +71,7 @@ export interface IRuleSet extends JoinCondition {
 
 export interface RuleSetOptions extends IRuleSet {
     rules: Array<IRule | RuleJSONConfig>,
-    logger?: Logger
+    logger: Logger
 }
 
 /**

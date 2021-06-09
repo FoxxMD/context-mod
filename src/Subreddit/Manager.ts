@@ -4,7 +4,6 @@ import {SubmissionCheck} from "../Check/SubmissionCheck";
 import {CommentCheck} from "../Check/CommentCheck";
 import {
     determineNewResults,
-    loggerMetaShuffle,
     mergeArr,
 } from "../util";
 import {CommentStream, SubmissionStream} from "snoostorm";
@@ -32,8 +31,23 @@ export class Manager {
     lastHeartbeat = dayjs();
     apiLimitWarning: number;
 
+    displayLabel: string;
+    currentLabels?: string[];
+
+    getCurrentLabels = () => {
+        return this.currentLabels;
+    }
+
     constructor(sub: Subreddit, client: Snoowrap, logger: Logger, sourceData: object, opts: ManagerOptions = {}) {
-        this.logger = logger.child(loggerMetaShuffle(logger, undefined, [`r/${sub.display_name}`], {truncateLength: 40}), mergeArr);
+        const displayLabel = `r/${sub.display_name}`;
+        this.displayLabel = displayLabel;
+        this.currentLabels = [displayLabel];
+        const getLabels = this.getCurrentLabels;
+        // dynamic default meta for winston feasible using function getters
+        // https://github.com/winstonjs/winston/issues/1626#issuecomment-531142958
+        this.logger = logger.child({
+            get labels () { return getLabels() }
+        }, mergeArr);
 
         const configBuilder = new ConfigBuilder({logger: this.logger});
         const [subChecks, commentChecks, configManagerOptions] = configBuilder.buildFromJson(sourceData);
@@ -64,15 +78,15 @@ export class Manager {
         const itemId = await item.id;
         let allRuleResults: RuleResult[] = [];
         const itemIdentifier = `${checkType} ${itemId}`;
+        this.currentLabels = [this.displayLabel, itemIdentifier];
         const [peek, _] = await itemContentPeek(item);
-        this.logger.info(`New Event: ${itemIdentifier} => ${peek}`);
+        this.logger.info(`<EVENT> ${peek}`);
 
         for (const check of checks) {
             if(checkNames.length > 0 && !checkNames.map(x => x.toLowerCase()).some(x => x === check.name.toLowerCase())) {
                 this.logger.debug(`Check ${check} not in array of requested checks to run, skipping`);
                 continue;
             }
-            this.logger.debug(`[${itemIdentifier}] Running Check ${check.name}`);
             let triggered = false;
             let currentResults: RuleResult[] = [];
             try {
@@ -80,22 +94,12 @@ export class Manager {
                 currentResults = checkResults;
                 allRuleResults = allRuleResults.concat(determineNewResults(allRuleResults, checkResults));
                 triggered = checkTriggered;
-                const invokedRules = checkResults.map(x => x.name || x.premise.kind).join(' | ');
-                if (checkTriggered) {
-                    this.logger.info(`[${itemIdentifier}] [CHK ${check.name}] Triggered with invoked Rules: ${invokedRules}`);
-                } else {
-                    this.logger.debug(`[${itemIdentifier}] [CHK ${check.name}] WAS NOT triggered with invoked Rule(s): ${invokedRules}`);
-                }
-
             } catch (e) {
-                this.logger.warn(`[${itemIdentifier}] [CHK ${check.name}] Failed with error: ${e.message}`, e);
+                this.logger.warn(`[Check ${check.name}] Failed with error: ${e.message}`, e);
             }
 
             if (triggered) {
-                this.logger.debug(`[${itemIdentifier}] [CHK ${check.name}] Running actions`);
-                // TODO give actions a name
                 await check.runActions(item, currentResults);
-                this.logger.info(`[${itemIdentifier}] [CHK ${check.name}] Ran actions`);
                 break;
             }
         }
@@ -129,8 +133,6 @@ export class Manager {
 
             this.streamSub.once('listing', async (listing) => {
                 this.subListedOnce = true;
-                // for debugging
-                // await this.runChecks('Submission', listing[0]);
             });
             this.streamSub.on('item', async (item) => {
                 if (!this.subListedOnce) {
@@ -164,11 +166,16 @@ export class Manager {
         }
 
         if (this.streamSub !== undefined) {
+            this.logger.info('Bot Running');
             await pEvent(this.streamSub, 'end');
         } else if (this.streamComments !== undefined) {
+            this.logger.info('Bot Running');
             await pEvent(this.streamComments, 'end');
         } else {
-            this.logger.warn('No submission or comment checks to run!');
+            this.logger.warn('No submission or comment checks to run! Bot will not run.');
+            return;
         }
+
+        this.logger.info('Bot Stopped');
     }
 }

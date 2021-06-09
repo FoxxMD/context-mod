@@ -1,7 +1,7 @@
 import Snoowrap from "snoowrap";
 import {Manager} from "./Subreddit/Manager";
 import winston, {Logger} from "winston";
-import {labelledFormat, loggerMetaShuffle} from "./util";
+import {labelledFormat} from "./util";
 import snoowrap from "snoowrap";
 import pEvent from "p-event";
 import EventEmitter from "events";
@@ -100,31 +100,36 @@ export class App {
             maxRetryAttempts: 5,
             debug: shouldDebug,
             // @ts-ignore
-            logger: this.logger.child(loggerMetaShuffle(this.logger, undefined, ['Snoowrap'])),
+            logger: this.logger.child({labels: ['Snoowrap']}),
             continueAfterRatelimitError: true,
         });
     }
 
     async buildManagers(subreddits: string[] = []) {
         let availSubs = [];
+        const name = await this.client.getMe().name;
+        this.logger.info(`Authenticated Account: /u/${name}`);
         for (const sub of await this.client.getModeratedSubreddits()) {
             // TODO don't know a way to check permissions yet
             availSubs.push(sub);
         }
+        this.logger.info(`/u/${name} is a moderator of these subreddits: ${availSubs.map(x => x.display_name).join(', ')}`);
 
         let subsToRun = [];
         const subsToUse = subreddits.length > 0 ? subreddits : this.subreddits;
         if (subsToUse.length > 0) {
+            this.logger.info(`User-defined subreddit constraints detected (CLI argument or environmental variable), will try to run on: ${subsToUse.join(', ')}`);
             for (const sub of subsToUse) {
                 const asub = availSubs.find(x => x.display_name.toLowerCase() === sub.trim().toLowerCase())
                 if (asub === undefined) {
-                    this.logger.error(`Will not run on ${sub} because is not modded by, or does not have appropriate permissions to mod with, for this client.`);
+                    this.logger.warn(`Will not run on ${sub} because is not modded by, or does not have appropriate permissions to mod with, for this client.`);
                 } else {
                     subsToRun.push(asub);
                 }
             }
         } else {
             // otherwise assume all moddable subs from client should be run on
+            this.logger.info('No user-defined subreddit constraints detected, will try to run on all');
             subsToRun = availSubs;
         }
 
@@ -137,21 +142,20 @@ export class App {
                 const wiki = sub.getWikiPage(this.wikiLocation);
                 content = await wiki.content_md;
             } catch (err) {
-                this.logger.error(`Could not read wiki configuration for ${sub.display_name}. Please ensure the page 'contextbot' exists and is readable -- error: ${err.message}`);
+                this.logger.error(`[${sub.display_name}] Could not read wiki configuration. Please ensure the page 'contextbot' exists and is readable -- error: ${err.message}`);
                 continue;
             }
             try {
                 json = JSON.parse(content);
 
             } catch (err) {
-                this.logger.error(`Wiki page contents for ${sub.display_name} was not valid -- error: ${err.message}`);
+                this.logger.error(`[${sub.display_name}] Wiki page contents was not valid -- error: ${err.message}`);
                 continue;
             }
             try {
                 subSchedule.push(new Manager(sub, this.client, this.logger, json));
             } catch (err) {
-                debugger;
-                this.logger.error(`Config for ${sub.display_name} was not valid, will not run for this subreddit`, undefined, err);
+                this.logger.error(`[${sub.display_name}] Config was not valid`, undefined, err);
             }
         }
         this.subManagers = subSchedule;

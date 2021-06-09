@@ -1,14 +1,13 @@
-import {Comment, RedditUser} from "snoowrap";
+import {Comment} from "snoowrap";
 import Submission from "snoowrap/dist/objects/Submission";
 import {Logger} from "winston";
-import {createLabelledLogger, findResultByPremise, loggerMetaShuffle, mergeArr} from "../util";
+import {findResultByPremise, mergeArr} from "../util";
 import {testAuthorCriteria} from "../Utils/SnoowrapUtils";
 
 export interface RuleOptions {
     name?: string;
     authors?: AuthorOptions;
-    logger?: Logger
-    loggerPrefix?: string
+    logger: Logger
 }
 
 export interface RulePremise {
@@ -39,7 +38,6 @@ export abstract class Rule implements IRule, Triggerable {
     constructor(options: RuleOptions) {
         const {
             name = this.getKind(),
-            loggerPrefix = '',
             logger,
             authors: {
                 include = [],
@@ -54,20 +52,13 @@ export abstract class Rule implements IRule, Triggerable {
         }
 
         const ruleUniqueName = this.name === undefined ? this.getKind() : `${this.getKind()} - ${this.name}`;
-        if (logger === undefined) {
-            const prefix = `${loggerPrefix}|${ruleUniqueName}`;
-            this.logger = createLabelledLogger(prefix, prefix);
-        } else {
-            this.logger = logger.child(loggerMetaShuffle(logger, undefined, [ruleUniqueName], {truncateLength: 100}));
-        }
+        this.logger = logger.child({labels: ['Rule',`${ruleUniqueName}`]}, mergeArr);
     }
 
     async run(item: Comment | Submission, existingResults: RuleResult[] = []): Promise<[(boolean | null), RuleResult[]]> {
-        this.logger = this.logger.child(loggerMetaShuffle(this.logger, `${item instanceof Submission ? 'SUB' : 'COMM'} ${item.id}`), mergeArr);
-        this.logger.debug('Starting');
         const existingResult = findResultByPremise(this.getPremise(), existingResults);
         if (existingResult) {
-            this.logger.debug('Returning existing result');
+            this.logger.debug(`Returning existing result of ${existingResult.triggered ? '✔️' : '❌'}`);
             return Promise.resolve([existingResult.triggered, [{...existingResult, name: this.name}]]);
         }
         if (this.authors.include !== undefined && this.authors.include.length > 0) {

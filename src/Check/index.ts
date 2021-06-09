@@ -5,7 +5,7 @@ import {Logger} from "winston";
 import {Comment, Submission} from "snoowrap";
 import {actionFactory} from "../Action/ActionFactory";
 import {ruleFactory} from "../Rule/RuleFactory";
-import {createLabelledLogger, loggerMetaShuffle, mergeArr} from "../util";;
+import {mergeArr, ruleNamesFromResults} from "../util";
 import {JoinCondition, JoinOperands} from "../Common/interfaces";
 import * as RuleSchema from '../Schema/Rule.json';
 import * as RuleSetSchema from '../Schema/RuleSet.json';
@@ -32,12 +32,7 @@ export class Check implements ICheck {
             actions = [],
         } = options;
 
-        if (options.logger !== undefined) {
-            // @ts-ignore
-            this.logger = options.logger.child(loggerMetaShuffle(options.logger, undefined, [`CHK ${name}`]), mergeArr);
-        } else {
-            this.logger = createLabelledLogger('Check');
-        }
+        this.logger = options.logger.child({labels: [`Check ${name}`]}, mergeArr);
 
         this.name = name;
         this.description = description;
@@ -50,16 +45,13 @@ export class Check implements ICheck {
                 let setErrors: any = [];
                 let ruleErrors: any = [];
                 if (valid) {
-                    // @ts-ignore
-                    r.logger = this.logger;
-                    this.rules.push(new RuleSet(r as RuleSetObjectJson));
+                    const ruleConfig = r as RuleSetObjectJson;
+                    this.rules.push(new RuleSet({...ruleConfig, logger: this.logger}));
                 } else {
                     setErrors = ajv.errors;
                     valid = ajv.validate(RuleSchema, r);
                     if (valid) {
-                        // @ts-ignore
-                        r.logger = this.logger;
-                        this.rules.push(ruleFactory(r as RuleJSONConfig));
+                        this.rules.push(ruleFactory(r as RuleJSONConfig, this.logger));
                     } else {
                         ruleErrors = ajv.errors;
                         const leastErrorType = setErrors.length < ruleErrors ? 'RuleSet' : 'Rule';
@@ -79,7 +71,8 @@ export class Check implements ICheck {
             } else {
                 let valid = ajv.validate(ActionSchema, a);
                 if (valid) {
-                    this.actions.push(actionFactory(a as ActionJson));
+                    const aj = a as ActionJson;
+                    this.actions.push(actionFactory(aj, this.logger));
                     // @ts-ignore
                     a.logger = this.logger;
                 } else {
@@ -92,13 +85,11 @@ export class Check implements ICheck {
     }
 
     async run(item: Submission | Comment, existingResults: RuleResult[] = []): Promise<[boolean, RuleResult[]]> {
-        //this.logger.debug('Starting check');
         let allResults: RuleResult[] = [];
         let runOne = false;
         for (const r of this.rules) {
             const combinedResults = [...existingResults, ...allResults];
             const [passed, results] = await r.run(item, combinedResults);
-            //allResults = allResults.concat(determineNewResults(combinedResults, results));
             allResults = allResults.concat(results);
             if (passed === null) {
                 continue;
@@ -106,22 +97,28 @@ export class Check implements ICheck {
             runOne = true;
             if (passed) {
                 if (this.condition === 'OR') {
+                    this.logger.info(`✔️ => Rules (OR): ${ruleNamesFromResults(allResults)}`);
                     return [true, allResults];
                 }
             } else if (this.condition === 'AND') {
+                this.logger.info(`❌ => Rules (AND): ${ruleNamesFromResults(allResults)}`);
                 return [false, allResults];
             }
         }
         if (!runOne) {
+            this.logger.info('❌ => All Rules skipped because of Author checks');
             return [false, allResults];
         }
+        this.logger.info(`✔️ => Rules (AND) : ${ruleNamesFromResults(allResults)}`);
         return [true, allResults];
     }
 
     async runActions(item: Submission | Comment, ruleResults: RuleResult[]): Promise<void> {
+        this.logger.debug('Running Actions');
         for (const a of this.actions) {
             await a.handle(item, ruleResults);
         }
+        this.logger.info('Ran Actions');
     }
 }
 
@@ -140,7 +137,7 @@ export interface ICheck extends JoinCondition {
 export interface CheckOptions extends ICheck {
     rules: Array<IRuleSet | IRule>
     actions: ActionConfig[]
-    logger?: Logger
+    logger: Logger
 }
 
 export interface CheckJson extends ICheck {
