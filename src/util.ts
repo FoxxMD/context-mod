@@ -199,4 +199,65 @@ export const createAjvFactory = (logger: Logger) => {
     return  new Ajv({logger: logger, verbose: true, strict: "log", allowUnionTypes: true});
 }
 
+export const comparisonTextOp = (val1: number, strOp: string, val2: number): boolean => {
+    switch (strOp) {
+        case '>':
+            return val1 > val2;
+        case '>=':
+            return val1 >= val2;
+        case '<':
+            return val1 < val2;
+        case '<=':
+            return val1 <= val2;
+        default:
+            throw new Error(`${strOp} was not a recognized operator`);
+    }
+}
 
+export const percentFromString = (str: string): number => {
+   const n = Number.parseInt(str.replace('%', ''));
+   if(Number.isNaN(n)) {
+       throw new Error(`${str} could not be parsed to a number`);
+   }
+   return n / 100;
+}
+
+export const formatNumber = ( val: number|string, options: any = {} ) => {
+    const {
+        toFixed    = 2,
+        defaultVal = null,
+        prefix     = '',
+        suffix     = '',
+        round = {
+            type: 'round',
+            enable: false,
+            indicate: true,
+        }
+    }         = options;
+    let parsedVal = typeof val === 'number' ? val : Number.parseFloat( val );
+    if(Number.isNaN( parsedVal )) {
+        return defaultVal;
+    }
+    let prefixStr = prefix;
+    const { enable = true, indicate = true, type = 'round' } = round;
+    if(enable && !Number.isInteger(parsedVal)) {
+        switch(type) {
+            case 'round':
+                parsedVal = Math.round(parsedVal);
+                break;
+            case 'ceil':
+                parsedVal = Math.ceil(parsedVal);
+                break;
+            case 'floor':
+                parsedVal = Math.floor(parsedVal);
+        }
+        if(indicate) {
+            prefixStr = `~${prefix}`;
+        }
+    }
+    const localeString = parsedVal.toLocaleString( undefined, {
+        minimumFractionDigits: toFixed,
+        maximumFractionDigits: toFixed,
+    } );
+    return `${prefixStr}${localeString}${suffix}`;
+};

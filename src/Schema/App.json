@@ -34,7 +34,7 @@
             "properties": {
                 "minActivityCount": {
                     "default": 5,
-                    "description": "The minimum number of activities (activities defined in `includeInTotal`) that must exist for this criteria to run",
+                    "description": "The minimum number of activities that must exist for this criteria to run",
                     "type": "number"
                 },
                 "name": {
@@ -321,6 +321,9 @@
                                 "$ref": "#/definitions/AttributionJSONConfig"
                             },
                             {
+                                "$ref": "#/definitions/HistoryJSONConfig"
+                            },
+                            {
                                 "$ref": "#/definitions/RuleSetJson"
                             },
                             {
@@ -387,6 +390,36 @@
             ],
             "type": "object"
         },
+        "CommentThresholdCriteria": {
+            "properties": {
+                "asOp": {
+                    "description": "If `true` then when threshold...\n\n* is `number` it will be number of comments where author is OP\n* is `percent` it will be **percent of total comments where author is OP**",
+                    "type": "boolean"
+                },
+                "condition": {
+                    "enum": [
+                        "<",
+                        "<=",
+                        ">",
+                        ">="
+                    ],
+                    "type": "string"
+                },
+                "threshold": {
+                    "default": "10%",
+                    "description": "The number or percentage to trigger this criteria at\n\n* If `threshold` is a `number` then it is the absolute number of items to trigger at\n* If `threshold` is a `string` with percentage (EX `40%`) then it is the percentage of the total this item must reach to trigger",
+                    "type": [
+                        "string",
+                        "number"
+                    ]
+                }
+            },
+            "required": [
+                "condition",
+                "threshold"
+            ],
+            "type": "object"
+        },
         "DurationObject": {
             "additionalProperties": false,
             "description": "A Day.js duration object\n\nhttps://day.js.org/docs/en/durations/creating",
@@ -445,6 +478,114 @@
                 }
             },
             "required": [
+                "kind"
+            ],
+            "type": "object"
+        },
+        "HistoryCriteria": {
+            "description": "If both `submission` and `comment` are defined then criteria will only trigger if BOTH thresholds are met",
+            "properties": {
+                "comment": {
+                    "$ref": "#/definitions/CommentThresholdCriteria"
+                },
+                "minActivityCount": {
+                    "default": 5,
+                    "description": "The minimum number of activities that must exist from the `window` results for this criteria to run",
+                    "type": "number"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "submission": {
+                    "$ref": "#/definitions/ThresholdCriteria"
+                },
+                "window": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/definitions/DurationObject"
+                        },
+                        {
+                            "$ref": "#/definitions/ActivityWindowCriteria"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "number"
+                            ]
+                        }
+                    ],
+                    "description": "Window defining Activities to consider (both Comment/Submission)"
+                }
+            },
+            "required": [
+                "window"
+            ],
+            "type": "object"
+        },
+        "HistoryJSONConfig": {
+            "description": "Aggregates an Author's submission and comment history. Rule can be triggered on count/percent of total (for either or both comment/sub totals) as well as comment OP total.\n\nAvailable data for [Action templating](https://github.com/FoxxMD/reddit-context-bot#action-templating):\n\n```\nactivityTotal    => Total number of activities\nsubmissionTotal  => Total number of submissions\ncommentTotal     => Total number of comments\nopTotal          => Total number of comments as OP\nthresholdSummary => A text summary of the first Criteria triggered with totals/percentages\ncriteria         => The ThresholdCriteria object\nwindow           => A text summary of the range of Activities considered (# of Items if number, time range if Duration)\n```",
+            "properties": {
+                "authors": {
+                    "additionalProperties": false,
+                    "description": "If present then these Author criteria are checked before running the rule. If criteria fails then the rule is skipped.",
+                    "minProperties": 1,
+                    "type": "object"
+                },
+                "criteria": {
+                    "description": "A list threshold-window values to test activities against.",
+                    "items": {
+                        "$ref": "#/definitions/HistoryCriteria"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                },
+                "criteriaJoin": {
+                    "description": "* If `OR` then any set of Criteria that pass will trigger the Rule\n* If `AND` then all Criteria sets must pass to trigger the Rule",
+                    "enum": [
+                        "AND",
+                        "OR"
+                    ],
+                    "type": "string"
+                },
+                "exclude": {
+                    "description": "Do not include Submissions from this list of Subreddits.\n\nA list of subreddits (case-insensitive) to look for. Do not include \"r/\" prefix.\n\nEX to match against /r/mealtimevideos and /r/askscience use [\"mealtimevideos\",\"askscience\"]",
+                    "examples": [
+                        "mealtimevideos",
+                        "askscience"
+                    ],
+                    "items": {
+                        "type": "string"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                },
+                "include": {
+                    "description": "Only include Submissions from this list of Subreddits.\n\nA list of subreddits (case-insensitive) to look for. Do not include \"r/\" prefix.\n\nEX to match against /r/mealtimevideos and /r/askscience use [\"mealtimevideos\",\"askscience\"]",
+                    "examples": [
+                        "mealtimevideos",
+                        "askscience"
+                    ],
+                    "items": {
+                        "type": "string"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                },
+                "kind": {
+                    "description": "The kind of rule to run",
+                    "enum": [
+                        "history"
+                    ],
+                    "type": "string"
+                },
+                "name": {
+                    "description": "An optional, but highly recommended, friendly name for this rule. If not present will default to `kind`.\n\nCan only contain letters, numbers, underscore, spaces, and dashes\n\nname is used to reference Rule result data during Action content templating. See CommentAction or ReportAction for more details.",
+                    "pattern": "^[a-zA-Z]([\\w -]*[\\w])?$",
+                    "type": "string"
+                }
+            },
+            "required": [
+                "criteria",
                 "kind"
             ],
             "type": "object"
@@ -791,6 +932,9 @@
                                 "$ref": "#/definitions/AttributionJSONConfig"
                             },
                             {
+                                "$ref": "#/definitions/HistoryJSONConfig"
+                            },
+                            {
                                 "type": "string"
                             }
                         ]
@@ -827,6 +971,32 @@
             },
             "required": [
                 "subreddits"
+            ],
+            "type": "object"
+        },
+        "ThresholdCriteria": {
+            "properties": {
+                "condition": {
+                    "enum": [
+                        "<",
+                        "<=",
+                        ">",
+                        ">="
+                    ],
+                    "type": "string"
+                },
+                "threshold": {
+                    "default": "10%",
+                    "description": "The number or percentage to trigger this criteria at\n\n* If `threshold` is a `number` then it is the absolute number of items to trigger at\n* If `threshold` is a `string` with percentage (EX `40%`) then it is the percentage of the total this item must reach to trigger",
+                    "type": [
+                        "string",
+                        "number"
+                    ]
+                }
+            },
+            "required": [
+                "condition",
+                "threshold"
             ],
             "type": "object"
         }

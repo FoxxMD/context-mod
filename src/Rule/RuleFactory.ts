@@ -4,6 +4,7 @@ import {Rule, RuleJSONConfig} from "./index";
 import AuthorRule, {AuthorRuleJSONConfig} from "./AuthorRule";
 import {AttributionJSONConfig, AttributionRule} from "./SubmissionRule/AttributionRule";
 import {Logger} from "winston";
+import HistoryRule, {HistoryJSONConfig} from "./HistoryRule";
 
 export function ruleFactory
 (config: RuleJSONConfig, logger: Logger): Rule {
@@ -21,6 +22,9 @@ export function ruleFactory
         case 'attribution':
             cfg = config as AttributionJSONConfig;
             return new AttributionRule({...cfg, logger});
+        case 'history':
+            cfg = config as HistoryJSONConfig;
+            return new HistoryRule({...cfg, logger});
         default:
             throw new Error('rule "kind" was not recognized.');
     }

@@ -7,8 +7,9 @@ import {CommentActionJson} from "../Action/CommentAction";
 import {ReportActionJson} from "../Action/ReportAction";
 import {LockActionJson} from "../Action/LockAction";
 import {RemoveActionJson} from "../Action/RemoveAction";
+import {HistoryJSONConfig} from "../Rule/HistoryRule";
 
-export type RuleJson = RecentActivityRuleJSONConfig | RepeatActivityJSONConfig | AuthorRuleJSONConfig | AttributionJSONConfig | string;
+export type RuleJson = RecentActivityRuleJSONConfig | RepeatActivityJSONConfig | AuthorRuleJSONConfig | AttributionJSONConfig | HistoryJSONConfig | string;
 export type RuleObjectJson = Exclude<RuleJson, string>
 
 export type ActionJson = FlairActionJson | CommentActionJson | ReportActionJson | LockActionJson | RemoveActionJson | string;

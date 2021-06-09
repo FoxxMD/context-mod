@@ -31,7 +31,7 @@ export interface AttributionCriteria {
      **/
     thresholdOn?: 'submissions' | 'all'
     /**
-     * The minimum number of activities (activities defined in `includeInTotal`) that must exist for this criteria to run
+     * The minimum number of activities that must exist for this criteria to run
      * @default 5
      * */
     minActivityCount?: number

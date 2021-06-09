@@ -183,3 +183,17 @@ export interface ManagerOptions {
      * */
     apiLimitWarning?: number
 }
+
+export interface ThresholdCriteria {
+    /**
+     * The number or percentage to trigger this criteria at
+     *
+     * * If `threshold` is a `number` then it is the absolute number of items to trigger at
+     * * If `threshold` is a `string` with percentage (EX `40%`) then it is the percentage of the total this item must reach to trigger
+     *
+     * @default 10%
+     * */
+    threshold: number | string
+
+    condition: '>' | '>=' | '<' | '<='
+}
