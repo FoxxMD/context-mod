@@ -10,6 +10,13 @@ import CacheManager from './Subreddit/SubredditCache';
 
 const {transports} = winston;
 
+const snooLogWrapper = (logger: Logger) => {
+    return {
+        warn: (...args: any[]) => logger.warn(args.slice(0,2).join(' '), [args.slice(2)]),
+        debug: (...args: any[]) => logger.debug(args.slice(0,2).join(' '), [args.slice(2)]),
+    }
+}
+
 export class App {
 
     client: Snoowrap;
@@ -28,7 +35,7 @@ export class App {
             logDir,
             logLevel,
             wikiConfig,
-            snooDebug,
+            snooDebug = process.env.SNOO_DEBUG,
             version,
             authorTTL,
             disableCache = false,
@@ -100,14 +107,19 @@ export class App {
             accessToken,
         };
 
-        let shouldDebug = snooDebug === false && process.env.SNOO_DEBUG === 'true' ? true : snooDebug === true || snooDebug === 'true';
+        let shouldDebug = snooDebug === true || snooDebug === 'true';
+        let snooLogger;
+        if(shouldDebug) {
+            const clogger = this.logger.child({labels: ['Snoowrap']});
+            snooLogger = snooLogWrapper(clogger);
+        }
         this.client = new snoowrap(creds);
         this.client.config({
             warnings: true,
             maxRetryAttempts: 5,
             debug: shouldDebug,
             // @ts-ignore
-            logger: this.logger.child({labels: ['Snoowrap']}),
+            logger: snooLogger,
             continueAfterRatelimitError: true,
         });
     }
