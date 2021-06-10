@@ -14,6 +14,7 @@ import {ManagerOptions, PollingOptions} from "../Common/interfaces";
 import Submission from "snoowrap/dist/objects/Submission";
 import {itemContentPeek} from "../Utils/SnoowrapUtils";
 import dayjs from "dayjs";
+import LoggedError from "../Utils/LoggedError";
 
 export class Manager {
     subreddit: Subreddit;
@@ -46,7 +47,9 @@ export class Manager {
         // dynamic default meta for winston feasible using function getters
         // https://github.com/winstonjs/winston/issues/1626#issuecomment-531142958
         this.logger = logger.child({
-            get labels () { return getLabels() }
+            get labels() {
+                return getLabels()
+            }
         }, mergeArr);
 
         const configBuilder = new ConfigBuilder({logger: this.logger});
@@ -57,11 +60,11 @@ export class Manager {
         this.apiLimitWarning = apiLimitWarning;
         this.subreddit = sub;
         this.client = client;
-        for(const sub of subChecks) {
+        for (const sub of subChecks) {
             this.logger.info(`Submission Check: ${sub.name}${sub.description !== undefined ? ` ${sub.description}` : ''}`);
         }
         this.submissionChecks = subChecks;
-        for(const comm of commentChecks) {
+        for (const comm of commentChecks) {
             this.logger.info(`Comment Check: ${comm.name}${comm.description !== undefined ? ` ${comm.description}` : ''}`);
         }
         this.commentChecks = commentChecks;
@@ -82,36 +85,45 @@ export class Manager {
         const [peek, _] = await itemContentPeek(item);
         this.logger.info(`<EVENT> ${peek}`);
 
-        for (const check of checks) {
-            if(checkNames.length > 0 && !checkNames.map(x => x.toLowerCase()).some(x => x === check.name.toLowerCase())) {
-                this.logger.debug(`Check ${check} not in array of requested checks to run, skipping`);
-                continue;
-            }
-            let triggered = false;
-            let currentResults: RuleResult[] = [];
-            try {
-                const [checkTriggered, checkResults] = await check.run(item, allRuleResults);
-                currentResults = checkResults;
-                allRuleResults = allRuleResults.concat(determineNewResults(allRuleResults, checkResults));
-                triggered = checkTriggered;
-            } catch (e) {
-                this.logger.warn(`[Check ${check.name}] Failed with error: ${e.message}`, e);
-            }
+        try {
+            for (const check of checks) {
+                if (checkNames.length > 0 && !checkNames.map(x => x.toLowerCase()).some(x => x === check.name.toLowerCase())) {
+                    this.logger.debug(`Check ${check} not in array of requested checks to run, skipping`);
+                    continue;
+                }
+                let triggered = false;
+                let currentResults: RuleResult[] = [];
+                try {
+                    const [checkTriggered, checkResults] = await check.run(item, allRuleResults);
+                    currentResults = checkResults;
+                    allRuleResults = allRuleResults.concat(determineNewResults(allRuleResults, checkResults));
+                    triggered = checkTriggered;
+                } catch (e) {
+                    this.logger.warn(`[Check ${check.name}] Failed with error: ${e.message}`, e);
+                }
 
-            if (triggered) {
-                await check.runActions(item, currentResults);
-                break;
+                if (triggered) {
+                    await check.runActions(item, currentResults);
+                    break;
+                }
             }
+        } catch (err) {
+            if (!(err instanceof LoggedError)) {
+                this.logger.error('An unhandled error occurred while running checks', err);
+            }
+        } finally {
+            this.currentLabels = [this.displayLabel];
+            this.logger.debug(`Reddit API Rate Limit remaining: ${this.client.ratelimitRemaining}`);
         }
     }
 
     heartbeat() {
         const apiRemaining = this.client.ratelimitRemaining;
-        if(this.heartbeatInterval !== undefined && dayjs().diff(this.lastHeartbeat) >= this.heartbeatInterval) {
+        if (this.heartbeatInterval !== undefined && dayjs().diff(this.lastHeartbeat) >= this.heartbeatInterval) {
             this.logger.info(`HEARTBEAT -- Reddit API Rate Limit remaining: ${apiRemaining}`);
             this.lastHeartbeat = dayjs();
         }
-        if(apiRemaining < this.apiLimitWarning) {
+        if (apiRemaining < this.apiLimitWarning) {
             this.logger.warn(`Reddit API rate limit remaining: ${apiRemaining} (Warning at ${this.apiLimitWarning})`);
         }
     }
