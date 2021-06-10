@@ -20,8 +20,10 @@ export const getOptions = () => {
     options.push(new Option('-s, --subreddits <list...>', 'List of subreddits to run on. Bot will run on all subs it has access to if not defined').default(process.env.SUBREDDITS || [], 'process.env.SUBREDDITS (comma-seperated)'));
     options.push(new Option('-d, --logDir <dir>', 'Absolute path to directory to store rotated logs in').default(process.env.LOG_DIR || `${process.cwd()}/logs`, 'process.env.LOG_DIR'));
     options.push(new Option('-l, --logLevel <level>', 'Log level').default(process.env.LOG_LEVEL, 'process.env.LOG_LEVEL'));
-    options.push(new Option('-w, --wikiConfig <path>', 'Relative url to contextbot wiki page (from https://reddit.com/r/subreddit/wiki/<path>').default(process.env.WIKI_CONFIG || 'botconfig/contextbot', 'process.env.WIK_CONFIG || \'botconfig/contextbot\''));
+    options.push(new Option('-w, --wikiConfig <path>', 'Relative url to contextbot wiki page (from https://reddit.com/r/subreddit/wiki/<path>').default(process.env.WIKI_CONFIG || 'botconfig/contextbot', 'process.env.WIKI_CONFIG || \'botconfig/contextbot\''));
     options.push(new Option('-n, --snooDebug', 'Set Snoowrap to debug').default(process.env.SNOO_DEBUG || false, 'process.env.SNOO_DEBUG || false'));
+    options.push(new Option('--authorTTL <ms>', 'Set the TTL (ms) for the Author Activities shared cache').default(process.env.AUTHOR_TTL || 10000, 'process.env.AUTHOR_TTL || 10000'));
+    options.push(new Option('--disableCache', 'Disable caching for all subreddits'));
 
     return options;
 }

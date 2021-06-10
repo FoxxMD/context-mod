@@ -15,6 +15,7 @@ import Submission from "snoowrap/dist/objects/Submission";
 import {itemContentPeek} from "../Utils/SnoowrapUtils";
 import dayjs from "dayjs";
 import LoggedError from "../Utils/LoggedError";
+import CacheManager from "./SubredditCache";
 
 export class Manager {
     subreddit: Subreddit;
@@ -53,15 +54,35 @@ export class Manager {
         }, mergeArr);
 
         const configBuilder = new ConfigBuilder({logger: this.logger});
-        const [subChecks, commentChecks, configManagerOptions] = configBuilder.buildFromJson(sourceData);
-        const {polling = {}, heartbeatInterval, apiLimitWarning = 250} = configManagerOptions || {};
+        const validJson = configBuilder.validateJson(sourceData);
+        const {checks, ...managerOpts} = validJson;
+        const {polling = {}, heartbeatInterval, apiLimitWarning = 250, caching} = managerOpts || {};
         this.pollOptions = {...polling, ...opts.polling};
         this.heartbeatInterval = heartbeatInterval;
         this.apiLimitWarning = apiLimitWarning;
         this.subreddit = sub;
         this.client = client;
-        for (const sub of subChecks) {
-            this.logger.info(`Submission Check: ${sub.name}${sub.description !== undefined ? ` ${sub.description}` : ''}`);
+
+        const cacheConfig = caching === false ? {enabled: false, logger: this.logger} : {
+            ...caching,
+            enabled: true,
+            logger: this.logger
+        };
+        CacheManager.get(sub.display_name, cacheConfig);
+
+        const commentChecks: Array<CommentCheck> = [];
+        const subChecks: Array<SubmissionCheck> = [];
+        const structuredChecks = configBuilder.parseToStructured(validJson);
+        for (const jCheck of structuredChecks) {
+            if (jCheck.kind === 'comment') {
+                commentChecks.push(new CommentCheck({...jCheck, logger: this.logger, subredditName: sub.display_name}));
+            } else if (jCheck.kind === 'submission') {
+                subChecks.push(new SubmissionCheck({...jCheck, logger: this.logger, subredditName: sub.display_name}));
+            }
+        }
+
+        for (const subc of subChecks) {
+            this.logger.info(`Submission Check: ${subc.name}${subc.description !== undefined ? ` ${subc.description}` : ''}`);
         }
         this.submissionChecks = subChecks;
         for (const comm of commentChecks) {

@@ -5,6 +5,7 @@ import {labelledFormat} from "./util";
 import snoowrap from "snoowrap";
 import pEvent from "p-event";
 import EventEmitter from "events";
+import CacheManager from './Subreddit/SubredditCache';
 
 const {transports} = winston;
 
@@ -28,7 +29,12 @@ export class App {
             wikiConfig,
             snooDebug,
             version,
+            authorTTL,
+            disableCache = false,
         } = options;
+
+        CacheManager.authorTTL = authorTTL;
+        CacheManager.enabled = !disableCache;
 
         this.wikiLocation = wikiConfig;
 
@@ -124,7 +130,9 @@ export class App {
                 if (asub === undefined) {
                     this.logger.warn(`Will not run on ${sub} because is not modded by, or does not have appropriate permissions to mod with, for this client.`);
                 } else {
-                    subsToRun.push(asub);
+                    // @ts-ignore
+                    const fetchedSub = await asub.fetch();
+                    subsToRun.push(fetchedSub);
                 }
             }
         } else {

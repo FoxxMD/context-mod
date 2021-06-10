@@ -1,8 +1,7 @@
 import {SubmissionRule, SubmissionRuleJSONConfig} from "./index";
-import {Rule, RuleOptions, RulePremise, RuleResult} from "../index";
+import {RuleOptions, RuleResult} from "../index";
 import {Comment} from "snoowrap";
-import {getAuthorActivities, getAuthorComments, getAuthorSubmissions} from "../../Utils/SnoowrapUtils";
-import {groupBy, parseUsableLinkIdentifier as linkParser, truncateStringToLength} from "../../util";
+import {parseUsableLinkIdentifier as linkParser} from "../../util";
 import {ActivityWindow, ActivityWindowType, ReferenceSubmission} from "../../Common/interfaces";
 import Submission from "snoowrap/dist/objects/Submission";
 import dayjs from "dayjs";
@@ -86,10 +85,10 @@ export class RepeatActivityRule extends SubmissionRule {
         let activities: (Submission | Comment)[] = [];
         switch (this.lookAt) {
             case 'submissions':
-                activities = await getAuthorSubmissions(item.author, {window: this.window});
+                activities = await this.cache.getAuthorSubmissions(item.author, {window: this.window});
                 break;
             default:
-                activities = await getAuthorActivities(item.author, {window: this.window});
+                activities = await this.cache.getAuthorActivities(item.author, {window: this.window});
                 break;
         }
 

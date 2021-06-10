@@ -3,11 +3,13 @@ import Submission from "snoowrap/dist/objects/Submission";
 import {Logger} from "winston";
 import {findResultByPremise, mergeArr} from "../util";
 import {testAuthorCriteria} from "../Utils/SnoowrapUtils";
+import CacheManager, {SubredditCache} from "../Subreddit/SubredditCache";
 
 export interface RuleOptions {
     name?: string;
     authors?: AuthorOptions;
     logger: Logger
+    subredditName: string;
 }
 
 export interface RulePremise {
@@ -34,6 +36,7 @@ export abstract class Rule implements IRule, Triggerable {
     name: string;
     logger: Logger
     authors: AuthorOptions;
+    cache: SubredditCache;
 
     constructor(options: RuleOptions) {
         const {
@@ -43,8 +46,10 @@ export abstract class Rule implements IRule, Triggerable {
                 include = [],
                 exclude = [],
             } = {},
+            subredditName,
         } = options;
         this.name = name;
+        this.cache = CacheManager.get(subredditName);
 
         this.authors = {
             exclude: exclude.map(x => new Author(x)),
@@ -63,7 +68,7 @@ export abstract class Rule implements IRule, Triggerable {
         }
         if (this.authors.include !== undefined && this.authors.include.length > 0) {
             for (const auth of this.authors.include) {
-                if (await testAuthorCriteria(item, auth)) {
+                if (await this.cache.testAuthorCriteria(item, auth)) {
                     return this.process(item);
                 }
             }
@@ -72,7 +77,7 @@ export abstract class Rule implements IRule, Triggerable {
         }
         if (this.authors.exclude !== undefined && this.authors.exclude.length > 0) {
             for (const auth of this.authors.exclude) {
-                if (await testAuthorCriteria(item, auth, false)) {
+                if (await this.cache.testAuthorCriteria(item, auth, false)) {
                     return this.process(item);
                 }
             }

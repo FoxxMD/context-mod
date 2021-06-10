@@ -171,6 +171,14 @@ export interface PollingOptions {
     }
 }
 
+export interface SubredditCacheConfig {
+    /**
+     * Amount of time, in milliseconds, author activities (Comments/Submission) should be cached
+     * */
+    authorTTL?: number;
+    wikiTTL?: number;
+}
+
 export interface ManagerOptions {
     polling?: PollingOptions
     /**
@@ -182,6 +190,8 @@ export interface ManagerOptions {
      * @default 250
      * */
     apiLimitWarning?: number
+
+    caching?: false | SubredditCacheConfig
 }
 
 export interface ThresholdCriteria {

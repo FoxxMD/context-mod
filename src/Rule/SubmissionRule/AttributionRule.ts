@@ -1,8 +1,8 @@
 import {SubmissionRule, SubmissionRuleJSONConfig} from "./index";
-import {ActivityWindow, ActivityWindowType, ReferenceSubmission} from "../../Common/interfaces";
+import {ActivityWindowType, ReferenceSubmission} from "../../Common/interfaces";
 import {RuleOptions, RuleResult} from "../index";
 import Submission from "snoowrap/dist/objects/Submission";
-import {getAttributionIdentifier, getAuthorActivities, getAuthorSubmissions} from "../../Utils/SnoowrapUtils";
+import {getAttributionIdentifier} from "../../Utils/SnoowrapUtils";
 import dayjs from "dayjs";
 
 
@@ -114,7 +114,7 @@ export class AttributionRule extends SubmissionRule {
                 percentVal = Number.parseInt(threshold.replace('%', '')) / 100;
             }
 
-            let activities = thresholdOn === 'submissions' ? await getAuthorSubmissions(item.author, {window: window}) : await getAuthorActivities(item.author, {window: window});
+            let activities = thresholdOn === 'submissions' ? await this.cache.getAuthorSubmissions(item.author, {window: window}) : await this.cache.getAuthorActivities(item.author, {window: window});
             activities = activities.filter(act => {
                 if (this.include.length > 0) {
                     return this.include.some(x => x === act.subreddit.display_name.toLowerCase());

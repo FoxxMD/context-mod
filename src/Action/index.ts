@@ -1,18 +1,22 @@
 import {Comment, Submission} from "snoowrap";
 import {Logger} from "winston";
 import {RuleResult} from "../Rule";
+import CacheManager, {SubredditCache} from "../Subreddit/SubredditCache";
 
 export abstract class Action {
     name?: string;
     logger: Logger;
+    cache: SubredditCache;
 
     constructor(options: ActionOptions) {
         const {
             name = this.getKind(),
             logger,
+            subredditName
         } = options;
 
         this.name = name;
+        this.cache = CacheManager.get(subredditName);
         const uniqueName = this.name === this.getKind() ? this.getKind() : `${this.getKind()} - ${this.name}`;
         this.logger = logger.child({labels: ['Action', uniqueName]});
     }
@@ -30,6 +34,7 @@ export abstract class Action {
 export interface ActionOptions {
     name?: string;
     logger: Logger,
+    subredditName: string;
 }
 
 export interface ActionConfig {

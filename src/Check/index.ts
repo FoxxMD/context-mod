@@ -28,6 +28,7 @@ export class Check implements ICheck {
             condition = 'AND',
             rules = [],
             actions = [],
+            subredditName
         } = options;
 
         this.logger = options.logger.child({labels: [`Check ${name}`]}, mergeArr);
@@ -46,12 +47,12 @@ export class Check implements ICheck {
                 let ruleErrors: any = [];
                 if (valid) {
                     const ruleConfig = r as RuleSetObjectJson;
-                    this.rules.push(new RuleSet({...ruleConfig, logger: this.logger}));
+                    this.rules.push(new RuleSet({...ruleConfig, logger: this.logger, subredditName}));
                 } else {
                     setErrors = ajv.errors;
                     valid = ajv.validate(RuleSchema, r);
                     if (valid) {
-                        this.rules.push(ruleFactory(r as RuleJSONConfig, this.logger));
+                        this.rules.push(ruleFactory(r as RuleJSONConfig, this.logger, subredditName));
                     } else {
                         ruleErrors = ajv.errors;
                         const leastErrorType = setErrors.length < ruleErrors ? 'RuleSet' : 'Rule';
@@ -72,7 +73,7 @@ export class Check implements ICheck {
                 let valid = ajv.validate(ActionSchema, a);
                 if (valid) {
                     const aj = a as ActionJson;
-                    this.actions.push(actionFactory(aj, this.logger));
+                    this.actions.push(actionFactory(aj, this.logger, subredditName));
                     // @ts-ignore
                     a.logger = this.logger;
                 } else {
@@ -138,6 +139,7 @@ export interface CheckOptions extends ICheck {
     rules: Array<IRuleSet | IRule>
     actions: ActionConfig[]
     logger: Logger
+    subredditName: string
 }
 
 export interface CheckJson extends ICheck {

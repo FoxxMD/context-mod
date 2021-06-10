@@ -24,7 +24,7 @@ export class RuleSet implements IRuleSet, Triggerable {
             } else {
                 const valid = ajv.validate(RuleSchema, r);
                 if (valid) {
-                    this.rules.push(ruleFactory(r as RuleJSONConfig, logger));
+                    this.rules.push(ruleFactory(r as RuleJSONConfig, logger, options.subredditName));
                 } else {
                     this.logger.warn('Could not build rule because of JSON errors', {}, {errors: ajv.errors, obj: r});
                 }
@@ -71,6 +71,7 @@ export interface IRuleSet extends JoinCondition {
 export interface RuleSetOptions extends IRuleSet {
     rules: Array<IRule | RuleJSONConfig>,
     logger: Logger
+    subredditName: string
 }
 
 /**

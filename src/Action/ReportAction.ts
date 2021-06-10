@@ -23,7 +23,8 @@ export class ReportAction extends Action {
     }
 
     async process(item: Comment | Submission, ruleResults: RuleResult[]): Promise<void> {
-        const renderedContent = await renderContent(this.content, item, ruleResults);
+        const content = await this.cache.getContent(this.content, item.subreddit);
+        const renderedContent = await renderContent(content, item, ruleResults);
         //const truncatedContent = reportTrunc(renderedContent);
         // @ts-ignore
         await item.report({reason: renderedContent});

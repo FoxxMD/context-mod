@@ -28,47 +28,18 @@ export class ConfigBuilder {
         this.logger = options.logger;
     }
 
-    buildFromJson(config: object): [Array<SubmissionCheck>,Array<CommentCheck>,ManagerOptions] {
-        const commentChecks: Array<CommentCheck> = [];
-        const subChecks: Array<SubmissionCheck> = [];
-
-        let namedRules: Map<string,RuleObjectJson> = new Map();
-        let namedActions: Map<string,ActionObjectJson> = new Map();
-
+    validateJson(config: object): JSONConfig {
         const ajv = createAjvFactory(this.logger);
         const valid = ajv.validate(schema, config);
-        let managerOptions: ManagerOptions = {};
-        if(valid) {
-            const validConfig = config as JSONConfig;
-            const {checks = [], ...rest} = validConfig;
-            for(const c of checks) {
-                namedRules = extractNamedRules(c.rules, namedRules);
-                namedActions = extractNamedActions(c.actions, namedActions);
-            }
-
-            const structuredChecks: CheckStructuredJson[] = [];
-            for(const c of checks) {
-                const strongRules = insertNamedRules(c.rules, namedRules);
-                const strongActions = insertNamedActions(c.actions, namedActions);
-                const strongCheck = {...c, rules: strongRules, actions: strongActions} as CheckStructuredJson;
-                structuredChecks.push(strongCheck);
-            }
-
-            managerOptions = rest;
-            for (const jCheck of structuredChecks) {
-                if (jCheck.kind === 'comment') {
-                    commentChecks.push(new CommentCheck({...jCheck, logger: this.logger}));
-                } else if (jCheck.kind === 'submission') {
-                    subChecks.push(new SubmissionCheck({...jCheck, logger: this.logger}));
-                }
-            }
+        if (valid) {
+            return config as JSONConfig;
         } else {
             this.configLogger.error('Json config was not valid. Please use schema to check validity.');
-            if(Array.isArray(ajv.errors)) {
-                for(const err of ajv.errors) {
+            if (Array.isArray(ajv.errors)) {
+                for (const err of ajv.errors) {
                     let suffix = '';
                     // @ts-ignore
-                    if(err.params.allowedValues !== undefined) {
+                    if (err.params.allowedValues !== undefined) {
                         // @ts-ignore
                         suffix = err.params.allowedValues.join(', ');
                         suffix = ` [${suffix}]`;
@@ -78,8 +49,26 @@ export class ConfigBuilder {
             }
             throw new LoggedError();
         }
+    }
 
-        return [subChecks, commentChecks, managerOptions];
+    parseToStructured(config: JSONConfig): CheckStructuredJson[] {
+        let namedRules: Map<string, RuleObjectJson> = new Map();
+        let namedActions: Map<string, ActionObjectJson> = new Map();
+        const {checks = []} = config;
+        for (const c of checks) {
+            namedRules = extractNamedRules(c.rules, namedRules);
+            namedActions = extractNamedActions(c.actions, namedActions);
+        }
+
+        const structuredChecks: CheckStructuredJson[] = [];
+        for (const c of checks) {
+            const strongRules = insertNamedRules(c.rules, namedRules);
+            const strongActions = insertNamedActions(c.actions, namedActions);
+            const strongCheck = {...c, rules: strongRules, actions: strongActions} as CheckStructuredJson;
+            structuredChecks.push(strongCheck);
+        }
+
+        return structuredChecks;
     }
 }
 
@@ -143,7 +132,7 @@ export const insertNamedRules = (rules: Array<RuleSetJson | RuleJson>, namedRule
 
 export const extractNamedActions = (actions: Array<ActionJson>, namedActions: Map<string, ActionObjectJson> = new Map()): Map<string, ActionObjectJson> => {
     for (const a of actions) {
-        if(!(typeof a === 'string')) {
+        if (!(typeof a === 'string')) {
             if (isActionJson(a) && a.name !== undefined) {
                 const normalName = a.name.toLowerCase();
                 const {name: n, ...rest} = a;
@@ -172,7 +161,7 @@ export const insertNamedActions = (actions: Array<ActionJson>, namedActions: Map
                 throw new Error(`No named Action with the name ${a} was found`);
             }
             strongActions.push(foundAction);
-        }else {
+        } else {
             strongActions.push(a);
         }
     }

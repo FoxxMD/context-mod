@@ -24,6 +24,7 @@ Some feature highlights:
 * History-based rules support multiple "valid window" types -- [ISO 8601 Durations](https://en.wikipedia.org/wiki/ISO_8601#Durations), [Day.js Durations](https://day.js.org/docs/en/durations/creating), and submission/comment count limits.
 * All rules support skipping behavior based on author criteria -- name, css flair/text, and moderator status
 * Rules and Actions support named references so you write rules/actions once and reference them anywhere
+* User-configurable global/subreddit-level API caching
 * Docker container support
 
 # Table of Contents
@@ -232,6 +233,8 @@ Options:
   -l, --logLevel <level>                     Log level (default: process.env.LOG_LEVEL || 'info')
   -w, --wikiConfig <path>                    Relative url to contextbot wiki page EX https://reddit.com/r/subreddit/wiki/<path> (default: process.env.WIKI_CONFIG || 'botconfig/contextbot')
   -n, --snooDebug                            Set Snoowrap to debug (default: process.env.SNOO_DEBUG || false)
+  --authorTTL <ms>                           Set the TTL (ms) for the Author Activities shared cache (default: process.env.AUTHOR_TTL || 10000)
+  --disableCache                             Disable caching for all subreddits
   -h, --help                                 display help for command
 
 Commands:

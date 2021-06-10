@@ -1,7 +1,6 @@
 import {Rule, RuleJSONConfig, RuleOptions, RulePremise, RuleResult} from "./index";
 import {Comment, VoteableContent} from "snoowrap";
 import Submission from "snoowrap/dist/objects/Submission";
-import {getAuthorActivities, getAuthorComments, getAuthorSubmissions} from "../Utils/SnoowrapUtils";
 import {parseUsableLinkIdentifier} from "../util";
 import {
     ActivityWindow,
@@ -50,13 +49,13 @@ export class RecentActivityRule extends Rule {
 
         switch (this.lookAt) {
             case 'comments':
-                activities = await getAuthorComments(item.author, {window: this.window});
+                activities = await this.cache.getAuthorComments(item.author, {window: this.window});
                 break;
             case 'submissions':
-                activities = await getAuthorSubmissions(item.author, {window: this.window});
+                activities = await this.cache.getAuthorSubmissions(item.author, {window: this.window});
                 break;
             default:
-                activities = await getAuthorActivities(item.author, {window: this.window});
+                activities = await this.cache.getAuthorActivities(item.author, {window: this.window});
                 break;
         }
 
