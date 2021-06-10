@@ -4,6 +4,7 @@ import winston, {Logger} from "winston";
 import {labelledFormat} from "./util";
 import snoowrap from "snoowrap";
 import pEvent from "p-event";
+import JSON5 from 'json5';
 import EventEmitter from "events";
 import CacheManager from './Subreddit/SubredditCache';
 
@@ -154,7 +155,7 @@ export class App {
                 continue;
             }
             try {
-                json = JSON.parse(content);
+                json = JSON5.parse(content);
 
             } catch (err) {
                 this.logger.error(`[${sub.display_name_prefixed}] Wiki page contents was not valid -- error: ${err.message}`);
