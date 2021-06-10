@@ -115,6 +115,7 @@ export class App {
     async buildManagers(subreddits: string[] = []) {
         let availSubs = [];
         const name = await this.client.getMe().name;
+        this.logger.info(`Reddit API Limit Remaining: ${this.client.ratelimitRemaining}`);
         this.logger.info(`Authenticated Account: /u/${name}`);
         for (const sub of await this.client.getModeratedSubreddits()) {
             // TODO don't know a way to check permissions yet
