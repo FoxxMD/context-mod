@@ -1,0 +1,41 @@
+{
+  "checks": [
+    {
+      "name": "Free Karma Alert",
+      "description": "Check if author has posted in 'freekarma' subreddits",
+      // check will run on a new submission in your subreddit and look at the Author of that submission
+      "kind": "submission",
+      "rules": [
+        {
+          "name": "freekarma",
+          "kind": "recentActivity",
+          // when `lookAt` is not present this rule will look for submissions and comments
+          // lookAt: "submissions"
+          // lookAt: "comments"
+          "thresholds": [
+            {
+              // for all subreddits, if the number of activities (sub/comment) is equal to or greater than 1 then the rule is triggered
+              "totalCount": 1,
+              "subreddits": [
+                "DeFreeKarma",
+                "FreeKarma4U",
+                "FreeKarma4You",
+                "upvote"
+              ]
+            }
+          ],
+          // will look at all of the Author's activities in the last 7 days
+          "window": {
+            "days": 7
+          }
+        }
+      ],
+      "actions": [
+        {
+          "kind": "report",
+          "content": "{{rules.freekarma.totalCount}} activities in karma {{rules.freekarma.subCount}} subs over {{rules.freekarma.window}}: {{rules.freekarma.subSummary}}"
+        }
+      ]
+    }
+  ]
+}
