@@ -160,7 +160,7 @@ export class Manager {
                 }
                 await this.runChecks('Submission', item)
             });
-            this.streamSub.on('listing', (_) => this.logger.debug('Polled Submissions'));
+            //this.streamSub.on('listing', (_) => this.logger.debug('Polled Submissions'));
         }
 
         if (this.commentChecks.length > 0) {
@@ -182,7 +182,7 @@ export class Manager {
                 }
                 await this.runChecks('Comment', item)
             });
-            this.streamComments.on('listing', (_) => this.logger.debug('Polled Comments'));
+            //this.streamComments.on('listing', (_) => this.logger.debug('Polled Comments'));
         }
 
         if (this.streamSub !== undefined) {
