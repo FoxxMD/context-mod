@@ -184,12 +184,26 @@ export class HistoryRule extends Rule {
                     criteria,
                 } = refCriteriaResults;
 
+                const data: any = {
+                    activityTotal,
+                    submissionTotal,
+                    commentTotal,
+                    opTotal,
+                    commentPercent: formatNumber((commentTotal/activityTotal)*100),
+                    submissionPercent: formatNumber((submissionTotal/activityTotal)*100),
+                    opPercent: formatNumber((opTotal/commentTotal)*100),
+                    criteria,
+                    window: typeof window === 'number' ? `${activityTotal} Items` : activityTotalWindow.humanize(true)
+
+                };
+
                 let thresholdSummary = [];
                 let submissionSummary;
                 let commentSummary;
                 if(sthresh !== undefined) {
                     const suffix = typeof sthresh === 'number' ? 'Items' : `(${formatNumber((submissionTotal/activityTotal)*100)}%) of ${activityTotal} Total`;
                     submissionSummary = `Submissions (${submissionTotal}) were ${scond}${sthresh} ${suffix}`;
+                    data.submissionSummary = submissionSummary;
                     thresholdSummary.push(submissionSummary);
                 }
                 if(cthresh !== undefined) {
@@ -197,21 +211,11 @@ export class HistoryRule extends Rule {
                     const countType = asOp ? 'Comments as OP' : 'Comments';
                     const suffix = typeof cthresh === 'number' ? 'Items' : `(${asOp ? formatNumber((opTotal/commentTotal)*100) : formatNumber((commentTotal/activityTotal)*100)}%) of ${activityTotal} Total ${totalType}`;
                     commentSummary = `${countType} (${asOp ? opTotal : commentTotal}) were ${ccond}${cthresh} ${suffix}`;
+                    data.commentSummary = commentSummary;
                     thresholdSummary.push(commentSummary);
                 }
 
-                const data: any = {
-                    activityTotal,
-                    submissionTotal,
-                    commentTotal,
-                    opTotal,
-                    submissionSummary,
-                    commentSummary,
-                    thresholdSummary: thresholdSummary.join(' and '),
-                    criteria,
-                    window: typeof window === 'number' ? `${activityTotal} Items` : activityTotalWindow.humanize(true)
-
-                };
+                data.thresholdSummary = thresholdSummary.join(' and ');
 
                 const result = `${thresholdSummary} (${data.window})`;
                 this.logger.verbose(result);
