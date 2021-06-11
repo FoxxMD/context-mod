@@ -6,5 +6,5 @@ Consult the [schema](https://json-schema.app/view/%23%2Fdefinitions%2FRecentActi
 
 ### Examples
 
-* [Free Karma Subreddits](/examples/recentActivity/freeKarma.json5) - Check if any of Author's aggregated submission origins are >10% of entire history
-* [Free Karma Subreddits](/examples/recentActivity/freeKarma.json5) - Check if any of Author's aggregated submission origins are >10% of entire history
+* [Free Karma Subreddits](/examples/recentActivity/freeKarma.json5) - Check if the Author has recently posted in any "free karma" subreddits
+* [Submission in Free Karma Subreddits](/examples/recentActivity/freeKarmaOnSubmission.json5) - Check if the Author has posted the Submission this check is running on in any "free karma" subreddits recently
