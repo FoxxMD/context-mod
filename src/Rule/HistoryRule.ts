@@ -188,14 +188,14 @@ export class HistoryRule extends Rule {
                 let submissionSummary;
                 let commentSummary;
                 if(sthresh !== undefined) {
-                    const suffix = typeof sthresh === 'number' ? 'Items' : `(${formatNumber((submissionTotal/activityTotal)*100)}%) of Total (${activityTotal})`;
+                    const suffix = typeof sthresh === 'number' ? 'Items' : `(${formatNumber((submissionTotal/activityTotal)*100)}%) of ${activityTotal} Total`;
                     submissionSummary = `Submissions (${submissionTotal}) were ${scond}${sthresh} ${suffix}`;
                     thresholdSummary.push(submissionSummary);
                 }
                 if(cthresh !== undefined) {
                     const totalType = asOp ? 'Comments' : 'Activities'
                     const countType = asOp ? 'Comments as OP' : 'Comments';
-                    const suffix = typeof cthresh === 'number' ? 'Items' : `(${asOp ? formatNumber((opTotal/commentTotal)*100) : formatNumber((commentTotal/activityTotal)*100)}%) of Total ${totalType} (${activityTotal})`;
+                    const suffix = typeof cthresh === 'number' ? 'Items' : `(${asOp ? formatNumber((opTotal/commentTotal)*100) : formatNumber((commentTotal/activityTotal)*100)}%) of ${activityTotal} Total ${totalType}`;
                     commentSummary = `${countType} (${asOp ? opTotal : commentTotal}) were ${ccond}${cthresh} ${suffix}`;
                     thresholdSummary.push(commentSummary);
                 }
