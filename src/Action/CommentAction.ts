@@ -37,13 +37,15 @@ export class CommentAction extends Action {
         const reply: Comment = await item.reply(renderedContent);
         if (this.lock) {
             if(item instanceof Submission) {
-                // @ts-ignore
-                await item.lock();
+                if(!this.dryRun) {
+                    // @ts-ignore
+                    await item.lock();
+                }
             } else {
                 this.logger.warn('Snoowrap does not support locking Comments');
             }
         }
-        if (this.distinguish) {
+        if (this.distinguish && !this.dryRun) {
             // @ts-ignore
             await reply.distinguish({sticky: this.sticky});
         }

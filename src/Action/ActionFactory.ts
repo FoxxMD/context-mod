@@ -8,21 +8,17 @@ import {Logger} from "winston";
 
 export function actionFactory
 (config: ActionJson, logger: Logger, subredditName: string): Action {
-    let cfg;
     switch (config.kind) {
         case 'comment':
-            cfg = config as CommentActionJson;
-            return new CommentAction({...cfg, logger, subredditName});
+            return new CommentAction({...config as CommentActionJson, logger, subredditName});
         case 'lock':
-            return new LockAction({logger, subredditName});
+            return new LockAction({...config, logger, subredditName});
         case 'remove':
-            return new RemoveAction({logger, subredditName});
+            return new RemoveAction({...config, logger, subredditName});
         case 'report':
-            cfg = config as ReportActionJson;
-            return new ReportAction({...cfg, logger, subredditName});
+            return new ReportAction({...config as ReportActionJson, logger, subredditName});
         case 'flair':
-            cfg = config as FlairActionJson;
-            return new FlairAction({...cfg, logger, subredditName});
+            return new FlairAction({...config as FlairActionJson, logger, subredditName});
         default:
             throw new Error('rule "kind" was not recognized.');
     }

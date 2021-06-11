@@ -235,6 +235,7 @@ Options:
   -n, --snooDebug                            Set Snoowrap to debug (default: process.env.SNOO_DEBUG || false)
   --authorTTL <ms>                           Set the TTL (ms) for the Author Activities shared cache (default: process.env.AUTHOR_TTL || 10000)
   --disableCache                             Disable caching for all subreddits
+  --dryRun                                   Override dryRun=true for all checks/actions on all subreddits (default: process.env.DRYRUN)
   -h, --help                                 display help for command
 
 Commands:

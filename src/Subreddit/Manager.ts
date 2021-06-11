@@ -32,6 +32,7 @@ export class Manager {
     heartbeatInterval?: number;
     lastHeartbeat = dayjs();
     apiLimitWarning: number;
+    dryRun?: boolean;
 
     displayLabel: string;
     currentLabels?: string[];
@@ -55,13 +56,14 @@ export class Manager {
 
         const configBuilder = new ConfigBuilder({logger: this.logger});
         const validJson = configBuilder.validateJson(sourceData);
-        const {checks, ...managerOpts} = validJson;
-        const {polling = {}, heartbeatInterval, apiLimitWarning = 250, caching} = managerOpts || {};
+        const {checks, ...configManagerOpts} = validJson;
+        const {polling = {}, heartbeatInterval, apiLimitWarning = 250, caching, dryRun} = configManagerOpts || {};
         this.pollOptions = {...polling, ...opts.polling};
         this.heartbeatInterval = heartbeatInterval;
         this.apiLimitWarning = apiLimitWarning;
         this.subreddit = sub;
         this.client = client;
+        this.dryRun = opts.dryRun || dryRun;
 
         const cacheConfig = caching === false ? {enabled: false, logger: this.logger} : {
             ...caching,
@@ -74,10 +76,11 @@ export class Manager {
         const subChecks: Array<SubmissionCheck> = [];
         const structuredChecks = configBuilder.parseToStructured(validJson);
         for (const jCheck of structuredChecks) {
+            const checkConfig = {...jCheck, dryRun: this.dryRun || jCheck.dryRun, logger: this.logger, subredditName: sub.display_name};
             if (jCheck.kind === 'comment') {
-                commentChecks.push(new CommentCheck({...jCheck, logger: this.logger, subredditName: sub.display_name}));
+                commentChecks.push(new CommentCheck(checkConfig));
             } else if (jCheck.kind === 'submission') {
-                subChecks.push(new SubmissionCheck({...jCheck, logger: this.logger, subredditName: sub.display_name}));
+                subChecks.push(new SubmissionCheck(checkConfig));
             }
         }
 

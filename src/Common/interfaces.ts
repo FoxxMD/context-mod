@@ -192,6 +192,13 @@ export interface ManagerOptions {
     apiLimitWarning?: number
 
     caching?: false | SubredditCacheConfig
+
+    /**
+     * Use this option to override the `dryRun` setting for all `Checks`
+     *
+     * @default undefined
+     * */
+    dryRun?: boolean;
 }
 
 export interface ThresholdCriteria {

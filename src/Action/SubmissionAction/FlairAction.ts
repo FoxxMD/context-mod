@@ -22,8 +22,10 @@ export class FlairAction extends Action {
 
     async process(item: Comment | Submission, ruleResults: RuleResult[]): Promise<void> {
         if (item instanceof Submission) {
-            // @ts-ignore
-            await item.assignFlair({text: this.text, cssClass: this.css})
+            if(!this.dryRun) {
+                // @ts-ignore
+                await item.assignFlair({text: this.text, cssClass: this.css})
+            }
         } else {
             this.logger.warn('Cannot flair Comment');
         }

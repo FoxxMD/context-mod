@@ -24,6 +24,7 @@ export class App {
     subManagers: Manager[] = [];
     logger: Logger;
     wikiLocation: string;
+    dryRun?: true | undefined;
 
     constructor(options: any = {}) {
         const {
@@ -36,6 +37,7 @@ export class App {
             logLevel,
             wikiConfig,
             snooDebug = process.env.SNOO_DEBUG,
+            dryRun = process.env.DRYRUN,
             version,
             authorTTL,
             disableCache = false,
@@ -44,6 +46,7 @@ export class App {
         CacheManager.authorTTL = authorTTL;
         CacheManager.enabled = !disableCache;
 
+        this.dryRun = dryRun === true || dryRun === 'true' ? true : undefined;
         this.wikiLocation = wikiConfig;
 
         const consoleTransport = new transports.Console();
@@ -88,6 +91,10 @@ export class App {
         winston.loggers.add('default', loggerOptions);
 
         this.logger = winston.loggers.get('default');
+
+        if(this.dryRun) {
+            this.logger.info('Running in DRYRUN mode');
+        }
 
         let subredditsArg = [];
         if (subreddits !== undefined) {
@@ -175,7 +182,7 @@ export class App {
                 continue;
             }
             try {
-                subSchedule.push(new Manager(sub, this.client, this.logger, json));
+                subSchedule.push(new Manager(sub, this.client, this.logger, json, {dryRun: this.dryRun}));
             } catch (err) {
                 this.logger.error(`[${sub.display_name_prefixed}] Config was not valid`, undefined, err);
             }

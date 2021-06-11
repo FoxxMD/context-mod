@@ -291,6 +291,11 @@
                 "description": {
                     "type": "string"
                 },
+                "dryRun": {
+                    "default": "undefined",
+                    "description": "Use this option to override the `dryRun` setting for all of its `Actions`",
+                    "type": "boolean"
+                },
                 "kind": {
                     "description": "The type of event (new submission or new comment) this check should be run against",
                     "enum": [
@@ -357,6 +362,11 @@
                 },
                 "distinguish": {
                     "description": "Distinguish the comment after creation?",
+                    "type": "boolean"
+                },
+                "dryRun": {
+                    "default": false,
+                    "description": "If `true` the Action will not make the API request to Reddit to perform its action.",
                     "type": "boolean"
                 },
                 "kind": {
@@ -455,6 +465,11 @@
                 "css": {
                     "description": "The text of the css class of the flair to apply",
                     "type": "string"
+                },
+                "dryRun": {
+                    "default": false,
+                    "description": "If `true` the Action will not make the API request to Reddit to perform its action.",
+                    "type": "boolean"
                 },
                 "kind": {
                     "description": "The type of action that will be performed",
@@ -593,6 +608,11 @@
         "LockActionJson": {
             "description": "Lock the Activity",
             "properties": {
+                "dryRun": {
+                    "default": false,
+                    "description": "If `true` the Action will not make the API request to Reddit to perform its action.",
+                    "type": "boolean"
+                },
                 "kind": {
                     "description": "The type of action that will be performed",
                     "enum": [
@@ -741,6 +761,11 @@
         "RemoveActionJson": {
             "description": "Remove the Activity",
             "properties": {
+                "dryRun": {
+                    "default": false,
+                    "description": "If `true` the Action will not make the API request to Reddit to perform its action.",
+                    "type": "boolean"
+                },
                 "kind": {
                     "description": "The type of action that will be performed",
                     "enum": [
@@ -880,6 +905,11 @@
                     "description": "The text of the report. If longer than 100 characters will be truncated to \"[content]...\"",
                     "type": "string"
                 },
+                "dryRun": {
+                    "default": false,
+                    "description": "If `true` the Action will not make the API request to Reddit to perform its action.",
+                    "type": "boolean"
+                },
                 "kind": {
                     "description": "The type of action that will be performed",
                     "enum": [
@@ -974,6 +1004,18 @@
             ],
             "type": "object"
         },
+        "SubredditCacheConfig": {
+            "properties": {
+                "authorTTL": {
+                    "description": "Amount of time, in milliseconds, author activities (Comments/Submission) should be cached",
+                    "type": "number"
+                },
+                "wikiTTL": {
+                    "type": "number"
+                }
+            },
+            "type": "object"
+        },
         "ThresholdCriteria": {
             "properties": {
                 "condition": {
@@ -1007,6 +1049,19 @@
             "description": "When Reddit API limit remaining reaches this number context bot will start warning on every poll interval",
             "type": "number"
         },
+        "caching": {
+            "anyOf": [
+                {
+                    "$ref": "#/definitions/SubredditCacheConfig"
+                },
+                {
+                    "enum": [
+                        false
+                    ],
+                    "type": "boolean"
+                }
+            ]
+        },
         "checks": {
             "description": "A list of all the checks that should be run for a subreddit.\n\nChecks are split into two lists -- submission or comment -- based on kind and run independently.\n\nChecks in each list are run in the order found in the configuration.\n\nWhen a check \"passes\", and actions are performed, then all subsequent checks are skipped.",
             "items": {
@@ -1014,6 +1069,11 @@
             },
             "minItems": 1,
             "type": "array"
+        },
+        "dryRun": {
+            "default": "undefined",
+            "description": "Use this option to override the `dryRun` setting for all `Checks`",
+            "type": "boolean"
         },
         "heartbeatInterval": {
             "description": "If present, time in milliseconds between HEARTBEAT log statements with current api limit count. Nice to have to know things are still ticking if there is low activity",

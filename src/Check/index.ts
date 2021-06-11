@@ -20,6 +20,7 @@ export class Check implements ICheck {
     condition: JoinOperands;
     rules: Array<RuleSet | Rule> = [];
     logger: Logger;
+    dryRun?: boolean;
 
     constructor(options: CheckOptions) {
         const {
@@ -28,7 +29,8 @@ export class Check implements ICheck {
             condition = 'AND',
             rules = [],
             actions = [],
-            subredditName
+            subredditName,
+            dryRun,
         } = options;
 
         this.logger = options.logger.child({labels: [`Check ${name}`]}, mergeArr);
@@ -38,6 +40,7 @@ export class Check implements ICheck {
         this.name = name;
         this.description = description;
         this.condition = condition;
+        this.dryRun = dryRun;
         for (const r of rules) {
             if (r instanceof Rule || r instanceof RuleSet) {
                 this.rules.push(r);
@@ -73,7 +76,7 @@ export class Check implements ICheck {
                 let valid = ajv.validate(ActionSchema, a);
                 if (valid) {
                     const aj = a as ActionJson;
-                    this.actions.push(actionFactory(aj, this.logger, subredditName));
+                    this.actions.push(actionFactory({...aj, dryRun: this.dryRun || aj.dryRun}, this.logger, subredditName));
                     // @ts-ignore
                     a.logger = this.logger;
                 } else {
@@ -115,11 +118,11 @@ export class Check implements ICheck {
     }
 
     async runActions(item: Submission | Comment, ruleResults: RuleResult[]): Promise<void> {
-        this.logger.debug('Running Actions');
+        this.logger.debug(`${this.dryRun ? 'DRYRUN - ' : ''}Running Actions`);
         for (const a of this.actions) {
             await a.handle(item, ruleResults);
         }
-        this.logger.info('Ran Actions');
+        this.logger.info(`${this.dryRun ? 'DRYRUN - ' : ''}Ran Actions`);
     }
 }
 
@@ -133,6 +136,13 @@ export interface ICheck extends JoinCondition {
      * */
     name: string,
     description?: string,
+
+    /**
+     * Use this option to override the `dryRun` setting for all of its `Actions`
+     *
+     * @default undefined
+     * */
+    dryRun?: boolean;
 }
 
 export interface CheckOptions extends ICheck {

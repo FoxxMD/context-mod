@@ -10,8 +10,10 @@ export class LockAction extends Action {
 
     async process(item: Comment|Submission, ruleResults: RuleResult[]): Promise<void> {
         if (item instanceof Submission) {
-            // @ts-ignore
-            await item.lock();
+            if(!this.dryRun) {
+                // @ts-ignore
+                await item.lock();
+            }
         } else {
             this.logger.warn('Snoowrap does not support locking Comments');
         }

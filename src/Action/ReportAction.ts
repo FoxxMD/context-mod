@@ -27,8 +27,10 @@ export class ReportAction extends Action {
         const renderedContent = await renderContent(content, item, ruleResults);
         this.logger.verbose(`Contents:\r\n${renderedContent}`);
         const truncatedContent = reportTrunc(renderedContent);
-        // @ts-ignore
-        await item.report({reason: truncatedContent});
+        if(!this.dryRun) {
+            // @ts-ignore
+            await item.report({reason: truncatedContent});
+        }
     }
 }
 

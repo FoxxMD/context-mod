@@ -9,8 +9,10 @@ export class RemoveAction extends Action {
     }
 
     async process(item: Comment|Submission, ruleResults: RuleResult[]): Promise<void> {
-        // @ts-ignore
-        await item.remove();
+        if(!this.dryRun) {
+            // @ts-ignore
+            await item.remove();
+        }
     }
 }
 

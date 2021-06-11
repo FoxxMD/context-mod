@@ -7,15 +7,18 @@ export abstract class Action {
     name?: string;
     logger: Logger;
     cache: SubredditCache;
+    dryRun: boolean;
 
     constructor(options: ActionOptions) {
         const {
             name = this.getKind(),
             logger,
-            subredditName
+            subredditName,
+            dryRun = false,
         } = options;
 
         this.name = name;
+        this.dryRun = dryRun;
         this.cache = CacheManager.get(subredditName);
         const uniqueName = this.name === this.getKind() ? this.getKind() : `${this.getKind()} - ${this.name}`;
         this.logger = logger.child({labels: ['Action', uniqueName]});
@@ -25,15 +28,14 @@ export abstract class Action {
 
     async handle(item: Comment | Submission, ruleResults: RuleResult[]): Promise<void> {
         await this.process(item, ruleResults);
-        this.logger.debug('Done');
+        this.logger.debug(`${this.dryRun ? 'DRYRUN - ' : ''}Done`);
     }
 
     abstract process(item: Comment | Submission, ruleResults: RuleResult[]): Promise<void>;
 }
 
-export interface ActionOptions {
-    name?: string;
-    logger: Logger,
+export interface ActionOptions extends ActionConfig {
+    logger: Logger;
     subredditName: string;
 }
 
@@ -46,6 +48,12 @@ export interface ActionConfig {
      * @pattern ^[a-zA-Z]([\w -]*[\w])?$
      * */
     name?: string;
+    /**
+     * If `true` the Action will not make the API request to Reddit to perform its action.
+     *
+     * @default false
+     * */
+    dryRun?: boolean;
 }
 
 export interface ActionJson extends ActionConfig {

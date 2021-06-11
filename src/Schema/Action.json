@@ -1,6 +1,11 @@
 {
     "$schema": "http://json-schema.org/draft-07/schema#",
     "properties": {
+        "dryRun": {
+            "default": false,
+            "description": "If `true` the Action will not make the API request to Reddit to perform its action.",
+            "type": "boolean"
+        },
         "kind": {
             "description": "The type of action that will be performed",
             "enum": [

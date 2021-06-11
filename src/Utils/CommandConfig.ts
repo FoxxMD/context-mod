@@ -24,6 +24,7 @@ export const getOptions = () => {
     options.push(new Option('--snooDebug', 'Set Snoowrap to debug').default(undefined, 'process.env.SNOO_DEBUG'));
     options.push(new Option('--authorTTL <ms>', 'Set the TTL (ms) for the Author Activities shared cache').default(process.env.AUTHOR_TTL || 10000, 'process.env.AUTHOR_TTL || 10000'));
     options.push(new Option('--disableCache', 'Disable caching for all subreddits'));
+    options.push(new Option('--dryRun', 'Set dryRun=true for all checks/actions on all subreddits (overrides any existing)').default(undefined, 'process.env.DRYRUN'));
 
     return options;
 }
