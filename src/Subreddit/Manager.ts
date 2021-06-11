@@ -109,7 +109,7 @@ export class Manager {
         try {
             for (const check of checks) {
                 if (checkNames.length > 0 && !checkNames.map(x => x.toLowerCase()).some(x => x === check.name.toLowerCase())) {
-                    this.logger.debug(`Check ${check} not in array of requested checks to run, skipping`);
+                    this.logger.warn(`Check ${check} not in array of requested checks to run, skipping`);
                     continue;
                 }
                 let triggered = false;

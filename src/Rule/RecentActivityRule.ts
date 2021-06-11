@@ -63,9 +63,9 @@ export class RecentActivityRule extends Rule {
         let viableActivity = activities;
         if (this.useSubmissionAsReference) {
             if (!(item instanceof Submission)) {
-                this.logger.debug('Cannot use post as reference because triggered item is not a Submission');
+                this.logger.warn('Cannot use post as reference because triggered item is not a Submission');
             } else if (item.is_self) {
-                this.logger.debug('Cannot use post as reference because triggered Submission is not a link type');
+                this.logger.warn('Cannot use post as reference because triggered Submission is not a link type');
             } else {
                 const usableUrl = parseLink(await item.url);
                 viableActivity = viableActivity.filter((x) => {
@@ -98,7 +98,7 @@ export class RecentActivityRule extends Rule {
         if (triggeredOn.length > 0) {
             const friendlyText = triggeredOn.map(x => `${x.subreddit}(${x.count})`).join(', ');
             const friendly = `Triggered by: ${friendlyText}`;
-            this.logger.debug(friendly);
+            this.logger.verbose(friendly);
             return Promise.resolve([true, [this.getResult(true, {
                 result: friendly,
                 data: {

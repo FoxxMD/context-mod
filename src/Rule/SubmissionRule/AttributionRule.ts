@@ -235,7 +235,7 @@ export class AttributionRule extends SubmissionRule {
                 }
 
                 const result = `${triggeredDomains.length} Attribution(s) met the threshold of ${threshold}, largest being ${largestCount} (${largestPercent}%) of ${activityTotal} Total -- window: ${data.window}`;
-
+                this.logger.verbose(result);
                 return Promise.resolve([true, [this.getResult(true, {
                     result,
                     data,

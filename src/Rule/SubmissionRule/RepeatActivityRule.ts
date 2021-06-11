@@ -166,6 +166,7 @@ export class RepeatActivityRule extends SubmissionRule {
         if (triggeringSummaries.length > 0) {
             const largestRepeat = triggeringSummaries.reduce((acc, summ) => Math.max(summ.largestTrigger, acc), 0);
             const result = `${triggeringSummaries.length} of ${identifiersSummary.length} unique items repeated >=${this.threshold} (threshold) times, largest repeat: ${largestRepeat}`;
+            this.logger.verbose(result);
             return Promise.resolve([true, [this.getResult(true, {
                 result,
                 data: {

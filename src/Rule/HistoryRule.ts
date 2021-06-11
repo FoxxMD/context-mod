@@ -214,7 +214,7 @@ export class HistoryRule extends Rule {
                 };
 
                 const result = `${thresholdSummary} (${data.window})`;
-
+                this.logger.verbose(result);
                 return Promise.resolve([true, [this.getResult(true, {
                     result,
                     data,

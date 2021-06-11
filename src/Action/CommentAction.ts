@@ -32,6 +32,7 @@ export class CommentAction extends Action {
     async process(item: Comment | Submission, ruleResults: RuleResult[]): Promise<void> {
         const content = await this.cache.getContent(this.content, item.subreddit);
         const renderedContent = await renderContent(content, item, ruleResults);
+        this.logger.verbose(`Contents:\r\n${renderedContent}`);
         // @ts-ignore
         const reply: Comment = await item.reply(renderedContent);
         if (this.lock) {
