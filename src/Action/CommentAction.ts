@@ -33,7 +33,7 @@ export class CommentAction extends Action {
         const content = await this.cache.getContent(this.content, item.subreddit);
         const renderedContent = await renderContent(content, item, ruleResults);
         // @ts-ignore
-        const reply: Comment = await item.reply(he.decode(renderedContent));
+        const reply: Comment = await item.reply(renderedContent);
         if (this.lock) {
             if(item instanceof Submission) {
                 // @ts-ignore

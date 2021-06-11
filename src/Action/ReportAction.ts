@@ -1,6 +1,5 @@
 import {ActionJson, ActionConfig, ActionOptions} from "./index";
 import Action from "./index";
-import he from "he";
 import Snoowrap, {Comment, Submission} from "snoowrap";
 import {truncateStringToLength} from "../util";
 import {renderContent} from "../Utils/SnoowrapUtils";
@@ -26,7 +25,7 @@ export class ReportAction extends Action {
     async process(item: Comment | Submission, ruleResults: RuleResult[]): Promise<void> {
         const content = await this.cache.getContent(this.content, item.subreddit);
         const renderedContent = await renderContent(content, item, ruleResults);
-        const truncatedContent = he.decode(reportTrunc(renderedContent));
+        const truncatedContent = reportTrunc(renderedContent);
         // @ts-ignore
         await item.report({reason: truncatedContent});
     }

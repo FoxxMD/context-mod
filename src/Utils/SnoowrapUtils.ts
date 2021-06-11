@@ -3,6 +3,7 @@ import Submission from "snoowrap/dist/objects/Submission";
 import {Duration, DurationUnitsObjectType} from "dayjs/plugin/duration";
 import dayjs, {Dayjs} from "dayjs";
 import Mustache from "mustache";
+import he from "he";
 import {AuthorOptions, AuthorCriteria, RuleResult} from "../Rule";
 import {ActivityWindowCriteria, ActivityWindowType} from "../Common/interfaces";
 import {truncateStringToLength} from "../util";
@@ -132,7 +133,7 @@ export const renderContent = async (content: string, data: (Submission | Comment
         };
     }, {});
 
-    return Mustache.render(content, {item: templateData, rules: normalizedRuleResults});
+    return he.decode(Mustache.render(content, {item: templateData, rules: normalizedRuleResults}));
 }
 
 export const testAuthorCriteria = async (item: (Comment|Submission), authorOpts: AuthorCriteria, include = true) => {
