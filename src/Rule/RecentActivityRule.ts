@@ -1,7 +1,7 @@
 import {Rule, RuleJSONConfig, RuleOptions, RulePremise, RuleResult} from "./index";
 import {Comment, VoteableContent} from "snoowrap";
 import Submission from "snoowrap/dist/objects/Submission";
-import {parseUsableLinkIdentifier} from "../util";
+import {activityWindowText, parseUsableLinkIdentifier} from "../util";
 import {
     ActivityWindow,
     ActivityWindowCriteria,
@@ -84,28 +84,69 @@ export class RecentActivityRule extends Rule {
             grouped[s] = (grouped[s] || []).concat(activity);
             return grouped;
         }, {} as Record<string, (Submission | Comment)[]>);
-        const triggeredOn = [];
+        let triggeredPerSub = [];
+        let totalTriggeredOn;
         for (const triggerSet of this.thresholds) {
-            const {count: threshold = 1, subreddits = []} = triggerSet;
+            triggeredPerSub = [];
+            let currCount = 0;
+            let presentSubs = [];
+            const {count: subCount, totalCount, subreddits = []} = triggerSet;
             for (const sub of subreddits) {
                 const isub = sub.toLowerCase();
                 const {[isub]: tSub = []} = groupedActivity;
-                if (tSub.length >= threshold) {
-                    triggeredOn.push({subreddit: sub, count: tSub.length});
+                if(tSub.length > 0) {
+                    currCount += tSub.length;
+                    presentSubs.push(sub);
+                    if (subCount !== undefined && tSub.length >= subCount) {
+                        triggeredPerSub.push({subreddit: sub, count: tSub.length, threshold: subCount});
+                    }
                 }
             }
+            if(totalCount !== undefined && currCount >= totalCount) {
+                totalTriggeredOn = {subreddits: presentSubs, count: currCount, threshold: totalCount};
+            }
+            // if either trigger condition is hit end the iteration early
+            if(triggeredPerSub.length > 0 || totalTriggeredOn !== undefined) {
+                break;
+            }
         }
-        if (triggeredOn.length > 0) {
-            const friendlyText = triggeredOn.map(x => `${x.subreddit}(${x.count})`).join(', ');
-            const friendly = `Triggered by: ${friendlyText}`;
-            this.logger.verbose(friendly);
+        if (triggeredPerSub.length > 0 || totalTriggeredOn !== undefined) {
+            let resultArr = [];
+            const data: any = {};
+            if(triggeredPerSub.length > 0) {
+                data.perSubCount = triggeredPerSub.length;
+                data.perSubTotal = triggeredPerSub.reduce((acc, x) => acc + x.count, 0);
+                data.perSubSubredditsSummary = triggeredPerSub.map(x => x.subreddit).join(', ');
+                data.perSubSummary = triggeredPerSub.map(x => `${x.subreddit}(${x.count})`).join(', ');
+                data.perSubThreshold = triggeredPerSub[0].threshold;
+                resultArr.push(`${triggeredPerSub.length} subs have >${triggeredPerSub[0].threshold} activities (${data.perSubTotal} Total)`);
+            }
+            if(totalTriggeredOn !== undefined) {
+                data.totalCount = totalTriggeredOn.count;
+                data.totalSubredditsCount = totalTriggeredOn.subreddits.length;
+                data.totalSubredditsSummary = totalTriggeredOn.subreddits.join(', ')
+                data.totalThreshold = totalTriggeredOn.threshold;
+                data.totalSummary = `${data.totalCount} (>${totalTriggeredOn.threshold}) activities over ${totalTriggeredOn.subreddits.length} subreddits`;
+                resultArr.push(data.totalSummary);
+            }
+            let summary;
+            if(resultArr.length === 2) {
+                // need a shortened summary
+                summary = `${data.perSubCount} per-sub triggers (${data.perSubThreshold}) and ${data.totalCount} total (${data.totalThreshold})`
+            } else {
+                summary = resultArr[0];
+            }
+            const result = resultArr.join(' and ')
+            this.logger.verbose(result);
             return Promise.resolve([true, [this.getResult(true, {
-                result: friendly,
+                result,
                 data: {
-                    triggeredOn,
-                    summary: friendlyText,
-                    subCount: triggeredOn.length,
-                    totalCount: triggeredOn.reduce((cnt, data) => cnt + data.count, 0)
+                    window: typeof this.window === 'number' ? `${activities.length} Items` : activityWindowText(viableActivity),
+                    triggeredOn: triggeredPerSub,
+                    summary,
+                    subSummary: data.totalSubredditsSummary|| data.perSubSubredditsSummary,
+                    subCount: data.totalSubredditsCount || data.perSubCount,
+                    totalCount: data.totalCount || data.perSubTotal
                 }
             })]]);
         }
@@ -114,13 +155,23 @@ export class RecentActivityRule extends Rule {
     }
 }
 
+/**
+ * At least one count property must be present. If both are present then either can trigger the rule
+ *
+ * @minProperties 1
+ * @additionalProperties false
+ * */
 export interface SubThreshold extends SubredditCriteria {
     /**
      * The number of activities in each subreddit from the list that will trigger this rule
-     * @default 1
      * @minimum 1
      * */
     count?: number,
+    /**
+     * The total number of activities across all listed subreddits that will trigger this rule
+     * @minimum 1
+     * */
+    totalCount?: number
 }
 
 interface RecentActivityConfig extends ActivityWindow, ReferenceSubmission {

@@ -7,6 +7,8 @@ import utc from 'dayjs/plugin/utc.js';
 import dduration from 'dayjs/plugin/duration.js';
 import Ajv from "ajv";
 import {InvalidOptionArgumentError} from "commander";
+import Submission from "snoowrap/dist/objects/Submission";
+import {Comment} from "snoowrap";
 
 dayjs.extend(utc);
 dayjs.extend(dduration);
@@ -287,4 +289,15 @@ export function parseBool(value: any, prev: any = false): boolean {
         return usedVal;
     }
     throw new InvalidOptionArgumentError('Not a boolean value.');
+}
+
+export function activityWindowText(activities: (Submission | Comment)[], suffix = false): (string | undefined) {
+    if (activities.length === 0) {
+        return undefined;
+    }
+    if (activities.length === 1) {
+        return `1 Item`;
+    }
+
+    return dayjs.duration(dayjs(activities[0].created_utc * 1000).diff(dayjs(activities[activities.length - 1].created_utc * 1000))).humanize(suffix);
 }

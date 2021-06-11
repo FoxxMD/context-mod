@@ -633,9 +633,11 @@
             "type": "object"
         },
         "SubThreshold": {
+            "additionalProperties": false,
+            "description": "At least one count property must be present. If both are present then either can trigger the rule",
+            "minProperties": 1,
             "properties": {
                 "count": {
-                    "default": 1,
                     "description": "The number of activities in each subreddit from the list that will trigger this rule",
                     "minimum": 1,
                     "type": "number"
@@ -651,6 +653,11 @@
                     },
                     "minItems": 1,
                     "type": "array"
+                },
+                "totalCount": {
+                    "description": "The total number of activities across all listed subreddits that will trigger this rule",
+                    "minimum": 1,
+                    "type": "number"
                 }
             },
             "required": [
