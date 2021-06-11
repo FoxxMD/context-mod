@@ -29,9 +29,6 @@ export class Manager {
     streamSub?: SubmissionStream;
     commentsListedOnce = false;
     streamComments?: CommentStream;
-    heartbeatInterval?: number;
-    lastHeartbeat = dayjs();
-    apiLimitWarning: number;
     dryRun?: boolean;
 
     displayLabel: string;
@@ -57,10 +54,8 @@ export class Manager {
         const configBuilder = new ConfigBuilder({logger: this.logger});
         const validJson = configBuilder.validateJson(sourceData);
         const {checks, ...configManagerOpts} = validJson;
-        const {polling = {}, heartbeatInterval, apiLimitWarning = 250, caching, dryRun} = configManagerOpts || {};
+        const {polling = {}, caching, dryRun} = configManagerOpts || {};
         this.pollOptions = {...polling, ...opts.polling};
-        this.heartbeatInterval = heartbeatInterval;
-        this.apiLimitWarning = apiLimitWarning;
         this.subreddit = sub;
         this.client = client;
         this.dryRun = opts.dryRun || dryRun;
@@ -141,17 +136,6 @@ export class Manager {
         }
     }
 
-    heartbeat() {
-        const apiRemaining = this.client.ratelimitRemaining;
-        if (this.heartbeatInterval !== undefined && dayjs().diff(this.lastHeartbeat) >= this.heartbeatInterval) {
-            this.logger.info(`HEARTBEAT -- Reddit API Rate Limit remaining: ${apiRemaining}`);
-            this.lastHeartbeat = dayjs();
-        }
-        if (apiRemaining < this.apiLimitWarning) {
-            this.logger.warn(`Reddit API rate limit remaining: ${apiRemaining} (Warning at ${this.apiLimitWarning})`);
-        }
-    }
-
     async handle(): Promise<void> {
         if (this.submissionChecks.length > 0) {
             const {
@@ -176,7 +160,7 @@ export class Manager {
                 }
                 await this.runChecks('Submission', item)
             });
-            this.streamSub.on('listing', (_) => this.heartbeat());
+            this.streamSub.on('listing', (_) => this.logger.debug('Polled Submissions'));
         }
 
         if (this.commentChecks.length > 0) {
@@ -198,7 +182,7 @@ export class Manager {
                 }
                 await this.runChecks('Comment', item)
             });
-            this.streamComments.on('listing', (_) => this.heartbeat());
+            this.streamComments.on('listing', (_) => this.logger.debug('Polled Comments'));
         }
 
         if (this.streamSub !== undefined) {

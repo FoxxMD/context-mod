@@ -1044,11 +1044,6 @@
         }
     },
     "properties": {
-        "apiLimitWarning": {
-            "default": 250,
-            "description": "When Reddit API limit remaining reaches this number context bot will start warning on every poll interval",
-            "type": "number"
-        },
         "caching": {
             "anyOf": [
                 {
@@ -1074,10 +1069,6 @@
             "default": "undefined",
             "description": "Use this option to override the `dryRun` setting for all `Checks`",
             "type": "boolean"
-        },
-        "heartbeatInterval": {
-            "description": "If present, time in milliseconds between HEARTBEAT log statements with current api limit count. Nice to have to know things are still ticking if there is low activity",
-            "type": "number"
         },
         "polling": {
             "$ref": "#/definitions/PollingOptions",

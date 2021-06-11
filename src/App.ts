@@ -1,19 +1,20 @@
 import Snoowrap from "snoowrap";
 import {Manager} from "./Subreddit/Manager";
 import winston, {Logger} from "winston";
-import {labelledFormat} from "./util";
+import {argParseInt, labelledFormat, parseBool, sleep} from "./util";
 import snoowrap from "snoowrap";
 import pEvent from "p-event";
 import JSON5 from 'json5';
 import EventEmitter from "events";
 import CacheManager from './Subreddit/SubredditCache';
+import dayjs from "dayjs";
 
 const {transports} = winston;
 
 const snooLogWrapper = (logger: Logger) => {
     return {
-        warn: (...args: any[]) => logger.warn(args.slice(0,2).join(' '), [args.slice(2)]),
-        debug: (...args: any[]) => logger.debug(args.slice(0,2).join(' '), [args.slice(2)]),
+        warn: (...args: any[]) => logger.warn(args.slice(0, 2).join(' '), [args.slice(2)]),
+        debug: (...args: any[]) => logger.debug(args.slice(0, 2).join(' '), [args.slice(2)]),
     }
 }
 
@@ -25,6 +26,8 @@ export class App {
     logger: Logger;
     wikiLocation: string;
     dryRun?: true | undefined;
+    heartbeatInterval: number;
+    apiLimitWarning: number;
 
     constructor(options: any = {}) {
         const {
@@ -33,20 +36,24 @@ export class App {
             clientSecret,
             accessToken,
             refreshToken,
-            logDir,
-            logLevel,
-            wikiConfig,
-            snooDebug = process.env.SNOO_DEBUG,
-            dryRun = process.env.DRYRUN,
+            logDir = process.env.LOG_DIR || `${process.cwd()}/logs`,
+            logLevel = process.env.LOG_LEVEL || 'info',
+            wikiConfig = process.env.WIKI_CONFIG || 'botconfig/contextbot',
+            snooDebug = process.env.SNOO_DEBUG || false,
+            dryRun = process.env.DRYRUN || false,
+            heartbeat = process.env.HEARTBEAT || 300,
+            apiLimitWarning = process.env.API_REMAINING || 250,
             version,
-            authorTTL,
-            disableCache = false,
+            authorTTL = process.env.AUTHOR_TTL || 10000,
+            disableCache = process.env.DISABLE_CACHE || false,
         } = options;
 
-        CacheManager.authorTTL = authorTTL;
-        CacheManager.enabled = !disableCache;
+        CacheManager.authorTTL = argParseInt(authorTTL);
+        CacheManager.enabled = !parseBool(disableCache);
 
-        this.dryRun = dryRun === true || dryRun === 'true' ? true : undefined;
+        this.dryRun = parseBool(dryRun) === true ? true : undefined;
+        this.heartbeatInterval = argParseInt(heartbeat);
+        this.apiLimitWarning = argParseInt(apiLimitWarning);
         this.wikiLocation = wikiConfig;
 
         const consoleTransport = new transports.Console();
@@ -92,7 +99,7 @@ export class App {
 
         this.logger = winston.loggers.get('default');
 
-        if(this.dryRun) {
+        if (this.dryRun) {
             this.logger.info('Running in DRYRUN mode');
         }
 
@@ -114,9 +121,9 @@ export class App {
             accessToken,
         };
 
-        let shouldDebug = snooDebug === true || snooDebug === 'true';
+        let shouldDebug = parseBool(snooDebug);
         let snooLogger;
-        if(shouldDebug) {
+        if (shouldDebug) {
             const clogger = this.logger.child({labels: ['Snoowrap']});
             snooLogger = snooLogWrapper(clogger);
         }
@@ -190,10 +197,26 @@ export class App {
         this.subManagers = subSchedule;
     }
 
+    async heartbeat() {
+        while (true) {
+            await sleep(this.heartbeatInterval * 1000);
+            const heartbeat = `HEARTBEAT -- Reddit API Rate Limit remaining: ${this.client.ratelimitRemaining}`
+            if (this.apiLimitWarning >= this.client.ratelimitRemaining) {
+                this.logger.warn(heartbeat);
+            } else {
+                this.logger.info(heartbeat);
+            }
+        }
+    }
+
     async runManagers() {
 
         for (const manager of this.subManagers) {
             manager.handle();
+        }
+
+        if (this.heartbeatInterval !== 0) {
+            this.heartbeat();
         }
 
         const emitter = new EventEmitter();

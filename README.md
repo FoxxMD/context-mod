@@ -224,25 +224,30 @@ Below is a configuration fulfilling the example given at the start of this readm
 Usage: index [options] [command]
 
 Options:
-  -c, --clientId <id>                        Client ID for your Reddit application (default: process.env.CLIENT_ID)
-  -e, --clientSecret <secret>                Client Secret for your Reddit application (default: process.env.CLIENT_SECRET)
-  -a, --accessToken <token>                  Access token retrieved from authenticating an account with your Reddit Application (default: process.env.ACCESS_TOKEN)
-  -r, --refreshToken <token>                 Refresh token retrieved from authenticating an account with your Reddit Application (default: process.env.REFRESH_TOKEN)
-  -s, --subreddits <list...>                 List of subreddits to run on. Bot will run on all subs it has access to if not defined (default: process.env.SUBREDDITS as comma-separated string)
-  -d, --logDir <dir>                         Absolute path to directory to store rotated logs in (default: process.env.LOG_DIR || 'CWD/logs')
-  -l, --logLevel <level>                     Log level (default: process.env.LOG_LEVEL || 'info')
-  -w, --wikiConfig <path>                    Relative url to contextbot wiki page EX https://reddit.com/r/subreddit/wiki/<path> (default: process.env.WIKI_CONFIG || 'botconfig/contextbot')
-  -n, --snooDebug                            Set Snoowrap to debug (default: process.env.SNOO_DEBUG || false)
-  --authorTTL <ms>                           Set the TTL (ms) for the Author Activities shared cache (default: process.env.AUTHOR_TTL || 10000)
-  --disableCache                             Disable caching for all subreddits
-  --dryRun                                   Override dryRun=true for all checks/actions on all subreddits (default: process.env.DRYRUN)
-  -h, --help                                 display help for command
+  -c, --clientId <id>                          Client ID for your Reddit application (default: process.env.CLIENT_ID)
+  -e, --clientSecret <secret>                  Client Secret for your Reddit application (default: process.env.CLIENT_SECRET)
+  -a, --accessToken <token>                    Access token retrieved from authenticating an account with your Reddit Application (default: process.env.ACCESS_TOKEN)
+  -r, --refreshToken <token>                   Refresh token retrieved from authenticating an account with your Reddit Application (default: process.env.REFRESH_TOKEN)
+  -s, --subreddits <list...>                   List of subreddits to run on. Bot will run on all subs it has access to if not defined (default: process.env.SUBREDDITS (comma-seperated))
+  -d, --logDir <dir>                           Absolute path to directory to store rotated logs in (default: process.env.LOG_DIR || process.cwd()/logs)
+  -l, --logLevel <level>                       Log level (default: process.env.LOG_LEVEL || info)
+  -w, --wikiConfig <path>                      Relative url to contextbot wiki page EX https://reddit.com/r/subreddit/wiki/<path> (default: process.env.WIKI_CONFIG || 'botconfig/contextbot')
+  --snooDebug                                  Set Snoowrap to debug (default: process.env.SNOO_DEBUG || false)
+  --authorTTL <ms>                             Set the TTL (ms) for the Author Activities shared cache (default: process.env.AUTHOR_TTL || 10000)
+  --heartbeat <s>                              Interval, in seconds, between heartbeat logs. Set to 0 to disable (default: process.env.HEARTBEAT || 300)
+  --apiLimitWarning <remaining>                When API limit remaining (600/10min) is lower than this value log statements for limit will be raised to WARN level (default: process.env.API_REMAINING || 250)
+  --dryRun                                     Set dryRun=true for all checks/actions on all subreddits (overrides any existing) (default: process.env.DRYRUN)
+  --disableCache                               Disable caching for all subreddits (default: process.env.DISABLE_CACHE || false)
+  -h, --help                                   display help for command
 
 Commands:
-  run                                        Runs bot normally (unattended)
-  check <activityId> [type] [checkNames...]  Run check(s) on a specific activity, then exits
-  help [command]                             display help for command
+  run                                          Runs bot normally
+  check [options] <activityIdentifier> [type]  Run check(s) on a specific activity
+  help [command]                               display help for command
+
 ```
+
+### Logging
 
 ### Reddit App??
 

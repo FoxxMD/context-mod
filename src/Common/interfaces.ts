@@ -181,15 +181,6 @@ export interface SubredditCacheConfig {
 
 export interface ManagerOptions {
     polling?: PollingOptions
-    /**
-     * If present, time in milliseconds between HEARTBEAT log statements with current api limit count. Nice to have to know things are still ticking if there is low activity
-     * */
-    heartbeatInterval?: number
-    /**
-     * When Reddit API limit remaining reaches this number context bot will start warning on every poll interval
-     * @default 250
-     * */
-    apiLimitWarning?: number
 
     caching?: false | SubredditCacheConfig
 

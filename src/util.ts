@@ -6,6 +6,7 @@ import deepEqual from "fast-deep-equal";
 import utc from 'dayjs/plugin/utc.js';
 import dduration from 'dayjs/plugin/duration.js';
 import Ajv from "ajv";
+import {InvalidOptionArgumentError} from "commander";
 
 dayjs.extend(utc);
 dayjs.extend(dduration);
@@ -20,13 +21,10 @@ const CWD = process.cwd();
 
 export const truncateStringToLength = (length: number, truncStr = '...') => (str: string) => str.length > length ? `${str.slice(0, length - truncStr.length - 1)}${truncStr}` : str;
 
-let longestLabel = 3;
-// @ts-ignore
 export const defaultFormat = printf(({
                                          level,
                                          message,
-                                         label = 'App',
-                                         labels = [],
+                                         labels = ['App'],
                                          leaf,
                                          itemId,
                                          timestamp,
@@ -36,9 +34,6 @@ export const defaultFormat = printf(({
                                          ...rest
                                      }) => {
     let stringifyValue = splatObj !== undefined ? jsonStringify(splatObj) : '';
-    if (label.length > longestLabel) {
-        longestLabel = label.length;
-    }
     let msg = message;
     let stackMsg = '';
     if (stack !== undefined) {
@@ -51,16 +46,11 @@ export const defaultFormat = printf(({
         stackMsg = `\n${cleanedStack}`;
     }
 
-    let labelContent = `[${label.padEnd(longestLabel)}]`;
-    if (labels.length > 0 || (leaf !== null && leaf !== undefined)) {
-        let nodes = labels;
-        if (leaf !== null && leaf !== undefined) {
-            nodes.push(leaf);
-        }
-        //labelContent = `${labels.slice(0, labels.length).map((x: string) => `[${x}]`).join(' ')}`
-        labelContent = `${nodes.map((x: string) => `[${x}]`).join(' ')}`;
+    let nodes = labels;
+    if (leaf !== null && leaf !== undefined) {
+        nodes.push(leaf);
     }
-    //let leafContent = leaf !== undefined ? ` (${leaf})` : '';
+    const labelContent = `${nodes.map((x: string) => `[${x}]`).join(' ')}`;
 
     return `${timestamp} ${level.padEnd(7)}: ${labelContent} ${msg}${stringifyValue !== '' ? ` ${stringifyValue}` : ''}${stackMsg}`;
 });
@@ -261,3 +251,40 @@ export const formatNumber = ( val: number|string, options: any = {} ) => {
     } );
     return `${prefixStr}${localeString}${suffix}`;
 };
+
+export function argParseInt(value: any, prev: any = undefined): number {
+    let usedVal = value;
+    if (value === undefined || value === '') {
+        usedVal = prev;
+    }
+    if(usedVal === undefined || usedVal === '') {
+        return usedVal;
+    }
+
+    if (typeof usedVal === 'string') {
+        const parsedValue = parseInt(usedVal, 10);
+        if (isNaN(parsedValue)) {
+            throw new InvalidOptionArgumentError('Not a number.');
+        }
+        return parsedValue;
+    } else if (typeof usedVal === 'number') {
+        return usedVal;
+    }
+    throw new InvalidOptionArgumentError('Not a number.');
+}
+
+export function parseBool(value: any, prev: any = false): boolean {
+    let usedVal = value;
+    if (value === undefined || value === '') {
+        usedVal = prev;
+    }
+    if(usedVal === undefined || usedVal === '') {
+        return false;
+    }
+    if (typeof usedVal === 'string') {
+        return usedVal === 'true';
+    } else if (typeof usedVal === 'boolean') {
+        return usedVal;
+    }
+    throw new InvalidOptionArgumentError('Not a boolean value.');
+}
