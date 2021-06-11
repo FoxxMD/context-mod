@@ -29,4 +29,14 @@ This directory contains example of valid, ready-to-go configurations for Context
 ### Examples Overview
 
 * Rules
-  * [Attribution](/src/examples/attribution)
+  * [Attribution](/examples/attribution)
+  * [Recent Activity](/examples/recentActivity)
+  * [Repeat Activity](/examples/repeatActivity)
+  * [History](/examples/history)
+  * [Author](/examples/author)
+* [Advanced Concepts](/examples/advancedConcepts)
+  * [Rule Sets](/examples/advancedConcepts/ruleSets.json5)
+  * [Name Rules](/examples/advancedConcepts/ruleNameReuse.json5)
+  * [Check Ordering](/examples/advancedConcepts)
+* Subreddit-ready examples
+  * Coming soon...

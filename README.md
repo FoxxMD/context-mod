@@ -32,6 +32,7 @@ Some feature highlights:
 * [How It Works](#how-it-works)
 * [Installation](#installation)
 * [Configuration](#configuration)
+  * [Examples](#examples)
 * [Usage](#usage)
 
 ### How It Works
@@ -89,6 +90,10 @@ docker run -e "CLIENT_ID=myId" ... foxxmd/reddit-context-bot
 Context Bot's configuration can be written in JSON or [JSON5](https://json5.org/). It's [schema](/src/Schema/App.json) conforms to [JSON Schema Draft 7](https://json-schema.org/).
 
 I suggest using [Atlassian JSON Schema Viewer](https://json-schema.app/start) ([direct link](https://json-schema.app/view/%23?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Freddit-context-bot%2Fmaster%2Fsrc%2FSchema%2FApp.json)) so you can view all documentation while also interactively writing and validating your config! From there you can drill down into any object, see its requirements, view an example JSON document, and live-edit your configuration on the right-hand side.
+
+### Examples
+
+Read through the [Examples](/examples) section for a thorough introduction to all the **Rules**, in-depth concepts, and sample configuration files.
 
 ### Action Templating
 
@@ -155,66 +160,6 @@ bProperty: 'something else'
 }
 }
 const content = "My content will render the property {{item.aProperty}} like this, and another nested property {{item.anotherObject.bProperty}} like this."
-```
-</details>
-
-### Example Config
-
-Below is a configuration fulfilling the example given at the start of this readme:
-
-<details>
-  <summary>Click to expand configuration</summary>
-
-```json
-{
-  "checks": [
-    {
-      "name": "repeatSpam",
-      "kind": "submission",
-      "rules": [
-        {
-          "kind": "repeatActivity",
-          "gapAllowance": 2,
-          "threshold": 10
-        }
-      ],
-      "actions": [
-        {
-          "kind": "remove"
-        },
-        {
-          "kind": "comment",
-          "content": "Thank you for your submission but we do not allow mass crossposting. Your submission has been removed",
-          "distingish": true
-        }
-      ]
-    },
-    {
-      "name": "selfPromoActivity",
-      "kind": "submission",
-      "rules": [
-        {
-          "kind": "recentActivity",
-          "thresholds": [
-            {
-              "subreddits": [
-                "YouTubeSubscribeBoost",
-                "AdvertiseYourVideos"
-              ]
-            }
-          ]
-        }
-      ],
-      "actions": [
-        {
-          "kind": "report",
-          "content": "User posted link {{rules.recentactivity.totalCount}} times in {{rules.recentactivity.subCount}} SP subs: {{rules.recentactivity.summary}}"
-        }
-      ]
-    }
-  ]
-}
-
 ```
 </details>
 
