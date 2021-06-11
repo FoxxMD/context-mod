@@ -1,19 +1,12 @@
 import Action, {ActionJson, ActionOptions} from "./index";
 import {Comment} from "snoowrap";
 import Submission from "snoowrap/dist/objects/Submission";
-import dayjs, {Dayjs} from "dayjs";
 import {renderContent} from "../Utils/SnoowrapUtils";
 import {RichContent} from "../Common/interfaces";
 import {RuleResult} from "../Rule";
-import LoggedError from "../Utils/LoggedError";
-
-export const WIKI_DESCRIM = 'wiki:';
 
 export class CommentAction extends Action {
     content: string;
-    hasWiki: boolean;
-    wiki?: string;
-    wikiFetched?: Dayjs;
     lock: boolean = false;
     sticky: boolean = false;
     distinguish: boolean = false;
@@ -26,11 +19,7 @@ export class CommentAction extends Action {
             sticky = false,
             distinguish = false,
         } = options;
-        this.hasWiki = content.trim().substring(0, WIKI_DESCRIM.length) === WIKI_DESCRIM;
         this.content = content;
-        if (this.hasWiki) {
-            this.wiki = this.content.trim().substring(WIKI_DESCRIM.length);
-        }
         this.lock = lock;
         this.sticky = sticky;
         this.distinguish = distinguish;
@@ -41,18 +30,10 @@ export class CommentAction extends Action {
     }
 
     async process(item: Comment | Submission, ruleResults: RuleResult[]): Promise<void> {
-        if (this.hasWiki && (this.wikiFetched === undefined || Math.abs(dayjs().diff(this.wikiFetched, 'minute')) > 5)) {
-            try {
-                const wiki = item.subreddit.getWikiPage(this.wiki as string);
-                this.content = await wiki.content_md;
-                this.wikiFetched = dayjs();
-            } catch (err) {
-                this.logger.error(`Could not read wiki page. Please ensure the page '${this.wiki}' exists and is readable`, err);
-                throw new LoggedError(`Could not read wiki page. Please ensure the page '${this.wiki}' exists and is readable`);
-            }
-        }
+        const content = await this.cache.getContent(this.content, item.subreddit);
+        const renderedContent = await renderContent(content, item, ruleResults);
         // @ts-ignore
-        const reply: Comment = await item.reply(renderContent(this.content, item, ruleResults));
+        const reply: Comment = await item.reply(he.decode(renderedContent));
         if (this.lock) {
             if(item instanceof Submission) {
                 // @ts-ignore

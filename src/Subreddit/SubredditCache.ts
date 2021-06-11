@@ -10,10 +10,11 @@ import {
 import Subreddit from 'snoowrap/dist/objects/Subreddit';
 import winston, {Logger} from "winston";
 import {mergeArr} from "../util";
-import {WIKI_DESCRIM} from "../Action/CommentAction";
 import LoggedError from "../Utils/LoggedError";
 import {SubredditCacheConfig} from "../Common/interfaces";
 import {AuthorCriteria} from "../Rule";
+
+export const WIKI_DESCRIM = 'wiki:';
 
 export interface SubredditCacheOptions extends SubredditCacheConfig {
     enabled: boolean;
