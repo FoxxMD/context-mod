@@ -1,5 +1,5 @@
 import {Logger} from "winston";
-import {createAjvFactory, mergeArr} from "./util";
+import {createAjvFactory, mergeArr, normalizeName} from "./util";
 import {CommentCheck} from "./Check/CommentCheck";
 import {SubmissionCheck} from "./Check/SubmissionCheck";
 
@@ -90,7 +90,7 @@ export const extractNamedRules = (rules: Array<RuleSetJson | RuleJson>, namedRul
             }
             for (const rule of rulesToAdd) {
                 const name = rule.name as string;
-                const normalName = name.toLowerCase();
+                const normalName = normalizeName(name);
                 const {name: n, ...rest} = rule;
                 const ruleNoName = {...rest};
 

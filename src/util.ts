@@ -301,3 +301,7 @@ export function activityWindowText(activities: (Submission | Comment)[], suffix 
 
     return dayjs.duration(dayjs(activities[0].created_utc * 1000).diff(dayjs(activities[activities.length - 1].created_utc * 1000))).humanize(suffix);
 }
+
+export function normalizeName(val: string) {
+    return val.trim().replace(/\W+/g, '').toLowerCase()
+}

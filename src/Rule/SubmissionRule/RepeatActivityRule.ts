@@ -1,7 +1,7 @@
 import {SubmissionRule, SubmissionRuleJSONConfig} from "./index";
 import {RuleOptions, RuleResult} from "../index";
 import {Comment} from "snoowrap";
-import {parseUsableLinkIdentifier as linkParser} from "../../util";
+import {activityWindowText, parseUsableLinkIdentifier as linkParser} from "../../util";
 import {ActivityWindow, ActivityWindowType, ReferenceSubmission} from "../../Common/interfaces";
 import Submission from "snoowrap/dist/objects/Submission";
 import dayjs from "dayjs";
@@ -170,6 +170,7 @@ export class RepeatActivityRule extends SubmissionRule {
             return Promise.resolve([true, [this.getResult(true, {
                 result,
                 data: {
+                    window: typeof this.window === 'number' ? `${activities.length} Items` : activityWindowText(activities),
                     totalTriggeringSets: triggeringSummaries.length,
                     largestRepeat,
                     threshold: this.threshold,

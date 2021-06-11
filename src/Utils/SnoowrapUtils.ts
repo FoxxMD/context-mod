@@ -6,7 +6,7 @@ import Mustache from "mustache";
 import he from "he";
 import {AuthorOptions, AuthorCriteria, RuleResult} from "../Rule";
 import {ActivityWindowCriteria, ActivityWindowType} from "../Common/interfaces";
-import {truncateStringToLength} from "../util";
+import {normalizeName, truncateStringToLength} from "../util";
 
 export interface AuthorTypedActivitiesOptions extends AuthorActivitiesOptions {
     type?: 'comment' | 'submission',
@@ -122,7 +122,7 @@ export const renderContent = async (content: string, data: (Submission | Comment
         } = ruleResult;
         // remove all non-alphanumeric characters (spaces, dashes, underscore) and set to lowercase
         // we will set this as the rule property name to make it easy to access results from mustache template
-        const normalName = name.trim().replace(/\W+/g, '').toLowerCase()
+        const normalName = normalizeName(name);
         return {
             ...acc, [normalName]: {
                 kind,
