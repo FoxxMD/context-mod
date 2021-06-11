@@ -7,7 +7,7 @@ import {RuleResult} from "../Rule";
 
 // https://www.reddit.com/dev/api/oauth#POST_api_report
 // denotes 100 characters maximum
-// const reportTrunc = truncateStringToLength(100);
+const reportTrunc = truncateStringToLength(100);
 // actually only applies to VISIBLE text on OLD reddit... on old reddit rest of text is visible on hover. on new reddit the whole thing displays (up to at least 400 characters)
 
 export class ReportAction extends Action {
@@ -25,9 +25,9 @@ export class ReportAction extends Action {
     async process(item: Comment | Submission, ruleResults: RuleResult[]): Promise<void> {
         const content = await this.cache.getContent(this.content, item.subreddit);
         const renderedContent = await renderContent(content, item, ruleResults);
-        //const truncatedContent = reportTrunc(renderedContent);
+        const truncatedContent = reportTrunc(renderedContent);
         // @ts-ignore
-        await item.report({reason: renderedContent});
+        await item.report({reason: truncatedContent});
     }
 }
 
