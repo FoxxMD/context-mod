@@ -10,7 +10,7 @@ This directory contains example of valid, ready-to-go configurations for Context
 
 #### Get the raw contents of the configuration
 
-* In a new tab open the github page for the configuration you want ([example](https://github.com/FoxxMD/reddit-context-bot/blob/master/src/Schema/Action.json))
+* In a new tab open the github page for the configuration you want ([example](/examples/repeatActivity/crosspostSpamming.json5))
 * Click the **Raw** button...keep this tab open and move on to the next step
 
 #### Edit your wiki configuration
