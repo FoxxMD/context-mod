@@ -15,6 +15,8 @@ const snooLogWrapper = (logger: Logger) => {
     return {
         warn: (...args: any[]) => logger.warn(args.slice(0, 2).join(' '), [args.slice(2)]),
         debug: (...args: any[]) => logger.debug(args.slice(0, 2).join(' '), [args.slice(2)]),
+        info: (...args: any[]) => logger.info(args.slice(0, 2).join(' '), [args.slice(2)]),
+        trace: (...args: any[]) => logger.debug(args.slice(0, 2).join(' '), [args.slice(2)]),
     }
 }
 
@@ -121,19 +123,12 @@ export class App {
             accessToken,
         };
 
-        let shouldDebug = parseBool(snooDebug);
-        let snooLogger;
-        if (shouldDebug) {
-            const clogger = this.logger.child({labels: ['Snoowrap']});
-            snooLogger = snooLogWrapper(clogger);
-        }
         this.client = new snoowrap(creds);
         this.client.config({
             warnings: true,
             maxRetryAttempts: 5,
-            debug: shouldDebug,
-            // @ts-ignore
-            logger: snooLogger,
+            debug: parseBool(snooDebug),
+            logger: snooLogWrapper(this.logger.child({labels: ['Snoowrap']})),
             continueAfterRatelimitError: true,
         });
     }
