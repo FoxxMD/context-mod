@@ -164,10 +164,12 @@ export interface AuthorCriteria {
     name?: string[],
     /**
      * A list of (user) flair css class values from the subreddit to match against
+     * @examples ["red"]
      * */
     flairCssClass?: string[],
     /**
      * A list of (user) flair text values from the subreddit to match against
+     * @examples ["Approved"]
      * */
     flairText?: string[],
     /**
@@ -184,6 +186,7 @@ export interface IRule {
      *
      * name is used to reference Rule result data during Action content templating. See CommentAction or ReportAction for more details.
      * @pattern ^[a-zA-Z]([\w -]*[\w])?$
+     * @examples ["myNewRule"]
      * */
     name?: string
     /**
@@ -195,6 +198,7 @@ export interface IRule {
 export interface RuleJSONConfig extends IRule {
     /**
      * The kind of rule to run
+     * @examples ["recentActivity", "repeatActivity", "author", "attribution", "history"]
      */
     kind: 'recentActivity' | 'repeatActivity' | 'author' | 'attribution' | 'history'
 }

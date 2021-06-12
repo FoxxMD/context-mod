@@ -12,5 +12,5 @@ import {HistoryJSONConfig} from "../Rule/HistoryRule";
 export type RuleJson = RecentActivityRuleJSONConfig | RepeatActivityJSONConfig | AuthorRuleJSONConfig | AttributionJSONConfig | HistoryJSONConfig | string;
 export type RuleObjectJson = Exclude<RuleJson, string>
 
-export type ActionJson = FlairActionJson | CommentActionJson | ReportActionJson | LockActionJson | RemoveActionJson | string;
+export type ActionJson = CommentActionJson | FlairActionJson | ReportActionJson | LockActionJson | RemoveActionJson | string;
 export type ActionObjectJson = Exclude<ActionJson, string>;

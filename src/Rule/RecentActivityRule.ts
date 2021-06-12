@@ -165,11 +165,13 @@ export interface SubThreshold extends SubredditCriteria {
     /**
      * The number of activities in each subreddit from the list that will trigger this rule
      * @minimum 1
+     * @examples [1]
      * */
     count?: number,
     /**
      * The total number of activities across all listed subreddits that will trigger this rule
      * @minimum 1
+     * @examples [1]
      * */
     totalCount?: number
 }
@@ -177,6 +179,7 @@ export interface SubThreshold extends SubredditCriteria {
 interface RecentActivityConfig extends ActivityWindow, ReferenceSubmission {
     /**
      * If present restricts the activities that are considered for count from SubThreshold
+     * @examples ["submissions","comments"]
      * */
     lookAt?: 'comments' | 'submissions',
     /**
@@ -201,6 +204,9 @@ export interface RecentActivityRuleOptions extends RecentActivityConfig, RuleOpt
  * ```
  * */
 export interface RecentActivityRuleJSONConfig extends RecentActivityConfig, RuleJSONConfig {
+    /**
+     * @examples ["recentActivity"]
+     * */
     kind: 'recentActivity'
 }
 

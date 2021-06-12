@@ -14,6 +14,7 @@ export type Duration = ISO8601 | DurationObject;
 export interface ActivityWindowCriteria {
     /**
      * The number of activities (submission/comments) to consider
+     * @examples [15]
      * */
     count?: number,
     /**
@@ -37,12 +38,33 @@ export interface ActivityWindowCriteria {
  * @additionalProperties false
  * */
 export interface DurationObject {
+    /**
+     * @examples [15]
+     * */
     seconds?: number
+    /**
+     * @examples [50]
+     * */
     minutes?: number
+    /**
+     * @examples [4]
+     * */
     hours?: number
+    /**
+     * @examples [7]
+     * */
     days?: number
+    /**
+     * @examples [2]
+     * */
     weeks?: number
+    /**
+     * @examples [3]
+     * */
     months?: number
+    /**
+     * @examples [0]
+     * */
     years?: number
 }
 
@@ -100,7 +122,7 @@ export interface RichContent {
      *
      * EX "this is **bold** markdown text"
      *
-     * @examples ["this is plain text", "this is **bold** markdown text", "wiki:botconfig/acomment" ]
+     * @examples ["This is the content of a comment/report", "this is **bold** markdown text", "wiki:botconfig/acomment" ]
      * */
     content: string,
 }
@@ -115,7 +137,14 @@ export interface RichContent {
 export type SubredditList = string[];
 
 export interface SubredditCriteria {
-    subreddits: SubredditList
+    /**
+     * A list of subreddits (case-insensitive) to look for. Do not include "r/" prefix.
+     *
+     * EX to match against /r/mealtimevideos and /r/askscience use ["mealtimevideos","askscience"]
+     * @examples [["mealtimevideos","askscience"]]
+     * @minItems 2
+     * */
+    subreddits: string[]
 }
 
 export type JoinOperands = 'OR' | 'AND';
@@ -129,6 +158,7 @@ export interface JoinCondition {
      * If `AND` then **all** `Rule` objects must be triggered to result in success.
      *
      * @default "AND"
+     * @examples ["AND"]
      * */
     condition?: JoinOperands,
 }
@@ -144,12 +174,14 @@ export interface PollingOptions {
         /**
          * The number of submissions to pull from /r/subreddit/new on every request
          * @default 10
+         * @examples [10]
          * */
         limit?: number,
         /**
          * Amount of time, in milliseconds, to wait between requests to /r/subreddit/new
          *
          * @default 10000
+         * @examples [10000]
          * */
         interval?: number,
     },
@@ -160,12 +192,14 @@ export interface PollingOptions {
         /**
          * The number of new comments to pull on every request
          * @default 10
+         * @examples [10]
          * */
         limit?: number,
         /**
          * Amount of time, in milliseconds, to wait between requests for new comments
          *
          * @default 10000
+         * @examples [10000]
          * */
         interval?: number,
     }
@@ -174,14 +208,22 @@ export interface PollingOptions {
 export interface SubredditCacheConfig {
     /**
      * Amount of time, in milliseconds, author activities (Comments/Submission) should be cached
+     * @examples [10000]
      * */
     authorTTL?: number;
+    /**
+     * Amount of time, in milliseconds, wiki content pages should be cached
+     * @examples [100000]
+     * */
     wikiTTL?: number;
 }
 
 export interface ManagerOptions {
     polling?: PollingOptions
 
+    /**
+     * Per-subreddit config for caching TTL values. If set to `false` caching is disabled.
+     * */
     caching?: false | SubredditCacheConfig
 
     /**
@@ -200,8 +242,12 @@ export interface ThresholdCriteria {
      * * If `threshold` is a `string` with percentage (EX `40%`) then it is the percentage of the total this item must reach to trigger
      *
      * @default 10%
+     * @examples ["10%", 15]
      * */
     threshold: number | string
 
+    /**
+     * @examples [">",">=","<","<="]
+     * */
     condition: '>' | '>=' | '<' | '<='
 }

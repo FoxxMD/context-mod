@@ -8,6 +8,9 @@
             "properties": {
                 "count": {
                     "description": "The number of activities (submission/comments) to consider",
+                    "examples": [
+                        15
+                    ],
                     "type": "number"
                 },
                 "duration": {
@@ -157,6 +160,9 @@
                 },
                 "name": {
                     "description": "An optional, but highly recommended, friendly name for this rule. If not present will default to `kind`.\n\nCan only contain letters, numbers, underscore, spaces, and dashes\n\nname is used to reference Rule result data during Action content templating. See CommentAction or ReportAction for more details.",
+                    "examples": [
+                        "myNewRule"
+                    ],
                     "pattern": "^[a-zA-Z]([\\w -]*[\\w])?$",
                     "type": "string"
                 },
@@ -178,6 +184,9 @@
             "properties": {
                 "flairCssClass": {
                     "description": "A list of (user) flair css class values from the subreddit to match against",
+                    "examples": [
+                        "red"
+                    ],
                     "items": {
                         "type": "string"
                     },
@@ -185,6 +194,9 @@
                 },
                 "flairText": {
                     "description": "A list of (user) flair text values from the subreddit to match against",
+                    "examples": [
+                        "Approved"
+                    ],
                     "items": {
                         "type": "string"
                     },
@@ -239,6 +251,9 @@
                 },
                 "name": {
                     "description": "An optional, but highly recommended, friendly name for this rule. If not present will default to `kind`.\n\nCan only contain letters, numbers, underscore, spaces, and dashes\n\nname is used to reference Rule result data during Action content templating. See CommentAction or ReportAction for more details.",
+                    "examples": [
+                        "myNewRule"
+                    ],
                     "pattern": "^[a-zA-Z]([\\w -]*[\\w])?$",
                     "type": "string"
                 }
@@ -263,11 +278,21 @@
                         ">",
                         ">="
                     ],
+                    "examples": [
+                        ">",
+                        ">=",
+                        "<",
+                        "<="
+                    ],
                     "type": "string"
                 },
                 "threshold": {
                     "default": "10%",
                     "description": "The number or percentage to trigger this criteria at\n\n* If `threshold` is a `number` then it is the absolute number of items to trigger at\n* If `threshold` is a `string` with percentage (EX `40%`) then it is the percentage of the total this item must reach to trigger",
+                    "examples": [
+                        "10%",
+                        15
+                    ],
                     "type": [
                         "string",
                         "number"
@@ -286,24 +311,45 @@
             "minProperties": 1,
             "properties": {
                 "days": {
+                    "examples": [
+                        7
+                    ],
                     "type": "number"
                 },
                 "hours": {
+                    "examples": [
+                        4
+                    ],
                     "type": "number"
                 },
                 "minutes": {
+                    "examples": [
+                        50
+                    ],
                     "type": "number"
                 },
                 "months": {
+                    "examples": [
+                        3
+                    ],
                     "type": "number"
                 },
                 "seconds": {
+                    "examples": [
+                        15
+                    ],
                     "type": "number"
                 },
                 "weeks": {
+                    "examples": [
+                        2
+                    ],
                     "type": "number"
                 },
                 "years": {
+                    "examples": [
+                        0
+                    ],
                     "type": "number"
                 }
             },
@@ -407,6 +453,9 @@
                 },
                 "name": {
                     "description": "An optional, but highly recommended, friendly name for this rule. If not present will default to `kind`.\n\nCan only contain letters, numbers, underscore, spaces, and dashes\n\nname is used to reference Rule result data during Action content templating. See CommentAction or ReportAction for more details.",
+                    "examples": [
+                        "myNewRule"
+                    ],
                     "pattern": "^[a-zA-Z]([\\w -]*[\\w])?$",
                     "type": "string"
                 }
@@ -431,6 +480,9 @@
                     "enum": [
                         "recentActivity"
                     ],
+                    "examples": [
+                        "recentActivity"
+                    ],
                     "type": "string"
                 },
                 "lookAt": {
@@ -439,10 +491,17 @@
                         "comments",
                         "submissions"
                     ],
+                    "examples": [
+                        "submissions",
+                        "comments"
+                    ],
                     "type": "string"
                 },
                 "name": {
                     "description": "An optional, but highly recommended, friendly name for this rule. If not present will default to `kind`.\n\nCan only contain letters, numbers, underscore, spaces, and dashes\n\nname is used to reference Rule result data during Action content templating. See CommentAction or ReportAction for more details.",
+                    "examples": [
+                        "myNewRule"
+                    ],
                     "pattern": "^[a-zA-Z]([\\w -]*[\\w])?$",
                     "type": "string"
                 },
@@ -557,6 +616,9 @@
                 },
                 "name": {
                     "description": "An optional, but highly recommended, friendly name for this rule. If not present will default to `kind`.\n\nCan only contain letters, numbers, underscore, spaces, and dashes\n\nname is used to reference Rule result data during Action content templating. See CommentAction or ReportAction for more details.",
+                    "examples": [
+                        "myNewRule"
+                    ],
                     "pattern": "^[a-zA-Z]([\\w -]*[\\w])?$",
                     "type": "string"
                 },
@@ -619,23 +681,31 @@
             "properties": {
                 "count": {
                     "description": "The number of activities in each subreddit from the list that will trigger this rule",
+                    "examples": [
+                        1
+                    ],
                     "minimum": 1,
                     "type": "number"
                 },
                 "subreddits": {
                     "description": "A list of subreddits (case-insensitive) to look for. Do not include \"r/\" prefix.\n\nEX to match against /r/mealtimevideos and /r/askscience use [\"mealtimevideos\",\"askscience\"]",
                     "examples": [
-                        "mealtimevideos",
-                        "askscience"
+                        [
+                            "mealtimevideos",
+                            "askscience"
+                        ]
                     ],
                     "items": {
                         "type": "string"
                     },
-                    "minItems": 1,
+                    "minItems": 2,
                     "type": "array"
                 },
                 "totalCount": {
                     "description": "The total number of activities across all listed subreddits that will trigger this rule",
+                    "examples": [
+                        1
+                    ],
                     "minimum": 1,
                     "type": "number"
                 }
@@ -654,11 +724,21 @@
                         ">",
                         ">="
                     ],
+                    "examples": [
+                        ">",
+                        ">=",
+                        "<",
+                        "<="
+                    ],
                     "type": "string"
                 },
                 "threshold": {
                     "default": "10%",
                     "description": "The number or percentage to trigger this criteria at\n\n* If `threshold` is a `number` then it is the absolute number of items to trigger at\n* If `threshold` is a `string` with percentage (EX `40%`) then it is the percentage of the total this item must reach to trigger",
+                    "examples": [
+                        "10%",
+                        15
+                    ],
                     "type": [
                         "string",
                         "number"
@@ -680,6 +760,9 @@
             "enum": [
                 "AND",
                 "OR"
+            ],
+            "examples": [
+                "AND"
             ],
             "type": "string"
         },

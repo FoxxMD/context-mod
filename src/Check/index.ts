@@ -133,14 +133,16 @@ export interface ICheck extends JoinCondition {
      * Can only contain letters, numbers, underscore, spaces, and dashes
      *
      * @pattern ^[a-zA-Z]([\w -]*[\w])?$
+     * @examples ["myNewCheck"]
      * */
     name: string,
+    /**
+     * @examples ["A short description of what this check looks for and actions it performs"]
+     * */
     description?: string,
 
     /**
      * Use this option to override the `dryRun` setting for all of its `Actions`
-     *
-     * @default undefined
      * */
     dryRun?: boolean;
 }
@@ -155,6 +157,7 @@ export interface CheckOptions extends ICheck {
 export interface CheckJson extends ICheck {
     /**
      * The type of event (new submission or new comment) this check should be run against
+     * @examples ["submission", "comment"]
      */
     kind: 'submission' | 'comment'
     /**

@@ -8,6 +8,9 @@
             "properties": {
                 "count": {
                     "description": "The number of activities (submission/comments) to consider",
+                    "examples": [
+                        15
+                    ],
                     "type": "number"
                 },
                 "duration": {
@@ -157,6 +160,9 @@
                 },
                 "name": {
                     "description": "An optional, but highly recommended, friendly name for this rule. If not present will default to `kind`.\n\nCan only contain letters, numbers, underscore, spaces, and dashes\n\nname is used to reference Rule result data during Action content templating. See CommentAction or ReportAction for more details.",
+                    "examples": [
+                        "myNewRule"
+                    ],
                     "pattern": "^[a-zA-Z]([\\w -]*[\\w])?$",
                     "type": "string"
                 },
@@ -178,6 +184,9 @@
             "properties": {
                 "flairCssClass": {
                     "description": "A list of (user) flair css class values from the subreddit to match against",
+                    "examples": [
+                        "red"
+                    ],
                     "items": {
                         "type": "string"
                     },
@@ -185,6 +194,9 @@
                 },
                 "flairText": {
                     "description": "A list of (user) flair text values from the subreddit to match against",
+                    "examples": [
+                        "Approved"
+                    ],
                     "items": {
                         "type": "string"
                     },
@@ -239,6 +251,9 @@
                 },
                 "name": {
                     "description": "An optional, but highly recommended, friendly name for this rule. If not present will default to `kind`.\n\nCan only contain letters, numbers, underscore, spaces, and dashes\n\nname is used to reference Rule result data during Action content templating. See CommentAction or ReportAction for more details.",
+                    "examples": [
+                        "myNewRule"
+                    ],
                     "pattern": "^[a-zA-Z]([\\w -]*[\\w])?$",
                     "type": "string"
                 }
@@ -286,13 +301,18 @@
                         "AND",
                         "OR"
                     ],
+                    "examples": [
+                        "AND"
+                    ],
                     "type": "string"
                 },
                 "description": {
+                    "examples": [
+                        "A short description of what this check looks for and actions it performs"
+                    ],
                     "type": "string"
                 },
                 "dryRun": {
-                    "default": "undefined",
                     "description": "Use this option to override the `dryRun` setting for all of its `Actions`",
                     "type": "boolean"
                 },
@@ -302,10 +322,17 @@
                         "comment",
                         "submission"
                     ],
+                    "examples": [
+                        "submission",
+                        "comment"
+                    ],
                     "type": "string"
                 },
                 "name": {
                     "description": "Friendly name for this Check EX \"crosspostSpamCheck\"\n\nCan only contain letters, numbers, underscore, spaces, and dashes",
+                    "examples": [
+                        "myNewCheck"
+                    ],
                     "pattern": "^[a-zA-Z]([\\w -]*[\\w])?$",
                     "type": "string"
                 },
@@ -354,7 +381,7 @@
                 "content": {
                     "description": "The Content to submit for this Action. Content is interpreted as reddit-flavored Markdown.\n\nIf value starts with 'wiki:' then the proceeding value will be used to get a wiki page\n\nEX \"wiki:botconfig/mybot\" tries to get https://reddit.com/mySubredditExample/wiki/botconfig/mybot\n\nEX \"this is plain text\"\n\nEX \"this is **bold** markdown text\"",
                     "examples": [
-                        "this is plain text",
+                        "This is the content of a comment/report",
                         "this is **bold** markdown text",
                         "wiki:botconfig/acomment"
                     ],
@@ -413,11 +440,21 @@
                         ">",
                         ">="
                     ],
+                    "examples": [
+                        ">",
+                        ">=",
+                        "<",
+                        "<="
+                    ],
                     "type": "string"
                 },
                 "threshold": {
                     "default": "10%",
                     "description": "The number or percentage to trigger this criteria at\n\n* If `threshold` is a `number` then it is the absolute number of items to trigger at\n* If `threshold` is a `string` with percentage (EX `40%`) then it is the percentage of the total this item must reach to trigger",
+                    "examples": [
+                        "10%",
+                        15
+                    ],
                     "type": [
                         "string",
                         "number"
@@ -436,24 +473,45 @@
             "minProperties": 1,
             "properties": {
                 "days": {
+                    "examples": [
+                        7
+                    ],
                     "type": "number"
                 },
                 "hours": {
+                    "examples": [
+                        4
+                    ],
                     "type": "number"
                 },
                 "minutes": {
+                    "examples": [
+                        50
+                    ],
                     "type": "number"
                 },
                 "months": {
+                    "examples": [
+                        3
+                    ],
                     "type": "number"
                 },
                 "seconds": {
+                    "examples": [
+                        15
+                    ],
                     "type": "number"
                 },
                 "weeks": {
+                    "examples": [
+                        2
+                    ],
                     "type": "number"
                 },
                 "years": {
+                    "examples": [
+                        0
+                    ],
                     "type": "number"
                 }
             },
@@ -595,6 +653,9 @@
                 },
                 "name": {
                     "description": "An optional, but highly recommended, friendly name for this rule. If not present will default to `kind`.\n\nCan only contain letters, numbers, underscore, spaces, and dashes\n\nname is used to reference Rule result data during Action content templating. See CommentAction or ReportAction for more details.",
+                    "examples": [
+                        "myNewRule"
+                    ],
                     "pattern": "^[a-zA-Z]([\\w -]*[\\w])?$",
                     "type": "string"
                 }
@@ -644,11 +705,17 @@
                         "interval": {
                             "default": 10000,
                             "description": "Amount of time, in milliseconds, to wait between requests for new comments",
+                            "examples": [
+                                10000
+                            ],
                             "type": "number"
                         },
                         "limit": {
                             "default": 10,
                             "description": "The number of new comments to pull on every request",
+                            "examples": [
+                                10
+                            ],
                             "type": "number"
                         }
                     },
@@ -660,11 +727,17 @@
                         "interval": {
                             "default": 10000,
                             "description": "Amount of time, in milliseconds, to wait between requests to /r/subreddit/new",
+                            "examples": [
+                                10000
+                            ],
                             "type": "number"
                         },
                         "limit": {
                             "default": 10,
                             "description": "The number of submissions to pull from /r/subreddit/new on every request",
+                            "examples": [
+                                10
+                            ],
                             "type": "number"
                         }
                     },
@@ -687,6 +760,9 @@
                     "enum": [
                         "recentActivity"
                     ],
+                    "examples": [
+                        "recentActivity"
+                    ],
                     "type": "string"
                 },
                 "lookAt": {
@@ -695,10 +771,17 @@
                         "comments",
                         "submissions"
                     ],
+                    "examples": [
+                        "submissions",
+                        "comments"
+                    ],
                     "type": "string"
                 },
                 "name": {
                     "description": "An optional, but highly recommended, friendly name for this rule. If not present will default to `kind`.\n\nCan only contain letters, numbers, underscore, spaces, and dashes\n\nname is used to reference Rule result data during Action content templating. See CommentAction or ReportAction for more details.",
+                    "examples": [
+                        "myNewRule"
+                    ],
                     "pattern": "^[a-zA-Z]([\\w -]*[\\w])?$",
                     "type": "string"
                 },
@@ -718,10 +801,10 @@
                 "window": {
                     "anyOf": [
                         {
-                            "$ref": "#/definitions/DurationObject"
+                            "$ref": "#/definitions/ActivityWindowCriteria"
                         },
                         {
-                            "$ref": "#/definitions/ActivityWindowCriteria"
+                            "$ref": "#/definitions/DurationObject"
                         },
                         {
                             "type": [
@@ -843,6 +926,9 @@
                 },
                 "name": {
                     "description": "An optional, but highly recommended, friendly name for this rule. If not present will default to `kind`.\n\nCan only contain letters, numbers, underscore, spaces, and dashes\n\nname is used to reference Rule result data during Action content templating. See CommentAction or ReportAction for more details.",
+                    "examples": [
+                        "myNewRule"
+                    ],
                     "pattern": "^[a-zA-Z]([\\w -]*[\\w])?$",
                     "type": "string"
                 },
@@ -943,6 +1029,9 @@
                         "AND",
                         "OR"
                     ],
+                    "examples": [
+                        "AND"
+                    ],
                     "type": "string"
                 },
                 "rules": {
@@ -985,23 +1074,31 @@
             "properties": {
                 "count": {
                     "description": "The number of activities in each subreddit from the list that will trigger this rule",
+                    "examples": [
+                        1
+                    ],
                     "minimum": 1,
                     "type": "number"
                 },
                 "subreddits": {
                     "description": "A list of subreddits (case-insensitive) to look for. Do not include \"r/\" prefix.\n\nEX to match against /r/mealtimevideos and /r/askscience use [\"mealtimevideos\",\"askscience\"]",
                     "examples": [
-                        "mealtimevideos",
-                        "askscience"
+                        [
+                            "mealtimevideos",
+                            "askscience"
+                        ]
                     ],
                     "items": {
                         "type": "string"
                     },
-                    "minItems": 1,
+                    "minItems": 2,
                     "type": "array"
                 },
                 "totalCount": {
                     "description": "The total number of activities across all listed subreddits that will trigger this rule",
+                    "examples": [
+                        1
+                    ],
                     "minimum": 1,
                     "type": "number"
                 }
@@ -1015,9 +1112,16 @@
             "properties": {
                 "authorTTL": {
                     "description": "Amount of time, in milliseconds, author activities (Comments/Submission) should be cached",
+                    "examples": [
+                        10000
+                    ],
                     "type": "number"
                 },
                 "wikiTTL": {
+                    "description": "Amount of time, in milliseconds, wiki content pages should be cached",
+                    "examples": [
+                        100000
+                    ],
                     "type": "number"
                 }
             },
@@ -1032,11 +1136,21 @@
                         ">",
                         ">="
                     ],
+                    "examples": [
+                        ">",
+                        ">=",
+                        "<",
+                        "<="
+                    ],
                     "type": "string"
                 },
                 "threshold": {
                     "default": "10%",
                     "description": "The number or percentage to trigger this criteria at\n\n* If `threshold` is a `number` then it is the absolute number of items to trigger at\n* If `threshold` is a `string` with percentage (EX `40%`) then it is the percentage of the total this item must reach to trigger",
+                    "examples": [
+                        "10%",
+                        15
+                    ],
                     "type": [
                         "string",
                         "number"
@@ -1062,7 +1176,8 @@
                     ],
                     "type": "boolean"
                 }
-            ]
+            ],
+            "description": "Per-subreddit config for caching TTL values. If set to `false` caching is disabled."
         },
         "checks": {
             "description": "A list of all the checks that should be run for a subreddit.\n\nChecks are split into two lists -- submission or comment -- based on kind and run independently.\n\nChecks in each list are run in the order found in the configuration.\n\nWhen a check \"passes\", and actions are performed, then all subsequent checks are skipped.",
