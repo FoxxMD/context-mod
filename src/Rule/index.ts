@@ -73,7 +73,7 @@ export abstract class Rule implements IRule, Triggerable {
                 }
             }
             this.logger.verbose('Inclusive author criteria not matched, rule running skipped');
-            return Promise.resolve([false, [this.getResult(null, {result: 'Inclusive author criteria not matched, rule running skipped'})]]);
+            return Promise.resolve([null, [this.getResult(null, {result: 'Inclusive author criteria not matched, rule running skipped'})]]);
         }
         if (this.authors.exclude !== undefined && this.authors.exclude.length > 0) {
             for (const auth of this.authors.exclude) {
@@ -82,7 +82,7 @@ export abstract class Rule implements IRule, Triggerable {
                 }
             }
             this.logger.verbose('Exclusive author criteria not matched, rule running skipped');
-            return Promise.resolve([false, [this.getResult(null, {result: 'Exclusive author criteria not matched, rule running skipped'})]]);
+            return Promise.resolve([null, [this.getResult(null, {result: 'Exclusive author criteria not matched, rule running skipped'})]]);
         }
         return this.process(item);
     }
