@@ -79,7 +79,8 @@ export class RepeatActivityRule extends SubmissionRule {
     async process(item: Submission): Promise<[boolean, RuleResult[]]> {
         const referenceUrl = await item.url;
         if (referenceUrl === undefined && this.useSubmissionAsReference) {
-            throw new Error(`Cannot run Rule ${this.name} because submission is not a link`);
+            this.logger.warn(`Rule not triggered because useSubmissionAsReference=true but submission is not a link`);
+            return Promise.resolve([false, [this.getResult(false)]]);
         }
 
         let activities: (Submission | Comment)[] = [];
