@@ -188,6 +188,7 @@ Options:
 Commands:
   run                                          Runs bot normally
   check [options] <activityIdentifier> [type]  Run check(s) on a specific activity
+  unmoderated [options] <subreddits...>        Run checks on all unmoderated activity in the modqueue
   help [command]                               display help for command
 
 ```

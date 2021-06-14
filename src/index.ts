@@ -6,7 +6,7 @@ import dduration from 'dayjs/plugin/duration.js';
 import relTime from 'dayjs/plugin/relativeTime.js';
 import {Manager} from "./Subreddit/Manager";
 import {Command} from 'commander';
-import {getOptions} from "./Utils/CommandConfig";
+import {checks, getUniversalOptions, limit} from "./Utils/CommandConfig";
 import {App} from "./App";
 import Submission from "snoowrap/dist/objects/Submission";
 import {COMMENT_URL_ID, parseLinkIdentifier, SUBMISSION_URL_ID} from "./util";
@@ -19,7 +19,7 @@ const commentReg = parseLinkIdentifier([COMMENT_URL_ID]);
 const submissionReg = parseLinkIdentifier([SUBMISSION_URL_ID]);
 
 const program = new Command();
-for (const o of getOptions()) {
+for (const o of getUniversalOptions()) {
     program.addOption(o);
 }
 
@@ -41,7 +41,7 @@ for (const o of getOptions()) {
                 activityIdentifier: 'Either a permalink URL or the ID of the Comment or Submission',
                 type: `If activityIdentifier is not a permalink URL then the type of activity ('comment' or 'submission'). May also specify 'submission' type when using a permalink to a comment to get the Submission`,
             })
-            .option('-h, --checks <checkNames...>', 'An optional list of Checks, by name, that should be run. If none are specified all Checks for the Subreddit the Activity is in will be run')
+            .addOption(checks)
             .action(async (activityIdentifier, type, commandOptions = {}) => {
                 const {checks = []} = commandOptions;
                 const app = new App(program.opts());
@@ -90,6 +90,26 @@ for (const o of getOptions()) {
                 if (app.subManagers.length > 0) {
                     const manager = app.subManagers.find(x => x.subreddit.display_name === sub) as Manager;
                     await manager.runChecks(type === 'comment' ? 'Comment' : 'Submission', activity, checks);
+                }
+            });
+
+        program.command('unmoderated <subreddits...>')
+            .description('Run checks on all unmoderated activity in the modqueue', {
+                subreddits: 'The list of subreddits to run on. If not specified will run on all subreddits the account has moderation access to.'
+            })
+            .addOption(checks)
+            .addOption(limit)
+            .action(async (subreddits = [], commandOptions = {}) => {
+                const {checks = [], limit = 100} = commandOptions;
+                const app = new App(program.opts());
+
+                await app.buildManagers(subreddits);
+
+                for(const manager of app.subManagers) {
+                    const activities = await manager.subreddit.getUnmoderated({limit});
+                    for(const a of activities.reverse()) {
+                        await manager.runChecks(a instanceof Submission ? 'Submission' : 'Comment', a, checks);
+                    }
                 }
             });
 
