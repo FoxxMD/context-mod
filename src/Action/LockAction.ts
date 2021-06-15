@@ -8,14 +8,16 @@ export class LockAction extends Action {
         return 'Lock';
     }
 
-    async process(item: Comment|Submission, ruleResults: RuleResult[]): Promise<void> {
-        if (item instanceof Submission) {
-            if(!this.dryRun) {
-                // @ts-ignore
-                await item.lock();
-            }
-        } else {
-            this.logger.warn('Snoowrap does not support locking Comments');
+    async process(item: Comment | Submission, ruleResults: RuleResult[]): Promise<void> {
+        //snoowrap typing issue, thinks comments can't be locked
+        // @ts-ignore
+        if (item.locked) {
+            this.logger.warn('Item is already locked');
+        }
+        if (!this.dryRun) {
+            //snoowrap typing issue, thinks comments can't be locked
+            // @ts-ignore
+            await item.lock();
         }
     }
 }

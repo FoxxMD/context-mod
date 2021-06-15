@@ -8,8 +8,14 @@ export class RemoveAction extends Action {
         return 'Remove';
     }
 
-    async process(item: Comment|Submission, ruleResults: RuleResult[]): Promise<void> {
-        if(!this.dryRun) {
+    async process(item: Comment | Submission, ruleResults: RuleResult[]): Promise<void> {
+        // issue with snoowrap typings, doesn't think prop exists on Submission
+        // @ts-ignore
+        if (item.removed === true) {
+            this.logger.warn('Item is already removed');
+            return;
+        }
+        if (!this.dryRun) {
             // @ts-ignore
             await item.remove();
         }

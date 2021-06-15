@@ -33,16 +33,19 @@ export class CommentAction extends Action {
         const content = await this.resources.getContent(this.content, item.subreddit);
         const renderedContent = await renderContent(content, item, ruleResults);
         this.logger.verbose(`Contents:\r\n${renderedContent}`);
+
+        if(item.archived) {
+            this.logger.warn('Cannot comment because Item is archived');
+            return;
+        }
+
         // @ts-ignore
         const reply: Comment = await item.reply(renderedContent);
         if (this.lock) {
-            if(item instanceof Submission) {
-                if(!this.dryRun) {
-                    // @ts-ignore
-                    await item.lock();
-                }
-            } else {
-                this.logger.warn('Snoowrap does not support locking Comments');
+            if (!this.dryRun) {
+                // snoopwrap typing issue, thinks comments can't be locked
+                // @ts-ignore
+                await item.lock();
             }
         }
         if (this.distinguish && !this.dryRun) {
@@ -67,7 +70,7 @@ export interface CommentActionConfig extends RequiredRichContent {
     distinguish?: boolean,
 }
 
-export interface CommentActionOptions extends CommentActionConfig,ActionOptions {
+export interface CommentActionOptions extends CommentActionConfig, ActionOptions {
 }
 
 /**
