@@ -106,9 +106,6 @@ export class Manager {
         const [peek, _] = await itemContentPeek(item);
         this.logger.info(`<EVENT> ${peek}`);
 
-        const notes = await this.resources.userNotes.getUserNotes(item.author);
-        debugger;
-
         try {
             for (const check of checks) {
                 if (checkNames.length > 0 && !checkNames.map(x => x.toLowerCase()).some(x => x === check.name.toLowerCase())) {

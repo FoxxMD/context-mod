@@ -118,13 +118,44 @@ export class Author implements AuthorCriteria {
     flairCssClass?: string[];
     flairText?: string[];
     isMod?: boolean;
+    userNotes?: UserNoteCriteria[];
 
     constructor(options: AuthorCriteria) {
         this.name = options.name;
         this.flairCssClass = options.flairCssClass;
         this.flairText = options.flairText;
         this.isMod = options.isMod;
+        this.userNotes = options.userNotes;
     }
+}
+
+export interface UserNoteCriteria {
+    /**
+     * User Note type key
+     * @examples ["spamwarn"]
+     * */
+    type: string;
+    /**
+     * Number of occurrences of this type. Ignored if `search` is `current`
+     * @examples [1]
+     * @default 1
+     * */
+    count?: number;
+
+    /**
+     * * If `current` then only the most recent note is checked
+     * * If `consecutive` then `count` number of `type` notes must be found in a row, based on `order` direction
+     * * If `total` then `count` number of `type` must be found within all notes
+     * @examples ["current"]
+     * @default current
+     * */
+    search?: 'current' | 'consecutive' | 'total'
+    /**
+     * Time-based order to search Notes in for `consecutive` search
+     * @examples ["descending"]
+     * @default descending
+     * */
+    order?: 'ascending' | 'descending'
 }
 
 /**
@@ -175,6 +206,10 @@ export interface AuthorCriteria {
      * Is the author a moderator?
      * */
     isMod?: boolean,
+    /**
+     * A list of UserNote properties to check against the User Notes attached to this Author in this Subreddit (must have Toolbox enabled and used User Notes at least once)
+     * */
+    userNotes?: UserNoteCriteria[]
 }
 
 export interface IRule {

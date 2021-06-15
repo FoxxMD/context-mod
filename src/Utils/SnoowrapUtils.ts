@@ -1,12 +1,13 @@
 import Snoowrap, {Comment, RedditUser} from "snoowrap";
 import Submission from "snoowrap/dist/objects/Submission";
-import {Duration, DurationUnitsObjectType} from "dayjs/plugin/duration";
+import {Duration} from "dayjs/plugin/duration";
 import dayjs, {Dayjs} from "dayjs";
 import Mustache from "mustache";
 import he from "he";
-import {AuthorOptions, AuthorCriteria, RuleResult} from "../Rule";
-import {ActivityWindowCriteria, ActivityWindowType} from "../Common/interfaces";
+import {AuthorCriteria, RuleResult, UserNoteCriteria} from "../Rule";
+import {ActivityWindowType} from "../Common/interfaces";
 import {normalizeName, truncateStringToLength} from "../util";
+import UserNotes from "../Subreddit/UserNotes";
 
 export interface AuthorTypedActivitiesOptions extends AuthorActivitiesOptions {
     type?: 'comment' | 'submission',
@@ -72,7 +73,7 @@ export async function getAuthorActivities(user: RedditUser, options: AuthorTyped
                 // @ts-ignore
                 return window.isBefore(itemDate);
             });
-            if(truncatedItems.length !== listSlice.length) {
+            if (truncatedItems.length !== listSlice.length) {
                 hitEnd = true;
             }
             items = items.concat(truncatedItems);
@@ -83,7 +84,7 @@ export async function getAuthorActivities(user: RedditUser, options: AuthorTyped
         if (!hitEnd) {
             offset += chunkSize;
             listing = await listing.fetchMore({amount: chunkSize});
-        } else if(typeof window === 'number') {
+        } else if (typeof window === 'number') {
             items = listing.slice(0, window + 1);
         }
     }
@@ -136,62 +137,111 @@ export const renderContent = async (content: string, data: (Submission | Comment
     return he.decode(Mustache.render(content, {item: templateData, rules: normalizedRuleResults}));
 }
 
-export const testAuthorCriteria = async (item: (Comment|Submission), authorOpts: AuthorCriteria, include = true) => {
+export const testAuthorCriteria = async (item: (Comment | Submission), authorOpts: AuthorCriteria, include = true, userNotes: UserNotes) => {
     // @ts-ignore
     const author: RedditUser = await item.author;
-    for(const k of Object.keys(authorOpts)) {
-        switch(k) {
-            case 'name':
-               const authPass = () => {
-                   // @ts-ignore
-                   for (const n of authorOpts[k]) {
-                       if (n.toLowerCase() === author.name.toLowerCase()) {
-                          return true;
-                       }
-                   }
-                   return false;
-               }
-               if((include && !authPass) || (!include && authPass)) {
-                   return false;
-               }
-               break;
-            case 'flairCssClass':
-                const css = await item.author_flair_css_class;
-                const cssPass = () => {
-                    // @ts-ignore
-                    for(const c of authorOpts[k]) {
-                        if(c === css) {
-                            return;
+    for (const k of Object.keys(authorOpts)) {
+        // @ts-ignore
+        if (authorOpts[k] !== undefined) {
+            switch (k) {
+                case 'name':
+                    const authPass = () => {
+                        // @ts-ignore
+                        for (const n of authorOpts[k]) {
+                            if (n.toLowerCase() === author.name.toLowerCase()) {
+                                return true;
+                            }
                         }
+                        return false;
                     }
-                    return false;
-                }
-                if((include && !cssPass) || (!include && cssPass)) {
-                    return false;
-                }
-                break;
-            case 'flairText':
-                const text = await item.author_flair_text;
-                const textPass = () => {
-                    // @ts-ignore
-                    for(const c of authorOpts[k]) {
-                        if(c === text) {
-                            return
+                    const authResult = authPass();
+                    if ((include && !authResult) || (!include && authResult)) {
+                        return false;
+                    }
+                    break;
+                case 'flairCssClass':
+                    const css = await item.author_flair_css_class;
+                    const cssPass = () => {
+                        // @ts-ignore
+                        for (const c of authorOpts[k]) {
+                            if (c === css) {
+                                return;
+                            }
                         }
+                        return false;
                     }
-                    return false;
-                }
-                if((include && !textPass) || (!include && textPass)) {
-                    return false;
-                }
-                break;
-            case 'isMod':
-                const mods: RedditUser[] = await item.subreddit.getModerators();
-                const isModerator = mods.some(x => x.name === item.author.name);
-                const modMatch = authorOpts.isMod === isModerator;
-                if((include && !modMatch) || (!include && !modMatch)) {
-                    return false;
-                }
+                    const cssResult = cssPass();
+                    if ((include && !cssResult) || (!include && cssResult)) {
+                        return false;
+                    }
+                    break;
+                case 'flairText':
+                    const text = await item.author_flair_text;
+                    const textPass = () => {
+                        // @ts-ignore
+                        for (const c of authorOpts[k]) {
+                            if (c === text) {
+                                return
+                            }
+                        }
+                        return false;
+                    };
+                    const textResult = textPass();
+                    if ((include && !textResult) || (!include && textResult)) {
+                        return false;
+                    }
+                    break;
+                case 'isMod':
+                    const mods: RedditUser[] = await item.subreddit.getModerators();
+                    const isModerator = mods.some(x => x.name === item.author.name);
+                    const modMatch = authorOpts.isMod === isModerator;
+                    if ((include && !modMatch) || (!include && !modMatch)) {
+                        return false;
+                    }
+                    break;
+                case 'userNotes':
+                    const notes = await userNotes.getUserNotes(item.author);
+                    const notePass = () => {
+                        for (const noteCriteria of authorOpts[k] as UserNoteCriteria[]) {
+                            const {count = 1, order = 'descending', search = 'current', type} = noteCriteria;
+                            switch (search) {
+                                case 'current':
+                                    if (notes[notes.length - 1].noteType === type) {
+                                        return true;
+                                    }
+                                    break;
+                                case 'consecutive':
+                                    let orderedNotes = notes;
+                                    if (order === 'descending') {
+                                        orderedNotes = [...notes];
+                                        orderedNotes.reverse();
+                                    }
+                                    let currCount = 0;
+                                    for (const note of orderedNotes) {
+                                        if (note.noteType === type) {
+                                            currCount++;
+                                        } else {
+                                            currCount = 0;
+                                        }
+                                        if (currCount >= count) {
+                                            return true;
+                                        }
+                                    }
+                                    break;
+                                case 'total':
+                                    if (notes.filter(x => x.noteType === type).length >= count) {
+                                        return true;
+                                    }
+                            }
+                        }
+                        return false;
+                    }
+                    const noteResult = notePass();
+                    if ((include && !noteResult) || (!include && noteResult)) {
+                        return false;
+                    }
+                    break;
+            }
         }
     }
     return true;

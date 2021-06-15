@@ -82,6 +82,8 @@ export class UserNotes {
                 this.moderators = await this.subreddit.getModerators();
             }
             const notes = rawNotes.ns.map(x => UserNote.fromRaw(x, payload.constants, this.moderators as RedditUser[]));
+            // sort in ascending order by time
+            notes.sort((a, b) => a.time.isBefore(b.time) ? -1 : 1);
             if (this.notesTTL > 0) {
                 this.users.set(user.name, notes);
             }

@@ -148,7 +148,7 @@ export class SubredditResources {
             }
         }
 
-        const result = await testAuthorCriteria(item, authorOpts, include);
+        const result = await testAuthorCriteria(item, authorOpts, include, this.userNotes);
         if (useCache) {
             cache.put(hash, result, this.authorTTL);
         }

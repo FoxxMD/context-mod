@@ -216,6 +216,13 @@
                         "type": "string"
                     },
                     "type": "array"
+                },
+                "userNotes": {
+                    "description": "A list of UserNote properties to check against the User Notes attached to this Author in this Subreddit (must have Toolbox enabled and used User Notes at least once)",
+                    "items": {
+                        "$ref": "#/definitions/UserNoteCriteria"
+                    },
+                    "type": "array"
                 }
             },
             "type": "object"
@@ -748,6 +755,54 @@
             "required": [
                 "condition",
                 "threshold"
+            ],
+            "type": "object"
+        },
+        "UserNoteCriteria": {
+            "properties": {
+                "count": {
+                    "default": 1,
+                    "description": "Number of occurrences of this type. Ignored if `search` is `current`",
+                    "examples": [
+                        1
+                    ],
+                    "type": "number"
+                },
+                "order": {
+                    "default": "descending",
+                    "description": "Time-based order to search Notes in for `consecutive` search",
+                    "enum": [
+                        "ascending",
+                        "descending"
+                    ],
+                    "examples": [
+                        "descending"
+                    ],
+                    "type": "string"
+                },
+                "search": {
+                    "default": "current",
+                    "description": "* If `current` then only the most recent note is checked\n* If `consecutive` then `count` number of `type` notes must be found in a row, based on `order` direction\n* If `total` then `count` number of `type` must be found within all notes",
+                    "enum": [
+                        "consecutive",
+                        "current",
+                        "total"
+                    ],
+                    "examples": [
+                        "current"
+                    ],
+                    "type": "string"
+                },
+                "type": {
+                    "description": "User Note type key",
+                    "examples": [
+                        "spamwarn"
+                    ],
+                    "type": "string"
+                }
+            },
+            "required": [
+                "type"
             ],
             "type": "object"
         }
