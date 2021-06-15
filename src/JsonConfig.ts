@@ -1,4 +1,4 @@
-import {CheckJson} from "./Check";
+import {CheckJson, CommentCheckJson, SubmissionCheckJson} from "./Check";
 import {ManagerOptions} from "./Common/interfaces";
 
 export interface JSONConfig extends ManagerOptions {
@@ -12,5 +12,5 @@ export interface JSONConfig extends ManagerOptions {
      * When a check "passes", and actions are performed, then all subsequent checks are skipped.
      * @minItems 1
      * */
-    checks: CheckJson[]
+    checks: Array<SubmissionCheckJson|CommentCheckJson>
 }

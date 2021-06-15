@@ -5,9 +5,10 @@ import dayjs, {Dayjs} from "dayjs";
 import Mustache from "mustache";
 import he from "he";
 import {AuthorCriteria, RuleResult, UserNoteCriteria} from "../Rule";
-import {ActivityWindowType} from "../Common/interfaces";
+import {ActivityWindowType, CommentState, SubmissionState, TypedActivityStates} from "../Common/interfaces";
 import {normalizeName, truncateStringToLength} from "../util";
 import UserNotes from "../Subreddit/UserNotes";
+import {Logger} from "winston";
 
 export interface AuthorTypedActivitiesOptions extends AuthorActivitiesOptions {
     type?: 'comment' | 'submission',
@@ -309,4 +310,37 @@ export const getAttributionIdentifier = (sub: Submission, useParentMediaDomain =
     }
 
     return domain;
+}
+
+export const isItem = (item: Submission | Comment, stateCriteria: TypedActivityStates, logger: Logger): [boolean, SubmissionState|CommentState|undefined] => {
+    if (stateCriteria.length === 0) {
+        return [true, undefined];
+    }
+
+    const log = logger.child({leaf: 'Item Check'});
+
+    for (const crit of stateCriteria) {
+        const [pass, passCrit] = (() => {
+            for (const k of Object.keys(crit)) {
+                // @ts-ignore
+                if (crit[k] !== undefined) {
+                    // @ts-ignore
+                    if (item[k] !== undefined) {
+                        // @ts-ignore
+                        if (item[k] !== crit[k]) {
+                            return [false, crit];
+                        }
+                    } else {
+                        log.warn(`Tried to test for Item property '${k}' but it did not exist`);
+                    }
+                }
+            }
+            log.verbose(`itemIs passed: ${JSON.stringify(crit)}`);
+            return [true, crit];
+        })() as [boolean, SubmissionState|CommentState|undefined];
+        if (pass) {
+            return [true, passCrit];
+        }
+    }
+    return [false, undefined];
 }

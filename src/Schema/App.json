@@ -142,6 +142,23 @@
                     "description": "Include reddit `self.*` domains in aggregation?\n\nSelf-posts are aggregated under the domain `self.[subreddit]`. If you wish to include these domains in aggregation set this to `true`",
                     "type": "boolean"
                 },
+                "itemIs": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "$ref": "#/definitions/SubmissionState"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "items": {
+                                "$ref": "#/definitions/CommentState"
+                            },
+                            "type": "array"
+                        }
+                    ],
+                    "description": "A list of criteria to test the state of the `Activity` against before running the Rule.\n\nIf any set of criteria passes the Rule will be run. If the criteria fails then the Rule is skipped."
+                },
                 "kind": {
                     "description": "The kind of rule to run",
                     "enum": [
@@ -249,6 +266,23 @@
                     },
                     "type": "array"
                 },
+                "itemIs": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "$ref": "#/definitions/SubmissionState"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "items": {
+                                "$ref": "#/definitions/CommentState"
+                            },
+                            "type": "array"
+                        }
+                    ],
+                    "description": "A list of criteria to test the state of the `Activity` against before running the Rule.\n\nIf any set of criteria passes the Rule will be run. If the criteria fails then the Rule is skipped."
+                },
                 "kind": {
                     "description": "The kind of rule to run",
                     "enum": [
@@ -272,7 +306,55 @@
             ],
             "type": "object"
         },
-        "CheckJson": {
+        "CommentActionJson": {
+            "description": "Reply to the Activity. For a submission the reply will be a top-level comment.",
+            "properties": {
+                "content": {
+                    "description": "The Content to submit for this Action. Content is interpreted as reddit-flavored Markdown.\n\nIf value starts with 'wiki:' then the proceeding value will be used to get a wiki page\n\nEX \"wiki:botconfig/mybot\" tries to get https://reddit.com/mySubredditExample/wiki/botconfig/mybot\n\nEX \"this is plain text\"\n\nEX \"this is **bold** markdown text\"",
+                    "type": "string"
+                },
+                "distinguish": {
+                    "description": "Distinguish the comment after creation?",
+                    "type": "boolean"
+                },
+                "dryRun": {
+                    "default": false,
+                    "description": "If `true` the Action will not make the API request to Reddit to perform its action.",
+                    "type": "boolean"
+                },
+                "kind": {
+                    "description": "The type of action that will be performed",
+                    "enum": [
+                        "comment",
+                        "flair",
+                        "lock",
+                        "remove",
+                        "report",
+                        "usernote"
+                    ],
+                    "type": "string"
+                },
+                "lock": {
+                    "description": "Lock the comment after creation?",
+                    "type": "boolean"
+                },
+                "name": {
+                    "description": "An optional, but highly recommended, friendly name for this Action. If not present will default to `kind`.\n\nCan only contain letters, numbers, underscore, spaces, and dashes",
+                    "pattern": "^[a-zA-Z]([\\w -]*[\\w])?$",
+                    "type": "string"
+                },
+                "sticky": {
+                    "description": "Stick the comment after creation?",
+                    "type": "boolean"
+                }
+            },
+            "required": [
+                "content",
+                "kind"
+            ],
+            "type": "object"
+        },
+        "CommentCheckJson": {
             "properties": {
                 "actions": {
                     "description": "The `Actions` to run after the check is successfully triggered. ALL `Actions` will run in the order they are listed\n\n Can be `Action` or the `name` of any **named** `Action` in your subreddit's configuration",
@@ -323,14 +405,16 @@
                     "description": "Use this option to override the `dryRun` setting for all of its `Actions`",
                     "type": "boolean"
                 },
+                "itemIs": {
+                    "description": "A list of criteria to test the state of the `Activity` against before running the check.\n\nIf any set of criteria passes the Check will be run. If the criteria fails then the Check will fail.",
+                    "items": {
+                        "$ref": "#/definitions/CommentState"
+                    },
+                    "type": "array"
+                },
                 "kind": {
                     "description": "The type of event (new submission or new comment) this check should be run against",
                     "enum": [
-                        "comment",
-                        "submission"
-                    ],
-                    "examples": [
-                        "submission",
                         "comment"
                     ],
                     "type": "string"
@@ -382,52 +466,31 @@
             ],
             "type": "object"
         },
-        "CommentActionJson": {
-            "description": "Reply to the Activity. For a submission the reply will be a top-level comment.",
+        "CommentState": {
+            "description": "Different attributes a `Comment` can be in. Only include a property if you want to check it.",
             "properties": {
-                "content": {
-                    "description": "The Content to submit for this Action. Content is interpreted as reddit-flavored Markdown.\n\nIf value starts with 'wiki:' then the proceeding value will be used to get a wiki page\n\nEX \"wiki:botconfig/mybot\" tries to get https://reddit.com/mySubredditExample/wiki/botconfig/mybot\n\nEX \"this is plain text\"\n\nEX \"this is **bold** markdown text\"",
-                    "type": "string"
-                },
-                "distinguish": {
-                    "description": "Distinguish the comment after creation?",
+                "approved": {
                     "type": "boolean"
                 },
-                "dryRun": {
-                    "default": false,
-                    "description": "If `true` the Action will not make the API request to Reddit to perform its action.",
+                "distinguished": {
                     "type": "boolean"
                 },
-                "kind": {
-                    "description": "The type of action that will be performed",
-                    "enum": [
-                        "comment",
-                        "flair",
-                        "lock",
-                        "remove",
-                        "report",
-                        "usernote"
-                    ],
-                    "type": "string"
-                },
-                "lock": {
-                    "description": "Lock the comment after creation?",
+                "locked": {
                     "type": "boolean"
                 },
-                "name": {
-                    "description": "An optional, but highly recommended, friendly name for this Action. If not present will default to `kind`.\n\nCan only contain letters, numbers, underscore, spaces, and dashes",
-                    "pattern": "^[a-zA-Z]([\\w -]*[\\w])?$",
-                    "type": "string"
+                "op": {
+                    "type": "boolean"
                 },
-                "sticky": {
-                    "description": "Stick the comment after creation?",
+                "removed": {
+                    "type": "boolean"
+                },
+                "spam": {
+                    "type": "boolean"
+                },
+                "stickied": {
                     "type": "boolean"
                 }
             },
-            "required": [
-                "content",
-                "kind"
-            ],
             "type": "object"
         },
         "CommentThresholdCriteria": {
@@ -648,6 +711,23 @@
                     "minItems": 1,
                     "type": "array"
                 },
+                "itemIs": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "$ref": "#/definitions/SubmissionState"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "items": {
+                                "$ref": "#/definitions/CommentState"
+                            },
+                            "type": "array"
+                        }
+                    ],
+                    "description": "A list of criteria to test the state of the `Activity` against before running the Rule.\n\nIf any set of criteria passes the Rule will be run. If the criteria fails then the Rule is skipped."
+                },
                 "kind": {
                     "description": "The kind of rule to run",
                     "enum": [
@@ -759,6 +839,23 @@
                     "description": "If present then these Author criteria are checked before running the rule. If criteria fails then the rule is skipped.",
                     "minProperties": 1,
                     "type": "object"
+                },
+                "itemIs": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "$ref": "#/definitions/SubmissionState"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "items": {
+                                "$ref": "#/definitions/CommentState"
+                            },
+                            "type": "array"
+                        }
+                    ],
+                    "description": "A list of criteria to test the state of the `Activity` against before running the Rule.\n\nIf any set of criteria passes the Rule will be run. If the criteria fails then the Rule is skipped."
                 },
                 "kind": {
                     "description": "The kind of rule to run",
@@ -913,6 +1010,23 @@
                     },
                     "minItems": 1,
                     "type": "array"
+                },
+                "itemIs": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "$ref": "#/definitions/SubmissionState"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "items": {
+                                "$ref": "#/definitions/CommentState"
+                            },
+                            "type": "array"
+                        }
+                    ],
+                    "description": "A list of criteria to test the state of the `Activity` against before running the Rule.\n\nIf any set of criteria passes the Rule will be run. If the criteria fails then the Rule is skipped."
                 },
                 "kind": {
                     "description": "The kind of rule to run",
@@ -1119,6 +1233,155 @@
             ],
             "type": "object"
         },
+        "SubmissionCheckJson": {
+            "properties": {
+                "actions": {
+                    "description": "The `Actions` to run after the check is successfully triggered. ALL `Actions` will run in the order they are listed\n\n Can be `Action` or the `name` of any **named** `Action` in your subreddit's configuration",
+                    "items": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/definitions/FlairActionJson"
+                            },
+                            {
+                                "$ref": "#/definitions/CommentActionJson"
+                            },
+                            {
+                                "$ref": "#/definitions/ReportActionJson"
+                            },
+                            {
+                                "$ref": "#/definitions/LockActionJson"
+                            },
+                            {
+                                "$ref": "#/definitions/RemoveActionJson"
+                            },
+                            {
+                                "type": "string"
+                            }
+                        ]
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                },
+                "condition": {
+                    "default": "AND",
+                    "description": "Under what condition should a set of run `Rule` objects be considered \"successful\"?\n\nIf `OR` then **any** triggered `Rule` object results in success.\n\nIf `AND` then **all** `Rule` objects must be triggered to result in success.",
+                    "enum": [
+                        "AND",
+                        "OR"
+                    ],
+                    "examples": [
+                        "AND"
+                    ],
+                    "type": "string"
+                },
+                "description": {
+                    "examples": [
+                        "A short description of what this check looks for and actions it performs"
+                    ],
+                    "type": "string"
+                },
+                "dryRun": {
+                    "description": "Use this option to override the `dryRun` setting for all of its `Actions`",
+                    "type": "boolean"
+                },
+                "itemIs": {
+                    "description": "A list of criteria to test the state of the `Activity` against before running the check.\n\nIf any set of criteria passes the Check will be run. If the criteria fails then the Check will fail.",
+                    "items": {
+                        "$ref": "#/definitions/SubmissionState"
+                    },
+                    "type": "array"
+                },
+                "kind": {
+                    "description": "The type of event (new submission or new comment) this check should be run against",
+                    "enum": [
+                        "submission"
+                    ],
+                    "type": "string"
+                },
+                "name": {
+                    "description": "Friendly name for this Check EX \"crosspostSpamCheck\"\n\nCan only contain letters, numbers, underscore, spaces, and dashes",
+                    "examples": [
+                        "myNewCheck"
+                    ],
+                    "pattern": "^[a-zA-Z]([\\w -]*[\\w])?$",
+                    "type": "string"
+                },
+                "rules": {
+                    "description": "A list of Rules to run. If `Rule` objects are triggered based on `condition` then `Actions` will be performed.\n\nCan be `Rule`, `RuleSet`, or the `name` of any **named** `Rule` in your subreddit's configuration",
+                    "items": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/definitions/RecentActivityRuleJSONConfig"
+                            },
+                            {
+                                "$ref": "#/definitions/RepeatActivityJSONConfig"
+                            },
+                            {
+                                "$ref": "#/definitions/AuthorRuleJSONConfig"
+                            },
+                            {
+                                "$ref": "#/definitions/AttributionJSONConfig"
+                            },
+                            {
+                                "$ref": "#/definitions/HistoryJSONConfig"
+                            },
+                            {
+                                "$ref": "#/definitions/RuleSetJson"
+                            },
+                            {
+                                "type": "string"
+                            }
+                        ]
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                }
+            },
+            "required": [
+                "actions",
+                "kind",
+                "name",
+                "rules"
+            ],
+            "type": "object"
+        },
+        "SubmissionState": {
+            "description": "Different attributes a `Submission` can be in. Only include a property if you want to check it.",
+            "properties": {
+                "approved": {
+                    "type": "boolean"
+                },
+                "distinguished": {
+                    "type": "boolean"
+                },
+                "is_self": {
+                    "type": "boolean"
+                },
+                "locked": {
+                    "type": "boolean"
+                },
+                "over_18": {
+                    "description": "NSFW",
+                    "type": "boolean"
+                },
+                "pinned": {
+                    "type": "boolean"
+                },
+                "removed": {
+                    "type": "boolean"
+                },
+                "spam": {
+                    "type": "boolean"
+                },
+                "spoiler": {
+                    "type": "boolean"
+                },
+                "stickied": {
+                    "type": "boolean"
+                }
+            },
+            "type": "object"
+        },
         "SubredditCacheConfig": {
             "properties": {
                 "authorTTL": {
@@ -1251,7 +1514,14 @@
         "checks": {
             "description": "A list of all the checks that should be run for a subreddit.\n\nChecks are split into two lists -- submission or comment -- based on kind and run independently.\n\nChecks in each list are run in the order found in the configuration.\n\nWhen a check \"passes\", and actions are performed, then all subsequent checks are skipped.",
             "items": {
-                "$ref": "#/definitions/CheckJson"
+                "anyOf": [
+                    {
+                        "$ref": "#/definitions/SubmissionCheckJson"
+                    },
+                    {
+                        "$ref": "#/definitions/CommentCheckJson"
+                    }
+                ]
             },
             "minItems": 1,
             "type": "array"

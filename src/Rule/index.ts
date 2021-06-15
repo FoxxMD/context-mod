@@ -3,12 +3,15 @@ import Submission from "snoowrap/dist/objects/Submission";
 import {Logger} from "winston";
 import {findResultByPremise, mergeArr} from "../util";
 import ResourceManager, {SubredditResources} from "../Subreddit/SubredditResources";
+import {ChecksActivityState, TypedActivityStates} from "../Common/interfaces";
+import {isItem} from "../Utils/SnoowrapUtils";
 
 export interface RuleOptions {
     name?: string;
     authors?: AuthorOptions;
     logger: Logger
     subredditName: string;
+    itemIs?: TypedActivityStates;
 }
 
 export interface RulePremise {
@@ -36,6 +39,7 @@ export abstract class Rule implements IRule, Triggerable {
     logger: Logger
     authors: AuthorOptions;
     resources: SubredditResources;
+    itemIs: TypedActivityStates;
 
     constructor(options: RuleOptions) {
         const {
@@ -45,6 +49,7 @@ export abstract class Rule implements IRule, Triggerable {
                 include = [],
                 exclude = [],
             } = {},
+            itemIs = [],
             subredditName,
         } = options;
         this.name = name;
@@ -55,6 +60,8 @@ export abstract class Rule implements IRule, Triggerable {
             include: include.map(x => new Author(x)),
         }
 
+        this.itemIs = itemIs;
+
         const ruleUniqueName = this.name === undefined ? this.getKind() : `${this.getKind()} - ${this.name}`;
         this.logger = logger.child({labels: ['Rule',`${ruleUniqueName}`]}, mergeArr);
     }
@@ -64,6 +71,11 @@ export abstract class Rule implements IRule, Triggerable {
         if (existingResult) {
             this.logger.debug(`Returning existing result of ${existingResult.triggered ? '✔️' : '❌'}`);
             return Promise.resolve([existingResult.triggered, [{...existingResult, name: this.name}]]);
+        }
+        const [itemPass, crit] = isItem(item, this.itemIs, this.logger);
+        if(!itemPass) {
+            this.logger.verbose(`Item did not pass 'itemIs' test, rule running skipped`);
+            return Promise.resolve([null, [this.getResult(null, {result: `Item did not pass 'itemIs' test, rule running skipped`})]]);
         }
         if (this.authors.include !== undefined && this.authors.include.length > 0) {
             for (const auth of this.authors.include) {
@@ -212,7 +224,7 @@ export interface AuthorCriteria {
     userNotes?: UserNoteCriteria[]
 }
 
-export interface IRule {
+export interface IRule extends ChecksActivityState {
     /**
      * An optional, but highly recommended, friendly name for this rule. If not present will default to `kind`.
      *
@@ -227,6 +239,12 @@ export interface IRule {
      * If present then these Author criteria are checked before running the rule. If criteria fails then the rule is skipped.
      * */
     authors?: AuthorOptions
+    /**
+     * A list of criteria to test the state of the `Activity` against before running the Rule.
+     *
+     * If any set of criteria passes the Rule will be run. If the criteria fails then the Rule is skipped.
+     * */
+    itemIs?: TypedActivityStates
 }
 
 export interface RuleJSONConfig extends IRule {

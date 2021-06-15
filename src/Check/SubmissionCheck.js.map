@@ -1,1 +1,1 @@
-{"version":3,"file":"SubmissionCheck.js","sourceRoot":"","sources":["SubmissionCheck.ts"],"names":[],"mappings":";;;AACA,mCAA8B;AAE9B,MAAa,eAAgB,SAAQ,aAAK;CAEzC;AAFD,0CAEC"}
+{"version":3,"file":"SubmissionCheck.js","sourceRoot":"","sources":["SubmissionCheck.ts"],"names":[],"mappings":";;;AACA,mCAA4C;AAG5C,MAAa,eAAgB,SAAQ,aAAK;IAGtC,YAAY,OAAqB;QAC7B,KAAK,CAAC,OAAO,CAAC,CAAC;QACf,MAAM,EAAC,MAAM,GAAG,EAAE,EAAC,GAAG,OAAO,CAAC;QAC9B,IAAI,CAAC,MAAM,GAAG,MAAM,CAAC;IACzB,CAAC;CACJ;AARD,0CAQC"}

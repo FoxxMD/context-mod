@@ -142,6 +142,23 @@
                     "description": "Include reddit `self.*` domains in aggregation?\n\nSelf-posts are aggregated under the domain `self.[subreddit]`. If you wish to include these domains in aggregation set this to `true`",
                     "type": "boolean"
                 },
+                "itemIs": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "$ref": "#/definitions/SubmissionState"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "items": {
+                                "$ref": "#/definitions/CommentState"
+                            },
+                            "type": "array"
+                        }
+                    ],
+                    "description": "A list of criteria to test the state of the `Activity` against before running the Rule.\n\nIf any set of criteria passes the Rule will be run. If the criteria fails then the Rule is skipped."
+                },
                 "kind": {
                     "description": "The kind of rule to run",
                     "enum": [
@@ -249,6 +266,23 @@
                     },
                     "type": "array"
                 },
+                "itemIs": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "$ref": "#/definitions/SubmissionState"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "items": {
+                                "$ref": "#/definitions/CommentState"
+                            },
+                            "type": "array"
+                        }
+                    ],
+                    "description": "A list of criteria to test the state of the `Activity` against before running the Rule.\n\nIf any set of criteria passes the Rule will be run. If the criteria fails then the Rule is skipped."
+                },
                 "kind": {
                     "description": "The kind of rule to run",
                     "enum": [
@@ -270,6 +304,33 @@
                 "include",
                 "kind"
             ],
+            "type": "object"
+        },
+        "CommentState": {
+            "description": "Different attributes a `Comment` can be in. Only include a property if you want to check it.",
+            "properties": {
+                "approved": {
+                    "type": "boolean"
+                },
+                "distinguished": {
+                    "type": "boolean"
+                },
+                "locked": {
+                    "type": "boolean"
+                },
+                "op": {
+                    "type": "boolean"
+                },
+                "removed": {
+                    "type": "boolean"
+                },
+                "spam": {
+                    "type": "boolean"
+                },
+                "stickied": {
+                    "type": "boolean"
+                }
+            },
             "type": "object"
         },
         "CommentThresholdCriteria": {
@@ -451,6 +512,23 @@
                     "minItems": 1,
                     "type": "array"
                 },
+                "itemIs": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "$ref": "#/definitions/SubmissionState"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "items": {
+                                "$ref": "#/definitions/CommentState"
+                            },
+                            "type": "array"
+                        }
+                    ],
+                    "description": "A list of criteria to test the state of the `Activity` against before running the Rule.\n\nIf any set of criteria passes the Rule will be run. If the criteria fails then the Rule is skipped."
+                },
                 "kind": {
                     "description": "The kind of rule to run",
                     "enum": [
@@ -481,6 +559,23 @@
                     "description": "If present then these Author criteria are checked before running the rule. If criteria fails then the rule is skipped.",
                     "minProperties": 1,
                     "type": "object"
+                },
+                "itemIs": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "$ref": "#/definitions/SubmissionState"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "items": {
+                                "$ref": "#/definitions/CommentState"
+                            },
+                            "type": "array"
+                        }
+                    ],
+                    "description": "A list of criteria to test the state of the `Activity` against before running the Rule.\n\nIf any set of criteria passes the Rule will be run. If the criteria fails then the Rule is skipped."
                 },
                 "kind": {
                     "description": "The kind of rule to run",
@@ -605,6 +700,23 @@
                     "minItems": 1,
                     "type": "array"
                 },
+                "itemIs": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "$ref": "#/definitions/SubmissionState"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "items": {
+                                "$ref": "#/definitions/CommentState"
+                            },
+                            "type": "array"
+                        }
+                    ],
+                    "description": "A list of criteria to test the state of the `Activity` against before running the Rule.\n\nIf any set of criteria passes the Rule will be run. If the criteria fails then the Rule is skipped."
+                },
                 "kind": {
                     "description": "The kind of rule to run",
                     "enum": [
@@ -720,6 +832,43 @@
             "required": [
                 "subreddits"
             ],
+            "type": "object"
+        },
+        "SubmissionState": {
+            "description": "Different attributes a `Submission` can be in. Only include a property if you want to check it.",
+            "properties": {
+                "approved": {
+                    "type": "boolean"
+                },
+                "distinguished": {
+                    "type": "boolean"
+                },
+                "is_self": {
+                    "type": "boolean"
+                },
+                "locked": {
+                    "type": "boolean"
+                },
+                "over_18": {
+                    "description": "NSFW",
+                    "type": "boolean"
+                },
+                "pinned": {
+                    "type": "boolean"
+                },
+                "removed": {
+                    "type": "boolean"
+                },
+                "spam": {
+                    "type": "boolean"
+                },
+                "spoiler": {
+                    "type": "boolean"
+                },
+                "stickied": {
+                    "type": "boolean"
+                }
+            },
             "type": "object"
         },
         "ThresholdCriteria": {

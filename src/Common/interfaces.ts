@@ -264,3 +264,41 @@ export interface ThresholdCriteria {
      * */
     condition: '>' | '>=' | '<' | '<='
 }
+
+export interface ChecksActivityState {
+    itemIs?: TypedActivityStates
+}
+
+export interface ActivityState {
+    removed?: boolean
+    locked?: boolean
+    spam?: boolean
+    stickied?: boolean
+    distinguished?: boolean
+    approved?: boolean
+}
+
+/**
+ * Different attributes a `Submission` can be in. Only include a property if you want to check it.
+ * */
+export interface SubmissionState extends ActivityState {
+    pinned?: boolean
+    spoiler?: boolean
+    /**
+     * NSFW
+     * */
+    over_18?: boolean
+    is_self?: boolean
+}
+
+/**
+ * Different attributes a `Comment` can be in. Only include a property if you want to check it.
+ * */
+export interface CommentState extends ActivityState {
+    /*
+    * Is this Comment Author also the Author of the Submission this comment is in?
+    * */
+    op?: boolean
+}
+
+export type TypedActivityStates = SubmissionState[] | CommentState[];

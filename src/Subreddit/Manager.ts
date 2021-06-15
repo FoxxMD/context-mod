@@ -106,6 +106,12 @@ export class Manager {
         const [peek, _] = await itemContentPeek(item);
         this.logger.info(`<EVENT> ${peek}`);
 
+        debugger;
+        // @ts-ignore
+        const replies = await item.expandReplies({depth: 1});
+        debugger;
+        const f = 1;
+
         try {
             for (const check of checks) {
                 if (checkNames.length > 0 && !checkNames.map(x => x.toLowerCase()).some(x => x === check.name.toLowerCase())) {

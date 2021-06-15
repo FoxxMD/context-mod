@@ -6,12 +6,19 @@ import {Comment, Submission} from "snoowrap";
 import {actionFactory} from "../Action/ActionFactory";
 import {ruleFactory} from "../Rule/RuleFactory";
 import {createAjvFactory, mergeArr, ruleNamesFromResults} from "../util";
-import {JoinCondition, JoinOperands} from "../Common/interfaces";
+import {
+    ChecksActivityState,
+    CommentState,
+    JoinCondition,
+    JoinOperands,
+    SubmissionState,
+    TypedActivityStates
+} from "../Common/interfaces";
 import * as RuleSchema from '../Schema/Rule.json';
 import * as RuleSetSchema from '../Schema/RuleSet.json';
 import * as ActionSchema from '../Schema/Action.json';
-import Ajv from 'ajv';
 import {ActionObjectJson, RuleJson, RuleObjectJson, ActionJson as ActionTypeJson} from "../Common/types";
+import {isItem} from "../Utils/SnoowrapUtils";
 
 export class Check implements ICheck {
     actions: Action[] = [];
@@ -20,6 +27,7 @@ export class Check implements ICheck {
     condition: JoinOperands;
     rules: Array<RuleSet | Rule> = [];
     logger: Logger;
+    itemIs: TypedActivityStates;
     dryRun?: boolean;
 
     constructor(options: CheckOptions) {
@@ -30,6 +38,7 @@ export class Check implements ICheck {
             rules = [],
             actions = [],
             subredditName,
+            itemIs = [],
             dryRun,
         } = options;
 
@@ -40,6 +49,7 @@ export class Check implements ICheck {
         this.name = name;
         this.description = description;
         this.condition = condition;
+        this.itemIs = itemIs;
         this.dryRun = dryRun;
         for (const r of rules) {
             if (r instanceof Rule || r instanceof RuleSet) {
@@ -90,6 +100,11 @@ export class Check implements ICheck {
 
     async run(item: Submission | Comment, existingResults: RuleResult[] = []): Promise<[boolean, RuleResult[]]> {
         let allResults: RuleResult[] = [];
+        const [itemPass, crit] = isItem(item, this.itemIs, this.logger);
+        if(!itemPass) {
+            this.logger.info(`❌ => Item did not pass 'itemIs' test`);
+            return [false, allResults];
+        }
         let runOne = false;
         for (const r of this.rules) {
             const combinedResults = [...existingResults, ...allResults];
@@ -110,7 +125,7 @@ export class Check implements ICheck {
             }
         }
         if (!runOne) {
-            this.logger.info('❌ => All Rules skipped because of Author checks');
+            this.logger.info('❌ => All Rules skipped because of Author checks or itemIs tests');
             return [false, allResults];
         }
         this.logger.info(`✔️ => Rules (AND) : ${ruleNamesFromResults(allResults)}`);
@@ -126,7 +141,7 @@ export class Check implements ICheck {
     }
 }
 
-export interface ICheck extends JoinCondition {
+export interface ICheck extends JoinCondition, ChecksActivityState {
     /**
      * Friendly name for this Check EX "crosspostSpamCheck"
      *
@@ -145,6 +160,13 @@ export interface ICheck extends JoinCondition {
      * Use this option to override the `dryRun` setting for all of its `Actions`
      * */
     dryRun?: boolean;
+
+    /**
+     * A list of criteria to test the state of the `Activity` against before running the check.
+     *
+     * If any set of criteria passes the Check will be run. If the criteria fails then the Check will fail.
+     * */
+    itemIs?: TypedActivityStates
 }
 
 export interface CheckOptions extends ICheck {
@@ -177,7 +199,28 @@ export interface CheckJson extends ICheck {
     actions: Array<ActionTypeJson>
 }
 
-export interface CheckStructuredJson extends CheckJson {
+export interface SubmissionCheckJson extends CheckJson {
+    kind: 'submission'
+    itemIs?: SubmissionState[]
+}
+
+export interface CommentCheckJson extends CheckJson {
+    kind: 'comment'
+    itemIs?: CommentState[]
+}
+
+export type CheckStructuredJson  = SubmissionCheckStructuredJson | CommentCheckStructuredJson;
+// export interface CheckStructuredJson extends CheckJson {
+//     rules: Array<RuleSetObjectJson | RuleObjectJson>
+//     actions: Array<ActionObjectJson>
+// }
+
+export interface SubmissionCheckStructuredJson extends SubmissionCheckJson {
+    rules: Array<RuleSetObjectJson | RuleObjectJson>
+    actions: Array<ActionObjectJson>
+}
+
+export interface CommentCheckStructuredJson extends CommentCheckJson {
     rules: Array<RuleSetObjectJson | RuleObjectJson>
     actions: Array<ActionObjectJson>
 }
