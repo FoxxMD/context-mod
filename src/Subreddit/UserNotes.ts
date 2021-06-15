@@ -101,7 +101,6 @@ export class UserNotes {
         // idgaf
         // @ts-ignore
         const mod = await this.subreddit._r.getMe();
-        debugger;
         if(!payload.constants.users.includes(mod.name)) {
             this.logger.info(`Mod ${mod.name} does not exist in UserNote constants, adding them`);
             payload.constants.users.push(mod.name);
@@ -166,7 +165,6 @@ export class UserNotes {
 
     async saveData(payload: RawUserNotesPayload): Promise<RawUserNotesPayload> {
 
-        debugger;
         const blob = deflateUserNotes(payload.blob);
         const wikiPayload = {...payload, blob};
 
