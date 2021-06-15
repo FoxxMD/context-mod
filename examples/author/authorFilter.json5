@@ -28,7 +28,7 @@
           "kind": "recentActivity",
           // authors filter will be checked before a rule is run. If anything passes then the Rule is skipped -- it is not failed or triggered.
           // if *all* Rules for a Check are skipped due to authors filter then the Check will fail
-          "authors": {
+          "authorIs": {
             // each property (include/exclude) can contain multiple AuthorCriteria
             // if any AuthorCriteria passes its test the Rule is skipped
             //

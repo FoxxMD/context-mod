@@ -1,5 +1,5 @@
 import {RuleSet, IRuleSet, RuleSetJson, RuleSetObjectJson} from "../Rule/RuleSet";
-import {IRule,Rule, RuleJSONConfig, RuleResult} from "../Rule";
+import {Author, AuthorOptions, IRule, Rule, RuleJSONConfig, RuleResult} from "../Rule";
 import Action, {ActionConfig, ActionJson} from "../Action";
 import {Logger} from "winston";
 import {Comment, Submission} from "snoowrap";
@@ -19,6 +19,7 @@ import * as RuleSetSchema from '../Schema/RuleSet.json';
 import * as ActionSchema from '../Schema/Action.json';
 import {ActionObjectJson, RuleJson, RuleObjectJson, ActionJson as ActionTypeJson} from "../Common/types";
 import {isItem} from "../Utils/SnoowrapUtils";
+import ResourceManager, {SubredditResources} from "../Subreddit/SubredditResources";
 
 export class Check implements ICheck {
     actions: Action[] = [];
@@ -28,7 +29,9 @@ export class Check implements ICheck {
     rules: Array<RuleSet | Rule> = [];
     logger: Logger;
     itemIs: TypedActivityStates;
+    authorIs: AuthorOptions;
     dryRun?: boolean;
+    resources: SubredditResources;
 
     constructor(options: CheckOptions) {
         const {
@@ -39,6 +42,10 @@ export class Check implements ICheck {
             actions = [],
             subredditName,
             itemIs = [],
+            authorIs: {
+                include = [],
+                exclude = [],
+            } = {},
             dryRun,
         } = options;
 
@@ -46,10 +53,16 @@ export class Check implements ICheck {
 
         const ajv = createAjvFactory(this.logger);
 
+        this.resources = ResourceManager.get(subredditName) as SubredditResources;
+
         this.name = name;
         this.description = description;
         this.condition = condition;
         this.itemIs = itemIs;
+        this.authorIs = {
+            exclude: exclude.map(x => new Author(x)),
+            include: include.map(x => new Author(x)),
+        }
         this.dryRun = dryRun;
         for (const r of rules) {
             if (r instanceof Rule || r instanceof RuleSet) {
@@ -104,6 +117,32 @@ export class Check implements ICheck {
         if(!itemPass) {
             this.logger.info(`❌ => Item did not pass 'itemIs' test`);
             return [false, allResults];
+        }
+        debugger;
+        let authorPass = null;
+        if (this.authorIs.include !== undefined && this.authorIs.include.length > 0) {
+            for (const auth of this.authorIs.include) {
+                if (await this.resources.testAuthorCriteria(item, auth)) {
+                    authorPass = true;
+                    break;
+                }
+            }
+            if(!authorPass) {
+                this.logger.verbose('❌ => Inclusive author criteria not matched');
+                return Promise.resolve([false, allResults]);
+            }
+        }
+        if (authorPass === null && this.authorIs.exclude !== undefined && this.authorIs.exclude.length > 0) {
+            for (const auth of this.authorIs.exclude) {
+                if (await this.resources.testAuthorCriteria(item, auth, false)) {
+                    authorPass = true;
+                    break;
+                }
+            }
+            if(!authorPass) {
+                this.logger.verbose('❌ =>  Exclusive author criteria not matched');
+                return Promise.resolve([false, allResults]);
+            }
         }
         let runOne = false;
         for (const r of this.rules) {
@@ -167,6 +206,11 @@ export interface ICheck extends JoinCondition, ChecksActivityState {
      * If any set of criteria passes the Check will be run. If the criteria fails then the Check will fail.
      * */
     itemIs?: TypedActivityStates
+
+    /**
+     * If present then these Author criteria are checked before running the Check. If criteria fails then the Check will fail.
+     * */
+    authorIs?: AuthorOptions
 }
 
 export interface CheckOptions extends ICheck {

@@ -22,11 +22,12 @@ Some feature highlights:
 * Any text-based actions (comment, submission, message, usernotes, etc...) can be configured via a wiki page or raw text in JSON
 * All text-based actions support [mustache](https://mustache.github.io) templating
 * History-based rules support multiple "valid window" types -- [ISO 8601 Durations](https://en.wikipedia.org/wiki/ISO_8601#Durations), [Day.js Durations](https://day.js.org/docs/en/durations/creating), and submission/comment count limits.
-* Rules support skipping behavior based on author criteria -- name, css flair/text, and moderator status
+* Checks/Rules support skipping behavior based on:
+  * author criteria (name, css flair/text, moderator status, and [Toolbox User Notes](https://www.reddit.com/r/toolbox/wiki/docs/usernotes))
+  * Activity state (removed, locked, distinguished, etc.)
 * Rules and Actions support named references so you write rules/actions once and reference them anywhere
-* Check and Rules support skipping based on Submission/Comment state (removed, locked, distinguished, etc.)
 * User-configurable global/subreddit-level API caching
-* Support for [Toolbox User Notes](https://www.reddit.com/r/toolbox/wiki/docs/usernotes) in Rules and Actions
+* Support for [Toolbox User Notes](https://www.reddit.com/r/toolbox/wiki/docs/usernotes) as criteria or Actions (writing notes)
 * Docker container support
 
 # Table of Contents

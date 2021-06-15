@@ -8,10 +8,10 @@ import {isItem} from "../Utils/SnoowrapUtils";
 
 export interface RuleOptions {
     name?: string;
-    authors?: AuthorOptions;
+    authorIs?: AuthorOptions;
+    itemIs?: TypedActivityStates;
     logger: Logger
     subredditName: string;
-    itemIs?: TypedActivityStates;
 }
 
 export interface RulePremise {
@@ -37,15 +37,15 @@ export interface Triggerable {
 export abstract class Rule implements IRule, Triggerable {
     name: string;
     logger: Logger
-    authors: AuthorOptions;
-    resources: SubredditResources;
+    authorIs: AuthorOptions;
     itemIs: TypedActivityStates;
+    resources: SubredditResources;
 
     constructor(options: RuleOptions) {
         const {
             name = this.getKind(),
             logger,
-            authors: {
+            authorIs: {
                 include = [],
                 exclude = [],
             } = {},
@@ -55,7 +55,7 @@ export abstract class Rule implements IRule, Triggerable {
         this.name = name;
         this.resources = ResourceManager.get(subredditName) as SubredditResources;
 
-        this.authors = {
+        this.authorIs = {
             exclude: exclude.map(x => new Author(x)),
             include: include.map(x => new Author(x)),
         }
@@ -77,8 +77,8 @@ export abstract class Rule implements IRule, Triggerable {
             this.logger.verbose(`Item did not pass 'itemIs' test, rule running skipped`);
             return Promise.resolve([null, [this.getResult(null, {result: `Item did not pass 'itemIs' test, rule running skipped`})]]);
         }
-        if (this.authors.include !== undefined && this.authors.include.length > 0) {
-            for (const auth of this.authors.include) {
+        if (this.authorIs.include !== undefined && this.authorIs.include.length > 0) {
+            for (const auth of this.authorIs.include) {
                 if (await this.resources.testAuthorCriteria(item, auth)) {
                     return this.process(item);
                 }
@@ -86,8 +86,8 @@ export abstract class Rule implements IRule, Triggerable {
             this.logger.verbose('Inclusive author criteria not matched, rule running skipped');
             return Promise.resolve([null, [this.getResult(null, {result: 'Inclusive author criteria not matched, rule running skipped'})]]);
         }
-        if (this.authors.exclude !== undefined && this.authors.exclude.length > 0) {
-            for (const auth of this.authors.exclude) {
+        if (this.authorIs.exclude !== undefined && this.authorIs.exclude.length > 0) {
+            for (const auth of this.authorIs.exclude) {
                 if (await this.resources.testAuthorCriteria(item, auth, false)) {
                     return this.process(item);
                 }
@@ -109,7 +109,8 @@ export abstract class Rule implements IRule, Triggerable {
         return {
             kind: this.getKind(),
             config: {
-                authors: this.authors,
+                authorIs: this.authorIs,
+                itemIs: this.itemIs,
                 ...config,
             },
         };
@@ -172,9 +173,6 @@ export interface UserNoteCriteria {
 
 /**
  * If present then these Author criteria are checked before running the rule. If criteria fails then the rule is skipped.
- * @minProperties 1
- * @additionalProperties false
- * @TJS-type object
  * */
 export interface AuthorOptions {
     /**
@@ -238,7 +236,7 @@ export interface IRule extends ChecksActivityState {
     /**
      * If present then these Author criteria are checked before running the rule. If criteria fails then the rule is skipped.
      * */
-    authors?: AuthorOptions
+    authorIs?: AuthorOptions
     /**
      * A list of criteria to test the state of the `Activity` against before running the Rule.
      *

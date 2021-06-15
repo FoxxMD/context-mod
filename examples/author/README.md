@@ -25,9 +25,13 @@ Consult the [schema](https://json-schema.app/view/%23%2Fdefinitions%2FAuthorRule
     
 ## Filter
 
-All **Rules** have an optional `authors` property that takes an [AuthorOptions](https://json-schema.app/view/%23%2Fdefinitions%2FAuthorOptions?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Freddit-context-bot%2Fmaster%2Fsrc%2FSchema%2FApp.json) object. 
+All **Rules** and **Checks** have an optional `authorIs` property that takes an [AuthorOptions](https://json-schema.app/view/%23%2Fdefinitions%2FAuthorOptions?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Freddit-context-bot%2Fmaster%2Fsrc%2FSchema%2FApp.json) object. 
 
-**This property works the same as the Author Rule but if any criteria pass the Rule is skipped.** If a Rule is skipped **it does not fail or pass** and so does not affect the outcome of the Check. However, if all Rules on a Check are skipped the Check will fail.
+**This property works the same as the Author Rule except that:**
+* On **Rules** if all criteria fail the Rule is **skipped.** 
+  * If a Rule is skipped **it does not fail or pass** and so does not affect the outcome of the Check.
+  * However, if all Rules on a Check are skipped the Check will fail.
+* On **Checks** if all criteria fail the Check **fails**.
 
 ### Examples
 
