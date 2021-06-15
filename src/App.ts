@@ -7,7 +7,7 @@ import pEvent from "p-event";
 import JSON5 from 'json5';
 import EventEmitter from "events";
 import CacheManager from './Subreddit/SubredditResources';
-import dayjs from "dayjs";
+import dayjs, {Dayjs} from "dayjs";
 
 const {transports} = winston;
 
@@ -30,6 +30,7 @@ export class App {
     dryRun?: true | undefined;
     heartbeatInterval: number;
     apiLimitWarning: number;
+    heartBeating: boolean = false;
 
     constructor(options: any = {}) {
         const {
@@ -193,28 +194,79 @@ export class App {
     }
 
     async heartbeat() {
-        while (true) {
-            await sleep(this.heartbeatInterval * 1000);
-            const heartbeat = `HEARTBEAT -- Reddit API Rate Limit remaining: ${this.client.ratelimitRemaining}`
-            if (this.apiLimitWarning >= this.client.ratelimitRemaining) {
-                this.logger.warn(heartbeat);
-            } else {
-                this.logger.info(heartbeat);
+        try {
+            this.heartBeating = true;
+            while (true) {
+                await sleep(this.heartbeatInterval * 1000);
+                const heartbeat = `HEARTBEAT -- Reddit API Rate Limit remaining: ${this.client.ratelimitRemaining}`
+                if (this.apiLimitWarning >= this.client.ratelimitRemaining) {
+                    this.logger.warn(heartbeat);
+                } else {
+                    this.logger.info(heartbeat);
+                }
             }
+        } finally {
+            this.heartBeating = false;
         }
     }
 
     async runManagers() {
 
-        for (const manager of this.subManagers) {
-            manager.handle();
-        }
+        // basic backoff delay if reddit is under load and not responding
+        let timeoutCount = 0;
+        let maxTimeoutCount = 4;
+        let otherRetryCount = 0;
+        // not sure should even allow so set to 0 for now
+        let maxOtherCount = 0;
+        let keepRunning = true;
+        let lastErrorAt: Dayjs | undefined;
 
-        if (this.heartbeatInterval !== 0) {
-            this.heartbeat();
-        }
+        while (keepRunning) {
+            try {
+                for (const manager of this.subManagers) {
+                    if (!manager.running) {
+                        manager.handle();
+                    }
+                }
 
-        const emitter = new EventEmitter();
-        await pEvent(emitter, 'end');
+                if (this.heartbeatInterval !== 0 && !this.heartBeating) {
+                    this.heartbeat();
+                }
+
+                const emitter = new EventEmitter();
+                await pEvent(emitter, 'end');
+                keepRunning = false;
+            } catch (err) {
+                if (lastErrorAt !== undefined && dayjs().diff(lastErrorAt, 'minute') >= 5) {
+                    // if its been longer than 5 minutes since last error clear counters
+                    timeoutCount = 0;
+                    otherRetryCount = 0;
+                }
+
+                lastErrorAt = dayjs();
+
+                if (err.message.includes('ETIMEDOUT')) {
+                    timeoutCount++;
+                    if (timeoutCount > maxTimeoutCount) {
+                        this.logger.error(`Timeouts (${timeoutCount}) exceeded max allowed (${maxTimeoutCount})`);
+                        throw err;
+                    }
+                    // exponential backoff
+                    const ms = (Math.pow(2, timeoutCount - 1) + (Math.random() - 0.3)) * 1000;
+                    this.logger.warn(`Reddit response timed out. Will wait ${ms / 1000} seconds before restarting managers`);
+                    await sleep(ms);
+
+                } else {
+                    // linear backoff
+                    otherRetryCount++;
+                    if (maxOtherCount > otherRetryCount) {
+                        throw err;
+                    }
+                    const ms = (3 * 1000) * otherRetryCount;
+                    this.logger.warn(`Non-timeout error occurred. Will wait ${ms / 1000} seconds before restarting managers`);
+                    await sleep(ms);
+                }
+            }
+        }
     }
 }

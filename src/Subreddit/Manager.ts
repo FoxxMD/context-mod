@@ -35,6 +35,8 @@ export class Manager {
     displayLabel: string;
     currentLabels?: string[];
 
+    running: boolean = false;
+
     getCurrentLabels = () => {
         return this.currentLabels;
     }
@@ -73,7 +75,12 @@ export class Manager {
         const subChecks: Array<SubmissionCheck> = [];
         const structuredChecks = configBuilder.parseToStructured(validJson);
         for (const jCheck of structuredChecks) {
-            const checkConfig = {...jCheck, dryRun: this.dryRun || jCheck.dryRun, logger: this.logger, subredditName: sub.display_name};
+            const checkConfig = {
+                ...jCheck,
+                dryRun: this.dryRun || jCheck.dryRun,
+                logger: this.logger,
+                subredditName: sub.display_name
+            };
             if (jCheck.kind === 'comment') {
                 commentChecks.push(new CommentCheck(checkConfig));
             } else if (jCheck.kind === 'submission') {
@@ -139,65 +146,73 @@ export class Manager {
     }
 
     async handle(): Promise<void> {
-        if (this.submissionChecks.length > 0) {
-            const {
-                submissions: {
-                    limit = 10,
-                    interval = 10000,
-                } = {}
-            } = this.pollOptions
-            this.streamSub = new SubmissionStream(this.client, {
-                subreddit: this.subreddit.display_name,
-                limit,
-                pollTime: interval,
-            });
+        try {
+            if (this.submissionChecks.length > 0) {
+                const {
+                    submissions: {
+                        limit = 10,
+                        interval = 10000,
+                    } = {}
+                } = this.pollOptions
+                this.streamSub = new SubmissionStream(this.client, {
+                    subreddit: this.subreddit.display_name,
+                    limit,
+                    pollTime: interval,
+                });
 
 
-            this.streamSub.once('listing', async (listing) => {
-                this.subListedOnce = true;
-            });
-            this.streamSub.on('item', async (item) => {
-                if (!this.subListedOnce) {
-                    return;
-                }
-                await this.runChecks('Submission', item)
-            });
-            //this.streamSub.on('listing', (_) => this.logger.debug('Polled Submissions'));
+                this.streamSub.once('listing', async (listing) => {
+                    this.subListedOnce = true;
+                });
+                this.streamSub.on('item', async (item) => {
+                    if (!this.subListedOnce) {
+                        return;
+                    }
+                    await this.runChecks('Submission', item)
+                });
+                //this.streamSub.on('listing', (_) => this.logger.debug('Polled Submissions'));
+            }
+
+            if (this.commentChecks.length > 0) {
+                const {
+                    comments: {
+                        limit = 10,
+                        interval = 10000,
+                    } = {}
+                } = this.pollOptions
+                this.streamComments = new CommentStream(this.client, {
+                    subreddit: this.subreddit.display_name,
+                    limit,
+                    pollTime: interval,
+                });
+                this.streamComments.once('listing', () => this.commentsListedOnce = true);
+                this.streamComments.on('item', async (item) => {
+                    if (!this.commentsListedOnce) {
+                        return;
+                    }
+                    await this.runChecks('Comment', item)
+                });
+                //this.streamComments.on('listing', (_) => this.logger.debug('Polled Comments'));
+            }
+
+            this.running = true;
+
+            if (this.streamSub !== undefined) {
+                this.logger.info('Bot Running');
+                await pEvent(this.streamSub, 'end');
+            } else if (this.streamComments !== undefined) {
+                this.logger.info('Bot Running');
+                await pEvent(this.streamComments, 'end');
+            } else {
+                this.logger.warn('No submission or comment checks to run! Bot will not run.');
+                return;
+            }
+        } catch (err) {
+            this.logger.error('Encountered unhandled error, manager is bailing out');
+            this.logger.error(err);
+        } finally {
+            this.running = false;
+            this.logger.info('Bot Stopped');
         }
-
-        if (this.commentChecks.length > 0) {
-            const {
-                comments: {
-                    limit = 10,
-                    interval = 10000,
-                } = {}
-            } = this.pollOptions
-            this.streamComments = new CommentStream(this.client, {
-                subreddit: this.subreddit.display_name,
-                limit,
-                pollTime: interval,
-            });
-            this.streamComments.once('listing', () => this.commentsListedOnce = true);
-            this.streamComments.on('item', async (item) => {
-                if (!this.commentsListedOnce) {
-                    return;
-                }
-                await this.runChecks('Comment', item)
-            });
-            //this.streamComments.on('listing', (_) => this.logger.debug('Polled Comments'));
-        }
-
-        if (this.streamSub !== undefined) {
-            this.logger.info('Bot Running');
-            await pEvent(this.streamSub, 'end');
-        } else if (this.streamComments !== undefined) {
-            this.logger.info('Bot Running');
-            await pEvent(this.streamComments, 'end');
-        } else {
-            this.logger.warn('No submission or comment checks to run! Bot will not run.');
-            return;
-        }
-
-        this.logger.info('Bot Stopped');
     }
 }
