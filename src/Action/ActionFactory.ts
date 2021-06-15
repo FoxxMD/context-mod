@@ -5,6 +5,7 @@ import {ReportAction, ReportActionJson} from "./ReportAction";
 import {FlairAction, FlairActionJson} from "./SubmissionAction/FlairAction";
 import Action, {ActionJson} from "./index";
 import {Logger} from "winston";
+import {UserNoteAction, UserNoteActionJson} from "./UserNoteAction";
 
 export function actionFactory
 (config: ActionJson, logger: Logger, subredditName: string): Action {
@@ -19,6 +20,8 @@ export function actionFactory
             return new ReportAction({...config as ReportActionJson, logger, subredditName});
         case 'flair':
             return new FlairAction({...config as FlairActionJson, logger, subredditName});
+        case 'usernote':
+            return new UserNoteAction({...config as UserNoteActionJson, logger, subredditName});
         default:
             throw new Error('rule "kind" was not recognized.');
     }

@@ -387,11 +387,6 @@
             "properties": {
                 "content": {
                     "description": "The Content to submit for this Action. Content is interpreted as reddit-flavored Markdown.\n\nIf value starts with 'wiki:' then the proceeding value will be used to get a wiki page\n\nEX \"wiki:botconfig/mybot\" tries to get https://reddit.com/mySubredditExample/wiki/botconfig/mybot\n\nEX \"this is plain text\"\n\nEX \"this is **bold** markdown text\"",
-                    "examples": [
-                        "This is the content of a comment/report",
-                        "this is **bold** markdown text",
-                        "wiki:botconfig/acomment"
-                    ],
                     "type": "string"
                 },
                 "distinguish": {
@@ -410,7 +405,8 @@
                         "flair",
                         "lock",
                         "remove",
-                        "report"
+                        "report",
+                        "usernote"
                     ],
                     "type": "string"
                 },
@@ -543,7 +539,8 @@
                         "flair",
                         "lock",
                         "remove",
-                        "report"
+                        "report",
+                        "usernote"
                     ],
                     "type": "string"
                 },
@@ -688,7 +685,8 @@
                         "flair",
                         "lock",
                         "remove",
-                        "report"
+                        "report",
+                        "usernote"
                     ],
                     "type": "string"
                 },
@@ -863,7 +861,8 @@
                         "flair",
                         "lock",
                         "remove",
-                        "report"
+                        "report",
+                        "usernote"
                     ],
                     "type": "string"
                 },
@@ -995,7 +994,12 @@
             "description": "Report the Activity",
             "properties": {
                 "content": {
-                    "description": "The text of the report. If longer than 100 characters will be truncated to \"[content]...\"",
+                    "description": "The Content to submit for this Action. Content is interpreted as reddit-flavored Markdown.\n\nIf value starts with 'wiki:' then the proceeding value will be used to get a wiki page\n\nEX \"wiki:botconfig/mybot\" tries to get https://reddit.com/mySubredditExample/wiki/botconfig/mybot\n\nEX \"this is plain text\"\n\nEX \"this is **bold** markdown text\"",
+                    "examples": [
+                        "This is the content of a comment/report/usernote",
+                        "this is **bold** markdown text",
+                        "wiki:botconfig/acomment"
+                    ],
                     "type": "string"
                 },
                 "dryRun": {
@@ -1010,7 +1014,8 @@
                         "flair",
                         "lock",
                         "remove",
-                        "report"
+                        "report",
+                        "usernote"
                     ],
                     "type": "string"
                 },
@@ -1021,7 +1026,6 @@
                 }
             },
             "required": [
-                "content",
                 "kind"
             ],
             "type": "object"

@@ -2,7 +2,7 @@ import Action, {ActionJson, ActionOptions} from "./index";
 import {Comment} from "snoowrap";
 import Submission from "snoowrap/dist/objects/Submission";
 import {renderContent} from "../Utils/SnoowrapUtils";
-import {RichContent} from "../Common/interfaces";
+import {RequiredRichContent, RichContent} from "../Common/interfaces";
 import {RuleResult} from "../Rule";
 
 export class CommentAction extends Action {
@@ -52,7 +52,7 @@ export class CommentAction extends Action {
     }
 }
 
-export interface CommentActionConfig extends RichContent {
+export interface CommentActionConfig extends RequiredRichContent {
     /**
      * Lock the comment after creation?
      * */

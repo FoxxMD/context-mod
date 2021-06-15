@@ -6,6 +6,7 @@ import Subreddit from "snoowrap/dist/objects/Subreddit";
 import {Logger} from "winston";
 import LoggedError from "../Utils/LoggedError";
 import Submission from "snoowrap/dist/objects/Submission";
+import {RichContent} from "../Common/interfaces";
 
 interface RawUserNotesPayload {
     ver: number,
@@ -99,9 +100,16 @@ export class UserNotes {
 
         // idgaf
         // @ts-ignore
-        const mod = this.subreddit._r.getMe();
+        const mod = await this.subreddit._r.getMe();
+        debugger;
         if(!payload.constants.users.includes(mod.name)) {
+            this.logger.info(`Mod ${mod.name} does not exist in UserNote constants, adding them`);
             payload.constants.users.push(mod.name);
+        }
+        if(!payload.constants.warnings.find((x: string) => x === type)) {
+            this.logger.warn(`UserNote type '${type}' does not exist, adding it but make sure spelling and letter case is correct`);
+            payload.constants.warnings.push(type);
+            //throw new LoggedError(`UserNote type '${type}' does not exist. If you meant to use this please add it through Toolbox first.`);
         }
         const newNote = new UserNote(dayjs(), text, mod, type, `https://reddit.com${item.permalink}`);
 
@@ -119,6 +127,12 @@ export class UserNotes {
         return newNote;
     }
 
+    async warningExists(type: string): Promise<boolean>
+    {
+        const payload = await this.retrieveData();
+        return payload.constants.warnings.some((x: string) => x === type);
+    }
+
     async retrieveData(): Promise<RawUserNotesPayload> {
         if (this.notesTTL > 0) {
             const cachedPayload = cache.get(this.identifier);
@@ -129,8 +143,8 @@ export class UserNotes {
 
         try {
             // @ts-ignore
-            this.wiki = await this.wiki.refresh();
-            const wikiContent = await this.wiki.content_md;
+            this.wiki = await this.subreddit.getWikiPage('usernotes').fetch();
+            const wikiContent = this.wiki.content_md;
             // TODO don't handle for versions lower than 6
             const userNotes = JSON.parse(wikiContent);
 
@@ -152,12 +166,15 @@ export class UserNotes {
 
     async saveData(payload: RawUserNotesPayload): Promise<RawUserNotesPayload> {
 
+        debugger;
         const blob = deflateUserNotes(payload.blob);
         const wikiPayload = {...payload, blob};
 
         try {
             // @ts-ignore
-            this.wiki = await this.wiki.edit({text: JSON.stringify(wikiPayload), reason: 'ContextBot edited usernotes'});
+            //this.wiki = await this.wiki.refresh();
+            // @ts-ignore
+            this.wiki = await this.subreddit.getWikiPage('usernotes').edit({text: JSON.stringify(wikiPayload), reason: 'ContextBot edited usernotes'});
             if (this.notesTTL > 0) {
                 cache.put(this.identifier, payload, this.notesTTL, () => {
                     this.users = new Map();
@@ -171,6 +188,14 @@ export class UserNotes {
             throw new LoggedError(msg);
         }
     }
+}
+
+export interface UserNoteJson extends RichContent {
+    /**
+     * User Note type key
+     * @examples ["spamwarn"]
+     * */
+    type: string,
 }
 
 export class UserNote {

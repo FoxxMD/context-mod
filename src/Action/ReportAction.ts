@@ -4,6 +4,7 @@ import Snoowrap, {Comment, Submission} from "snoowrap";
 import {truncateStringToLength} from "../util";
 import {renderContent} from "../Utils/SnoowrapUtils";
 import {RuleResult} from "../Rule";
+import {RichContent} from "../Common/interfaces";
 
 // https://www.reddit.com/dev/api/oauth#POST_api_report
 // denotes 100 characters maximum
@@ -34,11 +35,7 @@ export class ReportAction extends Action {
     }
 }
 
-export interface ReportActionConfig {
-    /**
-     * The text of the report. If longer than 100 characters will be truncated to "[content]..."
-     * */
-    content: string,
+export interface ReportActionConfig extends RichContent {
 }
 
 export interface ReportActionOptions extends ReportActionConfig, ActionOptions {

@@ -13,7 +13,8 @@
                 "flair",
                 "lock",
                 "remove",
-                "report"
+                "report",
+                "usernote"
             ],
             "type": "string"
         },

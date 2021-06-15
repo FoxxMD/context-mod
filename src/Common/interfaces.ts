@@ -122,9 +122,13 @@ export interface RichContent {
      *
      * EX "this is **bold** markdown text"
      *
-     * @examples ["This is the content of a comment/report", "this is **bold** markdown text", "wiki:botconfig/acomment" ]
+     * @examples ["This is the content of a comment/report/usernote", "this is **bold** markdown text", "wiki:botconfig/acomment" ]
      * */
-    content: string,
+    content?: string,
+}
+
+export interface RequiredRichContent extends RichContent {
+    content: string
 }
 
 /**
