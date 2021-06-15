@@ -186,7 +186,7 @@ export class App {
             try {
                 subSchedule.push(new Manager(sub, this.client, this.logger, json, {dryRun: this.dryRun}));
             } catch (err) {
-                this.logger.error(`[${sub.display_name_prefixed}] Config was not valid`, undefined, err);
+                this.logger.error(`[${sub.display_name_prefixed}] Config was not valid`, err);
             }
         }
         this.subManagers = subSchedule;
