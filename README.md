@@ -19,12 +19,14 @@ Some feature highlights:
 * Simple rule-action behavior can be combined to create any level of complexity in behavior
 * One instance can handle managing many subreddits (as many as it has moderator permissions in!)
 * Per-subreddit configuration is handled by JSON stored in the subreddit wiki
-* Any text-based actions (comment, submission, message, etc...) can be configured via a wiki page or raw text in JSON
+* Any text-based actions (comment, submission, message, usernotes, etc...) can be configured via a wiki page or raw text in JSON
 * All text-based actions support [mustache](https://mustache.github.io) templating
 * History-based rules support multiple "valid window" types -- [ISO 8601 Durations](https://en.wikipedia.org/wiki/ISO_8601#Durations), [Day.js Durations](https://day.js.org/docs/en/durations/creating), and submission/comment count limits.
-* All rules support skipping behavior based on author criteria -- name, css flair/text, and moderator status
+* Rules support skipping behavior based on author criteria -- name, css flair/text, and moderator status
 * Rules and Actions support named references so you write rules/actions once and reference them anywhere
+* Check and Rules support skipping based on Submission/Comment state (removed, locked, distinguished, etc.)
 * User-configurable global/subreddit-level API caching
+* Support for [Toolbox User Notes](https://www.reddit.com/r/toolbox/wiki/docs/usernotes) in Rules and Actions
 * Docker container support
 
 # Table of Contents
@@ -226,6 +228,7 @@ Visit https://not-an-aardvark.github.io/reddit-oauth-helper/
     * report
     * submit
     * wikiread
+    * wikiedit (if you are using Toolbox User Notes)
 * Click **Generate tokens**, you will get a popup asking you to approve access (or login) -- **the account you approve access with is the account that Bot will control.**
 * After approving an **Access Token** and **Refresh Token** will be shown at the bottom of the page. Write these down. 
   

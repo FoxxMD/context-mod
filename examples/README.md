@@ -34,6 +34,7 @@ This directory contains example of valid, ready-to-go configurations for Context
   * [Repeat Activity](/examples/repeatActivity)
   * [History](/examples/history)
   * [Author](/examples/author)
+* [Toolbox User Notes](/examples/userNotes)
 * [Advanced Concepts](/examples/advancedConcepts)
   * [Rule Sets](/examples/advancedConcepts/ruleSets.json5)
   * [Name Rules](/examples/advancedConcepts/ruleNameReuse.json5)

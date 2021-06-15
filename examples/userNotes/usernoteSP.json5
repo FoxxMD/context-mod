@@ -1,0 +1,38 @@
+{
+  "checks": [
+    {
+      "name": "Self Promo Activities",
+      "description": "Check if any of Author's aggregated submission origins are >10% of entire history",
+      // check will run on a new submission in your subreddit and look at the Author of that submission
+      "kind": "submission",
+      "rules": [
+        {
+          "name": "attr10all",
+          "kind": "attribution",
+          "criteria": [
+            {
+              "threshold": "10%",
+              "window": {
+                "days": 90
+              }
+            },
+            {
+              "threshold": "10%",
+              "window": 100
+            }
+          ],
+        }
+      ],
+      "actions": [
+        {
+          "kind": "usernote",
+          // the key of usernote type
+          // https://github.com/toolbox-team/reddit-moderator-toolbox/wiki/Subreddit-Wikis%3A-usernotes#working-with-note-types
+          "type": "spamwarn",
+          // content is mustache templated as usual
+          "content": "Self Promotion: {{rules.attr10all.refDomainTitle}} {{rules.attr10sub.largestPercent}}%"
+        }
+      ]
+    }
+  ]
+}

@@ -58,8 +58,8 @@ export interface UserNoteActionOptions extends UserNoteActionConfig, ActionOptio
 }
 
 /**
- * Report the Activity
+ * Add a Toolbox User Note to the Author of this Activity
  * */
 export interface UserNoteActionJson extends UserNoteActionConfig, ActionJson {
-
+    kind: 'usernote'
 }

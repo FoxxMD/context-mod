@@ -30,5 +30,5 @@ export interface RemoveActionConfig extends ActionConfig {
  * Remove the Activity
  * */
 export interface RemoveActionJson extends RemoveActionConfig, ActionJson {
-
+kind: 'remove'
 }

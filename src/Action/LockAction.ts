@@ -30,7 +30,7 @@ export interface LockActionConfig extends ActionConfig {
  * Lock the Activity
  * */
 export interface LockActionJson extends LockActionConfig, ActionJson {
-
+kind: 'lock'
 }
 
 export default LockAction;

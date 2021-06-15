@@ -55,5 +55,5 @@ export interface FlairActionOptions extends FlairActionConfig,ActionOptions {
  * Flair the Submission
  * */
 export interface FlairActionJson extends FlairActionConfig, ActionJson {
-
+kind: 'flair'
 }

@@ -77,5 +77,5 @@ export interface CommentActionOptions extends CommentActionConfig, ActionOptions
  * Reply to the Activity. For a submission the reply will be a top-level comment.
  * */
 export interface CommentActionJson extends CommentActionConfig, ActionJson {
-
+kind: 'comment'
 }

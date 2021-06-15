@@ -45,5 +45,5 @@ export interface ReportActionOptions extends ReportActionConfig, ActionOptions {
  * Report the Activity
  * */
 export interface ReportActionJson extends ReportActionConfig, ActionJson {
-
+    kind: 'report'
 }

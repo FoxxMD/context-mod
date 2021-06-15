@@ -310,7 +310,7 @@
             "description": "Reply to the Activity. For a submission the reply will be a top-level comment.",
             "properties": {
                 "content": {
-                    "description": "The Content to submit for this Action. Content is interpreted as reddit-flavored Markdown.\n\nIf value starts with 'wiki:' then the proceeding value will be used to get a wiki page\n\nEX \"wiki:botconfig/mybot\" tries to get https://reddit.com/mySubredditExample/wiki/botconfig/mybot\n\nEX \"this is plain text\"\n\nEX \"this is **bold** markdown text\"",
+                    "description": "The Content to submit for this Action. Content is interpreted as reddit-flavored Markdown.\n\nIf value starts with `wiki:` then the proceeding value will be used to get a wiki page\n\nEX `wiki:botconfig/mybot` tries to get `https://reddit.com/mySubredditExample/wiki/botconfig/mybot`\n\nEX `this is plain text` => \"this is plain text\"\n\nEX `this is **bold** markdown text` => \"this is **bold** markdown text\"",
                     "type": "string"
                 },
                 "distinguish": {
@@ -325,12 +325,7 @@
                 "kind": {
                     "description": "The type of action that will be performed",
                     "enum": [
-                        "comment",
-                        "flair",
-                        "lock",
-                        "remove",
-                        "report",
-                        "usernote"
+                        "comment"
                     ],
                     "type": "string"
                 },
@@ -374,6 +369,9 @@
                             },
                             {
                                 "$ref": "#/definitions/RemoveActionJson"
+                            },
+                            {
+                                "$ref": "#/definitions/UserNoteActionJson"
                             },
                             {
                                 "type": "string"
@@ -598,12 +596,7 @@
                 "kind": {
                     "description": "The type of action that will be performed",
                     "enum": [
-                        "comment",
-                        "flair",
-                        "lock",
-                        "remove",
-                        "report",
-                        "usernote"
+                        "flair"
                     ],
                     "type": "string"
                 },
@@ -761,12 +754,7 @@
                 "kind": {
                     "description": "The type of action that will be performed",
                     "enum": [
-                        "comment",
-                        "flair",
-                        "lock",
-                        "remove",
-                        "report",
-                        "usernote"
+                        "lock"
                     ],
                     "type": "string"
                 },
@@ -954,12 +942,7 @@
                 "kind": {
                     "description": "The type of action that will be performed",
                     "enum": [
-                        "comment",
-                        "flair",
-                        "lock",
-                        "remove",
-                        "report",
-                        "usernote"
+                        "remove"
                     ],
                     "type": "string"
                 },
@@ -1108,7 +1091,7 @@
             "description": "Report the Activity",
             "properties": {
                 "content": {
-                    "description": "The Content to submit for this Action. Content is interpreted as reddit-flavored Markdown.\n\nIf value starts with 'wiki:' then the proceeding value will be used to get a wiki page\n\nEX \"wiki:botconfig/mybot\" tries to get https://reddit.com/mySubredditExample/wiki/botconfig/mybot\n\nEX \"this is plain text\"\n\nEX \"this is **bold** markdown text\"",
+                    "description": "The Content to submit for this Action. Content is interpreted as reddit-flavored Markdown.\n\nIf value starts with `wiki:` then the proceeding value will be used to get a wiki page\n\nEX `wiki:botconfig/mybot` tries to get `https://reddit.com/mySubredditExample/wiki/botconfig/mybot`\n\nEX `this is plain text` => \"this is plain text\"\n\nEX `this is **bold** markdown text` => \"this is **bold** markdown text\"",
                     "examples": [
                         "This is the content of a comment/report/usernote",
                         "this is **bold** markdown text",
@@ -1124,12 +1107,7 @@
                 "kind": {
                     "description": "The type of action that will be performed",
                     "enum": [
-                        "comment",
-                        "flair",
-                        "lock",
-                        "remove",
-                        "report",
-                        "usernote"
+                        "report"
                     ],
                     "type": "string"
                 },
@@ -1253,6 +1231,9 @@
                             },
                             {
                                 "$ref": "#/definitions/RemoveActionJson"
+                            },
+                            {
+                                "$ref": "#/definitions/UserNoteActionJson"
                             },
                             {
                                 "type": "string"
@@ -1444,6 +1425,57 @@
             "required": [
                 "condition",
                 "threshold"
+            ],
+            "type": "object"
+        },
+        "UserNoteActionJson": {
+            "description": "Add a Toolbox User Note to the Author of this Activity",
+            "properties": {
+                "allowDuplicate": {
+                    "default": false,
+                    "description": "Add Note even if a Note already exists for this Activity",
+                    "examples": [
+                        false
+                    ],
+                    "type": "boolean"
+                },
+                "content": {
+                    "description": "The Content to submit for this Action. Content is interpreted as reddit-flavored Markdown.\n\nIf value starts with `wiki:` then the proceeding value will be used to get a wiki page\n\nEX `wiki:botconfig/mybot` tries to get `https://reddit.com/mySubredditExample/wiki/botconfig/mybot`\n\nEX `this is plain text` => \"this is plain text\"\n\nEX `this is **bold** markdown text` => \"this is **bold** markdown text\"",
+                    "examples": [
+                        "This is the content of a comment/report/usernote",
+                        "this is **bold** markdown text",
+                        "wiki:botconfig/acomment"
+                    ],
+                    "type": "string"
+                },
+                "dryRun": {
+                    "default": false,
+                    "description": "If `true` the Action will not make the API request to Reddit to perform its action.",
+                    "type": "boolean"
+                },
+                "kind": {
+                    "description": "The type of action that will be performed",
+                    "enum": [
+                        "usernote"
+                    ],
+                    "type": "string"
+                },
+                "name": {
+                    "description": "An optional, but highly recommended, friendly name for this Action. If not present will default to `kind`.\n\nCan only contain letters, numbers, underscore, spaces, and dashes",
+                    "pattern": "^[a-zA-Z]([\\w -]*[\\w])?$",
+                    "type": "string"
+                },
+                "type": {
+                    "description": "User Note type key",
+                    "examples": [
+                        "spamwarn"
+                    ],
+                    "type": "string"
+                }
+            },
+            "required": [
+                "kind",
+                "type"
             ],
             "type": "object"
         },

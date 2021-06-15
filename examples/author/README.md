@@ -2,13 +2,14 @@
 
 ## Rule
 
-The **Author** rule can if any [AuthorCriteria](https://json-schema.app/view/%23%2Fdefinitions%2FAuthorCriteria?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Freddit-context-bot%2Fmaster%2Fsrc%2FSchema%2FApp.json) from a list are either **included** or **excluded**, depending on which property you put them in.
+The **Author** rule triggers if any [AuthorCriteria](https://json-schema.app/view/%23%2Fdefinitions%2FAuthorCriteria?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Freddit-context-bot%2Fmaster%2Fsrc%2FSchema%2FApp.json) from a list are either **included** or **excluded**, depending on which property you put them in.
 
 **AuthorCriteria** that can be checked:
 * name (u/userName)
 * author's subreddit flair text
 * author's subreddit flair css
 * author's subreddit mod status
+* [Toolbox User Notes](/examples/userNotes)
 
 The Author **Rule** is best used in conjunction with other Rules to short-circuit a Check based on who the Author is. It is easier to use a Rule to do this then to write **author filters** for every Rule (and makes Rules more re-useable).
 

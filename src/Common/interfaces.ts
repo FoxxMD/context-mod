@@ -114,13 +114,13 @@ export interface RichContent {
     /**
      * The Content to submit for this Action. Content is interpreted as reddit-flavored Markdown.
      *
-     * If value starts with 'wiki:' then the proceeding value will be used to get a wiki page
+     * If value starts with `wiki:` then the proceeding value will be used to get a wiki page
      *
-     * EX "wiki:botconfig/mybot" tries to get https://reddit.com/mySubredditExample/wiki/botconfig/mybot
+     * EX `wiki:botconfig/mybot` tries to get `https://reddit.com/mySubredditExample/wiki/botconfig/mybot`
      *
-     * EX "this is plain text"
+     * EX `this is plain text` => "this is plain text"
      *
-     * EX "this is **bold** markdown text"
+     * EX `this is **bold** markdown text` => "this is **bold** markdown text"
      *
      * @examples ["This is the content of a comment/report/usernote", "this is **bold** markdown text", "wiki:botconfig/acomment" ]
      * */
