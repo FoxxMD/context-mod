@@ -56,14 +56,14 @@ export class AuthorRule extends Rule {
     protected async process(item: Comment | Submission): Promise<[boolean, RuleResult[]]> {
         if (this.include.length > 0) {
             for (const auth of this.include) {
-                if (await this.cache.testAuthorCriteria(item, auth)) {
+                if (await this.resources.testAuthorCriteria(item, auth)) {
                     return Promise.resolve([true, [this.getResult(true)]]);
                 }
             }
             return Promise.resolve([false, [this.getResult(false)]]);
         }
         for (const auth of this.exclude) {
-            if (await this.cache.testAuthorCriteria(item, auth, false)) {
+            if (await this.resources.testAuthorCriteria(item, auth, false)) {
                 return Promise.resolve([true, [this.getResult(true)]]);
             }
         }

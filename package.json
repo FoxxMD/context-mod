@@ -35,11 +35,13 @@
     "mustache": "^4.2.0",
     "object-hash": "^2.2.0",
     "p-event": "^4.2.0",
+    "pako": "^0.2.6",
     "safe-stable-stringify": "^1.1.1",
     "snoostorm": "^1.5.2",
     "snoowrap": "^1.23.0",
     "winston": "FoxxMD/winston#fbab8de969ecee578981c77846156c7f43b5f01e",
-    "winston-daily-rotate-file": "^4.5.5"
+    "winston-daily-rotate-file": "^4.5.5",
+    "zlib": "^1.0.5"
   },
   "devDependencies": {
     "@tsconfig/node14": "^1.0.0",
@@ -49,6 +51,7 @@
     "@types/mustache": "^4.1.1",
     "@types/node": "^15.6.1",
     "@types/object-hash": "^2.1.0",
+    "@types/pako": "^1.0.1",
     "ts-auto-guard": "*",
     "ts-json-schema-generator": "^0.93.0",
     "typescript-json-schema": "^0.50.1"

@@ -2,8 +2,7 @@ import {Comment} from "snoowrap";
 import Submission from "snoowrap/dist/objects/Submission";
 import {Logger} from "winston";
 import {findResultByPremise, mergeArr} from "../util";
-import {testAuthorCriteria} from "../Utils/SnoowrapUtils";
-import CacheManager, {SubredditCache} from "../Subreddit/SubredditCache";
+import ResourceManager, {SubredditResources} from "../Subreddit/SubredditResources";
 
 export interface RuleOptions {
     name?: string;
@@ -36,7 +35,7 @@ export abstract class Rule implements IRule, Triggerable {
     name: string;
     logger: Logger
     authors: AuthorOptions;
-    cache: SubredditCache;
+    resources: SubredditResources;
 
     constructor(options: RuleOptions) {
         const {
@@ -49,7 +48,7 @@ export abstract class Rule implements IRule, Triggerable {
             subredditName,
         } = options;
         this.name = name;
-        this.cache = CacheManager.get(subredditName);
+        this.resources = ResourceManager.get(subredditName) as SubredditResources;
 
         this.authors = {
             exclude: exclude.map(x => new Author(x)),
@@ -68,7 +67,7 @@ export abstract class Rule implements IRule, Triggerable {
         }
         if (this.authors.include !== undefined && this.authors.include.length > 0) {
             for (const auth of this.authors.include) {
-                if (await this.cache.testAuthorCriteria(item, auth)) {
+                if (await this.resources.testAuthorCriteria(item, auth)) {
                     return this.process(item);
                 }
             }
@@ -77,7 +76,7 @@ export abstract class Rule implements IRule, Triggerable {
         }
         if (this.authors.exclude !== undefined && this.authors.exclude.length > 0) {
             for (const auth of this.authors.exclude) {
-                if (await this.cache.testAuthorCriteria(item, auth, false)) {
+                if (await this.resources.testAuthorCriteria(item, auth, false)) {
                     return this.process(item);
                 }
             }

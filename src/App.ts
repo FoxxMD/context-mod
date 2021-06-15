@@ -6,7 +6,7 @@ import snoowrap from "snoowrap";
 import pEvent from "p-event";
 import JSON5 from 'json5';
 import EventEmitter from "events";
-import CacheManager from './Subreddit/SubredditCache';
+import CacheManager from './Subreddit/SubredditResources';
 import dayjs from "dayjs";
 
 const {transports} = winston;

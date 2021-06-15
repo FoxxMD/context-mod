@@ -209,13 +209,22 @@ export interface SubredditCacheConfig {
     /**
      * Amount of time, in milliseconds, author activities (Comments/Submission) should be cached
      * @examples [10000]
+     * @default 10000
      * */
     authorTTL?: number;
     /**
      * Amount of time, in milliseconds, wiki content pages should be cached
-     * @examples [100000]
+     * @examples [300000]
+     * @default 300000
      * */
     wikiTTL?: number;
+
+    /**
+     * Amount of time, in milliseconds, [Toolbox User Notes](https://www.reddit.com/r/toolbox/wiki/docs/usernotes) should be cached
+     * @examples [60000]
+     * @default 60000
+     * */
+    userNotesTTL?: number;
 }
 
 export interface ManagerOptions {

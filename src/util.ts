@@ -9,6 +9,8 @@ import Ajv from "ajv";
 import {InvalidOptionArgumentError} from "commander";
 import Submission from "snoowrap/dist/objects/Submission";
 import {Comment} from "snoowrap";
+import {inflateSync, deflateSync} from "zlib";
+import pako from "pako";
 
 dayjs.extend(utc);
 dayjs.extend(dduration);
@@ -304,4 +306,28 @@ export function activityWindowText(activities: (Submission | Comment)[], suffix 
 
 export function normalizeName(val: string) {
     return val.trim().replace(/\W+/g, '').toLowerCase()
+}
+
+// https://github.com/toolbox-team/reddit-moderator-toolbox/wiki/Subreddit-Wikis%3A-usernotes#working-with-the-blob
+export const inflateUserNotes = (blob: string) => {
+    //const binaryData = Buffer.from(blob, 'base64').toString('binary');
+    //const str = pako.inflate(binaryData, {to: 'string'});
+
+    const buffer = Buffer.from(blob, 'base64');
+    const str = inflateSync(buffer).toString('utf-8');
+
+    // @ts-ignore
+    return JSON.parse(str);
+}
+// https://github.com/toolbox-team/reddit-moderator-toolbox/wiki/Subreddit-Wikis%3A-usernotes#working-with-the-blob
+export const deflateUserNotes = (usersObject: object) => {
+    const jsonString = JSON.stringify(usersObject);
+
+    // Deflate/compress the string
+    //const binaryData = pako.deflate(jsonString);
+    const binaryData = deflateSync(jsonString);
+
+    // Convert binary data to a base64 string with a Buffer
+    const blob = Buffer.from(binaryData).toString('base64');
+    return blob;
 }

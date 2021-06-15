@@ -49,13 +49,13 @@ export class RecentActivityRule extends Rule {
 
         switch (this.lookAt) {
             case 'comments':
-                activities = await this.cache.getAuthorComments(item.author, {window: this.window});
+                activities = await this.resources.getAuthorComments(item.author, {window: this.window});
                 break;
             case 'submissions':
-                activities = await this.cache.getAuthorSubmissions(item.author, {window: this.window});
+                activities = await this.resources.getAuthorSubmissions(item.author, {window: this.window});
                 break;
             default:
-                activities = await this.cache.getAuthorActivities(item.author, {window: this.window});
+                activities = await this.resources.getAuthorActivities(item.author, {window: this.window});
                 break;
         }
 

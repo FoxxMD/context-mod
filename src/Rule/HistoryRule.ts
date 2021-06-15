@@ -80,7 +80,7 @@ export class HistoryRule extends Rule {
 
             const {comment, window, submission, minActivityCount = 5} = criteria;
 
-            let activities = await this.cache.getAuthorActivities(item.author, {window: window});
+            let activities = await this.resources.getAuthorActivities(item.author, {window: window});
             activities = activities.filter(act => {
                 if (this.include.length > 0) {
                     return this.include.some(x => x === act.subreddit.display_name.toLowerCase());

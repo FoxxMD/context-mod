@@ -86,10 +86,10 @@ export class RepeatActivityRule extends SubmissionRule {
         let activities: (Submission | Comment)[] = [];
         switch (this.lookAt) {
             case 'submissions':
-                activities = await this.cache.getAuthorSubmissions(item.author, {window: this.window});
+                activities = await this.resources.getAuthorSubmissions(item.author, {window: this.window});
                 break;
             default:
-                activities = await this.cache.getAuthorActivities(item.author, {window: this.window});
+                activities = await this.resources.getAuthorActivities(item.author, {window: this.window});
                 break;
         }
 

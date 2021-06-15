@@ -15,7 +15,7 @@ import Submission from "snoowrap/dist/objects/Submission";
 import {itemContentPeek} from "../Utils/SnoowrapUtils";
 import dayjs from "dayjs";
 import LoggedError from "../Utils/LoggedError";
-import CacheManager from "./SubredditCache";
+import ResourceManager, {SubredditResources} from "./SubredditResources";
 
 export class Manager {
     subreddit: Subreddit;
@@ -24,6 +24,7 @@ export class Manager {
     pollOptions: PollingOptions;
     submissionChecks: SubmissionCheck[];
     commentChecks: CommentCheck[];
+    resources: SubredditResources;
 
     subListedOnce = false;
     streamSub?: SubmissionStream;
@@ -60,12 +61,13 @@ export class Manager {
         this.client = client;
         this.dryRun = opts.dryRun || dryRun;
 
-        const cacheConfig = caching === false ? {enabled: false, logger: this.logger} : {
+        const cacheConfig = caching === false ? {enabled: false, logger: this.logger, subreddit: sub} : {
             ...caching,
             enabled: true,
-            logger: this.logger
+            logger: this.logger,
+            subreddit: sub,
         };
-        CacheManager.get(sub.display_name, cacheConfig);
+        this.resources = ResourceManager.set(sub.display_name, cacheConfig);
 
         const commentChecks: Array<CommentCheck> = [];
         const subChecks: Array<SubmissionCheck> = [];
@@ -103,6 +105,9 @@ export class Manager {
         this.currentLabels = [this.displayLabel, itemIdentifier];
         const [peek, _] = await itemContentPeek(item);
         this.logger.info(`<EVENT> ${peek}`);
+
+        const notes = await this.resources.userNotes.getUserNotes(item.author);
+        debugger;
 
         try {
             for (const check of checks) {

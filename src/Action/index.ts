@@ -1,12 +1,12 @@
 import {Comment, Submission} from "snoowrap";
 import {Logger} from "winston";
 import {RuleResult} from "../Rule";
-import CacheManager, {SubredditCache} from "../Subreddit/SubredditCache";
+import ResourceManager, {SubredditResources} from "../Subreddit/SubredditResources";
 
 export abstract class Action {
     name?: string;
     logger: Logger;
-    cache: SubredditCache;
+    resources: SubredditResources;
     dryRun: boolean;
 
     constructor(options: ActionOptions) {
@@ -19,7 +19,7 @@ export abstract class Action {
 
         this.name = name;
         this.dryRun = dryRun;
-        this.cache = CacheManager.get(subredditName);
+        this.resources = ResourceManager.get(subredditName) as SubredditResources;
         const uniqueName = this.name === this.getKind() ? this.getKind() : `${this.getKind()} - ${this.name}`;
         this.logger = logger.child({labels: ['Action', uniqueName]});
     }

@@ -13,26 +13,31 @@ import {mergeArr} from "../util";
 import LoggedError from "../Utils/LoggedError";
 import {SubredditCacheConfig} from "../Common/interfaces";
 import {AuthorCriteria} from "../Rule";
+import UserNotes from "./UserNotes";
 
 export const WIKI_DESCRIM = 'wiki:';
 
 export interface SubredditCacheOptions extends SubredditCacheConfig {
     enabled: boolean;
-    logger?: Logger;
+    subreddit: Subreddit,
+    logger: Logger;
 }
 
-export class SubredditCache {
+export class SubredditResources {
     enabled: boolean;
-    authorTTL: number;
-    useSubredditAuthorCache: boolean;
-    wikiTTL: number;
+    protected authorTTL: number;
+    protected useSubredditAuthorCache: boolean;
+    protected wikiTTL: number;
     name: string;
-    logger: Logger;
+    protected logger: Logger;
+    userNotes: UserNotes;
 
-    constructor(name: string, options?: SubredditCacheOptions) {
+    constructor(name: string, options: SubredditCacheOptions) {
         const {
             enabled = true,
             authorTTL,
+            subreddit,
+            userNotesTTL = 60000,
             wikiTTL = 300000, // 5 minutes
             logger,
         } = options || {};
@@ -46,6 +51,9 @@ export class SubredditCache {
             this.authorTTL = authorTTL;
         }
         this.wikiTTL = wikiTTL;
+
+        this.userNotes = new UserNotes(enabled ? userNotesTTL : 0, subreddit, logger);
+
         this.name = name;
         if (logger === undefined) {
             const alogger = winston.loggers.get('default')
@@ -61,7 +69,7 @@ export class SubredditCache {
         if (useCache) {
             const userName = user.name;
             const hashObj: any = {...options, userName};
-            if(this.useSubredditAuthorCache) {
+            if (this.useSubredditAuthorCache) {
                 hashObj.subreddit = this.name;
             }
             hash = objectHash.sha1({...options, userName});
@@ -127,40 +135,46 @@ export class SubredditCache {
         }
     }
 
-    async testAuthorCriteria(item: (Comment|Submission), authorOpts: AuthorCriteria, include = true) {
+    async testAuthorCriteria(item: (Comment | Submission), authorOpts: AuthorCriteria, include = true) {
         const useCache = this.enabled && this.authorTTL > 0;
         let hash;
-        if(useCache) {
+        if (useCache) {
             const hashObj = {itemId: item.id, ...authorOpts, include};
             hash = `authorCrit-${objectHash.sha1(hashObj)}`;
             const cachedAuthorTest = cache.get(hash);
-            if(null !== cachedAuthorTest) {
+            if (null !== cachedAuthorTest) {
                 this.logger.debug(`Cache Hit: Author Check on ${item.id}`);
                 return cachedAuthorTest;
             }
         }
 
         const result = await testAuthorCriteria(item, authorOpts, include);
-        if(useCache) {
+        if (useCache) {
             cache.put(hash, result, this.authorTTL);
         }
         return result;
     }
 }
 
-class SubredditCacheManager {
-    caches: Map<string, SubredditCache> = new Map();
+class SubredditResourcesManager {
+    resources: Map<string, SubredditResources> = new Map();
     authorTTL: number = 10000;
     enabled: boolean = true;
 
-    get(subName: string, initOptions?: SubredditCacheOptions): SubredditCache {
-        if (!this.caches.has(subName)) {
-            this.caches.set(subName, new SubredditCache(subName, initOptions))
+    get(subName: string): SubredditResources | undefined {
+        if (this.resources.has(subName)) {
+            return this.resources.get(subName) as SubredditResources;
         }
-        return this.caches.get(subName) as SubredditCache;
+        return undefined;
+    }
+
+    set(subName: string, initOptions: SubredditCacheOptions): SubredditResources {
+        const resource = new SubredditResources(subName, initOptions);
+        this.resources.set(subName, resource);
+        return resource;
     }
 }
 
-const manager = new SubredditCacheManager();
+const manager = new SubredditResourcesManager();
 
 export default manager;
