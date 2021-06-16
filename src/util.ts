@@ -11,6 +11,7 @@ import Submission from "snoowrap/dist/objects/Submission";
 import {Comment} from "snoowrap";
 import {inflateSync, deflateSync} from "zlib";
 import pako from "pako";
+import {ActivityWindowCriteria} from "./Common/interfaces";
 
 dayjs.extend(utc);
 dayjs.extend(dduration);
@@ -330,4 +331,13 @@ export const deflateUserNotes = (usersObject: object) => {
     // Convert binary data to a base64 string with a Buffer
     const blob = Buffer.from(binaryData).toString('base64');
     return blob;
+}
+
+export const isActivityWindowCriteria = (val: any): val is ActivityWindowCriteria => {
+    if (val !== null && typeof val === 'object') {
+        return (val.count !== undefined && typeof val.count === 'number') ||
+            // close enough
+            val.duration !== undefined;
+    }
+    return false;
 }

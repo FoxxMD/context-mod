@@ -5,8 +5,14 @@ import dayjs, {Dayjs} from "dayjs";
 import Mustache from "mustache";
 import he from "he";
 import {AuthorCriteria, RuleResult, UserNoteCriteria} from "../Rule";
-import {ActivityWindowType, CommentState, SubmissionState, TypedActivityStates} from "../Common/interfaces";
-import {normalizeName, truncateStringToLength} from "../util";
+import {
+    ActivityWindowType,
+    CommentState,
+    DurationVal,
+    SubmissionState,
+    TypedActivityStates
+} from "../Common/interfaces";
+import {isActivityWindowCriteria, normalizeName, truncateStringToLength} from "../util";
 import UserNotes from "../Subreddit/UserNotes";
 import {Logger} from "winston";
 
@@ -21,31 +27,47 @@ export interface AuthorActivitiesOptions {
 
 export async function getAuthorActivities(user: RedditUser, options: AuthorTypedActivitiesOptions): Promise<Array<Submission | Comment>> {
 
-    const {chunkSize: cs = 100} = options;
+    const {chunkSize: cs = 100, window: optWindow} = options;
 
-    let window: number | Dayjs,
+    let satisfiedCount: number | undefined,
+        satisfiedEndtime: Dayjs | undefined,
         chunkSize = Math.min(cs, 100);
-    if (typeof options.window !== 'number') {
+
+    let durVal: DurationVal | undefined;
+    let duration: Duration | undefined;
+
+    if(isActivityWindowCriteria(optWindow)) {
+        satisfiedCount = optWindow.count;
+        durVal = optWindow.duration;
+    } else if(typeof optWindow === 'number') {
+        satisfiedCount = optWindow;
+    } else {
+        durVal = optWindow as DurationVal;
+    }
+
+    // if count is less than max limit (100) go ahead and just get that many. may result in faster response time for low numbers
+    if(satisfiedCount !== undefined) {
+        chunkSize = Math.min(chunkSize, satisfiedCount);
+    }
+
+    if(durVal !== undefined) {
         const endTime = dayjs();
-        let d;
-        if (dayjs.isDuration(options.window)) {
-            d = options.window;
-        } else {
+        if (!dayjs.isDuration(durVal)) {
             // @ts-ignore
-            d = dayjs.duration(options.window);
+            duration = dayjs.duration(durVal);
         }
-        if (!dayjs.isDuration(d)) {
+        if (!dayjs.isDuration(duration)) {
             // TODO print object
             throw new Error('window given was not a number, a valid ISO8601 duration, a Day.js duration, or well-formed Duration options');
         }
-        window = endTime.subtract(d.asMilliseconds(), 'milliseconds');
-    } else {
-        window = options.window;
-        // use whichever is smaller so we only do one api request if window is smaller than default chunk size
-        chunkSize = Math.min(chunkSize, window);
+        satisfiedEndtime = endTime.subtract(duration.asMilliseconds(), 'milliseconds');
     }
+
+    if(satisfiedCount === undefined && satisfiedEndtime === undefined) {
+        throw new Error('window value was not valid');
+    }
+
     let items: Array<Submission | Comment> = [];
-    let lastItemDate;
     //let count = 1;
     let listing;
     switch (options.type) {
@@ -63,33 +85,38 @@ export async function getAuthorActivities(user: RedditUser, options: AuthorTyped
     let offset = chunkSize;
     while (!hitEnd) {
 
-        if (typeof window === 'number') {
-            hitEnd = listing.length >= window;
-        } else {
-            const listSlice = listing.slice(offset - chunkSize);
+        const listSlice = listing.slice(offset - chunkSize)
+        if (satisfiedCount !== undefined && items.length + listSlice.length >= satisfiedCount) {
+            // satisfied count
+            items = items.concat(listSlice).slice(0, satisfiedCount);
+            break;
+        }
 
+        if(satisfiedEndtime !== undefined) {
             const truncatedItems = listSlice.filter((x) => {
                 const utc = x.created_utc * 1000;
                 const itemDate = dayjs(utc);
                 // @ts-ignore
-                return window.isBefore(itemDate);
+                return satisfiedEndtime.isBefore(itemDate);
             });
+
             if (truncatedItems.length !== listSlice.length) {
-                hitEnd = true;
+                // satisfied duration
+                items = items.concat(truncatedItems);
+                break;
             }
-            items = items.concat(truncatedItems);
         }
-        if (!hitEnd) {
-            hitEnd = listing.isFinished;
-        }
+
+        // if we got this far neither count or time was satisfied so just add all items from listing and fetch more is possible
+        items = items.concat(listSlice);
+
+        hitEnd = listing.isFinished;
+
         if (!hitEnd) {
             offset += chunkSize;
             listing = await listing.fetchMore({amount: chunkSize});
-        } else if (typeof window === 'number') {
-            items = listing.slice(0, window + 1);
         }
     }
-    // TODO truncate items to window size when duration
     return Promise.resolve(items);
 }
 

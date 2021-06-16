@@ -3,11 +3,16 @@
  * @pattern ^(-?)P(?=\d|T\d)(?:(\d+)Y)?(?:(\d+)M)?(?:(\d+)([DW]))?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?)?$
  * */
 export type ISO8601 = string;
-export type ActivityWindowType = Duration | number | ActivityWindowCriteria;
-export type Duration = ISO8601 | DurationObject;
+export type ActivityWindowType = DurationVal | number | ActivityWindowCriteria;
+export type DurationVal = ISO8601 | DurationObject;
 
 /**
- * If both properties are defined then the first criteria met will be used IE if # of activities = count before duration is reached then count will be used, or vice versa
+ * If both criteria are defined then whichever is met first will be used
+ *
+ * EX 100 count, 90 days
+ *
+ * * If 90 days of activities = 40 activities => returns 40 activities
+ * * If 100 activities is only 20 days => 100 activities
  * @minProperties 1
  * @additionalProperties false
  * */
@@ -18,7 +23,7 @@ export interface ActivityWindowCriteria {
      * */
     count?: number,
     /**
-     * An ISO 8601 duration or Day.js duration object.
+     * An [ISO 8601 duration](https://en.wikipedia.org/wiki/ISO_8601#Durations) or [Day.js duration object](https://day.js.org/docs/en/durations/creating).
      *
      * The duration will be subtracted from the time when the rule is run to create a time range like this:
      *
@@ -27,7 +32,7 @@ export interface ActivityWindowCriteria {
      * EX endTime = 3:00PM <----> startTime = (NOW - 15 minutes) = 2:45PM -- so look for activities between 2:45PM and 3:00PM
      * @examples ["PT1M", {"minutes": 15}]
      * */
-    duration?: Duration
+    duration?: DurationVal
 }
 
 /**

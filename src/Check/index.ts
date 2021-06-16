@@ -118,7 +118,6 @@ export class Check implements ICheck {
             this.logger.info(`❌ => Item did not pass 'itemIs' test`);
             return [false, allResults];
         }
-        debugger;
         let authorPass = null;
         if (this.authorIs.include !== undefined && this.authorIs.include.length > 0) {
             for (const auth of this.authorIs.include) {
