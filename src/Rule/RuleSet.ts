@@ -57,6 +57,11 @@ export class RuleSet implements IRuleSet, Triggerable {
         if (!runOne) {
             return [false, results];
         }
+        if(this.condition === 'OR') {
+            // if OR and did not return already then none passed
+            return [false, results];
+        }
+        // otherwise AND and did not return already so all passed
         return [true, results];
     }
 }

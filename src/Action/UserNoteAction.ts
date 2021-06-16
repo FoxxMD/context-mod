@@ -27,6 +27,7 @@ export class UserNoteAction extends Action {
     async process(item: Comment | Submission, ruleResults: RuleResult[]): Promise<void> {
         const content = await this.resources.getContent(this.content, item.subreddit);
         const renderedContent = await renderContent(content, item, ruleResults);
+        debugger;
         this.logger.verbose(`Note:\r\n(${this.type}) ${renderedContent}`);
 
         if (!this.allowDuplicate) {

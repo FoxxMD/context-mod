@@ -202,7 +202,12 @@ export class Check implements ICheck {
         if (!runOne) {
             this.logger.info('❌ => All Rules skipped because of Author checks or itemIs tests');
             return [false, allResults];
+        } else if(this.condition === 'OR') {
+            // if OR and did not return already then none passed
+            this.logger.info(`❌ => Rules (OR): ${ruleNamesFromResults(allResults)}`);
+            return [false, allResults];
         }
+        // otherwise AND and did not return already so all passed
         this.logger.info(`✔️ => Rules (AND) : ${ruleNamesFromResults(allResults)}`);
         return [true, allResults];
     }
