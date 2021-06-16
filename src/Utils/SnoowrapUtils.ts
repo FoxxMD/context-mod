@@ -263,7 +263,7 @@ export const testAuthorCriteria = async (item: (Comment | Submission), authorOpt
                             const {count = 1, order = 'descending', search = 'current', type} = noteCriteria;
                             switch (search) {
                                 case 'current':
-                                    if (notes[notes.length - 1].noteType === type) {
+                                    if (notes.length > 0 && notes[notes.length - 1].noteType === type) {
                                         return true;
                                     }
                                     break;
