@@ -106,18 +106,26 @@ export class Manager {
         this.currentLabels = [this.displayLabel, itemIdentifier];
         const [peek, _] = await itemContentPeek(item);
         this.logger.info(`<EVENT> ${peek}`);
+        const startingApiLimit = this.client.ratelimitRemaining;
+
+        let checksRun = 0;
+        let actionsRun = 0;
+        let totalRulesRun = 0;
 
         try {
+            let triggered = false;
             for (const check of checks) {
                 if (checkNames.length > 0 && !checkNames.map(x => x.toLowerCase()).some(x => x === check.name.toLowerCase())) {
                     this.logger.warn(`Check ${check} not in array of requested checks to run, skipping`);
                     continue;
                 }
-                let triggered = false;
+                checksRun++;
+                triggered = false;
                 let currentResults: RuleResult[] = [];
                 try {
-                    const [checkTriggered, checkResults] = await check.run(item, allRuleResults);
+                    const [checkTriggered, checkResults] = await check.runRules(item, allRuleResults);
                     currentResults = checkResults;
+                    totalRulesRun += checkResults.length;
                     allRuleResults = allRuleResults.concat(determineNewResults(allRuleResults, checkResults));
                     triggered = checkTriggered;
                 } catch (e) {
@@ -125,17 +133,24 @@ export class Manager {
                 }
 
                 if (triggered) {
-                    await check.runActions(item, currentResults);
+                    const runActions = await check.runActions(item, currentResults);
+                    actionsRun = runActions.length;
                     break;
                 }
             }
+
+            if(!triggered) {
+                this.logger.info('No checks triggered');
+            }
+
         } catch (err) {
             if (!(err instanceof LoggedError)) {
                 this.logger.error('An unhandled error occurred while running checks', err);
             }
         } finally {
+            this.logger.verbose(`Run Stats:        Checks ${checksRun} | Rules => Total: ${totalRulesRun} Unique: ${allRuleResults.length} Cached: ${totalRulesRun - allRuleResults.length} | Actions ${actionsRun}`);
+            this.logger.verbose(`Reddit API Stats: Initial Limit ${startingApiLimit} | Current Limit ${this.client.ratelimitRemaining} | Calls Made ${startingApiLimit - this.client.ratelimitRemaining}`);
             this.currentLabels = [this.displayLabel];
-            this.logger.debug(`Reddit API Rate Limit remaining: ${this.client.ratelimitRemaining}`);
         }
     }
 

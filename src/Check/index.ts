@@ -142,11 +142,11 @@ export class Check implements ICheck {
         }
     }
 
-    async run(item: Submission | Comment, existingResults: RuleResult[] = []): Promise<[boolean, RuleResult[]]> {
+    async runRules(item: Submission | Comment, existingResults: RuleResult[] = []): Promise<[boolean, RuleResult[]]> {
         let allResults: RuleResult[] = [];
         const [itemPass, crit] = isItem(item, this.itemIs, this.logger);
         if(!itemPass) {
-            this.logger.info(`❌ => Item did not pass 'itemIs' test`);
+            this.logger.verbose(`❌ => Item did not pass 'itemIs' test`);
             return [false, allResults];
         }
         let authorPass = null;
@@ -200,11 +200,11 @@ export class Check implements ICheck {
             }
         }
         if (!runOne) {
-            this.logger.info('❌ => All Rules skipped because of Author checks or itemIs tests');
+            this.logger.verbose('❌ => All Rules skipped because of Author checks or itemIs tests');
             return [false, allResults];
         } else if(this.condition === 'OR') {
             // if OR and did not return already then none passed
-            this.logger.info(`❌ => Rules (OR): ${ruleNamesFromResults(allResults)}`);
+            this.logger.verbose(`❌ => Rules (OR): ${ruleNamesFromResults(allResults)}`);
             return [false, allResults];
         }
         // otherwise AND and did not return already so all passed
@@ -212,12 +212,20 @@ export class Check implements ICheck {
         return [true, allResults];
     }
 
-    async runActions(item: Submission | Comment, ruleResults: RuleResult[]): Promise<void> {
+    async runActions(item: Submission | Comment, ruleResults: RuleResult[]): Promise<Action[]> {
         this.logger.debug(`${this.dryRun ? 'DRYRUN - ' : ''}Running Actions`);
+        const runActions: Action[] = [];
         for (const a of this.actions) {
-            await a.handle(item, ruleResults);
+            try {
+                await a.handle(item, ruleResults);
+                runActions.push(a);
+            } catch(err) {
+                this.logger.error(`Action ${a.getActionUniqueName()} encountered an error while running`);
+                this.logger.error(err);
+            }
         }
-        this.logger.info(`${this.dryRun ? 'DRYRUN - ' : ''}Ran Actions`);
+        this.logger.info(`${this.dryRun ? 'DRYRUN - ' : ''}Ran Actions: ${runActions.map(x => x.getActionUniqueName()).join(' | ')}`);
+        return runActions;
     }
 }
 

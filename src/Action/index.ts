@@ -31,7 +31,7 @@ export abstract class Action {
 
     async handle(item: Comment | Submission, ruleResults: RuleResult[]): Promise<void> {
         await this.process(item, ruleResults);
-        this.logger.debug(`${this.dryRun ? 'DRYRUN - ' : ''}Done`);
+        this.logger.verbose(`${this.dryRun ? 'DRYRUN - ' : ''}Done`);
     }
 
     abstract process(item: Comment | Submission, ruleResults: RuleResult[]): Promise<void>;
