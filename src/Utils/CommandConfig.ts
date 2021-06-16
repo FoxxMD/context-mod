@@ -24,7 +24,7 @@ export const logDir = new commander.Option('-d, --logDir <dir>', 'Absolute path 
     .default(process.env.LOG_DIR || `${process.cwd()}/logs`, 'process.env.LOG_DIR || process.cwd()/logs');
 
 export const logLevel = new commander.Option('-l, --logLevel <level>', 'Log level')
-    .default(process.env.LOG_LEVEL || 'info', 'process.env.LOG_LEVEL || info');
+    .default(process.env.LOG_LEVEL || 'verbose', 'process.env.LOG_LEVEL || verbose');
 
 export const wikiConfig = new commander.Option('-w, --wikiConfig <path>', 'Relative url to contextbot wiki page EX https://reddit.com/r/subreddit/wiki/<path>')
     .default(process.env.WIKI_CONFIG || 'botconfig/contextbot', "process.env.WIKI_CONFIG || 'botconfig/contextbot'");

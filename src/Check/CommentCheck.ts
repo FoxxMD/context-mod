@@ -8,5 +8,6 @@ export class CommentCheck extends Check {
         super(options);
         const {itemIs = []} = options;
         this.itemIs = itemIs;
+        this.logSummary('comment');
     }
 }

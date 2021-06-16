@@ -107,8 +107,39 @@ export class Check implements ICheck {
                 }
             }
         }
+    }
 
-
+    logSummary(type: string) {
+        const runStats = [];
+        const ruleSetCount = this.rules.reduce((x, r) => r instanceof RuleSet ? x + 1: x, 0);
+        const rulesInSetsCount = this.rules.reduce((x, r) => r instanceof RuleSet ? x + r.rules.length : x,0);
+        if(ruleSetCount > 0) {
+            runStats.push(`${ruleSetCount} Rule Sets (${rulesInSetsCount} Rules)`);
+        }
+        const topRuleCount = this.rules.reduce((x, r) => r instanceof Rule ? x + 1: x, 0);
+        if(topRuleCount > 0) {
+            runStats.push(`${topRuleCount} Top-Level Rules`);
+        }
+        runStats.push(`${this.actions.length} Actions`);
+        // not sure if this should be info or verbose
+        this.logger.info(`${type.toUpperCase()} (${this.condition}) => ${runStats.join(' | ')}${this.description !== undefined ? ` => ${this.description}` : ''}`);
+        if(this.rules.length === 0) {
+            this.logger.warn('No rules found -- this check will ALWAYS PASS!');
+        }
+        let ruleSetIndex = 1;
+        for(const r of this.rules) {
+            if(r instanceof RuleSet) {
+                for(const ru of r.rules) {
+                    this.logger.verbose(`(Rule Set ${ruleSetIndex} ${r.condition}) => ${ru.getRuleUniqueName()}`);
+                }
+                ruleSetIndex++;
+            } else {
+                this.logger.verbose(`(Rule) => ${r.getRuleUniqueName()}`);
+            }
+        }
+        for(const a of this.actions) {
+            this.logger.verbose(`(Action) => ${a.getActionUniqueName()}`);
+        }
     }
 
     async run(item: Submission | Comment, existingResults: RuleResult[] = []): Promise<[boolean, RuleResult[]]> {
@@ -143,6 +174,12 @@ export class Check implements ICheck {
                 return Promise.resolve([false, allResults]);
             }
         }
+
+        if(this.rules.length === 0) {
+            this.logger.info(`✔️ => No rules to run, check auto-passes`);
+            return [true, allResults];
+        }
+
         let runOne = false;
         for (const r of this.rules) {
             const combinedResults = [...existingResults, ...allResults];
@@ -229,12 +266,15 @@ export interface CheckJson extends ICheck {
      */
     kind: 'submission' | 'comment'
     /**
-     * A list of Rules to run. If `Rule` objects are triggered based on `condition` then `Actions` will be performed.
+     * A list of Rules to run.
      *
-     * Can be `Rule`, `RuleSet`, or the `name` of any **named** `Rule` in your subreddit's configuration
-     * @minItems 1
+     * If `Rule` objects are triggered based on `condition` then `actions` will be performed.
+     *
+     * Can be `Rule`, `RuleSet`, or the `name` of any **named** `Rule` in your subreddit's configuration.
+     *
+     * **If `rules` is an empty array or not present then `actions` are performed immediately.**
      * */
-    rules: Array<RuleSetJson | RuleJson>
+    rules?: Array<RuleSetJson | RuleJson>
     /**
      * The `Actions` to run after the check is successfully triggered. ALL `Actions` will run in the order they are listed
      *

@@ -88,13 +88,7 @@ export class Manager {
             }
         }
 
-        for (const subc of subChecks) {
-            this.logger.info(`Submission Check: ${subc.name}${subc.description !== undefined ? ` => ${subc.description}` : ''}`);
-        }
         this.submissionChecks = subChecks;
-        for (const comm of commentChecks) {
-            this.logger.info(`Comment Check: ${comm.name}${comm.description !== undefined ? ` => ${comm.description}` : ''}`);
-        }
         this.commentChecks = commentChecks;
         const checkSummary = `Found Checks -- Submission: ${this.submissionChecks.length} | Comment: ${this.commentChecks.length}`;
         if (subChecks.length === 0 && commentChecks.length === 0) {

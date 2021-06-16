@@ -62,8 +62,7 @@ export abstract class Rule implements IRule, Triggerable {
 
         this.itemIs = itemIs;
 
-        const ruleUniqueName = this.name === undefined ? this.getKind() : `${this.getKind()} - ${this.name}`;
-        this.logger = logger.child({labels: ['Rule',`${ruleUniqueName}`]}, mergeArr);
+        this.logger = logger.child({labels: ['Rule',`${this.getRuleUniqueName()}`]}, mergeArr);
     }
 
     async run(item: Comment | Submission, existingResults: RuleResult[] = []): Promise<[(boolean | null), RuleResult[]]> {
@@ -101,6 +100,10 @@ export abstract class Rule implements IRule, Triggerable {
     protected abstract process(item: Comment | Submission): Promise<[boolean, RuleResult[]]>;
 
     abstract getKind(): string;
+
+    getRuleUniqueName() {
+        return this.name === undefined ? this.getKind() : `${this.getKind()} - ${this.name}`;
+    }
 
     protected abstract getSpecificPremise(): object;
 

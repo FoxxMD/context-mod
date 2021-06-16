@@ -56,13 +56,15 @@ export class ConfigBuilder {
         let namedActions: Map<string, ActionObjectJson> = new Map();
         const {checks = []} = config;
         for (const c of checks) {
-            namedRules = extractNamedRules(c.rules, namedRules);
+            const { rules = [] } = c;
+            namedRules = extractNamedRules(rules, namedRules);
             namedActions = extractNamedActions(c.actions, namedActions);
         }
 
         const structuredChecks: CheckStructuredJson[] = [];
         for (const c of checks) {
-            const strongRules = insertNamedRules(c.rules, namedRules);
+            const { rules = [] } = c;
+            const strongRules = insertNamedRules(rules, namedRules);
             const strongActions = insertNamedActions(c.actions, namedActions);
             const strongCheck = {...c, rules: strongRules, actions: strongActions} as CheckStructuredJson;
             structuredChecks.push(strongCheck);

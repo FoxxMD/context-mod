@@ -40,7 +40,7 @@ export class App {
             accessToken,
             refreshToken,
             logDir = process.env.LOG_DIR || `${process.cwd()}/logs`,
-            logLevel = process.env.LOG_LEVEL || 'info',
+            logLevel = process.env.LOG_LEVEL || 'verbose',
             wikiConfig = process.env.WIKI_CONFIG || 'botconfig/contextbot',
             snooDebug = process.env.SNOO_DEBUG || false,
             dryRun = process.env.DRYRUN || false,

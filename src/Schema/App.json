@@ -562,7 +562,7 @@
                     "type": "string"
                 },
                 "rules": {
-                    "description": "A list of Rules to run. If `Rule` objects are triggered based on `condition` then `Actions` will be performed.\n\nCan be `Rule`, `RuleSet`, or the `name` of any **named** `Rule` in your subreddit's configuration",
+                    "description": "A list of Rules to run.\n\nIf `Rule` objects are triggered based on `condition` then `actions` will be performed.\n\nCan be `Rule`, `RuleSet`, or the `name` of any **named** `Rule` in your subreddit's configuration.\n\n**If `rules` is an empty array or not present then `actions` are performed immediately.**",
                     "items": {
                         "anyOf": [
                             {
@@ -588,15 +588,13 @@
                             }
                         ]
                     },
-                    "minItems": 1,
                     "type": "array"
                 }
             },
             "required": [
                 "actions",
                 "kind",
-                "name",
-                "rules"
+                "name"
             ],
             "type": "object"
         },
@@ -1526,7 +1524,7 @@
                     "type": "string"
                 },
                 "rules": {
-                    "description": "A list of Rules to run. If `Rule` objects are triggered based on `condition` then `Actions` will be performed.\n\nCan be `Rule`, `RuleSet`, or the `name` of any **named** `Rule` in your subreddit's configuration",
+                    "description": "A list of Rules to run.\n\nIf `Rule` objects are triggered based on `condition` then `actions` will be performed.\n\nCan be `Rule`, `RuleSet`, or the `name` of any **named** `Rule` in your subreddit's configuration.\n\n**If `rules` is an empty array or not present then `actions` are performed immediately.**",
                     "items": {
                         "anyOf": [
                             {
@@ -1552,15 +1550,13 @@
                             }
                         ]
                     },
-                    "minItems": 1,
                     "type": "array"
                 }
             },
             "required": [
                 "actions",
                 "kind",
-                "name",
-                "rules"
+                "name"
             ],
             "type": "object"
         },

@@ -20,11 +20,14 @@ export abstract class Action {
         this.name = name;
         this.dryRun = dryRun;
         this.resources = ResourceManager.get(subredditName) as SubredditResources;
-        const uniqueName = this.name === this.getKind() ? this.getKind() : `${this.getKind()} - ${this.name}`;
-        this.logger = logger.child({labels: ['Action', uniqueName]});
+        this.logger = logger.child({labels: ['Action', this.getActionUniqueName()]});
     }
 
     abstract getKind(): string;
+
+    getActionUniqueName() {
+        return this.name === this.getKind() ? this.getKind() : `${this.getKind()} - ${this.name}`;
+    }
 
     async handle(item: Comment | Submission, ruleResults: RuleResult[]): Promise<void> {
         await this.process(item, ruleResults);
