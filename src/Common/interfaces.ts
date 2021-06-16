@@ -3,16 +3,15 @@
  * @pattern ^(-?)P(?=\d|T\d)(?:(\d+)Y)?(?:(\d+)M)?(?:(\d+)([DW]))?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?)?$
  * */
 export type ISO8601 = string;
-export type ActivityWindowType = DurationVal | number | ActivityWindowCriteria;
+export type ActivityWindowType = ActivityWindowCriteria | DurationVal | number;
 export type DurationVal = ISO8601 | DurationObject;
 
 /**
- * If both criteria are defined then whichever is met first will be used
+ * The criteria used to define what range of Activity to retrieve.
  *
- * EX 100 count, 90 days
+ * May specify one, or both properties along with the `satisfyOn` property, to affect the retrieval behavior.
  *
- * * If 90 days of activities = 40 activities => returns 40 activities
- * * If 100 activities is only 20 days => 100 activities
+ * @examples [{"count": 100, "duration": {"days": 90}}]
  * @minProperties 1
  * @additionalProperties false
  * */
@@ -23,22 +22,48 @@ export interface ActivityWindowCriteria {
      * */
     count?: number,
     /**
-     * An [ISO 8601 duration](https://en.wikipedia.org/wiki/ISO_8601#Durations) or [Day.js duration object](https://day.js.org/docs/en/durations/creating).
+     * An [ISO 8601 duration string](https://en.wikipedia.org/wiki/ISO_8601#Durations) or [Day.js duration object](https://day.js.org/docs/en/durations/creating).
      *
      * The duration will be subtracted from the time when the rule is run to create a time range like this:
      *
-     * endTime = NOW  <----> startTime = (NOW - duration)
+     * endTime = NOW  <----> startTime = (NOW - `duration`)
      *
-     * EX endTime = 3:00PM <----> startTime = (NOW - 15 minutes) = 2:45PM -- so look for activities between 2:45PM and 3:00PM
-     * @examples ["PT1M", {"minutes": 15}]
+     * EX `PT15M` or `{"minutes": 15}`
+     * * `endTime` = NOW (3:00PM)
+     * * `startTime` = (NOW - 15 minutes) = 2:45PM
+     *
+     * So look for Activities between 2:45PM and 3:00PM
+     * @examples ["PT15M", {"minutes": 15}]
      * */
     duration?: DurationVal
+
+    /**
+     * Define the condition under which both criteria are considered met
+     *
+     * **If `any` then it will retrieve Activities until one of the criteria is met, whichever occurs first**
+     *
+     * EX `{count: 100, duration: {days: 90}}`:
+     * * If 90 days of activities = 40 activities => returns 40 activities
+     * * If 100 activities is only 20 days => 100 activities
+     *
+     * **If `all` then both criteria must be met.**
+     *
+     * Effectively, whichever criteria produces the most Activities...
+     *
+     * EX `{count: 100, duration: {days: 90}}`:
+     * * If at 90 days of activities => 40 activities, continue retrieving results until 100 => results in >90 days of activities
+     * * If at 100 activities => 20 days of activities, continue retrieving results until 90 days => results in >100 activities
+     *
+     * @examples ["any"]
+     * @default any
+     * */
+    satisfyOn?: 'any' | 'all';
 }
 
 /**
- * A Day.js duration object
+ * A [Day.js duration object](https://day.js.org/docs/en/durations/creating)
  *
- * https://day.js.org/docs/en/durations/creating
+ * @examples [{"minutes": 30, "hours": 1}]
  * @minProperties 1
  * @additionalProperties false
  * */
@@ -98,10 +123,8 @@ export interface ActivityWindow {
     /**
      * Criteria for defining what set of activities should be considered.
      *
-     * The value of this property may be either count OR duration -- to use both write it as an ActivityWindowCriteria
+     * The value of this property may be either count OR duration -- to use both write it as an `ActivityWindowCriteria`
      *
-     * See ActivityWindowCriteria for descriptions of what count/duration do
-     * @examples require('./interfaces.ts').windowExample
      * @default 15
      */
     window?: ActivityWindowType,
@@ -174,10 +197,12 @@ export interface JoinCondition {
 
 /**
  * You may specify polling options independently for submissions/comments
+ * @examples [{"submissions": {"limit": 10, "interval": 10000}, "comments": {"limit": 15, "interval": 10000}}]
  * */
 export interface PollingOptions {
     /**
      * Polling options for submission events
+     * @examples [{"limit": 10, "interval": 10000}]
      * */
     submissions?: {
         /**
@@ -196,6 +221,7 @@ export interface PollingOptions {
     },
     /**
      * Polling options for comment events
+     * @examples [{"limit": 10, "interval": 10000}]
      * */
     comments?: {
         /**
@@ -248,6 +274,7 @@ export interface ManagerOptions {
      * Use this option to override the `dryRun` setting for all `Checks`
      *
      * @default undefined
+     * @examples [false,true]
      * */
     dryRun?: boolean;
 }
@@ -285,6 +312,7 @@ export interface ActivityState {
 
 /**
  * Different attributes a `Submission` can be in. Only include a property if you want to check it.
+ * @examples [{"over_18": true, "removed": false}]
  * */
 export interface SubmissionState extends ActivityState {
     pinned?: boolean
@@ -298,6 +326,7 @@ export interface SubmissionState extends ActivityState {
 
 /**
  * Different attributes a `Comment` can be in. Only include a property if you want to check it.
+ * @examples [{"op": true, "removed": false}]
  * */
 export interface CommentState extends ActivityState {
     /*

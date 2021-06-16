@@ -4,6 +4,10 @@
         "dryRun": {
             "default": false,
             "description": "If `true` the Action will not make the API request to Reddit to perform its action.",
+            "examples": [
+                false,
+                true
+            ],
             "type": "boolean"
         },
         "kind": {
@@ -20,6 +24,9 @@
         },
         "name": {
             "description": "An optional, but highly recommended, friendly name for this Action. If not present will default to `kind`.\n\nCan only contain letters, numbers, underscore, spaces, and dashes",
+            "examples": [
+                "myDescriptiveAction"
+            ],
             "pattern": "^[a-zA-Z]([\\w -]*[\\w])?$",
             "type": "string"
         }

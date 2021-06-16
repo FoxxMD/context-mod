@@ -46,12 +46,14 @@ export interface ActionConfig {
      * Can only contain letters, numbers, underscore, spaces, and dashes
      *
      * @pattern ^[a-zA-Z]([\w -]*[\w])?$
+     * @examples ["myDescriptiveAction"]
      * */
     name?: string;
     /**
      * If `true` the Action will not make the API request to Reddit to perform its action.
      *
      * @default false
+     * @examples [false, true]
      * */
     dryRun?: boolean;
 }

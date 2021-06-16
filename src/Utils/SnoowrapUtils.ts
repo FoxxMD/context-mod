@@ -1,6 +1,6 @@
 import Snoowrap, {Comment, RedditUser} from "snoowrap";
 import Submission from "snoowrap/dist/objects/Submission";
-import {Duration} from "dayjs/plugin/duration";
+import {Duration, DurationUnitsObjectType} from "dayjs/plugin/duration";
 import dayjs, {Dayjs} from "dayjs";
 import Mustache from "mustache";
 import he from "he";
@@ -22,23 +22,29 @@ export interface AuthorTypedActivitiesOptions extends AuthorActivitiesOptions {
 
 export interface AuthorActivitiesOptions {
     window: ActivityWindowType | Duration
-    chunkSize?: number
+    chunkSize?: number,
 }
 
 export async function getAuthorActivities(user: RedditUser, options: AuthorTypedActivitiesOptions): Promise<Array<Submission | Comment>> {
 
-    const {chunkSize: cs = 100, window: optWindow} = options;
+    const {
+        chunkSize: cs = 100,
+        window: optWindow
+    } = options;
 
     let satisfiedCount: number | undefined,
         satisfiedEndtime: Dayjs | undefined,
-        chunkSize = Math.min(cs, 100);
+        chunkSize = Math.min(cs, 100),
+        satisfy = 'any';
 
     let durVal: DurationVal | undefined;
     let duration: Duration | undefined;
 
     if(isActivityWindowCriteria(optWindow)) {
-        satisfiedCount = optWindow.count;
-        durVal = optWindow.duration;
+        const { satisfyOn = 'any', count, duration } = optWindow;
+        satisfiedCount = count;
+        durVal = duration;
+        satisfy = satisfyOn
     } else if(typeof optWindow === 'number') {
         satisfiedCount = optWindow;
     } else {
@@ -65,6 +71,9 @@ export async function getAuthorActivities(user: RedditUser, options: AuthorTyped
 
     if(satisfiedCount === undefined && satisfiedEndtime === undefined) {
         throw new Error('window value was not valid');
+    } else if(satisfy === 'all' && !(satisfiedCount !== undefined && satisfiedEndtime !== undefined)) {
+        // even though 'all' was requested we don't have two criteria so its really 'any' logic
+        satisfy = 'any';
     }
 
     let items: Array<Submission | Comment> = [];
@@ -85,15 +94,22 @@ export async function getAuthorActivities(user: RedditUser, options: AuthorTyped
     let offset = chunkSize;
     while (!hitEnd) {
 
+        let countOk = false,
+            timeOk = false;
+
         const listSlice = listing.slice(offset - chunkSize)
         if (satisfiedCount !== undefined && items.length + listSlice.length >= satisfiedCount) {
             // satisfied count
-            items = items.concat(listSlice).slice(0, satisfiedCount);
-            break;
+            if(satisfy === 'any') {
+                items = items.concat(listSlice).slice(0, satisfiedCount);
+                break;
+            }
+            countOk = true;
         }
 
+        let truncatedItems: Array<Submission | Comment> = [];
         if(satisfiedEndtime !== undefined) {
-            const truncatedItems = listSlice.filter((x) => {
+            truncatedItems = listSlice.filter((x) => {
                 const utc = x.created_utc * 1000;
                 const itemDate = dayjs(utc);
                 // @ts-ignore
@@ -101,13 +117,26 @@ export async function getAuthorActivities(user: RedditUser, options: AuthorTyped
             });
 
             if (truncatedItems.length !== listSlice.length) {
-                // satisfied duration
-                items = items.concat(truncatedItems);
-                break;
+                if(satisfy === 'any') {
+                    // satisfied duration
+                    items = items.concat(truncatedItems);
+                    break;
+                }
+                timeOk = true;
             }
         }
 
-        // if we got this far neither count or time was satisfied so just add all items from listing and fetch more is possible
+        // if we've satisfied everything take whichever is bigger
+        if(satisfy === 'all' && countOk && timeOk) {
+            if(satisfiedCount as number > items.length + truncatedItems.length) {
+                items = items.concat(listSlice).slice(0, satisfiedCount);
+            } else {
+                items = items.concat(truncatedItems);
+            }
+            break;
+        }
+
+        // if we got this far neither count nor time was satisfied (or both) so just add all items from listing and fetch more if possible
         items = items.concat(listSlice);
 
         hitEnd = listing.isFinished;

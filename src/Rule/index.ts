@@ -173,6 +173,7 @@ export interface UserNoteCriteria {
 
 /**
  * If present then these Author criteria are checked before running the rule. If criteria fails then the rule is skipped.
+ * @examples [{"include": [{"flairText": ["Contributor","Veteran"]}, {"isMod": true}]}]
  * */
 export interface AuthorOptions {
     /**
@@ -193,6 +194,7 @@ export interface AuthorOptions {
  *
  * @minProperties 1
  * @additionalProperties false
+ * @examples [{"flairText": ["Contributor","Veteran"], "isMod": true, "name": ["FoxxMD", "AnotherUser"] }]
  * */
 export interface AuthorCriteria {
     /**
@@ -241,6 +243,7 @@ export interface IRule extends ChecksActivityState {
      * A list of criteria to test the state of the `Activity` against before running the Rule.
      *
      * If any set of criteria passes the Rule will be run. If the criteria fails then the Rule is skipped.
+     *
      * */
     itemIs?: TypedActivityStates
 }

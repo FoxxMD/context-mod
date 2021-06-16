@@ -23,7 +23,15 @@
     "definitions": {
         "ActivityWindowCriteria": {
             "additionalProperties": false,
-            "description": "If both criteria are defined then whichever is met first will be used\n\nEX 100 count, 90 days\n\n* If 90 days of activities = 40 activities => returns 40 activities\n* If 100 activities is only 20 days => 100 activities",
+            "description": "The criteria used to define what range of Activity to retrieve.\n\nMay specify one, or both properties along with the `satisfyOn` property, to affect the retrieval behavior.",
+            "examples": [
+                {
+                    "count": 100,
+                    "duration": {
+                        "days": 90
+                    }
+                }
+            ],
             "minProperties": 1,
             "properties": {
                 "count": {
@@ -42,13 +50,25 @@
                             "type": "string"
                         }
                     ],
-                    "description": "An [ISO 8601 duration](https://en.wikipedia.org/wiki/ISO_8601#Durations) or [Day.js duration object](https://day.js.org/docs/en/durations/creating).\n\nThe duration will be subtracted from the time when the rule is run to create a time range like this:\n\nendTime = NOW  <----> startTime = (NOW - duration)\n\nEX endTime = 3:00PM <----> startTime = (NOW - 15 minutes) = 2:45PM -- so look for activities between 2:45PM and 3:00PM",
+                    "description": "An [ISO 8601 duration string](https://en.wikipedia.org/wiki/ISO_8601#Durations) or [Day.js duration object](https://day.js.org/docs/en/durations/creating).\n\nThe duration will be subtracted from the time when the rule is run to create a time range like this:\n\nendTime = NOW  <----> startTime = (NOW - `duration`)\n\nEX `PT15M` or `{\"minutes\": 15}`\n* `endTime` = NOW (3:00PM)\n* `startTime` = (NOW - 15 minutes) = 2:45PM\n\nSo look for Activities between 2:45PM and 3:00PM",
                     "examples": [
-                        "PT1M",
+                        "PT15M",
                         {
                             "minutes": 15
                         }
                     ]
+                },
+                "satisfyOn": {
+                    "default": "any",
+                    "description": "Define the condition under which both criteria are considered met\n\n**If `any` then it will retrieve Activities until one of the criteria is met, whichever occurs first**\n\nEX `{count: 100, duration: {days: 90}}`:\n* If 90 days of activities = 40 activities => returns 40 activities\n* If 100 activities is only 20 days => 100 activities\n\n**If `all` then both criteria must be met.**\n\nEffectively, whichever criteria produces the most Activities...\n\nEX `{count: 100, duration: {days: 90}}`:\n* If at 90 days of activities => 40 activities, continue retrieving results until 100 => results in >90 days of activities\n* If at 100 activities => 20 days of activities, continue retrieving results until 90 days => results in >100 activities",
+                    "enum": [
+                        "all",
+                        "any"
+                    ],
+                    "examples": [
+                        "any"
+                    ],
+                    "type": "string"
                 }
             },
             "type": "object"
@@ -83,10 +103,10 @@
                 "window": {
                     "anyOf": [
                         {
-                            "$ref": "#/definitions/DurationObject"
+                            "$ref": "#/definitions/ActivityWindowCriteria"
                         },
                         {
-                            "$ref": "#/definitions/ActivityWindowCriteria"
+                            "$ref": "#/definitions/DurationObject"
                         },
                         {
                             "type": [
@@ -113,7 +133,22 @@
                 },
                 "authorIs": {
                     "$ref": "#/definitions/AuthorOptions",
-                    "description": "If present then these Author criteria are checked before running the rule. If criteria fails then the rule is skipped."
+                    "description": "If present then these Author criteria are checked before running the rule. If criteria fails then the rule is skipped.",
+                    "examples": [
+                        {
+                            "include": [
+                                {
+                                    "flairText": [
+                                        "Contributor",
+                                        "Veteran"
+                                    ]
+                                },
+                                {
+                                    "isMod": true
+                                }
+                            ]
+                        }
+                    ]
                 },
                 "criteria": {
                     "description": "A list threshold-window values to test attribution against\n\nIf none is provided the default set used is:\n\n```\nthreshold: 10%\nwindow: 100\n```",
@@ -215,6 +250,19 @@
         "AuthorCriteria": {
             "additionalProperties": false,
             "description": "Criteria with which to test against the author of an Activity. The outcome of the test is based on:\n\n1. All present properties passing and\n2. If a property is a list then any value from the list matching",
+            "examples": [
+                {
+                    "flairText": [
+                        "Contributor",
+                        "Veteran"
+                    ],
+                    "isMod": true,
+                    "name": [
+                        "FoxxMD",
+                        "AnotherUser"
+                    ]
+                }
+            ],
             "minProperties": 1,
             "properties": {
                 "flairCssClass": {
@@ -264,6 +312,21 @@
         },
         "AuthorOptions": {
             "description": "If present then these Author criteria are checked before running the rule. If criteria fails then the rule is skipped.",
+            "examples": [
+                {
+                    "include": [
+                        {
+                            "flairText": [
+                                "Contributor",
+                                "Veteran"
+                            ]
+                        },
+                        {
+                            "isMod": true
+                        }
+                    ]
+                }
+            ],
             "properties": {
                 "exclude": {
                     "description": "Only runs if include is not present. Will \"pass\" if any of set of the AuthorCriteria does not pass",
@@ -286,7 +349,22 @@
             "properties": {
                 "authorIs": {
                     "$ref": "#/definitions/AuthorOptions",
-                    "description": "If present then these Author criteria are checked before running the rule. If criteria fails then the rule is skipped."
+                    "description": "If present then these Author criteria are checked before running the rule. If criteria fails then the rule is skipped.",
+                    "examples": [
+                        {
+                            "include": [
+                                {
+                                    "flairText": [
+                                        "Contributor",
+                                        "Veteran"
+                                    ]
+                                },
+                                {
+                                    "isMod": true
+                                }
+                            ]
+                        }
+                    ]
                 },
                 "exclude": {
                     "description": "Only runs if include is not present. Will \"pass\" if any of set of the AuthorCriteria does not pass",
@@ -344,6 +422,12 @@
         },
         "CommentState": {
             "description": "Different attributes a `Comment` can be in. Only include a property if you want to check it.",
+            "examples": [
+                {
+                    "op": true,
+                    "removed": false
+                }
+            ],
             "properties": {
                 "approved": {
                     "type": "boolean"
@@ -411,7 +495,13 @@
         },
         "DurationObject": {
             "additionalProperties": false,
-            "description": "A Day.js duration object\n\nhttps://day.js.org/docs/en/durations/creating",
+            "description": "A [Day.js duration object](https://day.js.org/docs/en/durations/creating)",
+            "examples": [
+                {
+                    "hours": 1,
+                    "minutes": 30
+                }
+            ],
             "minProperties": 1,
             "properties": {
                 "days": {
@@ -479,10 +569,10 @@
                 "window": {
                     "anyOf": [
                         {
-                            "$ref": "#/definitions/DurationObject"
+                            "$ref": "#/definitions/ActivityWindowCriteria"
                         },
                         {
-                            "$ref": "#/definitions/ActivityWindowCriteria"
+                            "$ref": "#/definitions/DurationObject"
                         },
                         {
                             "type": [
@@ -504,7 +594,22 @@
             "properties": {
                 "authorIs": {
                     "$ref": "#/definitions/AuthorOptions",
-                    "description": "If present then these Author criteria are checked before running the rule. If criteria fails then the rule is skipped."
+                    "description": "If present then these Author criteria are checked before running the rule. If criteria fails then the rule is skipped.",
+                    "examples": [
+                        {
+                            "include": [
+                                {
+                                    "flairText": [
+                                        "Contributor",
+                                        "Veteran"
+                                    ]
+                                },
+                                {
+                                    "isMod": true
+                                }
+                            ]
+                        }
+                    ]
                 },
                 "criteria": {
                     "description": "A list threshold-window values to test activities against.",
@@ -590,7 +695,22 @@
             "properties": {
                 "authorIs": {
                     "$ref": "#/definitions/AuthorOptions",
-                    "description": "If present then these Author criteria are checked before running the rule. If criteria fails then the rule is skipped."
+                    "description": "If present then these Author criteria are checked before running the rule. If criteria fails then the rule is skipped.",
+                    "examples": [
+                        {
+                            "include": [
+                                {
+                                    "flairText": [
+                                        "Contributor",
+                                        "Veteran"
+                                    ]
+                                },
+                                {
+                                    "isMod": true
+                                }
+                            ]
+                        }
+                    ]
                 },
                 "itemIs": {
                     "anyOf": [
@@ -655,10 +775,10 @@
                 "window": {
                     "anyOf": [
                         {
-                            "$ref": "#/definitions/DurationObject"
+                            "$ref": "#/definitions/ActivityWindowCriteria"
                         },
                         {
-                            "$ref": "#/definitions/ActivityWindowCriteria"
+                            "$ref": "#/definitions/DurationObject"
                         },
                         {
                             "type": [
@@ -668,25 +788,7 @@
                         }
                     ],
                     "default": 15,
-                    "description": "Criteria for defining what set of activities should be considered.\n\nThe value of this property may be either count OR duration -- to use both write it as an ActivityWindowCriteria\n\nSee ActivityWindowCriteria for descriptions of what count/duration do",
-                    "examples": [
-                        15,
-                        "PT1M",
-                        {
-                            "count": 10
-                        },
-                        {
-                            "duration": {
-                                "hours": 5
-                            }
-                        },
-                        {
-                            "count": 5,
-                            "duration": {
-                                "minutes": 15
-                            }
-                        }
-                    ]
+                    "description": "Criteria for defining what set of activities should be considered.\n\nThe value of this property may be either count OR duration -- to use both write it as an `ActivityWindowCriteria`"
                 }
             },
             "required": [
@@ -700,7 +802,22 @@
             "properties": {
                 "authorIs": {
                     "$ref": "#/definitions/AuthorOptions",
-                    "description": "If present then these Author criteria are checked before running the rule. If criteria fails then the rule is skipped."
+                    "description": "If present then these Author criteria are checked before running the rule. If criteria fails then the rule is skipped.",
+                    "examples": [
+                        {
+                            "include": [
+                                {
+                                    "flairText": [
+                                        "Contributor",
+                                        "Veteran"
+                                    ]
+                                },
+                                {
+                                    "isMod": true
+                                }
+                            ]
+                        }
+                    ]
                 },
                 "exclude": {
                     "description": "Do not include Submissions from this list of Subreddits.\n\nA list of subreddits (case-insensitive) to look for. Do not include \"r/\" prefix.\n\nEX to match against /r/mealtimevideos and /r/askscience use [\"mealtimevideos\",\"askscience\"]",
@@ -784,10 +901,10 @@
                 "window": {
                     "anyOf": [
                         {
-                            "$ref": "#/definitions/DurationObject"
+                            "$ref": "#/definitions/ActivityWindowCriteria"
                         },
                         {
-                            "$ref": "#/definitions/ActivityWindowCriteria"
+                            "$ref": "#/definitions/DurationObject"
                         },
                         {
                             "type": [
@@ -797,25 +914,7 @@
                         }
                     ],
                     "default": 15,
-                    "description": "Criteria for defining what set of activities should be considered.\n\nThe value of this property may be either count OR duration -- to use both write it as an ActivityWindowCriteria\n\nSee ActivityWindowCriteria for descriptions of what count/duration do",
-                    "examples": [
-                        15,
-                        "PT1M",
-                        {
-                            "count": 10
-                        },
-                        {
-                            "duration": {
-                                "hours": 5
-                            }
-                        },
-                        {
-                            "count": 5,
-                            "duration": {
-                                "minutes": 15
-                            }
-                        }
-                    ]
+                    "description": "Criteria for defining what set of activities should be considered.\n\nThe value of this property may be either count OR duration -- to use both write it as an `ActivityWindowCriteria`"
                 }
             },
             "required": [
@@ -866,6 +965,12 @@
         },
         "SubmissionState": {
             "description": "Different attributes a `Submission` can be in. Only include a property if you want to check it.",
+            "examples": [
+                {
+                    "over_18": true,
+                    "removed": false
+                }
+            ],
             "properties": {
                 "approved": {
                     "type": "boolean"
