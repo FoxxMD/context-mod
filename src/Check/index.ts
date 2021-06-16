@@ -241,6 +241,7 @@ export interface CheckJson extends ICheck {
      *  Can be `Action` or the `name` of any **named** `Action` in your subreddit's configuration
      *
      * @minItems 1
+     * @examples [[{"kind": "comment", "content": "this is the content of the comment", "distinguish": true}, {"kind": "lock"}]]
      * */
     actions: Array<ActionTypeJson>
 }

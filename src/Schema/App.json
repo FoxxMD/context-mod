@@ -454,6 +454,18 @@
             "properties": {
                 "actions": {
                     "description": "The `Actions` to run after the check is successfully triggered. ALL `Actions` will run in the order they are listed\n\n Can be `Action` or the `name` of any **named** `Action` in your subreddit's configuration",
+                    "examples": [
+                        [
+                            {
+                                "content": "this is the content of the comment",
+                                "distinguish": true,
+                                "kind": "comment"
+                            },
+                            {
+                                "kind": "lock"
+                            }
+                        ]
+                    ],
                     "items": {
                         "anyOf": [
                             {
@@ -1406,6 +1418,18 @@
             "properties": {
                 "actions": {
                     "description": "The `Actions` to run after the check is successfully triggered. ALL `Actions` will run in the order they are listed\n\n Can be `Action` or the `name` of any **named** `Action` in your subreddit's configuration",
+                    "examples": [
+                        [
+                            {
+                                "content": "this is the content of the comment",
+                                "distinguish": true,
+                                "kind": "comment"
+                            },
+                            {
+                                "kind": "lock"
+                            }
+                        ]
+                    ],
                     "items": {
                         "anyOf": [
                             {
