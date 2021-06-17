@@ -1,13 +1,13 @@
 import Snoowrap from "snoowrap";
 import {Manager} from "./Subreddit/Manager";
 import winston, {Logger} from "winston";
-import {argParseInt, labelledFormat, parseBool, sleep} from "./util";
+import {argParseInt, labelledFormat, parseBool, parseFromJsonOrYamlToObject, sleep} from "./util";
 import snoowrap from "snoowrap";
 import pEvent from "p-event";
-import JSON5 from 'json5';
 import EventEmitter from "events";
 import CacheManager from './Subreddit/SubredditResources';
 import dayjs, {Dayjs} from "dayjs";
+import LoggedError from "./Utils/LoggedError";
 
 const {transports} = winston;
 
@@ -169,7 +169,6 @@ export class App {
         // get configs for subs we want to run on and build/validate them
         for (const sub of subsToRun) {
             let content = undefined;
-            let json = undefined;
             try {
                 const wiki = sub.getWikiPage(this.wikiLocation);
                 content = await wiki.content_md;
@@ -177,17 +176,27 @@ export class App {
                 this.logger.error(`[${sub.display_name_prefixed}] Could not read wiki configuration. Please ensure the page https://reddit.com${sub.url}wiki/${this.wikiLocation} exists and is readable -- error: ${err.message}`);
                 continue;
             }
-            try {
-                json = JSON5.parse(content);
 
-            } catch (err) {
-                this.logger.error(`[${sub.display_name_prefixed}] Wiki page contents was not valid -- error: ${err.message}`);
+            if(content === '') {
+                this.logger.error(`[${sub.display_name_prefixed}] Wiki page contents was empty`);
                 continue;
             }
+
+            const [configObj, jsonErr, yamlErr] = parseFromJsonOrYamlToObject(content);
+
+            if (configObj === undefined) {
+                this.logger.error(`[${sub.display_name_prefixed}] Could not parse wiki page contents as JSON or YAML`);
+                this.logger.error(jsonErr);
+                this.logger.error(yamlErr);
+                continue;
+            }
+
             try {
-                subSchedule.push(new Manager(sub, this.client, this.logger, json, {dryRun: this.dryRun}));
+                subSchedule.push(new Manager(sub, this.client, this.logger, configObj, {dryRun: this.dryRun}));
             } catch (err) {
-                this.logger.error(`[${sub.display_name_prefixed}] Config was not valid`, err);
+                if(!(err instanceof LoggedError)) {
+                    this.logger.error(`[${sub.display_name_prefixed}] Config was not valid`, err);
+                }
             }
         }
         this.subManagers = subSchedule;

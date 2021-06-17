@@ -12,6 +12,9 @@ import {Comment} from "snoowrap";
 import {inflateSync, deflateSync} from "zlib";
 import pako from "pako";
 import {ActivityWindowCriteria} from "./Common/interfaces";
+import JSON5 from "json5";
+import yaml, {JSON_SCHEMA} from "js-yaml";
+import SimpleError from "./Utils/SimpleError";
 
 dayjs.extend(utc);
 dayjs.extend(dduration);
@@ -21,8 +24,21 @@ const {combine, printf, timestamp, label, splat, errors} = format;
 
 const s = splat();
 const SPLAT = Symbol.for('splat')
-const errorsFormat = errors({stack: true});
+//const errorsFormat = errors({stack: true});
 const CWD = process.cwd();
+
+// const errorAwareFormat = (info: any) => {
+//     if(info instanceof SimpleError) {
+//         return errors()(info);
+//     }
+// }
+const errorAwareFormat = {
+    transform: (info: any, opts: any) => {
+        // don't need to log stack trace if we know the error is just a simple message (we handled it)
+        const stack = !(info instanceof SimpleError) && !(info.message instanceof SimpleError);
+        return errors().transform(info, { stack });
+    }
+}
 
 export const truncateStringToLength = (length: number, truncStr = '...') => (str: string) => str.length > length ? `${str.slice(0, length - truncStr.length - 1)}${truncStr}` : str;
 
@@ -71,7 +87,8 @@ export const labelledFormat = (labelName = 'App') => {
         ),
         l,
         s,
-        errorsFormat,
+        errorAwareFormat,
+        //errorsFormat,
         defaultFormat,
     );
 }
@@ -340,4 +357,34 @@ export const isActivityWindowCriteria = (val: any): val is ActivityWindowCriteri
             val.duration !== undefined;
     }
     return false;
+}
+
+export const parseFromJsonOrYamlToObject = (content: string): [object?, Error?, Error?] => {
+    let obj;
+    let jsonErr,
+        yamlErr;
+
+    try {
+        obj = JSON5.parse(content);
+        const oType = obj === null ? 'null' : typeof obj;
+        if (oType !== 'object') {
+            jsonErr = new SimpleError(`Parsing as json produced data of type '${oType}' (expected 'object')`);
+            obj = undefined;
+        }
+    } catch (err) {
+        jsonErr = err;
+    }
+    if (obj === undefined) {
+        try {
+            obj = yaml.load(content, {schema: JSON_SCHEMA, json: true});
+            const oType = obj === null ? 'null' : typeof obj;
+            if (oType !== 'object') {
+                yamlErr = new Error(`Parsing as yaml produced data of type '${oType}' (expected 'object')`);
+                obj = undefined;
+            }
+        } catch (err) {
+            yamlErr = err;
+        }
+    }
+    return [obj, jsonErr, yamlErr];
 }

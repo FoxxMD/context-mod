@@ -47,7 +47,7 @@ export class ConfigBuilder {
                     this.configLogger.error(`${err.keyword}: ${err.schemaPath} => ${err.message}${suffix}`);
                 }
             }
-            throw new LoggedError();
+            throw new LoggedError('Config schema validity failure');
         }
     }
 
