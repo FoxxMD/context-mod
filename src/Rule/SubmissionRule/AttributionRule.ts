@@ -99,7 +99,7 @@ export class AttributionRule extends SubmissionRule {
         }
 
         const refDomain = this.aggregateMediaDomains ? item.domain : item.secure_media?.oembed?.author_url;
-        const refDomainTitle = this.aggregateMediaDomains ? (item.secure_media?.oembed?.provider_name || item.domain) : item.secure_media?.oembed?.author_name;
+        const refDomainTitle = this.aggregateMediaDomains ? (item.secure_media?.oembed?.provider_name || item.domain) : (item.secure_media?.oembed?.author_name || item.secure_media?.oembed?.author_url);
 
         // TODO reuse activities between ActivityCriteria to reduce api calls
 

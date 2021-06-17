@@ -157,11 +157,62 @@ export const getAuthorSubmissions = async (user: RedditUser, options: AuthorActi
     return await getAuthorActivities(user, {...options, type: 'submission'}) as unknown as Promise<Submission[]>;
 }
 
-export const renderContent = async (content: string, data: (Submission | Comment), ruleResults: RuleResult[] = []) => {
+export const renderContent = async (template: string, data: (Submission | Comment), ruleResults: RuleResult[] = [], usernotes: UserNotes) => {
     const templateData: any = {
         kind: data instanceof Submission ? 'submission' : 'comment',
         author: await data.author.name,
+        // make this a getter so that if we don't load notes (and api call) if we don't need to
+        // didn't work either for some reason
+        // tried to get too fancy :(
+        // get notes() {
+        //     return usernotes.getUserNotes(data.author).then((notesData) => {
+        //         // return usable notes data with some stats
+        //         const current = notesData.length > 0 ? notesData[notesData.length -1] : undefined;
+        //         // group by type
+        //         const grouped = notesData.reduce((acc: any, x) => {
+        //             const {[x.noteType]: nt = []} = acc;
+        //             return Object.assign(acc, {[x.noteType]: nt.concat(x)});
+        //         }, {});
+        //         return {
+        //             data: notesData,
+        //             current,
+        //             ...grouped,
+        //         };
+        //     });
+        // },
+        // when i was trying to use mustache-async (didn't work)
+        // notes: async () => {
+        //     const notesData = await usernotes.getUserNotes(data.author);
+        //     // return usable notes data with some stats
+        //     const current = notesData.length > 0 ? notesData[notesData.length -1] : undefined;
+        //     // group by type
+        //     const grouped = notesData.reduce((acc: any, x) => {
+        //         const {[x.noteType]: nt = []} = acc;
+        //         return Object.assign(acc, {[x.noteType]: nt.concat(x)});
+        //     }, {});
+        //     return {
+        //         data: notesData,
+        //         current,
+        //         ...grouped,
+        //     };
+        // },
         permalink: data.permalink,
+    }
+    if(template.includes('{{item.notes')) {
+        // we need to get notes
+        const notesData = await usernotes.getUserNotes(data.author);
+        // return usable notes data with some stats
+        const current = notesData.length > 0 ? notesData[notesData.length -1] : undefined;
+        // group by type
+        const grouped = notesData.reduce((acc: any, x) => {
+            const {[x.noteType]: nt = []} = acc;
+            return Object.assign(acc, {[x.noteType]: nt.concat(x)});
+        }, {});
+        templateData.notes = {
+            data: notesData,
+            current,
+            ...grouped,
+        };
     }
     if (data instanceof Submission) {
         templateData.url = data.url;
@@ -191,7 +242,9 @@ export const renderContent = async (content: string, data: (Submission | Comment
         };
     }, {});
 
-    return he.decode(Mustache.render(content, {item: templateData, rules: normalizedRuleResults}));
+    const view = {item: templateData, rules: normalizedRuleResults};
+    const rendered = Mustache.render(template, view) as string;
+    return he.decode(rendered);
 }
 
 export const testAuthorCriteria = async (item: (Comment | Submission), authorOpts: AuthorCriteria, include = true, userNotes: UserNotes) => {

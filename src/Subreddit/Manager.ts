@@ -133,7 +133,7 @@ export class Manager {
                 }
 
                 if (triggered) {
-                    const runActions = await check.runActions(item, currentResults);
+                    const runActions = await check.runActions(item, currentResults.filter(x => x.triggered));
                     actionsRun = runActions.length;
                     break;
                 }

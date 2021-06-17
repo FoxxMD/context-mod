@@ -15,6 +15,7 @@ import {ActivityWindowCriteria} from "./Common/interfaces";
 import JSON5 from "json5";
 import yaml, {JSON_SCHEMA} from "js-yaml";
 import SimpleError from "./Utils/SimpleError";
+import he from "he";
 
 dayjs.extend(utc);
 dayjs.extend(dduration);
@@ -391,8 +392,10 @@ export const parseFromJsonOrYamlToObject = (content: string): [object?, Error?, 
 
 export const generateFooter = async (item: Submission | Comment) => {
     const subName = await item.subreddit.display_name;
+    let permalink = await item.permalink;
+    const reference = encodeURIComponent(`https://reddit.com${permalink}`);
     // TODO customize modmail message based on action being peformed
-    const modmailLink = `https://www.reddit.com/message/compose?to=%2Fr%2F${subName}&message=Reminder:%20If+you+are+messaging+about+a+post+removal+,+please+include+the%20post%20URL%20somewhere%20in%20the%20message.`
+    const modmailLink = `https://www.reddit.com/message/compose?to=%2Fr%2F${subName}&message=${reference}`
 
-    return `\r\n*****\r\nThis action was performed by [a bot.](https://www.reddit.com/r/ContextModBot/comments/o1dugk/introduction_to_contextmodbot_and_rcb/) Mention a moderator or [send a modmail](${modmailLink}) if you any ideas, questions , or concerns about this action.`
+    return `\r\n*****\r\nThis action was performed by [a bot.](https://www.reddit.com/r/ContextModBot/comments/o1dugk/introduction_to_contextmodbot_and_rcb/) Mention a moderator or [send a modmail](${modmailLink}) if you any ideas, questions, or concerns about this action.`
 }

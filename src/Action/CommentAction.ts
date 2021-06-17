@@ -32,8 +32,8 @@ export class CommentAction extends Action {
 
     async process(item: Comment | Submission, ruleResults: RuleResult[]): Promise<void> {
         const content = await this.resources.getContent(this.content, item.subreddit);
-        const renderedContent = await renderContent(content, item, ruleResults);
-        this.logger.verbose(`Contents:\r\n${renderedContent}`);
+        const body = await renderContent(content, item, ruleResults, this.resources.userNotes);
+        this.logger.verbose(`Contents:\r\n${body}`);
 
         if(item.archived) {
             this.logger.warn('Cannot comment because Item is archived');
@@ -42,8 +42,9 @@ export class CommentAction extends Action {
 
         const footer = await generateFooter(item);
 
+        const renderedContent = `${body}${footer}`;
         // @ts-ignore
-        const reply: Comment = await item.reply(`${renderedContent}${footer}`);
+        const reply: Comment = await item.reply(renderedContent);
         if (this.lock) {
             if (!this.dryRun) {
                 // snoopwrap typing issue, thinks comments can't be locked

@@ -32,7 +32,7 @@ export class BanAction extends Action {
 
     async process(item: Comment | Submission, ruleResults: RuleResult[]): Promise<void> {
         const content = this.message === undefined ? undefined : await this.resources.getContent(this.message, item.subreddit);
-        const renderedContent = content === undefined ? undefined : await renderContent(content, item, ruleResults);
+        const renderedContent = content === undefined ? undefined : await renderContent(content, item, ruleResults, this.resources.userNotes);
 
         const footer = await generateFooter(item);
 
