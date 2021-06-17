@@ -45,8 +45,11 @@ export class CommentAction extends Action {
             this.logger.warn('Cannot comment because Item is archived');
             return;
         }
-        // @ts-ignore
-        const reply: Comment = await item.reply(renderedContent);
+        let reply: Comment;
+        if(!this.dryRun) {
+            // @ts-ignore
+           reply = await item.reply(renderedContent);
+        }
         if (this.lock) {
             if (!this.dryRun) {
                 // snoopwrap typing issue, thinks comments can't be locked
