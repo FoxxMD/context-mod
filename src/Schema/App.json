@@ -53,6 +53,39 @@
             },
             "type": "object"
         },
+        "ApproveActionJson": {
+            "description": "Ban the Author of the Activity this Check is run on",
+            "properties": {
+                "dryRun": {
+                    "default": false,
+                    "description": "If `true` the Action will not make the API request to Reddit to perform its action.",
+                    "examples": [
+                        false,
+                        true
+                    ],
+                    "type": "boolean"
+                },
+                "kind": {
+                    "description": "The type of action that will be performed",
+                    "enum": [
+                        "approve"
+                    ],
+                    "type": "string"
+                },
+                "name": {
+                    "description": "An optional, but highly recommended, friendly name for this Action. If not present will default to `kind`.\n\nCan only contain letters, numbers, underscore, spaces, and dashes",
+                    "examples": [
+                        "myDescriptiveAction"
+                    ],
+                    "pattern": "^[a-zA-Z]([\\w -]*[\\w])?$",
+                    "type": "string"
+                }
+            },
+            "required": [
+                "kind"
+            ],
+            "type": "object"
+        },
         "AttributionCriteria": {
             "properties": {
                 "minActivityCount": {
@@ -400,6 +433,73 @@
             ],
             "type": "object"
         },
+        "BanActionJson": {
+            "description": "Ban the Author of the Activity this Check is run on",
+            "properties": {
+                "dryRun": {
+                    "default": false,
+                    "description": "If `true` the Action will not make the API request to Reddit to perform its action.",
+                    "examples": [
+                        false,
+                        true
+                    ],
+                    "type": "boolean"
+                },
+                "duration": {
+                    "description": "Number of days to ban the Author. If not specified Author will be banned permanently.",
+                    "examples": [
+                        90
+                    ],
+                    "maximum": 999,
+                    "minimum": 1,
+                    "type": "number"
+                },
+                "kind": {
+                    "description": "The type of action that will be performed",
+                    "enum": [
+                        "ban"
+                    ],
+                    "type": "string"
+                },
+                "message": {
+                    "description": "The message that is sent in the ban notification. `message` is interpreted as reddit-flavored Markdown.\n\nIf value starts with `wiki:` then the proceeding value will be used to get a wiki page\n\nEX `wiki:botconfig/mybot` tries to get `https://reddit.com/mySubredditExample/wiki/botconfig/mybot`\n\nEX `this is plain text` => \"this is plain text\"\n\nEX `this is **bold** markdown text` => \"this is **bold** markdown text\"",
+                    "examples": [
+                        "This is the content of a comment/report/usernote",
+                        "this is **bold** markdown text",
+                        "wiki:botconfig/acomment"
+                    ],
+                    "type": "string"
+                },
+                "name": {
+                    "description": "An optional, but highly recommended, friendly name for this Action. If not present will default to `kind`.\n\nCan only contain letters, numbers, underscore, spaces, and dashes",
+                    "examples": [
+                        "myDescriptiveAction"
+                    ],
+                    "pattern": "^[a-zA-Z]([\\w -]*[\\w])?$",
+                    "type": "string"
+                },
+                "note": {
+                    "description": "A mod note for this ban",
+                    "examples": [
+                        "Sock puppet for u/AnotherUser"
+                    ],
+                    "maximum": 100,
+                    "type": "string"
+                },
+                "reason": {
+                    "description": "Reason for ban.",
+                    "examples": [
+                        "repeat spam"
+                    ],
+                    "maximum": 100,
+                    "type": "string"
+                }
+            },
+            "required": [
+                "kind"
+            ],
+            "type": "object"
+        },
         "CommentActionJson": {
             "description": "Reply to the Activity. For a submission the reply will be a top-level comment.",
             "properties": {
@@ -485,6 +585,12 @@
                             },
                             {
                                 "$ref": "#/definitions/UserNoteActionJson"
+                            },
+                            {
+                                "$ref": "#/definitions/ApproveActionJson"
+                            },
+                            {
+                                "$ref": "#/definitions/BanActionJson"
                             },
                             {
                                 "type": "string"
@@ -1447,6 +1553,12 @@
                             },
                             {
                                 "$ref": "#/definitions/UserNoteActionJson"
+                            },
+                            {
+                                "$ref": "#/definitions/ApproveActionJson"
+                            },
+                            {
+                                "$ref": "#/definitions/BanActionJson"
                             },
                             {
                                 "type": "string"

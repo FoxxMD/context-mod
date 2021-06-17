@@ -13,6 +13,8 @@
         "kind": {
             "description": "The type of action that will be performed",
             "enum": [
+                "approve",
+                "ban",
                 "comment",
                 "flair",
                 "lock",
