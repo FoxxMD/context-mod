@@ -113,7 +113,8 @@ All Actions with `content` have access to this data:
         author: 'string', // name of the item author (reddit user)
         permalink: 'string', // a url to the item
         url: 'string', // if the item is a Submission then its URL (external for link type submission, reddit link for self-posts)
-        title: 'string', // if the item is a Submission, then the title of the Submission
+        title: 'string', // if the item is a Submission, then the title of the Submission,
+        botLink: 'string' // a link to the bot's FAQ
     },
     rules: {
         // contains all rules that were run and are accessible using the name, lowercased, with all spaces/dashes/underscores removed

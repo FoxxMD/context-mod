@@ -16,6 +16,8 @@ import {isActivityWindowCriteria, normalizeName, truncateStringToLength} from ".
 import UserNotes from "../Subreddit/UserNotes";
 import {Logger} from "winston";
 
+export const BOT_LINK = 'https://www.reddit.com/r/ContextModBot/comments/o1dugk/introduction_to_contextmodbot_and_rcb';
+
 export interface AuthorTypedActivitiesOptions extends AuthorActivitiesOptions {
     type?: 'comment' | 'submission',
 }
@@ -197,6 +199,7 @@ export const renderContent = async (template: string, data: (Submission | Commen
         //     };
         // },
         permalink: data.permalink,
+        botLink: BOT_LINK,
     }
     if(template.includes('{{item.notes')) {
         // we need to get notes

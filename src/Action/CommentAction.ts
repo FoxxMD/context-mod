@@ -2,15 +2,15 @@ import Action, {ActionJson, ActionOptions} from "./index";
 import {Comment} from "snoowrap";
 import Submission from "snoowrap/dist/objects/Submission";
 import {renderContent} from "../Utils/SnoowrapUtils";
-import {RequiredRichContent, RichContent} from "../Common/interfaces";
+import {Footer, RequiredRichContent, RichContent} from "../Common/interfaces";
 import {RuleResult} from "../Rule";
-import {generateFooter} from "../util";
 
 export class CommentAction extends Action {
     content: string;
     lock: boolean = false;
     sticky: boolean = false;
     distinguish: boolean = false;
+    footer?: false | string;
 
     constructor(options: CommentActionOptions) {
         super(options);
@@ -19,7 +19,9 @@ export class CommentAction extends Action {
             lock = false,
             sticky = false,
             distinguish = false,
+            footer,
         } = options;
+        this.footer = footer;
         this.content = content;
         this.lock = lock;
         this.sticky = sticky;
@@ -33,16 +35,16 @@ export class CommentAction extends Action {
     async process(item: Comment | Submission, ruleResults: RuleResult[]): Promise<void> {
         const content = await this.resources.getContent(this.content, item.subreddit);
         const body = await renderContent(content, item, ruleResults, this.resources.userNotes);
-        this.logger.verbose(`Contents:\r\n${body}`);
+
+        const footer = await this.resources.generateFooter(item, this.footer);
+
+        const renderedContent = `${body}${footer}`;
+        this.logger.verbose(`Contents:\r\n${renderedContent.length > 100 ? `\r\n${renderedContent}` : renderedContent}`);
 
         if(item.archived) {
             this.logger.warn('Cannot comment because Item is archived');
             return;
         }
-
-        const footer = await generateFooter(item);
-
-        const renderedContent = `${body}${footer}`;
         // @ts-ignore
         const reply: Comment = await item.reply(renderedContent);
         if (this.lock) {
@@ -59,7 +61,7 @@ export class CommentAction extends Action {
     }
 }
 
-export interface CommentActionConfig extends RequiredRichContent {
+export interface CommentActionConfig extends RequiredRichContent, Footer {
     /**
      * Lock the comment after creation?
      * */

@@ -15,7 +15,7 @@ import Submission from "snoowrap/dist/objects/Submission";
 import {itemContentPeek} from "../Utils/SnoowrapUtils";
 import dayjs from "dayjs";
 import LoggedError from "../Utils/LoggedError";
-import ResourceManager, {SubredditResources} from "./SubredditResources";
+import ResourceManager, {SubredditResourceOptions, SubredditResources} from "./SubredditResources";
 
 export class Manager {
     subreddit: Subreddit;
@@ -57,19 +57,26 @@ export class Manager {
         const configBuilder = new ConfigBuilder({logger: this.logger});
         const validJson = configBuilder.validateJson(sourceData);
         const {checks, ...configManagerOpts} = validJson;
-        const {polling = {}, caching, dryRun} = configManagerOpts || {};
+        const {polling = {}, caching, dryRun, footer} = configManagerOpts || {};
         this.pollOptions = {...polling, ...opts.polling};
         this.subreddit = sub;
         this.client = client;
         this.dryRun = opts.dryRun || dryRun;
 
-        const cacheConfig = caching === false ? {enabled: false, logger: this.logger, subreddit: sub} : {
-            ...caching,
-            enabled: true,
+        let resourceConfig: SubredditResourceOptions = {
             logger: this.logger,
             subreddit: sub,
+            footer,
+            enabled: true
         };
-        this.resources = ResourceManager.set(sub.display_name, cacheConfig);
+
+        if(caching === false) {
+            resourceConfig.enabled = false;
+        } else {
+            resourceConfig = {...resourceConfig, ...caching};
+        }
+
+        this.resources = ResourceManager.set(sub.display_name, resourceConfig);
 
         const commentChecks: Array<CommentCheck> = [];
         const subChecks: Array<SubmissionCheck> = [];

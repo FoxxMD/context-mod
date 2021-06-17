@@ -380,7 +380,7 @@ export const parseFromJsonOrYamlToObject = (content: string): [object?, Error?, 
             obj = yaml.load(content, {schema: JSON_SCHEMA, json: true});
             const oType = obj === null ? 'null' : typeof obj;
             if (oType !== 'object') {
-                yamlErr = new Error(`Parsing as yaml produced data of type '${oType}' (expected 'object')`);
+                yamlErr = new SimpleError(`Parsing as yaml produced data of type '${oType}' (expected 'object')`);
                 obj = undefined;
             }
         } catch (err) {
@@ -388,14 +388,4 @@ export const parseFromJsonOrYamlToObject = (content: string): [object?, Error?, 
         }
     }
     return [obj, jsonErr, yamlErr];
-}
-
-export const generateFooter = async (item: Submission | Comment) => {
-    const subName = await item.subreddit.display_name;
-    let permalink = await item.permalink;
-    const reference = encodeURIComponent(`https://reddit.com${permalink}`);
-    // TODO customize modmail message based on action being peformed
-    const modmailLink = `https://www.reddit.com/message/compose?to=%2Fr%2F${subName}&message=${reference}`
-
-    return `\r\n*****\r\nThis action was performed by [a bot.](https://www.reddit.com/r/ContextModBot/comments/o1dugk/introduction_to_contextmodbot_and_rcb/) Mention a moderator or [send a modmail](${modmailLink}) if you any ideas, questions, or concerns about this action.`
 }

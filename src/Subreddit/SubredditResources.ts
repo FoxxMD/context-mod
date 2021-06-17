@@ -3,7 +3,7 @@ import cache from 'memory-cache';
 import objectHash from 'object-hash';
 import {
     AuthorActivitiesOptions,
-    AuthorTypedActivitiesOptions,
+    AuthorTypedActivitiesOptions, BOT_LINK,
     getAuthorActivities,
     testAuthorCriteria
 } from "../Utils/SnoowrapUtils";
@@ -11,13 +11,16 @@ import Subreddit from 'snoowrap/dist/objects/Subreddit';
 import winston, {Logger} from "winston";
 import {mergeArr} from "../util";
 import LoggedError from "../Utils/LoggedError";
-import {SubredditCacheConfig} from "../Common/interfaces";
+import {Footer, SubredditCacheConfig} from "../Common/interfaces";
 import {AuthorCriteria} from "../Rule";
 import UserNotes from "./UserNotes";
+import Mustache from "mustache";
+import he from "he";
 
 export const WIKI_DESCRIM = 'wiki:';
+export const DEFAULT_FOOTER = '\r\n*****\r\nThis action was performed by [a bot.]({{botLink}}) Mention a moderator or [send a modmail]({{modmailLink}}) if you any ideas, questions, or concerns about this action.';
 
-export interface SubredditCacheOptions extends SubredditCacheConfig {
+export interface SubredditResourceOptions extends SubredditCacheConfig, Footer {
     enabled: boolean;
     subreddit: Subreddit,
     logger: Logger;
@@ -31,8 +34,9 @@ export class SubredditResources {
     name: string;
     protected logger: Logger;
     userNotes: UserNotes;
+    footer: false | string;
 
-    constructor(name: string, options: SubredditCacheOptions) {
+    constructor(name: string, options: SubredditResourceOptions) {
         const {
             enabled = true,
             authorTTL,
@@ -40,8 +44,10 @@ export class SubredditResources {
             userNotesTTL = 60000,
             wikiTTL = 300000, // 5 minutes
             logger,
+            footer = DEFAULT_FOOTER
         } = options || {};
 
+        this.footer = footer;
         this.enabled = manager.enabled ? enabled : false;
         if (authorTTL === undefined) {
             this.useSubredditAuthorCache = false;
@@ -154,6 +160,20 @@ export class SubredditResources {
         }
         return result;
     }
+
+    async generateFooter(item: Submission | Comment, actionFooter?: false | string)
+    {
+        let footer = actionFooter !== undefined ? actionFooter : this.footer;
+        if(footer === false) {
+            return '';
+        }
+        const subName = await item.subreddit.display_name;
+        const permaLink = `https://reddit.com${await item.permalink}`
+        const modmailLink = `https://www.reddit.com/message/compose?to=%2Fr%2F${subName}&message=${encodeURIComponent(permaLink)}`
+
+        const footerRawContent = await this.getContent(footer, item.subreddit);
+        return he.decode(Mustache.render(footerRawContent, {subName, permaLink, modmailLink, botLink: BOT_LINK}));
+    }
 }
 
 class SubredditResourcesManager {
@@ -168,7 +188,7 @@ class SubredditResourcesManager {
         return undefined;
     }
 
-    set(subName: string, initOptions: SubredditCacheOptions): SubredditResources {
+    set(subName: string, initOptions: SubredditResourceOptions): SubredditResources {
         const resource = new SubredditResources(subName, initOptions);
         this.resources.set(subName, resource);
         return resource;

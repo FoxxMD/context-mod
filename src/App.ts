@@ -185,7 +185,7 @@ export class App {
             const [configObj, jsonErr, yamlErr] = parseFromJsonOrYamlToObject(content);
 
             if (configObj === undefined) {
-                this.logger.error(`[${sub.display_name_prefixed}] Could not parse wiki page contents as JSON or YAML`);
+                this.logger.error(`[${sub.display_name_prefixed}] Could not parse wiki page contents as JSON or YAML:`);
                 this.logger.error(jsonErr);
                 this.logger.error(yamlErr);
                 continue;

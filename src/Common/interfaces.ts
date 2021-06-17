@@ -144,11 +144,20 @@ export interface RichContent {
      *
      * If value starts with `wiki:` then the proceeding value will be used to get a wiki page
      *
-     * EX `wiki:botconfig/mybot` tries to get `https://reddit.com/mySubredditExample/wiki/botconfig/mybot`
+     *  * EX `wiki:botconfig/mybot` tries to get `https://reddit.com/mySubredditExample/wiki/botconfig/mybot`
+     *  * EX `this is **bold** markdown text` => "this is **bold** markdown text"
      *
-     * EX `this is plain text` => "this is plain text"
+     * Content is rendered using [mustache](https://github.com/janl/mustache.js/#templates) to enable [Action Templating](https://github.com/FoxxMD/reddit-context-bot#action-templating).
      *
-     * EX `this is **bold** markdown text` => "this is **bold** markdown text"
+     * The following properties are always available in the template (view individual Rules to see rule-specific template data):
+     * ```
+     * item.kind      => The type of Activity that was checked (comment/submission)
+     * item.author    => The name of the Author of the Activity EX FoxxMD
+     * item.permalink => A permalink URL to the Activity EX https://reddit.com/r/yourSub/comments/o1h0i0/title_name/1v3b7x
+     * item.url       => If the Activity is Link Sumbission then the external URL
+     * item.title     => If the Activity is a Submission then the title of that Submission
+     * rules          => An object containing RuleResults of all the rules run for this check. See Action Templating for more details on naming
+     * ```
      *
      * @examples ["This is the content of a comment/report/usernote", "this is **bold** markdown text", "wiki:botconfig/acomment" ]
      * */
@@ -262,6 +271,34 @@ export interface SubredditCacheConfig {
     userNotesTTL?: number;
 }
 
+export interface Footer {
+    /**
+     * Customize the footer for Actions that send replies (Comment/Ban)
+     *
+     * If `false` no footer is appended
+     *
+     * If `string` the value is rendered as markdown or will use `wiki:` parser the same way `content` properties on Actions are rendered with [templating](https://github.com/FoxxMD/reddit-context-bot#action-templating).
+     *
+     * If footer is `undefined` (not set) the default footer will be used:
+     *
+     * > *****
+     * > This action was performed by [a bot.] Mention a moderator or [send a modmail] if you any ideas, questions, or concerns about this action.
+     *
+     * *****
+     *
+     * The following properties are available for [templating](https://github.com/FoxxMD/reddit-context-bot#action-templating):
+     * ```
+     * subName    => name of subreddit Action was performed in (EX 'mealtimevideos')
+     * permaLink  => The permalink for the Activity the Action was performed on EX https://reddit.com/r/yourSub/comments/o1h0i0/title_name/1v3b7x
+     * modmaiLink => An encoded URL that will open a new message to your subreddit with the Action permalink appended to the body
+     * botLink    => A permalink to the FAQ for this bot.
+     * ```
+     * If you use your own footer or no footer **please link back to the bot FAQ** using the `{{botLink}}` property in your content :)
+     *
+     * */
+    footer?: false | string
+}
+
 export interface ManagerOptions {
     polling?: PollingOptions
 
@@ -277,6 +314,33 @@ export interface ManagerOptions {
      * @examples [false,true]
      * */
     dryRun?: boolean;
+
+    /**
+     * Customize the footer for Actions that send replies (Comment/Ban). **This sets the default value for all Actions without `footer` specified in their configuration.**
+     *
+     * If `false` no footer is appended
+     *
+     * If `string` the value is rendered as markdown or will use `wiki:` parser the same way `content` properties on Actions are rendered with [templating](https://github.com/FoxxMD/reddit-context-bot#action-templating).
+     *
+     * If footer is `undefined` (not set) the default footer will be used:
+     *
+     * > *****
+     * > This action was performed by [a bot.] Mention a moderator or [send a modmail] if you any ideas, questions, or concerns about this action.
+     *
+     * *****
+     *
+     * The following properties are available for [templating](https://github.com/FoxxMD/reddit-context-bot#action-templating):
+     * ```
+     * subName    => name of subreddit Action was performed in (EX 'mealtimevideos')
+     * permaLink  => The permalink for the Activity the Action was performed on EX https://reddit.com/r/yourSub/comments/o1h0i0/title_name/1v3b7x
+     * modmaiLink => An encoded URL that will open a new message to your subreddit with the Action permalink appended to the body
+     * botLink    => A permalink to the FAQ for this bot.
+     * ```
+     * If you use your own footer or no footer **please link back to the bot FAQ** using the `{{botLink}}` property in your content :)
+     *
+     * @default undefined
+     * */
+    footer?: false | string
 }
 
 export interface ThresholdCriteria {

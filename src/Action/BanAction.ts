@@ -3,7 +3,7 @@ import Action from "./index";
 import Snoowrap, {Comment, Submission} from "snoowrap";
 import {RuleResult} from "../Rule";
 import {renderContent} from "../Utils/SnoowrapUtils";
-import {generateFooter} from "../util";
+import {Footer} from "../Common/interfaces";
 
 export class BanAction extends Action {
 
@@ -11,6 +11,7 @@ export class BanAction extends Action {
     reason?: string;
     duration?: number;
     note?: string;
+    footer?: false | string;
 
     constructor(options: BanActionOptions) {
         super(options);
@@ -18,8 +19,10 @@ export class BanAction extends Action {
             message,
             reason,
             duration,
-            note
+            note,
+            footer,
         } = options;
+        this.footer = footer;
         this.message = message;
         this.reason = reason;
         this.duration = duration;
@@ -32,21 +35,21 @@ export class BanAction extends Action {
 
     async process(item: Comment | Submission, ruleResults: RuleResult[]): Promise<void> {
         const content = this.message === undefined ? undefined : await this.resources.getContent(this.message, item.subreddit);
-        const renderedContent = content === undefined ? undefined : await renderContent(content, item, ruleResults, this.resources.userNotes);
-
-        const footer = await generateFooter(item);
+        const renderedBody = content === undefined ? undefined : await renderContent(content, item, ruleResults, this.resources.userNotes);
+        const renderedContent = renderedBody === undefined ? undefined : `${renderedBody}${await this.resources.generateFooter(item, this.footer)}`;
 
         let banPieces = [];
         banPieces.push(`Message: ${renderedContent === undefined ? 'None' : `${renderedContent.length > 100 ? `\r\n${renderedContent}` : renderedContent}`}`);
         banPieces.push(`Reason:  ${this.reason || 'None'}`);
         banPieces.push(`Note:    ${this.note || 'None'}`);
         const durText = this.duration === undefined ? 'permanently' : `for ${this.duration} days`;
-        this.logger.verbose(`Banning ${item.author.name} ${durText}\r\n${banPieces.join('\r\n')}`);
+        this.logger.info(`Banning ${item.author.name} ${durText}${this.reason !== undefined ? ` (${this.reason})` : ''}`);
+        this.logger.verbose(`\r\n${banPieces.join('\r\n')}`);
         if (!this.dryRun) {
             // @ts-ignore
             await item.subreddit.banUser({
                 name: item.author.id,
-                banMessage: renderedContent === undefined ? undefined : `${renderedContent}${footer}`,
+                banMessage: renderedContent === undefined ? undefined : renderedContent,
                 banReason: this.reason,
                 banNote: this.note,
                 duration: this.duration
@@ -55,7 +58,7 @@ export class BanAction extends Action {
     }
 }
 
-export interface BanActionConfig extends ActionConfig {
+export interface BanActionConfig extends ActionConfig, Footer {
     /**
      * The message that is sent in the ban notification. `message` is interpreted as reddit-flavored Markdown.
      *
@@ -72,7 +75,7 @@ export interface BanActionConfig extends ActionConfig {
     message?: string
     /**
      * Reason for ban.
-     * @maximum 100
+     * @maxLength 100
      * @examples ["repeat spam"]
      * */
     reason?: string
@@ -85,7 +88,7 @@ export interface BanActionConfig extends ActionConfig {
     duration?: number
     /**
      * A mod note for this ban
-     * @maximum 100
+     * @maxLength 100
      * @examples ["Sock puppet for u/AnotherUser"]
      * */
     note?: string
