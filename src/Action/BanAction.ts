@@ -3,6 +3,7 @@ import Action from "./index";
 import Snoowrap, {Comment, Submission} from "snoowrap";
 import {RuleResult} from "../Rule";
 import {renderContent} from "../Utils/SnoowrapUtils";
+import {generateFooter} from "../util";
 
 export class BanAction extends Action {
 
@@ -32,6 +33,9 @@ export class BanAction extends Action {
     async process(item: Comment | Submission, ruleResults: RuleResult[]): Promise<void> {
         const content = this.message === undefined ? undefined : await this.resources.getContent(this.message, item.subreddit);
         const renderedContent = content === undefined ? undefined : await renderContent(content, item, ruleResults);
+
+        const footer = await generateFooter(item);
+
         let banPieces = [];
         banPieces.push(`Message: ${renderedContent === undefined ? 'None' : `${renderedContent.length > 100 ? `\r\n${renderedContent}` : renderedContent}`}`);
         banPieces.push(`Reason:  ${this.reason || 'None'}`);
@@ -42,7 +46,7 @@ export class BanAction extends Action {
             // @ts-ignore
             await item.subreddit.banUser({
                 name: item.author.id,
-                banMessage: renderedContent,
+                banMessage: renderedContent === undefined ? undefined : `${renderedContent}${footer}`,
                 banReason: this.reason,
                 banNote: this.note,
                 duration: this.duration

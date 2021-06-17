@@ -4,6 +4,7 @@ import Submission from "snoowrap/dist/objects/Submission";
 import {renderContent} from "../Utils/SnoowrapUtils";
 import {RequiredRichContent, RichContent} from "../Common/interfaces";
 import {RuleResult} from "../Rule";
+import {generateFooter} from "../util";
 
 export class CommentAction extends Action {
     content: string;
@@ -39,8 +40,10 @@ export class CommentAction extends Action {
             return;
         }
 
+        const footer = await generateFooter(item);
+
         // @ts-ignore
-        const reply: Comment = await item.reply(renderedContent);
+        const reply: Comment = await item.reply(`${renderedContent}${footer}`);
         if (this.lock) {
             if (!this.dryRun) {
                 // snoopwrap typing issue, thinks comments can't be locked
