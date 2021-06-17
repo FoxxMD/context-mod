@@ -90,7 +90,7 @@ docker run -e "CLIENT_ID=myId" ... foxxmd/reddit-context-bot
 
 ## Configuration
 
-Context Bot's configuration can be written in JSON or [JSON5](https://json5.org/). It's [schema](/src/Schema/App.json) conforms to [JSON Schema Draft 7](https://json-schema.org/).
+Context Bot's configuration can be written in JSON, [JSON5](https://json5.org/) or YAML. It's [schema](/src/Schema/App.json) conforms to [JSON Schema Draft 7](https://json-schema.org/).
 
 I suggest using [Atlassian JSON Schema Viewer](https://json-schema.app/start) ([direct link](https://json-schema.app/view/%23?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Freddit-context-bot%2Fmaster%2Fsrc%2FSchema%2FApp.json)) so you can view all documentation while also interactively writing and validating your config! From there you can drill down into any object, see its requirements, view an example JSON document, and live-edit your configuration on the right-hand side.
 
