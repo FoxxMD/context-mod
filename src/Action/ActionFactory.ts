@@ -7,6 +7,7 @@ import Action, {ActionJson} from "./index";
 import {Logger} from "winston";
 import {UserNoteAction, UserNoteActionJson} from "./UserNoteAction";
 import ApproveAction, {ApproveActionConfig} from "./ApproveAction";
+import BanAction, {BanActionJson} from "./BanAction";
 
 export function actionFactory
 (config: ActionJson, logger: Logger, subredditName: string): Action {
@@ -25,6 +26,8 @@ export function actionFactory
             return new ApproveAction({...config as ApproveActionConfig, logger, subredditName});
         case 'usernote':
             return new UserNoteAction({...config as UserNoteActionJson, logger, subredditName});
+        case 'ban':
+            return new BanAction({...config as BanActionJson, logger, subredditName});
         default:
             throw new Error('rule "kind" was not recognized.');
     }
