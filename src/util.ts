@@ -1,24 +1,19 @@
 import winston, {Logger} from "winston";
 import jsonStringify from 'safe-stable-stringify';
-import dayjs from 'dayjs';
+import dayjs, {Dayjs, OpUnitType} from 'dayjs';
 import {RulePremise, RuleResult} from "./Rule";
 import deepEqual from "fast-deep-equal";
-import utc from 'dayjs/plugin/utc.js';
-import dduration from 'dayjs/plugin/duration.js';
+import {Duration} from 'dayjs/plugin/duration.js';
 import Ajv from "ajv";
 import {InvalidOptionArgumentError} from "commander";
 import Submission from "snoowrap/dist/objects/Submission";
 import {Comment} from "snoowrap";
 import {inflateSync, deflateSync} from "zlib";
-import pako from "pako";
-import {ActivityWindowCriteria} from "./Common/interfaces";
+import {ActivityWindowCriteria, DurationComparison, StringOperator} from "./Common/interfaces";
 import JSON5 from "json5";
 import yaml, {JSON_SCHEMA} from "js-yaml";
 import SimpleError from "./Utils/SimpleError";
-import he from "he";
-
-dayjs.extend(utc);
-dayjs.extend(dduration);
+import InvalidRegexError from "./Utils/InvalidRegexError";
 
 const {format} = winston;
 const {combine, printf, timestamp, label, splat, errors} = format;
@@ -388,4 +383,44 @@ export const parseFromJsonOrYamlToObject = (content: string): [object?, Error?, 
         }
     }
     return [obj, jsonErr, yamlErr];
+}
+
+export const dateComparisonTextOp = (val1: Dayjs, strOp: StringOperator, val2: Dayjs, granularity?: OpUnitType): boolean => {
+    switch (strOp) {
+        case '>':
+            return val1.isBefore(val2, granularity);
+        case '>=':
+            return val1.isSameOrBefore(val2, granularity);
+        case '<':
+            return val1.isAfter(val2, granularity);
+        case '<=':
+            return val1.isSameOrAfter(val2, granularity);
+        default:
+            throw new Error(`${strOp} was not a recognized operator`);
+    }
+}
+
+/**
+ * Named groups: operator, time, unit
+ * */
+const DURATION_REGEX: RegExp = /^\s*(?<opStr>>|>=|<|<=)\s*(?<time>\d+)\s*(?<unit>days|weeks|months|years|hours|minutes|seconds|milliseconds)\s*$/;
+const DURATION_REGEX_URL = 'https://regexr.com/609n8';
+export const parseDurationComparison = (val: string): DurationComparison => {
+    const matches = val.match(DURATION_REGEX);
+    if (matches === null) {
+        throw new InvalidRegexError(DURATION_REGEX, val, DURATION_REGEX_URL)
+    }
+    const groups = matches.groups as any;
+    const dur: Duration = dayjs.duration(groups.time, groups.unit);
+    if (!dayjs.isDuration(dur)) {
+        throw new SimpleError(`Parsed value '${val}' did not result in a valid Dayjs Duration`);
+    }
+    return {
+        operator: groups.opStr as StringOperator,
+        duration: dur
+    }
+}
+export const compareDurationValue = (comp: DurationComparison, date: Dayjs) => {
+    const dateToCompare = dayjs().subtract(comp.duration.asSeconds(), 'seconds');
+    return dateComparisonTextOp(date, comp.operator, dateToCompare);
 }

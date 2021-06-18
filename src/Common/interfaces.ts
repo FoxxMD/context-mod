@@ -1,3 +1,5 @@
+import {Duration} from "dayjs/plugin/duration";
+
 /**
  * An ISO 8601 Duration
  * @pattern ^(-?)P(?=\d|T\d)(?:(\d+)Y)?(?:(\d+)M)?(?:(\d+)([DW]))?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?)?$
@@ -96,6 +98,11 @@ export interface DurationObject {
      * @examples [0]
      * */
     years?: number
+}
+
+export interface DurationComparison {
+    operator: StringOperator,
+    duration: Duration
 }
 
 
@@ -343,6 +350,8 @@ export interface ManagerOptions {
     footer?: false | string
 }
 
+export type StringOperator = '>' | '>=' | '<' | '<=';
+
 export interface ThresholdCriteria {
     /**
      * The number or percentage to trigger this criteria at
@@ -358,7 +367,7 @@ export interface ThresholdCriteria {
     /**
      * @examples [">",">=","<","<="]
      * */
-    condition: '>' | '>=' | '<' | '<='
+    condition: StringOperator
 }
 
 export interface ChecksActivityState {

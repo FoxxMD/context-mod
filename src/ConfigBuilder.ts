@@ -37,6 +37,18 @@ export class ConfigBuilder {
             this.configLogger.error('Json config was not valid. Please use schema to check validity.');
             if (Array.isArray(ajv.errors)) {
                 for (const err of ajv.errors) {
+                    let parts = [
+                        `At: ${err.dataPath}`,
+                    ];
+                    let data;
+                    if (typeof err.data === 'string') {
+                        data = err.data;
+                    } else if (err.data !== null && typeof err.data === 'object' && (err.data as any).name !== undefined) {
+                        data = `Object named '${(err.data as any).name}'`;
+                    }
+                    if (data !== undefined) {
+                        parts.push(`Data: ${data}`);
+                    }
                     let suffix = '';
                     // @ts-ignore
                     if (err.params.allowedValues !== undefined) {
@@ -44,7 +56,23 @@ export class ConfigBuilder {
                         suffix = err.params.allowedValues.join(', ');
                         suffix = ` [${suffix}]`;
                     }
-                    this.configLogger.error(`${err.keyword}: ${err.schemaPath} => ${err.message}${suffix}`);
+                    parts.push(`${err.keyword}: ${err.schemaPath} => ${err.message}${suffix}`);
+
+                    // if we have a reference in the description parse it out so we can log it here for context
+                    if(err.parentSchema !== undefined && err.parentSchema.description !== undefined) {
+                        const desc = err.parentSchema.description as string;
+                        const seeIndex = desc.indexOf('[See]');
+                        if(seeIndex !== -1) {
+                            let newLineIndex: number | undefined = desc.indexOf('\n', seeIndex);
+                            if(newLineIndex === -1) {
+                                newLineIndex = undefined;
+                            }
+                            const seeFragment = desc.slice(seeIndex + 5, newLineIndex);
+                            parts.push(`See:${seeFragment}`);
+                        }
+                    }
+
+                    this.configLogger.error(`Schema Error:\r\n${parts.join('\r\n')}`);
                 }
             }
             throw new LoggedError('Config schema validity failure');
@@ -56,14 +84,14 @@ export class ConfigBuilder {
         let namedActions: Map<string, ActionObjectJson> = new Map();
         const {checks = []} = config;
         for (const c of checks) {
-            const { rules = [] } = c;
+            const {rules = []} = c;
             namedRules = extractNamedRules(rules, namedRules);
             namedActions = extractNamedActions(c.actions, namedActions);
         }
 
         const structuredChecks: CheckStructuredJson[] = [];
         for (const c of checks) {
-            const { rules = [] } = c;
+            const {rules = []} = c;
             const strongRules = insertNamedRules(rules, namedRules);
             const strongActions = insertNamedActions(c.actions, namedActions);
             const strongCheck = {...c, rules: strongRules, actions: strongActions} as CheckStructuredJson;

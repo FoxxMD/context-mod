@@ -135,6 +135,7 @@ export class Author implements AuthorCriteria {
     flairText?: string[];
     isMod?: boolean;
     userNotes?: UserNoteCriteria[];
+    age?: string;
 
     constructor(options: AuthorCriteria) {
         this.name = options.name;
@@ -142,6 +143,7 @@ export class Author implements AuthorCriteria {
         this.flairText = options.flairText;
         this.isMod = options.isMod;
         this.userNotes = options.userNotes;
+        this.age = options.age;
     }
 }
 
@@ -225,7 +227,39 @@ export interface AuthorCriteria {
      * A list of UserNote properties to check against the User Notes attached to this Author in this Subreddit (must have Toolbox enabled and used User Notes at least once)
      * */
     userNotes?: UserNoteCriteria[]
+
+    /**
+     * Test the age of the Author's account (when it was created) against this comparison
+     *
+     * The syntax is `[operator, one of < > <= >=] [number] [unit]`
+     *
+     * * EX `> 100 days` => Passes if Author's account is older than 100 days
+     * * EX `<= 2 months` => Passes if Author's account is younger than or equal to 2 months
+     *
+     * Unit must be one of [DayJS Duration units](https://day.js.org/docs/en/durations/creating)
+     *
+     * [See] https://regexr.com/609n8 for example
+     *
+     * @pattern ^\s*(>|>=|<|<=)\s*(\d+)\s*(days|weeks|months|years|hours|minutes|seconds|milliseconds)\s*$
+     * */
+    age?: DurationComparor
 }
+
+/**
+ * A duration and how to compare it against a value
+ *
+ * The syntax is `[operator, one of < > <= >=] [number] [unit]` EX `> 100 days`, `<= 2 months`
+ *
+ * * EX `> 100 days` => Passes if the date being compared is before 100 days ago
+ * * EX `<= 2 months` => Passes if the date being compared is after or equal to 2 months
+ *
+ * Unit must be one of [DayJS Duration units](https://day.js.org/docs/en/durations/creating)
+ *
+ * [See] https://regexr.com/609n8 for example
+ *
+ * @pattern ^\s*(>|>=|<|<=)\s*(\d+)\s*(days|weeks|months|years|hours|minutes|seconds|milliseconds)\s*$
+ * */
+export type DurationComparor = string;
 
 export interface IRule extends ChecksActivityState {
     /**

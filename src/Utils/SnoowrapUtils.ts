@@ -12,7 +12,13 @@ import {
     SubmissionState,
     TypedActivityStates
 } from "../Common/interfaces";
-import {isActivityWindowCriteria, normalizeName, truncateStringToLength} from "../util";
+import {
+    compareDurationValue,
+    isActivityWindowCriteria,
+    normalizeName,
+    parseDurationComparison,
+    truncateStringToLength
+} from "../util";
 import UserNotes from "../Subreddit/UserNotes";
 import {Logger} from "winston";
 
@@ -309,6 +315,12 @@ export const testAuthorCriteria = async (item: (Comment | Submission), authorOpt
                     const isModerator = mods.some(x => x.name === item.author.name);
                     const modMatch = authorOpts.isMod === isModerator;
                     if ((include && !modMatch) || (!include && !modMatch)) {
+                        return false;
+                    }
+                    break;
+                case 'age':
+                    const ageTest = compareDurationValue(parseDurationComparison(authorOpts.age as string), dayjs.unix(await item.author.created));
+                    if ((include && !ageTest) || (!include && !ageTest)) {
                         return false;
                     }
                     break;
