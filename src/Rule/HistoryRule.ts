@@ -1,10 +1,10 @@
 
-import {ActivityWindowType, ThresholdCriteria} from "../Common/interfaces";
+import {ActivityWindowType, CompareValueOrPercent, ThresholdCriteria} from "../Common/interfaces";
 import {Rule, RuleJSONConfig, RuleOptions, RuleResult} from "./index";
 import Submission from "snoowrap/dist/objects/Submission";
 import {getAuthorActivities} from "../Utils/SnoowrapUtils";
 import dayjs from "dayjs";
-import {comparisonTextOp, formatNumber, percentFromString} from "../util";
+import {comparisonTextOp, formatNumber, parseGenericComparison, percentFromString} from "../util";
 
 export interface CommentThresholdCriteria extends ThresholdCriteria {
     /**
@@ -20,8 +20,33 @@ export interface CommentThresholdCriteria extends ThresholdCriteria {
  * */
 export interface HistoryCriteria {
 
-    submission?: ThresholdCriteria
-    comment?: CommentThresholdCriteria
+    /**
+     * A string containing a comparison operator and a value to compare submissions against
+     *
+     * The syntax is `[< OR > OR <= OR >=] [number][?percent sign]`
+     *
+     * * EX `> 100`  => greater than 100 submissions
+     * * EX `<= 75%` => submissions are equal to or less than 75% of all Activities
+     *
+     * @pattern ^\s*(>|>=|<|<=)\s*(\d+)\s*(%?)(.*)$
+     * */
+    submission?: CompareValueOrPercent
+    /**
+     * A string containing a comparison operator and a value to compare comments against
+     *
+     * The syntax is `[< OR > OR <= OR >=] [number][?percent sign]`
+     *
+     * * EX `> 100`  => greater than 100 comments
+     * * EX `<= 75%` => comments are equal to or less than 75% of all Activities
+     *
+     * If your string also contains the text `OP` somewhere **after** `[number][?percent sign]`...:
+     *
+     * * EX `> 100 OP`  => greater than 100 comments as OP
+     * * EX `<= 25% as OP` => Comments as OP were less then or equal to 25% of **all Comments**
+     *
+     * @pattern ^\s*(>|>=|<|<=)\s*(\d+)\s*(%?)(.*)$
+     * */
+    comment?: CompareValueOrPercent
     /**
      * Window defining Activities to consider (both Comment/Submission)
      */
@@ -108,31 +133,32 @@ export class HistoryRule extends Rule {
 
             let commentTrigger = undefined;
             if(comment !== undefined) {
-                const {threshold, condition, asOp = false} = comment;
-                if(typeof threshold === 'string') {
-                    const per = percentFromString(threshold);
+                const {operator, value, isPercent, extra = ''} = parseGenericComparison(comment);
+                const asOp = extra.toLowerCase().includes('op');
+                if(isPercent) {
+                    const per = value / 100;
                     if(asOp) {
-                        commentTrigger = comparisonTextOp(opTotal / commentTotal, condition, per);
+                        commentTrigger = comparisonTextOp(opTotal / commentTotal, operator, per);
                     } else {
-                        commentTrigger = comparisonTextOp(commentTotal / activityTotal, condition, per);
+                        commentTrigger = comparisonTextOp(commentTotal / activityTotal, operator, per);
                     }
                 } else {
                     if(asOp) {
-                        commentTrigger = comparisonTextOp(opTotal, condition, threshold);
+                        commentTrigger = comparisonTextOp(opTotal, operator, value);
                     } else {
-                        commentTrigger = comparisonTextOp(commentTotal, condition, threshold);
+                        commentTrigger = comparisonTextOp(commentTotal, operator, value);
                     }
                 }
             }
 
             let submissionTrigger = undefined;
             if(submission !== undefined) {
-                const {threshold, condition, } = submission;
-                if(typeof threshold === 'string') {
-                    const per = percentFromString(threshold);
-                    submissionTrigger = comparisonTextOp(submissionTotal / activityTotal, condition, per);
+                const {operator, value, isPercent} = parseGenericComparison(submission);
+                if(isPercent) {
+                    const per = value / 100;
+                    submissionTrigger = comparisonTextOp(submissionTotal / activityTotal, operator, per);
                 } else {
-                    submissionTrigger = comparisonTextOp(submissionTotal, condition, threshold);
+                    submissionTrigger = comparisonTextOp(submissionTotal, operator, value);
                 }
             }
 
@@ -170,15 +196,8 @@ export class HistoryRule extends Rule {
                     commentTotal,
                     opTotal,
                     criteria: {
-                        comment: {
-                            threshold: cthresh,
-                            condition: ccond,
-                            asOp
-                        } = {},
-                        submission: {
-                            threshold: sthresh,
-                            condition: scond,
-                        } = {},
+                        comment,
+                        submission,
                         window,
                     },
                     criteria,
@@ -200,17 +219,20 @@ export class HistoryRule extends Rule {
                 let thresholdSummary = [];
                 let submissionSummary;
                 let commentSummary;
-                if(sthresh !== undefined) {
-                    const suffix = typeof sthresh === 'number' ? 'Items' : `(${formatNumber((submissionTotal/activityTotal)*100)}%) of ${activityTotal} Total`;
-                    submissionSummary = `Submissions (${submissionTotal}) were ${scond}${sthresh} ${suffix}`;
+                if(submission !== undefined) {
+                    const {operator, value, isPercent, displayText} = parseGenericComparison(submission);
+                    const suffix = !isPercent ? 'Items' : `(${formatNumber((submissionTotal/activityTotal)*100)}%) of ${activityTotal} Total`;
+                    submissionSummary = `Submissions (${submissionTotal}) were ${displayText} ${suffix}`;
                     data.submissionSummary = submissionSummary;
                     thresholdSummary.push(submissionSummary);
                 }
-                if(cthresh !== undefined) {
+                if(comment !== undefined) {
+                    const {operator, value, isPercent, displayText, extra = ''} = parseGenericComparison(comment);
+                    const asOp = extra.toLowerCase().includes('op');
                     const totalType = asOp ? 'Comments' : 'Activities'
                     const countType = asOp ? 'Comments as OP' : 'Comments';
-                    const suffix = typeof cthresh === 'number' ? 'Items' : `(${asOp ? formatNumber((opTotal/commentTotal)*100) : formatNumber((commentTotal/activityTotal)*100)}%) of ${activityTotal} Total ${totalType}`;
-                    commentSummary = `${countType} (${asOp ? opTotal : commentTotal}) were ${ccond}${cthresh} ${suffix}`;
+                    const suffix = !isPercent ? 'Items' : `(${asOp ? formatNumber((opTotal/commentTotal)*100) : formatNumber((commentTotal/activityTotal)*100)}%) of ${activityTotal} Total ${totalType}`;
+                    commentSummary = `${countType} (${asOp ? opTotal : commentTotal}) were ${displayText} ${suffix}`;
                     data.commentSummary = commentSummary;
                     thresholdSummary.push(commentSummary);
                 }

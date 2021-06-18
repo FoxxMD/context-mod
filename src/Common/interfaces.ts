@@ -105,6 +105,14 @@ export interface DurationComparison {
     duration: Duration
 }
 
+export interface GenericComparison {
+    operator: StringOperator,
+    value: number,
+    isPercent: boolean,
+    extra?: string,
+    displayText: string,
+}
+
 
 export const windowExample: ActivityWindowType[] = [
     15,
@@ -349,6 +357,18 @@ export interface ManagerOptions {
      * */
     footer?: false | string
 }
+
+/**
+ * A string containing a comparison operator and a value to compare against
+ *
+ * The syntax is `< OR > OR <= OR >=] [number][?percent sign]`
+ *
+ * * EX `> 100`  => greater than 100
+ * * EX `<= 75%` => less than or equal to 75%
+ *
+ * @pattern ^\s*(>|>=|<|<=)\s*(\d+)\s*(%?)(.*)$
+ * */
+export type CompareValueOrPercent = string;
 
 export type StringOperator = '>' | '>=' | '<' | '<=';
 

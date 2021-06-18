@@ -231,7 +231,7 @@ export interface AuthorCriteria {
     /**
      * Test the age of the Author's account (when it was created) against this comparison
      *
-     * The syntax is `[operator, one of < > <= >=] [number] [unit]`
+     * The syntax is `[< OR > OR <= OR >=] [number] [unit]`
      *
      * * EX `> 100 days` => Passes if Author's account is older than 100 days
      * * EX `<= 2 months` => Passes if Author's account is younger than or equal to 2 months
@@ -248,7 +248,7 @@ export interface AuthorCriteria {
 /**
  * A duration and how to compare it against a value
  *
- * The syntax is `[operator, one of < > <= >=] [number] [unit]` EX `> 100 days`, `<= 2 months`
+ * The syntax is `[< OR > OR <= OR >=] [number] [unit]` EX `> 100 days`, `<= 2 months`
  *
  * * EX `> 100 days` => Passes if the date being compared is before 100 days ago
  * * EX `<= 2 months` => Passes if the date being compared is after or equal to 2 months

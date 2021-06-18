@@ -9,7 +9,7 @@ import {InvalidOptionArgumentError} from "commander";
 import Submission from "snoowrap/dist/objects/Submission";
 import {Comment} from "snoowrap";
 import {inflateSync, deflateSync} from "zlib";
-import {ActivityWindowCriteria, DurationComparison, StringOperator} from "./Common/interfaces";
+import {ActivityWindowCriteria, DurationComparison, GenericComparison, StringOperator} from "./Common/interfaces";
 import JSON5 from "json5";
 import yaml, {JSON_SCHEMA} from "js-yaml";
 import SimpleError from "./Utils/SimpleError";
@@ -383,6 +383,24 @@ export const parseFromJsonOrYamlToObject = (content: string): [object?, Error?, 
         }
     }
     return [obj, jsonErr, yamlErr];
+}
+
+const GENERIC_VALUE_PERCENT_COMPARISON = /^\s*(?<opStr>>|>=|<|<=)\s*(?<value>\d+)\s*(?<percent>%?)(?<extra>.*)$/
+const GENERIC_VALUE_PERCENT_COMPARISON_URL = 'https://regexr.com/60a16';
+export const parseGenericComparison = (val: string): GenericComparison => {
+    const matches = val.match(GENERIC_VALUE_PERCENT_COMPARISON);
+    if (matches === null) {
+        throw new InvalidRegexError(GENERIC_VALUE_PERCENT_COMPARISON, val, GENERIC_VALUE_PERCENT_COMPARISON_URL)
+    }
+    const groups = matches.groups as any;
+
+    return {
+        operator: groups.opStr as StringOperator,
+        value: Number.parseFloat(groups.number),
+        isPercent: groups.percent !== undefined,
+        extra: groups.extra,
+        displayText: `${groups.opStr} ${groups.number}${groups.percent === undefined ? '': '%'}`
+    }
 }
 
 export const dateComparisonTextOp = (val1: Dayjs, strOp: StringOperator, val2: Dayjs, granularity?: OpUnitType): boolean => {

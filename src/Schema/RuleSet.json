@@ -246,7 +246,7 @@
             "minProperties": 1,
             "properties": {
                 "age": {
-                    "description": "Test the age of the Author's account (when it was created) against this comparison\n\nThe syntax is `[operator, one of < > <= >=] [number] [unit]`\n\n* EX `> 100 days` => Passes if Author's account is older than 100 days\n* EX `<= 2 months` => Passes if Author's account is younger than or equal to 2 months\n\nUnit must be one of [DayJS Duration units](https://day.js.org/docs/en/durations/creating)\n\n[See] https://regexr.com/609n8 for example",
+                    "description": "Test the age of the Author's account (when it was created) against this comparison\n\nThe syntax is `[< OR > OR <= OR >=] [number] [unit]`\n\n* EX `> 100 days` => Passes if Author's account is older than 100 days\n* EX `<= 2 months` => Passes if Author's account is younger than or equal to 2 months\n\nUnit must be one of [DayJS Duration units](https://day.js.org/docs/en/durations/creating)\n\n[See] https://regexr.com/609n8 for example",
                     "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(days|weeks|months|years|hours|minutes|seconds|milliseconds)\\s*$",
                     "type": "string"
                 },
@@ -438,40 +438,6 @@
             },
             "type": "object"
         },
-        "CommentThresholdCriteria": {
-            "properties": {
-                "asOp": {
-                    "description": "If `true` then when threshold...\n\n* is `number` it will be number of comments where author is OP\n* is `percent` it will be **percent of total comments where author is OP**",
-                    "type": "boolean"
-                },
-                "condition": {
-                    "$ref": "#/definitions/StringOperator",
-                    "examples": [
-                        ">",
-                        ">=",
-                        "<",
-                        "<="
-                    ]
-                },
-                "threshold": {
-                    "default": "10%",
-                    "description": "The number or percentage to trigger this criteria at\n\n* If `threshold` is a `number` then it is the absolute number of items to trigger at\n* If `threshold` is a `string` with percentage (EX `40%`) then it is the percentage of the total this item must reach to trigger",
-                    "examples": [
-                        "10%",
-                        15
-                    ],
-                    "type": [
-                        "string",
-                        "number"
-                    ]
-                }
-            },
-            "required": [
-                "condition",
-                "threshold"
-            ],
-            "type": "object"
-        },
         "DurationObject": {
             "additionalProperties": false,
             "description": "A [Day.js duration object](https://day.js.org/docs/en/durations/creating)",
@@ -532,7 +498,9 @@
             "description": "If both `submission` and `comment` are defined then criteria will only trigger if BOTH thresholds are met",
             "properties": {
                 "comment": {
-                    "$ref": "#/definitions/CommentThresholdCriteria"
+                    "description": "A string containing a comparison operator and a value to compare comments against\n\nThe syntax is `[< OR > OR <= OR >=] [number][?percent sign]`\n\n* EX `> 100`  => greater than 100 comments\n* EX `<= 75%` => comments are equal to or less than 75% of all Activities\n\nIf your string also contains the text `OP` **after** `[number][?percent sign]`...:\n\n* EX `> 100 OP`  => greater than 100 comments as OP\n* EX `<= 25% as OP` => Comments as OP were less or equal to 25% of **all Comments**",
+                    "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
+                    "type": "string"
                 },
                 "minActivityCount": {
                     "default": 5,
@@ -543,7 +511,9 @@
                     "type": "string"
                 },
                 "submission": {
-                    "$ref": "#/definitions/ThresholdCriteria"
+                    "description": "A string containing a comparison operator and a value to compare submissions against\n\nThe syntax is `[< OR > OR <= OR >=] [number][?percent sign]`\n\n* EX `> 100`  => greater than 100 submissions\n* EX `<= 75%` => submissions are equal to or less than 75% of all Activities",
+                    "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
+                    "type": "string"
                 },
                 "window": {
                     "anyOf": [
@@ -901,15 +871,6 @@
             ],
             "type": "object"
         },
-        "StringOperator": {
-            "enum": [
-                "<",
-                "<=",
-                ">",
-                ">="
-            ],
-            "type": "string"
-        },
         "SubThreshold": {
             "additionalProperties": false,
             "description": "At least one count property must be present. If both are present then either can trigger the rule",
@@ -992,36 +953,6 @@
                     "type": "boolean"
                 }
             },
-            "type": "object"
-        },
-        "ThresholdCriteria": {
-            "properties": {
-                "condition": {
-                    "$ref": "#/definitions/StringOperator",
-                    "examples": [
-                        ">",
-                        ">=",
-                        "<",
-                        "<="
-                    ]
-                },
-                "threshold": {
-                    "default": "10%",
-                    "description": "The number or percentage to trigger this criteria at\n\n* If `threshold` is a `number` then it is the absolute number of items to trigger at\n* If `threshold` is a `string` with percentage (EX `40%`) then it is the percentage of the total this item must reach to trigger",
-                    "examples": [
-                        "10%",
-                        15
-                    ],
-                    "type": [
-                        "string",
-                        "number"
-                    ]
-                }
-            },
-            "required": [
-                "condition",
-                "threshold"
-            ],
             "type": "object"
         },
         "UserNoteCriteria": {
