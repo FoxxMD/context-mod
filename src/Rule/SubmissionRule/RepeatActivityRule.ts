@@ -45,7 +45,7 @@ export class RepeatActivityRule extends SubmissionRule {
         super(options);
         const {
             threshold = 5,
-            window = 15,
+            window = 100,
             gapAllowance,
             useSubmissionAsReference = true,
             lookAt = 'all',

@@ -418,15 +418,38 @@ export const dateComparisonTextOp = (val1: Dayjs, strOp: StringOperator, val2: D
     }
 }
 
+const ISO8601_REGEX: RegExp = /^(-?)P(?=\d|T\d)(?:(\d+)Y)?(?:(\d+)M)?(?:(\d+)([DW]))?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?)?$/;
+const DURATION_REGEX: RegExp = /^\s*(?<time>\d+)\s*(?<unit>days?|weeks?|months?|years?|hours?|minutes?|seconds?|milliseconds?)\s*$/;
+export const parseDuration = (val: string): Duration => {
+    let matches = val.match(DURATION_COMPARISON_REGEX);
+    if (matches !== null) {
+        const groups = matches.groups as any;
+        const dur: Duration = dayjs.duration(groups.time, groups.unit);
+        if (!dayjs.isDuration(dur)) {
+            throw new SimpleError(`Parsed value '${val}' did not result in a valid Dayjs Duration`);
+        }
+        return dur;
+    }
+    matches = val.match(ISO8601_REGEX);
+    if (matches !== null) {
+        const dur: Duration = dayjs.duration(val);
+        if (!dayjs.isDuration(dur)) {
+            throw new SimpleError(`Parsed value '${val}' did not result in a valid Dayjs Duration`);
+        }
+        return dur;
+    }
+    throw new InvalidRegexError([DURATION_REGEX, ISO8601_REGEX], val)
+}
+
 /**
  * Named groups: operator, time, unit
  * */
-const DURATION_REGEX: RegExp = /^\s*(?<opStr>>|>=|<|<=)\s*(?<time>\d+)\s*(?<unit>days|weeks|months|years|hours|minutes|seconds|milliseconds)\s*$/;
-const DURATION_REGEX_URL = 'https://regexr.com/609n8';
+const DURATION_COMPARISON_REGEX: RegExp = /^\s*(?<opStr>>|>=|<|<=)\s*(?<time>\d+)\s*(?<unit>days?|weeks?|months?|years?|hours?|minutes?|seconds?|milliseconds?)\s*$/;
+const DURATION_COMPARISON_REGEX_URL = 'https://regexr.com/609n8';
 export const parseDurationComparison = (val: string): DurationComparison => {
-    const matches = val.match(DURATION_REGEX);
+    const matches = val.match(DURATION_COMPARISON_REGEX);
     if (matches === null) {
-        throw new InvalidRegexError(DURATION_REGEX, val, DURATION_REGEX_URL)
+        throw new InvalidRegexError(DURATION_COMPARISON_REGEX, val, DURATION_COMPARISON_REGEX_URL)
     }
     const groups = matches.groups as any;
     const dur: Duration = dayjs.duration(groups.time, groups.unit);

@@ -47,9 +47,7 @@ export interface HistoryCriteria {
      * @pattern ^\s*(>|>=|<|<=)\s*(\d+)\s*(%?)(.*)$
      * */
     comment?: CompareValueOrPercent
-    /**
-     * Window defining Activities to consider (both Comment/Submission)
-     */
+
     window: ActivityWindowType
 
     /**

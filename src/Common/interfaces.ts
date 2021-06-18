@@ -5,11 +5,55 @@ import {Duration} from "dayjs/plugin/duration";
  * @pattern ^(-?)P(?=\d|T\d)(?:(\d+)Y)?(?:(\d+)M)?(?:(\d+)([DW]))?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?)?$
  * */
 export type ISO8601 = string;
-export type ActivityWindowType = ActivityWindowCriteria | DurationVal | number;
-export type DurationVal = ISO8601 | DurationObject;
 
 /**
- * The criteria used to define what range of Activity to retrieve.
+ * A shorthand value for a DayJS duration consisting of a number value and time unit
+ *
+ * * EX `9 days`
+ * * EX `3 months`
+ * @pattern ^\s*(?<time>\d+)\s*(?<unit>days?|weeks?|months?|years?|hours?|minutes?|seconds?|milliseconds?)\s*$
+ * */
+export type DayJSShorthand = string;
+export type DurationString = DayJSShorthand | ISO8601;
+
+/**
+ * A value to define the range of Activities to retrieve.
+ *
+ * Acceptable values:
+ *
+ * **`ActivityWindowCriteria` object**
+ *
+ * Allows specify multiple range properties and more specific behavior
+ *
+ * **A `number` of Activities to retrieve**
+ *
+ * * EX `100` => 100 Activities
+ *
+ * *****
+ *
+ * Any of the below values that specify the amount of time to subtract from `NOW` to create a time range IE `NOW <---> [duration] ago`
+ *
+ * Acceptable values:
+ *
+ * **A `string` consisting of a value and a [Day.js](https://day.js.org/docs/en/durations/creating#list-of-all-available-units) time UNIT**
+ *
+ * * EX `9 days` => Range is `NOW <---> 9 days ago`
+ *
+ * **A [Day.js](https://day.js.org/docs/en/durations/creating) `object`**
+ *
+ * * EX `{"days": 90, "minutes": 15}` => Range is `NOW <---> 90 days and 15 minutes ago`
+ *
+ * **An [ISO 8601 duration](https://en.wikipedia.org/wiki/ISO_8601#Durations) `string`**
+ *
+ * * EX `PT15M` => 15 minutes => Range is `NOW <----> 15 minutes ago`
+ *
+ * @examples ["90 days"]
+ * */
+export type ActivityWindowType = ActivityWindowCriteria | DurationVal | number;
+export type DurationVal = DurationString | DurationObject;
+
+/**
+ * Multiple properties that may be used to define what range of Activity to retrieve.
  *
  * May specify one, or both properties along with the `satisfyOn` property, to affect the retrieval behavior.
  *
@@ -24,18 +68,23 @@ export interface ActivityWindowCriteria {
      * */
     count?: number,
     /**
-     * An [ISO 8601 duration string](https://en.wikipedia.org/wiki/ISO_8601#Durations) or [Day.js duration object](https://day.js.org/docs/en/durations/creating).
+     * A value that specifies the amount of time to subtract from `NOW` to create a time range IE `NOW <---> [duration] ago`
      *
-     * The duration will be subtracted from the time when the rule is run to create a time range like this:
+     * Acceptable values:
      *
-     * endTime = NOW  <----> startTime = (NOW - `duration`)
+     * **A `string` consisting of a value and a [Day.js](https://day.js.org/docs/en/durations/creating) time unit**
      *
-     * EX `PT15M` or `{"minutes": 15}`
-     * * `endTime` = NOW (3:00PM)
-     * * `startTime` = (NOW - 15 minutes) = 2:45PM
+     * * EX `9 days` => Range is `NOW <---> 9 days ago`
      *
-     * So look for Activities between 2:45PM and 3:00PM
-     * @examples ["PT15M", {"minutes": 15}]
+     * **A [Day.js](https://day.js.org/docs/en/durations/creating) `object`**
+     *
+     * * EX `{"days": 90, "minutes": 15}` => Range is `NOW <---> 90 days and 15 minutes ago`
+     *
+     * **An [ISO 8601 duration](https://en.wikipedia.org/wiki/ISO_8601#Durations) `string`**
+     *
+     * * EX `PT15M` => 15 minutes => Range is `NOW <----> 15 minutes ago`
+     *
+     * @examples ["90 days", "PT15M", {"minutes": 15}]
      * */
     duration?: DurationVal
 
@@ -135,13 +184,7 @@ export const windowExample: ActivityWindowType[] = [
 
 
 export interface ActivityWindow {
-    /**
-     * Criteria for defining what set of activities should be considered.
-     *
-     * The value of this property may be either count OR duration -- to use both write it as an `ActivityWindowCriteria`
-     *
-     * @default 15
-     */
+
     window?: ActivityWindowType,
 }
 

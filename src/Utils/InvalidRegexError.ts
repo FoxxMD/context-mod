@@ -1,11 +1,14 @@
 import ExtendableError from "es6-error";
 
 class InvalidRegexError extends ExtendableError {
-    constructor(regex: RegExp, val?: string, url?: string) {
+    constructor(regex: RegExp | RegExp[], val?: string, url?: string) {
         const msgParts = [
-            'Regex did not match the value given.',
-            `Regex: ${regex}`
+            'Regex(es) did not match the value given.',
         ];
+        let regArr = Array.isArray(regex) ? regex : [regex];
+        for(const r of regArr) {
+            msgParts.push(`Regex: ${r}`)
+        }
         if (val !== undefined) {
             msgParts.push(`Value: ${val}`);
         }

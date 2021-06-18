@@ -3,7 +3,7 @@
     "definitions": {
         "ActivityWindowCriteria": {
             "additionalProperties": false,
-            "description": "The criteria used to define what range of Activity to retrieve.\n\nMay specify one, or both properties along with the `satisfyOn` property, to affect the retrieval behavior.",
+            "description": "Multiple properties that may be used to define what range of Activity to retrieve.\n\nMay specify one, or both properties along with the `satisfyOn` property, to affect the retrieval behavior.",
             "examples": [
                 {
                     "count": 100,
@@ -30,8 +30,9 @@
                             "type": "string"
                         }
                     ],
-                    "description": "An [ISO 8601 duration string](https://en.wikipedia.org/wiki/ISO_8601#Durations) or [Day.js duration object](https://day.js.org/docs/en/durations/creating).\n\nThe duration will be subtracted from the time when the rule is run to create a time range like this:\n\nendTime = NOW  <----> startTime = (NOW - `duration`)\n\nEX `PT15M` or `{\"minutes\": 15}`\n* `endTime` = NOW (3:00PM)\n* `startTime` = (NOW - 15 minutes) = 2:45PM\n\nSo look for Activities between 2:45PM and 3:00PM",
+                    "description": "A value that specifies the amount of time to subtract from `NOW` to create a time range IE `NOW <---> [duration] ago`\n\nAcceptable values:\n\n**A `string` consisting of a value and a [Day.js](https://day.js.org/docs/en/durations/creating) time unit**\n\n* EX `9 days` => Range is `NOW <---> 9 days ago`\n\n**A [Day.js](https://day.js.org/docs/en/durations/creating) `object`**\n\n* EX `{\"days\": 90, \"minutes\": 15}` => Range is `NOW <---> 90 days and 15 minutes ago`\n\n**An [ISO 8601 duration](https://en.wikipedia.org/wiki/ISO_8601#Durations) `string`**\n\n* EX `PT15M` => 15 minutes => Range is `NOW <----> 15 minutes ago`",
                     "examples": [
+                        "90 days",
                         "PT15M",
                         {
                             "minutes": 15
@@ -127,6 +128,10 @@
                                 "number"
                             ]
                         }
+                    ],
+                    "description": "A value to define the range of Activities to retrieve.\n\nAcceptable values:\n\n**`ActivityWindowCriteria` object**\n\nAllows specify multiple range properties and more specific behavior\n\n**A `number` of Activities to retrieve**\n\n* EX `100` => 100 Activities\n\n*****\n\nAny of the below values that specify the amount of time to subtract from `NOW` to create a time range IE `NOW <---> [duration] ago`\n\nAcceptable values:\n\n**A `string` consisting of a value and a [Day.js](https://day.js.org/docs/en/durations/creating#list-of-all-available-units) time UNIT**\n\n* EX `9 days` => Range is `NOW <---> 9 days ago`\n\n**A [Day.js](https://day.js.org/docs/en/durations/creating) `object`**\n\n* EX `{\"days\": 90, \"minutes\": 15}` => Range is `NOW <---> 90 days and 15 minutes ago`\n\n**An [ISO 8601 duration](https://en.wikipedia.org/wiki/ISO_8601#Durations) `string`**\n\n* EX `PT15M` => 15 minutes => Range is `NOW <----> 15 minutes ago`",
+                    "examples": [
+                        "90 days"
                     ]
                 }
             },
@@ -871,7 +876,7 @@
             "description": "If both `submission` and `comment` are defined then criteria will only trigger if BOTH thresholds are met",
             "properties": {
                 "comment": {
-                    "description": "A string containing a comparison operator and a value to compare comments against\n\nThe syntax is `[< OR > OR <= OR >=] [number][?percent sign]`\n\n* EX `> 100`  => greater than 100 comments\n* EX `<= 75%` => comments are equal to or less than 75% of all Activities\n\nIf your string also contains the text `OP` **after** `[number][?percent sign]`...:\n\n* EX `> 100 OP`  => greater than 100 comments as OP\n* EX `<= 25% as OP` => Comments as OP were less or equal to 25% of **all Comments**",
+                    "description": "A string containing a comparison operator and a value to compare comments against\n\nThe syntax is `[< OR > OR <= OR >=] [number][?percent sign]`\n\n* EX `> 100`  => greater than 100 comments\n* EX `<= 75%` => comments are equal to or less than 75% of all Activities\n\nIf your string also contains the text `OP` somewhere **after** `[number][?percent sign]`...:\n\n* EX `> 100 OP`  => greater than 100 comments as OP\n* EX `<= 25% as OP` => Comments as OP were less then or equal to 25% of **all Comments**",
                     "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
                     "type": "string"
                 },
@@ -903,7 +908,10 @@
                             ]
                         }
                     ],
-                    "description": "Window defining Activities to consider (both Comment/Submission)"
+                    "description": "A value to define the range of Activities to retrieve.\n\nAcceptable values:\n\n**`ActivityWindowCriteria` object**\n\nAllows specify multiple range properties and more specific behavior\n\n**A `number` of Activities to retrieve**\n\n* EX `100` => 100 Activities\n\n*****\n\nAny of the below values that specify the amount of time to subtract from `NOW` to create a time range IE `NOW <---> [duration] ago`\n\nAcceptable values:\n\n**A `string` consisting of a value and a [Day.js](https://day.js.org/docs/en/durations/creating#list-of-all-available-units) time UNIT**\n\n* EX `9 days` => Range is `NOW <---> 9 days ago`\n\n**A [Day.js](https://day.js.org/docs/en/durations/creating) `object`**\n\n* EX `{\"days\": 90, \"minutes\": 15}` => Range is `NOW <---> 90 days and 15 minutes ago`\n\n**An [ISO 8601 duration](https://en.wikipedia.org/wiki/ISO_8601#Durations) `string`**\n\n* EX `PT15M` => 15 minutes => Range is `NOW <----> 15 minutes ago`",
+                    "examples": [
+                        "90 days"
+                    ]
                 }
             },
             "required": [
@@ -1216,8 +1224,10 @@
                             ]
                         }
                     ],
-                    "default": 15,
-                    "description": "Criteria for defining what set of activities should be considered.\n\nThe value of this property may be either count OR duration -- to use both write it as an `ActivityWindowCriteria`"
+                    "description": "A value to define the range of Activities to retrieve.\n\nAcceptable values:\n\n**`ActivityWindowCriteria` object**\n\nAllows specify multiple range properties and more specific behavior\n\n**A `number` of Activities to retrieve**\n\n* EX `100` => 100 Activities\n\n*****\n\nAny of the below values that specify the amount of time to subtract from `NOW` to create a time range IE `NOW <---> [duration] ago`\n\nAcceptable values:\n\n**A `string` consisting of a value and a [Day.js](https://day.js.org/docs/en/durations/creating#list-of-all-available-units) time UNIT**\n\n* EX `9 days` => Range is `NOW <---> 9 days ago`\n\n**A [Day.js](https://day.js.org/docs/en/durations/creating) `object`**\n\n* EX `{\"days\": 90, \"minutes\": 15}` => Range is `NOW <---> 90 days and 15 minutes ago`\n\n**An [ISO 8601 duration](https://en.wikipedia.org/wiki/ISO_8601#Durations) `string`**\n\n* EX `PT15M` => 15 minutes => Range is `NOW <----> 15 minutes ago`",
+                    "examples": [
+                        "90 days"
+                    ]
                 }
             },
             "required": [
@@ -1375,8 +1385,10 @@
                             ]
                         }
                     ],
-                    "default": 15,
-                    "description": "Criteria for defining what set of activities should be considered.\n\nThe value of this property may be either count OR duration -- to use both write it as an `ActivityWindowCriteria`"
+                    "description": "A value to define the range of Activities to retrieve.\n\nAcceptable values:\n\n**`ActivityWindowCriteria` object**\n\nAllows specify multiple range properties and more specific behavior\n\n**A `number` of Activities to retrieve**\n\n* EX `100` => 100 Activities\n\n*****\n\nAny of the below values that specify the amount of time to subtract from `NOW` to create a time range IE `NOW <---> [duration] ago`\n\nAcceptable values:\n\n**A `string` consisting of a value and a [Day.js](https://day.js.org/docs/en/durations/creating#list-of-all-available-units) time UNIT**\n\n* EX `9 days` => Range is `NOW <---> 9 days ago`\n\n**A [Day.js](https://day.js.org/docs/en/durations/creating) `object`**\n\n* EX `{\"days\": 90, \"minutes\": 15}` => Range is `NOW <---> 90 days and 15 minutes ago`\n\n**An [ISO 8601 duration](https://en.wikipedia.org/wiki/ISO_8601#Durations) `string`**\n\n* EX `PT15M` => 15 minutes => Range is `NOW <----> 15 minutes ago`",
+                    "examples": [
+                        "90 days"
+                    ]
                 }
             },
             "required": [

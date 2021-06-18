@@ -15,12 +15,13 @@ import {
 import {
     compareDurationValue,
     isActivityWindowCriteria,
-    normalizeName,
+    normalizeName, parseDuration,
     parseDurationComparison,
     truncateStringToLength
 } from "../util";
 import UserNotes from "../Subreddit/UserNotes";
 import {Logger} from "winston";
+import InvalidRegexError from "./InvalidRegexError";
 
 export const BOT_LINK = 'https://www.reddit.com/r/ContextModBot/comments/o1dugk/introduction_to_contextmodbot_and_rcb';
 
@@ -66,13 +67,20 @@ export async function getAuthorActivities(user: RedditUser, options: AuthorTyped
 
     if(durVal !== undefined) {
         const endTime = dayjs();
-        if (!dayjs.isDuration(durVal)) {
-            // @ts-ignore
+        if (typeof durVal === 'object') {
             duration = dayjs.duration(durVal);
-        }
-        if (!dayjs.isDuration(duration)) {
-            // TODO print object
-            throw new Error('window given was not a number, a valid ISO8601 duration, a Day.js duration, or well-formed Duration options');
+            if (!dayjs.isDuration(durVal)) {
+                throw new Error('window value given was not a well-formed Duration object');
+            }
+        } else {
+            try {
+                duration = parseDuration(durVal);
+            } catch (e) {
+                if (e instanceof InvalidRegexError) {
+                    throw new Error(`window value of '${durVal}' could not be parsed as a valid ISO8601 duration or DayJS duration shorthand (see Schema)`);
+                }
+                throw e;
+            }
         }
         satisfiedEndtime = endTime.subtract(duration.asMilliseconds(), 'milliseconds');
     }
