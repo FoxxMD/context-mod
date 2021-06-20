@@ -1492,6 +1492,7 @@
             "minProperties": 1,
             "properties": {
                 "count": {
+                    "default": 1,
                     "description": "The number of activities in each subreddit from the list that will trigger this rule",
                     "examples": [
                         1
@@ -1514,6 +1515,7 @@
                     "type": "array"
                 },
                 "totalCount": {
+                    "default": 1,
                     "description": "The total number of activities across all listed subreddits that will trigger this rule",
                     "examples": [
                         1

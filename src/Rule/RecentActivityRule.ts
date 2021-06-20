@@ -90,7 +90,7 @@ export class RecentActivityRule extends Rule {
             triggeredPerSub = [];
             let currCount = 0;
             let presentSubs = [];
-            const {count: subCount, totalCount, subreddits = []} = triggerSet;
+            const {count: subCount = 1, totalCount = 1, subreddits = []} = triggerSet;
             for (const sub of subreddits) {
                 const isub = sub.toLowerCase();
                 const {[isub]: tSub = []} = groupedActivity;
@@ -165,12 +165,14 @@ export interface SubThreshold extends SubredditCriteria {
     /**
      * The number of activities in each subreddit from the list that will trigger this rule
      * @minimum 1
+     * @default 1
      * @examples [1]
      * */
     count?: number,
     /**
      * The total number of activities across all listed subreddits that will trigger this rule
      * @minimum 1
+     * @default 1
      * @examples [1]
      * */
     totalCount?: number
