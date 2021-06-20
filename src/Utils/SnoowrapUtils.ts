@@ -69,7 +69,7 @@ export async function getAuthorActivities(user: RedditUser, options: AuthorTyped
         const endTime = dayjs();
         if (typeof durVal === 'object') {
             duration = dayjs.duration(durVal);
-            if (!dayjs.isDuration(durVal)) {
+            if (!dayjs.isDuration(duration)) {
                 throw new Error('window value given was not a well-formed Duration object');
             }
         } else {
