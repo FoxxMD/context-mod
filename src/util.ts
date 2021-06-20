@@ -421,7 +421,7 @@ export const dateComparisonTextOp = (val1: Dayjs, strOp: StringOperator, val2: D
 const ISO8601_REGEX: RegExp = /^(-?)P(?=\d|T\d)(?:(\d+)Y)?(?:(\d+)M)?(?:(\d+)([DW]))?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?)?$/;
 const DURATION_REGEX: RegExp = /^\s*(?<time>\d+)\s*(?<unit>days?|weeks?|months?|years?|hours?|minutes?|seconds?|milliseconds?)\s*$/;
 export const parseDuration = (val: string): Duration => {
-    let matches = val.match(DURATION_COMPARISON_REGEX);
+    let matches = val.match(DURATION_REGEX);
     if (matches !== null) {
         const groups = matches.groups as any;
         const dur: Duration = dayjs.duration(groups.time, groups.unit);
