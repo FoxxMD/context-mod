@@ -585,6 +585,14 @@
                         }
                     ]
                 },
+                "condition": {
+                    "description": "* If `OR` then any set of Criteria that pass will trigger the Rule\n* If `AND` then all Criteria sets must pass to trigger the Rule",
+                    "enum": [
+                        "AND",
+                        "OR"
+                    ],
+                    "type": "string"
+                },
                 "criteria": {
                     "description": "A list threshold-window values to test activities against.",
                     "items": {
@@ -592,14 +600,6 @@
                     },
                     "minItems": 1,
                     "type": "array"
-                },
-                "criteriaJoin": {
-                    "description": "* If `OR` then any set of Criteria that pass will trigger the Rule\n* If `AND` then all Criteria sets must pass to trigger the Rule",
-                    "enum": [
-                        "AND",
-                        "OR"
-                    ],
-                    "type": "string"
                 },
                 "exclude": {
                     "description": "Do not include Submissions from this list of Subreddits.\n\nA list of subreddits (case-insensitive) to look for. Do not include \"r/\" prefix.\n\nEX to match against /r/mealtimevideos and /r/askscience use [\"mealtimevideos\",\"askscience\"]",
