@@ -483,3 +483,4 @@ export interface CommentState extends ActivityState {
 }
 
 export type TypedActivityStates = SubmissionState[] | CommentState[];
+

@@ -131,3 +131,6 @@ for (const o of getUniversalOptions()) {
         console.log(err);
     }
 }());
+export {Author} from "./Author/Author";
+export {AuthorCriteria} from "./Author/Author";
+export {AuthorOptions} from "./Author/Author";

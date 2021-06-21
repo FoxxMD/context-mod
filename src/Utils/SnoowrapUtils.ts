@@ -4,10 +4,9 @@ import {Duration, DurationUnitsObjectType} from "dayjs/plugin/duration";
 import dayjs, {Dayjs} from "dayjs";
 import Mustache from "mustache";
 import he from "he";
-import {AuthorCriteria, RuleResult, UserNoteCriteria} from "../Rule";
+import {RuleResult, UserNoteCriteria} from "../Rule";
 import {
-    ActivityWindowType,
-    CommentState,
+    ActivityWindowType, CommentState,
     DurationVal,
     SubmissionState,
     TypedActivityStates
@@ -23,6 +22,7 @@ import UserNotes from "../Subreddit/UserNotes";
 import {Logger} from "winston";
 import InvalidRegexError from "./InvalidRegexError";
 import SimpleError from "./SimpleError";
+import {AuthorCriteria} from "../Author/Author";
 
 export const BOT_LINK = 'https://www.reddit.com/r/ContextModBot/comments/o1dugk/introduction_to_contextmodbot_and_rcb';
 

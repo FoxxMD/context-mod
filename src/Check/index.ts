@@ -1,5 +1,5 @@
 import {RuleSet, IRuleSet, RuleSetJson, RuleSetObjectJson} from "../Rule/RuleSet";
-import {Author, AuthorOptions, IRule, Rule, RuleJSONConfig, RuleResult} from "../Rule";
+import {IRule, Rule, RuleJSONConfig, RuleResult} from "../Rule";
 import Action, {ActionConfig, ActionJson} from "../Action";
 import {Logger} from "winston";
 import {Comment, Submission} from "snoowrap";
@@ -20,6 +20,7 @@ import * as ActionSchema from '../Schema/Action.json';
 import {ActionObjectJson, RuleJson, RuleObjectJson, ActionJson as ActionTypeJson} from "../Common/types";
 import {isItem} from "../Utils/SnoowrapUtils";
 import ResourceManager, {SubredditResources} from "../Subreddit/SubredditResources";
+import {Author, AuthorCriteria, AuthorOptions} from "../Author/Author";
 
 export class Check implements ICheck {
     actions: Action[] = [];
@@ -29,7 +30,10 @@ export class Check implements ICheck {
     rules: Array<RuleSet | Rule> = [];
     logger: Logger;
     itemIs: TypedActivityStates;
-    authorIs: AuthorOptions;
+    authorIs: {
+        include: AuthorCriteria[],
+        exclude: AuthorCriteria[]
+    };
     dryRun?: boolean;
     resources: SubredditResources;
 
@@ -123,8 +127,8 @@ export class Check implements ICheck {
         runStats.push(`${this.actions.length} Actions`);
         // not sure if this should be info or verbose
         this.logger.info(`${type.toUpperCase()} (${this.condition}) => ${runStats.join(' | ')}${this.description !== undefined ? ` => ${this.description}` : ''}`);
-        if(this.rules.length === 0) {
-            this.logger.warn('No rules found -- this check will ALWAYS PASS!');
+        if(this.rules.length === 0 && this.itemIs.length === 0 && this.authorIs.exclude.length === 0 && this.authorIs.include.length === 0) {
+            this.logger.warn('No rules, item tests, or author test found -- this check will ALWAYS PASS!');
         }
         let ruleSetIndex = 1;
         for(const r of this.rules) {

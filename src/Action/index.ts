@@ -2,11 +2,16 @@ import {Comment, Submission} from "snoowrap";
 import {Logger} from "winston";
 import {RuleResult} from "../Rule";
 import ResourceManager, {SubredditResources} from "../Subreddit/SubredditResources";
+import {ChecksActivityState, TypedActivityStates} from "../Common/interfaces";
+import Author, {AuthorOptions} from "../Author/Author";
+import {isItem} from "../Utils/SnoowrapUtils";
 
 export abstract class Action {
     name?: string;
     logger: Logger;
     resources: SubredditResources;
+    authorIs: AuthorOptions;
+    itemIs: TypedActivityStates;
     dryRun: boolean;
 
     constructor(options: ActionOptions) {
@@ -15,12 +20,24 @@ export abstract class Action {
             logger,
             subredditName,
             dryRun = false,
+            authorIs: {
+                include = [],
+                exclude = [],
+            } = {},
+            itemIs = [],
         } = options;
 
         this.name = name;
         this.dryRun = dryRun;
         this.resources = ResourceManager.get(subredditName) as SubredditResources;
         this.logger = logger.child({labels: ['Action', this.getActionUniqueName()]});
+
+        this.authorIs = {
+            exclude: exclude.map(x => new Author(x)),
+            include: include.map(x => new Author(x)),
+        }
+
+        this.itemIs = itemIs;
     }
 
     abstract getKind(): string;
@@ -30,7 +47,41 @@ export abstract class Action {
     }
 
     async handle(item: Comment | Submission, ruleResults: RuleResult[]): Promise<void> {
-        await this.process(item, ruleResults);
+        let actionRun = false;
+        const [itemPass, crit] = isItem(item, this.itemIs, this.logger);
+        if (!itemPass) {
+            this.logger.verbose(`Activity did not pass 'itemIs' test, Action not run`);
+            return;
+        }
+        const authorRun = async () => {
+            if (this.authorIs.include !== undefined && this.authorIs.include.length > 0) {
+                for (const auth of this.authorIs.include) {
+                    if (await this.resources.testAuthorCriteria(item, auth)) {
+                        await this.process(item, ruleResults);
+                        return true;
+                    }
+                }
+                this.logger.verbose('Inclusive author criteria not matched, Action not run');
+                return false;
+            }
+            if (!actionRun && this.authorIs.exclude !== undefined && this.authorIs.exclude.length > 0) {
+                for (const auth of this.authorIs.exclude) {
+                    if (await this.resources.testAuthorCriteria(item, auth, false)) {
+                        await this.process(item, ruleResults);
+                        return true;
+                    }
+                }
+                this.logger.verbose('Exclusive author criteria not matched, Action not run');
+                return false;
+            }
+            return null;
+        }
+        const authorRunResults = await authorRun();
+        if (null === authorRunResults) {
+            await this.process(item, ruleResults);
+        } else if (!authorRunResults) {
+            return;
+        }
         this.logger.verbose(`${this.dryRun ? 'DRYRUN - ' : ''}Done`);
     }
 
@@ -42,7 +93,7 @@ export interface ActionOptions extends ActionConfig {
     subredditName: string;
 }
 
-export interface ActionConfig {
+export interface ActionConfig extends ChecksActivityState {
     /**
      * An optional, but highly recommended, friendly name for this Action. If not present will default to `kind`.
      *
@@ -59,6 +110,19 @@ export interface ActionConfig {
      * @examples [false, true]
      * */
     dryRun?: boolean;
+
+    /**
+     * If present then these Author criteria are checked before running the Action. If criteria fails then the Action is not run.
+     * */
+    authorIs?: AuthorOptions
+
+    /**
+     * A list of criteria to test the state of the `Activity` against before running the Action.
+     *
+     * If any set of criteria passes the Action will be run.
+     *
+     * */
+    itemIs?: TypedActivityStates
 }
 
 export interface ActionJson extends ActionConfig {

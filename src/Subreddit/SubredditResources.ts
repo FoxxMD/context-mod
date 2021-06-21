@@ -12,10 +12,10 @@ import winston, {Logger} from "winston";
 import {mergeArr} from "../util";
 import LoggedError from "../Utils/LoggedError";
 import {Footer, SubredditCacheConfig} from "../Common/interfaces";
-import {AuthorCriteria} from "../Rule";
 import UserNotes from "./UserNotes";
 import Mustache from "mustache";
 import he from "he";
+import {AuthorCriteria} from "../Author/Author";
 
 export const WIKI_DESCRIM = 'wiki:';
 export const DEFAULT_FOOTER = '\r\n*****\r\nThis action was performed by [a bot.]({{botLink}}) Mention a moderator or [send a modmail]({{modmailLink}}) if you any ideas, questions, or concerns about this action.';
