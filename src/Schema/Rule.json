@@ -85,12 +85,10 @@
                     "type": "string"
                 },
                 "threshold": {
-                    "default": "10%",
-                    "description": "The number or percentage to trigger this rule at\n\n* If `threshold` is a `number` then it is the absolute number of attribution instances to trigger at\n* If `threshold` is a `string` with percentage (EX `40%`) then it is the percentage of the total (see `lookAt`) this attribution must reach to trigger",
-                    "type": [
-                        "string",
-                        "number"
-                    ]
+                    "default": "> 10%",
+                    "description": "A string containing a comparison operator and a value to compare comments against\n\nThe syntax is `[< OR > OR <= OR >=] [number][?percent sign]`\n\n* EX `> 12`  => greater than 12 activities originate from same attribution\n* EX `<= 10%` => less than 10% of all Activities have the same attribution",
+                    "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
+                    "type": "string"
                 },
                 "thresholdOn": {
                     "default": "all",
@@ -868,9 +866,9 @@
                     "type": "string"
                 },
                 "threshold": {
-                    "default": 5,
+                    "default": ">= 5",
                     "description": "The number of repeat submissions that will trigger the rule",
-                    "type": "number"
+                    "type": "string"
                 },
                 "useSubmissionAsReference": {
                     "default": true,
@@ -908,15 +906,6 @@
             "description": "At least one count property must be present. If both are present then either can trigger the rule",
             "minProperties": 1,
             "properties": {
-                "count": {
-                    "default": 1,
-                    "description": "The number of activities in each subreddit from the list that will trigger this rule",
-                    "examples": [
-                        1
-                    ],
-                    "minimum": 1,
-                    "type": "number"
-                },
                 "subreddits": {
                     "description": "A list of subreddits (case-insensitive) to look for. Do not include \"r/\" prefix.\n\nEX to match against /r/mealtimevideos and /r/askscience use [\"mealtimevideos\",\"askscience\"]",
                     "examples": [
@@ -931,14 +920,14 @@
                     "minItems": 2,
                     "type": "array"
                 },
-                "totalCount": {
-                    "default": 1,
-                    "description": "The total number of activities across all listed subreddits that will trigger this rule",
+                "threshold": {
+                    "default": ">= 1",
+                    "description": "A string containing a comparison operator and a value to compare recent activities against\n\nThe syntax is `[< OR > OR <= OR >=] [number][?percent sign]`\n\n* EX `> 3`  => greater than 3 activities found in the listed subreddits\n* EX `<= 75%` => number of Activities in the subreddits listed are equal to or less than 75% of all Activities\n\n**Note:** If you use percentage comparison here as well as `useSubmissionAsReference` then \"all Activities\" is only pertains to Activities that had the Link of the Submission, rather than all Activities from this window.",
                     "examples": [
-                        1
+                        ">= 1"
                     ],
-                    "minimum": 1,
-                    "type": "number"
+                    "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
+                    "type": "string"
                 }
             },
             "required": [
@@ -992,28 +981,17 @@
         "UserNoteCriteria": {
             "properties": {
                 "count": {
-                    "default": 1,
-                    "description": "Number of occurrences of this type. Ignored if `search` is `current`",
+                    "default": ">= 1",
+                    "description": "Number of occurrences of this type. Ignored if `search` is `current`\n\nA string containing a comparison operator and/or a value to compare number of occurrences against\n\nThe syntax is `(< OR > OR <= OR >=) <number>[percent sign] [ascending|descending]`",
                     "examples": [
                         1
                     ],
-                    "type": "number"
-                },
-                "order": {
-                    "default": "descending",
-                    "description": "Time-based order to search Notes in for `consecutive` search",
-                    "enum": [
-                        "ascending",
-                        "descending"
-                    ],
-                    "examples": [
-                        "descending"
-                    ],
+                    "pattern": "^\\s*(?<opStr>>|>=|<|<=)\\s*(?<value>\\d+)\\s*(?<percent>%?)\\s*(?<extra>asc.*|desc.*)*$",
                     "type": "string"
                 },
                 "search": {
                     "default": "current",
-                    "description": "* If `current` then only the most recent note is checked\n* If `consecutive` then `count` number of `type` notes must be found in a row, based on `order` direction\n* If `total` then `count` number of `type` must be found within all notes",
+                    "description": "How to test the notes for this Author\n\n### current\n\nOnly the most recent note is checked for `type`\n\n### total\n\nThe `count` comparison of `type` must be found within all notes\n\n* EX `count: > 3`   => Must have more than 3 notes of `type`, total\n* EX `count: <= 25%` => Must have 25% or less of notes of `type`, total\n\n### consecutive\n\nThe `count` **number** of `type` notes must be found in a row.\n\nYou may also specify the time-based order in which to search the notes by specifying `ascending (asc)` or `descending (desc)` in the `count` value. Default is `descending`\n\n* EX `count: >= 3` => Must have 3 or more notes of `type` consecutively, in descending order\n* EX `count: < 2`  => Must have less than 2 notes of `type` consecutively, in descending order\n* EX `count: > 4 asc` => Must have greater than 4 notes of `type` consecutively, in ascending order",
                     "enum": [
                         "consecutive",
                         "current",
@@ -1025,7 +1003,7 @@
                     "type": "string"
                 },
                 "type": {
-                    "description": "User Note type key",
+                    "description": "User Note type key to search for",
                     "examples": [
                         "spamwarn"
                     ],

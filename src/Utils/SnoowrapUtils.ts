@@ -13,15 +13,16 @@ import {
     TypedActivityStates
 } from "../Common/interfaces";
 import {
-    compareDurationValue,
+    compareDurationValue, comparisonTextOp,
     isActivityWindowCriteria,
     normalizeName, parseDuration,
-    parseDurationComparison,
+    parseDurationComparison, parseGenericValueOrPercentComparison,
     truncateStringToLength
 } from "../util";
 import UserNotes from "../Subreddit/UserNotes";
 import {Logger} from "winston";
 import InvalidRegexError from "./InvalidRegexError";
+import SimpleError from "./SimpleError";
 
 export const BOT_LINK = 'https://www.reddit.com/r/ContextModBot/comments/o1dugk/introduction_to_contextmodbot_and_rcb';
 
@@ -266,7 +267,8 @@ export const renderContent = async (template: string, data: (Submission | Commen
 
 export const testAuthorCriteria = async (item: (Comment | Submission), authorOpts: AuthorCriteria, include = true, userNotes: UserNotes) => {
     // @ts-ignore
-    const author: RedditUser = await item.author;
+    const author: RedditUser = await item.author.fetch();
+    debugger;
     for (const k of Object.keys(authorOpts)) {
         // @ts-ignore
         if (authorOpts[k] !== undefined) {
@@ -336,7 +338,9 @@ export const testAuthorCriteria = async (item: (Comment | Submission), authorOpt
                     const notes = await userNotes.getUserNotes(item.author);
                     const notePass = () => {
                         for (const noteCriteria of authorOpts[k] as UserNoteCriteria[]) {
-                            const {count = 1, order = 'descending', search = 'current', type} = noteCriteria;
+                            const {count = '>= 1', search = 'current', type} = noteCriteria;
+                            const {value, operator, isPercent, extra = ''} = parseGenericValueOrPercentComparison(count);
+                            const order = extra.includes('asc') ? 'ascending' : 'descending';
                             switch (search) {
                                 case 'current':
                                     if (notes.length > 0 && notes[notes.length - 1].noteType === type) {
@@ -356,13 +360,20 @@ export const testAuthorCriteria = async (item: (Comment | Submission), authorOpt
                                         } else {
                                             currCount = 0;
                                         }
-                                        if (currCount >= count) {
+                                        if(isPercent) {
+                                            throw new SimpleError(`When comparing UserNotes with 'consecutive' search 'count' cannot be a percentage. Given: ${count}`);
+                                        }
+                                        if (comparisonTextOp(currCount, operator, value)) {
                                             return true;
                                         }
                                     }
                                     break;
                                 case 'total':
-                                    if (notes.filter(x => x.noteType === type).length >= count) {
+                                    if(isPercent) {
+                                        if(comparisonTextOp(notes.filter(x => x.noteType === type).length / notes.length, operator, value/100)) {
+                                            return true;
+                                        }
+                                    } else if(comparisonTextOp(notes.filter(x => x.noteType === type).length, operator, value)) {
                                         return true;
                                     }
                             }

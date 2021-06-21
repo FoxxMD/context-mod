@@ -1,7 +1,12 @@
 import {SubmissionRule, SubmissionRuleJSONConfig} from "./index";
 import {RuleOptions, RuleResult} from "../index";
 import {Comment} from "snoowrap";
-import {activityWindowText, parseUsableLinkIdentifier as linkParser} from "../../util";
+import {
+    activityWindowText,
+    comparisonTextOp,
+    parseGenericValueComparison,
+    parseUsableLinkIdentifier as linkParser
+} from "../../util";
 import {ActivityWindow, ActivityWindowType, ReferenceSubmission} from "../../Common/interfaces";
 import Submission from "snoowrap/dist/objects/Submission";
 import dayjs from "dayjs";
@@ -33,7 +38,7 @@ const getActivityIdentifier = (activity: (Submission | Comment), length = 200) =
 }
 
 export class RepeatActivityRule extends SubmissionRule {
-    threshold: number;
+    threshold: string;
     window: ActivityWindowType;
     gapAllowance?: number;
     useSubmissionAsReference: boolean;
@@ -44,7 +49,7 @@ export class RepeatActivityRule extends SubmissionRule {
     constructor(options: RepeatActivityOptions) {
         super(options);
         const {
-            threshold = 5,
+            threshold = '> 5',
             window = 100,
             gapAllowance,
             useSubmissionAsReference = true,
@@ -139,6 +144,10 @@ export class RepeatActivityRule extends SubmissionRule {
             applicableGroupedActivities.set(getActivityIdentifier(item), referenceSubmissions || [])
         }
 
+        const {operator, value: thresholdValue} = parseGenericValueComparison(this.threshold);
+        const greaterThan = operator.includes('>');
+        let allLessThan = true;
+
         const identifiersSummary: SummaryData[] = [];
         for (let [key, value] of applicableGroupedActivities) {
             const summaryData = {
@@ -150,23 +159,39 @@ export class RepeatActivityRule extends SubmissionRule {
                 triggeringSetsMarkdown: [],
             };
             for (let set of value) {
-                if (set.length >= this.threshold) {
-                    // @ts-ignore
-                    summaryData.triggeringSets.push(set);
-                    summaryData.totalTriggeringSets++;
-                    summaryData.largestTrigger = Math.max(summaryData.largestTrigger, set.length);
-                    const md = set.map((x: (Comment | Submission)) => `[${x instanceof Submission ? x.title : getActivityIdentifier(x, 50)}](https://reddit.com${x.permalink}) in ${x.subreddit_name_prefixed} on ${dayjs(x.created_utc * 1000).utc().format()}`);
-                    // @ts-ignore
-                    summaryData.triggeringSetsMarkdown.push(md);
+                const test = comparisonTextOp(set.length, operator, thresholdValue);
+                if(test) {
+                   // if(greaterThan) {
+                        // @ts-ignore
+                        summaryData.triggeringSets.push(set);
+                        summaryData.totalTriggeringSets++;
+                        summaryData.largestTrigger = Math.max(summaryData.largestTrigger, set.length);
+                        const md = set.map((x: (Comment | Submission)) => `[${x instanceof Submission ? x.title : getActivityIdentifier(x, 50)}](https://reddit.com${x.permalink}) in ${x.subreddit_name_prefixed} on ${dayjs(x.created_utc * 1000).utc().format()}`);
+                        // @ts-ignore
+                        summaryData.triggeringSetsMarkdown.push(md);
+                   // }
+                } else if(!greaterThan) {
+                    allLessThan = false;
                 }
+                // if ((test && greaterThan) || (!test && !greaterThan)) {
+                //     // @ts-ignore
+                //     summaryData.triggeringSets.push(set);
+                //     summaryData.totalTriggeringSets++;
+                //     summaryData.largestTrigger = Math.max(summaryData.largestTrigger, set.length);
+                //     const md = set.map((x: (Comment | Submission)) => `[${x instanceof Submission ? x.title : getActivityIdentifier(x, 50)}](https://reddit.com${x.permalink}) in ${x.subreddit_name_prefixed} on ${dayjs(x.created_utc * 1000).utc().format()}`);
+                //     // @ts-ignore
+                //     summaryData.triggeringSetsMarkdown.push(md);
+                // }
             }
-            identifiersSummary.push(summaryData);
+            if(greaterThan || (!greaterThan && allLessThan)) {
+                identifiersSummary.push(summaryData);
+            }
         }
 
         const triggeringSummaries = identifiersSummary.filter(x => x.totalTriggeringSets > 0)
         if (triggeringSummaries.length > 0) {
             const largestRepeat = triggeringSummaries.reduce((acc, summ) => Math.max(summ.largestTrigger, acc), 0);
-            const result = `${triggeringSummaries.length} of ${identifiersSummary.length} unique items repeated >=${this.threshold} (threshold) times, largest repeat: ${largestRepeat}`;
+            const result = `${triggeringSummaries.length} of ${identifiersSummary.length} unique items repeated ${this.threshold} (threshold) times, largest repeat: ${largestRepeat}`;
             this.logger.verbose(result);
             return Promise.resolve([true, [this.getResult(true, {
                 result,
@@ -198,9 +223,9 @@ interface SummaryData {
 interface RepeatActivityConfig extends ActivityWindow, ReferenceSubmission {
     /**
      * The number of repeat submissions that will trigger the rule
-     * @default 5
+     * @default ">= 5"
      * */
-    threshold?: number,
+    threshold?: string,
     /**
      * The number of allowed non-identical Submissions between identical Submissions that can be ignored when checking against the threshold value
      * */

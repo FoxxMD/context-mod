@@ -207,21 +207,6 @@ export const createAjvFactory = (logger: Logger) => {
     return  new Ajv({logger: logger, verbose: true, strict: "log", allowUnionTypes: true});
 }
 
-export const comparisonTextOp = (val1: number, strOp: string, val2: number): boolean => {
-    switch (strOp) {
-        case '>':
-            return val1 > val2;
-        case '>=':
-            return val1 >= val2;
-        case '<':
-            return val1 < val2;
-        case '<=':
-            return val1 <= val2;
-        default:
-            throw new Error(`${strOp} was not a recognized operator`);
-    }
-}
-
 export const percentFromString = (str: string): number => {
    const n = Number.parseInt(str.replace('%', ''));
    if(Number.isNaN(n)) {
@@ -385,9 +370,42 @@ export const parseFromJsonOrYamlToObject = (content: string): [object?, Error?, 
     return [obj, jsonErr, yamlErr];
 }
 
+export const comparisonTextOp = (val1: number, strOp: string, val2: number): boolean => {
+    switch (strOp) {
+        case '>':
+            return val1 > val2;
+        case '>=':
+            return val1 >= val2;
+        case '<':
+            return val1 < val2;
+        case '<=':
+            return val1 <= val2;
+        default:
+            throw new Error(`${strOp} was not a recognized operator`);
+    }
+}
+
+const GENERIC_VALUE_COMPARISON = /^\s*(?<opStr>>|>=|<|<=)\s*(?<value>\d+)(?<extra>\s+.*)*$/
+const GENERIC_VALUE_COMPARISON_URL = 'https://regexr.com/60dq4';
+export const parseGenericValueComparison = (val: string): GenericComparison => {
+    const matches = val.match(GENERIC_VALUE_COMPARISON);
+    if (matches === null) {
+        throw new InvalidRegexError(GENERIC_VALUE_COMPARISON, val, GENERIC_VALUE_COMPARISON_URL)
+    }
+    const groups = matches.groups as any;
+
+    return {
+        operator: groups.opStr as StringOperator,
+        value: Number.parseFloat(groups.value),
+        isPercent: false,
+        extra: groups.extra,
+        displayText: `${groups.opStr} ${groups.number}`
+    }
+}
+
 const GENERIC_VALUE_PERCENT_COMPARISON = /^\s*(?<opStr>>|>=|<|<=)\s*(?<value>\d+)\s*(?<percent>%?)(?<extra>.*)$/
 const GENERIC_VALUE_PERCENT_COMPARISON_URL = 'https://regexr.com/60a16';
-export const parseGenericComparison = (val: string): GenericComparison => {
+export const parseGenericValueOrPercentComparison = (val: string): GenericComparison => {
     const matches = val.match(GENERIC_VALUE_PERCENT_COMPARISON);
     if (matches === null) {
         throw new InvalidRegexError(GENERIC_VALUE_PERCENT_COMPARISON, val, GENERIC_VALUE_PERCENT_COMPARISON_URL)
@@ -396,8 +414,8 @@ export const parseGenericComparison = (val: string): GenericComparison => {
 
     return {
         operator: groups.opStr as StringOperator,
-        value: Number.parseFloat(groups.number),
-        isPercent: groups.percent !== undefined,
+        value: Number.parseFloat(groups.value),
+        isPercent: groups.percent !== '',
         extra: groups.extra,
         displayText: `${groups.opStr} ${groups.number}${groups.percent === undefined ? '': '%'}`
     }

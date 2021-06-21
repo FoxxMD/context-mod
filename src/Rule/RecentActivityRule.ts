@@ -1,7 +1,7 @@
 import {Rule, RuleJSONConfig, RuleOptions, RulePremise, RuleResult} from "./index";
 import {Comment, VoteableContent} from "snoowrap";
 import Submission from "snoowrap/dist/objects/Submission";
-import {activityWindowText, parseUsableLinkIdentifier} from "../util";
+import {activityWindowText, comparisonTextOp, parseGenericValueOrPercentComparison, parseUsableLinkIdentifier} from "../util";
 import {
     ActivityWindow,
     ActivityWindowCriteria,
@@ -59,7 +59,6 @@ export class RecentActivityRule extends Rule {
                 break;
         }
 
-
         let viableActivity = activities;
         if (this.useSubmissionAsReference) {
             if (!(item instanceof Submission)) {
@@ -84,53 +83,51 @@ export class RecentActivityRule extends Rule {
             grouped[s] = (grouped[s] || []).concat(activity);
             return grouped;
         }, {} as Record<string, (Submission | Comment)[]>);
-        let triggeredPerSub = [];
+
+
         let totalTriggeredOn;
         for (const triggerSet of this.thresholds) {
-            triggeredPerSub = [];
             let currCount = 0;
-            let presentSubs = [];
-            const {count: subCount = 1, totalCount = 1, subreddits = []} = triggerSet;
+            let presentSubs;
+            const {threshold = '>= 1', subreddits = []} = triggerSet;
             for (const sub of subreddits) {
                 const isub = sub.toLowerCase();
                 const {[isub]: tSub = []} = groupedActivity;
-                if(tSub.length > 0) {
+                if (tSub.length > 0) {
                     currCount += tSub.length;
-                    presentSubs.push(sub);
-                    if (subCount !== undefined && tSub.length >= subCount) {
-                        triggeredPerSub.push({subreddit: sub, count: tSub.length, threshold: subCount});
+                    if(presentSubs === undefined) {
+                        presentSubs = [];
                     }
+                    presentSubs.push(sub);
                 }
             }
-            if(totalCount !== undefined && currCount >= totalCount) {
-                totalTriggeredOn = {subreddits: presentSubs, count: currCount, threshold: totalCount};
+            const {operator, value, isPercent} = parseGenericValueOrPercentComparison(threshold);
+            if (threshold !== undefined) {
+                if (isPercent) {
+                    if (comparisonTextOp(currCount / viableActivity.length, operator, value / 100)) {
+                        totalTriggeredOn = {subreddits: presentSubs || subreddits, count: currCount, threshold};
+                    }
+                } else if (comparisonTextOp(currCount, operator, value)) {
+                    totalTriggeredOn = {subreddits: presentSubs || subreddits, count: currCount, threshold};
+                }
             }
             // if either trigger condition is hit end the iteration early
-            if(triggeredPerSub.length > 0 || totalTriggeredOn !== undefined) {
+            if (totalTriggeredOn !== undefined) {
                 break;
             }
         }
-        if (triggeredPerSub.length > 0 || totalTriggeredOn !== undefined) {
+        if (totalTriggeredOn !== undefined) {
             let resultArr = [];
             const data: any = {};
-            if(triggeredPerSub.length > 0) {
-                data.perSubCount = triggeredPerSub.length;
-                data.perSubTotal = triggeredPerSub.reduce((acc, x) => acc + x.count, 0);
-                data.perSubSubredditsSummary = triggeredPerSub.map(x => x.subreddit).join(', ');
-                data.perSubSummary = triggeredPerSub.map(x => `${x.subreddit}(${x.count})`).join(', ');
-                data.perSubThreshold = triggeredPerSub[0].threshold;
-                resultArr.push(`${triggeredPerSub.length} subs have >${triggeredPerSub[0].threshold} activities (${data.perSubTotal} Total)`);
-            }
-            if(totalTriggeredOn !== undefined) {
-                data.totalCount = totalTriggeredOn.count;
-                data.totalSubredditsCount = totalTriggeredOn.subreddits.length;
-                data.totalSubredditsSummary = totalTriggeredOn.subreddits.join(', ')
-                data.totalThreshold = totalTriggeredOn.threshold;
-                data.totalSummary = `${data.totalCount} (>${totalTriggeredOn.threshold}) activities over ${totalTriggeredOn.subreddits.length} subreddits`;
-                resultArr.push(data.totalSummary);
-            }
+            data.totalCount = totalTriggeredOn.count;
+            data.totalSubredditsCount = totalTriggeredOn.subreddits.length;
+            data.totalSubredditsSummary = totalTriggeredOn.subreddits.join(', ')
+            data.totalThreshold = totalTriggeredOn.threshold;
+            data.totalSummary = `${data.totalCount} (${totalTriggeredOn.threshold}) activities over ${totalTriggeredOn.subreddits.length} subreddits`;
+            resultArr.push(data.totalSummary);
+
             let summary;
-            if(resultArr.length === 2) {
+            if (resultArr.length === 2) {
                 // need a shortened summary
                 summary = `${data.perSubCount} per-sub triggers (${data.perSubThreshold}) and ${data.totalCount} total (${data.totalThreshold})`
             } else {
@@ -142,11 +139,11 @@ export class RecentActivityRule extends Rule {
                 result,
                 data: {
                     window: typeof this.window === 'number' ? `${activities.length} Items` : activityWindowText(viableActivity),
-                    triggeredOn: triggeredPerSub,
+                    //triggeredOn: triggeredPerSub,
                     summary,
-                    subSummary: data.totalSubredditsSummary|| data.perSubSubredditsSummary,
-                    subCount: data.totalSubredditsCount || data.perSubCount,
-                    totalCount: data.totalCount || data.perSubTotal
+                    subSummary: data.totalSubredditsSummary,
+                    subCount: data.totalSubredditsCount,
+                    totalCount: data.totalCount
                 }
             })]]);
         }
@@ -163,19 +160,20 @@ export class RecentActivityRule extends Rule {
  * */
 export interface SubThreshold extends SubredditCriteria {
     /**
-     * The number of activities in each subreddit from the list that will trigger this rule
-     * @minimum 1
-     * @default 1
-     * @examples [1]
+     * A string containing a comparison operator and a value to compare recent activities against
+     *
+     * The syntax is `(< OR > OR <= OR >=) <number>[percent sign]`
+     *
+     * * EX `> 3`  => greater than 3 activities found in the listed subreddits
+     * * EX `<= 75%` => number of Activities in the subreddits listed are equal to or less than 75% of all Activities
+     *
+     * **Note:** If you use percentage comparison here as well as `useSubmissionAsReference` then "all Activities" is only pertains to Activities that had the Link of the Submission, rather than all Activities from this window.
+     *
+     * @pattern ^\s*(>|>=|<|<=)\s*(\d+)\s*(%?)(.*)$
+     * @default ">= 1"
+     * @examples [">= 1"]
      * */
-    count?: number,
-    /**
-     * The total number of activities across all listed subreddits that will trigger this rule
-     * @minimum 1
-     * @default 1
-     * @examples [1]
-     * */
-    totalCount?: number
+    threshold?: string
 }
 
 interface RecentActivityConfig extends ActivityWindow, ReferenceSubmission {

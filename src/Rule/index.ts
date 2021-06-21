@@ -149,31 +149,51 @@ export class Author implements AuthorCriteria {
 
 export interface UserNoteCriteria {
     /**
-     * User Note type key
+     * User Note type key to search for
      * @examples ["spamwarn"]
      * */
     type: string;
     /**
      * Number of occurrences of this type. Ignored if `search` is `current`
-     * @examples [1]
-     * @default 1
+     *
+     * A string containing a comparison operator and/or a value to compare number of occurrences against
+     *
+     * The syntax is `(< OR > OR <= OR >=) <number>[percent sign] [ascending|descending]`
+     *
+     * @examples [">= 1"]
+     * @default ">= 1"
+     * @pattern ^\s*(?<opStr>>|>=|<|<=)\s*(?<value>\d+)\s*(?<percent>%?)\s*(?<extra>asc.*|desc.*)*$
      * */
-    count?: number;
+    count?: string;
 
     /**
-     * * If `current` then only the most recent note is checked
-     * * If `consecutive` then `count` number of `type` notes must be found in a row, based on `order` direction
-     * * If `total` then `count` number of `type` must be found within all notes
+     * How to test the notes for this Author:
+     *
+     * ### current
+     *
+     * Only the most recent note is checked for `type`
+     *
+     * ### total
+     *
+     * The `count` comparison of `type` must be found within all notes
+     *
+     * * EX `count: > 3`   => Must have more than 3 notes of `type`, total
+     * * EX `count: <= 25%` => Must have 25% or less of notes of `type`, total
+     *
+     * ### consecutive
+     *
+     * The `count` **number** of `type` notes must be found in a row.
+     *
+     * You may also specify the time-based order in which to search the notes by specifying `ascending (asc)` or `descending (desc)` in the `count` value. Default is `descending`
+     *
+     * * EX `count: >= 3` => Must have 3 or more notes of `type` consecutively, in descending order
+     * * EX `count: < 2`  => Must have less than 2 notes of `type` consecutively, in descending order
+     * * EX `count: > 4 asc` => Must have greater than 4 notes of `type` consecutively, in ascending order
+     *
      * @examples ["current"]
      * @default current
      * */
     search?: 'current' | 'consecutive' | 'total'
-    /**
-     * Time-based order to search Notes in for `consecutive` search
-     * @examples ["descending"]
-     * @default descending
-     * */
-    order?: 'ascending' | 'descending'
 }
 
 /**
@@ -231,7 +251,7 @@ export interface AuthorCriteria {
     /**
      * Test the age of the Author's account (when it was created) against this comparison
      *
-     * The syntax is `[< OR > OR <= OR >=] [number] [unit]`
+     * The syntax is `(< OR > OR <= OR >=) <number> <unit>`
      *
      * * EX `> 100 days` => Passes if Author's account is older than 100 days
      * * EX `<= 2 months` => Passes if Author's account is younger than or equal to 2 months
@@ -248,7 +268,7 @@ export interface AuthorCriteria {
 /**
  * A duration and how to compare it against a value
  *
- * The syntax is `[< OR > OR <= OR >=] [number] [unit]` EX `> 100 days`, `<= 2 months`
+ * The syntax is `(< OR > OR <= OR >=) <number> <unit>` EX `> 100 days`, `<= 2 months`
  *
  * * EX `> 100 days` => Passes if the date being compared is before 100 days ago
  * * EX `<= 2 months` => Passes if the date being compared is after or equal to 2 months

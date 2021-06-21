@@ -4,7 +4,7 @@ import {Rule, RuleJSONConfig, RuleOptions, RuleResult} from "./index";
 import Submission from "snoowrap/dist/objects/Submission";
 import {getAuthorActivities} from "../Utils/SnoowrapUtils";
 import dayjs from "dayjs";
-import {comparisonTextOp, formatNumber, parseGenericComparison, percentFromString} from "../util";
+import {comparisonTextOp, formatNumber, parseGenericValueOrPercentComparison, percentFromString} from "../util";
 
 export interface CommentThresholdCriteria extends ThresholdCriteria {
     /**
@@ -23,7 +23,7 @@ export interface HistoryCriteria {
     /**
      * A string containing a comparison operator and a value to compare submissions against
      *
-     * The syntax is `[< OR > OR <= OR >=] [number][?percent sign]`
+     * The syntax is `(< OR > OR <= OR >=) <number>[percent sign]`
      *
      * * EX `> 100`  => greater than 100 submissions
      * * EX `<= 75%` => submissions are equal to or less than 75% of all Activities
@@ -34,12 +34,12 @@ export interface HistoryCriteria {
     /**
      * A string containing a comparison operator and a value to compare comments against
      *
-     * The syntax is `[< OR > OR <= OR >=] [number][?percent sign]`
+     * The syntax is `(< OR > OR <= OR >=) <number>[percent sign] [OP]`
      *
      * * EX `> 100`  => greater than 100 comments
      * * EX `<= 75%` => comments are equal to or less than 75% of all Activities
      *
-     * If your string also contains the text `OP` somewhere **after** `[number][?percent sign]`...:
+     * If your string also contains the text `OP` somewhere **after** `<number>[percent sign]`...:
      *
      * * EX `> 100 OP`  => greater than 100 comments as OP
      * * EX `<= 25% as OP` => Comments as OP were less then or equal to 25% of **all Comments**
@@ -131,7 +131,7 @@ export class HistoryRule extends Rule {
 
             let commentTrigger = undefined;
             if(comment !== undefined) {
-                const {operator, value, isPercent, extra = ''} = parseGenericComparison(comment);
+                const {operator, value, isPercent, extra = ''} = parseGenericValueOrPercentComparison(comment);
                 const asOp = extra.toLowerCase().includes('op');
                 if(isPercent) {
                     const per = value / 100;
@@ -151,7 +151,7 @@ export class HistoryRule extends Rule {
 
             let submissionTrigger = undefined;
             if(submission !== undefined) {
-                const {operator, value, isPercent} = parseGenericComparison(submission);
+                const {operator, value, isPercent} = parseGenericValueOrPercentComparison(submission);
                 if(isPercent) {
                     const per = value / 100;
                     submissionTrigger = comparisonTextOp(submissionTotal / activityTotal, operator, per);
@@ -218,14 +218,14 @@ export class HistoryRule extends Rule {
                 let submissionSummary;
                 let commentSummary;
                 if(submission !== undefined) {
-                    const {operator, value, isPercent, displayText} = parseGenericComparison(submission);
+                    const {operator, value, isPercent, displayText} = parseGenericValueOrPercentComparison(submission);
                     const suffix = !isPercent ? 'Items' : `(${formatNumber((submissionTotal/activityTotal)*100)}%) of ${activityTotal} Total`;
                     submissionSummary = `Submissions (${submissionTotal}) were ${displayText} ${suffix}`;
                     data.submissionSummary = submissionSummary;
                     thresholdSummary.push(submissionSummary);
                 }
                 if(comment !== undefined) {
-                    const {operator, value, isPercent, displayText, extra = ''} = parseGenericComparison(comment);
+                    const {operator, value, isPercent, displayText, extra = ''} = parseGenericValueOrPercentComparison(comment);
                     const asOp = extra.toLowerCase().includes('op');
                     const totalType = asOp ? 'Comments' : 'Activities'
                     const countType = asOp ? 'Comments as OP' : 'Comments';

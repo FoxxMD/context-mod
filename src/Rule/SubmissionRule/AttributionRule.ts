@@ -4,18 +4,22 @@ import {RuleOptions, RuleResult} from "../index";
 import Submission from "snoowrap/dist/objects/Submission";
 import {getAttributionIdentifier} from "../../Utils/SnoowrapUtils";
 import dayjs from "dayjs";
+import {comparisonTextOp, parseGenericValueOrPercentComparison} from "../../util";
 
 
 export interface AttributionCriteria {
     /**
-     * The number or percentage to trigger this rule at
+     * A string containing a comparison operator and a value to compare comments against
      *
-     * * If `threshold` is a `number` then it is the absolute number of attribution instances to trigger at
-     * * If `threshold` is a `string` with percentage (EX `40%`) then it is the percentage of the total (see `lookAt`) this attribution must reach to trigger
+     * The syntax is `(< OR > OR <= OR >=) <number>[percent sign]`
      *
-     * @default 10%
+     * * EX `> 12`  => greater than 12 activities originate from same attribution
+     * * EX `<= 10%` => less than 10% of all Activities have the same attribution
+     *
+     * @pattern ^\s*(>|>=|<|<=)\s*(\d+)\s*(%?)(.*)$
+     * @default "> 10%"
      * */
-    threshold: number | string
+    threshold: string
     window: ActivityWindowType
     /**
      * What activities to use for total count when determining what percentage an attribution comprises
@@ -107,12 +111,8 @@ export class AttributionRule extends SubmissionRule {
 
         for (const criteria of this.criteria) {
 
-            const {threshold, window, thresholdOn = 'all', minActivityCount = 5} = criteria;
-
-            let percentVal;
-            if (typeof threshold === 'string') {
-                percentVal = Number.parseInt(threshold.replace('%', '')) / 100;
-            }
+            const {threshold = '> 10%', window, thresholdOn = 'all', minActivityCount = 10} = criteria;
+            const {operator, value, isPercent, extra = ''} = parseGenericValueOrPercentComparison(threshold);
 
             let activities = thresholdOn === 'submissions' ? await this.resources.getAuthorSubmissions(item.author, {window: window}) : await this.resources.getAuthorActivities(item.author, {window: window});
             activities = activities.filter(act => {
@@ -172,11 +172,11 @@ export class AttributionRule extends SubmissionRule {
             let triggeredDomains = [];
             for (const [domain, subCount] of aggregatedSubmissions) {
                 let triggered = false;
-                if (percentVal !== undefined) {
-
-                    triggered = percentVal <= subCount / activityTotal;
-                } else if (subCount >= threshold) {
-                    triggered = true;
+                if(isPercent) {
+                    triggered = comparisonTextOp(subCount / activityTotal, operator, (value/100));
+                }
+                else {
+                    triggered = comparisonTextOp(subCount, operator, value);
                 }
 
                 if (triggered) {
