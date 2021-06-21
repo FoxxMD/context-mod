@@ -404,6 +404,17 @@ export interface ManagerOptions {
 /**
  * A string containing a comparison operator and a value to compare against
  *
+ * The syntax is `(< OR > OR <= OR >=) <number>`
+ *
+ * * EX `> 100`  => greater than 100
+ *
+ * @pattern ^\s*(>|>=|<|<=)\s*(\d+)\s*(%?)(.*)$
+ * */
+export type CompareValue = string;
+
+/**
+ * A string containing a comparison operator and a value to compare against
+ *
  * The syntax is `(< OR > OR <= OR >=) <number>[percent sign]`
  *
  * * EX `> 100`  => greater than 100

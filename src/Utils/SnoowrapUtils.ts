@@ -16,7 +16,7 @@ import {
     compareDurationValue, comparisonTextOp,
     isActivityWindowCriteria,
     normalizeName, parseDuration,
-    parseDurationComparison, parseGenericValueOrPercentComparison,
+    parseDurationComparison, parseGenericValueComparison, parseGenericValueOrPercentComparison,
     truncateStringToLength
 } from "../util";
 import UserNotes from "../Subreddit/UserNotes";
@@ -267,8 +267,7 @@ export const renderContent = async (template: string, data: (Submission | Commen
 
 export const testAuthorCriteria = async (item: (Comment | Submission), authorOpts: AuthorCriteria, include = true, userNotes: UserNotes) => {
     // @ts-ignore
-    const author: RedditUser = await item.author.fetch();
-    debugger;
+    const author: RedditUser = await item.author;
     for (const k of Object.keys(authorOpts)) {
         // @ts-ignore
         if (authorOpts[k] !== undefined) {
@@ -324,13 +323,59 @@ export const testAuthorCriteria = async (item: (Comment | Submission), authorOpt
                     const mods: RedditUser[] = await item.subreddit.getModerators();
                     const isModerator = mods.some(x => x.name === item.author.name);
                     const modMatch = authorOpts.isMod === isModerator;
-                    if ((include && !modMatch) || (!include && !modMatch)) {
+                    if ((include && !modMatch) || (!include && modMatch)) {
                         return false;
                     }
                     break;
                 case 'age':
-                    const ageTest = compareDurationValue(parseDurationComparison(authorOpts.age as string), dayjs.unix(await item.author.created));
-                    if ((include && !ageTest) || (!include && !ageTest)) {
+                    const ageTest = compareDurationValue(parseDurationComparison(await authorOpts.age as string), dayjs.unix(await item.author.created));
+                    if ((include && !ageTest) || (!include && ageTest)) {
+                        return false;
+                    }
+                    break;
+                case 'linkKarma':
+                    const lkCompare = parseGenericValueOrPercentComparison(await authorOpts.linkKarma as string);
+                    let lkMatch;
+                    if(lkCompare.isPercent) {
+                        // @ts-ignore
+                        const tk = author.total_karma as number;
+                        lkMatch = comparisonTextOp(author.link_karma / tk, lkCompare.operator, lkCompare.value/100);
+                    } else {
+                        lkMatch = comparisonTextOp(author.link_karma, lkCompare.operator, lkCompare.value);
+                    }
+                    if ((include && !lkMatch) || (!include && lkMatch)) {
+                        return false;
+                    }
+                    break;
+                case 'commentKarma':
+                    const ckCompare = parseGenericValueOrPercentComparison(await authorOpts.commentKarma as string);
+                    let ckMatch;
+                    if(ckCompare.isPercent) {
+                        // @ts-ignore
+                        const ck = author.total_karma as number;
+                        ckMatch = comparisonTextOp(author.comment_karma / ck, ckCompare.operator, ckCompare.value/100);
+                    } else {
+                        ckMatch = comparisonTextOp(author.comment_karma, ckCompare.operator, ckCompare.value);
+                    }
+                    if ((include && !ckMatch) || (!include && ckMatch)) {
+                        return false;
+                    }
+                    break;
+                case 'totalKarma':
+                    const tkCompare = parseGenericValueComparison(await authorOpts.totalKarma as string);
+                    if(tkCompare.isPercent) {
+                        throw new SimpleError(`'totalKarma' value on AuthorCriteria cannot be a percentage`);
+                    }
+                    // @ts-ignore
+                    const totalKarma = author.total_karma as number;
+                    const tkMatch = comparisonTextOp(totalKarma, tkCompare.operator, tkCompare.value);
+                    if ((include && !tkMatch) || (!include && tkMatch)) {
+                        return false;
+                    }
+                    break;
+                case 'verified':
+                    const vMatch = await author.has_verified_mail === authorOpts.verified as boolean;
+                    if ((include && !vMatch) || (!include && vMatch)) {
                         return false;
                     }
                     break;

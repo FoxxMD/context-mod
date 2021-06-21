@@ -86,7 +86,7 @@
                 },
                 "threshold": {
                     "default": "> 10%",
-                    "description": "A string containing a comparison operator and a value to compare comments against\n\nThe syntax is `[< OR > OR <= OR >=] [number][?percent sign]`\n\n* EX `> 12`  => greater than 12 activities originate from same attribution\n* EX `<= 10%` => less than 10% of all Activities have the same attribution",
+                    "description": "A string containing a comparison operator and a value to compare comments against\n\nThe syntax is `(< OR > OR <= OR >=) <number>[percent sign]`\n\n* EX `> 12`  => greater than 12 activities originate from same attribution\n* EX `<= 10%` => less than 10% of all Activities have the same attribution",
                     "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
                     "type": "string"
                 },
@@ -269,8 +269,13 @@
             "minProperties": 1,
             "properties": {
                 "age": {
-                    "description": "Test the age of the Author's account (when it was created) against this comparison\n\nThe syntax is `[< OR > OR <= OR >=] [number] [unit]`\n\n* EX `> 100 days` => Passes if Author's account is older than 100 days\n* EX `<= 2 months` => Passes if Author's account is younger than or equal to 2 months\n\nUnit must be one of [DayJS Duration units](https://day.js.org/docs/en/durations/creating)\n\n[See] https://regexr.com/609n8 for example",
+                    "description": "Test the age of the Author's account (when it was created) against this comparison\n\nThe syntax is `(< OR > OR <= OR >=) <number> <unit>`\n\n* EX `> 100 days` => Passes if Author's account is older than 100 days\n* EX `<= 2 months` => Passes if Author's account is younger than or equal to 2 months\n\nUnit must be one of [DayJS Duration units](https://day.js.org/docs/en/durations/creating)\n\n[See] https://regexr.com/609n8 for example",
                     "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(days|weeks|months|years|hours|minutes|seconds|milliseconds)\\s*$",
+                    "type": "string"
+                },
+                "commentKarma": {
+                    "description": "A string containing a comparison operator and a value to compare karma against\n\nThe syntax is `(< OR > OR <= OR >=) <number>[percent sign]`\n\n* EX `> 100`  => greater than 100 comment karma\n* EX `<= 75%` => comment karma is less than or equal to 75% of **all karma**",
+                    "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
                     "type": "string"
                 },
                 "flairCssClass": {
@@ -297,6 +302,11 @@
                     "description": "Is the author a moderator?",
                     "type": "boolean"
                 },
+                "linkKarma": {
+                    "description": "A string containing a comparison operator and a value to compare link karma against\n\nThe syntax is `(< OR > OR <= OR >=) <number>[percent sign]`\n\n* EX `> 100`  => greater than 100 link karma\n* EX `<= 75%` => link karma is less than or equal to 75% of **all karma**",
+                    "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
+                    "type": "string"
+                },
                 "name": {
                     "description": "A list of reddit usernames (case-insensitive) to match against. Do not include the \"u/\" prefix\n\n EX to match against /u/FoxxMD and /u/AnotherUser use [\"FoxxMD\",\"AnotherUser\"]",
                     "examples": [
@@ -308,12 +318,21 @@
                     },
                     "type": "array"
                 },
+                "totalKarma": {
+                    "description": "A string containing a comparison operator and a value to compare against\n\nThe syntax is `(< OR > OR <= OR >=) <number>`\n\n* EX `> 100`  => greater than 100",
+                    "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
+                    "type": "string"
+                },
                 "userNotes": {
                     "description": "A list of UserNote properties to check against the User Notes attached to this Author in this Subreddit (must have Toolbox enabled and used User Notes at least once)",
                     "items": {
                         "$ref": "#/definitions/UserNoteCriteria"
                     },
                     "type": "array"
+                },
+                "verified": {
+                    "description": "Does Author's account have a verified email?",
+                    "type": "boolean"
                 }
             },
             "type": "object"
@@ -521,7 +540,7 @@
             "description": "If both `submission` and `comment` are defined then criteria will only trigger if BOTH thresholds are met",
             "properties": {
                 "comment": {
-                    "description": "A string containing a comparison operator and a value to compare comments against\n\nThe syntax is `[< OR > OR <= OR >=] [number][?percent sign]`\n\n* EX `> 100`  => greater than 100 comments\n* EX `<= 75%` => comments are equal to or less than 75% of all Activities\n\nIf your string also contains the text `OP` somewhere **after** `[number][?percent sign]`...:\n\n* EX `> 100 OP`  => greater than 100 comments as OP\n* EX `<= 25% as OP` => Comments as OP were less then or equal to 25% of **all Comments**",
+                    "description": "A string containing a comparison operator and a value to compare comments against\n\nThe syntax is `(< OR > OR <= OR >=) <number>[percent sign] [OP]`\n\n* EX `> 100`  => greater than 100 comments\n* EX `<= 75%` => comments are equal to or less than 75% of all Activities\n\nIf your string also contains the text `OP` somewhere **after** `<number>[percent sign]`...:\n\n* EX `> 100 OP`  => greater than 100 comments as OP\n* EX `<= 25% as OP` => Comments as OP were less then or equal to 25% of **all Comments**",
                     "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
                     "type": "string"
                 },
@@ -534,7 +553,7 @@
                     "type": "string"
                 },
                 "submission": {
-                    "description": "A string containing a comparison operator and a value to compare submissions against\n\nThe syntax is `[< OR > OR <= OR >=] [number][?percent sign]`\n\n* EX `> 100`  => greater than 100 submissions\n* EX `<= 75%` => submissions are equal to or less than 75% of all Activities",
+                    "description": "A string containing a comparison operator and a value to compare submissions against\n\nThe syntax is `(< OR > OR <= OR >=) <number>[percent sign]`\n\n* EX `> 100`  => greater than 100 submissions\n* EX `<= 75%` => submissions are equal to or less than 75% of all Activities",
                     "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
                     "type": "string"
                 },
@@ -922,7 +941,7 @@
                 },
                 "threshold": {
                     "default": ">= 1",
-                    "description": "A string containing a comparison operator and a value to compare recent activities against\n\nThe syntax is `[< OR > OR <= OR >=] [number][?percent sign]`\n\n* EX `> 3`  => greater than 3 activities found in the listed subreddits\n* EX `<= 75%` => number of Activities in the subreddits listed are equal to or less than 75% of all Activities\n\n**Note:** If you use percentage comparison here as well as `useSubmissionAsReference` then \"all Activities\" is only pertains to Activities that had the Link of the Submission, rather than all Activities from this window.",
+                    "description": "A string containing a comparison operator and a value to compare recent activities against\n\nThe syntax is `(< OR > OR <= OR >=) <number>[percent sign]`\n\n* EX `> 3`  => greater than 3 activities found in the listed subreddits\n* EX `<= 75%` => number of Activities in the subreddits listed are equal to or less than 75% of all Activities\n\n**Note:** If you use percentage comparison here as well as `useSubmissionAsReference` then \"all Activities\" is only pertains to Activities that had the Link of the Submission, rather than all Activities from this window.",
                     "examples": [
                         ">= 1"
                     ],
@@ -984,14 +1003,14 @@
                     "default": ">= 1",
                     "description": "Number of occurrences of this type. Ignored if `search` is `current`\n\nA string containing a comparison operator and/or a value to compare number of occurrences against\n\nThe syntax is `(< OR > OR <= OR >=) <number>[percent sign] [ascending|descending]`",
                     "examples": [
-                        1
+                        ">= 1"
                     ],
                     "pattern": "^\\s*(?<opStr>>|>=|<|<=)\\s*(?<value>\\d+)\\s*(?<percent>%?)\\s*(?<extra>asc.*|desc.*)*$",
                     "type": "string"
                 },
                 "search": {
                     "default": "current",
-                    "description": "How to test the notes for this Author\n\n### current\n\nOnly the most recent note is checked for `type`\n\n### total\n\nThe `count` comparison of `type` must be found within all notes\n\n* EX `count: > 3`   => Must have more than 3 notes of `type`, total\n* EX `count: <= 25%` => Must have 25% or less of notes of `type`, total\n\n### consecutive\n\nThe `count` **number** of `type` notes must be found in a row.\n\nYou may also specify the time-based order in which to search the notes by specifying `ascending (asc)` or `descending (desc)` in the `count` value. Default is `descending`\n\n* EX `count: >= 3` => Must have 3 or more notes of `type` consecutively, in descending order\n* EX `count: < 2`  => Must have less than 2 notes of `type` consecutively, in descending order\n* EX `count: > 4 asc` => Must have greater than 4 notes of `type` consecutively, in ascending order",
+                    "description": "How to test the notes for this Author:\n\n### current\n\nOnly the most recent note is checked for `type`\n\n### total\n\nThe `count` comparison of `type` must be found within all notes\n\n* EX `count: > 3`   => Must have more than 3 notes of `type`, total\n* EX `count: <= 25%` => Must have 25% or less of notes of `type`, total\n\n### consecutive\n\nThe `count` **number** of `type` notes must be found in a row.\n\nYou may also specify the time-based order in which to search the notes by specifying `ascending (asc)` or `descending (desc)` in the `count` value. Default is `descending`\n\n* EX `count: >= 3` => Must have 3 or more notes of `type` consecutively, in descending order\n* EX `count: < 2`  => Must have less than 2 notes of `type` consecutively, in descending order\n* EX `count: > 4 asc` => Must have greater than 4 notes of `type` consecutively, in ascending order",
                     "enum": [
                         "consecutive",
                         "current",

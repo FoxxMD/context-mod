@@ -3,7 +3,7 @@ import Submission from "snoowrap/dist/objects/Submission";
 import {Logger} from "winston";
 import {findResultByPremise, mergeArr} from "../util";
 import ResourceManager, {SubredditResources} from "../Subreddit/SubredditResources";
-import {ChecksActivityState, TypedActivityStates} from "../Common/interfaces";
+import {ChecksActivityState, CompareValue, CompareValueOrPercent, TypedActivityStates} from "../Common/interfaces";
 import {isItem} from "../Utils/SnoowrapUtils";
 
 export interface RuleOptions {
@@ -263,6 +263,37 @@ export interface AuthorCriteria {
      * @pattern ^\s*(>|>=|<|<=)\s*(\d+)\s*(days|weeks|months|years|hours|minutes|seconds|milliseconds)\s*$
      * */
     age?: DurationComparor
+
+    /**
+     * A string containing a comparison operator and a value to compare link karma against
+     *
+     * The syntax is `(< OR > OR <= OR >=) <number>[percent sign]`
+     *
+     * * EX `> 100`  => greater than 100 link karma
+     * * EX `<= 75%` => link karma is less than or equal to 75% of **all karma**
+     *
+     * @pattern ^\s*(>|>=|<|<=)\s*(\d+)\s*(%?)(.*)$
+     * */
+    linkKarma?: CompareValueOrPercent
+
+    /**
+     * A string containing a comparison operator and a value to compare karma against
+     *
+     * The syntax is `(< OR > OR <= OR >=) <number>[percent sign]`
+     *
+     * * EX `> 100`  => greater than 100 comment karma
+     * * EX `<= 75%` => comment karma is less than or equal to 75% of **all karma**
+     *
+     * @pattern ^\s*(>|>=|<|<=)\s*(\d+)\s*(%?)(.*)$
+     * */
+    commentKarma?: CompareValueOrPercent
+
+    totalKarma?: CompareValue
+
+    /**
+     * Does Author's account have a verified email?
+     * */
+    verified?: boolean
 }
 
 /**
