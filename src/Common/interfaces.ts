@@ -241,7 +241,7 @@ export interface SubredditCriteria {
      *
      * EX to match against /r/mealtimevideos and /r/askscience use ["mealtimevideos","askscience"]
      * @examples [["mealtimevideos","askscience"]]
-     * @minItems 2
+     * @minItems 1
      * */
     subreddits: string[]
 }
