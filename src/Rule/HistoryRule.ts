@@ -94,7 +94,7 @@ export class HistoryRule extends Rule {
         }
     }
 
-    protected async process(item: Submission): Promise<[boolean, RuleResult[]]> {
+    protected async process(item: Submission): Promise<[boolean, RuleResult]> {
         // TODO reuse activities between ActivityCriteria to reduce api calls
 
         let criteriaResults = [];
@@ -239,15 +239,15 @@ export class HistoryRule extends Rule {
 
                 const result = `${thresholdSummary} (${data.window})`;
                 this.logger.verbose(result);
-                return Promise.resolve([true, [this.getResult(true, {
+                return Promise.resolve([true, this.getResult(true, {
                     result,
                     data,
-                })]]);
+                })]);
             }
 
         }
 
-        return Promise.resolve([false, [this.getResult(false)]]);
+        return Promise.resolve([false, this.getResult(false)]);
     }
 
 }

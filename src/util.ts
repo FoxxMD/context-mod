@@ -1,7 +1,7 @@
 import winston, {Logger} from "winston";
 import jsonStringify from 'safe-stable-stringify';
 import dayjs, {Dayjs, OpUnitType} from 'dayjs';
-import {RulePremise, RuleResult} from "./Rule";
+import {isRuleSetResult, RulePremise, RuleResult, RuleSetResult} from "./Rule";
 import deepEqual from "fast-deep-equal";
 import {Duration} from 'dayjs/plugin/duration.js';
 import Ajv from "ajv";
@@ -201,6 +201,25 @@ export const mergeArr = (objValue: [], srcValue: []): (any[] | undefined) => {
 
 export const ruleNamesFromResults = (results: RuleResult[]) => {
     return results.map(x => x.name || x.premise.kind).join(' | ')
+}
+
+export const triggeredIndicator = (val: boolean | null): string => {
+    if(val === null) {
+        return '-';
+    }
+    return val ? '✔' : '❌';
+}
+
+export const resultsSummary = (results: (RuleResult|RuleSetResult)[], topLevelCondition: 'OR' | 'AND'): string => {
+    const parts: string[] = results.map((x) => {
+        if(isRuleSetResult(x)) {
+            return `${triggeredIndicator(x.triggered)} (${resultsSummary(x.results, x.condition)}${x.results.length === 1 ? ` [${x.condition}]` : ''})`;
+        }
+        const res = x as RuleResult;
+        return `${triggeredIndicator(x.triggered)} ${res.name}`;
+    });
+    return parts.join(` ${topLevelCondition} `)
+    //return results.map(x => x.name || x.premise.kind).join(' | ')
 }
 
 export const createAjvFactory = (logger: Logger) => {

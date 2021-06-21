@@ -31,8 +31,18 @@ export interface RuleResult extends ResultContext {
     triggered: (boolean | null)
 }
 
+export interface RuleSetResult {
+    results: RuleResult[],
+    condition: 'OR' | 'AND',
+    triggered: boolean
+}
+
+export const isRuleSetResult = (obj: any): obj is RuleSetResult => {
+    return typeof obj === 'object' && Array.isArray(obj.results) && obj.condition !== undefined && obj.triggered !== undefined;
+}
+
 export interface Triggerable {
-    run(item: Comment | Submission, existingResults: RuleResult[]): Promise<[(boolean | null), RuleResult[]]>;
+    run(item: Comment | Submission, existingResults: RuleResult[]): Promise<[(boolean | null), RuleResult?]>;
 }
 
 export abstract class Rule implements IRule, Triggerable {
@@ -66,16 +76,16 @@ export abstract class Rule implements IRule, Triggerable {
         this.logger = logger.child({labels: ['Rule',`${this.getRuleUniqueName()}`]}, mergeArr);
     }
 
-    async run(item: Comment | Submission, existingResults: RuleResult[] = []): Promise<[(boolean | null), RuleResult[]]> {
+    async run(item: Comment | Submission, existingResults: RuleResult[] = []): Promise<[(boolean | null), RuleResult]> {
         const existingResult = findResultByPremise(this.getPremise(), existingResults);
         if (existingResult) {
             this.logger.debug(`Returning existing result of ${existingResult.triggered ? '✔️' : '❌'}`);
-            return Promise.resolve([existingResult.triggered, [{...existingResult, name: this.name}]]);
+            return Promise.resolve([existingResult.triggered, {...existingResult, name: this.name}]);
         }
         const [itemPass, crit] = isItem(item, this.itemIs, this.logger);
         if(!itemPass) {
-            this.logger.verbose(`Item did not pass 'itemIs' test, rule running skipped`);
-            return Promise.resolve([null, [this.getResult(null, {result: `Item did not pass 'itemIs' test, rule running skipped`})]]);
+            this.logger.verbose(`(Skipped) Item did not pass 'itemIs' test`);
+            return Promise.resolve([null, this.getResult(null, {result: `Item did not pass 'itemIs' test`})]);
         }
         if (this.authorIs.include !== undefined && this.authorIs.include.length > 0) {
             for (const auth of this.authorIs.include) {
@@ -83,8 +93,8 @@ export abstract class Rule implements IRule, Triggerable {
                     return this.process(item);
                 }
             }
-            this.logger.verbose('Inclusive author criteria not matched, rule running skipped');
-            return Promise.resolve([null, [this.getResult(null, {result: 'Inclusive author criteria not matched, rule running skipped'})]]);
+            this.logger.verbose('(Skipped) Inclusive author criteria not matched');
+            return Promise.resolve([null, this.getResult(null, {result: 'Inclusive author criteria not matched'})]);
         }
         if (this.authorIs.exclude !== undefined && this.authorIs.exclude.length > 0) {
             for (const auth of this.authorIs.exclude) {
@@ -92,13 +102,13 @@ export abstract class Rule implements IRule, Triggerable {
                     return this.process(item);
                 }
             }
-            this.logger.verbose('Exclusive author criteria not matched, rule running skipped');
-            return Promise.resolve([null, [this.getResult(null, {result: 'Exclusive author criteria not matched, rule running skipped'})]]);
+            this.logger.verbose('(Skipped) Exclusive author criteria not matched');
+            return Promise.resolve([null, this.getResult(null, {result: 'Exclusive author criteria not matched'})]);
         }
         return this.process(item);
     }
 
-    protected abstract process(item: Comment | Submission): Promise<[boolean, RuleResult[]]>;
+    protected abstract process(item: Comment | Submission): Promise<[boolean, RuleResult]>;
 
     abstract getKind(): string;
 

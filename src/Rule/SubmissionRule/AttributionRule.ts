@@ -96,7 +96,7 @@ export class AttributionRule extends SubmissionRule {
         }
     }
 
-    protected async process(item: Submission): Promise<[boolean, RuleResult[]]> {
+    protected async process(item: Submission): Promise<[boolean, RuleResult]> {
         const referenceUrl = await item.url;
         if (referenceUrl === undefined && this.useSubmissionAsReference) {
             throw new Error(`Cannot run Rule ${this.name} because submission is not a link`);
@@ -236,15 +236,15 @@ export class AttributionRule extends SubmissionRule {
 
                 const result = `${triggeredDomains.length} Attribution(s) met the threshold of ${threshold}, largest being ${largestCount} (${largestPercent}%) of ${activityTotal} Total -- window: ${data.window}`;
                 this.logger.verbose(result);
-                return Promise.resolve([true, [this.getResult(true, {
+                return Promise.resolve([true, this.getResult(true, {
                     result,
                     data,
-                })]]);
+                })]);
             }
 
         }
 
-        return Promise.resolve([false, [this.getResult(false)]]);
+        return Promise.resolve([false, this.getResult(false)]);
     }
 
 }

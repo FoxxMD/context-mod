@@ -516,6 +516,8 @@ export const isItem = (item: Submission | Comment, stateCriteria: TypedActivityS
                     if (item[k] !== undefined) {
                         // @ts-ignore
                         if (item[k] !== crit[k]) {
+                            // @ts-ignore
+                            log.debug(`Failed: Expected => ${k}:${crit[k]} | Found => ${item[k]}`)
                             return [false, crit];
                         }
                     } else {
@@ -523,7 +525,7 @@ export const isItem = (item: Submission | Comment, stateCriteria: TypedActivityS
                     }
                 }
             }
-            log.verbose(`itemIs passed: ${JSON.stringify(crit)}`);
+            log.debug(`Passed: ${JSON.stringify(crit)}`);
             return [true, crit];
         })() as [boolean, SubmissionState|CommentState|undefined];
         if (pass) {

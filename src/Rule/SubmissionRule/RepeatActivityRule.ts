@@ -81,11 +81,11 @@ export class RepeatActivityRule extends SubmissionRule {
         }
     }
 
-    async process(item: Submission): Promise<[boolean, RuleResult[]]> {
+    async process(item: Submission): Promise<[boolean, RuleResult]> {
         const referenceUrl = await item.url;
         if (referenceUrl === undefined && this.useSubmissionAsReference) {
             this.logger.warn(`Rule not triggered because useSubmissionAsReference=true but submission is not a link`);
-            return Promise.resolve([false, [this.getResult(false)]]);
+            return Promise.resolve([false, this.getResult(false)]);
         }
 
         let activities: (Submission | Comment)[] = [];
@@ -193,7 +193,7 @@ export class RepeatActivityRule extends SubmissionRule {
             const largestRepeat = triggeringSummaries.reduce((acc, summ) => Math.max(summ.largestTrigger, acc), 0);
             const result = `${triggeringSummaries.length} of ${identifiersSummary.length} unique items repeated ${this.threshold} (threshold) times, largest repeat: ${largestRepeat}`;
             this.logger.verbose(result);
-            return Promise.resolve([true, [this.getResult(true, {
+            return Promise.resolve([true, this.getResult(true, {
                 result,
                 data: {
                     window: typeof this.window === 'number' ? `${activities.length} Items` : activityWindowText(activities),
@@ -204,10 +204,10 @@ export class RepeatActivityRule extends SubmissionRule {
                     url: referenceUrl,
                     triggeringSummaries,
                 }
-            })]]);
+            })]);
         }
 
-        return Promise.resolve([false, [this.getResult(false)]]);
+        return Promise.resolve([false, this.getResult(false)]);
     }
 }
 

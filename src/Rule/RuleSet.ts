@@ -1,4 +1,4 @@
-import {IRule, Triggerable, Rule, RuleJSONConfig, RuleResult} from "./index";
+import {IRule, Triggerable, Rule, RuleJSONConfig, RuleResult, RuleSetResult} from "./index";
 import {Comment, Submission} from "snoowrap";
 import {ruleFactory} from "./RuleFactory";
 import {createAjvFactory, mergeArr} from "../util";
@@ -8,7 +8,7 @@ import * as RuleSchema from '../Schema/Rule.json';
 import Ajv from 'ajv';
 import {RuleJson, RuleObjectJson} from "../Common/types";
 
-export class RuleSet implements IRuleSet, Triggerable {
+export class RuleSet implements IRuleSet {
     rules: Rule[] = [];
     condition: JoinOperands;
     logger: Logger;
@@ -32,12 +32,12 @@ export class RuleSet implements IRuleSet, Triggerable {
         }
     }
 
-    async run(item: Comment | Submission, existingResults: RuleResult[] = []): Promise<[boolean, RuleResult[]]> {
+    async run(item: Comment | Submission, existingResults: RuleResult[] = []): Promise<[boolean, RuleSetResult]> {
         let results: RuleResult[] = [];
         let runOne = false;
         for (const r of this.rules) {
             const combinedResults = [...existingResults, ...results];
-            const [passed, [result]] = await r.run(item, combinedResults);
+            const [passed, result] = await r.run(item, combinedResults);
             //results = results.concat(determineNewResults(combinedResults, result));
             results.push(result);
             // skip rule if author check failed
@@ -47,22 +47,30 @@ export class RuleSet implements IRuleSet, Triggerable {
             runOne = true;
             if (passed) {
                 if (this.condition === 'OR') {
-                    return [true, results];
+                    return [true, this.generateResultSet(true, results)];
                 }
             } else if (this.condition === 'AND') {
-                return [false, results];
+                return [false, this.generateResultSet(false, results)];
             }
         }
         // if no rules were run it's the same as if nothing was triggered
         if (!runOne) {
-            return [false, results];
+            return [false, this.generateResultSet(false, results)];
         }
         if(this.condition === 'OR') {
             // if OR and did not return already then none passed
-            return [false, results];
+            return [false, this.generateResultSet(false, results)];
         }
         // otherwise AND and did not return already so all passed
-        return [true, results];
+        return [true, this.generateResultSet(true, results)];
+    }
+
+    generateResultSet(triggered: boolean, results: RuleResult[]): RuleSetResult {
+        return {
+            results,
+            triggered,
+            condition: this.condition
+        };
     }
 }
 

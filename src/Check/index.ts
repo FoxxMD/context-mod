@@ -1,11 +1,11 @@
 import {RuleSet, IRuleSet, RuleSetJson, RuleSetObjectJson} from "../Rule/RuleSet";
-import {IRule, Rule, RuleJSONConfig, RuleResult} from "../Rule";
+import {IRule, isRuleSetResult, Rule, RuleJSONConfig, RuleResult, RuleSetResult} from "../Rule";
 import Action, {ActionConfig, ActionJson} from "../Action";
 import {Logger} from "winston";
 import {Comment, Submission} from "snoowrap";
 import {actionFactory} from "../Action/ActionFactory";
 import {ruleFactory} from "../Rule/RuleFactory";
-import {createAjvFactory, mergeArr, ruleNamesFromResults} from "../util";
+import {createAjvFactory, mergeArr, resultsSummary, ruleNamesFromResults} from "../util";
 import {
     ChecksActivityState,
     CommentState,
@@ -147,11 +147,12 @@ export class Check implements ICheck {
     }
 
     async runRules(item: Submission | Comment, existingResults: RuleResult[] = []): Promise<[boolean, RuleResult[]]> {
-        let allResults: RuleResult[] = [];
+        let allRuleResults: RuleResult[] = [];
+        let allResults: (RuleResult | RuleSetResult)[] = [];
         const [itemPass, crit] = isItem(item, this.itemIs, this.logger);
         if(!itemPass) {
             this.logger.verbose(`❌ => Item did not pass 'itemIs' test`);
-            return [false, allResults];
+            return [false, allRuleResults];
         }
         let authorPass = null;
         if (this.authorIs.include !== undefined && this.authorIs.include.length > 0) {
@@ -163,7 +164,7 @@ export class Check implements ICheck {
             }
             if(!authorPass) {
                 this.logger.verbose('❌ => Inclusive author criteria not matched');
-                return Promise.resolve([false, allResults]);
+                return Promise.resolve([false, allRuleResults]);
             }
         }
         if (authorPass === null && this.authorIs.exclude !== undefined && this.authorIs.exclude.length > 0) {
@@ -175,45 +176,52 @@ export class Check implements ICheck {
             }
             if(!authorPass) {
                 this.logger.verbose('❌ =>  Exclusive author criteria not matched');
-                return Promise.resolve([false, allResults]);
+                return Promise.resolve([false, allRuleResults]);
             }
         }
 
         if(this.rules.length === 0) {
             this.logger.info(`✔️ => No rules to run, check auto-passes`);
-            return [true, allResults];
+            return [true, allRuleResults];
         }
 
         let runOne = false;
         for (const r of this.rules) {
-            const combinedResults = [...existingResults, ...allResults];
+            //let results: RuleResult | RuleSetResult;
+            const combinedResults = [...existingResults, ...allRuleResults];
             const [passed, results] = await r.run(item, combinedResults);
-            allResults = allResults.concat(results);
+            if(isRuleSetResult(results)) {
+                allRuleResults = allRuleResults.concat(results.results);
+            } else {
+                allRuleResults = allRuleResults.concat(results as RuleResult);
+            }
+            allResults.push(results);
             if (passed === null) {
                 continue;
             }
+            debugger;
             runOne = true;
             if (passed) {
                 if (this.condition === 'OR') {
-                    this.logger.info(`✔️ => Rules (OR): ${ruleNamesFromResults(allResults)}`);
-                    return [true, allResults];
+                    this.logger.info(`✔️ => Rules: ${resultsSummary(allResults, this.condition)}`);
+                    return [true, allRuleResults];
                 }
             } else if (this.condition === 'AND') {
-                this.logger.info(`❌ => Rules (AND): ${ruleNamesFromResults(allResults)}`);
-                return [false, allResults];
+                this.logger.info(`❌ => Rules: ${resultsSummary(allResults, this.condition)}`);
+                return [false, allRuleResults];
             }
         }
         if (!runOne) {
             this.logger.verbose('❌ => All Rules skipped because of Author checks or itemIs tests');
-            return [false, allResults];
+            return [false, allRuleResults];
         } else if(this.condition === 'OR') {
             // if OR and did not return already then none passed
-            this.logger.verbose(`❌ => Rules (OR): ${ruleNamesFromResults(allResults)}`);
-            return [false, allResults];
+            this.logger.verbose(`❌ => Rules: ${resultsSummary(allResults, this.condition)}`);
+            return [false, allRuleResults];
         }
         // otherwise AND and did not return already so all passed
-        this.logger.info(`✔️ => Rules (AND) : ${ruleNamesFromResults(allResults)}`);
-        return [true, allResults];
+        this.logger.info(`✔️ => Rules: ${resultsSummary(allResults, this.condition)}`);
+        return [true, allRuleResults];
     }
 
     async runActions(item: Submission | Comment, ruleResults: RuleResult[]): Promise<Action[]> {

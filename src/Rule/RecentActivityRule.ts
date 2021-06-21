@@ -44,7 +44,7 @@ export class RecentActivityRule extends Rule {
         }
     }
 
-    async process(item: Submission | Comment): Promise<[boolean, RuleResult[]]> {
+    async process(item: Submission | Comment): Promise<[boolean, RuleResult]> {
         let activities;
 
         switch (this.lookAt) {
@@ -135,7 +135,7 @@ export class RecentActivityRule extends Rule {
             }
             const result = resultArr.join(' and ')
             this.logger.verbose(result);
-            return Promise.resolve([true, [this.getResult(true, {
+            return Promise.resolve([true, this.getResult(true, {
                 result,
                 data: {
                     window: typeof this.window === 'number' ? `${activities.length} Items` : activityWindowText(viableActivity),
@@ -145,10 +145,10 @@ export class RecentActivityRule extends Rule {
                     subCount: data.totalSubredditsCount,
                     totalCount: data.totalCount
                 }
-            })]]);
+            })]);
         }
 
-        return Promise.resolve([false, [this.getResult(false)]]);
+        return Promise.resolve([false, this.getResult(false)]);
     }
 }
 
