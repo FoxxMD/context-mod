@@ -60,7 +60,7 @@ export interface HistoryCriteria {
 
 export class HistoryRule extends Rule {
     criteria: HistoryCriteria[];
-    criteriaJoin: 'AND' | 'OR';
+    condition: 'AND' | 'OR';
     include: string[];
     exclude: string[];
 
@@ -68,13 +68,13 @@ export class HistoryRule extends Rule {
         super(options);
         const {
             criteria,
-            criteriaJoin = 'OR',
+            condition = 'OR',
             include = [],
             exclude = [],
         } = options || {};
 
         this.criteria = criteria;
-        this.criteriaJoin = criteriaJoin;
+        this.condition = condition;
         if (this.criteria.length === 0) {
             throw new Error('Must provide at least one HistoryCriteria');
         }
@@ -177,7 +177,7 @@ export class HistoryRule extends Rule {
         }
 
         let criteriaMeta = false;
-        if (this.criteriaJoin === 'OR') {
+        if (this.condition === 'OR') {
             criteriaMeta = criteriaResults.some(x => x.triggered);
         } else {
             criteriaMeta = criteriaResults.every(x => x.triggered);
@@ -267,7 +267,7 @@ interface HistoryConfig  {
      * * If `OR` then any set of Criteria that pass will trigger the Rule
      * * If `AND` then all Criteria sets must pass to trigger the Rule
      * */
-    criteriaJoin?: 'AND' | 'OR'
+    condition?: 'AND' | 'OR'
 
     /**
      * Only include Submissions from this list of Subreddits.
