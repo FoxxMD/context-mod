@@ -36,6 +36,9 @@ const errorAwareFormat = {
     }
 }
 
+export const PASS = '✔';
+export const FAIL = '✘';
+
 export const truncateStringToLength = (length: number, truncStr = '...') => (str: string) => str.length > length ? `${str.slice(0, length - truncStr.length - 1)}${truncStr}` : str;
 
 export const defaultFormat = printf(({
@@ -207,7 +210,7 @@ export const triggeredIndicator = (val: boolean | null): string => {
     if(val === null) {
         return '-';
     }
-    return val ? '✔' : '✘';
+    return val ? PASS : FAIL;
 }
 
 export const resultsSummary = (results: (RuleResult|RuleSetResult)[], topLevelCondition: 'OR' | 'AND'): string => {

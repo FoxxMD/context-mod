@@ -5,7 +5,7 @@ import {Logger} from "winston";
 import {Comment, Submission} from "snoowrap";
 import {actionFactory} from "../Action/ActionFactory";
 import {ruleFactory} from "../Rule/RuleFactory";
-import {createAjvFactory, mergeArr, resultsSummary, ruleNamesFromResults} from "../util";
+import {createAjvFactory, FAIL, mergeArr, PASS, resultsSummary, ruleNamesFromResults} from "../util";
 import {
     ChecksActivityState,
     CommentState,
@@ -151,7 +151,7 @@ export class Check implements ICheck {
         let allResults: (RuleResult | RuleSetResult)[] = [];
         const [itemPass, crit] = isItem(item, this.itemIs, this.logger);
         if(!itemPass) {
-            this.logger.verbose(`❌ => Item did not pass 'itemIs' test`);
+            this.logger.verbose(`${FAIL} => Item did not pass 'itemIs' test`);
             return [false, allRuleResults];
         }
         let authorPass = null;
@@ -163,7 +163,7 @@ export class Check implements ICheck {
                 }
             }
             if(!authorPass) {
-                this.logger.verbose('❌ => Inclusive author criteria not matched');
+                this.logger.verbose(`${FAIL} => Inclusive author criteria not matched`);
                 return Promise.resolve([false, allRuleResults]);
             }
         }
@@ -175,13 +175,13 @@ export class Check implements ICheck {
                 }
             }
             if(!authorPass) {
-                this.logger.verbose('❌ =>  Exclusive author criteria not matched');
+                this.logger.verbose(`${FAIL} =>  Exclusive author criteria not matched`);
                 return Promise.resolve([false, allRuleResults]);
             }
         }
 
         if(this.rules.length === 0) {
-            this.logger.info(`✔️ => No rules to run, check auto-passes`);
+            this.logger.info(`${PASS} => No rules to run, check auto-passes`);
             return [true, allRuleResults];
         }
 
@@ -202,24 +202,24 @@ export class Check implements ICheck {
             runOne = true;
             if (passed) {
                 if (this.condition === 'OR') {
-                    this.logger.info(`✔ => Rules: ${resultsSummary(allResults, this.condition)}`);
+                    this.logger.info(`${PASS} => Rules: ${resultsSummary(allResults, this.condition)}`);
                     return [true, allRuleResults];
                 }
             } else if (this.condition === 'AND') {
-                this.logger.verbose(`✘ => Rules: ${resultsSummary(allResults, this.condition)}`);
+                this.logger.verbose(`${FAIL} => Rules: ${resultsSummary(allResults, this.condition)}`);
                 return [false, allRuleResults];
             }
         }
         if (!runOne) {
-            this.logger.verbose('✘ => All Rules skipped because of Author checks or itemIs tests');
+            this.logger.verbose(`${FAIL} => All Rules skipped because of Author checks or itemIs tests`);
             return [false, allRuleResults];
         } else if(this.condition === 'OR') {
             // if OR and did not return already then none passed
-            this.logger.verbose(`✘ => Rules: ${resultsSummary(allResults, this.condition)}`);
+            this.logger.verbose(`${FAIL} => Rules: ${resultsSummary(allResults, this.condition)}`);
             return [false, allRuleResults];
         }
         // otherwise AND and did not return already so all passed
-        this.logger.info(`✔ => Rules: ${resultsSummary(allResults, this.condition)}`);
+        this.logger.info(`${PASS} => Rules: ${resultsSummary(allResults, this.condition)}`);
         return [true, allRuleResults];
     }
 
