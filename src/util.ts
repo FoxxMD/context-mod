@@ -207,7 +207,7 @@ export const triggeredIndicator = (val: boolean | null): string => {
     if(val === null) {
         return '-';
     }
-    return val ? '✔' : '❌';
+    return val ? '✔' : '✘';
 }
 
 export const resultsSummary = (results: (RuleResult|RuleSetResult)[], topLevelCondition: 'OR' | 'AND'): string => {

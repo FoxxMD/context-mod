@@ -199,28 +199,27 @@ export class Check implements ICheck {
             if (passed === null) {
                 continue;
             }
-            debugger;
             runOne = true;
             if (passed) {
                 if (this.condition === 'OR') {
-                    this.logger.info(`✔️ => Rules: ${resultsSummary(allResults, this.condition)}`);
+                    this.logger.info(`✔ => Rules: ${resultsSummary(allResults, this.condition)}`);
                     return [true, allRuleResults];
                 }
             } else if (this.condition === 'AND') {
-                this.logger.info(`❌ => Rules: ${resultsSummary(allResults, this.condition)}`);
+                this.logger.verbose(`✘ => Rules: ${resultsSummary(allResults, this.condition)}`);
                 return [false, allRuleResults];
             }
         }
         if (!runOne) {
-            this.logger.verbose('❌ => All Rules skipped because of Author checks or itemIs tests');
+            this.logger.verbose('✘ => All Rules skipped because of Author checks or itemIs tests');
             return [false, allRuleResults];
         } else if(this.condition === 'OR') {
             // if OR and did not return already then none passed
-            this.logger.verbose(`❌ => Rules: ${resultsSummary(allResults, this.condition)}`);
+            this.logger.verbose(`✘ => Rules: ${resultsSummary(allResults, this.condition)}`);
             return [false, allRuleResults];
         }
         // otherwise AND and did not return already so all passed
-        this.logger.info(`✔️ => Rules: ${resultsSummary(allResults, this.condition)}`);
+        this.logger.info(`✔ => Rules: ${resultsSummary(allResults, this.condition)}`);
         return [true, allRuleResults];
     }
 
