@@ -3,9 +3,9 @@ import {RuleOptions, RuleResult} from "../index";
 import {Comment} from "snoowrap";
 import {
     activityWindowText,
-    comparisonTextOp,
+    comparisonTextOp, FAIL,
     parseGenericValueComparison,
-    parseUsableLinkIdentifier as linkParser
+    parseUsableLinkIdentifier as linkParser, PASS
 } from "../../util";
 import {ActivityWindow, ActivityWindowType, ReferenceSubmission} from "../../Common/interfaces";
 import Submission from "snoowrap/dist/objects/Submission";
@@ -150,49 +150,49 @@ export class RepeatActivityRule extends SubmissionRule {
 
         const identifiersSummary: SummaryData[] = [];
         for (let [key, value] of applicableGroupedActivities) {
-            const summaryData = {
+            const summaryData: SummaryData = {
                 identifier: key,
                 totalSets: value.length,
                 totalTriggeringSets: 0,
                 largestTrigger: 0,
+                sets: [],
+                setsMarkdown: [],
                 triggeringSets: [],
                 triggeringSetsMarkdown: [],
             };
             for (let set of value) {
                 const test = comparisonTextOp(set.length, operator, thresholdValue);
-                if(test) {
-                   // if(greaterThan) {
-                        // @ts-ignore
-                        summaryData.triggeringSets.push(set);
-                        summaryData.totalTriggeringSets++;
-                        summaryData.largestTrigger = Math.max(summaryData.largestTrigger, set.length);
-                        const md = set.map((x: (Comment | Submission)) => `[${x instanceof Submission ? x.title : getActivityIdentifier(x, 50)}](https://reddit.com${x.permalink}) in ${x.subreddit_name_prefixed} on ${dayjs(x.created_utc * 1000).utc().format()}`);
-                        // @ts-ignore
-                        summaryData.triggeringSetsMarkdown.push(md);
-                   // }
-                } else if(!greaterThan) {
+                const md = set.map((x: (Comment | Submission)) => `[${x instanceof Submission ? x.title : getActivityIdentifier(x, 50)}](https://reddit.com${x.permalink}) in ${x.subreddit_name_prefixed} on ${dayjs(x.created_utc * 1000).utc().format()}`);
+
+                summaryData.sets.push(set);
+                summaryData.largestTrigger = Math.max(summaryData.largestTrigger, set.length);
+                summaryData.setsMarkdown.push(md);
+                if (test) {
+                    summaryData.triggeringSets.push(set);
+                    summaryData.totalTriggeringSets++;
+                    summaryData.triggeringSetsMarkdown.push(md);
+                    // }
+                } else if (!greaterThan) {
                     allLessThan = false;
                 }
-                // if ((test && greaterThan) || (!test && !greaterThan)) {
-                //     // @ts-ignore
-                //     summaryData.triggeringSets.push(set);
-                //     summaryData.totalTriggeringSets++;
-                //     summaryData.largestTrigger = Math.max(summaryData.largestTrigger, set.length);
-                //     const md = set.map((x: (Comment | Submission)) => `[${x instanceof Submission ? x.title : getActivityIdentifier(x, 50)}](https://reddit.com${x.permalink}) in ${x.subreddit_name_prefixed} on ${dayjs(x.created_utc * 1000).utc().format()}`);
-                //     // @ts-ignore
-                //     summaryData.triggeringSetsMarkdown.push(md);
-                // }
             }
-            if(greaterThan || (!greaterThan && allLessThan)) {
-                identifiersSummary.push(summaryData);
-            }
+            identifiersSummary.push(summaryData);
         }
 
-        const triggeringSummaries = identifiersSummary.filter(x => x.totalTriggeringSets > 0)
-        if (triggeringSummaries.length > 0) {
-            const largestRepeat = triggeringSummaries.reduce((acc, summ) => Math.max(summ.largestTrigger, acc), 0);
-            const result = `${triggeringSummaries.length} of ${identifiersSummary.length} unique items repeated ${this.threshold} (threshold) times, largest repeat: ${largestRepeat}`;
-            this.logger.verbose(result);
+        const criteriaMet = identifiersSummary.filter(x => x.totalTriggeringSets > 0).length > 0 && (greaterThan || (!greaterThan && allLessThan));
+
+        const largestRepeat = identifiersSummary.reduce((acc, summ) => Math.max(summ.largestTrigger, acc), 0);
+        let result: string;
+        if (criteriaMet || greaterThan) {
+            result = `${criteriaMet ? PASS : FAIL} ${identifiersSummary.filter(x => x.totalTriggeringSets > 0).length} of ${identifiersSummary.length} unique items repeated ${this.threshold} times, largest repeat: ${largestRepeat}`;
+        } else {
+            result = `${FAIL} Not all of ${identifiersSummary.length} unique items repeated ${this.threshold} times, largest repeat: ${largestRepeat}`
+        }
+
+        this.logger.verbose(result);
+
+        if (criteriaMet) {
+            const triggeringSummaries = identifiersSummary.filter(x => x.totalTriggeringSets > 0);
             return Promise.resolve([true, this.getResult(true, {
                 result,
                 data: {
@@ -204,10 +204,10 @@ export class RepeatActivityRule extends SubmissionRule {
                     url: referenceUrl,
                     triggeringSummaries,
                 }
-            })]);
+            })])
         }
 
-        return Promise.resolve([false, this.getResult(false)]);
+        return Promise.resolve([false, this.getResult(false, {result})]);
     }
 }
 
@@ -216,6 +216,8 @@ interface SummaryData {
     totalSets: number,
     totalTriggeringSets: number,
     largestTrigger: number,
+    sets: (Comment | Submission)[],
+    setsMarkdown: string[],
     triggeringSets: (Comment | Submission)[],
     triggeringSetsMarkdown: string[]
 }

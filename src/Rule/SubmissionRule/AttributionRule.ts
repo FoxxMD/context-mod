@@ -4,7 +4,7 @@ import {RuleOptions, RuleResult} from "../index";
 import Submission from "snoowrap/dist/objects/Submission";
 import {getAttributionIdentifier} from "../../Utils/SnoowrapUtils";
 import dayjs from "dayjs";
-import {comparisonTextOp, parseGenericValueOrPercentComparison} from "../../util";
+import {comparisonTextOp, FAIL, parseGenericValueOrPercentComparison, PASS} from "../../util";
 
 
 export interface AttributionCriteria {
@@ -201,7 +201,7 @@ export class AttributionRule extends SubmissionRule {
         }
         // probably none hit min count then
         if(criteriaResults.every(x => x.minCountMet === false)) {
-            const result = 'No criteria had their min activity count met';
+            const result = `${FAIL} No criteria had their min activity count met`;
             this.logger.verbose(result);
             return Promise.resolve([false, this.getResult(false, {result})]);
         }
@@ -234,7 +234,7 @@ export class AttributionRule extends SubmissionRule {
 
         let result;
         if(criteriaMeta) {
-            result = `${aggDomains.length} Attribution(s) ${resultAgnostic}`;
+            result = `${PASS} ${aggDomains.length} Attribution(s) ${resultAgnostic}`;
             data = {
                 triggeredDomainCount: aggDomains.length,
                 activityTotal,
@@ -250,7 +250,7 @@ export class AttributionRule extends SubmissionRule {
             }
 
         } else {
-            result = `No Attributions ${resultAgnostic}`;
+            result = `${FAIL} No Attributions ${resultAgnostic}`;
         }
 
         //const result = `${aggDomains.length} Attribution(s) met the threshold of ${threshold}, largest being ${largestCount} (${largestPercent}%) of ${activityTotal} Total -- window: ${data.window}`;
