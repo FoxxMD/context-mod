@@ -4,7 +4,14 @@ import {Rule, RuleJSONConfig, RuleOptions, RuleResult} from "./index";
 import Submission from "snoowrap/dist/objects/Submission";
 import {getAuthorActivities} from "../Utils/SnoowrapUtils";
 import dayjs from "dayjs";
-import {comparisonTextOp, formatNumber, parseGenericValueOrPercentComparison, percentFromString} from "../util";
+import {
+    comparisonTextOp,
+    FAIL,
+    formatNumber,
+    parseGenericValueOrPercentComparison,
+    PASS,
+    percentFromString
+} from "../util";
 
 export interface CommentThresholdCriteria extends ThresholdCriteria {
     /**
@@ -172,82 +179,104 @@ export class HistoryRule extends Rule {
                 submissionTotal,
                 commentTotal,
                 opTotal,
-                triggered: submissionTrigger === true || commentTrigger === true
+                submissionTrigger,
+                commentTrigger,
+                triggered: (submissionTrigger === undefined || submissionTrigger === true) && (commentTrigger === undefined || commentTrigger === true)
             });
         }
 
-        let criteriaMeta = false;
+        let criteriaMet = false;
+        let failCriteriaResult: string = '';
         if (this.condition === 'OR') {
-            criteriaMeta = criteriaResults.some(x => x.triggered);
+            criteriaMet = criteriaResults.some(x => x.triggered);
+            if(!criteriaMet) {
+                failCriteriaResult = `${FAIL} No criteria was met`;
+            }
         } else {
-            criteriaMeta = criteriaResults.every(x => x.triggered);
+            criteriaMet = criteriaResults.every(x => x.triggered);
+            if(!criteriaMet) {
+                if(criteriaResults.some(x => x.triggered)) {
+                    const met = criteriaResults.filter(x => x.triggered);
+                    failCriteriaResult = `${FAIL} ${met.length} out of ${criteriaResults.length} criteria met but Rule required all be met. Set log level to debug to see individual results`;
+                    const results = criteriaResults.map(x => this.generateResultDataFromCriteria(x, true));
+                    this.logger.debug(`\r\n ${results.map(x => x.result).join('\r\n')}`);
+                } else {
+                    failCriteriaResult = `${FAIL} No criteria was met`;
+                }
+            }
         }
 
-        if (criteriaMeta) {
+        if(criteriaMet) {
             // use first triggered criteria found
             const refCriteriaResults = criteriaResults.find(x => x.triggered);
-            if (refCriteriaResults !== undefined) {
-                const {
-                    activityTotal,
-                    activityTotalWindow,
-                    submissionTotal,
-                    commentTotal,
-                    opTotal,
-                    criteria: {
-                        comment,
-                        submission,
-                        window,
-                    },
-                    criteria,
-                } = refCriteriaResults;
+            const resultData = this.generateResultDataFromCriteria(refCriteriaResults);
 
-                const data: any = {
-                    activityTotal,
-                    submissionTotal,
-                    commentTotal,
-                    opTotal,
-                    commentPercent: formatNumber((commentTotal/activityTotal)*100),
-                    submissionPercent: formatNumber((submissionTotal/activityTotal)*100),
-                    opPercent: formatNumber((opTotal/commentTotal)*100),
-                    criteria,
-                    window: typeof window === 'number' ? `${activityTotal} Items` : activityTotalWindow.humanize(true)
-
-                };
-
-                let thresholdSummary = [];
-                let submissionSummary;
-                let commentSummary;
-                if(submission !== undefined) {
-                    const {operator, value, isPercent, displayText} = parseGenericValueOrPercentComparison(submission);
-                    const suffix = !isPercent ? 'Items' : `(${formatNumber((submissionTotal/activityTotal)*100)}%) of ${activityTotal} Total`;
-                    submissionSummary = `Submissions (${submissionTotal}) were ${displayText} ${suffix}`;
-                    data.submissionSummary = submissionSummary;
-                    thresholdSummary.push(submissionSummary);
-                }
-                if(comment !== undefined) {
-                    const {operator, value, isPercent, displayText, extra = ''} = parseGenericValueOrPercentComparison(comment);
-                    const asOp = extra.toLowerCase().includes('op');
-                    const totalType = asOp ? 'Comments' : 'Activities'
-                    const countType = asOp ? 'Comments as OP' : 'Comments';
-                    const suffix = !isPercent ? 'Items' : `(${asOp ? formatNumber((opTotal/commentTotal)*100) : formatNumber((commentTotal/activityTotal)*100)}%) of ${activityTotal} Total ${totalType}`;
-                    commentSummary = `${countType} (${asOp ? opTotal : commentTotal}) were ${displayText} ${suffix}`;
-                    data.commentSummary = commentSummary;
-                    thresholdSummary.push(commentSummary);
-                }
-
-                data.thresholdSummary = thresholdSummary.join(' and ');
-
-                const result = `${thresholdSummary} (${data.window})`;
-                this.logger.verbose(result);
-                return Promise.resolve([true, this.getResult(true, {
-                    result,
-                    data,
-                })]);
-            }
-
+            this.logger.verbose(`${PASS} ${resultData.result}`);
+            return Promise.resolve([true, this.getResult(true, resultData)]);
         }
 
-        return Promise.resolve([false, this.getResult(false)]);
+        return Promise.resolve([false, this.getResult(false, {result: failCriteriaResult})]);
+    }
+
+    protected generateResultDataFromCriteria(results: any, includePassFailSymbols = false) {
+        const {
+            activityTotal,
+            activityTotalWindow,
+            submissionTotal,
+            commentTotal,
+            opTotal,
+            criteria: {
+                comment,
+                submission,
+                window,
+            },
+            criteria,
+            triggered,
+            submissionTrigger,
+            commentTrigger,
+        } = results;
+
+        const data: any = {
+            activityTotal,
+            submissionTotal,
+            commentTotal,
+            opTotal,
+            commentPercent: formatNumber((commentTotal/activityTotal)*100),
+            submissionPercent: formatNumber((submissionTotal/activityTotal)*100),
+            opPercent: formatNumber((opTotal/commentTotal)*100),
+            criteria,
+            window: typeof window === 'number' ? `${activityTotal} Items` : activityTotalWindow.humanize(true),
+            triggered,
+            submissionTrigger,
+            commentTrigger,
+        };
+
+        let thresholdSummary = [];
+        let submissionSummary;
+        let commentSummary;
+        if(submission !== undefined) {
+            const {operator, value, isPercent, displayText} = parseGenericValueOrPercentComparison(submission);
+            const suffix = !isPercent ? 'Items' : `(${formatNumber((submissionTotal/activityTotal)*100)}%) of ${activityTotal} Total`;
+            submissionSummary = `${includePassFailSymbols ? `${submissionTrigger ? PASS : FAIL} ` : ''}Submissions (${submissionTotal}) were${submissionTrigger ? '' : ' not'} ${displayText} ${suffix}`;
+            data.submissionSummary = submissionSummary;
+            thresholdSummary.push(submissionSummary);
+        }
+        if(comment !== undefined) {
+            const {operator, value, isPercent, displayText, extra = ''} = parseGenericValueOrPercentComparison(comment);
+            const asOp = extra.toLowerCase().includes('op');
+            const totalType = asOp ? 'Comments' : 'Activities'
+            const countType = asOp ? 'Comments as OP' : 'Comments';
+            const suffix = !isPercent ? 'Items' : `(${asOp ? formatNumber((opTotal/commentTotal)*100) : formatNumber((commentTotal/activityTotal)*100)}%) of ${activityTotal} Total ${totalType}`;
+            commentSummary = `${includePassFailSymbols ? `${commentTrigger ? PASS : FAIL} ` : ''}${countType} (${asOp ? opTotal : commentTotal}) were${commentTrigger ? '' : ' not'} ${displayText} ${suffix}`;
+            data.commentSummary = commentSummary;
+            thresholdSummary.push(commentSummary);
+        }
+
+        data.thresholdSummary = thresholdSummary.join(' and ');
+
+        const result = `${thresholdSummary} (${data.window})`;
+
+        return {result, data};
     }
 
 }
