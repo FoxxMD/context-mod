@@ -254,7 +254,7 @@ export class App {
 
                 lastErrorAt = dayjs();
 
-                if (err.message.includes('ETIMEDOUT')) {
+                if (err.message.includes('ETIMEDOUT') || (err.code !== undefined && err.code.includes('ETIMEDOUT'))) {
                     timeoutCount++;
                     if (timeoutCount > maxTimeoutCount) {
                         this.logger.error(`Timeouts (${timeoutCount}) exceeded max allowed (${maxTimeoutCount})`);
