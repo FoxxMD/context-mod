@@ -262,49 +262,71 @@ export interface JoinCondition {
     condition?: JoinOperands,
 }
 
+export type PollOn = 'unmoderated' | 'modqueue' | 'newSub' | 'newComm';
+
+export interface PollingOptionsStrong extends PollingOptions {
+    limit: number,
+    interval: number,
+}
+
 /**
- * You may specify polling options independently for submissions/comments
- * @examples [{"submissions": {"limit": 10, "interval": 10000}, "comments": {"limit": 15, "interval": 10000}}]
+ * A configuration for where, how, and when to poll Reddit for Activities to process
+ *
+ * @examples [{"pollOn": "unmoderated","limit": 25, "interval": 20000}]
  * */
 export interface PollingOptions {
+
     /**
-     * Polling options for submission events
-     * @examples [{"limit": 10, "interval": 10000}]
+     * What source to get Activities from. The source you choose will modify how the bots behaves so choose carefully.
+     *
+     * ### unmoderated (default)
+     *
+     * Activities that have yet to be approved/removed by a mod. This includes all modqueue (reports/spam) **and new submissions**.
+     *
+     * Use this if you want the bot to act like a regular moderator and act on anything that can be seen from mod tools.
+     *
+     * **Note:** Does NOT include new comments, only comments that are reported/filtered by Automoderator. If you want to process all unmoderated AND all new comments then use some version of `polling: ["unmoderated","newComm"]`
+     *
+     * ### modqueue
+     *
+     * Activities requiring moderator review, such as reported things and items caught by the spam filter.
+     *
+     * Use this if you only want the Bot to process reported/filtered Activities.
+     *
+     * ### newSub
+     *
+     * Get only `Submissions` that show up in `/r/mySubreddit/new`
+     *
+     * Use this if you want the bot to process Submissions only when:
+     *
+     * * they are not initially filtered by Automoderator or
+     * * after they have been manually approved from modqueue
+     *
+     * ## newComm
+     *
+     * Get only new `Comments`
+     *
+     * Use this if you want the bot to process Comments only when:
+     *
+     * * they are not initially filtered by Automoderator or
+     * * after they have been manually approved from modqueue
+     *
      * */
-    submissions?: {
-        /**
-         * The number of submissions to pull from /r/subreddit/new on every request
-         * @default 10
-         * @examples [10]
-         * */
-        limit?: number,
-        /**
-         * Amount of time, in milliseconds, to wait between requests to /r/subreddit/new
-         *
-         * @default 10000
-         * @examples [10000]
-         * */
-        interval?: number,
-    },
+    pollOn: 'unmoderated' | 'modqueue' | 'newSub' | 'newComm'
     /**
-     * Polling options for comment events
-     * @examples [{"limit": 10, "interval": 10000}]
+     * The maximum number of Activities to get on every request
+     * @default 25
+     * @examples [25]
      * */
-    comments?: {
-        /**
-         * The number of new comments to pull on every request
-         * @default 10
-         * @examples [10]
-         * */
-        limit?: number,
-        /**
-         * Amount of time, in milliseconds, to wait between requests for new comments
-         *
-         * @default 10000
-         * @examples [10000]
-         * */
-        interval?: number,
-    }
+    limit?: number
+
+    /**
+     * Amount of time, in milliseconds, to wait between requests
+     *
+     * @default 20000
+     * @examples [20000]
+     * */
+    interval?: number,
 }
 
 export interface SubredditCacheConfig {
@@ -358,7 +380,33 @@ export interface Footer {
 }
 
 export interface ManagerOptions {
-    polling?: PollingOptions
+    /**
+     * An array of sources to process Activities from
+     *
+     * Values in the array may be either:
+     *
+     * **A `string` representing the `pollOn` value to use**
+     *
+     * One of:
+     *
+     * * `unmoderated`
+     * * `modqueue`
+     * * `newSub`
+     * * `newComm`
+     *
+     * with the rest of the `PollingOptions` properties as defaults
+     *
+     * **A `PollingOptions` object**
+     *
+     * If you want to specify non-default preoperties
+     *
+     * ****
+     * If not specified the default is `["unmoderated"]`
+     *
+     * @default [["unmoderated"]]
+     * @example [["unmoderated","newComm"]]
+    * */
+    polling?: (string|PollingOptions)[]
 
     /**
      * Per-subreddit config for caching TTL values. If set to `false` caching is disabled.
@@ -404,6 +452,7 @@ export interface ManagerOptions {
     * An alternate identifier to use in logs to identify your subreddit
     *
     * If your subreddit has a very long name it can make logging unwieldy. Specify a shorter name here to make log statements more readable (and shorter)
+    * @example ["shortName"]
     * */
     nickname?: string
 }

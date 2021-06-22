@@ -8,7 +8,7 @@ import * as schema from './Schema/App.json';
 import {JSONConfig} from "./JsonConfig";
 import LoggedError from "./Utils/LoggedError";
 import {CheckStructuredJson} from "./Check";
-import {ManagerOptions} from "./Common/interfaces";
+import {PollingOptions, PollingOptionsStrong, PollOn} from "./Common/interfaces";
 import {isRuleSetJSON, RuleSetJson, RuleSetObjectJson} from "./Rule/RuleSet";
 import deepEqual from "fast-deep-equal";
 import {ActionJson, ActionObjectJson, RuleJson, RuleObjectJson} from "./Common/types";
@@ -100,6 +100,23 @@ export class ConfigBuilder {
 
         return structuredChecks;
     }
+}
+
+export const buildPollingOptions = (values: (string | PollingOptions)[]): PollingOptionsStrong[] => {
+    let opts: PollingOptionsStrong[] = [];
+    for (const v of values) {
+        if (typeof v === 'string') {
+            opts.push({pollOn: v as PollOn, interval: 10000, limit: 25});
+        } else {
+            const {
+                pollOn: p,
+                interval = 20000,
+                limit = 25
+            } = v;
+            opts.push({pollOn: p as PollOn, interval, limit});
+        }
+    }
+    return opts;
 }
 
 export const extractNamedRules = (rules: Array<RuleSetJson | RuleJson>, namedRules: Map<string, RuleObjectJson> = new Map()): Map<string, RuleObjectJson> => {
