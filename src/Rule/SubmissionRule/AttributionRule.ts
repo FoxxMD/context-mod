@@ -102,6 +102,7 @@ export class AttributionRule extends SubmissionRule {
             throw new Error(`Cannot run Rule ${this.name} because submission is not a link`);
         }
 
+        const refIdentifier = getAttributionIdentifier(item, this.aggregateMediaDomains);
         const refDomain = this.aggregateMediaDomains ? item.domain : item.secure_media?.oembed?.author_url;
         const refDomainTitle = this.aggregateMediaDomains ? (item.secure_media?.oembed?.provider_name || item.domain) : (item.secure_media?.oembed?.author_name || item.secure_media?.oembed?.author_url);
 
@@ -134,7 +135,7 @@ export class AttributionRule extends SubmissionRule {
             const activityTotalWindow = dayjs.duration(dayjs(firstActivity.created_utc * 1000).diff(dayjs(lastActivity.created_utc * 1000)));
 
             if (activities.length < minActivityCount) {
-                criteriaResults.push({criteria, activityTotal, activityTotalWindow, aggDomains: [], minCountMet: false});
+                criteriaResults.push({criteria, activityTotal, activityTotalWindow, triggered: false, aggDomains: [], minCountMet: false});
                 this.logger.debug(`${activities.length } activities retrieved was less than min activities required to run criteria (${minActivityCount})`);
                 continue;
             }
@@ -182,7 +183,7 @@ export class AttributionRule extends SubmissionRule {
 
             if (this.useSubmissionAsReference) {
                 // filter aggDomains to only reference
-                aggDomains = aggDomains.filter(x => x.domain === refDomain || x.domain === refDomainTitle);
+                aggDomains = aggDomains.filter(x => x.domain === refDomain || x.domain === refDomainTitle || x.domain === refIdentifier);
             }
 
             criteriaResults.push({criteria, activityTotal, activityTotalWindow, aggDomains, minCountMet: true});
@@ -190,12 +191,12 @@ export class AttributionRule extends SubmissionRule {
 
         let criteriaMeta = false;
         if (this.criteriaJoin === 'OR') {
-            criteriaMeta = criteriaResults.some(x => x.aggDomains.length > 0 && x.aggDomains.some(y => y.triggered));
+            criteriaMeta = criteriaResults.some(x => x.aggDomains.length > 0 && x.aggDomains.some(y => y.triggered === true));
         } else {
-            criteriaMeta = criteriaResults.every(x => x.aggDomains.length > 0 && x.aggDomains.some(y => y.triggered));
+            criteriaMeta = criteriaResults.every(x => x.aggDomains.length > 0 && x.aggDomains.some(y => y.triggered === true));
         }
 
-        let usableCriteria = criteriaResults.filter(x => x.aggDomains.length > 0 && x.aggDomains.some(y => y.triggered));
+        let usableCriteria = criteriaResults.filter(x => x.aggDomains.length > 0 && x.aggDomains.some(y => y.triggered === true));
         if (usableCriteria.length === 0) {
             usableCriteria = criteriaResults.filter(x => x.aggDomains.length > 0)
         }
@@ -206,7 +207,12 @@ export class AttributionRule extends SubmissionRule {
             return Promise.resolve([false, this.getResult(false, {result})]);
         }
 
-        const refCriteriaResults = usableCriteria[0];
+        let result;
+        const refCriteriaResults = usableCriteria.find(x => x !== undefined);
+        if(refCriteriaResults === undefined) {
+            result = `${FAIL} No criteria results found??`;
+            return Promise.resolve([false, this.getResult(false, {result})])
+        }
 
         // TODO could be good to find the criteria that had the largest percent/count out of its agg domains but for now just get first
         //     usableCriteria.reduce((acc, curr) => {
@@ -219,7 +225,7 @@ export class AttributionRule extends SubmissionRule {
         // }, undefined)
 
         const {
-            aggDomains,
+            aggDomains = [],
             activityTotal,
             activityTotalWindow,
             criteria: {threshold, window}
@@ -232,7 +238,6 @@ export class AttributionRule extends SubmissionRule {
         let data: any = {};
         const resultAgnostic = `met the threshold of ${threshold}, largest being ${largestCount} (${largestPercent}%) of ${activityTotal} Total -- window: ${windowText}`;
 
-        let result;
         if(criteriaMeta) {
             result = `${PASS} ${aggDomains.length} Attribution(s) ${resultAgnostic}`;
             data = {
