@@ -399,6 +399,13 @@ export interface ManagerOptions {
      * @default undefined
      * */
     footer?: false | string
+
+    /*
+    * An alternate identifier to use in logs to identify your subreddit
+    *
+    * If your subreddit has a very long name it can make logging unwieldy. Specify a shorter name here to make log statements more readable (and shorter)
+    * */
+    nickname?: string
 }
 
 /**

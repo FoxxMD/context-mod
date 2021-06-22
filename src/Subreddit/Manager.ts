@@ -57,11 +57,16 @@ export class Manager {
         const configBuilder = new ConfigBuilder({logger: this.logger});
         const validJson = configBuilder.validateJson(sourceData);
         const {checks, ...configManagerOpts} = validJson;
-        const {polling = {}, caching, dryRun, footer} = configManagerOpts || {};
+        const {polling = {}, caching, dryRun, footer, nickname} = configManagerOpts || {};
         this.pollOptions = {...polling, ...opts.polling};
         this.subreddit = sub;
         this.client = client;
         this.dryRun = opts.dryRun || dryRun;
+
+        if(nickname !== undefined) {
+            this.displayLabel = nickname;
+            this.currentLabels = [this.displayLabel];
+        }
 
         let resourceConfig: SubredditResourceOptions = {
             logger: this.logger,
@@ -109,7 +114,7 @@ export class Manager {
         const checks = checkType === 'Comment' ? this.commentChecks : this.submissionChecks;
         const itemId = await item.id;
         let allRuleResults: RuleResult[] = [];
-        const itemIdentifier = `${checkType} ${itemId}`;
+        const itemIdentifier = `${checkType === 'Submission' ? 'SUB' : 'COM'} ${itemId}`;
         this.currentLabels = [this.displayLabel, itemIdentifier];
         const [peek, _] = await itemContentPeek(item);
         this.logger.info(`<EVENT> ${peek}`);
@@ -136,7 +141,7 @@ export class Manager {
                     allRuleResults = allRuleResults.concat(determineNewResults(allRuleResults, checkResults));
                     triggered = checkTriggered;
                 } catch (e) {
-                    this.logger.warn(`[Check ${check.name}] Failed with error: ${e.message}`, e);
+                    this.logger.warn(`Check ${check.name} Failed with error: ${e.message}`, e);
                 }
 
                 if (triggered) {
