@@ -5,7 +5,15 @@ import {Logger} from "winston";
 import {Comment, Submission} from "snoowrap";
 import {actionFactory} from "../Action/ActionFactory";
 import {ruleFactory} from "../Rule/RuleFactory";
-import {createAjvFactory, FAIL, mergeArr, PASS, resultsSummary, ruleNamesFromResults} from "../util";
+import {
+    createAjvFactory,
+    FAIL,
+    mergeArr,
+    PASS,
+    resultsSummary,
+    ruleNamesFromResults,
+    truncateStringToLength
+} from "../util";
 import {
     ChecksActivityState,
     CommentState,
@@ -21,6 +29,8 @@ import {ActionObjectJson, RuleJson, RuleObjectJson, ActionJson as ActionTypeJson
 import {isItem} from "../Utils/SnoowrapUtils";
 import ResourceManager, {SubredditResources} from "../Subreddit/SubredditResources";
 import {Author, AuthorCriteria, AuthorOptions} from "../Author/Author";
+
+const checkLogName = truncateStringToLength(25);
 
 export class Check implements ICheck {
     actions: Action[] = [];
@@ -53,7 +63,7 @@ export class Check implements ICheck {
             dryRun,
         } = options;
 
-        this.logger = options.logger.child({labels: [`Check ${name}`]}, mergeArr);
+        this.logger = options.logger.child({labels: [`CHK ${checkLogName(name)}`]}, mergeArr);
 
         const ajv = createAjvFactory(this.logger);
 
