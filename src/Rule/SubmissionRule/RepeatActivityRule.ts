@@ -67,7 +67,7 @@ export class RepeatActivityRule extends SubmissionRule {
     }
 
     getKind(): string {
-        return 'Repeat Activity';
+        return 'Repeat';
     }
 
     getSpecificPremise(): object {
