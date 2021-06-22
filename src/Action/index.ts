@@ -30,7 +30,7 @@ export abstract class Action {
         this.name = name;
         this.dryRun = dryRun;
         this.resources = ResourceManager.get(subredditName) as SubredditResources;
-        this.logger = logger.child({labels: ['Action', this.getActionUniqueName()]});
+        this.logger = logger.child({labels: [`Action ${this.getActionUniqueName()}`]});
 
         this.authorIs = {
             exclude: exclude.map(x => new Author(x)),
