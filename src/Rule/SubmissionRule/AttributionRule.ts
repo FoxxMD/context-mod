@@ -81,7 +81,7 @@ export class AttributionRule extends SubmissionRule {
     }
 
     getKind(): string {
-        return "Attribution";
+        return "Attr";
     }
 
     protected getSpecificPremise(): object {
@@ -124,7 +124,18 @@ export class AttributionRule extends SubmissionRule {
                 return true;
             });
 
+            let activityTotal = 0;
+            let firstActivity, lastActivity;
+
+            activityTotal = activities.length;
+            firstActivity = activities[0];
+            lastActivity = activities[activities.length - 1];
+
+            const activityTotalWindow = dayjs.duration(dayjs(firstActivity.created_utc * 1000).diff(dayjs(lastActivity.created_utc * 1000)));
+
             if (activities.length < minActivityCount) {
+                criteriaResults.push({criteria, activityTotal, activityTotalWindow, aggDomains: [], minCountMet: false});
+                this.logger.debug(`${activities.length } activities retrieved was less than min activities required to run criteria (${minActivityCount})`);
                 continue;
             }
             //const activities = await getAuthorSubmissions(item.author, {window: window}) as Submission[];
@@ -148,28 +159,7 @@ export class AttributionRule extends SubmissionRule {
                 return acc;
             }, new Map());
 
-            let activityTotal = 0;
-            let firstActivity, lastActivity;
-
-            activityTotal = activities.length;
-            firstActivity = activities[0];
-            lastActivity = activities[activities.length - 1];
-
-            // if (this.includeInTotal === 'submissions') {
-            //     activityTotal = activities.length;
-            //     firstActivity = activities[0];
-            //     lastActivity = activities[activities.length - 1];
-            // } else {
-            //     const dur = typeof window === 'number' ? dayjs.duration(dayjs().diff(dayjs(activities[activities.length - 1].created * 1000))) : window;
-            //     const allActivities = await getAuthorActivities(item.author, {window: dur});
-            //     activityTotal = allActivities.length;
-            //     firstActivity = allActivities[0];
-            //     lastActivity = allActivities[allActivities.length - 1];
-            // }
-
-            const activityTotalWindow = dayjs.duration(dayjs(firstActivity.created_utc * 1000).diff(dayjs(lastActivity.created_utc * 1000)));
-
-            let triggeredDomains = [];
+            let aggDomains = [];
             for (const [domain, subCount] of aggregatedSubmissions) {
                 let triggered = false;
                 if(isPercent) {
@@ -179,72 +169,96 @@ export class AttributionRule extends SubmissionRule {
                     triggered = comparisonTextOp(subCount, operator, value);
                 }
 
-                if (triggered) {
-                    // look for author channel
-                    const withChannel = submissions.find(x => x.secure_media?.oembed?.author_url === domain || x.secure_media?.oembed?.author_name === domain);
-                    triggeredDomains.push({
-                        domain,
-                        title: withChannel !== undefined ? (withChannel.secure_media?.oembed?.author_name || withChannel.secure_media?.oembed?.author_url) : domain,
-                        count: subCount,
-                        percent: Math.round((subCount / activityTotal) * 100)
-                    });
-                }
+                // look for author channel
+                const withChannel = submissions.find(x => x.secure_media?.oembed?.author_url === domain || x.secure_media?.oembed?.author_name === domain);
+                aggDomains.push({
+                    domain,
+                    title: withChannel !== undefined ? (withChannel.secure_media?.oembed?.author_name || withChannel.secure_media?.oembed?.author_url) : domain,
+                    count: subCount,
+                    percent: Math.round((subCount / activityTotal) * 100),
+                    triggered,
+                });
             }
 
             if (this.useSubmissionAsReference) {
-                // filter triggeredDomains to only reference
-                triggeredDomains = triggeredDomains.filter(x => x.domain === refDomain || x.domain === refDomainTitle);
+                // filter aggDomains to only reference
+                aggDomains = aggDomains.filter(x => x.domain === refDomain || x.domain === refDomainTitle);
             }
 
-            criteriaResults.push({criteria, activityTotal, activityTotalWindow, triggeredDomains});
+            criteriaResults.push({criteria, activityTotal, activityTotalWindow, aggDomains, minCountMet: true});
         }
 
         let criteriaMeta = false;
         if (this.criteriaJoin === 'OR') {
-            criteriaMeta = criteriaResults.some(x => x.triggeredDomains.length > 0);
+            criteriaMeta = criteriaResults.some(x => x.aggDomains.length > 0 && x.aggDomains.some(y => y.triggered));
         } else {
-            criteriaMeta = criteriaResults.every(x => x.triggeredDomains.length > 0);
+            criteriaMeta = criteriaResults.every(x => x.aggDomains.length > 0 && x.aggDomains.some(y => y.triggered));
         }
 
-        if (criteriaMeta) {
-            // use first triggered criteria found
-            const refCriteriaResults = criteriaResults.find(x => x.triggeredDomains.length > 0);
-            if (refCriteriaResults !== undefined) {
-                const {
-                    triggeredDomains,
-                    activityTotal,
-                    activityTotalWindow,
-                    criteria: {threshold, window}
-                } = refCriteriaResults;
+        let usableCriteria = criteriaResults.filter(x => x.aggDomains.length > 0 && x.aggDomains.some(y => y.triggered));
+        if (usableCriteria.length === 0) {
+            usableCriteria = criteriaResults.filter(x => x.aggDomains.length > 0)
+        }
+        // probably none hit min count then
+        if(criteriaResults.every(x => x.minCountMet === false)) {
+            const result = 'No criteria had their min activity count met';
+            this.logger.verbose(result);
+            return Promise.resolve([false, this.getResult(false, {result})]);
+        }
 
-                const largestCount = triggeredDomains.reduce((acc, curr) => Math.max(acc, curr.count), 0);
-                const largestPercent = triggeredDomains.reduce((acc, curr) => Math.max(acc, curr.percent), 0);
+        const refCriteriaResults = usableCriteria[0];
 
-                const data: any = {
-                    triggeredDomainCount: triggeredDomains.length,
-                    activityTotal,
-                    largestCount,
-                    largestPercent,
-                    threshold: threshold,
-                    window: typeof window === 'number' ? `${activityTotal} Items` : activityTotalWindow.humanize()
+        // TODO could be good to find the criteria that had the largest percent/count out of its agg domains but for now just get first
+        //     usableCriteria.reduce((acc, curr) => {
+        //     const {aggDomains = []} = acc || {};
+        //     const accValue = isPercent
+        //     if(acc === undefined) {
+        //         return curr;
+        //     }
+        //
+        // }, undefined)
 
-                };
-                if (this.useSubmissionAsReference) {
-                    data.refDomain = refDomain;
-                    data.refDomainTitle = refDomainTitle;
-                }
+        const {
+            aggDomains,
+            activityTotal,
+            activityTotalWindow,
+            criteria: {threshold, window}
+        } = refCriteriaResults;
 
-                const result = `${triggeredDomains.length} Attribution(s) met the threshold of ${threshold}, largest being ${largestCount} (${largestPercent}%) of ${activityTotal} Total -- window: ${data.window}`;
-                this.logger.verbose(result);
-                return Promise.resolve([true, this.getResult(true, {
-                    result,
-                    data,
-                })]);
+        const largestCount = aggDomains.reduce((acc, curr) => Math.max(acc, curr.count), 0);
+        const largestPercent = aggDomains.reduce((acc, curr) => Math.max(acc, curr.percent), 0);
+        const windowText = typeof window === 'number' ? `${activityTotal} Items` : activityTotalWindow.humanize();
+
+        let data: any = {};
+        const resultAgnostic = `met the threshold of ${threshold}, largest being ${largestCount} (${largestPercent}%) of ${activityTotal} Total -- window: ${windowText}`;
+
+        let result;
+        if(criteriaMeta) {
+            result = `${aggDomains.length} Attribution(s) ${resultAgnostic}`;
+            data = {
+                triggeredDomainCount: aggDomains.length,
+                activityTotal,
+                largestCount,
+                largestPercent,
+                threshold: threshold,
+                window: windowText
+
+            };
+            if (this.useSubmissionAsReference) {
+                data.refDomain = refDomain;
+                data.refDomainTitle = refDomainTitle;
             }
 
+        } else {
+            result = `No Attributions ${resultAgnostic}`;
         }
 
-        return Promise.resolve([false, this.getResult(false)]);
+        //const result = `${aggDomains.length} Attribution(s) met the threshold of ${threshold}, largest being ${largestCount} (${largestPercent}%) of ${activityTotal} Total -- window: ${data.window}`;
+        this.logger.verbose(result);
+        return Promise.resolve([criteriaMeta, this.getResult(criteriaMeta, {
+            result,
+            data,
+        })]);
     }
 
 }
