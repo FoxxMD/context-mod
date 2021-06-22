@@ -1,7 +1,13 @@
 import {Rule, RuleJSONConfig, RuleOptions, RulePremise, RuleResult} from "./index";
 import {Comment, VoteableContent} from "snoowrap";
 import Submission from "snoowrap/dist/objects/Submission";
-import {activityWindowText, comparisonTextOp, parseGenericValueOrPercentComparison, parseUsableLinkIdentifier} from "../util";
+import {
+    activityWindowText,
+    comparisonTextOp, FAIL, formatNumber,
+    parseGenericValueOrPercentComparison,
+    parseUsableLinkIdentifier,
+    PASS
+} from "../util";
 import {
     ActivityWindow,
     ActivityWindowCriteria,
@@ -85,70 +91,81 @@ export class RecentActivityRule extends Rule {
         }, {} as Record<string, (Submission | Comment)[]>);
 
 
+        const summaries = [];
         let totalTriggeredOn;
         for (const triggerSet of this.thresholds) {
             let currCount = 0;
-            let presentSubs;
+            const presentSubs = [];
             const {threshold = '>= 1', subreddits = []} = triggerSet;
             for (const sub of subreddits) {
                 const isub = sub.toLowerCase();
                 const {[isub]: tSub = []} = groupedActivity;
                 if (tSub.length > 0) {
                     currCount += tSub.length;
-                    if(presentSubs === undefined) {
-                        presentSubs = [];
-                    }
                     presentSubs.push(sub);
                 }
             }
             const {operator, value, isPercent} = parseGenericValueOrPercentComparison(threshold);
-            if (threshold !== undefined) {
-                if (isPercent) {
-                    if (comparisonTextOp(currCount / viableActivity.length, operator, value / 100)) {
-                        totalTriggeredOn = {subreddits: presentSubs || subreddits, count: currCount, threshold};
-                    }
-                } else if (comparisonTextOp(currCount, operator, value)) {
-                    totalTriggeredOn = {subreddits: presentSubs || subreddits, count: currCount, threshold};
+            let sum = {subsWithActivity: presentSubs, subreddits, count: currCount, threshold, triggered: false, testValue: currCount.toString()};
+            if (isPercent) {
+                sum.testValue = `${formatNumber((currCount / viableActivity.length) * 100)}%`;
+                if (comparisonTextOp(currCount / viableActivity.length, operator, value / 100)) {
+                    sum.triggered = true;
+                    totalTriggeredOn = sum;
                 }
+            } else if (comparisonTextOp(currCount, operator, value)) {
+                sum.triggered = true;
+                totalTriggeredOn = sum;
             }
+            summaries.push(sum);
             // if either trigger condition is hit end the iteration early
             if (totalTriggeredOn !== undefined) {
                 break;
             }
         }
+        let result = '';
         if (totalTriggeredOn !== undefined) {
-            let resultArr = [];
-            const data: any = {};
-            data.totalCount = totalTriggeredOn.count;
-            data.totalSubredditsCount = totalTriggeredOn.subreddits.length;
-            data.totalSubredditsSummary = totalTriggeredOn.subreddits.join(', ')
-            data.totalThreshold = totalTriggeredOn.threshold;
-            data.totalSummary = `${data.totalCount} (${totalTriggeredOn.threshold}) activities over ${totalTriggeredOn.subreddits.length} subreddits`;
-            resultArr.push(data.totalSummary);
-
-            let summary;
-            if (resultArr.length === 2) {
-                // need a shortened summary
-                summary = `${data.perSubCount} per-sub triggers (${data.perSubThreshold}) and ${data.totalCount} total (${data.totalThreshold})`
-            } else {
-                summary = resultArr[0];
-            }
-            const result = resultArr.join(' and ')
+            const resultData = this.generateResultData(totalTriggeredOn, viableActivity);
+            result = `${PASS} ${resultData.result}`;
             this.logger.verbose(result);
-            return Promise.resolve([true, this.getResult(true, {
-                result,
-                data: {
-                    window: typeof this.window === 'number' ? `${activities.length} Items` : activityWindowText(viableActivity),
-                    //triggeredOn: triggeredPerSub,
-                    summary,
-                    subSummary: data.totalSubredditsSummary,
-                    subCount: data.totalSubredditsCount,
-                    totalCount: data.totalCount
-                }
-            })]);
+            return Promise.resolve([true, this.getResult(true, resultData)]);
+        } else if(summaries.length === 1) {
+            // can display result if its only one summary otherwise need to log to debug
+            const res = this.generateResultData(summaries[0], viableActivity);
+            result = `${FAIL} ${res.result}`;
+        } else {
+            result = `${FAIL} No criteria was met. Use 'debug' to see individual results`;
+            this.logger.debug(`\r\n ${summaries.map(x => this.generateResultData(x, viableActivity).result).join('\r\n')}`);
         }
 
-        return Promise.resolve([false, this.getResult(false)]);
+        this.logger.verbose(result);
+
+        return Promise.resolve([false, this.getResult(false, {result})]);
+    }
+    
+    generateResultData(summary: any, activities: (Submission | Comment)[] = []) {
+        const {
+            count,
+            testValue,
+            subreddits = [],
+            subsWithActivity = [],
+            threshold,
+            triggered
+        } = summary;
+        const relevantSubs = subsWithActivity.length === 0 ? subreddits : subsWithActivity;
+        const totalSummary = `${testValue} activities over ${relevantSubs.length} subreddits ${triggered ? 'met' : 'did not meet'} threshold of ${threshold}`;
+        return {
+            result: totalSummary,
+            data: {
+                window: typeof this.window === 'number' ? `${activities.length} Items` : activityWindowText(activities),
+                summary: totalSummary,
+                subSummary: relevantSubs.join(', '),
+                subCount: relevantSubs.length,
+                totalCount: count,
+                threshold,
+                testValue
+            }
+        };
     }
 }
 
