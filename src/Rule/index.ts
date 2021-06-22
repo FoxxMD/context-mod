@@ -73,7 +73,7 @@ export abstract class Rule implements IRule, Triggerable {
 
         this.itemIs = itemIs;
 
-        this.logger = logger.child({labels: ['Rule',`${this.getRuleUniqueName()}`]}, mergeArr);
+        this.logger = logger.child({labels: [`Rule ${this.getRuleUniqueName()}`]}, mergeArr);
     }
 
     async run(item: Comment | Submission, existingResults: RuleResult[] = []): Promise<[(boolean | null), RuleResult]> {
