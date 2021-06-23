@@ -64,6 +64,7 @@ export class App {
         const myTransports = [
             consoleTransport,
         ];
+        let errorTransports = [];
 
         if (logDir !== false) {
             let logPath = logDir;
@@ -80,6 +81,7 @@ export class App {
             });
             // @ts-ignore
             myTransports.push(rotateTransport);
+            errorTransports.push(rotateTransport);
         }
 
         const loggerOptions = {
@@ -95,7 +97,9 @@ export class App {
                 debug: 5,
                 trace: 5,
                 silly: 6
-            }
+            },
+            exceptionHandlers: errorTransports,
+            rejectionHandlers: errorTransports,
         };
 
         winston.loggers.add('default', loggerOptions);
