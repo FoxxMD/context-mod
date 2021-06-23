@@ -119,6 +119,16 @@ export class Manager {
         this.logger.info(`<EVENT> ${peek}`);
         const startingApiLimit = this.client.ratelimitRemaining;
 
+        if(item instanceof Submission) {
+            if(await item.removed_by_category === 'deleted') {
+                this.logger.warn('Submission was deleted, cannot process.');
+                return;
+            }
+        } else if(item.author.name === '[deleted]') {
+            this.logger.warn('Comment was deleted, cannot process.');
+            return;
+        }
+
         let checksRun = 0;
         let actionsRun = 0;
         let totalRulesRun = 0;
@@ -140,7 +150,9 @@ export class Manager {
                     allRuleResults = allRuleResults.concat(determineNewResults(allRuleResults, checkResults));
                     triggered = checkTriggered;
                 } catch (e) {
-                    this.logger.warn(`Check ${check.name} Failed with error: ${e.message}`, e);
+                    if(e.logged !== true) {
+                        this.logger.warn(`Running rules for Check ${check.name} failed due to uncaught exception`, e);
+                    }
                 }
 
                 if (triggered) {
@@ -155,7 +167,7 @@ export class Manager {
             }
 
         } catch (err) {
-            if (!(err instanceof LoggedError)) {
+            if (!(err instanceof LoggedError) && err.logged !== true) {
                 this.logger.error('An unhandled error occurred while running checks', err);
             }
         } finally {
