@@ -58,12 +58,17 @@ export const defaultFormat = printf(({
     let stackMsg = '';
     if (stack !== undefined) {
         const stackArr = stack.split('\n');
-        msg = stackArr[0];
+        const stackTop = stackArr[0];
         const cleanedStack = stackArr
             .slice(1) // don't need actual error message since we are showing it as msg
             .map((x: string) => x.replace(CWD, 'CWD')) // replace file location up to cwd for user privacy
             .join('\n'); // rejoin with newline to preserve formatting
         stackMsg = `\n${cleanedStack}`;
+        if(msg === undefined || msg === null || typeof message === 'object') {
+            msg = stackTop;
+        } else {
+            stackMsg = `\n${stackTop}${stackMsg}`
+        }
     }
 
     let nodes = labels;
@@ -237,26 +242,34 @@ export const percentFromString = (str: string): number => {
    return n / 100;
 }
 
-export const formatNumber = ( val: number|string, options: any = {} ) => {
+export interface numberFormatOptions {
+    toFixed: number,
+    defaultVal?: any,
+    prefix?: string,
+    suffix?: string,
+    round?: {
+        type?: string,
+        enable: boolean,
+        indicate?: boolean,
+    }
+}
+
+export const formatNumber = (val: number | string, options?: numberFormatOptions) => {
     const {
-        toFixed    = 2,
+        toFixed = 2,
         defaultVal = null,
-        prefix     = '',
-        suffix     = '',
-        round = {
-            type: 'round',
-            enable: false,
-            indicate: true,
-        }
-    }         = options;
-    let parsedVal = typeof val === 'number' ? val : Number.parseFloat( val );
-    if(Number.isNaN( parsedVal )) {
+        prefix = '',
+        suffix = '',
+        round,
+    } = options || {};
+    let parsedVal = typeof val === 'number' ? val : Number.parseFloat(val);
+    if (Number.isNaN(parsedVal)) {
         return defaultVal;
     }
     let prefixStr = prefix;
-    const { enable = true, indicate = true, type = 'round' } = round;
-    if(enable && !Number.isInteger(parsedVal)) {
-        switch(type) {
+    const {enable = false, indicate = true, type = 'round'} = round || {};
+    if (enable && !Number.isInteger(parsedVal)) {
+        switch (type) {
             case 'round':
                 parsedVal = Math.round(parsedVal);
                 break;
@@ -266,14 +279,14 @@ export const formatNumber = ( val: number|string, options: any = {} ) => {
             case 'floor':
                 parsedVal = Math.floor(parsedVal);
         }
-        if(indicate) {
+        if (indicate) {
             prefixStr = `~${prefix}`;
         }
     }
-    const localeString = parsedVal.toLocaleString( undefined, {
+    const localeString = parsedVal.toLocaleString(undefined, {
         minimumFractionDigits: toFixed,
         maximumFractionDigits: toFixed,
-    } );
+    });
     return `${prefixStr}${localeString}${suffix}`;
 };
 
