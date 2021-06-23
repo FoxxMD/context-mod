@@ -542,7 +542,7 @@ export const isItem = (item: Submission | Comment, stateCriteria: TypedActivityS
                         // @ts-ignore
                         if (item[k] !== crit[k]) {
                             // @ts-ignore
-                            log.debug(`Failed: Expected => ${k}:${crit[k]} | Found => ${item[k]}`)
+                            log.debug(`Failed: Expected => ${k}:${crit[k]} | Found => ${k}:${item[k]}`)
                             return [false, crit];
                         }
                     } else {
