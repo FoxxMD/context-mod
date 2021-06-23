@@ -540,3 +540,9 @@ export interface CommentState extends ActivityState {
 
 export type TypedActivityStates = SubmissionState[] | CommentState[];
 
+export interface DomainInfo {
+    display: string,
+    domain: string,
+    aliases: string[],
+    provider?: string
+}

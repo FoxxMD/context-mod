@@ -6,7 +6,7 @@ import Mustache from "mustache";
 import he from "he";
 import {RuleResult, UserNoteCriteria} from "../Rule";
 import {
-    ActivityWindowType, CommentState,
+    ActivityWindowType, CommentState, DomainInfo,
     DurationVal,
     SubmissionState,
     TypedActivityStates
@@ -483,21 +483,46 @@ export const getSubmissionFromComment = async (item: Comment): Promise<Submissio
     }
 }
 
-export const getAttributionIdentifier = (sub: Submission, useParentMediaDomain = false) => {
-    let domain = sub.domain;
+export const getAttributionIdentifier = (sub: Submission, useParentMediaDomain = false): DomainInfo => {
+    let domain: string = '';
+    let displayDomain: string = '';
+    let domainIdents: string[] = [sub.domain];
+    let provider: string | undefined;
     if (!useParentMediaDomain && sub.secure_media?.oembed !== undefined) {
         const {
             author_url,
             author_name,
+            provider_name,
         } = sub.secure_media?.oembed;
         if (author_name !== undefined) {
-            domain = author_name;
-        } else if (author_url !== undefined) {
-            domain = author_url;
+            domainIdents.push(author_name);
+            if (displayDomain === '') {
+                displayDomain = author_name;
+            }
         }
+        if (author_url !== undefined) {
+            domainIdents.push(author_url);
+            domain = author_url;
+            if (displayDomain === '') {
+                displayDomain = author_url;
+            }
+        }
+        provider = provider_name;
+    } else if(sub.secure_media?.type !== undefined) {
+        domainIdents.push(sub.secure_media?.type);
+        domain = sub.secure_media?.type;
+    } else {
+        domain = sub.domain;
     }
 
-    return domain;
+    if(domain === '') {
+        domain = sub.domain;
+    }
+    if (displayDomain === '') {
+        displayDomain = domain;
+    }
+
+    return {display: displayDomain, domain, aliases: domainIdents, provider};
 }
 
 export const isItem = (item: Submission | Comment, stateCriteria: TypedActivityStates, logger: Logger): [boolean, SubmissionState|CommentState|undefined] => {

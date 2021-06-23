@@ -2,7 +2,7 @@ import {RecentActivityRule, RecentActivityRuleJSONConfig} from "./RecentActivity
 import RepeatActivityRule, {RepeatActivityJSONConfig} from "./SubmissionRule/RepeatActivityRule";
 import {Rule, RuleJSONConfig} from "./index";
 import AuthorRule, {AuthorRuleJSONConfig} from "./AuthorRule";
-import {AttributionJSONConfig, AttributionRule} from "./SubmissionRule/AttributionRule";
+import {AttributionJSONConfig, AttributionRule} from "./AttributionRule";
 import {Logger} from "winston";
 import HistoryRule, {HistoryJSONConfig} from "./HistoryRule";
 

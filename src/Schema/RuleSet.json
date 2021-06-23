@@ -56,6 +56,74 @@
         },
         "AttributionCriteria": {
             "properties": {
+                "aggregateOn": {
+                    "default": "undefined",
+                    "description": "If `domains` is not specified this list determines which categories of domains should be aggregated on. All aggregated domains will be tested against `threshold`\n\n* If `media` is included then aggregate author's submission history which reddit recognizes as media (youtube, vimeo, etc.)\n* If `self` is included then aggregate on author's submission history which are self-post (`self.[subreddit]`) or reddit image/video (i.redd.it / v.redd.it)\n* If `link` is included then aggregate author's submission history which is external links but not media\n\nIf nothing is specified or list is empty (default) all domains are aggregated",
+                    "examples": [
+                        [
+                        ]
+                    ],
+                    "items": {
+                        "enum": [
+                            "link",
+                            "media",
+                            "self"
+                        ],
+                        "type": "string"
+                    },
+                    "type": "array"
+                },
+                "consolidateMediaDomains": {
+                    "default": false,
+                    "description": "Should the criteria consolidate recognized media domains into the parent domain?\n\nSubmissions to major media domains (youtube, vimeo) can be identified by individual Channel/Author...\n\n* If `false` then domains will be aggregated at the channel level IE Youtube Channel A (2 counts), Youtube Channel B  (3 counts)\n* If `true` then then media domains will be consolidated at domain level and then aggregated IE youtube.com (5 counts)",
+                    "examples": [
+                        false
+                    ],
+                    "type": "boolean"
+                },
+                "domains": {
+                    "default": [
+                        [
+                        ]
+                    ],
+                    "description": "A list of domains whose Activities will be tested against `threshold`.\n\nIf this is present then `aggregateOn` is ignored.\n\nThe values are tested as partial strings so you do not need to include full URLs, just the part that matters.\n\nEX `[\"youtube\"]` will match submissions with the domain `https://youtube.com/c/aChannel`\nEX `[\"youtube.com/c/bChannel\"]` will NOT match submissions with the domain `https://youtube.com/c/aChannel`\n\nIf you wish to aggregate on self-posts for a subreddit use the syntax `self.[subreddit]` EX `self.AskReddit`\n\n**If this Rule is part of a Check for a Submission and you wish to aggregate on the domain of the Submission use the special string `AGG:SELF`**\n\nIf nothing is specified or list is empty (default) aggregate using `aggregateOn`",
+                    "items": {
+                        "type": "string"
+                    },
+                    "type": "array"
+                },
+                "domainsCombined": {
+                    "default": false,
+                    "description": "Set to `true` if you wish to combine all of the Activities from `domains` to test against `threshold` instead of testing each `domain` individually",
+                    "examples": [
+                        false
+                    ],
+                    "type": "boolean"
+                },
+                "exclude": {
+                    "description": "Do not include Activities from this list of Subreddits. Will be ignored if `include` is present.\n\nA list of subreddits (case-insensitive) to look for. Do not include \"r/\" prefix.\n\nEX to match against /r/mealtimevideos and /r/askscience use [\"mealtimevideos\",\"askscience\"]",
+                    "examples": [
+                        "mealtimevideos",
+                        "askscience"
+                    ],
+                    "items": {
+                        "type": "string"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                },
+                "include": {
+                    "description": "Only include Activities from this list of Subreddits.\n\nA list of subreddits (case-insensitive) to look for. Do not include \"r/\" prefix.\n\nEX to match against /r/mealtimevideos and /r/askscience use [\"mealtimevideos\",\"askscience\"]",
+                    "examples": [
+                        "mealtimevideos",
+                        "askscience"
+                    ],
+                    "items": {
+                        "type": "string"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                },
                 "minActivityCount": {
                     "default": 5,
                     "description": "The minimum number of activities that must exist for this criteria to run",
@@ -107,13 +175,8 @@
             "type": "object"
         },
         "AttributionJSONConfig": {
-            "description": "Aggregates all of the domain/media accounts attributed to an author's Submission history. If any domain is over the threshold the rule is triggered\n\nAvailable data for [Action templating](https://github.com/FoxxMD/reddit-context-bot#action-templating):\n\n```\ncount      => Total number of repeat Submissions\nthreshold  => The threshold you configured for this Rule to trigger\nurl        => Url of the submission that triggered the rule\n```",
+            "description": "Aggregates all of the domain/media accounts attributed to an author's Submission history. If any domain is over the threshold the rule is triggered\n\nAvailable data for [Action templating](https://github.com/FoxxMD/reddit-context-bot#action-templating):\n\n```\ntriggeredDomainCount => Number of domains that met the threshold\nactivityTotal        => Number of Activities considered from window\nwindow               => The date range of the Activities considered\nlargestCount         => The count from the largest aggregated domain\nlargestPercentage    => The percentage of Activities the largest aggregated domain comprises\nsmallestCount        => The count from the smallest aggregated domain\nsmallestPercentage   => The percentage of Activities the smallest aggregated domain comprises\ncountRange           => A convenience string displaying \"smallestCount - largestCount\" or just one number if both are the same\npercentRange         => A convenience string displaying \"smallestPercentage - largestPercentage\" or just one percentage if both are the same\ndomains              => An array of all the domain URLs that met the threshold\ndomainsDelim         => A comma-delimited string of all the domain URLs that met the threshold\ntitles               => The friendly-name of the domain if one is present, otherwise the URL (IE youtube.com/c/34ldfa343 => \"My Youtube Channel Title\")\ntitlesDelim          => A comma-delimited string of all the domain friendly-names\nthreshold            => The threshold you configured for this Rule to trigger\nurl                  => Url of the submission that triggered the rule\n```",
             "properties": {
-                "aggregateMediaDomains": {
-                    "default": false,
-                    "description": "Should the rule aggregate recognized media domains into the parent domain?\n\nSubmissions to major media domains (youtube, vimeo) can be identified by individual Channel/Author...\n\n* If `false` then aggregate will occur at the channel level IE Youtube Channel A (2 counts), Youtube Channel B  (3 counts)\n* If `true` then then aggregation will occur at the domain level IE youtube.com (5 counts)",
-                    "type": "boolean"
-                },
                 "authorIs": {
                     "$ref": "#/definitions/AuthorOptions",
                     "description": "If present then these Author criteria are checked before running the rule. If criteria fails then the rule is skipped.",
@@ -149,35 +212,6 @@
                     ],
                     "type": "string"
                 },
-                "exclude": {
-                    "description": "Do not include Submissions from this list of Subreddits.\n\nA list of subreddits (case-insensitive) to look for. Do not include \"r/\" prefix.\n\nEX to match against /r/mealtimevideos and /r/askscience use [\"mealtimevideos\",\"askscience\"]",
-                    "examples": [
-                        "mealtimevideos",
-                        "askscience"
-                    ],
-                    "items": {
-                        "type": "string"
-                    },
-                    "minItems": 1,
-                    "type": "array"
-                },
-                "include": {
-                    "description": "Only include Submissions from this list of Subreddits.\n\nA list of subreddits (case-insensitive) to look for. Do not include \"r/\" prefix.\n\nEX to match against /r/mealtimevideos and /r/askscience use [\"mealtimevideos\",\"askscience\"]",
-                    "examples": [
-                        "mealtimevideos",
-                        "askscience"
-                    ],
-                    "items": {
-                        "type": "string"
-                    },
-                    "minItems": 1,
-                    "type": "array"
-                },
-                "includeSelf": {
-                    "default": false,
-                    "description": "Include reddit `self.*` domains in aggregation?\n\nSelf-posts are aggregated under the domain `self.[subreddit]`. If you wish to include these domains in aggregation set this to `true`",
-                    "type": "boolean"
-                },
                 "itemIs": {
                     "anyOf": [
                         {
@@ -199,15 +233,6 @@
                     "description": "The kind of rule to run",
                     "enum": [
                         "attribution"
-                    ],
-                    "type": "string"
-                },
-                "lookAt": {
-                    "default": "all",
-                    "description": "Determines which type of attribution to look at\n\n* If `media` then only the author's submission history which reddit recognizes as media (youtube, vimeo, etc.) will be considered\n* If `all` then all domains (EX youtube.com, twitter.com) from the author's submission history will be considered",
-                    "enum": [
-                        "all",
-                        "media"
                     ],
                     "type": "string"
                 },

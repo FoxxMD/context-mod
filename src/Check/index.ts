@@ -113,7 +113,10 @@ export class Check implements ICheck {
                 let valid = ajv.validate(ActionSchema, a);
                 if (valid) {
                     const aj = a as ActionJson;
-                    this.actions.push(actionFactory({...aj, dryRun: this.dryRun || aj.dryRun}, this.logger, subredditName));
+                    this.actions.push(actionFactory({
+                        ...aj,
+                        dryRun: this.dryRun || aj.dryRun
+                    }, this.logger, subredditName));
                     // @ts-ignore
                     a.logger = this.logger;
                 } else {
@@ -125,25 +128,25 @@ export class Check implements ICheck {
 
     logSummary(type: string) {
         const runStats = [];
-        const ruleSetCount = this.rules.reduce((x, r) => r instanceof RuleSet ? x + 1: x, 0);
-        const rulesInSetsCount = this.rules.reduce((x, r) => r instanceof RuleSet ? x + r.rules.length : x,0);
-        if(ruleSetCount > 0) {
+        const ruleSetCount = this.rules.reduce((x, r) => r instanceof RuleSet ? x + 1 : x, 0);
+        const rulesInSetsCount = this.rules.reduce((x, r) => r instanceof RuleSet ? x + r.rules.length : x, 0);
+        if (ruleSetCount > 0) {
             runStats.push(`${ruleSetCount} Rule Sets (${rulesInSetsCount} Rules)`);
         }
-        const topRuleCount = this.rules.reduce((x, r) => r instanceof Rule ? x + 1: x, 0);
-        if(topRuleCount > 0) {
+        const topRuleCount = this.rules.reduce((x, r) => r instanceof Rule ? x + 1 : x, 0);
+        if (topRuleCount > 0) {
             runStats.push(`${topRuleCount} Top-Level Rules`);
         }
         runStats.push(`${this.actions.length} Actions`);
         // not sure if this should be info or verbose
         this.logger.info(`${type.toUpperCase()} (${this.condition}) => ${runStats.join(' | ')}${this.description !== undefined ? ` => ${this.description}` : ''}`);
-        if(this.rules.length === 0 && this.itemIs.length === 0 && this.authorIs.exclude.length === 0 && this.authorIs.include.length === 0) {
+        if (this.rules.length === 0 && this.itemIs.length === 0 && this.authorIs.exclude.length === 0 && this.authorIs.include.length === 0) {
             this.logger.warn('No rules, item tests, or author test found -- this check will ALWAYS PASS!');
         }
         let ruleSetIndex = 1;
-        for(const r of this.rules) {
-            if(r instanceof RuleSet) {
-                for(const ru of r.rules) {
+        for (const r of this.rules) {
+            if (r instanceof RuleSet) {
+                for (const ru of r.rules) {
                     this.logger.verbose(`(Rule Set ${ruleSetIndex} ${r.condition}) => ${ru.getRuleUniqueName()}`);
                 }
                 ruleSetIndex++;
@@ -151,86 +154,92 @@ export class Check implements ICheck {
                 this.logger.verbose(`(Rule) => ${r.getRuleUniqueName()}`);
             }
         }
-        for(const a of this.actions) {
+        for (const a of this.actions) {
             this.logger.verbose(`(Action) => ${a.getActionUniqueName()}`);
         }
     }
 
     async runRules(item: Submission | Comment, existingResults: RuleResult[] = []): Promise<[boolean, RuleResult[]]> {
-        let allRuleResults: RuleResult[] = [];
-        let allResults: (RuleResult | RuleSetResult)[] = [];
-        const [itemPass, crit] = isItem(item, this.itemIs, this.logger);
-        if(!itemPass) {
-            this.logger.verbose(`${FAIL} => Item did not pass 'itemIs' test`);
-            return [false, allRuleResults];
-        }
-        let authorPass = null;
-        if (this.authorIs.include !== undefined && this.authorIs.include.length > 0) {
-            for (const auth of this.authorIs.include) {
-                if (await this.resources.testAuthorCriteria(item, auth)) {
-                    authorPass = true;
-                    break;
+        try {
+            let allRuleResults: RuleResult[] = [];
+            let allResults: (RuleResult | RuleSetResult)[] = [];
+            const [itemPass, crit] = isItem(item, this.itemIs, this.logger);
+            if (!itemPass) {
+                this.logger.verbose(`${FAIL} => Item did not pass 'itemIs' test`);
+                return [false, allRuleResults];
+            }
+            let authorPass = null;
+            if (this.authorIs.include !== undefined && this.authorIs.include.length > 0) {
+                for (const auth of this.authorIs.include) {
+                    if (await this.resources.testAuthorCriteria(item, auth)) {
+                        authorPass = true;
+                        break;
+                    }
+                }
+                if (!authorPass) {
+                    this.logger.verbose(`${FAIL} => Inclusive author criteria not matched`);
+                    return Promise.resolve([false, allRuleResults]);
                 }
             }
-            if(!authorPass) {
-                this.logger.verbose(`${FAIL} => Inclusive author criteria not matched`);
-                return Promise.resolve([false, allRuleResults]);
-            }
-        }
-        if (authorPass === null && this.authorIs.exclude !== undefined && this.authorIs.exclude.length > 0) {
-            for (const auth of this.authorIs.exclude) {
-                if (await this.resources.testAuthorCriteria(item, auth, false)) {
-                    authorPass = true;
-                    break;
+            if (authorPass === null && this.authorIs.exclude !== undefined && this.authorIs.exclude.length > 0) {
+                for (const auth of this.authorIs.exclude) {
+                    if (await this.resources.testAuthorCriteria(item, auth, false)) {
+                        authorPass = true;
+                        break;
+                    }
+                }
+                if (!authorPass) {
+                    this.logger.verbose(`${FAIL} =>  Exclusive author criteria not matched`);
+                    return Promise.resolve([false, allRuleResults]);
                 }
             }
-            if(!authorPass) {
-                this.logger.verbose(`${FAIL} =>  Exclusive author criteria not matched`);
-                return Promise.resolve([false, allRuleResults]);
-            }
-        }
 
-        if(this.rules.length === 0) {
-            this.logger.info(`${PASS} => No rules to run, check auto-passes`);
-            return [true, allRuleResults];
-        }
+            if (this.rules.length === 0) {
+                this.logger.info(`${PASS} => No rules to run, check auto-passes`);
+                return [true, allRuleResults];
+            }
 
-        let runOne = false;
-        for (const r of this.rules) {
-            //let results: RuleResult | RuleSetResult;
-            const combinedResults = [...existingResults, ...allRuleResults];
-            const [passed, results] = await r.run(item, combinedResults);
-            if(isRuleSetResult(results)) {
-                allRuleResults = allRuleResults.concat(results.results);
-            } else {
-                allRuleResults = allRuleResults.concat(results as RuleResult);
-            }
-            allResults.push(results);
-            if (passed === null) {
-                continue;
-            }
-            runOne = true;
-            if (passed) {
-                if (this.condition === 'OR') {
-                    this.logger.info(`${PASS} => Rules: ${resultsSummary(allResults, this.condition)}`);
-                    return [true, allRuleResults];
+            let runOne = false;
+            for (const r of this.rules) {
+                //let results: RuleResult | RuleSetResult;
+                const combinedResults = [...existingResults, ...allRuleResults];
+                const [passed, results] = await r.run(item, combinedResults);
+                if (isRuleSetResult(results)) {
+                    allRuleResults = allRuleResults.concat(results.results);
+                } else {
+                    allRuleResults = allRuleResults.concat(results as RuleResult);
                 }
-            } else if (this.condition === 'AND') {
+                allResults.push(results);
+                if (passed === null) {
+                    continue;
+                }
+                runOne = true;
+                if (passed) {
+                    if (this.condition === 'OR') {
+                        this.logger.info(`${PASS} => Rules: ${resultsSummary(allResults, this.condition)}`);
+                        return [true, allRuleResults];
+                    }
+                } else if (this.condition === 'AND') {
+                    this.logger.verbose(`${FAIL} => Rules: ${resultsSummary(allResults, this.condition)}`);
+                    return [false, allRuleResults];
+                }
+            }
+            if (!runOne) {
+                this.logger.verbose(`${FAIL} => All Rules skipped because of Author checks or itemIs tests`);
+                return [false, allRuleResults];
+            } else if (this.condition === 'OR') {
+                // if OR and did not return already then none passed
                 this.logger.verbose(`${FAIL} => Rules: ${resultsSummary(allResults, this.condition)}`);
                 return [false, allRuleResults];
             }
+            // otherwise AND and did not return already so all passed
+            this.logger.info(`${PASS} => Rules: ${resultsSummary(allResults, this.condition)}`);
+            return [true, allRuleResults];
+        } catch (e) {
+            e.logged = true;
+            this.logger.warn(`Running rules failed due to uncaught exception`, e);
+            throw e;
         }
-        if (!runOne) {
-            this.logger.verbose(`${FAIL} => All Rules skipped because of Author checks or itemIs tests`);
-            return [false, allRuleResults];
-        } else if(this.condition === 'OR') {
-            // if OR and did not return already then none passed
-            this.logger.verbose(`${FAIL} => Rules: ${resultsSummary(allResults, this.condition)}`);
-            return [false, allRuleResults];
-        }
-        // otherwise AND and did not return already so all passed
-        this.logger.info(`${PASS} => Rules: ${resultsSummary(allResults, this.condition)}`);
-        return [true, allRuleResults];
     }
 
     async runActions(item: Submission | Comment, ruleResults: RuleResult[]): Promise<Action[]> {
@@ -240,9 +249,8 @@ export class Check implements ICheck {
             try {
                 await a.handle(item, ruleResults);
                 runActions.push(a);
-            } catch(err) {
-                this.logger.error(`Action ${a.getActionUniqueName()} encountered an error while running`);
-                this.logger.error(err);
+            } catch (err) {
+                this.logger.error(`Action ${a.getActionUniqueName()} encountered an error while running`, err);
             }
         }
         this.logger.info(`${this.dryRun ? 'DRYRUN - ' : ''}Ran Actions: ${runActions.map(x => x.getActionUniqueName()).join(' | ')}`);
@@ -330,7 +338,7 @@ export interface CommentCheckJson extends CheckJson {
     itemIs?: CommentState[]
 }
 
-export type CheckStructuredJson  = SubmissionCheckStructuredJson | CommentCheckStructuredJson;
+export type CheckStructuredJson = SubmissionCheckStructuredJson | CommentCheckStructuredJson;
 // export interface CheckStructuredJson extends CheckJson {
 //     rules: Array<RuleSetObjectJson | RuleObjectJson>
 //     actions: Array<ActionObjectJson>
