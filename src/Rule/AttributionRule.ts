@@ -194,6 +194,11 @@ export class AttributionRule extends Rule {
             let activityTotal = 0;
             let firstActivity, lastActivity;
 
+            if(activities.length === 0) {
+                this.logger.debug(`No activities retrieved for criteria`);
+                continue;
+            }
+
             activityTotal = activities.length;
             firstActivity = activities[0];
             lastActivity = activities[activities.length - 1];
