@@ -40,6 +40,7 @@
     "safe-stable-stringify": "^1.1.1",
     "snoostorm": "^1.5.2",
     "snoowrap": "^1.23.0",
+    "typescript": "^4.3.4",
     "winston": "FoxxMD/winston#fbab8de969ecee578981c77846156c7f43b5f01e",
     "winston-daily-rotate-file": "^4.5.5",
     "zlib": "^1.0.5"
