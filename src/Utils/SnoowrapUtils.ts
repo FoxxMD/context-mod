@@ -486,7 +486,7 @@ export const getSubmissionFromComment = async (item: Comment): Promise<Submissio
 export const getAttributionIdentifier = (sub: Submission, useParentMediaDomain = false): DomainInfo => {
     let domain: string = '';
     let displayDomain: string = '';
-    let domainIdents: string[] = [sub.domain];
+    let domainIdents: string[] = useParentMediaDomain ? [sub.domain] : [];
     let provider: string | undefined;
     if (!useParentMediaDomain && sub.secure_media?.oembed !== undefined) {
         const {
