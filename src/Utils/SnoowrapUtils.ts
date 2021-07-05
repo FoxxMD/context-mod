@@ -1,5 +1,6 @@
-import Snoowrap, {Comment, RedditUser} from "snoowrap";
+import Snoowrap, {RedditUser} from "snoowrap";
 import Submission from "snoowrap/dist/objects/Submission";
+import Comment from "snoowrap/dist/objects/Comment";
 import {Duration, DurationUnitsObjectType} from "dayjs/plugin/duration";
 import dayjs, {Dayjs} from "dayjs";
 import Mustache from "mustache";
@@ -15,7 +16,7 @@ import {
     compareDurationValue, comparisonTextOp,
     isActivityWindowCriteria,
     normalizeName, parseDuration,
-    parseDurationComparison, parseGenericValueComparison, parseGenericValueOrPercentComparison,
+    parseDurationComparison, parseGenericValueComparison, parseGenericValueOrPercentComparison, parseSubredditName,
     truncateStringToLength
 } from "../util";
 import UserNotes from "../Subreddit/UserNotes";
@@ -33,13 +34,16 @@ export interface AuthorTypedActivitiesOptions extends AuthorActivitiesOptions {
 export interface AuthorActivitiesOptions {
     window: ActivityWindowType | Duration
     chunkSize?: number,
+    // TODO maybe move this into window
+    keepRemoved?: boolean,
 }
 
 export async function getAuthorActivities(user: RedditUser, options: AuthorTypedActivitiesOptions): Promise<Array<Submission | Comment>> {
 
     const {
         chunkSize: cs = 100,
-        window: optWindow
+        window: optWindow,
+        keepRemoved = true,
     } = options;
 
     let satisfiedCount: number | undefined,
@@ -50,8 +54,27 @@ export async function getAuthorActivities(user: RedditUser, options: AuthorTyped
     let durVal: DurationVal | undefined;
     let duration: Duration | undefined;
 
+    let includes: string[] = [];
+    let excludes: string[] = [];
+
     if(isActivityWindowCriteria(optWindow)) {
-        const { satisfyOn = 'any', count, duration } = optWindow;
+        const {
+            satisfyOn = 'any',
+            count,
+            duration,
+            subreddits: {
+                include = [],
+                exclude = [],
+            } = {},
+        } = optWindow;
+
+        includes = include.map(x => parseSubredditName(x).toLowerCase());
+        excludes = exclude.map(x => parseSubredditName(x).toLowerCase());
+
+        if(includes.length > 0 && excludes.length > 0) {
+            // TODO add logger so this can be logged...
+            // this.logger.warn('include and exclude both specified, exclude will be ignored');
+        }
         satisfiedCount = count;
         durVal = duration;
         satisfy = satisfyOn
@@ -114,7 +137,26 @@ export async function getAuthorActivities(user: RedditUser, options: AuthorTyped
         let countOk = false,
             timeOk = false;
 
-        const listSlice = listing.slice(offset - chunkSize)
+        let listSlice = listing.slice(offset - chunkSize)
+        // TODO partition list by filtered so we can log a debug statement with count of filtered out activities
+        if (includes.length > 0) {
+            listSlice = listSlice.filter(x => {
+                const actSub = x.subreddit.display_name.toLowerCase();
+                return includes.includes(actSub);
+            });
+        } else if (excludes.length > 0) {
+            listSlice = listSlice.filter(x => {
+                const actSub = x.subreddit.display_name.toLowerCase();
+                return !excludes.includes(actSub);
+            });
+        }
+
+        if(!keepRemoved) {
+            // snoowrap typings think 'removed' property does not exist on submission
+            // @ts-ignore
+            listSlice = listSlice.filter(x => !activityIsRemoved(x));
+        }
+
         if (satisfiedCount !== undefined && items.length + listSlice.length >= satisfiedCount) {
             // satisfied count
             if(satisfy === 'any') {
@@ -537,16 +579,44 @@ export const isItem = (item: Submission | Comment, stateCriteria: TypedActivityS
             for (const k of Object.keys(crit)) {
                 // @ts-ignore
                 if (crit[k] !== undefined) {
-                    // @ts-ignore
-                    if (item[k] !== undefined) {
-                        // @ts-ignore
-                        if (item[k] !== crit[k]) {
+                    switch(k) {
+                        case 'removed':
+                            const removed = activityIsRemoved(item);
+                            if (removed !== crit['removed']) {
+                                // @ts-ignore
+                                log.debug(`Failed: Expected => ${k}:${crit[k]} | Found => ${k}:${removed}`)
+                                return [false, crit];
+                            }
+                            break;
+                        case 'deleted':
+                            const deleted = activityIsDeleted(item);
+                            if (deleted !== crit['deleted']) {
+                                // @ts-ignore
+                                log.debug(`Failed: Expected => ${k}:${crit[k]} | Found => ${k}:${deleted}`)
+                                return [false, crit];
+                            }
+                            break;
+                        case 'filtered':
+                            const filtered = activityIsFiltered(item);
+                            if (filtered !== crit['filtered']) {
+                                // @ts-ignore
+                                log.debug(`Failed: Expected => ${k}:${crit[k]} | Found => ${k}:${filtered}`)
+                                return [false, crit];
+                            }
+                            break;
+                        default:
                             // @ts-ignore
-                            log.debug(`Failed: Expected => ${k}:${crit[k]} | Found => ${k}:${item[k]}`)
-                            return [false, crit];
-                        }
-                    } else {
-                        log.warn(`Tried to test for Item property '${k}' but it did not exist`);
+                            if (item[k] !== undefined) {
+                                // @ts-ignore
+                                if (item[k] !== crit[k]) {
+                                    // @ts-ignore
+                                    log.debug(`Failed: Expected => ${k}:${crit[k]} | Found => ${k}:${item[k]}`)
+                                    return [false, crit];
+                                }
+                            } else {
+                                log.warn(`Tried to test for Item property '${k}' but it did not exist`);
+                            }
+                            break;
                     }
                 }
             }
@@ -558,4 +628,31 @@ export const isItem = (item: Submission | Comment, stateCriteria: TypedActivityS
         }
     }
     return [false, undefined];
+}
+
+export const activityIsRemoved = (item: Submission|Comment): boolean => {
+    if(item instanceof Submission) {
+        // when automod filters a post it gets this category
+        return item.banned_at_utc !== null && item.removed_by_category !== 'automod_filtered';
+    }
+    // when automod filters a comment item.removed === false
+    // so if we want to processing filtered comments we need to check for this
+    return item.banned_at_utc !== null && item.removed;
+}
+
+export const activityIsFiltered = (item: Submission|Comment): boolean => {
+    if(item instanceof Submission) {
+        // when automod filters a post it gets this category
+        return item.banned_at_utc !== null && item.removed_by_category === 'automod_filtered';
+    }
+    // when automod filters a comment item.removed === false
+    // so if we want to processing filtered comments we need to check for this
+    return item.banned_at_utc !== null && !item.removed;
+}
+
+export const activityIsDeleted = (item: Submission|Comment): boolean => {
+    if(item instanceof Submission) {
+        return item.removed_by_category === 'deleted';
+    }
+    return item.author.name === '[deleted]'
 }
