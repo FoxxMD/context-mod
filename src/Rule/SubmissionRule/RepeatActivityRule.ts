@@ -245,21 +245,17 @@ interface RepeatActivityConfig extends ActivityWindow, ReferenceSubmission {
      * */
     gapAllowance?: number,
     /**
-     * Only include Submissions from this list of Subreddits.
+     * Only include Submissions from this list of Subreddits (by name, case-insensitive)
      *
-     * A list of subreddits (case-insensitive) to look for. Do not include "r/" prefix.
-     *
-     * EX to match against /r/mealtimevideos and /r/askscience use ["mealtimevideos","askscience"]
+     * EX `["mealtimevideos","askscience"]`
      * @examples ["mealtimevideos","askscience"]
      * @minItems 1
      * */
     include?: string[],
     /**
-     * Do not include Submissions from this list of Subreddits.
+     * Do not include Submissions from this list of Subreddits (by name, case-insensitive)
      *
-     * A list of subreddits (case-insensitive) to look for. Do not include "r/" prefix.
-     *
-     * EX to match against /r/mealtimevideos and /r/askscience use ["mealtimevideos","askscience"]
+     * EX `["mealtimevideos","askscience"]`
      * @examples ["mealtimevideos","askscience"]
      * @minItems 1
      * */

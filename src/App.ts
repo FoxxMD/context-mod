@@ -1,7 +1,7 @@
 import Snoowrap from "snoowrap";
 import {Manager} from "./Subreddit/Manager";
 import winston, {Logger} from "winston";
-import {argParseInt, labelledFormat, parseBool, parseFromJsonOrYamlToObject, sleep} from "./util";
+import {argParseInt, labelledFormat, parseBool, parseFromJsonOrYamlToObject, parseSubredditName, sleep} from "./util";
 import snoowrap from "snoowrap";
 import pEvent from "p-event";
 import EventEmitter from "events";
@@ -118,7 +118,7 @@ export class App {
                 subredditsArg = subreddits.split(',');
             }
         }
-        this.subreddits = subredditsArg;
+        this.subreddits = subredditsArg.map(parseSubredditName);
 
         const creds = {
             userAgent: `web:contextBot:${version}`,
@@ -150,11 +150,11 @@ export class App {
         this.logger.info(`/u/${name} is a moderator of these subreddits: ${availSubs.map(x => x.display_name_prefixed).join(', ')}`);
 
         let subsToRun = [];
-        const subsToUse = subreddits.length > 0 ? subreddits : this.subreddits;
+        const subsToUse = subreddits.length > 0 ? subreddits.map(parseSubredditName) : this.subreddits;
         if (subsToUse.length > 0) {
             this.logger.info(`User-defined subreddit constraints detected (CLI argument or environmental variable), will try to run on: ${subsToUse.join(', ')}`);
             for (const sub of subsToUse) {
-                const asub = availSubs.find(x => x.display_name.toLowerCase() === sub.trim().toLowerCase())
+                const asub = availSubs.find(x => x.display_name.toLowerCase() === sub.toLowerCase())
                 if (asub === undefined) {
                     this.logger.warn(`Will not run on ${sub} because is not modded by, or does not have appropriate permissions to mod with, for this client.`);
                 } else {

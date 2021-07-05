@@ -4,7 +4,7 @@ import Submission from "snoowrap/dist/objects/Submission";
 import {
     activityWindowText,
     comparisonTextOp, FAIL, formatNumber,
-    parseGenericValueOrPercentComparison,
+    parseGenericValueOrPercentComparison, parseSubredditName,
     parseUsableLinkIdentifier,
     PASS
 } from "../util";
@@ -97,7 +97,7 @@ export class RecentActivityRule extends Rule {
             let currCount = 0;
             const presentSubs = [];
             const {threshold = '>= 1', subreddits = []} = triggerSet;
-            for (const sub of subreddits) {
+            for (const sub of subreddits.map(x => parseSubredditName(x))) {
                 const isub = sub.toLowerCase();
                 const {[isub]: tSub = []} = groupedActivity;
                 if (tSub.length > 0) {

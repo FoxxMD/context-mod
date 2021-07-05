@@ -4,7 +4,14 @@ import {Rule, RuleOptions, RuleResult} from "./index";
 import Submission from "snoowrap/dist/objects/Submission";
 import {getAttributionIdentifier} from "../Utils/SnoowrapUtils";
 import dayjs from "dayjs";
-import {comparisonTextOp, FAIL, formatNumber, parseGenericValueOrPercentComparison, PASS} from "../util";
+import {
+    comparisonTextOp,
+    FAIL,
+    formatNumber,
+    parseGenericValueOrPercentComparison,
+    parseSubredditName,
+    PASS
+} from "../util";
 import { Comment } from "snoowrap/dist/objects";
 import SimpleError from "../Utils/SimpleError";
 
@@ -70,21 +77,20 @@ export interface AttributionCriteria {
     domainsCombined?: boolean,
 
     /**
-     * Only include Activities from this list of Subreddits.
+     * Only include Activities from this list of Subreddits (by name, case-insensitive)
      *
-     * A list of subreddits (case-insensitive) to look for. Do not include "r/" prefix.
      *
-     * EX to match against /r/mealtimevideos and /r/askscience use ["mealtimevideos","askscience"]
+     * EX `["mealtimevideos","askscience"]`
      * @examples ["mealtimevideos","askscience"]
      * @minItems 1
      * */
     include?: string[],
     /**
-     * Do not include Activities from this list of Subreddits. Will be ignored if `include` is present.
+     * Do not include Activities from this list of Subreddits (by name, case-insensitive)
      *
-     * A list of subreddits (case-insensitive) to look for. Do not include "r/" prefix.
+     * Will be ignored if `include` is present.
      *
-     * EX to match against /r/mealtimevideos and /r/askscience use ["mealtimevideos","askscience"]
+     * EX `["mealtimevideos","askscience"]`
      * @examples ["mealtimevideos","askscience"]
      * @minItems 1
      * */
@@ -176,8 +182,8 @@ export class AttributionRule extends Rule {
                 exclude: excludeRaw = [],
             } = criteria;
 
-            const include = includeRaw.map(x => x.toLowerCase());
-            const exclude = excludeRaw.map(x => x.toLowerCase());
+            const include = includeRaw.map(x => parseSubredditName(x).toLowerCase());
+            const exclude = excludeRaw.map(x => parseSubredditName(x).toLowerCase());
 
             const {operator, value, isPercent, extra = ''} = parseGenericValueOrPercentComparison(threshold);
 

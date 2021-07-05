@@ -8,7 +8,7 @@ import {
     comparisonTextOp,
     FAIL,
     formatNumber,
-    parseGenericValueOrPercentComparison,
+    parseGenericValueOrPercentComparison, parseSubredditName,
     PASS,
     percentFromString
 } from "../util";
@@ -85,8 +85,8 @@ export class HistoryRule extends Rule {
         if (this.criteria.length === 0) {
             throw new Error('Must provide at least one HistoryCriteria');
         }
-        this.include = include.map(x => x.toLowerCase());
-        this.exclude = exclude.map(x => x.toLowerCase());
+        this.include = include.map(x => parseSubredditName(x).toLowerCase());
+        this.exclude = exclude.map(x => parseSubredditName(x).toLowerCase());
     }
 
     getKind(): string {
@@ -299,21 +299,17 @@ interface HistoryConfig  {
     condition?: 'AND' | 'OR'
 
     /**
-     * Only include Submissions from this list of Subreddits.
+     * Only include Submissions from this list of Subreddits (by name, case-insensitive)
      *
-     * A list of subreddits (case-insensitive) to look for. Do not include "r/" prefix.
-     *
-     * EX to match against /r/mealtimevideos and /r/askscience use ["mealtimevideos","askscience"]
+     * EX `["mealtimevideos","askscience"]`
      * @examples ["mealtimevideos","askscience"]
      * @minItems 1
      * */
     include?: string[],
     /**
-     * Do not include Submissions from this list of Subreddits.
+     * Do not include Submissions from this list of Subreddits (by name, case-insensitive)
      *
-     * A list of subreddits (case-insensitive) to look for. Do not include "r/" prefix.
-     *
-     * EX to match against /r/mealtimevideos and /r/askscience use ["mealtimevideos","askscience"]
+     * EX `["mealtimevideos","askscience"]`
      * @examples ["mealtimevideos","askscience"]
      * @minItems 1
      * */

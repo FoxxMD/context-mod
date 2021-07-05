@@ -519,7 +519,7 @@ export const compareDurationValue = (comp: DurationComparison, date: Dayjs) => {
     return dateComparisonTextOp(date, comp.operator, dateToCompare);
 }
 
-const SUBREDDIT_NAME_REGEX: RegExp = /\/*(?:r\/)*(\w+)$/;
+const SUBREDDIT_NAME_REGEX: RegExp = /^\s*(?:\/r\/|r\/)*(\w+)*\s*$/;
 const SUBREDDIT_NAME_REGEX_URL = 'https://regexr.com/61a1d';
 export const parseSubredditName = (val:string): string => {
     const matches = val.match(SUBREDDIT_NAME_REGEX);

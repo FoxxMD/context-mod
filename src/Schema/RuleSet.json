@@ -133,7 +133,7 @@
                     "type": "boolean"
                 },
                 "exclude": {
-                    "description": "Do not include Activities from this list of Subreddits. Will be ignored if `include` is present.\n\nA list of subreddits (case-insensitive) to look for. Do not include \"r/\" prefix.\n\nEX to match against /r/mealtimevideos and /r/askscience use [\"mealtimevideos\",\"askscience\"]",
+                    "description": "Do not include Activities from this list of Subreddits (by name, case-insensitive)\n\nWill be ignored if `include` is present.\n\nEX `[\"mealtimevideos\",\"askscience\"]`",
                     "examples": [
                         "mealtimevideos",
                         "askscience"
@@ -145,7 +145,7 @@
                     "type": "array"
                 },
                 "include": {
-                    "description": "Only include Activities from this list of Subreddits.\n\nA list of subreddits (case-insensitive) to look for. Do not include \"r/\" prefix.\n\nEX to match against /r/mealtimevideos and /r/askscience use [\"mealtimevideos\",\"askscience\"]",
+                    "description": "Only include Activities from this list of Subreddits (by name, case-insensitive)\n\n\nEX `[\"mealtimevideos\",\"askscience\"]`",
                     "examples": [
                         "mealtimevideos",
                         "askscience"
@@ -665,7 +665,7 @@
                     "type": "array"
                 },
                 "exclude": {
-                    "description": "Do not include Submissions from this list of Subreddits.\n\nA list of subreddits (case-insensitive) to look for. Do not include \"r/\" prefix.\n\nEX to match against /r/mealtimevideos and /r/askscience use [\"mealtimevideos\",\"askscience\"]",
+                    "description": "Do not include Submissions from this list of Subreddits (by name, case-insensitive)\n\nEX `[\"mealtimevideos\",\"askscience\"]`",
                     "examples": [
                         "mealtimevideos",
                         "askscience"
@@ -677,7 +677,7 @@
                     "type": "array"
                 },
                 "include": {
-                    "description": "Only include Submissions from this list of Subreddits.\n\nA list of subreddits (case-insensitive) to look for. Do not include \"r/\" prefix.\n\nEX to match against /r/mealtimevideos and /r/askscience use [\"mealtimevideos\",\"askscience\"]",
+                    "description": "Only include Submissions from this list of Subreddits (by name, case-insensitive)\n\nEX `[\"mealtimevideos\",\"askscience\"]`",
                     "examples": [
                         "mealtimevideos",
                         "askscience"
@@ -859,7 +859,7 @@
                     ]
                 },
                 "exclude": {
-                    "description": "Do not include Submissions from this list of Subreddits.\n\nA list of subreddits (case-insensitive) to look for. Do not include \"r/\" prefix.\n\nEX to match against /r/mealtimevideos and /r/askscience use [\"mealtimevideos\",\"askscience\"]",
+                    "description": "Do not include Submissions from this list of Subreddits (by name, case-insensitive)\n\nEX `[\"mealtimevideos\",\"askscience\"]`",
                     "examples": [
                         "mealtimevideos",
                         "askscience"
@@ -875,7 +875,7 @@
                     "type": "number"
                 },
                 "include": {
-                    "description": "Only include Submissions from this list of Subreddits.\n\nA list of subreddits (case-insensitive) to look for. Do not include \"r/\" prefix.\n\nEX to match against /r/mealtimevideos and /r/askscience use [\"mealtimevideos\",\"askscience\"]",
+                    "description": "Only include Submissions from this list of Subreddits (by name, case-insensitive)\n\nEX `[\"mealtimevideos\",\"askscience\"]`",
                     "examples": [
                         "mealtimevideos",
                         "askscience"
@@ -974,7 +974,7 @@
             "minProperties": 1,
             "properties": {
                 "subreddits": {
-                    "description": "A list of subreddits (case-insensitive) to look for. Do not include \"r/\" prefix.\n\nEX to match against /r/mealtimevideos and /r/askscience use [\"mealtimevideos\",\"askscience\"]",
+                    "description": "A list of Subreddits (by name, case-insensitive) to look for.\n\nEX [\"mealtimevideos\",\"askscience\"]",
                     "examples": [
                         [
                             "mealtimevideos",

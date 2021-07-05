@@ -259,9 +259,9 @@ export type SubredditList = string[];
 
 export interface SubredditCriteria {
     /**
-     * A list of subreddits (case-insensitive) to look for. Do not include "r/" prefix.
+     * A list of Subreddits (by name, case-insensitive) to look for.
      *
-     * EX to match against /r/mealtimevideos and /r/askscience use ["mealtimevideos","askscience"]
+     * EX ["mealtimevideos","askscience"]
      * @examples [["mealtimevideos","askscience"]]
      * @minItems 1
      * */
