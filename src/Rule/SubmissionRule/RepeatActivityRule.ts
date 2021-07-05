@@ -4,7 +4,7 @@ import {Comment} from "snoowrap";
 import {
     activityWindowText,
     comparisonTextOp, FAIL,
-    parseGenericValueComparison,
+    parseGenericValueComparison, parseSubredditName,
     parseUsableLinkIdentifier as linkParser, PASS
 } from "../../util";
 import {ActivityWindow, ActivityWindowType, ReferenceSubmission} from "../../Common/interfaces";
@@ -45,6 +45,7 @@ export class RepeatActivityRule extends SubmissionRule {
     lookAt: 'submissions' | 'all';
     include: string[];
     exclude: string[];
+    keepRemoved: boolean;
 
     constructor(options: RepeatActivityOptions) {
         super(options);
@@ -55,14 +56,16 @@ export class RepeatActivityRule extends SubmissionRule {
             useSubmissionAsReference = true,
             lookAt = 'all',
             include = [],
-            exclude = []
+            exclude = [],
+            keepRemoved = false,
         } = options;
+        this.keepRemoved = keepRemoved;
         this.threshold = threshold;
         this.window = window;
         this.gapAllowance = gapAllowance;
         this.useSubmissionAsReference = useSubmissionAsReference;
-        this.include = include;
-        this.exclude = exclude;
+        this.include = include.map(x => parseSubredditName(x).toLowerCase());
+        this.exclude = exclude.map(x => parseSubredditName(x).toLowerCase());
         this.lookAt = lookAt;
     }
 
@@ -88,13 +91,20 @@ export class RepeatActivityRule extends SubmissionRule {
             return Promise.resolve([false, this.getResult(false)]);
         }
 
+        let filterFunc = (x: any) => true;
+        if(this.include.length > 0) {
+            filterFunc = (x: Submission|Comment) => this.include.includes(x.subreddit.display_name.toLowerCase());
+        } else if(this.exclude.length > 0) {
+            filterFunc = (x: Submission|Comment) => !this.exclude.includes(x.subreddit.display_name.toLowerCase());
+        }
+
         let activities: (Submission | Comment)[] = [];
         switch (this.lookAt) {
             case 'submissions':
-                activities = await this.resources.getAuthorSubmissions(item.author, {window: this.window});
+                activities = await this.resources.getAuthorSubmissions(item.author, {window: this.window, keepRemoved: this.keepRemoved});
                 break;
             default:
-                activities = await this.resources.getAuthorActivities(item.author, {window: this.window});
+                activities = await this.resources.getAuthorActivities(item.author, {window: this.window, keepRemoved: this.keepRemoved});
                 break;
         }
 
@@ -102,16 +112,18 @@ export class RepeatActivityRule extends SubmissionRule {
             const {openSets = [], allSets = []} = acc;
 
             let identifier = getActivityIdentifier(activity);
+            const validSub = filterFunc(activity);
 
             let updatedAllSets = [...allSets];
-            let updatedOpenSets = [];
+            let updatedOpenSets: RepeatActivityData[] = [];
+
             let currIdentifierInOpen = false;
             const bufferedActivities = this.gapAllowance === undefined || this.gapAllowance === 0 ? [] : activities.slice(Math.max(0, index - this.gapAllowance), Math.max(0, index));
             for (const o of openSets) {
-                if (o.identifier === identifier) {
+                if (o.identifier === identifier && validSub) {
                     updatedOpenSets.push({...o, sets: [...o.sets, activity]});
                     currIdentifierInOpen = true;
-                } else if (bufferedActivities.some(x => getActivityIdentifier(x) === identifier)) {
+                } else if (bufferedActivities.some(x => getActivityIdentifier(x) === identifier) && validSub) {
                     updatedOpenSets.push(o);
                 } else {
                     updatedAllSets.push(o);
@@ -262,6 +274,16 @@ interface RepeatActivityConfig extends ActivityWindow, ReferenceSubmission {
      *  @default all
      * */
     lookAt?: 'submissions' | 'all',
+    /**
+     * Count submissions/comments that have previously been removed.
+     *
+     * By default all `Submissions/Commments` that are in a `removed` state will be filtered from `window` (only applies to subreddits you mod).
+     *
+     * Setting to `true` could be useful if you also want to also detected removed repeat posts by a user like for example if automoderator removes multiple, consecutive submissions for not following title format correctly.
+     *
+     * @default false
+     * */
+    keepRemoved?: boolean
 }
 
 export interface RepeatActivityOptions extends RepeatActivityConfig, RuleOptions {
