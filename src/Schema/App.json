@@ -41,7 +41,7 @@
                 },
                 "satisfyOn": {
                     "default": "any",
-                    "description": "Define the condition under which both criteria are considered met\n\n**If `any` then it will retrieve Activities until one of the criteria is met, whichever occurs first**\n\nEX `{count: 100, duration: {days: 90}}`:\n* If 90 days of activities = 40 activities => returns 40 activities\n* If 100 activities is only 20 days => 100 activities\n\n**If `all` then both criteria must be met.**\n\nEffectively, whichever criteria produces the most Activities...\n\nEX `{count: 100, duration: {days: 90}}`:\n* If at 90 days of activities => 40 activities, continue retrieving results until 100 => results in >90 days of activities\n* If at 100 activities => 20 days of activities, continue retrieving results until 90 days => results in >100 activities",
+                    "description": "Define the condition under which both criteria are considered met\n\n**If `any` then it will retrieve Activities until one of the criteria is met, whichever occurs first**\n\nEX `{\"count\": 100, duration: \"90 days\"}`:\n* If 90 days of activities = 40 activities => returns 40 activities\n* If 100 activities is only 20 days => 100 activities\n\n**If `all` then both criteria must be met.**\n\nEffectively, whichever criteria produces the most Activities...\n\nEX `{\"count\": 100, duration: \"90 days\"}`:\n* If at 90 days of activities => 40 activities, continue retrieving results until 100 => results in >90 days of activities\n* If at 100 activities => 20 days of activities, continue retrieving results until 90 days => results in >100 activities",
                     "enum": [
                         "all",
                         "any"
@@ -50,6 +50,38 @@
                         "any"
                     ],
                     "type": "string"
+                },
+                "subreddits": {
+                    "description": "Filter which subreddits (case-insensitive) Activities are retrieved from.\n\n**Note:** Filtering occurs **before** `duration/count` checks are performed.",
+                    "properties": {
+                        "exclude": {
+                            "description": "Exclude any results from these subreddits\n\n**Note:** `exclude` is ignored if `include` is present",
+                            "examples": [
+                                [
+                                    "mealtimevideos",
+                                    "askscience"
+                                ]
+                            ],
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        "include": {
+                            "description": "Include only results from these subreddits",
+                            "examples": [
+                                [
+                                    "mealtimevideos",
+                                    "askscience"
+                                ]
+                            ],
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        }
+                    },
+                    "type": "object"
                 }
             },
             "type": "object"
@@ -904,7 +936,13 @@
                 "approved": {
                     "type": "boolean"
                 },
+                "deleted": {
+                    "type": "boolean"
+                },
                 "distinguished": {
+                    "type": "boolean"
+                },
+                "filtered": {
                     "type": "boolean"
                 },
                 "locked": {
@@ -1562,6 +1600,11 @@
                     ],
                     "description": "A list of criteria to test the state of the `Activity` against before running the Rule.\n\nIf any set of criteria passes the Rule will be run. If the criteria fails then the Rule is skipped."
                 },
+                "keepRemoved": {
+                    "default": false,
+                    "description": "Count submissions/comments that have previously been removed.\n\nBy default all `Submissions/Commments` that are in a `removed` state will be filtered from `window` (only applies to subreddits you mod).\n\nSetting to `true` could be useful if you also want to also detected removed repeat posts by a user like for example if automoderator removes multiple, consecutive submissions for not following title format correctly.",
+                    "type": "boolean"
+                },
                 "kind": {
                     "description": "The kind of rule to run",
                     "enum": [
@@ -1948,7 +1991,13 @@
                 "approved": {
                     "type": "boolean"
                 },
+                "deleted": {
+                    "type": "boolean"
+                },
                 "distinguished": {
+                    "type": "boolean"
+                },
+                "filtered": {
                     "type": "boolean"
                 },
                 "is_self": {

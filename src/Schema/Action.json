@@ -135,7 +135,13 @@
                 "approved": {
                     "type": "boolean"
                 },
+                "deleted": {
+                    "type": "boolean"
+                },
                 "distinguished": {
+                    "type": "boolean"
+                },
+                "filtered": {
                     "type": "boolean"
                 },
                 "locked": {
@@ -168,7 +174,13 @@
                 "approved": {
                     "type": "boolean"
                 },
+                "deleted": {
+                    "type": "boolean"
+                },
                 "distinguished": {
+                    "type": "boolean"
+                },
+                "filtered": {
                     "type": "boolean"
                 },
                 "is_self": {

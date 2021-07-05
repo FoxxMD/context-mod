@@ -93,7 +93,7 @@ export interface ActivityWindowCriteria {
      *
      * **If `any` then it will retrieve Activities until one of the criteria is met, whichever occurs first**
      *
-     * EX `{count: 100, duration: {days: 90}}`:
+     * EX `{"count": 100, duration: "90 days"}`:
      * * If 90 days of activities = 40 activities => returns 40 activities
      * * If 100 activities is only 20 days => 100 activities
      *
@@ -101,7 +101,7 @@ export interface ActivityWindowCriteria {
      *
      * Effectively, whichever criteria produces the most Activities...
      *
-     * EX `{count: 100, duration: {days: 90}}`:
+     * EX `{"count": 100, duration: "90 days"}`:
      * * If at 90 days of activities => 40 activities, continue retrieving results until 100 => results in >90 days of activities
      * * If at 100 activities => 20 days of activities, continue retrieving results until 90 days => results in >100 activities
      *
@@ -109,6 +109,28 @@ export interface ActivityWindowCriteria {
      * @default any
      * */
     satisfyOn?: 'any' | 'all';
+
+    /**
+     * Filter which subreddits (case-insensitive) Activities are retrieved from.
+     *
+     * **Note:** Filtering occurs **before** `duration/count` checks are performed.
+     * */
+    subreddits?: {
+        /**
+         * Include only results from these subreddits
+         *
+         * @examples [["mealtimevideos","askscience"]]
+         * */
+        include?: string[],
+        /**
+         * Exclude any results from these subreddits
+         *
+         * **Note:** `exclude` is ignored if `include` is present
+         *
+         * @examples [["mealtimevideos","askscience"]]
+         * */
+        exclude?: string[],
+    }
 }
 
 /**
@@ -506,6 +528,8 @@ export interface ChecksActivityState {
 
 export interface ActivityState {
     removed?: boolean
+    filtered?: boolean
+    deleted?: boolean
     locked?: boolean
     spam?: boolean
     stickied?: boolean
