@@ -108,6 +108,10 @@ export class Author implements AuthorCriteria {
     isMod?: boolean;
     userNotes?: UserNoteCriteria[];
     age?: string;
+    commentKarma?: string;
+    linkKarma?: string;
+    totalKarma?: string;
+    verified?: boolean;
 
     constructor(options: AuthorCriteria) {
         this.name = options.name;
@@ -116,6 +120,9 @@ export class Author implements AuthorCriteria {
         this.isMod = options.isMod;
         this.userNotes = options.userNotes;
         this.age = options.age;
+        this.commentKarma = options.commentKarma;
+        this.linkKarma = options.linkKarma;
+        this.totalKarma = options.totalKarma;
     }
 }
 
