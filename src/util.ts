@@ -518,3 +518,13 @@ export const compareDurationValue = (comp: DurationComparison, date: Dayjs) => {
     const dateToCompare = dayjs().subtract(comp.duration.asSeconds(), 'seconds');
     return dateComparisonTextOp(date, comp.operator, dateToCompare);
 }
+
+const SUBREDDIT_NAME_REGEX: RegExp = /\/*(?:r\/)*(\w+)$/;
+const SUBREDDIT_NAME_REGEX_URL = 'https://regexr.com/61a1d';
+export const parseSubredditName = (val:string): string => {
+    const matches = val.match(SUBREDDIT_NAME_REGEX);
+    if (matches === null) {
+        throw new InvalidRegexError(SUBREDDIT_NAME_REGEX, val, SUBREDDIT_NAME_REGEX_URL)
+    }
+    return matches[1] as string;
+}
