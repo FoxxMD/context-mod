@@ -569,8 +569,8 @@ export const getAttributionIdentifier = (sub: Submission, useParentMediaDomain =
                 }
             break;
             case 'Anchor FM Inc.':
-                if(description !== undefined) {
-                    let match = description.match(ANCHOR_AUTHOR_REGEX);
+                if(author_name !== undefined) {
+                    let match = author_name.match(ANCHOR_AUTHOR_REGEX);
                     if(match !== null) {
                         const {author} = match.groups as any;
                         displayDomain = author;
