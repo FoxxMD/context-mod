@@ -24,6 +24,7 @@ import {Logger} from "winston";
 import InvalidRegexError from "./InvalidRegexError";
 import SimpleError from "./SimpleError";
 import {AuthorCriteria} from "../Author/Author";
+import { URL } from "url";
 
 export const BOT_LINK = 'https://www.reddit.com/r/ContextModBot/comments/o1dugk/introduction_to_contextmodbot_and_rcb';
 
@@ -525,29 +526,86 @@ export const getSubmissionFromComment = async (item: Comment): Promise<Submissio
     }
 }
 
+const SPOTIFY_PODCAST_AUTHOR_REGEX: RegExp = /this episode from (?<author>.*?) on Spotify./;
+const SPOTIFY_PODCAST_AUTHOR_REGEX_URL = 'https://regexr.com/61c2f';
+
+const SPOTIFY_MUSIC_AUTHOR_REGEX: RegExp = /Listen to .*? on Spotify.\s(?<author>.+?)\s·\s(?<mediaType>.+?)\s/;
+const SPOTIFY_MUSIC_AUTHOR_REGEX_URL = 'https://regexr.com/61c2r';
+
+const ANCHOR_AUTHOR_REGEX: RegExp = /by (?<author>.+?)$/;
+const ANCHOR_AUTHOR_REGEX_URL = 'https://regexr.com/61c31';
+
 export const getAttributionIdentifier = (sub: Submission, useParentMediaDomain = false): DomainInfo => {
     let domain: string = '';
     let displayDomain: string = '';
     let domainIdents: string[] = useParentMediaDomain ? [sub.domain] : [];
     let provider: string | undefined;
+    let mediaType: string | undefined;
     if (!useParentMediaDomain && sub.secure_media?.oembed !== undefined) {
         const {
             author_url,
             author_name,
+            description,
             provider_name,
         } = sub.secure_media?.oembed;
-        if (author_name !== undefined) {
-            domainIdents.push(author_name);
-            if (displayDomain === '') {
-                displayDomain = author_name;
+        switch(provider_name) {
+            case 'Spotify':
+                if(description !== undefined) {
+                    let match = description.match(SPOTIFY_PODCAST_AUTHOR_REGEX);
+                    if(match !== null) {
+                        const {author} = match.groups as any;
+                        displayDomain = author;
+                        domainIdents.push(author);
+                        mediaType = 'Podcast';
+                    } else {
+                        match = description.match(SPOTIFY_MUSIC_AUTHOR_REGEX);
+                        if(match !== null) {
+                            const {author, mediaType: mt} = match.groups as any;
+                            displayDomain = author;
+                            domainIdents.push(author);
+                            mediaType = mt.toLowerCase();
+                        }
+                    }
+                }
+            break;
+            case 'Anchor FM Inc.':
+                if(description !== undefined) {
+                    let match = description.match(ANCHOR_AUTHOR_REGEX);
+                    if(match !== null) {
+                        const {author} = match.groups as any;
+                        displayDomain = author;
+                        domainIdents.push(author);
+                        mediaType = 'podcast';
+                    }
+                }
+            break;
+            case 'YouTube':
+                mediaType = 'Video/Audio';
+                break;
+            default:
+                // nah
+        }
+        // handles yt, vimeo, twitter fine
+        if(displayDomain === '') {
+            if (author_name !== undefined) {
+                domainIdents.push(author_name);
+                if (displayDomain === '') {
+                    displayDomain = author_name;
+                }
+            }
+            if (author_url !== undefined) {
+                domainIdents.push(author_url);
+                domain = author_url;
+                if (displayDomain === '') {
+                    displayDomain = author_url;
+                }
             }
         }
-        if (author_url !== undefined) {
-            domainIdents.push(author_url);
-            domain = author_url;
-            if (displayDomain === '') {
-                displayDomain = author_url;
-            }
+        if(displayDomain === '') {
+            // we have media but could not parse stuff for some reason just use url
+            const u = new URL(sub.url);
+            displayDomain = u.pathname;
+            domainIdents.push(u.pathname);
         }
         provider = provider_name;
     } else if(sub.secure_media?.type !== undefined) {
@@ -564,7 +622,7 @@ export const getAttributionIdentifier = (sub: Submission, useParentMediaDomain =
         displayDomain = domain;
     }
 
-    return {display: displayDomain, domain, aliases: domainIdents, provider};
+    return {display: displayDomain, domain, aliases: domainIdents, provider, mediaType};
 }
 
 export const isItem = (item: Submission | Comment, stateCriteria: TypedActivityStates, logger: Logger): [boolean, SubmissionState|CommentState|undefined] => {

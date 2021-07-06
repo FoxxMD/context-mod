@@ -579,5 +579,6 @@ export interface DomainInfo {
     display: string,
     domain: string,
     aliases: string[],
-    provider?: string
+    provider?: string,
+    mediaType?: string
 }
