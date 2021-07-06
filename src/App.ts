@@ -1,4 +1,4 @@
-import Snoowrap from "snoowrap";
+import Snoowrap, { Subreddit } from "snoowrap";
 import {Manager} from "./Subreddit/Manager";
 import winston, {Logger} from "winston";
 import {argParseInt, labelledFormat, parseBool, parseFromJsonOrYamlToObject, parseSubredditName, sleep} from "./util";
@@ -8,6 +8,7 @@ import EventEmitter from "events";
 import CacheManager from './Subreddit/SubredditResources';
 import dayjs, {Dayjs} from "dayjs";
 import LoggedError from "./Utils/LoggedError";
+import ConfigParseError from "./Utils/ConfigParseError";
 
 const {transports} = winston;
 
@@ -149,7 +150,7 @@ export class App {
         }
         this.logger.info(`/u/${name} is a moderator of these subreddits: ${availSubs.map(x => x.display_name_prefixed).join(', ')}`);
 
-        let subsToRun = [];
+        let subsToRun: Subreddit[] = [];
         const subsToUse = subreddits.length > 0 ? subreddits.map(parseSubredditName) : this.subreddits;
         if (subsToUse.length > 0) {
             this.logger.info(`User-defined subreddit constraints detected (CLI argument or environmental variable), will try to run on: ${subsToUse.join(', ')}`);
@@ -173,9 +174,11 @@ export class App {
         // get configs for subs we want to run on and build/validate them
         for (const sub of subsToRun) {
             let content = undefined;
+            let wiki;
             try {
-                const wiki = sub.getWikiPage(this.wikiLocation);
-                content = await wiki.content_md;
+                // @ts-ignore
+                wiki = await sub.getWikiPage(this.wikiLocation).fetch();
+                content = wiki.content_md;
             } catch (err) {
                 this.logger.error(`[${sub.display_name_prefixed}] Could not read wiki configuration. Please ensure the page https://reddit.com${sub.url}wiki/${this.wikiLocation} exists and is readable -- error: ${err.message}`);
                 continue;
@@ -196,7 +199,10 @@ export class App {
             }
 
             try {
-                subSchedule.push(new Manager(sub, this.client, this.logger, configObj, {dryRun: this.dryRun}));
+                const manager = new Manager(sub, this.client, this.logger, configObj, {dryRun: this.dryRun});
+                manager.lastWikiCheck = dayjs();
+                manager.lastWikiRevision = dayjs.unix(wiki.revision_date);
+                subSchedule.push(manager);
             } catch (err) {
                 if(!(err instanceof LoggedError)) {
                     this.logger.error(`[${sub.display_name_prefixed}] Config was not valid`, err);
@@ -210,12 +216,23 @@ export class App {
         try {
             this.heartBeating = true;
             while (true) {
-                await sleep(this.heartbeatInterval * 1000);
+                await sleep(60 * 1000);
                 const heartbeat = `HEARTBEAT -- Reddit API Rate Limit remaining: ${this.client.ratelimitRemaining}`
                 if (this.apiLimitWarning >= this.client.ratelimitRemaining) {
                     this.logger.warn(heartbeat);
                 } else {
                     this.logger.info(heartbeat);
+                }
+                for(const s of this.subManagers) {
+                    try {
+                        await s.parseConfiguration();
+                        if(!s.running) {
+                            s.handle();
+                        }
+                    } catch (err) {
+                        s.stop();
+                        this.logger.info('Will retry parsing config on next heartbeat...');
+                    }
                 }
             }
         } finally {

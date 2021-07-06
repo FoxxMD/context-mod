@@ -26,29 +26,51 @@ export interface SubredditResourceOptions extends SubredditCacheConfig, Footer {
     logger: Logger;
 }
 
-export class SubredditResources {
+export interface SubredditResourceSetOptions extends SubredditCacheConfig, Footer {
     enabled: boolean;
-    protected authorTTL: number;
-    protected useSubredditAuthorCache: boolean;
-    protected wikiTTL: number;
+}
+
+export class SubredditResources {
+    enabled!: boolean;
+    protected authorTTL!: number;
+    protected useSubredditAuthorCache!: boolean;
+    protected wikiTTL!: number;
     name: string;
     protected logger: Logger;
     userNotes: UserNotes;
-    footer: false | string;
+    footer!: false | string;
     subreddit: Subreddit
 
     constructor(name: string, options: SubredditResourceOptions) {
         const {
-            enabled = true,
-            authorTTL,
             subreddit,
-            userNotesTTL = 60000,
-            wikiTTL = 300000, // 5 minutes
             logger,
-            footer = DEFAULT_FOOTER
+            enabled = true,
+            userNotesTTL = 60000,
         } = options || {};
 
         this.subreddit = subreddit;
+        this.name = name;
+        if (logger === undefined) {
+            const alogger = winston.loggers.get('default')
+            this.logger = alogger.child({labels: [this.name, 'Resource Cache']}, mergeArr);
+        } else {
+            this.logger = logger.child({labels: ['Resource Cache']}, mergeArr);
+        }
+
+        this.userNotes = new UserNotes(enabled ? userNotesTTL : 0, this.subreddit, this.logger)
+        this.setOptions(options);
+    }
+
+    setOptions (options: SubredditResourceSetOptions) {
+        const {
+            enabled = true,
+            authorTTL,
+            userNotesTTL = 60000,
+            wikiTTL = 300000, // 5 minutes
+            footer = DEFAULT_FOOTER
+        } = options || {};
+
         this.footer = footer;
         this.enabled = manager.enabled ? enabled : false;
         if (authorTTL === undefined) {
@@ -59,16 +81,7 @@ export class SubredditResources {
             this.authorTTL = authorTTL;
         }
         this.wikiTTL = wikiTTL;
-
-        this.userNotes = new UserNotes(enabled ? userNotesTTL : 0, subreddit, logger);
-
-        this.name = name;
-        if (logger === undefined) {
-            const alogger = winston.loggers.get('default')
-            this.logger = alogger.child({labels: [this.name, 'Resource Cache']}, mergeArr);
-        } else {
-            this.logger = logger.child({labels: ['Resource Cache']}, mergeArr);
-        }
+        this.userNotes.notesTTL = enabled ? userNotesTTL : 0;
     }
 
     async getAuthorActivities(user: RedditUser, options: AuthorTypedActivitiesOptions): Promise<Array<Submission | Comment>> {
