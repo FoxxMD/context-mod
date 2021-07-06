@@ -528,3 +528,28 @@ export const parseSubredditName = (val:string): string => {
     }
     return matches[1] as string;
 }
+
+const WIKI_REGEX: RegExp = /^\s*wiki:(?<url>[^|]+)\|*(?<subreddit>[^\s]*)\s*$/;
+const WIKI_REGEX_URL = 'https://regexr.com/61bq1';
+const URL_REGEX: RegExp = /^\s*url:(?<url>[^\s]+)\s*$/;
+const URL_REGEX_URL = 'https://regexr.com/61bqd';
+
+export const parseWikiContext = (val: string) => {
+    const matches = val.match(WIKI_REGEX);
+    if (matches === null) {
+        return undefined;
+    }
+    const sub = (matches.groups as any).subreddit as string;
+    return {
+        wiki: (matches.groups as any).url as string,
+        subreddit: sub === '' ? undefined : parseSubredditName(sub)
+    };
+}
+
+export const parseExternalUrl = (val: string) => {
+    const matches = val.match(URL_REGEX);
+    if (matches === null) {
+        return undefined;
+    }
+    return (matches.groups as any).url as string;
+}

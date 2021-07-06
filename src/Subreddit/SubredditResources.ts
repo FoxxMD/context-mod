@@ -1,4 +1,4 @@
-import {RedditUser, Comment, Submission} from "snoowrap";
+import Snoowrap, {RedditUser, Comment, Submission} from "snoowrap";
 import cache from 'memory-cache';
 import objectHash from 'object-hash';
 import {
@@ -9,7 +9,8 @@ import {
 } from "../Utils/SnoowrapUtils";
 import Subreddit from 'snoowrap/dist/objects/Subreddit';
 import winston, {Logger} from "winston";
-import {mergeArr} from "../util";
+import fetch from 'node-fetch';
+import {mergeArr, parseExternalUrl, parseWikiContext} from "../util";
 import LoggedError from "../Utils/LoggedError";
 import {Footer, SubredditCacheConfig} from "../Common/interfaces";
 import UserNotes from "./UserNotes";
@@ -17,7 +18,6 @@ import Mustache from "mustache";
 import he from "he";
 import {AuthorCriteria} from "../Author/Author";
 
-export const WIKI_DESCRIM = 'wiki:';
 export const DEFAULT_FOOTER = '\r\n*****\r\nThis action was performed by [a bot.]({{botLink}}) Mention a moderator or [send a modmail]({{modmailLink}}) if you any ideas, questions, or concerns about this action.';
 
 export interface SubredditResourceOptions extends SubredditCacheConfig, Footer {
@@ -35,6 +35,7 @@ export class SubredditResources {
     protected logger: Logger;
     userNotes: UserNotes;
     footer: false | string;
+    subreddit: Subreddit
 
     constructor(name: string, options: SubredditResourceOptions) {
         const {
@@ -47,6 +48,7 @@ export class SubredditResources {
             footer = DEFAULT_FOOTER
         } = options || {};
 
+        this.subreddit = subreddit;
         this.footer = footer;
         this.enabled = manager.enabled ? enabled : false;
         if (authorTTL === undefined) {
@@ -107,38 +109,69 @@ export class SubredditResources {
         }) as unknown as Promise<Submission[]>;
     }
 
-    async getContent(val: string, subreddit: Subreddit): Promise<string> {
-        const hasWiki = val.trim().substring(0, WIKI_DESCRIM.length) === WIKI_DESCRIM;
-        if (!hasWiki) {
+    async getContent(val: string, subredditArg?: Subreddit): Promise<string> {
+        const subreddit = subredditArg || this.subreddit;
+        let cacheKey;
+        const wikiContext = parseWikiContext(val);
+        if (wikiContext !== undefined) {
+            cacheKey = `${wikiContext.wiki}${wikiContext.subreddit !== undefined ? `|${wikiContext.subreddit}` : ''}`;
+        }
+        const extUrl = wikiContext === undefined ? parseExternalUrl(val) : undefined;
+        if (extUrl !== undefined) {
+            cacheKey = extUrl;
+        }
+
+        if (cacheKey === undefined) {
             return val;
-        } else {
-            const useCache = this.enabled && this.wikiTTL > 0;
-            const wikiPath = val.trim().substring(WIKI_DESCRIM.length);
+        }
 
-            let hash = `${subreddit.display_name}-${wikiPath}`;
-            if (useCache) {
-                const cachedContent = cache.get(`${subreddit.display_name}-${wikiPath}`);
-                if (cachedContent !== null) {
-                    this.logger.debug(`Cache Hit: ${wikiPath}`);
-                    return cachedContent;
-                }
+        const useCache = this.enabled && this.wikiTTL > 0;
+        // try to get cached value first
+        let hash = `${subreddit.display_name}-${cacheKey}`;
+        if (useCache) {
+            const cachedContent = cache.get(hash);
+            if (cachedContent !== null) {
+                this.logger.debug(`Cache Hit: ${cacheKey}`);
+                return cachedContent;
             }
+        }
 
+        let wikiContent: string;
+
+        // no cache hit, get from source
+        if (wikiContext !== undefined) {
+            let sub;
+            if (wikiContext.subreddit === undefined || wikiContext.subreddit.toLowerCase() === subreddit.display_name) {
+                sub = subreddit;
+            } else {
+                // @ts-ignore
+                const client = subreddit._r as Snoowrap;
+                sub = client.getSubreddit(wikiContext.subreddit);
+            }
             try {
-                const wikiPage = subreddit.getWikiPage(wikiPath);
-                const wikiContent = await wikiPage.content_md;
-
-                if (useCache) {
-                    cache.put(hash, wikiContent, this.wikiTTL);
-                }
-
-                return wikiContent;
+                const wikiPage = sub.getWikiPage(wikiContext.wiki);
+                wikiContent = await wikiPage.content_md;
             } catch (err) {
-                const msg = `Could not read wiki page. Please ensure the page 'https://reddit.com${subreddit.display_name_prefixed}wiki/${wikiPath}' exists and is readable`;
+                const msg = `Could not read wiki page. Please ensure the page 'https://reddit.com${sub.display_name_prefixed}wiki/${wikiContext}' exists and is readable`;
+                this.logger.error(msg, err);
+                throw new LoggedError(msg);
+            }
+        } else {
+            try {
+                const response = await fetch(extUrl as string);
+                wikiContent = await response.text();
+            } catch (err) {
+                const msg = `Error occurred while trying to fetch the url ${extUrl}`;
                 this.logger.error(msg, err);
                 throw new LoggedError(msg);
             }
         }
+
+        if (useCache) {
+            cache.put(hash, wikiContent, this.wikiTTL);
+        }
+
+        return wikiContent;
     }
 
     async testAuthorCriteria(item: (Comment | Submission), authorOpts: AuthorCriteria, include = true) {

@@ -222,12 +222,23 @@ export interface RichContent {
     /**
      * The Content to submit for this Action. Content is interpreted as reddit-flavored Markdown.
      *
-     * If value starts with `wiki:` then the proceeding value will be used to get a wiki page
+     * If value starts with `wiki:` then the proceeding value will be used to get a wiki page from the current subreddit
      *
-     *  * EX `wiki:botconfig/mybot` tries to get `https://reddit.com/mySubredditExample/wiki/botconfig/mybot`
+     *  * EX `wiki:botconfig/mybot` tries to get `https://reddit.com/r/currentSubreddit/wiki/botconfig/mybot`
+     *
+     * If the value starts with `wiki:` and ends with `|someValue` then `someValue` will be used as the base subreddit for the wiki page
+     *
+     * * EX `wiki:replytemplates/test|ContextModBot` tries to get `https://reddit.com/r/ContextModBot/wiki/replytemplates/test`
+     *
+     * If the value starts with `url:` then the value is fetched as an external url and expects raw text returned
+     *
+     * * EX `url:https://pastebin.com/raw/38qfL7mL` tries to get the text response of `https://pastebin.com/raw/38qfL7mL`
+     *
+     * If none of the above is used the value is treated as the raw context
+     *
      *  * EX `this is **bold** markdown text` => "this is **bold** markdown text"
      *
-     * Content is rendered using [mustache](https://github.com/janl/mustache.js/#templates) to enable [Action Templating](https://github.com/FoxxMD/reddit-context-bot#action-templating).
+     * All Content is rendered using [mustache](https://github.com/janl/mustache.js/#templates) to enable [Action Templating](https://github.com/FoxxMD/reddit-context-bot#action-templating).
      *
      * The following properties are always available in the template (view individual Rules to see rule-specific template data):
      * ```
@@ -249,9 +260,9 @@ export interface RequiredRichContent extends RichContent {
 }
 
 /**
- * A list of subreddits (case-insensitive) to look for. Do not include "r/" prefix.
+ * A list of subreddits (case-insensitive) to look for.
  *
- * EX to match against /r/mealtimevideos and /r/askscience use ["mealtimevideos","askscience"]
+ * EX ["mealtimevideos","askscience"]
  * @examples ["mealtimevideos","askscience"]
  * @minItems 1
  * */
