@@ -97,6 +97,11 @@ export class Manager {
             this.resources.footer = footer;
         }
 
+        this.logger.info(`Dry Run: ${this.dryRun === true}`);
+        for(const p of this.pollOptions) {
+            this.logger.info(`Polling Info => ${p.pollOn.toUpperCase()} every ${p.interval/1000} seconds${p.delayUntil !== undefined ? ` | wait until Activity is ${p.delayUntil} seconds old` : ''} | maximum of ${p.limit} Activities`)
+        }
+
         let resourceConfig: SubredditResourceSetOptions = {
             footer,
             enabled: true
