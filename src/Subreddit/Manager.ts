@@ -212,7 +212,7 @@ export class Manager {
             const created = dayjs.unix(item.created_utc);
             const diff = dayjs().diff(created, 's');
             if(diff < delayUntil) {
-                this.logger.debug(`Delaying processing until Activity is ${delayUntil} seconds old (${delayUntil - diff}s)`);
+                this.logger.verbose(`Delaying processing until Activity is ${delayUntil} seconds old (${delayUntil - diff}s)`);
                 await sleep(delayUntil - diff);
                 // @ts-ignore
                 item = await activity.refresh();
