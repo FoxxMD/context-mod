@@ -24,13 +24,11 @@
           "kind": "attribution",
           "criteria": [
             {
-              "threshold": "10%",
-              "window": {
-                "days": 90
-              }
+              "threshold": "> 10%",
+              "window": "90 days"
             },
             {
-              "threshold": "10%",
+              "threshold": "> 10%",
               "window": 100
             }
           ],
@@ -41,16 +39,14 @@
           "lookAt": "submissions",
           "thresholds": [
             {
-              "totalCount": 1,
+              "threshold": ">= 1",
               "subreddits": [
                 "DeFreeKarma",
                 "FreeKarma4U",
               ]
             }
           ],
-          "window": {
-            "days": 7
-          }
+          "window": "7 days"
         },
         {
           "name": "memes",
@@ -58,15 +54,13 @@
           "lookAt": "submissions",
           "thresholds": [
             {
-              "totalCount": 3,
+              "threshold": ">= 3",
               "subreddits": [
                 "dankmemes",
               ]
             }
           ],
-          "window": {
-            "days": 7
-          }
+          "window": "7 days"
         }
       ],
       // will NOT run if the Author for this Submission has the flair "vet"

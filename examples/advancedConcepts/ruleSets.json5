@@ -13,13 +13,11 @@
           "kind": "attribution",
           "criteria": [
             {
-              "threshold": "10%",
-              "window": {
-                "days": 90
-              }
+              "threshold": "> 10%",
+              "window": "90 days"
             },
             {
-              "threshold": "10%",
+              "threshold": "> 10%",
               "window": 100
             }
           ],
@@ -42,14 +40,12 @@
               "kind": "attribution",
               "criteria": [
                 {
-                  "threshold": "10%",
+                  "threshold": "> 10%",
                   "thresholdOn": "submissions",
-                  "window": {
-                    "days": 90
-                  }
+                  "window": "90 days"
                 },
                 {
-                  "threshold": "10%",
+                  "threshold": "> 10%",
                   "thresholdOn": "submissions",
                   "window": 100
                 }
@@ -62,23 +58,12 @@
               "criteriaJoin": "OR",
               "criteria": [
                 {
-                  "window": {
-                    "days": 90
-                  },
-                  "comment": {
-                    "threshold": "50%",
-                    "condition": "<"
-                  }
+                  "window": "90 days",
+                  "comment": "< 50%"
                 },
                 {
-                  "window": {
-                    "days": 90
-                  },
-                  "comment": {
-                    "asOp": true,
-                    "threshold": "40%",
-                    "condition": ">"
-                  }
+                  "window": "90 days",
+                  "comment": "> 40% OP"
                 }
               ]
             }

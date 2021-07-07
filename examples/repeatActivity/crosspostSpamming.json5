@@ -12,11 +12,9 @@
           // will only look at Submissions in Author's history that contain the same content (link) as the Submission this check was initiated by
           "useSubmissionAsReference": true,
           // if the Author has posted this Submission 5 times consecutively then this rule will trigger
-          "threshold": 5,
+          "threshold": ">= 5",
           // look at all of the Author's submissions in the last 7 days
-          "window": {
-            "days": 7
-          }
+          "window": "7 days"
         }
       ],
       "actions": [

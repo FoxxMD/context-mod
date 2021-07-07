@@ -17,7 +17,7 @@
           "thresholds": [
             {
               // for all subreddits, if the number of activities (sub/comment) is equal to or greater than 1 then the rule is triggered
-              "totalCount": 1,
+              "threshold": ">= 1",
               "subreddits": [
                 "DeFreeKarma",
                 "FreeKarma4U",
@@ -27,9 +27,7 @@
             }
           ],
           // look at all of the Author's submissions in the last 7 days
-          "window": {
-            "days": 7
-          }
+          "window": "7 days"
         }
       ],
       "actions": [

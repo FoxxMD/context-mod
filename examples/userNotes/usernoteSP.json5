@@ -11,13 +11,11 @@
           "kind": "attribution",
           "criteria": [
             {
-              "threshold": "10%",
-              "window": {
-                "days": 90
-              }
+              "threshold": "> 10%",
+              "window": "90 days"
             },
             {
-              "threshold": "10%",
+              "threshold": "> 10%",
               "window": 100
             }
           ],
@@ -30,7 +28,7 @@
           // https://github.com/toolbox-team/reddit-moderator-toolbox/wiki/Subreddit-Wikis%3A-usernotes#working-with-note-types
           "type": "spamwarn",
           // content is mustache templated as usual
-          "content": "Self Promotion: {{rules.attr10all.refDomainTitle}} {{rules.attr10sub.largestPercent}}%"
+          "content": "Self Promotion: {{rules.attr10all.titlesDelim}} {{rules.attr10sub.largestPercent}}%"
         }
       ]
     }

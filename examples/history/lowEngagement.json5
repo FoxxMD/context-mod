@@ -12,14 +12,9 @@
           "criteria": [
             {
               // look at last 90 days of Author's activities
-              "window": {
-                "days": 90
-              },
+              "window": "90 days",
               // trigger if less than 30% of their activities in this time period are comments
-              "comment": {
-                "threshold": "30%",
-                "condition": "<"
-              }
+              "comment": "< 30%"
             },
           ]
         }

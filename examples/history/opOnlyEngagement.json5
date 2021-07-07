@@ -12,15 +12,9 @@
           "criteria": [
             {
               // look at last 90 days of Author's activities
-              "window": {
-                "days": 90
-              },
-              // trigger if less than 30% of their activities in this time period are comments
-              "comment": {
-                "asOp": true,
-                "threshold": "60%",
-                "condition": ">"
-              }
+              "window": "90 days",
+              // trigger if more than 60% of their activities in this time period are comments as OP
+              "comment": "> 60% OP"
             },
           ]
         }

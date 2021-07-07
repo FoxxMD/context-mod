@@ -9,13 +9,14 @@
         {
           "name": "freekarma",
           "kind": "recentActivity",
+          "useSubmissionAsReference": false,
           // when `lookAt` is not present this rule will look for submissions and comments
           // lookAt: "submissions"
           // lookAt: "comments"
           "thresholds": [
             {
               // for all subreddits, if the number of activities (sub/comment) is equal to or greater than 1 then the rule is triggered
-              "totalCount": 1,
+              "threshold": ">= 1",
               "subreddits": [
                 "DeFreeKarma",
                 "FreeKarma4U",
@@ -25,9 +26,7 @@
             }
           ],
           // will look at all of the Author's activities in the last 7 days
-          "window": {
-            "days": 7
-          }
+          "window": "7 days"
         }
       ],
       "actions": [

@@ -13,17 +13,15 @@
           "criteria": [
             {
               // threshold can be a percent or an absolute number
-              "threshold": "10%",
+              "threshold": "> 10%",
               // calculate percentage of submissions, rather than entire history (submissions & comments)
               "thresholdOn": "submissions",
 
               // look at last 90 days of Author's activities (comments and submissions)
-              "window": {
-                "days": 90
-              }
+              "window": "90 days"
             },
             {
-              "threshold": "10%",
+              "threshold": "> 10%",
               "thresholdOn": "submissions",
               // look at Author's last 100 activities (comments and submissions)
               "window": 100

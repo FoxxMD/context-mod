@@ -12,16 +12,14 @@
           "lookAt": "submissions",
           "thresholds": [
             {
-              "totalCount": 1,
+              "threshold": ">= 1",
               "subreddits": [
                 "DeFreeKarma",
                 "FreeKarma4U",
               ]
             }
           ],
-          "window": {
-            "days": 7
-          }
+          "window": "7 days"
         },
         {
           "name": "noobmemer",
@@ -51,15 +49,13 @@
           "lookAt": "submissions",
           "thresholds": [
             {
-              "totalCount": 1,
+              "threshold": ">= 1",
               "subreddits": [
                 "dankmemes",
               ]
             }
           ],
-          "window": {
-            "days": 7
-          }
+          "window": "7 days"
         }
       ],
       "actions": [

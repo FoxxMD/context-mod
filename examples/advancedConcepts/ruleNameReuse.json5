@@ -14,13 +14,11 @@
           "kind": "attribution",
           "criteria": [
             {
-              "threshold": "10%",
-              "window": {
-                "days": 90
-              }
+              "threshold": "> 10%",
+              "window": "90 days"
             },
             {
-              "threshold": "10%",
+              "threshold": "> 10%",
               "window": 100
             }
           ],
@@ -54,7 +52,7 @@
           "useSubmissionAsReference":true,
           "thresholds": [
             {
-              "totalCount": 1,
+              "threshold": ">= 1",
               "subreddits": [
                 "DeFreeKarma",
                 "FreeKarma4U",
@@ -63,9 +61,7 @@
               ]
             }
           ],
-          "window": {
-            "days": 7
-          }
+          "window": "7 days"
         }
       ],
       "actions": [
