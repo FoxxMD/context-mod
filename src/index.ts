@@ -93,7 +93,7 @@ for (const o of getUniversalOptions()) {
                 await app.buildManagers([sub]);
                 if (app.subManagers.length > 0) {
                     const manager = app.subManagers.find(x => x.subreddit.display_name === sub) as Manager;
-                    await manager.runChecks(type === 'comment' ? 'Comment' : 'Submission', activity, checks);
+                    await manager.runChecks(type === 'comment' ? 'Comment' : 'Submission', activity, {checkNames: checks});
                 }
             });
 
@@ -109,10 +109,10 @@ for (const o of getUniversalOptions()) {
 
                 await app.buildManagers(subreddits);
 
-                for(const manager of app.subManagers) {
+                for (const manager of app.subManagers) {
                     const activities = await manager.subreddit.getUnmoderated({limit});
-                    for(const a of activities.reverse()) {
-                        await manager.runChecks(a instanceof Submission ? 'Submission' : 'Comment', a, checks);
+                    for (const a of activities.reverse()) {
+                        await manager.runChecks(a instanceof Submission ? 'Submission' : 'Comment', a, {checkNames: checks});
                     }
                 }
             });

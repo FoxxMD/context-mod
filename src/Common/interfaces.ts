@@ -360,6 +360,16 @@ export interface PollingOptions {
      * @examples [20000]
      * */
     interval?: number,
+
+    /**
+     * Delay processing Activity until it is `N` seconds old
+     *
+     * Useful if there are other bots that may process an Activity and you want this bot to run first/last/etc.
+     *
+     * If the Activity is already `N` seconds old when it is initially retrieved no refresh of the Activity occurs (no API request is made) and it is immediately processed.
+     *
+     * */
+    delayUntil?: number,
 }
 
 export interface SubredditCacheConfig {
@@ -431,7 +441,7 @@ export interface ManagerOptions {
      *
      * **A `PollingOptions` object**
      *
-     * If you want to specify non-default preoperties
+     * If you want to specify non-default properties
      *
      * ****
      * If not specified the default is `["unmoderated"]`

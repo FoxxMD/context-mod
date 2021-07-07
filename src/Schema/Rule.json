@@ -50,7 +50,7 @@
                             "type": "string"
                         }
                     ],
-                    "description": "A value that specifies the amount of time to subtract from `NOW` to create a time range IE `NOW <---> [duration] ago`\n\nAcceptable values:\n\n**A `string` consisting of a value and a [Day.js](https://day.js.org/docs/en/durations/creating) time unit**\n\n* EX `9 days` => Range is `NOW <---> 9 days ago`\n\n**A [Day.js](https://day.js.org/docs/en/durations/creating) `object`**\n\n* EX `{\"days\": 90, \"minutes\": 15}` => Range is `NOW <---> 90 days and 15 minutes ago`\n\n**An [ISO 8601 duration](https://en.wikipedia.org/wiki/ISO_8601#Durations) `string`**\n\n* EX `PT15M` => 15 minutes => Range is `NOW <----> 15 minutes ago`",
+                    "description": "A value that specifies the amount of time to subtract from `NOW` to create a time range IE `NOW <---> [duration] ago`\n\nAcceptable values:\n\n**A `string` consisting of a value and a [Day.js](https://day.js.org/docs/en/durations/creating) time unit** ([test your value](https://regexr.com/61em3))\n\n* EX `9 days` => Range is `NOW <---> 9 days ago`\n\n**A [Day.js](https://day.js.org/docs/en/durations/creating) `object`**\n\n* EX `{\"days\": 90, \"minutes\": 15}` => Range is `NOW <---> 90 days and 15 minutes ago`\n\n**An [ISO 8601 duration](https://en.wikipedia.org/wiki/ISO_8601#Durations) `string`** ([test your value](https://regexr.com/61em9))\n\n* EX `PT15M` => 15 minutes => Range is `NOW <----> 15 minutes ago`",
                     "examples": [
                         "90 days",
                         "PT15M",

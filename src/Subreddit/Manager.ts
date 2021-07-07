@@ -12,7 +12,7 @@ import {RuleResult} from "../Rule";
 import {ConfigBuilder, buildPollingOptions} from "../ConfigBuilder";
 import {ManagerOptions, PollingOptionsStrong} from "../Common/interfaces";
 import Submission from "snoowrap/dist/objects/Submission";
-import {itemContentPeek} from "../Utils/SnoowrapUtils";
+import {activityIsRemoved, itemContentPeek} from "../Utils/SnoowrapUtils";
 import LoggedError from "../Utils/LoggedError";
 import ResourceManager, {
     SubredditResourceOptions,
@@ -23,6 +23,11 @@ import {UnmoderatedStream} from "./Streams";
 import EventEmitter from "events";
 import ConfigParseError from "../Utils/ConfigParseError";
 import dayjs, { Dayjs as DayjsObj } from "dayjs";
+
+export interface runCheckOptions {
+    checkNames?: string[],
+    delayUntil?: number,
+}
 
 export class Manager {
     subreddit: Subreddit;
@@ -37,7 +42,7 @@ export class Manager {
     lastWikiCheck: DayjsObj = dayjs();
     wikiUpdateRunning: boolean = false;
 
-    streamListedOnce: string[] = [];
+    streamListedOnce: string[] = ['unmoderated'];
     streams: Poll<Snoowrap.Submission | Snoowrap.Comment>[] = [];
     dryRun?: boolean;
     globalDryRun?: boolean;
@@ -188,8 +193,9 @@ export class Manager {
         this.logger.info('Checks updated');
     }
 
-    async runChecks(checkType: ('Comment' | 'Submission'), item: (Submission | Comment), checkNames: string[] = []): Promise<void> {
+    async runChecks(checkType: ('Comment' | 'Submission'), activity: (Submission | Comment), options?: runCheckOptions): Promise<void> {
         const checks = checkType === 'Comment' ? this.commentChecks : this.submissionChecks;
+        let item = activity;
         const itemId = await item.id;
         let allRuleResults: RuleResult[] = [];
         const itemIdentifier = `${checkType === 'Submission' ? 'SUB' : 'COM'} ${itemId}`;
@@ -197,12 +203,28 @@ export class Manager {
         const [peek, _] = await itemContentPeek(item);
         this.logger.info(`<EVENT> ${peek}`);
 
+        const {
+            checkNames = [],
+            delayUntil = 600,
+        } = options || {};
+
+        if(delayUntil !== undefined) {
+            const created = dayjs.unix(item.created_utc);
+            const diff = dayjs().diff(created, 's');
+            if(diff < delayUntil) {
+                this.logger.debug(`Delaying processing until Activity is ${delayUntil} seconds old (${delayUntil - diff}s)`);
+                await sleep(delayUntil - diff);
+                // @ts-ignore
+                item = await activity.refresh();
+            }
+        }
+
         while(this.wikiUpdateRunning) {
             // sleep for a few seconds while we get new config zzzz
             this.logger.verbose('A wiki config update is running, delaying checks by 3 seconds');
             await sleep(3000);
         }
-        if(this.lastWikiCheck.diff(dayjs(), 's') > 60) {
+        if(dayjs().diff(this.lastWikiCheck, 's') > 60) {
             // last checked more than 60 seconds ago for config, try and update
             await this.parseConfiguration();
         }
@@ -276,59 +298,69 @@ export class Manager {
         try {
 
             for(const pollOpt of this.pollOptions) {
+                const {
+                    pollOn,
+                    limit,
+                    interval,
+                    delayUntil
+                } = pollOpt;
                 let stream: Poll<Snoowrap.Submission | Snoowrap.Comment>;
 
-                switch(pollOpt.pollOn) {
+                switch(pollOn) {
                     case 'unmoderated':
                         stream = new UnmoderatedStream(this.client, {
                             subreddit: this.subreddit.display_name,
-                            limit: pollOpt.limit,
-                            pollTime: pollOpt.interval,
+                            limit: limit,
+                            pollTime: interval,
                         });
                         break;
                     case 'modqueue':
                         stream = new ModQueueStream(this.client, {
                             subreddit: this.subreddit.display_name,
-                            limit: pollOpt.limit,
-                            pollTime: pollOpt.interval,
+                            limit: limit,
+                            pollTime: interval,
                         });
                         break;
                     case 'newSub':
                         stream = new SubmissionStream(this.client, {
                             subreddit: this.subreddit.display_name,
-                            limit: pollOpt.limit,
-                            pollTime: pollOpt.interval,
+                            limit: limit,
+                            pollTime: interval,
                         });
                         break;
                     case 'newComm':
                         stream = new CommentStream(this.client, {
                             subreddit: this.subreddit.display_name,
-                            limit: pollOpt.limit,
-                            pollTime: pollOpt.interval,
+                            limit: limit,
+                            pollTime: interval,
                         });
                         break;
                 }
 
                 stream.once('listing', async (listing) => {
                     // warning if poll event could potentially miss activities
-                    if(this.commentChecks.length === 0 && ['unmoderated','modqueue','newComm'].some(x => x === pollOpt.pollOn)) {
-                        this.logger.warn(`Polling '${pollOpt.pollOn}' may return Comments but no comments checks were configured.`);
+                    if(this.commentChecks.length === 0 && ['unmoderated','modqueue','newComm'].some(x => x === pollOn)) {
+                        this.logger.warn(`Polling '${pollOn}' may return Comments but no comments checks were configured.`);
                     }
-                    if(this.submissionChecks.length === 0 && ['unmoderated','modqueue','newSub'].some(x => x === pollOpt.pollOn)) {
-                        this.logger.warn(`Polling '${pollOpt.pollOn}' may return Submissions but no submission checks were configured.`);
+                    if(this.submissionChecks.length === 0 && ['unmoderated','modqueue','newSub'].some(x => x === pollOn)) {
+                        this.logger.warn(`Polling '${pollOn}' may return Submissions but no submission checks were configured.`);
                     }
-                    this.streamListedOnce.push(pollOpt.pollOn);
+                    this.streamListedOnce.push(pollOn);
                 });
                 stream.on('item', async (item) => {
-                    if (!this.streamListedOnce.includes(pollOpt.pollOn)) {
+                    if (!this.streamListedOnce.includes(pollOn)) {
                         return;
                     }
+                    let checkType: 'Submission' | 'Comment' | undefined;
                     if(item instanceof Submission) {
                         if(this.submissionChecks.length > 0) {
-                            await this.runChecks('Submission', item);
+                            checkType = 'Submission';
                         }
                     } else if(this.commentChecks.length > 0) {
-                        await this.runChecks('Comment', item)
+                        checkType = 'Comment';
+                    }
+                    if(checkType !== undefined) {
+                        await this.runChecks(checkType, item, {delayUntil});
                     }
                 });
                 this.streams.push(stream);

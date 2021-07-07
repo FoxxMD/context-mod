@@ -111,9 +111,10 @@ export const buildPollingOptions = (values: (string | PollingOptions)[]): Pollin
             const {
                 pollOn: p,
                 interval = 20000,
-                limit = 25
+                limit = 25,
+                delayUntil,
             } = v;
-            opts.push({pollOn: p as PollOn, interval, limit});
+            opts.push({pollOn: p as PollOn, interval, limit, delayUntil});
         }
     }
     return opts;

@@ -30,7 +30,7 @@
                             "type": "string"
                         }
                     ],
-                    "description": "A value that specifies the amount of time to subtract from `NOW` to create a time range IE `NOW <---> [duration] ago`\n\nAcceptable values:\n\n**A `string` consisting of a value and a [Day.js](https://day.js.org/docs/en/durations/creating) time unit**\n\n* EX `9 days` => Range is `NOW <---> 9 days ago`\n\n**A [Day.js](https://day.js.org/docs/en/durations/creating) `object`**\n\n* EX `{\"days\": 90, \"minutes\": 15}` => Range is `NOW <---> 90 days and 15 minutes ago`\n\n**An [ISO 8601 duration](https://en.wikipedia.org/wiki/ISO_8601#Durations) `string`**\n\n* EX `PT15M` => 15 minutes => Range is `NOW <----> 15 minutes ago`",
+                    "description": "A value that specifies the amount of time to subtract from `NOW` to create a time range IE `NOW <---> [duration] ago`\n\nAcceptable values:\n\n**A `string` consisting of a value and a [Day.js](https://day.js.org/docs/en/durations/creating) time unit** ([test your value](https://regexr.com/61em3))\n\n* EX `9 days` => Range is `NOW <---> 9 days ago`\n\n**A [Day.js](https://day.js.org/docs/en/durations/creating) `object`**\n\n* EX `{\"days\": 90, \"minutes\": 15}` => Range is `NOW <---> 90 days and 15 minutes ago`\n\n**An [ISO 8601 duration](https://en.wikipedia.org/wiki/ISO_8601#Durations) `string`** ([test your value](https://regexr.com/61em9))\n\n* EX `PT15M` => 15 minutes => Range is `NOW <----> 15 minutes ago`",
                     "examples": [
                         "90 days",
                         "PT15M",
@@ -1323,6 +1323,10 @@
                 }
             ],
             "properties": {
+                "delayUntil": {
+                    "description": "Delay processing Activity until it is `N` seconds old\n\nUseful if there are other bots that may process an Activity and you want this bot to run first/last/etc.\n\nIf the Activity is already `N` seconds old when it is initially retrieved no refresh of the Activity occurs (no API request is made) and it is immediately processed.",
+                    "type": "number"
+                },
                 "interval": {
                     "default": 20000,
                     "description": "Amount of time, in milliseconds, to wait between requests",
@@ -2252,7 +2256,7 @@
                     "unmoderated"
                 ]
             ],
-            "description": "An array of sources to process Activities from\n\nValues in the array may be either:\n\n**A `string` representing the `pollOn` value to use**\n\nOne of:\n\n* `unmoderated`\n* `modqueue`\n* `newSub`\n* `newComm`\n\nwith the rest of the `PollingOptions` properties as defaults\n\n**A `PollingOptions` object**\n\nIf you want to specify non-default preoperties\n\n****\nIf not specified the default is `[\"unmoderated\"]`",
+            "description": "An array of sources to process Activities from\n\nValues in the array may be either:\n\n**A `string` representing the `pollOn` value to use**\n\nOne of:\n\n* `unmoderated`\n* `modqueue`\n* `newSub`\n* `newComm`\n\nwith the rest of the `PollingOptions` properties as defaults\n\n**A `PollingOptions` object**\n\nIf you want to specify non-default properties\n\n****\nIf not specified the default is `[\"unmoderated\"]`",
             "items": {
                 "anyOf": [
                     {
