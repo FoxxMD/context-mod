@@ -33,7 +33,7 @@ Consider the following example in a user's history:
 
 Your goal is to remove a submission if it has been crossposted **5 times.**
 
-With defaults for lookAt and gapAllowance this rule **would not be triggered** because set of consecutive submissions was repeated 5 times.
+With defaults for lookAt and gapAllowance this rule **would not be triggered** because no set of consecutive submissions was repeated 5 times.
 
 With only `lookAt: "submissions"` this rule **would trigger** because all the comments would be ignored resulting in 8 repeats.
 
@@ -41,7 +41,7 @@ With only `gapAllowance: 1` this rule **would not trigger** because the 2 commen
 
 With only `gapAllowance: 2` this rule **would trigger** because the the 1 and 2 comment non-repeats would be thrown out resulting in 8 repeats.
 
-**Note:** Using `lookAt: "submissions"` can be dangerous because all comments are thrown away. This isn't indicative of real repeat behavior if the user is a heavy commenter. For this reason the default is `all` and `submissions` should be used with caution.
+**Note:** `lookAt: "submissions"` should be used with caution because all comments are thrown away. This isn't indicative of real repeat behavior if the user is a heavy commenter. For this reason the default is `all`.
 
 ## Examples
 
