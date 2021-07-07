@@ -72,7 +72,7 @@ export interface ActivityWindowCriteria {
      *
      * Acceptable values:
      *
-     * **A `string` consisting of a value and a [Day.js](https://day.js.org/docs/en/durations/creating) time unit**
+     * **A `string` consisting of a value and a [Day.js](https://day.js.org/docs/en/durations/creating) time unit** ([test your value](https://regexr.com/61em3))
      *
      * * EX `9 days` => Range is `NOW <---> 9 days ago`
      *
@@ -80,7 +80,7 @@ export interface ActivityWindowCriteria {
      *
      * * EX `{"days": 90, "minutes": 15}` => Range is `NOW <---> 90 days and 15 minutes ago`
      *
-     * **An [ISO 8601 duration](https://en.wikipedia.org/wiki/ISO_8601#Durations) `string`**
+     * **An [ISO 8601 duration](https://en.wikipedia.org/wiki/ISO_8601#Durations) `string`** ([test your value](https://regexr.com/61em9))
      *
      * * EX `PT15M` => 15 minutes => Range is `NOW <----> 15 minutes ago`
      *

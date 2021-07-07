@@ -34,13 +34,12 @@ Some feature highlights:
 
 * [How It Works](#how-it-works)
 * [Installation](#installation)
-* [Configuration](#configuration)
-  * [Examples](#examples)
+* [Configuration And Docs](#configuration)
 * [Usage](#usage)
 
 ### How It Works
 
-Context Bot's configuration is made up of an array of **Checks**. Each **Check** consists of :
+Context Bot's configuration is made up of a list of **Checks**. Each **Check** consists of :
 
 #### Kind
 
@@ -48,7 +47,7 @@ Is this check for a submission or comment?
 
 #### Rules
 
-A list of **Rule** objects to run against the activity. If **any** Rule object is triggered by the activity then the Check runs its **Actions**
+A list of **Rule** objects to run against the activity. Triggered Rules can cause the whole Check to trigger and run its **Actions**
 
 #### Actions
 
@@ -90,13 +89,11 @@ docker run -e "CLIENT_ID=myId" ... foxxmd/reddit-context-bot
 
 ## Configuration
 
+[**Check the docs for in-depth explanations of all concepts and examples**](/docs)
+
 Context Bot's configuration can be written in JSON, [JSON5](https://json5.org/) or YAML. It's [schema](/src/Schema/App.json) conforms to [JSON Schema Draft 7](https://json-schema.org/).
 
 I suggest using [Atlassian JSON Schema Viewer](https://json-schema.app/start) ([direct link](https://json-schema.app/view/%23?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Freddit-context-bot%2Fmaster%2Fsrc%2FSchema%2FApp.json)) so you can view all documentation while also interactively writing and validating your config! From there you can drill down into any object, see its requirements, view an example JSON document, and live-edit your configuration on the right-hand side.
-
-### Examples
-
-Read through the [Examples](/examples) section for a thorough introduction to all the **Rules**, in-depth concepts, and sample configuration files.
 
 ### Action Templating
 

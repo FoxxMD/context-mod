@@ -4,5 +4,5 @@ The **Repeat Activity** rule will check for patterns of repetition in an Author'
 
 ### Examples
 
-* [Crosspost Spamming](/examples/repeatActivity/crosspostSpamming.json5) - Check if an Author is spamming their Submissions across multiple subreddits
-* [Burst-posting](/examples/repeatActivity/burstPosting.json5) - Check if Author is crossposting their Submissions in short bursts
+* [Crosspost Spamming](/docs/examplesmples/repeatActivity/crosspostSpamming.json5) - Check if an Author is spamming their Submissions across multiple subreddits
+* [Burst-posting](/docs/examplesmples/repeatActivity/burstPosting.json5) - Check if Author is crossposting their Submissions in short bursts
