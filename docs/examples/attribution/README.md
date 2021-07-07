@@ -10,5 +10,5 @@ Consult the [schema](https://json-schema.app/view/%23/%23%2Fdefinitions%2FCheckJ
 
 ### Examples
 
-* [Self Promotion as percentage of all Activities](/docs/examplesmples/attribution/redditSelfPromoAll.json5) - Check if Author is submitting much more than they comment.
-* [Self Promotion as percentage of Submissions](/docs/examplesmples/attribution/redditSelfPromoSubmissionsOnly.json5) - Check if any of Author's aggregated submission origins are >10% of their submissions
+* [Self Promotion as percentage of all Activities](/docs/examples/attribution/redditSelfPromoAll.json5) - Check if Author is submitting much more than they comment.
+* [Self Promotion as percentage of Submissions](/docs/examplesm/attribution/redditSelfPromoSubmissionsOnly.json5) - Check if any of Author's aggregated submission origins are >10% of their submissions

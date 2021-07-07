@@ -14,7 +14,7 @@ Consult the [schema](https://json-schema.app/view/%23%2Fdefinitions%2FUserNoteCr
 
 ### Examples
 
-* [Do not tag user with Good User note](/docs/examplesmples/userNotes/usernoteFilter.json5)
+* [Do not tag user with Good User note](/docs/examples/userNotes/usernoteFilter.json5)
 
 ## Action
 
@@ -23,4 +23,4 @@ A User Note can also be added to the Author of a Submission or Comment with the 
 
 ### Examples
 
-* [Add note on user doing self promotion](/docs/examplesmples/userNotes/usernoteSP.json5)
+* [Add note on user doing self promotion](/docs/examples/userNotes/usernoteSP.json5)

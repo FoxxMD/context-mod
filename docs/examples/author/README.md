@@ -9,7 +9,7 @@ The **Author** rule triggers if any [AuthorCriteria](https://json-schema.app/vie
 * author's subreddit flair text
 * author's subreddit flair css
 * author's subreddit mod status
-* [Toolbox User Notes](/docs/examplesmples/userNotes)
+* [Toolbox User Notes](/docs/examples/userNotes)
 
 The Author **Rule** is best used in conjunction with other Rules to short-circuit a Check based on who the Author is. It is easier to use a Rule to do this then to write **author filters** for every Rule (and makes Rules more re-useable).
 
@@ -18,10 +18,10 @@ Consult the [schema](https://json-schema.app/view/%23%2Fdefinitions%2FAuthorRule
 ### Examples
 
 * Basic examples
-    * [Flair new user Submission](/docs/examplesmples/author/flairNewUserSubmission.json5) - If the Author does not have the `vet` flair then flair the Submission with `New User`
-    * [Flair vetted user Submission](/docs/examplesmples/author/flairNewUserSubmission.json5) - If the Author does have the `vet` flair then flair the Submission with `Vetted`
+    * [Flair new user Submission](/docs/examples/author/flairNewUserSubmission.json5) - If the Author does not have the `vet` flair then flair the Submission with `New User`
+    * [Flair vetted user Submission](/docs/examples/author/flairNewUserSubmission.json5) - If the Author does have the `vet` flair then flair the Submission with `Vetted`
 * Used with other Rules
-    * [Ignore vetted user](/docs/examplesmples/author/flairNewUserSubmission.json5) - Short-circuit the Check if the Author has the `vet` flair
+    * [Ignore vetted user](/docs/examples/author/flairNewUserSubmission.json5) - Short-circuit the Check if the Author has the `vet` flair
     
 ## Filter
 
@@ -35,4 +35,4 @@ All **Rules** and **Checks** have an optional `authorIs` property that takes an 
 
 ### Examples
 
-* [Skip recent activity check based on author](/docs/examplesmples/author/authorFilter.json5) - Skip a Recent Activity check for a set of subreddits if the Author of the Submission has any set of flairs.
+* [Skip recent activity check based on author](/docs/examples/author/authorFilter.json5) - Skip a Recent Activity check for a set of subreddits if the Author of the Submission has any set of flairs.
