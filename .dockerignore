@@ -4,3 +4,4 @@ Dockerfile
 .gitignore
 .git
 src/logs
+/docs
