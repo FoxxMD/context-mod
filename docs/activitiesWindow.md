@@ -78,7 +78,7 @@ The value used to define the duration can be **any of these three types**:
 
 A string consisting of
 
-* A [Dayjs unit of time]((https://day.js.org/docs/en/durations/creating#list-of-all-available-units))
+* A [Dayjs unit of time](https://day.js.org/docs/en/durations/creating#list-of-all-available-units)
 * The value of that unit of time
 
 Examples:
