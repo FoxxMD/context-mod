@@ -153,7 +153,7 @@ Example
 Activities are retrieved in chunks of 100 (or `count`, whichever is smaller)
 
 * If 90 days of activities returns only 40 activities => returns 40 activities
-* If 80 activities is only 20 days of range => 100 activities
+* If 80 activities is only 20 days of range => 80 activities
 
 #### Using `"satisfyOn": "all"`
 
