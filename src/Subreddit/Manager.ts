@@ -42,7 +42,7 @@ export class Manager {
     lastWikiCheck: DayjsObj = dayjs();
     wikiUpdateRunning: boolean = false;
 
-    streamListedOnce: string[] = ['unmoderated'];
+    streamListedOnce: string[] = [];
     streams: Poll<Snoowrap.Submission | Snoowrap.Comment>[] = [];
     dryRun?: boolean;
     globalDryRun?: boolean;
