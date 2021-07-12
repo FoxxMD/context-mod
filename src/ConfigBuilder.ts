@@ -8,7 +8,13 @@ import * as schema from './Schema/App.json';
 import {JSONConfig} from "./JsonConfig";
 import LoggedError from "./Utils/LoggedError";
 import {CheckStructuredJson} from "./Check";
-import {PollingOptions, PollingOptionsStrong, PollOn} from "./Common/interfaces";
+import {
+    DEFAULT_POLLING_INTERVAL,
+    DEFAULT_POLLING_LIMIT,
+    PollingOptions,
+    PollingOptionsStrong,
+    PollOn
+} from "./Common/interfaces";
 import {isRuleSetJSON, RuleSetJson, RuleSetObjectJson} from "./Rule/RuleSet";
 import deepEqual from "fast-deep-equal";
 import {ActionJson, ActionObjectJson, RuleJson, RuleObjectJson} from "./Common/types";
@@ -106,12 +112,12 @@ export const buildPollingOptions = (values: (string | PollingOptions)[]): Pollin
     let opts: PollingOptionsStrong[] = [];
     for (const v of values) {
         if (typeof v === 'string') {
-            opts.push({pollOn: v as PollOn, interval: 10000, limit: 25});
+            opts.push({pollOn: v as PollOn, interval: DEFAULT_POLLING_INTERVAL, limit: DEFAULT_POLLING_LIMIT});
         } else {
             const {
                 pollOn: p,
-                interval = 20000,
-                limit = 25,
+                interval = DEFAULT_POLLING_INTERVAL,
+                limit = DEFAULT_POLLING_LIMIT,
                 delayUntil,
             } = v;
             opts.push({pollOn: p as PollOn, interval, limit, delayUntil});

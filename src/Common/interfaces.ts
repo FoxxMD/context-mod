@@ -1,4 +1,6 @@
 import {Duration} from "dayjs/plugin/duration";
+import Poll from "snoostorm/out/util/Poll";
+import Snoowrap from "snoowrap";
 
 /**
  * An ISO 8601 Duration
@@ -348,16 +350,16 @@ export interface PollingOptions {
     pollOn: 'unmoderated' | 'modqueue' | 'newSub' | 'newComm'
     /**
      * The maximum number of Activities to get on every request
-     * @default 25
-     * @examples [25]
+     * @default 50
+     * @examples [50]
      * */
     limit?: number
 
     /**
-     * Amount of time, in milliseconds, to wait between requests
+     * Amount of time, in secibds, to wait between requests
      *
-     * @default 20000
-     * @examples [20000]
+     * @default 30
+     * @examples [30]
      * */
     interval?: number,
 
@@ -592,3 +594,6 @@ export interface DomainInfo {
     provider?: string,
     mediaType?: string
 }
+
+export const DEFAULT_POLLING_INTERVAL = 30;
+export const DEFAULT_POLLING_LIMIT = 50;

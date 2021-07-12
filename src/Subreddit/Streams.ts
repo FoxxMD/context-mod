@@ -2,13 +2,15 @@ import {Poll, SnooStormOptions} from "snoostorm"
 import Snoowrap from "snoowrap";
 import {EventEmitter} from "events";
 import {PollConfiguration} from "snoostorm/out/util/Poll";
+import {DEFAULT_POLLING_INTERVAL} from "../Common/interfaces";
 
 type Awaitable<T> = Promise<T> | T;
 
-class SPoll<T extends object> extends Poll<T> {
+export class SPoll<T extends object> extends Poll<T> {
     identifier: keyof T;
     getter: () => Awaitable<T[]>;
     frequency;
+    running: boolean = false;
 
     constructor(options: PollConfiguration<T>) {
         super(options);
@@ -16,10 +18,10 @@ class SPoll<T extends object> extends Poll<T> {
         this.getter = options.get;
         this.frequency = options.frequency;
         clearInterval(this.interval);
-        this.startInterval();
     }
 
     startInterval = () => {
+        this.running = true;
         this.interval = setInterval(async () => {
             try {
                 const batch = await this.getter();
@@ -38,10 +40,14 @@ class SPoll<T extends object> extends Poll<T> {
                 // Emit the new listing of all new items
                 this.emit("listing", newItems);
             } catch (err) {
-                
                 this.emit('error', err);
             }
         }, this.frequency);
+    }
+
+    end = () => {
+        this.running = false;
+        super.end();
     }
 }
 
@@ -50,8 +56,44 @@ export class UnmoderatedStream extends SPoll<Snoowrap.Submission | Snoowrap.Comm
         client: Snoowrap,
         options: SnooStormOptions & { subreddit: string }) {
         super({
-            frequency: options.pollTime || 20000,
+            frequency: options.pollTime || DEFAULT_POLLING_INTERVAL * 1000,
             get: async () => client.getSubreddit(options.subreddit).getUnmoderated(options),
+            identifier: "id",
+        });
+    }
+}
+
+export class ModQueueStream extends SPoll<Snoowrap.Submission | Snoowrap.Comment> {
+    constructor(
+        client: Snoowrap,
+        options: SnooStormOptions & { subreddit: string }) {
+        super({
+            frequency: options.pollTime || DEFAULT_POLLING_INTERVAL * 1000,
+            get: async () => client.getSubreddit(options.subreddit).getModqueue(options),
+            identifier: "id",
+        });
+    }
+}
+
+export class SubmissionStream extends SPoll<Snoowrap.Submission | Snoowrap.Comment> {
+    constructor(
+        client: Snoowrap,
+        options: SnooStormOptions & { subreddit: string }) {
+        super({
+            frequency: options.pollTime || DEFAULT_POLLING_INTERVAL * 1000,
+            get: async () => client.getNew(options.subreddit, options),
+            identifier: "id",
+        });
+    }
+}
+
+export class CommentStream extends SPoll<Snoowrap.Submission | Snoowrap.Comment> {
+    constructor(
+        client: Snoowrap,
+        options: SnooStormOptions & { subreddit: string }) {
+        super({
+            frequency: options.pollTime || DEFAULT_POLLING_INTERVAL * 1000,
+            get: async () => client.getNewComments(options.subreddit, options),
             identifier: "id",
         });
     }

@@ -1328,18 +1328,18 @@
                     "type": "number"
                 },
                 "interval": {
-                    "default": 20000,
-                    "description": "Amount of time, in milliseconds, to wait between requests",
+                    "default": 30,
+                    "description": "Amount of time, in secibds, to wait between requests",
                     "examples": [
-                        20000
+                        30
                     ],
                     "type": "number"
                 },
                 "limit": {
-                    "default": 25,
+                    "default": 50,
                     "description": "The maximum number of Activities to get on every request",
                     "examples": [
-                        25
+                        50
                     ],
                     "type": "number"
                 },

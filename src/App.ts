@@ -1,13 +1,22 @@
 import Snoowrap, {Subreddit} from "snoowrap";
 import {Manager} from "./Subreddit/Manager";
 import winston, {Logger} from "winston";
-import {argParseInt, labelledFormat, parseBool, parseFromJsonOrYamlToObject, parseSubredditName, sleep} from "./util";
+import {
+    argParseInt,
+    createRetryHandler,
+    labelledFormat,
+    parseBool,
+    parseFromJsonOrYamlToObject,
+    parseSubredditName,
+    sleep
+} from "./util";
 import pEvent from "p-event";
 import EventEmitter from "events";
 import CacheManager from './Subreddit/SubredditResources';
 import dayjs, {Dayjs} from "dayjs";
 import LoggedError from "./Utils/LoggedError";
 import ProxiedSnoowrap from "./Utils/ProxiedSnoowrap";
+import {ModQueueStream, UnmoderatedStream} from "./Subreddit/Streams";
 
 const {transports} = winston;
 
@@ -137,6 +146,27 @@ export class App {
             logger: snooLogWrapper(this.logger.child({labels: ['Snoowrap']})),
             continueAfterRatelimitError: true,
         });
+
+        const retryHandler = createRetryHandler({maxRequestRetry: 5, maxOtherRetry: 1}, this.logger);
+
+        const modStreamErrorListener = (name: string) => async (err: any) => {
+            this.logger.error('Polling error occurred', err);
+            const shouldRetry = await retryHandler(err);
+            if(shouldRetry) {
+                defaultUnmoderatedStream.startInterval();
+            } else {
+                this.logger.error(`Mod stream ${name.toUpperCase()} encountered too many errors while polling. Will try to restart on next heartbeat.`);
+            }
+        }
+
+        const defaultUnmoderatedStream = new UnmoderatedStream(this.client, {subreddit: 'mod'});
+        // @ts-ignore
+        defaultUnmoderatedStream.on('error', modStreamErrorListener('unmoderated'));
+        const defaultModqueueStream = new ModQueueStream(this.client, {subreddit: 'mod'});
+        // @ts-ignore
+        defaultModqueueStream.on('error', modStreamErrorListener('modqueue'));
+        CacheManager.modStreams.set('unmoderated', defaultUnmoderatedStream);
+        CacheManager.modStreams.set('modqueue', defaultModqueueStream);
     }
 
     async buildManagers(subreddits: string[] = []) {
@@ -216,7 +246,7 @@ export class App {
         try {
             this.heartBeating = true;
             while (true) {
-                await sleep(this.heartbeatInterval * 1000);
+                await sleep(60 * 1000);
                 const heartbeat = `HEARTBEAT -- Reddit API Rate Limit remaining: ${this.client.ratelimitRemaining}`
                 if (this.apiLimitWarning >= this.client.ratelimitRemaining) {
                     this.logger.warn(heartbeat);
@@ -225,8 +255,9 @@ export class App {
                 }
                 for (const s of this.subManagers) {
                     try {
-                        await s.parseConfiguration();
-                        if (!s.running) {
+                        const newConfig = await s.parseConfiguration();
+                        if (newConfig || !s.running) {
+                            await s.buildPolling();
                             s.handle();
                         }
                     } catch (err) {
@@ -234,6 +265,7 @@ export class App {
                         this.logger.info('Will retry parsing config on next heartbeat...');
                     }
                 }
+                await this.runModStreams();
             }
         } catch (err) {
             this.logger.error('Error occurred during heartbeat', err);
@@ -243,9 +275,19 @@ export class App {
         }
     }
 
+    async runModStreams() {
+        for(const [k,v] of CacheManager.modStreams) {
+            if(!v.running && v.listeners('item').length > 0) {
+                v.startInterval();
+                this.logger.info(`Starting default ${k.toUpperCase()} mod stream`);
+            }
+        }
+    }
+
     async runManagers() {
         for (const manager of this.subManagers) {
             if (!manager.running) {
+                await manager.buildPolling();
                 manager.handle();
             }
         }
@@ -253,6 +295,8 @@ export class App {
         if (this.heartbeatInterval !== 0 && !this.heartBeating) {
             this.heartbeat();
         }
+
+        await this.runModStreams();
 
         const emitter = new EventEmitter();
         await pEvent(emitter, 'end');

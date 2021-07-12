@@ -17,6 +17,8 @@ import UserNotes from "./UserNotes";
 import Mustache from "mustache";
 import he from "he";
 import {AuthorCriteria} from "../Author/Author";
+import Poll from "snoostorm/out/util/Poll";
+import {SPoll} from "./Streams";
 
 export const DEFAULT_FOOTER = '\r\n*****\r\nThis action was performed by [a bot.]({{botLink}}) Mention a moderator or [send a modmail]({{modmailLink}}) if you any ideas, questions, or concerns about this action.';
 
@@ -226,6 +228,7 @@ class SubredditResourcesManager {
     resources: Map<string, SubredditResources> = new Map();
     authorTTL: number = 10000;
     enabled: boolean = true;
+    modStreams: Map<string, SPoll<Snoowrap.Submission | Snoowrap.Comment>> = new Map();
 
     get(subName: string): SubredditResources | undefined {
         if (this.resources.has(subName)) {
