@@ -59,6 +59,9 @@ export const checks = new commander.Option('-h, --checks <checkNames...>', 'An o
 export const limit = new commander.Option('--limit <limit>', 'Limit the number of unmoderated activities pulled for each subreddit')
     .argParser(parseInt);
 
+export const proxy = new commander.Option('--proxy <proxyEndpoint>', 'PRoxy Snoowrap requests through this endpoint')
+    .default(process.env.PROXY, 'process.env.PROXY');
+
 export const getUniversalOptions = (): commander.Option[] => {
     let options = [];
 
@@ -78,7 +81,8 @@ export const getUniversalOptions = (): commander.Option[] => {
         heartbeat,
         apiRemaining,
         dryRun,
-        disableCache
+        disableCache,
+        proxy
     ]
 
 

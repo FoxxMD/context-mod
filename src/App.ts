@@ -1,14 +1,13 @@
-import Snoowrap, { Subreddit } from "snoowrap";
+import Snoowrap, {Subreddit} from "snoowrap";
 import {Manager} from "./Subreddit/Manager";
 import winston, {Logger} from "winston";
 import {argParseInt, labelledFormat, parseBool, parseFromJsonOrYamlToObject, parseSubredditName, sleep} from "./util";
-import snoowrap from "snoowrap";
 import pEvent from "p-event";
 import EventEmitter from "events";
 import CacheManager from './Subreddit/SubredditResources';
 import dayjs, {Dayjs} from "dayjs";
 import LoggedError from "./Utils/LoggedError";
-import ConfigParseError from "./Utils/ConfigParseError";
+import ProxiedSnoowrap from "./Utils/ProxiedSnoowrap";
 
 const {transports} = winston;
 
@@ -50,6 +49,7 @@ export class App {
             version,
             authorTTL = process.env.AUTHOR_TTL || 10000,
             disableCache = process.env.DISABLE_CACHE || false,
+            proxy = process.env.PROXY,
         } = options;
 
         CacheManager.authorTTL = argParseInt(authorTTL);
@@ -129,7 +129,7 @@ export class App {
             accessToken,
         };
 
-        this.client = new snoowrap(creds);
+        this.client = proxy === undefined ? new Snoowrap(creds) : new ProxiedSnoowrap({...creds, proxy});
         this.client.config({
             warnings: true,
             maxRetryAttempts: 5,
@@ -184,7 +184,7 @@ export class App {
                 continue;
             }
 
-            if(content === '') {
+            if (content === '') {
                 this.logger.error(`[${sub.display_name_prefixed}] Wiki page contents was empty`);
                 continue;
             }
@@ -204,7 +204,7 @@ export class App {
                 manager.lastWikiRevision = dayjs.unix(wiki.revision_date);
                 subSchedule.push(manager);
             } catch (err) {
-                if(!(err instanceof LoggedError)) {
+                if (!(err instanceof LoggedError)) {
                     this.logger.error(`[${sub.display_name_prefixed}] Config was not valid`, err);
                 }
             }
@@ -223,10 +223,10 @@ export class App {
                 } else {
                     this.logger.info(heartbeat);
                 }
-                for(const s of this.subManagers) {
+                for (const s of this.subManagers) {
                     try {
                         await s.parseConfiguration();
-                        if(!s.running) {
+                        if (!s.running) {
                             s.handle();
                         }
                     } catch (err) {
@@ -235,68 +235,26 @@ export class App {
                     }
                 }
             }
+        } catch (err) {
+            this.logger.error('Error occurred during heartbeat', err);
+            throw err;
         } finally {
             this.heartBeating = false;
         }
     }
 
     async runManagers() {
-
-        // basic backoff delay if reddit is under load and not responding
-        let timeoutCount = 0;
-        let maxTimeoutCount = 4;
-        let otherRetryCount = 0;
-        // not sure should even allow so set to 0 for now
-        let maxOtherCount = 0;
-        let keepRunning = true;
-        let lastErrorAt: Dayjs | undefined;
-
-        while (keepRunning) {
-            try {
-                for (const manager of this.subManagers) {
-                    if (!manager.running) {
-                        manager.handle();
-                    }
-                }
-
-                if (this.heartbeatInterval !== 0 && !this.heartBeating) {
-                    this.heartbeat();
-                }
-
-                const emitter = new EventEmitter();
-                await pEvent(emitter, 'end');
-                keepRunning = false;
-            } catch (err) {
-                if (lastErrorAt !== undefined && dayjs().diff(lastErrorAt, 'minute') >= 5) {
-                    // if its been longer than 5 minutes since last error clear counters
-                    timeoutCount = 0;
-                    otherRetryCount = 0;
-                }
-
-                lastErrorAt = dayjs();
-
-                if (err.message.includes('ETIMEDOUT') || (err.code !== undefined && err.code.includes('ETIMEDOUT'))) {
-                    timeoutCount++;
-                    if (timeoutCount > maxTimeoutCount) {
-                        this.logger.error(`Timeouts (${timeoutCount}) exceeded max allowed (${maxTimeoutCount})`);
-                        throw err;
-                    }
-                    // exponential backoff
-                    const ms = (Math.pow(2, timeoutCount - 1) + (Math.random() - 0.3)) * 1000;
-                    this.logger.warn(`Reddit response timed out. Will wait ${ms / 1000} seconds before restarting managers`);
-                    await sleep(ms);
-
-                } else {
-                    // linear backoff
-                    otherRetryCount++;
-                    if (maxOtherCount > otherRetryCount) {
-                        throw err;
-                    }
-                    const ms = (3 * 1000) * otherRetryCount;
-                    this.logger.warn(`Non-timeout error occurred. Will wait ${ms / 1000} seconds before restarting managers`);
-                    await sleep(ms);
-                }
+        for (const manager of this.subManagers) {
+            if (!manager.running) {
+                manager.handle();
             }
         }
+
+        if (this.heartbeatInterval !== 0 && !this.heartBeating) {
+            this.heartbeat();
+        }
+
+        const emitter = new EventEmitter();
+        await pEvent(emitter, 'end');
     }
 }

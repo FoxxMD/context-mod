@@ -3,6 +3,7 @@ import {Logger} from "winston";
 import {SubmissionCheck} from "../Check/SubmissionCheck";
 import {CommentCheck} from "../Check/CommentCheck";
 import {
+    createRetryHandler,
     determineNewResults,
     mergeArr, parseFromJsonOrYamlToObject, sleep,
 } from "../util";
@@ -300,6 +301,8 @@ export class Manager {
             return;
         }
 
+        const retryHandler = createRetryHandler({maxRequestRetry: 5, maxOtherRetry: 1}, this.logger);
+
         try {
 
             for(const pollOpt of this.pollOptions) {
@@ -364,8 +367,25 @@ export class Manager {
                     } else if(this.commentChecks.length > 0) {
                         checkType = 'Comment';
                     }
-                    if(checkType !== undefined) {
-                        await this.runChecks(checkType, item, {delayUntil});
+                    if (checkType !== undefined) {
+                        try {
+                            await this.runChecks(checkType, item, {delayUntil});
+                        } catch (err) {
+                            this.logger.error('Encountered unhandled error, event processing stopped early');
+                            this.logger.error(err);
+                        }
+                    }
+                });
+
+                // @ts-ignore
+                stream.on('error', async (err: any) => {
+                    
+                    this.logger.error('Polling error occurred', err);
+                    const shouldRetry = await retryHandler(err);
+                    if(shouldRetry && stream instanceof UnmoderatedStream) {
+                        stream.startInterval();
+                    } else {
+                        throw err;
                     }
                 });
                 this.streams.push(stream);
@@ -376,8 +396,7 @@ export class Manager {
 
             await pEvent(this.emitter, 'end');
         } catch (err) {
-            this.logger.error('Encountered unhandled error, manager is bailing out');
-            this.logger.error(err);
+            this.logger.error('Too many request errors occurred or an unhandled error was encountered, manager is stopping');
         } finally {
             this.stop();
         }

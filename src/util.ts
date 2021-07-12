@@ -553,3 +553,54 @@ export const parseExternalUrl = (val: string) => {
     }
     return (matches.groups as any).url as string;
 }
+
+export interface RetryOptions {
+    maxRequestRetry: number,
+    maxOtherRetry: number,
+}
+
+export const createRetryHandler = (opts: RetryOptions, logger: Logger) => {
+    const {maxRequestRetry, maxOtherRetry} = opts;
+
+    let timeoutCount = 0;
+    let otherRetryCount = 0;
+    let lastErrorAt: Dayjs | undefined;
+
+    return async (err: any) => {
+        if (lastErrorAt !== undefined && dayjs().diff(lastErrorAt, 'minute') >= 3) {
+            // if its been longer than 5 minutes since last error clear counters
+            timeoutCount = 0;
+            otherRetryCount = 0;
+        }
+
+        lastErrorAt = dayjs();
+
+        if(err.name === 'RequestError' || err.name === 'StatusCodeError') {
+            if (err.message.includes('ETIMEDOUT') || err.message.includes('ESOCKETTIMEDOUT') || (err.statusCode !== undefined && [500, 503, 502, 504, 522].includes(err.statusCode))) {
+                timeoutCount++;
+                if (timeoutCount > maxRequestRetry) {
+                    logger.error(`Reddit request timeout issue retries (${timeoutCount}) exceeded max allowed (${maxRequestRetry})`);
+                    return false;
+                }
+                // exponential backoff
+                const ms = (Math.pow(2, timeoutCount - 1) + (Math.random() - 0.3) + 1) * 1000;
+                logger.warn(`Reddit request timed out or returned a timeout error response (${timeoutCount} in 3 minutes). Will wait ${formatNumber(ms / 1000)} seconds before retrying`);
+                await sleep(ms);
+                return true;
+
+            } else {
+                return false;
+            }
+        } else {
+            // linear backoff
+            otherRetryCount++;
+            if (maxOtherRetry > otherRetryCount) {
+                return false;
+            }
+            const ms = (4 * 1000) * otherRetryCount;
+            logger.warn(`Non-request error occurred. Will wait ${formatNumber(ms / 1000)} seconds before retrying`);
+            await sleep(ms);
+            return true;
+        }
+    }
+}
