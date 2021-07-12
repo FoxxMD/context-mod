@@ -246,7 +246,7 @@ export class App {
         try {
             this.heartBeating = true;
             while (true) {
-                await sleep(60 * 1000);
+                await sleep(this.heartbeatInterval * 1000);
                 const heartbeat = `HEARTBEAT -- Reddit API Rate Limit remaining: ${this.client.ratelimitRemaining}`
                 if (this.apiLimitWarning >= this.client.ratelimitRemaining) {
                     this.logger.warn(heartbeat);
