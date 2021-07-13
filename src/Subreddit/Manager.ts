@@ -220,7 +220,7 @@ export class Manager {
 
         const {
             checkNames = [],
-            delayUntil = 600,
+            delayUntil,
         } = options || {};
 
         if(delayUntil !== undefined) {
