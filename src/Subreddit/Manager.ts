@@ -66,6 +66,7 @@ export class Manager {
 
     constructor(sub: Subreddit, client: Snoowrap, logger: Logger, sourceData: object, opts: ManagerOptions = {}) {
         const displayLabel = `${sub.display_name_prefixed}`;
+        const {dryRun} = opts;
         this.displayLabel = displayLabel;
         this.currentLabels = [displayLabel];
         const getLabels = this.getCurrentLabels;
@@ -76,6 +77,7 @@ export class Manager {
                 return getLabels()
             }
         }, mergeArr);
+        this.globalDryRun = dryRun;
         this.subreddit = sub;
         this.client = client;
         this.parseConfigurationFromObject(sourceData);
