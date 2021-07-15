@@ -49,14 +49,17 @@
         .stats label:after {
             content: ":";
         }
+
         .has-tooltip {
             position: relative;
         }
-        .tooltip{
+
+        .tooltip {
             visibility: hidden;
             position: absolute;
-            right:0;
+            right: 0;
         }
+
         .has-tooltip:hover .tooltip {
             visibility: visible;
             z-index: 100;
@@ -114,16 +117,16 @@
                 <div class="p-6 md:px-10 md:py-6">
                     <% subreddits.forEach(function (data){ %>
                         <div class="sub" data-subreddit="<%= data.name %>">
-                            <div class="grid md:grid-cols-3 gap-3">
+                            <div class="grid md:grid-cols-2 gap-10">
                                 <div class="bg-white shadow-md rounded my-6 dark:bg-gray-500 dark:text-white">
                                     <div class="space-x-4 px-4 p-2 leading-2 font-semibold bg-gray-300 dark:bg-gray-700 dark:text-white">
                                         <div class="flex items-center justify-between">
                                             <h4>Overview</h4>
                                             <div class="flex items-center flex-end">
                                                 <div>
-                                                    <a href="#">Start<%= data.name === 'All' ? ' All' : ''%></a> |
-                                                    <a href="#">Stop<%= data.name === 'All' ? ' All' : ''%></a> |
-                                                    <a href="#">Reload<%= data.name === 'All' ? ' All' : ''%></a>
+                                                    <a href="#">Start<%= data.name === 'All' ? ' All' : '' %></a> |
+                                                    <a href="#">Stop<%= data.name === 'All' ? ' All' : '' %></a> |
+                                                    <a href="#">Reload<%= data.name === 'All' ? ' All' : '' %></a>
                                                 </div>
                                             </div>
                                         </div>
@@ -134,10 +137,8 @@
                                             <span class="font-semibold"><%= data.running %></span>
                                             <label>Dry Run</label>
                                             <span><%= data.dryRun %></span>
-                                            <label>Submissions Checks</label>
-                                            <span><%= data.checks.submissions %></span>
-                                            <label>Comments Checks</label>
-                                            <span><%= data.checks.comments %></span>
+                                            <label>Checks</label>
+                                            <span><%= data.checks.submissions %> Submission | <%= data.checks.comments %> Comment </span>
                                             <% if (data.name !== 'All') { %>
                                                 <label>Started At</label>
                                                 <span class="has-tooltip">
@@ -146,16 +147,18 @@
                                                     </span>
                                                     <%= data.startedAtHuman %>
                                                 </span>
-                                                <label>Wiki Location</label>
-                                                <span><a href="<%= data.wikiHref %>"><%= data.wikiLocation %></a></span>
-                                                <label>Wiki Revision</label>
-                                                <span class="has-tooltip">
+                                                <label>Wiki</label>
+                                                <span>
+                                                    <a style="display: inline"
+                                                       href="<%= data.wikiHref %>"><%= data.wikiLocation %></a>
+                                                    <span class="has-tooltip">
                                                     <span class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2'>
                                                         <%= data.wikiRevision %>
                                                     </span>
-                                                    <%= data.wikiRevisionHuman %>
+                                                    (Revised <%= data.wikiRevisionHuman %>)
                                                 </span>
-                                                <label>Wiki Last Check</label>
+                                                </span>
+                                                <label>Wiki Checked</label>
                                                 <span class="has-tooltip">
                                                     <span class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2'>
                                                         <%= data.wikiLastCheck %>
@@ -164,62 +167,74 @@
                                                 </span>
                                             <% } %>
                                         </div>
+                                        <% if (data.name !== 'All') { %>
+                                            <ul class="list-disc list-inside mt-4">
+                                            <% data.pollingInfo.forEach(function (i){ %>
+                                                <li>Polling <%- i %></li>
+                                            <% }) %>
+                                            </ul>
+                                        <% } %>
                                     </div>
                                 </div>
-                                <% if (data.name !== 'All') { %>
-                                    <div class="bg-white shadow-md rounded my-6 dark:bg-gray-500 dark:text-white">
-                                        <div class="space-x-4 px-4 p-2 leading-2 font-semibold bg-gray-300 dark:bg-gray-700 dark:text-white">
-                                            <h4>Stats (Since Start)</h4>
-                                        </div>
-                                        <div class="p-4 stats">
-                                            <label>Events Checked</label>
-                                            <span><%= data.stats.eventsCheckedSinceStartTotal === undefined ? '-' : data.stats.eventsCheckedSinceStartTotal %></span>
-
-                                            <label>Checks Run</label>
-                                            <span><%= data.stats.checksRunSinceStartTotal === undefined ? '-' : data.stats.checksRunSinceStartTotal %></span>
-
-                                            <label>Checks Triggered</label>
-                                            <span><%= data.stats.checksTriggeredSinceStartTotal === undefined ? '-' : data.stats.checksTriggeredSinceStartTotal %></span>
-
-                                            <label>Rules Run</label>
-                                            <span><%= data.stats.rulesRunSinceStartTotal === undefined ? '-' : data.stats.rulesRunSinceStartTotal %></span>
-
-                                            <label>Rules Cached</label>
-                                            <span><%= data.stats.rulesCachedSinceStartTotal === undefined ? '-' : data.stats.rulesCachedSinceStartTotal %></span>
-
-                                            <label>Rules Triggered</label>
-                                            <span><%= data.stats.rulesTriggeredSinceStartTotal === undefined ? '-' : data.stats.rulesTriggeredSinceStartTotal %></span>
-
-                                            <label>Actions Run</label>
-                                            <span><%= data.stats.actionsRunSinceStartTotal === undefined ? '-' : data.stats.actionsRunSinceStartTotal %></span>
-                                        </div>
-                                    </div>
-                                <% } %>
                                 <div class="bg-white shadow-md rounded my-6 dark:bg-gray-500 dark:text-white">
                                     <div class="space-x-4 px-4 p-2 leading-2 font-semibold bg-gray-300 dark:bg-gray-700 dark:text-white">
-                                        <h4>Stats (All Time)</h4>
+                                        <h4>Stats</h4>
                                     </div>
-                                    <div class="p-4 stats">
-                                        <label>Events Checked</label>
-                                        <span><%= data.stats.eventsCheckedTotal %></span>
+                                    <div class="p-4">
+                                        <div class="flex items-center justify-evenly">
+                                            <% if (data.name !== 'All') { %>
+                                                <div>
+                                                    <h4 class="text-center text-semibold pb-2">Since Start</h4>
+                                                    <div class="stats">
+                                                        <label>Events Checked</label>
+                                                        <span><%= data.stats.eventsCheckedSinceStartTotal === undefined ? '-' : data.stats.eventsCheckedSinceStartTotal %></span>
 
-                                        <label>Checks Run</label>
-                                        <span><%= data.stats.checksRunTotal %></span>
+                                                        <label>Checks Run</label>
+                                                        <span><%= data.stats.checksRunSinceStartTotal === undefined ? '-' : data.stats.checksRunSinceStartTotal %></span>
 
-                                        <label>Checks Triggered</label>
-                                        <span><%= data.stats.checksTriggeredTotal %></span>
+                                                        <label>Checks Triggered</label>
+                                                        <span><%= data.stats.checksTriggeredSinceStartTotal === undefined ? '-' : data.stats.checksTriggeredSinceStartTotal %></span>
 
-                                        <label>Rules Run</label>
-                                        <span><%= data.stats.rulesRunTotal %></span>
+                                                        <label>Rules Run</label>
+                                                        <span><%= data.stats.rulesRunSinceStartTotal === undefined ? '-' : data.stats.rulesRunSinceStartTotal %></span>
 
-                                        <label>Rules Cached</label>
-                                        <span><%= data.stats.rulesCachedTotal %></span>
+                                                        <label>Rules Cached</label>
+                                                        <span><%= data.stats.rulesCachedSinceStartTotal === undefined ? '-' : data.stats.rulesCachedSinceStartTotal %></span>
 
-                                        <label>Rules Triggered</label>
-                                        <span><%= data.stats.rulesTriggeredTotal %></span>
+                                                        <label>Rules Triggered</label>
+                                                        <span><%= data.stats.rulesTriggeredSinceStartTotal === undefined ? '-' : data.stats.rulesTriggeredSinceStartTotal %></span>
 
-                                        <label>Actions Run</label>
-                                        <span><%= data.stats.actionsRunTotal %></span>
+                                                        <label>Actions Run</label>
+                                                        <span><%= data.stats.actionsRunSinceStartTotal === undefined ? '-' : data.stats.actionsRunSinceStartTotal %></span>
+                                                    </div>
+                                                </div>
+                                            <% } %>
+                                            <div>
+                                                <h4 class="text-center text-semibold pb-2">All Time</h4>
+                                                <div class="stats">
+                                                    <label>Events Checked</label>
+                                                    <span><%= data.stats.eventsCheckedTotal %></span>
+
+                                                    <label>Checks Run</label>
+                                                    <span><%= data.stats.checksRunTotal %></span>
+
+                                                    <label>Checks Triggered</label>
+                                                    <span><%= data.stats.checksTriggeredTotal %></span>
+
+                                                    <label>Rules Run</label>
+                                                    <span><%= data.stats.rulesRunTotal %></span>
+
+                                                    <label>Rules Cached</label>
+                                                    <span><%= data.stats.rulesCachedTotal %></span>
+
+                                                    <label>Rules Triggered</label>
+                                                    <span><%= data.stats.rulesTriggeredTotal %></span>
+
+                                                    <label>Actions Run</label>
+                                                    <span><%= data.stats.actionsRunTotal %></span>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -239,7 +254,7 @@
                                     repeatCount="indefinite"/>
                         </path>
                     </svg>
-                            <div class="logs font-mono text-sm">
+                            <div data-subreddit="<%= data.name %>" class="logs font-mono text-sm">
                                 <% data.logs.forEach(function (logEntry){ %>
                                     <%- logEntry %>
                                 <% }) %>
@@ -286,13 +301,10 @@
             e.preventDefault()
             fetch(e.target.href).then(req => {
                 if (req.ok) {
-                    if (e.target.dataset.log === 'info') {
-                        document.querySelector('[data-log="debug"]').classList.remove('font-bold', 'no-underline', 'pointer-events-none')
-                        document.querySelector('[data-log="info"]').classList.add('font-bold', 'no-underline', 'pointer-events-none')
-                    } else {
-                        document.querySelector('[data-log="info"]').classList.remove('font-bold', 'no-underline', 'pointer-events-none')
-                        document.querySelector('[data-log="debug"]').classList.add('font-bold', 'no-underline', 'pointer-events-none')
-                    }
+                    document.querySelectorAll('[data-log]').forEach(el => {
+                        el.classList.remove('font-bold', 'no-underline', 'pointer-events-none');
+                    });
+                    e.target.classList.add('font-bold', 'no-underline', 'pointer-events-none');
                 }
             })
         })
@@ -324,9 +336,9 @@
             fetch(e.target.href).then(req => {
                 if (req.ok) {
                     document.querySelectorAll('[data-limit]').forEach(el => {
-                        el.classList.remove('font-bold', 'no-underline', 'pointer-events-none')
-                        e.target.classList.add('font-bold', 'no-underline', 'pointer-events-none')
-                    })
+                        el.classList.remove('font-bold', 'no-underline', 'pointer-events-none');
+                    });
+                    e.target.classList.add('font-bold', 'no-underline', 'pointer-events-none')
                 }
             })
         })
@@ -369,19 +381,24 @@
     socket.on("connect", () => {
         document.body.classList.add('connected')
         socket.on("log", data => {
-            const selectors = ['[data-subreddit="All"].sub-logs'];
+            const selectors = ['[data-subreddit="All"].logs'];
             const sub = parseSubredditLogName(data);
             if (sub !== undefined) {
-                selectors.push(`[data-subreddit="${sub}"].sub-logs`);
+                selectors.push(`[data-subreddit="${sub}"].logs`);
             }
             selectors.forEach(sel => {
-                const currLogs = document.querySelector(sel).innerHTML;
+                const el = document.querySelector(sel);
+                if(el === null) {
+                    debugger;
+                }
+                const currLogs = el.innerHTML;
                 document.querySelector(sel).innerHTML = window.sort === 'desc' ? data.concat(currLogs) : currLogs.concat(data)
             });
         });
         socket.on("logClear", data => {
             data.forEach((obj) => {
-                document.querySelector(`[data-subreddit="${obj.name}"].sub-logs`).innerHTML = obj.logs;
+                const n = obj.name === 'all' ? 'All' : obj.name;
+                document.querySelector(`[data-subreddit="${n}"].logs`).innerHTML = obj.logs;
             })
             //document.querySelector('.logs').innerHTML = data.join().replaceAll(/<br\s*\/?>\,/g,'<br />');
         })
