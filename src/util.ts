@@ -45,6 +45,7 @@ export const defaultFormat = printf(({
                                          level,
                                          message,
                                          labels = ['App'],
+                                         subreddit,
                                          leaf,
                                          itemId,
                                          timestamp,
@@ -77,7 +78,7 @@ export const defaultFormat = printf(({
     }
     const labelContent = `${nodes.map((x: string) => `[${x}]`).join(' ')}`;
 
-    return `${timestamp} ${level.padEnd(7)}: ${labelContent} ${msg}${stringifyValue !== '' ? ` ${stringifyValue}` : ''}${stackMsg}`;
+    return `${timestamp} ${level.padEnd(7)}: ${subreddit !== undefined ? `{${subreddit}} ` : ''}${labelContent} ${msg}${stringifyValue !== '' ? ` ${stringifyValue}` : ''}${stackMsg}`;
 });
 
 
@@ -604,3 +605,82 @@ export const createRetryHandler = (opts: RetryOptions, logger: Logger) => {
         }
     }
 }
+
+const LABELS_REGEX: RegExp = /(\[.+?])*/g;
+export const parseLabels = (log: string): string[] => {
+    return Array.from(log.matchAll(LABELS_REGEX), m => m[0]).map(x => x.substring(1, x.length - 1));
+}
+
+const SUBREDDIT_NAME_LOG_REGEX: RegExp = /{(.+?)}/;
+export const parseSubredditLogName = (val:string): string | undefined => {
+    const matches = val.match(SUBREDDIT_NAME_LOG_REGEX);
+    if (matches === null) {
+        return undefined;
+    }
+    return matches[1] as string;
+}
+
+export const LOG_LEVEL_REGEX: RegExp = /\s*(debug|warn|info|error|verbose)\s*:/i
+export const isLogLineMinLevel = (line: string, minLevelText: string): boolean => {
+    const lineLevelMatch = line.match(LOG_LEVEL_REGEX);
+    if (lineLevelMatch === null) {
+        return false;
+    }
+
+    // @ts-ignore
+    const minLevel = logLevels[minLevelText];
+    // @ts-ignore
+    const level = logLevels[lineLevelMatch[1] as string];
+    return level <= minLevel;
+}
+
+// https://regexr.com/3e6m0
+const HYPERLINK_REGEX: RegExp = /(http(s)?:\/\/.)?(www\.)?[-a-zA-Z0-9@:%._\+~#=]{2,256}\.[a-z]{2,6}\b([-a-zA-Z0-9@:%_\+.~#?&//=]*)/;
+export const formatLogLineToHtml = (val: string) => {
+    return val
+        .replace(/(\s*debug\s*):/i, '<span class="debug text-pink-400">$1</span>:')
+        .replace(/(\s*warn\s*):/i, '<span class="warn text-yellow-400">$1</span>:')
+        .replace(/(\s*info\s*):/i, '<span class="info text-blue-300">$1</span>:')
+        .replace(/(\s*error\s*):/i, '<span class="error text-red-400">$1</span>:')
+        .replace(/(\s*verbose\s*):/i, '<span class="error text-purple-400">$1</span>:')
+        .replace('\n', '<br />')
+        .replace(HYPERLINK_REGEX, '<a href="$&">$&</a>');
+}
+
+export const filterLogBySubreddit = (rawLogs: string[] = [], subreddits: string[] = [], minLevel: string, isOperator = false): any => {
+    const subMap: Map<string, string[]> = new Map([['all', []]]);
+    const logs = rawLogs.filter(x => isLogLineMinLevel(x, minLevel));
+    if (isOperator) {
+        subMap.set('all', logs.map(formatLogLineToHtml));
+    }
+    return logs.reduce((acc: Map<string, string[]>, curr) => {
+        const subName = parseSubredditLogName(curr);
+        if (subName === undefined) {
+            return acc;
+        }
+        const formatted = formatLogLineToHtml(curr);
+        const sub = subreddits.find(x => subName === x);
+        if (sub === undefined) {
+            return acc;
+        } else if (!acc.has(sub)) {
+            acc.set(sub, []);
+        }
+        const subLogs = acc.get(sub) as string[];
+        acc.set(sub, subLogs.concat(formatted));
+        if (!isOperator) {
+            acc.set('all', (acc.get('all') as string[]).concat(formatted));
+        }
+        return acc;
+    }, subMap);
+}
+
+export const logLevels = {
+    error: 0,
+    warn: 1,
+    info: 2,
+    http: 3,
+    verbose: 4,
+    debug: 5,
+    trace: 5,
+    silly: 6
+};

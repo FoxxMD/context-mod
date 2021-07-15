@@ -9,13 +9,18 @@ export const clientSecret = new commander.Option('-e, --clientSecret <secret>', 
     .default(process.env.CLIENT_SECRET);
 clientSecret.required = true;
 
-export const accessToken = new commander.Option('-a, --accessToken <token>', 'Access token retrieved from authenticating an account with your Reddit Application (default: process.env.ACCESS_TOKEN)')
-    .default(process.env.ACCESS_TOKEN);
-accessToken.required = true;
+export const redirectURI = new commander.Option('-u, --redirectUri <uri>', 'Redirect URI for your Reddit application (default: process.env.REDIRECT_URI)')
+    .default(process.env.REDIRECT_URI);
+redirectURI.required = true;
 
-export const refreshToken = new commander.Option('-r, --refreshToken <token>', 'Refresh token retrieved from authenticating an account with your Reddit Application (default: process.env.REFRESH_TOKEN)')
+export const sessionSecret = new commander.Option('-t, --sessionSecret <secret>', 'Secret use to encrypt session id/data (default: process.env.SESSION_SECRET)')
+    .default(process.env.SESSION_SECRET);
+
+export const createAccessTokenOption = () => new commander.Option('-a, --accessToken <token>', 'Access token retrieved from authenticating an account with your Reddit Application (default: process.env.ACCESS_TOKEN)')
+    .default(process.env.ACCESS_TOKEN);
+
+export const createRefreshTokenOption = () => new commander.Option('-r, --refreshToken <token>', 'Refresh token retrieved from authenticating an account with your Reddit Application (default: process.env.REFRESH_TOKEN)')
     .default(process.env.REFRESH_TOKEN);
-refreshToken.required = true;
 
 export const subreddits = new commander.Option('-s, --subreddits <list...>', 'List of subreddits to run on. Bot will run on all subs it has access to if not defined')
     .default(process.env.SUBREDDITS || [], 'process.env.SUBREDDITS (comma-seperated)');
@@ -59,19 +64,48 @@ export const checks = new commander.Option('-h, --checks <checkNames...>', 'An o
 export const limit = new commander.Option('--limit <limit>', 'Limit the number of unmoderated activities pulled for each subreddit')
     .argParser(parseInt);
 
-export const proxy = new commander.Option('--proxy <proxyEndpoint>', 'PRoxy Snoowrap requests through this endpoint')
+export const proxy = new commander.Option('--proxy <proxyEndpoint>', 'Proxy Snoowrap requests through this endpoint')
     .default(process.env.PROXY, 'process.env.PROXY');
 
-export const getUniversalOptions = (): commander.Option[] => {
-    let options = [];
+export const operator = new commander.Option('--operator <name>', 'Username of the reddit user operating this application (default: process.env.OPERATOR)')
+    .default(process.env.OPERATOR);
 
-    options.push(dryRun);
-
-    options = [
+export const getUniversalWebOptions = (): commander.Option[] => {
+    return [
         clientId,
         clientSecret,
-        accessToken,
-        refreshToken,
+        createAccessTokenOption(),
+        createRefreshTokenOption(),
+        redirectURI,
+        sessionSecret,
+        subreddits,
+        logDir,
+        logLevel,
+        wikiConfig,
+        snooDebug,
+        authorTTL,
+        heartbeat,
+        apiRemaining,
+        dryRun,
+        disableCache,
+        proxy,
+        operator,
+    ];
+}
+
+export const getUniversalCLIOptions = (): commander.Option[] => {
+
+    const at = createAccessTokenOption();
+    at.required = true;
+
+    const rt = createRefreshTokenOption();
+    rt.required = true;
+
+    return [
+        clientId,
+        clientSecret,
+        at,
+        rt,
         subreddits,
         logDir,
         logLevel,
@@ -84,7 +118,8 @@ export const getUniversalOptions = (): commander.Option[] => {
         disableCache,
         proxy
     ]
+}
 
-
-    return options;
+export const addOptions = (com: commander.Command, options: commander.Option[]): commander.Command => {
+    return options.reduce((c, opt) => c.addOption(opt), com);
 }

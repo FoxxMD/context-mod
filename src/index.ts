@@ -8,8 +8,9 @@ import sameafter from 'dayjs/plugin/isSameOrAfter.js';
 import samebefore from 'dayjs/plugin/isSameOrBefore.js';
 import {Manager} from "./Subreddit/Manager";
 import {Command} from 'commander';
-import {checks, getUniversalOptions, limit} from "./Utils/CommandConfig";
+import {addOptions, checks, getUniversalCLIOptions, getUniversalWebOptions, limit} from "./Utils/CommandConfig";
 import {App} from "./App";
+import createWebServer from './Server/server';
 import Submission from "snoowrap/dist/objects/Submission";
 import {COMMENT_URL_ID, parseLinkIdentifier, SUBMISSION_URL_ID} from "./util";
 
@@ -23,28 +24,31 @@ const commentReg = parseLinkIdentifier([COMMENT_URL_ID]);
 const submissionReg = parseLinkIdentifier([SUBMISSION_URL_ID]);
 
 const program = new Command();
-for (const o of getUniversalOptions()) {
-    program.addOption(o);
-}
+// for (const o of getUniversalOptions()) {
+//     program.addOption(o);
+// }
 
 (async function () {
     try {
 
-        program
+        let runCommand = program
             .command('run')
             .description('Runs bot normally')
-            .action(async (run, command) => {
-                const app = new App(program.opts());
-                await app.buildManagers();
-                await app.runManagers();
-            });
+        runCommand = addOptions(runCommand, getUniversalCLIOptions());
+        runCommand.action(async (run, command) => {
+            const app = new App(program.opts());
+            await app.buildManagers();
+            await app.runManagers();
+        });
 
-        program
+        let checkCommand = program
             .command('check <activityIdentifier> [type]')
             .description('Run check(s) on a specific activity', {
                 activityIdentifier: 'Either a permalink URL or the ID of the Comment or Submission',
                 type: `If activityIdentifier is not a permalink URL then the type of activity ('comment' or 'submission'). May also specify 'submission' type when using a permalink to a comment to get the Submission`,
-            })
+            });
+        checkCommand = addOptions(checkCommand, getUniversalCLIOptions());
+        checkCommand
             .addOption(checks)
             .action(async (activityIdentifier, type, commandOptions = {}) => {
                 const {checks = []} = commandOptions;
@@ -97,10 +101,12 @@ for (const o of getUniversalOptions()) {
                 }
             });
 
-        program.command('unmoderated <subreddits...>')
+        let unmodCommand = program.command('unmoderated <subreddits...>')
             .description('Run checks on all unmoderated activity in the modqueue', {
                 subreddits: 'The list of subreddits to run on. If not specified will run on all subreddits the account has moderation access to.'
-            })
+            });
+        unmodCommand = addOptions(unmodCommand, getUniversalCLIOptions());
+        unmodCommand
             .addOption(checks)
             .addOption(limit)
             .action(async (subreddits = [], commandOptions = {}) => {
@@ -117,6 +123,12 @@ for (const o of getUniversalOptions()) {
                 }
             });
 
+        let webCommand = program.command('web');
+        webCommand = addOptions(webCommand, getUniversalWebOptions());
+        webCommand.action(async () => {
+            const server = createWebServer(program.opts());
+            await server;
+        });
 
         await program.parseAsync();
 

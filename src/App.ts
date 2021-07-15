@@ -4,7 +4,7 @@ import winston, {Logger} from "winston";
 import {
     argParseInt,
     createRetryHandler,
-    labelledFormat,
+    labelledFormat, logLevels,
     parseBool,
     parseFromJsonOrYamlToObject,
     parseSubredditName,
@@ -40,14 +40,15 @@ export class App {
     heartbeatInterval: number;
     apiLimitWarning: number;
     heartBeating: boolean = false;
+    botName?: string;
 
     constructor(options: any = {}) {
         const {
             subreddits = [],
-            clientId,
-            clientSecret,
-            accessToken,
-            refreshToken,
+            clientId = process.env.CLIENT_ID,
+            clientSecret = process.env.CLIENT_SECRET,
+            accessToken = process.env.ACCESS_TOKEN,
+            refreshToken = process.env.REFRESH_TOKEN,
             logDir = process.env.LOG_DIR || `${process.cwd()}/logs`,
             logLevel = process.env.LOG_LEVEL || 'verbose',
             wikiConfig = process.env.WIKI_CONFIG || 'botconfig/contextbot',
@@ -59,6 +60,7 @@ export class App {
             authorTTL = process.env.AUTHOR_TTL || 10000,
             disableCache = process.env.DISABLE_CACHE || false,
             proxy = process.env.PROXY,
+            additionalTransports = [],
         } = options;
 
         CacheManager.authorTTL = argParseInt(authorTTL);
@@ -74,7 +76,13 @@ export class App {
         const myTransports = [
             consoleTransport,
         ];
+
         let errorTransports = [];
+
+        for(const a of additionalTransports) {
+            myTransports.push(a);
+            errorTransports.push(a);
+        }
 
         if (logDir !== false) {
             let logPath = logDir;
@@ -98,16 +106,7 @@ export class App {
             level: logLevel || 'info',
             format: labelledFormat(),
             transports: myTransports,
-            levels: {
-                error: 0,
-                warn: 1,
-                info: 2,
-                http: 3,
-                verbose: 4,
-                debug: 5,
-                trace: 5,
-                silly: 6
-            },
+            levels: logLevels,
             exceptionHandlers: errorTransports,
             rejectionHandlers: errorTransports,
         };
@@ -174,6 +173,7 @@ export class App {
         const name = await this.client.getMe().name;
         this.logger.info(`Reddit API Limit Remaining: ${this.client.ratelimitRemaining}`);
         this.logger.info(`Authenticated Account: /u/${name}`);
+        this.botName = name;
         for (const sub of await this.client.getModeratedSubreddits()) {
             // TODO don't know a way to check permissions yet
             availSubs.push(sub);
@@ -210,19 +210,19 @@ export class App {
                 wiki = await sub.getWikiPage(this.wikiLocation).fetch();
                 content = wiki.content_md;
             } catch (err) {
-                this.logger.error(`[${sub.display_name_prefixed}] Could not read wiki configuration. Please ensure the page https://reddit.com${sub.url}wiki/${this.wikiLocation} exists and is readable -- error: ${err.message}`);
+                this.logger.error(`{${sub.display_name_prefixed}} Could not read wiki configuration. Please ensure the page https://reddit.com${sub.url}wiki/${this.wikiLocation} exists and is readable -- error: ${err.message}`);
                 continue;
             }
 
             if (content === '') {
-                this.logger.error(`[${sub.display_name_prefixed}] Wiki page contents was empty`);
+                this.logger.error(`{${sub.display_name_prefixed}} Wiki page contents was empty`);
                 continue;
             }
 
             const [configObj, jsonErr, yamlErr] = parseFromJsonOrYamlToObject(content);
 
             if (configObj === undefined) {
-                this.logger.error(`[${sub.display_name_prefixed}] Could not parse wiki page contents as JSON or YAML:`);
+                this.logger.error(`{${sub.display_name_prefixed}} Could not parse wiki page contents as JSON or YAML:`);
                 this.logger.error(jsonErr);
                 this.logger.error(yamlErr);
                 continue;
@@ -235,7 +235,7 @@ export class App {
                 subSchedule.push(manager);
             } catch (err) {
                 if (!(err instanceof LoggedError)) {
-                    this.logger.error(`[${sub.display_name_prefixed}] Config was not valid`, err);
+                    this.logger.error(`{${sub.display_name_prefixed}} Config was not valid`, err);
                 }
             }
         }
@@ -262,7 +262,9 @@ export class App {
                         }
                     } catch (err) {
                         s.stop();
-                        this.logger.info('Will retry parsing config on next heartbeat...');
+                        if(!(err instanceof LoggedError)) {
+                            this.logger.info('Will retry parsing config on next heartbeat...');
+                        }
                     }
                 }
                 await this.runModStreams();

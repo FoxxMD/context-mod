@@ -56,7 +56,7 @@ export class Manager {
     emitter: EventEmitter = new EventEmitter();
 
     displayLabel: string;
-    currentLabels?: string[];
+    currentLabels: string[] = [];
 
     running: boolean = false;
 
@@ -64,17 +64,23 @@ export class Manager {
         return this.currentLabels;
     }
 
+    getDisplay = () => {
+        return this.displayLabel;
+    }
+
     constructor(sub: Subreddit, client: Snoowrap, logger: Logger, sourceData: object, opts: ManagerOptions = {}) {
-        const displayLabel = `${sub.display_name_prefixed}`;
         const {dryRun} = opts;
-        this.displayLabel = displayLabel;
-        this.currentLabels = [displayLabel];
+        this.displayLabel =  opts.nickname || `${sub.display_name_prefixed}`;
         const getLabels = this.getCurrentLabels;
+        const getDisplay = this.getDisplay;
         // dynamic default meta for winston feasible using function getters
         // https://github.com/winstonjs/winston/issues/1626#issuecomment-531142958
         this.logger = logger.child({
             get labels() {
                 return getLabels()
+            },
+            get subreddit() {
+                return getDisplay()
             }
         }, mergeArr);
         this.globalDryRun = dryRun;
@@ -97,10 +103,7 @@ export class Manager {
         this.pollOptions = buildPollingOptions(polling);
         this.dryRun = this.globalDryRun || dryRun;
 
-        if(nickname !== undefined) {
-            this.displayLabel = nickname;
-            this.currentLabels = [this.displayLabel];
-        }
+        this.displayLabel = nickname || `${this.subreddit.display_name_prefixed}`;
 
         if(footer !== undefined) {
             this.resources.footer = footer;
@@ -182,12 +185,14 @@ export class Manager {
         } catch (err) {
             const msg = `Could not read wiki configuration. Please ensure the page https://reddit.com${this.subreddit.url}wiki/${this.wikiLocation} exists and is readable -- error: ${err.message}`;
             this.logger.error(msg);
+            this.logger.info('Will retry parsing config on next heartbeat...');
             this.wikiUpdateRunning = false;
             throw new ConfigParseError(msg);
         }
 
         if (sourceData === '') {
             this.logger.error(`Wiki page contents was empty`);
+            this.logger.info('Will retry parsing config on next heartbeat...');
             this.wikiUpdateRunning = false;
             throw new ConfigParseError('Wiki page contents was empty');
         }
@@ -198,6 +203,7 @@ export class Manager {
             this.logger.error(`Could not parse wiki page contents as JSON or YAML:`);
             this.logger.error(jsonErr);
             this.logger.error(yamlErr);
+            this.logger.info('Will retry parsing config on next heartbeat...');
             this.wikiUpdateRunning = false;
             throw new ConfigParseError('Could not parse wiki page contents as JSON or YAML:')
         }
@@ -300,7 +306,7 @@ export class Manager {
         } finally {
             this.logger.verbose(`Run Stats:        Checks ${checksRun} | Rules => Total: ${totalRulesRun} Unique: ${allRuleResults.length} Cached: ${totalRulesRun - allRuleResults.length} | Actions ${actionsRun}`);
             this.logger.verbose(`Reddit API Stats: Initial Limit ${startingApiLimit} | Current Limit ${this.client.ratelimitRemaining} | Calls Made ${startingApiLimit - this.client.ratelimitRemaining}`);
-            this.currentLabels = [this.displayLabel];
+            this.currentLabels = [];
         }
     }
 
