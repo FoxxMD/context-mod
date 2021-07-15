@@ -24,7 +24,6 @@ import {Manager} from "../Subreddit/Manager";
 const MemoryStore = createMemoryStore(session);
 const app = addAsync(express());
 const router = Router();
-const port = process.env.PORT ?? 8085;
 
 app.use(router);
 app.use(bodyParser.json());
@@ -73,17 +72,18 @@ const streamTransport = new winston.transports.Stream({
 })
 
 const rcbServer = async function (options: any = {}) {
-    const server = await app.listen(port);
-    const io = new SocketServer(server);
-
     const {
         clientId = process.env.CLIENT_ID,
         clientSecret = process.env.CLIENT_SECRET,
         redirectUri = process.env.REDIRECT_URI,
         sessionSecret = process.env.SESSION_SECRET || defaultSessionSecret,
         operator = process.env.OPERATOR,
-        operatorDisplay = process.env.OPERATOR_DISPLAY || 'Anonymous'
+        operatorDisplay = process.env.OPERATOR_DISPLAY || 'Anonymous',
+        port = process.env.PORT || 8085,
     } = options;
+
+    const server = await app.listen(port);
+    const io = new SocketServer(server);
 
     const bot = new App({...options, additionalTransports: [streamTransport]});
     await bot.buildManagers();

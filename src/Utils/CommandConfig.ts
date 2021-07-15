@@ -73,6 +73,9 @@ export const operator = new commander.Option('--operator <name>', 'Username of t
 export const operatorDisplay = new commander.Option('--operatorDisplay <name>', 'An optional name to display who is operating this application in the UI (default: process.env.OPERATOR_DISPLAY || Anonymous)')
     .default(process.env.OPERATOR_DISPLAY);
 
+export const port = new commander.Option('-p, --port <port>', 'Port for web server to listen on (default: process.env.PORT || 8085)')
+    .default(process.env.PORT);
+
 export const getUniversalWebOptions = (): commander.Option[] => {
     return [
         clientId,
@@ -93,7 +96,8 @@ export const getUniversalWebOptions = (): commander.Option[] => {
         disableCache,
         proxy,
         operator,
-        operatorDisplay
+        operatorDisplay,
+        port
     ];
 }
 
