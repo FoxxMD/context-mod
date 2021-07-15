@@ -700,3 +700,20 @@ export const totalFromMapStats = (val: Map<any, number>): number => {
         return acc + v;
     }, 0);
 }
+
+export const permissions = [
+    'edit',
+    'flair',
+    'history',
+    'identity',
+    'modcontributors',
+    'modflair',
+    'modposts',
+    'modself',
+    'mysubreddits',
+    'read',
+    'report',
+    'submit',
+    'wikiread',
+    'wikiedit'
+];

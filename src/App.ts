@@ -17,7 +17,7 @@ import dayjs, {Dayjs} from "dayjs";
 import LoggedError from "./Utils/LoggedError";
 import ProxiedSnoowrap from "./Utils/ProxiedSnoowrap";
 import {ModQueueStream, UnmoderatedStream} from "./Subreddit/Streams";
-import {createDefaultLogger} from "./Utils/loggerFactory";
+import {getDefaultLogger} from "./Utils/loggerFactory";
 
 const {transports} = winston;
 
@@ -71,11 +71,7 @@ export class App {
         this.apiLimitWarning = argParseInt(apiLimitWarning);
         this.wikiLocation = wikiConfig;
 
-        if(!winston.loggers.has('default')) {
-            this.logger = createDefaultLogger(options);
-        } else {
-            this.logger = winston.loggers.get('default');
-        }
+        this.logger = getDefaultLogger(options);
 
         if (this.dryRun) {
             this.logger.info('Running in DRYRUN mode');
@@ -106,8 +102,10 @@ export class App {
             }
         }
         if(missingCreds.length > 0) {
-            this.logger.error('There are credentials missing that would prevent initializing the Reddit API Client and subsequently the rest of the application.');
-            this.logger.error(`Check the USAGE section of the readme for the correct naming of these arguments/environment variables: ${missingCreds.join(', ')}`);
+            this.logger.error('There are credentials missing that would prevent initializing the Reddit API Client and subsequently the rest of the application');
+            this.logger.error(`Missing credentials: ${missingCreds.join(', ')}`)
+            this.logger.info(`If this is a first-time setup use the 'web' command for a web-based guide to configuring your application`);
+            this.logger.info(`Or check the USAGE section of the readme for the correct naming of these arguments/environment variables`);
             throw new LoggedError(`Missing credentials: ${missingCreds.join(', ')}`);
         }
 

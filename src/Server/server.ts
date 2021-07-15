@@ -46,8 +46,6 @@ const defaultSessionSecret = randomId();
 declare module 'express-session' {
     interface SessionData {
         user: string,
-        accessToken: string,
-        refreshToken: string,
         subreddits: string[],
         lastCheck?: number,
         limit?: number,
@@ -138,45 +136,9 @@ const rcbServer = async function (options: any = {}) {
     });
 
     const redditUserMiddleware = async (req: express.Request, res: express.Response, next: Function) => {
-        if (req.session.accessToken === undefined) {
+        if (req.session.user === undefined) {
             return res.redirect('/login');
         }
-
-        // this is buggy ATM and not really needed --
-        // if a user wants to refresh the subs they mod (like if they join a new sub as mod while logged in)
-        // they can just logout/log back in.
-        // maybe if this is requested in the future i'll revisit
-
-        // const {accessToken: userAT, refreshToken: userRT, lastCheck} = req.session;
-        //
-        // if (lastCheck !== undefined && dayjs().diff(dayjs.unix(req.session.lastCheck as number), 'm') > 5) {
-        //     try {
-        //         //@ts-ignore
-        //         const client = new Snoowrap({
-        //             clientId,
-        //             clientSecret,
-        //             accessToken: userAT,
-        //             refreshToken: userRT,
-        //             userAgent: `web:contextBot:web`,
-        //         });
-        //         if (operator === undefined || (operator.toLowerCase() !== req.session.user)) {
-        //             const subs = await client.getModeratedSubreddits();
-        //             const subNames = subs.map(x => x.display_name);
-        //             req.session.subreddits = bot.subManagers.reduce((acc: string[], manager) => {
-        //                 if (subNames.includes(manager.subreddit.display_name)) {
-        //                     return acc.concat(manager.displayLabel);
-        //                 }
-        //                 return acc;
-        //             }, []);
-        //         }
-        //     } catch (err) {
-        //         // some error occurred, probably token expired so redirect to login
-        //         // @ts-ignore
-        //         await req.session.destroy();
-        //         res.redirect('/login');
-        //     }
-        // }
-
         next();
     }
 
@@ -202,8 +164,6 @@ const rcbServer = async function (options: any = {}) {
         const user = await client.getMe().name as string;
         const subs = await client.getModeratedSubreddits();
 
-        req.session['accessToken'] = client.accessToken;
-        req.session['refreshToken'] = client.refreshToken;
         req.session['user'] = user;
         // @ts-ignore
         req.session['subreddits'] = operator !== undefined && operator.toLowerCase() === user.toLowerCase() ? bot.subManagers.map(x => x.displayLabel) : subs.reduce((acc: string[], x) => {

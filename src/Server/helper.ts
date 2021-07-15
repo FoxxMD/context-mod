@@ -1,0 +1,67 @@
+import {addAsync, Router} from '@awaitjs/express';
+import express from 'express';
+import Snoowrap from "snoowrap";
+import {permissions} from "../util";
+import {getDefaultLogger} from "../Utils/loggerFactory";
+
+const app = addAsync(express());
+const router = Router();
+app.set('views', `${__dirname}/views`);
+app.set('view engine', 'ejs');
+
+app.use(router);
+
+const helperServer = async function (options: any = {}) {
+    let rUri: string;
+    const {
+        clientId = process.env.CLIENT_ID,
+        clientSecret = process.env.CLIENT_SECRET,
+        redirectUri = process.env.REDIRECT_URI,
+        port = process.env.PORT || 8085,
+    } = options;
+
+    const server = await app.listen(port);
+    const logger = getDefaultLogger(options);
+    logger.info(`Helper UI started: http://localhost:${port}`);
+    app.getAsync('/', async (req, res) => {
+        res.render('helper', {
+            redirectUri
+        });
+    });
+
+    app.getAsync('/auth', async (req, res) => {
+        rUri = req.query.redirect as string;
+        let permissionsList = permissions;
+
+        const includeWikiEdit = (req.query.wikiEdit as any).toString() === "1";
+        if (!includeWikiEdit) {
+            permissionsList = permissionsList.filter(x => x !== 'wikiedit');
+        }
+        const authUrl = Snoowrap.getAuthUrl({
+            clientId,
+            scope: permissionsList,
+            redirectUri: rUri as string,
+            permanent: true,
+        });
+        return res.redirect(authUrl);
+    });
+
+    app.getAsync(/.*callback$/, async (req, res) => {
+        const client = await Snoowrap.fromAuthCode({
+            userAgent: `web:contextBot:web`,
+            clientId,
+            clientSecret,
+            redirectUri: rUri,
+            code: req.query.code as string,
+        });
+        // @ts-ignore
+        const user = await client.getMe();
+
+        res.render('callback', {
+            accessToken: client.accessToken,
+            refreshToken: client.refreshToken,
+        });
+    });
+}
+
+export default helperServer;

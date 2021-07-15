@@ -1,0 +1,99 @@
+<html>
+<head>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.0.3/tailwind.min.css"
+          integrity="sha512-wl80ucxCRpLkfaCnbM88y4AxnutbGk327762eM9E/rRTvY/ZGAHWMZrYUq66VQBYMIYDFpDdJAOGSLyIPHZ2IQ=="
+          crossorigin="anonymous"/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.0.3/tailwind-dark.min.css"
+          integrity="sha512-WvyKyiVHgInX5UQt67447ExtRRZG/8GUijaq1MpqTNYp8wY4/EJOG5bI80sRp/5crDy4Z6bBUydZI2OFV3Vbtg=="
+          crossorigin="anonymous"/>
+    <script type="module"
+            src="https://cdn.jsdelivr.net/npm/@catalyst-elements/catalyst-toggle-switch@0.7.0/catalyst-toggle-switch.min.js"></script>
+    <style>
+        a {
+            text-decoration: underline;
+        }
+
+        .has-tooltip {
+            position: relative;
+        }
+
+        .tooltip {
+            visibility: hidden;
+            position: absolute;
+            right: 0;
+        }
+
+        .has-tooltip:hover .tooltip {
+            visibility: visible;
+            z-index: 100;
+        }
+    </style>
+    <title>RCB OAuth Helper</title>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width,initial-scale=1.0">
+</head>
+<body class="">
+<script>localStorage.getItem('ms-dark') === 'yes' ? document.body.classList.add('dark') : document.body.classList.remove('dark')</script>
+<div class="min-w-screen min-h-screen bg-gray-100 bg-gray-100 dark:bg-gray-800 font-sans">
+    <div class="space-x-4 p-6 md:px-10 md:py-6 leading-6 font-semibold bg-gray-800 text-white">
+        <div class="container mx-auto">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center flex-grow pr-4">
+                    <div class="px-4 width-full relative">
+                        <div><a href="https://github.com/FoxxMD/reddit-context-bot">RCB</a> OAuth Helper</div>
+                    </div>
+                </div>
+                <div class="flex items-center flex-end text-sm">
+                    Dark mode
+                    <catalyst-toggle-switch id="toggle-switch"></catalyst-toggle-switch>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="container mx-auto">
+        <div class="grid">
+            <div class="bg-white dark:bg-gray-500 dark:text-white">
+                <div class="p-6 md:px-10 md:py-6">
+                    <div class="text-xl mb-4">Congrats! You did the thing.</div>
+                    <div class="space-y-3">
+                        <ul class="list-inside list-disc">
+                            <li>Access Token: <b><%= accessToken %></b></li>
+                            <li>Refresh Token: <b><%= refreshToken %></b></li>
+                        </ul>
+                        <div>Copy these somewhere and then restart the application providing these as either arguments
+                            or environmental variables as described in the <a
+                                    href="https://github.com/FoxxMD/reddit-context-bot#usage">usage section.</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+    let toggleSwitch = document.querySelector('#toggle-switch');
+    toggleSwitch.addEventListener('change', (event) => {
+        document.body.classList.toggle('dark')
+        toggleSwitch.checked ? localStorage.setItem('ms-dark', 'yes') : localStorage.setItem('ms-dark', 'no')
+    });
+    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        if (localStorage.getItem('ms-dark') === 'yes') {
+            document.body.classList.add('dark')
+            toggleSwitch.checked = true
+            localStorage.setItem('ms-dark', 'yes')
+        }
+    }
+
+    if (document.querySelector('#redirectUri').value === '') {
+        document.querySelector('#redirectUri').value = `${document.location.href}callback`;
+    }
+
+    document.querySelector('#doAuth').addEventListener('click', e => {
+        e.preventDefault()
+        const url = `${document.location.href}auth?redirect=${document.querySelector('#redirectUri').value}`
+        window.location.href = url;
+    })
+</script>
+</body>
+</html>

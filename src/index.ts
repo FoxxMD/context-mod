@@ -11,10 +11,11 @@ import {Command} from 'commander';
 import {addOptions, checks, getUniversalCLIOptions, getUniversalWebOptions, limit} from "./Utils/CommandConfig";
 import {App} from "./App";
 import createWebServer from './Server/server';
+import createHelperServer from './Server/helper';
 import Submission from "snoowrap/dist/objects/Submission";
 import {COMMENT_URL_ID, parseLinkIdentifier, SUBMISSION_URL_ID} from "./util";
 import LoggedError from "./Utils/LoggedError";
-import {createDefaultLogger} from "./Utils/loggerFactory";
+import {getDefaultLogger} from "./Utils/loggerFactory";
 
 dayjs.extend(utc);
 dayjs.extend(dduration);
@@ -127,10 +128,20 @@ const program = new Command();
         webCommand.action(async () => {
             const opts = program.opts();
             const {
-                redirectUri = process.env.REDIRECT_URI
+                redirectUri = process.env.REDIRECT_URI,
+                clientId = process.env.CLIENT_ID,
+                clientSecret = process.env.CLIENT_SECRET,
+                accessToken = process.env.ACCESS_TOKEN,
+                refreshToken = process.env.REFRESH_TOKEN,
             } = opts;
-            if(redirectUri === undefined) {
-                const logger = createDefaultLogger(opts);
+            const hasClient = clientId !== undefined && clientSecret !== undefined;
+            const hasNoTokens = accessToken === undefined && refreshToken === undefined;
+            if(hasClient && hasNoTokens) {
+                // run web helper
+                const server = createHelperServer(opts);
+                await server;
+            } else if(redirectUri === undefined) {
+                const logger = getDefaultLogger(opts);
                 logger.warn(`'web' command detected but no redirectUri found in arg/env. Switching to CLI only.`);
                 const app = new App(opts);
                 await app.buildManagers();
