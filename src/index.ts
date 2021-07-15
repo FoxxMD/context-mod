@@ -13,6 +13,7 @@ import {App} from "./App";
 import createWebServer from './Server/server';
 import Submission from "snoowrap/dist/objects/Submission";
 import {COMMENT_URL_ID, parseLinkIdentifier, SUBMISSION_URL_ID} from "./util";
+import LoggedError from "./Utils/LoggedError";
 
 dayjs.extend(utc);
 dayjs.extend(dduration);
@@ -130,14 +131,17 @@ const program = new Command();
         await program.parseAsync();
 
     } catch (err) {
-        const logger = winston.loggers.get('default');
-        if (err.name === 'StatusCodeError' && err.response !== undefined) {
-            const authHeader = err.response.headers['www-authenticate'];
-            if (authHeader !== undefined && authHeader.includes('insufficient_scope')) {
-                logger.error('Reddit responded with a 403 insufficient_scope, did you choose the correct scopes?');
+        if(!err.logged && !(err instanceof LoggedError)) {
+            const logger = winston.loggers.get('default');
+            if (err.name === 'StatusCodeError' && err.response !== undefined) {
+                const authHeader = err.response.headers['www-authenticate'];
+                if (authHeader !== undefined && authHeader.includes('insufficient_scope')) {
+                    logger.error('Reddit responded with a 403 insufficient_scope, did you choose the correct scopes?');
+                }
             }
+            console.log(err);
         }
-        console.log(err);
+        process.kill(process.pid, 'SIGTERM');
     }
 }());
 export {Author} from "./Author/Author";

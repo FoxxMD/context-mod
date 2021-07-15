@@ -82,10 +82,15 @@ const rcbServer = async function (options: any = {}) {
         port = process.env.PORT || 8085,
     } = options;
 
+    const bot = new App({...options, additionalTransports: [streamTransport]});
+    await bot.testClient();
+
     const server = await app.listen(port);
     const io = new SocketServer(server);
 
-    const bot = new App({...options, additionalTransports: [streamTransport]});
+    const logger = winston.loggers.get('default');
+    logger.info(`Web UI started: http://localhost:${port}`);
+
     await bot.buildManagers();
 
     const sessionObj = session({

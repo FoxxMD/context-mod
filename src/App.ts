@@ -139,6 +139,18 @@ export class App {
             accessToken,
         };
 
+        const missingCreds = [];
+        for(const [k,v] of Object.entries(creds)) {
+            if(v === undefined || v === '' || v === null) {
+                missingCreds.push(k);
+            }
+        }
+        if(missingCreds.length > 0) {
+            this.logger.error('There are credentials missing that would prevent initializing the Reddit API Client and subsequently the rest of the application.');
+            this.logger.error(`Check the USAGE section of the readme for the correct naming of these arguments/environment variables: ${missingCreds.join(', ')}`);
+            throw new LoggedError(`Missing credentials: ${missingCreds.join(', ')}`);
+        }
+
         this.client = proxy === undefined ? new Snoowrap(creds) : new ProxiedSnoowrap({...creds, proxy});
         this.client.config({
             warnings: true,
@@ -168,6 +180,29 @@ export class App {
         defaultModqueueStream.on('error', modStreamErrorListener('modqueue'));
         CacheManager.modStreams.set('unmoderated', defaultUnmoderatedStream);
         CacheManager.modStreams.set('modqueue', defaultModqueueStream);
+    }
+
+    async testClient() {
+        try {
+            // @ts-ignore
+            await this.client.getMe();
+            this.logger.info('Test API call successful');
+        } catch (err) {
+            this.logger.error('An error occurred while trying to initialize the Reddit API Client which would prevent the entire application from running.');
+            if(err.name === 'StatusCodeError') {
+                const authHeader = err.response.headers['www-authenticate'];
+                if (authHeader !== undefined && authHeader.includes('insufficient_scope')) {
+                    this.logger.error('Reddit responded with a 403 insufficient_scope. Please ensure you have chosen the correct scopes when authorizing your account.');
+                } else if(err.statusCode === 401) {
+                    this.logger.error('It is likely a credential is missing or incorrect. Check clientId, clientSecret, refreshToken, and accessToken');
+                }
+                this.logger.error(`Error Message: ${err.message}`);
+            } else {
+                this.logger.error(err);
+            }
+            err.logged = true;
+            throw err;
+        }
     }
 
     async buildManagers(subreddits: string[] = []) {
