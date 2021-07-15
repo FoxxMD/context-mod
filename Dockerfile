@@ -28,4 +28,4 @@ ARG webPort=8085
 ENV PORT=$webPort
 EXPOSE $PORT
 
-CMD [ "node", "src/index.js", "run" ]
+CMD [ "node", "src/index.js", "web" ]

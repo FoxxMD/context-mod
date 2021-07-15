@@ -17,6 +17,7 @@ import dayjs, {Dayjs} from "dayjs";
 import LoggedError from "./Utils/LoggedError";
 import ProxiedSnoowrap from "./Utils/ProxiedSnoowrap";
 import {ModQueueStream, UnmoderatedStream} from "./Subreddit/Streams";
+import {createDefaultLogger} from "./Utils/loggerFactory";
 
 const {transports} = winston;
 
@@ -51,8 +52,6 @@ export class App {
             clientSecret = process.env.CLIENT_SECRET,
             accessToken = process.env.ACCESS_TOKEN,
             refreshToken = process.env.REFRESH_TOKEN,
-            logDir = process.env.LOG_DIR || `${process.cwd()}/logs`,
-            logLevel = process.env.LOG_LEVEL || 'verbose',
             wikiConfig = process.env.WIKI_CONFIG || 'botconfig/contextbot',
             snooDebug = process.env.SNOO_DEBUG || false,
             dryRun = process.env.DRYRUN || false,
@@ -62,7 +61,6 @@ export class App {
             authorTTL = process.env.AUTHOR_TTL || 10000,
             disableCache = process.env.DISABLE_CACHE || false,
             proxy = process.env.PROXY,
-            additionalTransports = [],
         } = options;
 
         CacheManager.authorTTL = argParseInt(authorTTL);
@@ -73,49 +71,12 @@ export class App {
         this.apiLimitWarning = argParseInt(apiLimitWarning);
         this.wikiLocation = wikiConfig;
 
-        const consoleTransport = new transports.Console();
-
-        const myTransports = [
-            consoleTransport,
-        ];
-
-        let errorTransports = [];
-
-        for(const a of additionalTransports) {
-            myTransports.push(a);
-            errorTransports.push(a);
+        const aLogger = winston.loggers.get('default');
+        if(aLogger === undefined) {
+            this.logger = createDefaultLogger(options);
+        } else {
+            this.logger = aLogger;
         }
-
-        if (logDir !== false) {
-            let logPath = logDir;
-            if (logPath === true) {
-                logPath = `${process.cwd()}/logs`;
-            }
-            const rotateTransport = new winston.transports.DailyRotateFile({
-                dirname: logPath,
-                createSymlink: true,
-                symlinkName: 'contextBot-current.log',
-                filename: 'contextBot-%DATE%.log',
-                datePattern: 'YYYY-MM-DD',
-                maxSize: '5m'
-            });
-            // @ts-ignore
-            myTransports.push(rotateTransport);
-            errorTransports.push(rotateTransport);
-        }
-
-        const loggerOptions = {
-            level: logLevel || 'info',
-            format: labelledFormat(),
-            transports: myTransports,
-            levels: logLevels,
-            exceptionHandlers: errorTransports,
-            rejectionHandlers: errorTransports,
-        };
-
-        winston.loggers.add('default', loggerOptions);
-
-        this.logger = winston.loggers.get('default');
 
         if (this.dryRun) {
             this.logger.info('Running in DRYRUN mode');

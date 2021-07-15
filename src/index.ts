@@ -14,6 +14,7 @@ import createWebServer from './Server/server';
 import Submission from "snoowrap/dist/objects/Submission";
 import {COMMENT_URL_ID, parseLinkIdentifier, SUBMISSION_URL_ID} from "./util";
 import LoggedError from "./Utils/LoggedError";
+import {createDefaultLogger} from "./Utils/loggerFactory";
 
 dayjs.extend(utc);
 dayjs.extend(dduration);
@@ -124,8 +125,20 @@ const program = new Command();
         let webCommand = program.command('web');
         webCommand = addOptions(webCommand, getUniversalWebOptions());
         webCommand.action(async () => {
-            const server = createWebServer(program.opts());
-            await server;
+            const opts = program.opts();
+            const {
+                redirectUri = process.env.REDIRECT_URI
+            } = opts;
+            if(redirectUri === undefined) {
+                const logger = createDefaultLogger(opts);
+                logger.warn(`'web' command detected but no redirectUri found in arg/env. Switching to CLI only.`);
+                const app = new App(opts);
+                await app.buildManagers();
+                await app.runManagers();
+            } else {
+                const server = createWebServer(opts);
+                await server;
+            }
         });
 
         await program.parseAsync();
