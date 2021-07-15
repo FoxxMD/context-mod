@@ -142,6 +142,12 @@ const rcbServer = async function (options: any = {}) {
         next();
     }
 
+    app.getAsync('/logout', async (req, res) => {
+        // @ts-ignore
+        req.session.destroy();
+        res.send('Bye!');
+    })
+
     app.getAsync('/login', async (req, res) => {
         const authUrl = Snoowrap.getAuthUrl({
             clientId,
