@@ -9,7 +9,13 @@ import {InvalidOptionArgumentError} from "commander";
 import Submission from "snoowrap/dist/objects/Submission";
 import {Comment} from "snoowrap";
 import {inflateSync, deflateSync} from "zlib";
-import {ActivityWindowCriteria, DurationComparison, GenericComparison, StringOperator} from "./Common/interfaces";
+import {
+    ActivityWindowCriteria,
+    DurationComparison,
+    GenericComparison,
+    PollingOptionsStrong,
+    StringOperator
+} from "./Common/interfaces";
 import JSON5 from "json5";
 import yaml, {JSON_SCHEMA} from "js-yaml";
 import SimpleError from "./Utils/SimpleError";
@@ -684,3 +690,13 @@ export const logLevels = {
     trace: 5,
     silly: 6
 };
+
+export const pollingInfo = (opt: PollingOptionsStrong) => {
+    return `${opt.pollOn.toUpperCase()} every ${opt.interval} seconds${opt.delayUntil !== undefined ? ` | wait until Activity is ${opt.delayUntil} seconds old` : ''} | maximum of ${opt.limit} Activities`
+}
+
+export const totalFromMapStats = (val: Map<any, number>): number => {
+    return Object.entries(val).reduce((acc: number, [k, v]) => {
+        return acc + v;
+    }, 0);
+}

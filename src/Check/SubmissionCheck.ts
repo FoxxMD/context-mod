@@ -9,6 +9,10 @@ export class SubmissionCheck extends Check {
         super(options);
         const {itemIs = []} = options;
         this.itemIs = itemIs;
-        this.logSummary('submission');
+        this.logSummary();
+    }
+
+    logSummary() {
+        super.logSummary('submission');
     }
 }

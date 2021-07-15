@@ -12,7 +12,13 @@ import winston from 'winston';
 import {Server as SocketServer} from 'socket.io';
 import sharedSession from 'express-socket.io-session';
 import EventEmitter from "events";
-import {filterLogBySubreddit, formatLogLineToHtml, isLogLineMinLevel, parseSubredditLogName} from "../util";
+import {
+    filterLogBySubreddit,
+    formatLogLineToHtml,
+    isLogLineMinLevel,
+    parseSubredditLogName,
+    pollingInfo
+} from "../util";
 import {Manager} from "../Subreddit/Manager";
 
 const MemoryStore = createMemoryStore(session);
@@ -103,10 +109,15 @@ const rcbServer = async function (options: any = {}) {
             // @ts-ignore
             socket.join(socket.handshake.session.id);
             // @ts-ignore
-            connectedUsers.set(socket.handshake.session.id, {subreddits: socket.handshake.session.subreddits, level: socket.handshake.session.level});
+            connectedUsers.set(socket.handshake.session.id, {
+                // @ts-ignore
+                subreddits: socket.handshake.session.subreddits,
+                // @ts-ignore
+                level: socket.handshake.session.level
+            });
 
             // @ts-ignore
-            if(operator !== undefined && socket.handshake.session.user.toLowerCase() === operator.toLowerCase()) {
+            if (operator !== undefined && socket.handshake.session.user.toLowerCase() === operator.toLowerCase()) {
                 // @ts-ignore
                 operatorSessionId = socket.handshake.session.id;
             }
@@ -115,7 +126,7 @@ const rcbServer = async function (options: any = {}) {
     io.on('disconnect', (socket) => {
         // @ts-ignore
         connectedUsers.delete(socket.handshake.session.id);
-        if(operatorSessionId === socket.handshake.session.id) {
+        if (operatorSessionId === socket.handshake.session.id) {
             operatorSessionId = undefined;
         }
     });
@@ -126,7 +137,7 @@ const rcbServer = async function (options: any = {}) {
         }
         const {accessToken: userAT, refreshToken: userRT, lastCheck} = req.session;
 
-        if(lastCheck !== undefined && dayjs().diff(dayjs.unix(req.session.lastCheck as number), 'm') > 5) {
+        if (lastCheck !== undefined && dayjs().diff(dayjs.unix(req.session.lastCheck as number), 'm') > 5) {
             try {
                 //@ts-ignore
                 const client = new Snoowrap({
@@ -136,17 +147,17 @@ const rcbServer = async function (options: any = {}) {
                     refreshToken: userRT,
                     userAgent: `web:contextBot:web`,
                 });
-                if(operator === undefined || (operator.toLowerCase() !== req.session.user)) {
+                if (operator === undefined || (operator.toLowerCase() !== req.session.user)) {
                     const subs = await client.getModeratedSubreddits();
                     const subNames = subs.map(x => x.display_name);
                     req.session.subreddits = bot.subManagers.reduce((acc: string[], manager) => {
-                        if(subNames.includes(manager.subreddit.display_name)) {
+                        if (subNames.includes(manager.subreddit.display_name)) {
                             return acc.concat(manager.displayLabel);
                         }
                         return acc;
                     }, []);
                 }
-            } catch(err) {
+            } catch (err) {
                 // some error occurred, probably token expired so redirect to login
                 // @ts-ignore
                 await req.session.destroy();
@@ -185,7 +196,7 @@ const rcbServer = async function (options: any = {}) {
         // @ts-ignore
         req.session['subreddits'] = operator !== undefined && operator.toLowerCase() === user.toLowerCase() ? bot.subManagers.map(x => x.displayLabel) : subs.reduce((acc: string[], x) => {
             const sm = bot.subManagers.find(y => y.subreddit.display_name === x.display_name);
-            if(sm !== undefined) {
+            if (sm !== undefined) {
                 return acc.concat(sm.displayLabel);
             }
             return acc;
@@ -201,18 +212,88 @@ const rcbServer = async function (options: any = {}) {
         if (sort === 'ascending') {
             slicedLog.reverse();
         }
-        res.render('status', {
+        // @ts-ignore
+        const logs = filterLogBySubreddit(slicedLog, req.session.subreddits, level, operator !== undefined && operator.toLowerCase() === req.session.user.toLowerCase());
+        const subManagerData = [];
+        for (const s of subreddits) {
+            const m = bot.subManagers.find(x => x.displayLabel === s) as Manager;
+            const sd = {
+                name: s,
+                logs: logs.get(s),
+                running: m.running,
+                dryRun: m.dryRun === true,
+                pollingInfo: m.pollOptions.map(pollingInfo),
+                checks: {
+                    submissions: m.submissionChecks.length,
+                    comments: m.commentChecks.length,
+                },
+                wikiLocation: m.wikiLocation,
+                wikiHref: `https://reddit.com/r/${m.subreddit.display_name}/wiki/${m.wikiLocation}`,
+                wikiRevisionHuman: m.lastWikiRevision === undefined ? 'N/A' : `${dayjs.duration(dayjs().diff(m.lastWikiRevision)).humanize()} ago`,
+                wikiRevision: m.lastWikiRevision === undefined ? 'N/A' : m.lastWikiRevision.local().format('MMMM D, YYYY h:mm A Z'),
+                wikiLastCheckHuman: `${dayjs.duration(dayjs().diff(m.lastWikiCheck)).humanize()} ago`,
+                wikiLastCheck: m.lastWikiCheck.local().format('MMMM D, YYYY h:mm A Z'),
+                stats: m.getStats(),
+                startedAt: 'Not Started',
+                startedAtHuman: 'Not Started'
+            };
+            if (m.startedAt !== undefined) {
+                sd.startedAtHuman = `${dayjs.duration(dayjs().diff(m.startedAt)).humanize()} ago`;
+                sd.startedAt = m.startedAt.local().format('MMMM D, YYYY h:mm A Z');
+            }
+            subManagerData.push(sd);
+        }
+        const totalStats = subManagerData.reduce((acc, curr) => {
+            return {
+                checks: {
+                    submissions: acc.checks.submissions + curr.checks.submissions,
+                    comments: acc.checks.comments + curr.checks.comments,
+                },
+                eventsCheckedTotal: acc.eventsCheckedTotal + curr.stats.eventsCheckedTotal,
+                checksRunTotal: acc.checksRunTotal + curr.stats.checksRunTotal,
+                checksTriggeredTotal: acc.checksTriggeredTotal + curr.stats.checksTriggeredTotal,
+                rulesRunTotal: acc.rulesRunTotal + curr.stats.rulesRunTotal,
+                rulesCachedTotal: acc.rulesCachedTotal + curr.stats.rulesCachedTotal,
+                rulesTriggeredTotal: acc.rulesTriggeredTotal + curr.stats.rulesTriggeredTotal,
+                actionsRunTotal: acc.actionsRunTotal + curr.stats.actionsRunTotal,
+            };
+        }, {
+            checks: {
+                submissions: 0,
+                comments: 0,
+            },
+            eventsCheckedTotal: 0,
+            checksRunTotal: 0,
+            checksTriggeredTotal: 0,
+            rulesRunTotal: 0,
+            rulesCachedTotal: 0,
+            rulesTriggeredTotal: 0,
+            actionsRunTotal: 0,
+        });
+        const {checks, ...rest} = totalStats;
+
+        const allManagerData = [{
+            name: 'All',
+            running: true,
+            dryRun: bot.dryRun === true,
+            logs: logs.get('all'),
+            checks: checks,
+            stats: rest,
+            startedAt: '-',
+        }]        // @ts-ignore
+            .concat(subManagerData);
+        const data = {
             userName: user,
-            subreddits: req.session.subreddits,
+            subreddits: allManagerData,
             botName: bot.botName,
-            logs: {
-                // @ts-ignore
-                output: filterLogBySubreddit(slicedLog, req.session.subreddits, level, operator !== undefined && operator.toLowerCase() === req.session.user.toLowerCase()),
+            logSettings: {
                 limit: [10, 20, 50, 100, 200].map(x => `<a class="capitalize ${limit === x ? 'font-bold no-underline pointer-events-none' : ''}" data-limit="${x}" href="logs/settings/update?limit=${x}">${x}</a>`).join(' | '),
                 sort: ['ascending', 'descending'].map(x => `<a class="capitalize ${sort === x ? 'font-bold no-underline pointer-events-none' : ''}" data-sort="${x}" href="logs/settings/update?sort=${x}">${x}</a>`).join(' | '),
                 level: availableLevels.map(x => `<a class="capitalize log-${x} ${level === x ? `font-bold no-underline pointer-events-none` : ''}" data-log="${x}" href="logs/settings/update?level=${x}">${x}</a>`).join(' | ')
-            }
-        });
+            },
+        };
+
+        res.render('status', data);
     });
 
     app.getAsync('/logs/settings/update', async function (req, res) {
@@ -241,7 +322,7 @@ const rcbServer = async function (options: any = {}) {
         const subMap = filterLogBySubreddit(slicedLog, req.session.subreddits, level, operator !== undefined && operator.toLowerCase() === (user as string).toLowerCase());
         const subArr: any = [];
         subMap.forEach((v: string[], k: string) => {
-            subArr.push({name: k, logs: v.join()});
+            subArr.push({name: k, logs: v.join('')});
         });
         io.emit('logClear', subArr);
     });
@@ -249,18 +330,18 @@ const rcbServer = async function (options: any = {}) {
     emitter.on('log', (log) => {
         const emittedSessions = [];
         const subName = parseSubredditLogName(log);
-        if(subName !== undefined) {
-            for(const [id, info] of connectedUsers) {
+        if (subName !== undefined) {
+            for (const [id, info] of connectedUsers) {
                 const {subreddits, level = 'verbose'} = info;
-                if(isLogLineMinLevel(log, level) && subreddits.includes(subName)) {
+                if (isLogLineMinLevel(log, level) && subreddits.includes(subName)) {
                     emittedSessions.push(id);
                     io.to(id).emit('log', formatLogLineToHtml(log));
                 }
             }
         }
-        if(operatorSessionId !== undefined && (subName === undefined || !emittedSessions.includes(operatorSessionId))) {
+        if (operatorSessionId !== undefined && (subName === undefined || !emittedSessions.includes(operatorSessionId))) {
             const {level = 'verbose'} = connectedUsers.get(operatorSessionId) || {};
-            if(isLogLineMinLevel(log, level)) {
+            if (isLogLineMinLevel(log, level)) {
                 io.to(operatorSessionId).emit('log', formatLogLineToHtml(log));
             }
         }

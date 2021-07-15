@@ -5,7 +5,7 @@ import {CommentCheck} from "../Check/CommentCheck";
 import {
     createRetryHandler,
     determineNewResults,
-    mergeArr, parseFromJsonOrYamlToObject, sleep,
+    mergeArr, parseFromJsonOrYamlToObject, pollingInfo, sleep, totalFromMapStats,
 } from "../util";
 import {Poll} from "snoostorm";
 import pEvent from "p-event";
@@ -29,6 +29,7 @@ import {SPoll, UnmoderatedStream, ModQueueStream, SubmissionStream, CommentStrea
 import EventEmitter from "events";
 import ConfigParseError from "../Utils/ConfigParseError";
 import dayjs, { Dayjs as DayjsObj } from "dayjs";
+import Action from "../Action";
 
 export interface runCheckOptions {
     checkNames?: string[],
@@ -58,7 +59,46 @@ export class Manager {
     displayLabel: string;
     currentLabels: string[] = [];
 
+    startedAt?: DayjsObj;
     running: boolean = false;
+
+    eventsCheckedTotal: number = 0;
+    eventsCheckedSinceStartTotal: number = 0;
+    checksRunTotal: number = 0;
+    checksRunSinceStartTotal: number = 0;
+    checksTriggered: Map<string, number> = new Map();
+    checksTriggeredSinceStart: Map<string, number> = new Map();
+    rulesRunTotal: number = 0;
+    rulesRunSinceStartTotal: number = 0;
+    rulesCachedTotal: number = 0;
+    rulesCachedSinceStartTotal: number = 0;
+    rulesTriggeredTotal: number = 0;
+    rulesTriggeredSinceStartTotal: number = 0;
+    actionsRun: Map<string, number> = new Map();
+    actionsRunSinceStart: Map<string, number> = new Map();
+
+    getStats = () => {
+        return {
+            eventsCheckedTotal: this.eventsCheckedTotal,
+            eventsCheckedSinceStartTotal: this.eventsCheckedSinceStartTotal,
+            checksRunTotal: this.checksRunTotal,
+            checksRunSinceStartTotal: this.checksRunSinceStartTotal,
+            checksTriggered: this.checksTriggered,
+            checksTriggeredTotal: totalFromMapStats(this.checksTriggered),
+            checksTriggeredSinceStart: this.checksTriggeredSinceStart,
+            checksTriggeredSinceStartTotal: totalFromMapStats(this.checksTriggeredSinceStart),
+            rulesRunTotal: this.rulesRunTotal,
+            rulesRunSinceStartTotal: this.rulesRunSinceStartTotal,
+            rulesCachedTotal: this.rulesCachedTotal,
+            rulesCachedSinceStartTotal: this.rulesCachedSinceStartTotal,
+            rulesTriggeredTotal: this.rulesTriggeredTotal,
+            rulesTriggeredSinceStartTotal: this.rulesTriggeredSinceStartTotal,
+            actionsRun: this.actionsRun,
+            actionsRunTotal: totalFromMapStats(this.actionsRun),
+            actionsRunSinceStart: this.actionsRunSinceStart,
+            actionsRunSinceStartTotal: totalFromMapStats(this.actionsRunSinceStart)
+        }
+    }
 
     getCurrentLabels = () => {
         return this.currentLabels;
@@ -111,7 +151,7 @@ export class Manager {
 
         this.logger.info(`Dry Run: ${this.dryRun === true}`);
         for(const p of this.pollOptions) {
-            this.logger.info(`Polling Info => ${p.pollOn.toUpperCase()} every ${p.interval} seconds${p.delayUntil !== undefined ? ` | wait until Activity is ${p.delayUntil} seconds old` : ''} | maximum of ${p.limit} Activities`)
+            this.logger.info(`Polling Info => ${pollingInfo(p)}`)
         }
 
         let resourceConfig: SubredditResourceSetOptions = {
@@ -217,6 +257,8 @@ export class Manager {
     async runChecks(checkType: ('Comment' | 'Submission'), activity: (Submission | Comment), options?: runCheckOptions): Promise<void> {
         const checks = checkType === 'Comment' ? this.commentChecks : this.submissionChecks;
         let item = activity;
+        this.eventsCheckedTotal++;
+        this.eventsCheckedSinceStartTotal++;
         const itemId = await item.id;
         let allRuleResults: RuleResult[] = [];
         const itemIdentifier = `${checkType === 'Submission' ? 'SUB' : 'COM'} ${itemId}`;
@@ -265,12 +307,13 @@ export class Manager {
         let checksRun = 0;
         let actionsRun = 0;
         let totalRulesRun = 0;
+        let runActions: Action[] = [];
 
         try {
             let triggered = false;
             for (const check of checks) {
                 if (checkNames.length > 0 && !checkNames.map(x => x.toLowerCase()).some(x => x === check.name.toLowerCase())) {
-                    this.logger.warn(`Check ${check} not in array of requested checks to run, skipping`);
+                    this.logger.warn(`Check ${check.name} not in array of requested checks to run, skipping`);
                     continue;
                 }
                 checksRun++;
@@ -289,7 +332,9 @@ export class Manager {
                 }
 
                 if (triggered) {
-                    const runActions = await check.runActions(item, currentResults.filter(x => x.triggered));
+                    this.checksTriggered.set(check.name, (this.checksTriggered.get(check.name) || 0) + 1);
+                    this.checksTriggeredSinceStart.set(check.name, (this.checksTriggeredSinceStart.get(check.name) || 0) + 1);
+                    runActions = await check.runActions(item, currentResults.filter(x => x.triggered));
                     actionsRun = runActions.length;
                     break;
                 }
@@ -304,8 +349,26 @@ export class Manager {
                 this.logger.error('An unhandled error occurred while running checks', err);
             }
         } finally {
+            const cachedTotal = totalRulesRun - allRuleResults.length;
+            const triggeredRulesTotal = allRuleResults.filter(x => x.triggered).length;
+
+            this.checksRunTotal+= checksRun;
+            this.checksRunSinceStartTotal+= checksRun;
+            this.rulesRunTotal+= totalRulesRun;
+            this.rulesRunSinceStartTotal+= totalRulesRun;
+            this.rulesCachedTotal+= cachedTotal;
+            this.rulesCachedSinceStartTotal+= cachedTotal;
+            this.rulesTriggeredTotal+= triggeredRulesTotal;
+            this.rulesTriggeredSinceStartTotal+= triggeredRulesTotal;
+
+            for(const a of runActions) {
+                const name = a.getActionUniqueName();
+                this.actionsRun.set(name, (this.actionsRun.get(name) || 0) + 1);
+                this.actionsRunSinceStart.set(name, (this.actionsRunSinceStart.get(name) || 0) + 1)
+            }
+
             this.logger.verbose(`Run Stats:        Checks ${checksRun} | Rules => Total: ${totalRulesRun} Unique: ${allRuleResults.length} Cached: ${totalRulesRun - allRuleResults.length} | Actions ${actionsRun}`);
-            this.logger.verbose(`Reddit API Stats: Initial Limit ${startingApiLimit} | Current Limit ${this.client.ratelimitRemaining} | Calls Made ${startingApiLimit - this.client.ratelimitRemaining}`);
+            this.logger.verbose(`Reddit API Stats: Initial Limit ${startingApiLimit} | Current Limit ${this.client.ratelimitRemaining} | Est. Calls Made ${startingApiLimit - this.client.ratelimitRemaining}`);
             this.currentLabels = [];
         }
     }
@@ -442,6 +505,7 @@ export class Manager {
             for(const s of this.streams) {
                 s.startInterval();
             }
+            this.startedAt = dayjs();
             this.running = true;
             this.logger.info('Bot Running');
 
@@ -464,6 +528,14 @@ export class Manager {
                 stream.removeListener('item', v);
             }
             this.emitter.emit('end');
+            this.startedAt = undefined;
+            this.eventsCheckedSinceStartTotal = 0;
+            this.checksRunSinceStartTotal = 0;
+            this.rulesRunSinceStartTotal = 0;
+            this.rulesCachedSinceStartTotal = 0;
+            this.rulesTriggeredSinceStartTotal = 0;
+            this.checksTriggeredSinceStart = new Map();
+            this.actionsRunSinceStart = new Map();
             this.running = false;
             this.logger.info('Bot Stopped');
         }
