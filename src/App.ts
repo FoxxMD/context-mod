@@ -71,11 +71,10 @@ export class App {
         this.apiLimitWarning = argParseInt(apiLimitWarning);
         this.wikiLocation = wikiConfig;
 
-        const aLogger = winston.loggers.get('default');
-        if(aLogger === undefined) {
+        if(!winston.loggers.has('default')) {
             this.logger = createDefaultLogger(options);
         } else {
-            this.logger = aLogger;
+            this.logger = winston.loggers.get('default');
         }
 
         if (this.dryRun) {
