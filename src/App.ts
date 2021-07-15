@@ -38,9 +38,11 @@ export class App {
     wikiLocation: string;
     dryRun?: true | undefined;
     heartbeatInterval: number;
-    apiLimitWarning: number;
+    nextHeartbeat?: Dayjs;
     heartBeating: boolean = false;
+    apiLimitWarning: number;
     botName?: string;
+    startedAt: Dayjs = dayjs();
 
     constructor(options: any = {}) {
         const {
@@ -246,6 +248,7 @@ export class App {
         try {
             this.heartBeating = true;
             while (true) {
+                this.nextHeartbeat = dayjs().add(this.heartbeatInterval, 'second');
                 await sleep(this.heartbeatInterval * 1000);
                 const heartbeat = `HEARTBEAT -- Reddit API Rate Limit remaining: ${this.client.ratelimitRemaining}`
                 if (this.apiLimitWarning >= this.client.ratelimitRemaining) {
@@ -273,6 +276,7 @@ export class App {
             this.logger.error('Error occurred during heartbeat', err);
             throw err;
         } finally {
+            this.nextHeartbeat = undefined;
             this.heartBeating = false;
         }
     }

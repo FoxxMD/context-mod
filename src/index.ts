@@ -24,9 +24,6 @@ const commentReg = parseLinkIdentifier([COMMENT_URL_ID]);
 const submissionReg = parseLinkIdentifier([SUBMISSION_URL_ID]);
 
 const program = new Command();
-// for (const o of getUniversalOptions()) {
-//     program.addOption(o);
-// }
 
 (async function () {
     try {

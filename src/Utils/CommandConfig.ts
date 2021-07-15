@@ -67,8 +67,11 @@ export const limit = new commander.Option('--limit <limit>', 'Limit the number o
 export const proxy = new commander.Option('--proxy <proxyEndpoint>', 'Proxy Snoowrap requests through this endpoint')
     .default(process.env.PROXY, 'process.env.PROXY');
 
-export const operator = new commander.Option('--operator <name>', 'Username of the reddit user operating this application (default: process.env.OPERATOR)')
+export const operator = new commander.Option('--operator <name>', 'Username of the reddit user operating this application, used for displaying OP level info/actions in UI (default: process.env.OPERATOR)')
     .default(process.env.OPERATOR);
+
+export const operatorDisplay = new commander.Option('--operatorDisplay <name>', 'An optional name to display who is operating this application in the UI (default: process.env.OPERATOR_DISPLAY || Anonymous)')
+    .default(process.env.OPERATOR_DISPLAY);
 
 export const getUniversalWebOptions = (): commander.Option[] => {
     return [
@@ -90,6 +93,7 @@ export const getUniversalWebOptions = (): commander.Option[] => {
         disableCache,
         proxy,
         operator,
+        operatorDisplay
     ];
 }
 

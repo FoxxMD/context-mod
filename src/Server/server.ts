@@ -82,6 +82,7 @@ const rcbServer = async function (options: any = {}) {
         redirectUri = process.env.REDIRECT_URI,
         sessionSecret = process.env.SESSION_SECRET || defaultSessionSecret,
         operator = process.env.OPERATOR,
+        operatorDisplay = process.env.OPERATOR_DISPLAY || 'Anonymous'
     } = options;
 
     const bot = new App({...options, additionalTransports: [streamTransport]});
@@ -135,35 +136,41 @@ const rcbServer = async function (options: any = {}) {
         if (req.session.accessToken === undefined) {
             return res.redirect('/login');
         }
-        const {accessToken: userAT, refreshToken: userRT, lastCheck} = req.session;
 
-        if (lastCheck !== undefined && dayjs().diff(dayjs.unix(req.session.lastCheck as number), 'm') > 5) {
-            try {
-                //@ts-ignore
-                const client = new Snoowrap({
-                    clientId,
-                    clientSecret,
-                    accessToken: userAT,
-                    refreshToken: userRT,
-                    userAgent: `web:contextBot:web`,
-                });
-                if (operator === undefined || (operator.toLowerCase() !== req.session.user)) {
-                    const subs = await client.getModeratedSubreddits();
-                    const subNames = subs.map(x => x.display_name);
-                    req.session.subreddits = bot.subManagers.reduce((acc: string[], manager) => {
-                        if (subNames.includes(manager.subreddit.display_name)) {
-                            return acc.concat(manager.displayLabel);
-                        }
-                        return acc;
-                    }, []);
-                }
-            } catch (err) {
-                // some error occurred, probably token expired so redirect to login
-                // @ts-ignore
-                await req.session.destroy();
-                res.redirect('/login');
-            }
-        }
+        // this is buggy ATM and not really needed --
+        // if a user wants to refresh the subs they mod (like if they join a new sub as mod while logged in)
+        // they can just logout/log back in.
+        // maybe if this is requested in the future i'll revisit
+
+        // const {accessToken: userAT, refreshToken: userRT, lastCheck} = req.session;
+        //
+        // if (lastCheck !== undefined && dayjs().diff(dayjs.unix(req.session.lastCheck as number), 'm') > 5) {
+        //     try {
+        //         //@ts-ignore
+        //         const client = new Snoowrap({
+        //             clientId,
+        //             clientSecret,
+        //             accessToken: userAT,
+        //             refreshToken: userRT,
+        //             userAgent: `web:contextBot:web`,
+        //         });
+        //         if (operator === undefined || (operator.toLowerCase() !== req.session.user)) {
+        //             const subs = await client.getModeratedSubreddits();
+        //             const subNames = subs.map(x => x.display_name);
+        //             req.session.subreddits = bot.subManagers.reduce((acc: string[], manager) => {
+        //                 if (subNames.includes(manager.subreddit.display_name)) {
+        //                     return acc.concat(manager.displayLabel);
+        //                 }
+        //                 return acc;
+        //             }, []);
+        //         }
+        //     } catch (err) {
+        //         // some error occurred, probably token expired so redirect to login
+        //         // @ts-ignore
+        //         await req.session.destroy();
+        //         res.redirect('/login');
+        //     }
+        // }
 
         next();
     }
@@ -207,13 +214,15 @@ const rcbServer = async function (options: any = {}) {
 
     app.use('/', redditUserMiddleware);
     app.getAsync('/', async (req, res) => {
-        const {subreddits = [], user, limit = 200, level = 'verbose', sort = 'descending', lastCheck} = req.session;
+        const {subreddits = [], user: userVal, limit = 200, level = 'verbose', sort = 'descending', lastCheck} = req.session;
+        const user = userVal as string;
         let slicedLog = output.slice(0, limit + 1);
         if (sort === 'ascending') {
             slicedLog.reverse();
         }
+        const isOperator = operator !== undefined && operator.toLowerCase() === user.toLowerCase()
         // @ts-ignore
-        const logs = filterLogBySubreddit(slicedLog, req.session.subreddits, level, operator !== undefined && operator.toLowerCase() === req.session.user.toLowerCase());
+        const logs = filterLogBySubreddit(slicedLog, req.session.subreddits, level, isOperator);
         const subManagerData = [];
         for (const s of subreddits) {
             const m = bot.subManagers.find(x => x.displayLabel === s) as Manager;
@@ -272,20 +281,27 @@ const rcbServer = async function (options: any = {}) {
         });
         const {checks, ...rest} = totalStats;
 
-        const allManagerData = [{
+        let allManagerData: any = {
             name: 'All',
             running: true,
             dryRun: bot.dryRun === true,
             logs: logs.get('all'),
             checks: checks,
             stats: rest,
-            startedAt: '-',
-        }]        // @ts-ignore
-            .concat(subManagerData);
+        };
+        if(isOperator) {
+            allManagerData.startedAt = bot.startedAt.local().format('MMMM D, YYYY h:mm A Z');
+            allManagerData.heartbeatHuman = dayjs.duration({seconds: bot.heartbeatInterval}).humanize();
+            allManagerData.heartbeat = bot.heartbeatInterval;
+            allManagerData = {...allManagerData, ...opStats(bot)};
+        }
+
         const data = {
             userName: user,
-            subreddits: allManagerData,
+            subreddits: [allManagerData, ...subManagerData],
             botName: bot.botName,
+            operatorDisplay,
+            isOperator,
             logSettings: {
                 limit: [10, 20, 50, 100, 200].map(x => `<a class="capitalize ${limit === x ? 'font-bold no-underline pointer-events-none' : ''}" data-limit="${x}" href="logs/settings/update?limit=${x}">${x}</a>`).join(' | '),
                 sort: ['ascending', 'descending'].map(x => `<a class="capitalize ${sort === x ? 'font-bold no-underline pointer-events-none' : ''}" data-sort="${x}" href="logs/settings/update?sort=${x}">${x}</a>`).join(' | '),
@@ -339,16 +355,33 @@ const rcbServer = async function (options: any = {}) {
                 }
             }
         }
-        if (operatorSessionId !== undefined && (subName === undefined || !emittedSessions.includes(operatorSessionId))) {
-            const {level = 'verbose'} = connectedUsers.get(operatorSessionId) || {};
-            if (isLogLineMinLevel(log, level)) {
-                io.to(operatorSessionId).emit('log', formatLogLineToHtml(log));
+        if (operatorSessionId !== undefined) {
+            io.to(operatorSessionId).emit('opStats', opStats(bot));
+            if (subName === undefined || !emittedSessions.includes(operatorSessionId)) {
+                const {level = 'verbose'} = connectedUsers.get(operatorSessionId) || {};
+                if (isLogLineMinLevel(log, level)) {
+                    io.to(operatorSessionId).emit('log', formatLogLineToHtml(log));
+                }
             }
         }
     });
 
     await bot.runManagers();
 };
+
+const opStats = (bot: App) => {
+    const limitReset = dayjs(bot.client.ratelimitExpiration);
+    const nextHeartbeat = bot.nextHeartbeat !== undefined ? bot.nextHeartbeat.local().format('MMMM D, YYYY h:mm A Z') : 'N/A';
+    const nextHeartbeatHuman = bot.nextHeartbeat !== undefined ? `in ${dayjs.duration(bot.nextHeartbeat.diff(dayjs())).humanize()}` : 'N/A'
+    return {
+        startedAtHuman: `${dayjs.duration(dayjs().diff(bot.startedAt)).humanize()} ago`,
+        nextHeartbeat,
+        nextHeartbeatHuman,
+        apiLimit: bot.client.ratelimitRemaining,
+        limitReset,
+        limitResetHuman: `in ${dayjs.duration(limitReset.diff(dayjs())).humanize()}`
+    }
+}
 
 export default rcbServer;
 
