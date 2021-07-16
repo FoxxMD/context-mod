@@ -649,38 +649,67 @@ export const formatLogLineToHtml = (val: string) => {
         .replace(/(\s*info\s*):/i, '<span class="info text-blue-300">$1</span>:')
         .replace(/(\s*error\s*):/i, '<span class="error text-red-400">$1</span>:')
         .replace(/(\s*verbose\s*):/i, '<span class="error text-purple-400">$1</span>:')
-        .replace('\n', '<br />')
-        .replace(HYPERLINK_REGEX, '<a href="$&">$&</a>');
+        .replaceAll('\n', '<br />')
+        .replace(HYPERLINK_REGEX, '<a target="_blank" href="$&">$&</a>');
 }
 
-export const filterLogBySubreddit = (rawLogs: string[] = [], subreddits: string[] = [], minLevel: string, isOperator = false, user?: string): any => {
-    const subMap: Map<string, string[]> = new Map([['all', []]]);
-    const logs = rawLogs.filter(x => isLogLineMinLevel(x, minLevel));
-    if (isOperator) {
-        subMap.set('all', logs.map(formatLogLineToHtml));
+export type LogEntry = [number, string];
+export interface LogOptions {
+    limit: number,
+    level: string,
+    sort: 'ascending' | 'descending',
+    operator?: boolean,
+    user?: string,
+}
+
+export const filterLogBySubreddit = (logs: Map<string, LogEntry[]>, subreddits: string[] = [], options: LogOptions): Map<string, string[]> => {
+    const {
+        limit,
+        level,
+        sort,
+        operator = false,
+        user
+    } = options;
+
+    // get map of valid subreddits
+    const validSubMap: Map<string, LogEntry[]> = new Map();
+    for(const [k, v] of logs) {
+        if(subreddits.includes(k)) {
+            validSubMap.set(k, v);
+        }
     }
-    return logs.reduce((acc: Map<string, string[]>, curr) => {
-        const subName = parseSubredditLogName(curr);
-        if (subName === undefined) {
-            return acc;
+
+    // derive 'all'
+    let allLogs = (logs.get('app') || []);
+    if(!operator) {
+        if(user === undefined) {
+            allLogs = [];
+        } else {
+            allLogs.filter(([time, l]) => {
+                const sub = parseSubredditLogName(l);
+                return sub !== undefined && sub.includes(user);
+            });
         }
-        const formatted = formatLogLineToHtml(curr);
-        const sub = subreddits.find(x => subName === x);
-        const isUser = user !== undefined && subName.includes(user);
-        if(!isUser) {
-            if (sub === undefined) {
-                return acc;
-            } else if (!acc.has(sub)) {
-                acc.set(sub, []);
-            }
-            const subLogs = acc.get(sub) as string[];
-            acc.set(sub, subLogs.concat(formatted));
-        }
-        if (!isOperator) {
-            acc.set('all', (acc.get('all') as string[]).concat(formatted));
-        }
-        return acc;
-    }, subMap);
+    }
+    allLogs = Array.from(validSubMap.values()).reduce((acc, logs) => {
+        return acc.concat(logs);
+    },allLogs);
+
+    validSubMap.set('all', allLogs);
+
+    const sortFunc = sort === 'ascending' ? (a: LogEntry, b: LogEntry) => a[0] - b[0] : (a: LogEntry, b: LogEntry) => b[0] - a[0];
+
+    const preparedMap: Map<string, string[]> = new Map();
+    // iterate each entry and
+    // sort, filter by level, slice to limit, then map to html string
+    for(const [k,v] of validSubMap.entries()) {
+        let preparedEntries = v.filter(([time, l]) => isLogLineMinLevel(l, level));
+        preparedEntries.sort(sortFunc);
+        preparedMap.set(k, preparedEntries.slice(0, limit + 1).map(([time, l]) => formatLogLineToHtml(l)));
+    }
+
+
+    return preparedMap;
 }
 
 export const logLevels = {

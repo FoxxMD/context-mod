@@ -47,6 +47,7 @@ export abstract class Action {
     }
 
     async handle(item: Comment | Submission, ruleResults: RuleResult[], runtimeDryrun?: boolean): Promise<void> {
+        const dryRun = runtimeDryrun || this.dryRun;
         let actionRun = false;
         const [itemPass, crit] = isItem(item, this.itemIs, this.logger);
         if (!itemPass) {
@@ -82,7 +83,7 @@ export abstract class Action {
         } else if (!authorRunResults) {
             return;
         }
-        this.logger.verbose(`${this.dryRun ? 'DRYRUN - ' : ''}Done`);
+        this.logger.verbose(`${dryRun ? 'DRYRUN - ' : ''}Done`);
     }
 
     abstract process(item: Comment | Submission, ruleResults: RuleResult[], runtimeDryun?: boolean): Promise<void>;

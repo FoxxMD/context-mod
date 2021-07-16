@@ -17,11 +17,14 @@ import {
     COMMENT_URL_ID,
     filterLogBySubreddit,
     formatLogLineToHtml,
-    isLogLineMinLevel, parseLinkIdentifier,
+    isLogLineMinLevel,
+    LogEntry,
+    parseLinkIdentifier,
     parseSubredditLogName,
     pollingInfo, SUBMISSION_URL_ID
 } from "../util";
 import {Manager} from "../Subreddit/Manager";
+import {getDefaultLogger} from "../Utils/loggerFactory";
 
 const MemoryStore = createMemoryStore(session);
 const app = addAsync(express());
@@ -60,20 +63,10 @@ declare module 'express-session' {
     }
 }
 
+const subLogMap: Map<string, LogEntry[]> = new Map();
+
 const emitter = new EventEmitter();
-let output: string[] = []
 const stream = new Writable()
-stream._write = (chunk, encoding, next) => {
-    let logLine = chunk.toString();
-    output.unshift(logLine);
-    // keep last 1000 log statements
-    output = output.slice(0, 1001);
-    emitter.emit('log', logLine);
-    next();
-}
-const streamTransport = new winston.transports.Stream({
-    stream,
-})
 
 const rcbServer = async function (options: any = {}) {
     const {
@@ -84,7 +77,35 @@ const rcbServer = async function (options: any = {}) {
         operator = process.env.OPERATOR,
         operatorDisplay = process.env.OPERATOR_DISPLAY || 'Anonymous',
         port = process.env.PORT || 8085,
+        maxLogs = 200
     } = options;
+
+    let botSubreddits: string[] = [];
+
+    stream._write = (chunk, encoding, next) => {
+        let logLine = chunk.toString();
+        const now = Date.now();
+        const logEntry: LogEntry = [now, logLine];
+
+        const subName = parseSubredditLogName(logLine);
+        if (subName !== undefined && (botSubreddits.length === 0 || botSubreddits.includes(subName))) {
+            const subLogs = subLogMap.get(subName) || [];
+            subLogs.unshift(logEntry);
+            subLogMap.set(subName, subLogs.slice(0, maxLogs + 1));
+        } else {
+            const appLogs = subLogMap.get('app') || [];
+            appLogs.unshift(logEntry);
+            subLogMap.set('app', appLogs.slice(0, maxLogs + 1));
+        }
+
+        emitter.emit('log', logLine);
+        next();
+    }
+    const streamTransport = new winston.transports.Stream({
+        stream,
+    })
+
+    const logger = getDefaultLogger({...options, additionalTransports: [streamTransport]})
 
     const bot = new App({...options, additionalTransports: [streamTransport]});
     await bot.testClient();
@@ -92,10 +113,11 @@ const rcbServer = async function (options: any = {}) {
     const server = await app.listen(port);
     const io = new SocketServer(server);
 
-    const logger = winston.loggers.get('default');
     logger.info(`Web UI started: http://localhost:${port}`);
 
     await bot.buildManagers();
+    botSubreddits = bot.subManagers.map(x => x.displayLabel);
+    // TODO potentially prune subLogMap of user keys? shouldn't have happened this early though
 
     const sessionObj = session({
         cookie: {
@@ -195,13 +217,9 @@ const rcbServer = async function (options: any = {}) {
     app.getAsync('/', async (req, res) => {
         const {subreddits = [], user: userVal, limit = 200, level = 'verbose', sort = 'descending', lastCheck} = req.session;
         const user = userVal as string;
-        let slicedLog = output.slice(0, limit + 1);
-        if (sort === 'ascending') {
-            slicedLog.reverse();
-        }
         const isOperator = operator !== undefined && operator.toLowerCase() === user.toLowerCase()
         // @ts-ignore
-        const logs = filterLogBySubreddit(slicedLog, req.session.subreddits, level, isOperator, user);
+        const logs = filterLogBySubreddit(subLogMap, req.session.subreddits, {level, operator, user, sort, limit});
         const subManagerData = [];
         for (const s of subreddits) {
             const m = bot.subManagers.find(x => x.displayLabel === s) as Manager;
@@ -312,13 +330,15 @@ const rcbServer = async function (options: any = {}) {
         }
         const {limit = 200, level = 'verbose', sort = 'descending', user} = req.session;
 
-        let slicedLog = output.slice(0, limit + 1);
-        if (sort === 'ascending') {
-            slicedLog.reverse();
-        }
         res.send('OK');
 
-        const subMap = filterLogBySubreddit(slicedLog, req.session.subreddits, level, operator !== undefined && operator.toLowerCase() === (user as string).toLowerCase(), user);
+        const subMap = filterLogBySubreddit(subLogMap, req.session.subreddits, {
+            level,
+            operator: operator !== undefined && operator.toLowerCase() === (user as string).toLowerCase(),
+            user,
+            limit,
+            sort: (sort as 'descending' | 'ascending'),
+        });
         const subArr: any = [];
         subMap.forEach((v: string[], k: string) => {
             subArr.push({name: k, logs: v.join('')});
