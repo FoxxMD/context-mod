@@ -573,7 +573,7 @@ export const createRetryHandler = (opts: RetryOptions, logger: Logger) => {
     let otherRetryCount = 0;
     let lastErrorAt: Dayjs | undefined;
 
-    return async (err: any) => {
+    return async (err: any): Promise<boolean> => {
         if (lastErrorAt !== undefined && dayjs().diff(lastErrorAt, 'minute') >= 3) {
             // if its been longer than 5 minutes since last error clear counters
             timeoutCount = 0;
@@ -583,15 +583,15 @@ export const createRetryHandler = (opts: RetryOptions, logger: Logger) => {
         lastErrorAt = dayjs();
 
         if(err.name === 'RequestError' || err.name === 'StatusCodeError') {
-            if (err.message.includes('ETIMEDOUT') || err.message.includes('ESOCKETTIMEDOUT') || (err.statusCode !== undefined && [500, 503, 502, 504, 522].includes(err.statusCode))) {
+            if (err.statusCode === undefined || ([500, 503, 502, 504, 522].includes(err.statusCode))) {
                 timeoutCount++;
                 if (timeoutCount > maxRequestRetry) {
-                    logger.error(`Reddit request timeout issue retries (${timeoutCount}) exceeded max allowed (${maxRequestRetry})`);
+                    logger.error(`Reddit request error retries (${timeoutCount}) exceeded max allowed (${maxRequestRetry})`);
                     return false;
                 }
                 // exponential backoff
                 const ms = (Math.pow(2, timeoutCount - 1) + (Math.random() - 0.3) + 1) * 1000;
-                logger.warn(`Reddit request timed out or returned a timeout error response (${timeoutCount} in 3 minutes). Will wait ${formatNumber(ms / 1000)} seconds before retrying`);
+                logger.warn(`Error occurred while making a request to Reddit (${timeoutCount} in 3 minutes). Will wait ${formatNumber(ms / 1000)} seconds before retrying`);
                 await sleep(ms);
                 return true;
 
@@ -601,7 +601,7 @@ export const createRetryHandler = (opts: RetryOptions, logger: Logger) => {
         } else {
             // linear backoff
             otherRetryCount++;
-            if (maxOtherRetry > otherRetryCount) {
+            if (maxOtherRetry < otherRetryCount) {
                 return false;
             }
             const ms = (4 * 1000) * otherRetryCount;
