@@ -314,6 +314,48 @@ const rcbServer = async function (options: any = {}) {
         io.emit('logClear', subArr);
     });
 
+    app.getAsync('/action', async (req, res) => {
+        const { type, subreddit } = req.query as any;
+        let subreddits: string[] = [];
+        if(subreddit === 'All') {
+            subreddits = req.session.subreddits as string[];
+        } else if((req.session.subreddits as string[]).includes(subreddit)) {
+            subreddits = [subreddit];
+        }
+
+        for(const s of subreddits) {
+            const manager = bot.subManagers.find(x => x.displayLabel === s);
+            if(manager === undefined) {
+                logger.warn(`Manager for ${s} does not exist`);
+                continue;
+            }
+            const mLogger = manager.logger;
+            mLogger.info(`/u/${req.session.user} invoked '${type}' action on ${manager.displayLabel}`);
+            switch(type) {
+                case 'start':
+                    if(manager.running) {
+                        mLogger.info('Already running');
+                    } else {
+                        manager.handle();
+                    }
+                    break;
+                case 'stop':
+                    if(!manager.running) {
+                        mLogger.info('Already stopped');
+                    } else {
+                        await manager.stop();
+                    }
+                    break;
+                case 'reload':
+                    await manager.stop();
+                    await manager.parseConfiguration(true);
+                    manager.handle();
+                    break;
+            }
+        }
+        res.send('OK');
+    });
+
     emitter.on('log', (log) => {
         const emittedSessions = [];
         const subName = parseSubredditLogName(log);

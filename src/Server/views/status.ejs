@@ -131,9 +131,9 @@
                                             <h4>Overview</h4>
                                             <div class="flex items-center flex-end">
                                                 <div>
-                                                    <a href="#">Start<%= data.name === 'All' ? ' All' : '' %></a> |
-                                                    <a href="#">Stop<%= data.name === 'All' ? ' All' : '' %></a> |
-                                                    <a href="#">Reload<%= data.name === 'All' ? ' All' : '' %></a>
+                                                    <a class="action" id="start" data-subreddit="<%= data.name %>" href="#">Start<%= data.name === 'All' ? ' All' : '' %></a> |
+                                                    <a class="action" id="stop" data-subreddit="<%= data.name %>" href="#">Stop<%= data.name === 'All' ? ' All' : '' %></a> |
+                                                    <a class="action" id="reload" data-subreddit="<%= data.name %>" href="#">Reload<%= data.name === 'All' ? ' All' : '' %></a>
                                                 </div>
                                             </div>
                                         </div>
@@ -396,6 +396,16 @@
                 }
             })
         })
+    })
+
+    document.querySelectorAll('.action').forEach(el => {
+        el.addEventListener('click', e => {
+            e.preventDefault()
+            action = e.target.id;
+            subreddit = e.target.dataset.subreddit;
+
+            fetch(`action?type=${action}&subreddit=${subreddit}`);
+        });
     })
 
     document.querySelectorAll('[data-subreddit].tabSelect').forEach(el => {
