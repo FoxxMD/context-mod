@@ -32,7 +32,8 @@ export class CommentAction extends Action {
         return 'Comment';
     }
 
-    async process(item: Comment | Submission, ruleResults: RuleResult[]): Promise<void> {
+    async process(item: Comment | Submission, ruleResults: RuleResult[], runtimeDryrun?: boolean): Promise<void> {
+        const dryRun = runtimeDryrun || this.dryRun;
         const content = await this.resources.getContent(this.content, item.subreddit);
         const body = await renderContent(content, item, ruleResults, this.resources.userNotes);
 
@@ -46,18 +47,18 @@ export class CommentAction extends Action {
             return;
         }
         let reply: Comment;
-        if(!this.dryRun) {
+        if(!dryRun) {
             // @ts-ignore
            reply = await item.reply(renderedContent);
         }
         if (this.lock) {
-            if (!this.dryRun) {
+            if (!dryRun) {
                 // snoopwrap typing issue, thinks comments can't be locked
                 // @ts-ignore
                 await item.lock();
             }
         }
-        if (this.distinguish && !this.dryRun) {
+        if (this.distinguish && !dryRun) {
             // @ts-ignore
             await reply.distinguish({sticky: this.sticky});
         }

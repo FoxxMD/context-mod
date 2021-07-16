@@ -34,6 +34,7 @@ import Action from "../Action";
 export interface runCheckOptions {
     checkNames?: string[],
     delayUntil?: number,
+    dryRun?: boolean,
 }
 
 export class Manager {
@@ -269,6 +270,7 @@ export class Manager {
         const {
             checkNames = [],
             delayUntil,
+            dryRun,
         } = options || {};
 
         if(delayUntil !== undefined) {
@@ -334,7 +336,7 @@ export class Manager {
                 if (triggered) {
                     this.checksTriggered.set(check.name, (this.checksTriggered.get(check.name) || 0) + 1);
                     this.checksTriggeredSinceStart.set(check.name, (this.checksTriggeredSinceStart.get(check.name) || 0) + 1);
-                    runActions = await check.runActions(item, currentResults.filter(x => x.triggered));
+                    runActions = await check.runActions(item, currentResults.filter(x => x.triggered), dryRun);
                     actionsRun = runActions.length;
                     break;
                 }

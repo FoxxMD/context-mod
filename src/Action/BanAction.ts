@@ -33,7 +33,8 @@ export class BanAction extends Action {
         return 'Ban';
     }
 
-    async process(item: Comment | Submission, ruleResults: RuleResult[]): Promise<void> {
+    async process(item: Comment | Submission, ruleResults: RuleResult[], runtimeDryrun?: boolean): Promise<void> {
+        const dryRun = runtimeDryrun || this.dryRun;
         const content = this.message === undefined ? undefined : await this.resources.getContent(this.message, item.subreddit);
         const renderedBody = content === undefined ? undefined : await renderContent(content, item, ruleResults, this.resources.userNotes);
         const renderedContent = renderedBody === undefined ? undefined : `${renderedBody}${await this.resources.generateFooter(item, this.footer)}`;
@@ -45,7 +46,7 @@ export class BanAction extends Action {
         const durText = this.duration === undefined ? 'permanently' : `for ${this.duration} days`;
         this.logger.info(`Banning ${item.author.name} ${durText}${this.reason !== undefined ? ` (${this.reason})` : ''}`);
         this.logger.verbose(`\r\n${banPieces.join('\r\n')}`);
-        if (!this.dryRun) {
+        if (!dryRun) {
             // @ts-ignore
             await item.subreddit.banUser({
                 name: item.author.id,

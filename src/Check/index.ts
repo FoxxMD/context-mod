@@ -242,18 +242,19 @@ export class Check implements ICheck {
         }
     }
 
-    async runActions(item: Submission | Comment, ruleResults: RuleResult[]): Promise<Action[]> {
-        this.logger.debug(`${this.dryRun ? 'DRYRUN - ' : ''}Running Actions`);
+    async runActions(item: Submission | Comment, ruleResults: RuleResult[], runtimeDryrun?: boolean): Promise<Action[]> {
+        const dr = runtimeDryrun || this.dryRun;
+        this.logger.debug(`${dr ? 'DRYRUN - ' : ''}Running Actions`);
         const runActions: Action[] = [];
         for (const a of this.actions) {
             try {
-                await a.handle(item, ruleResults);
+                await a.handle(item, ruleResults, runtimeDryrun);
                 runActions.push(a);
             } catch (err) {
                 this.logger.error(`Action ${a.getActionUniqueName()} encountered an error while running`, err);
             }
         }
-        this.logger.info(`${this.dryRun ? 'DRYRUN - ' : ''}Ran Actions: ${runActions.map(x => x.getActionUniqueName()).join(' | ')}`);
+        this.logger.info(`${dr ? 'DRYRUN - ' : ''}Ran Actions: ${runActions.map(x => x.getActionUniqueName()).join(' | ')}`);
         return runActions;
     }
 }

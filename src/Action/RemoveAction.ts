@@ -9,14 +9,15 @@ export class RemoveAction extends Action {
         return 'Remove';
     }
 
-    async process(item: Comment | Submission, ruleResults: RuleResult[]): Promise<void> {
+    async process(item: Comment | Submission, ruleResults: RuleResult[], runtimeDryrun?: boolean): Promise<void> {
+        const dryRun = runtimeDryrun || this.dryRun;
         // issue with snoowrap typings, doesn't think prop exists on Submission
         // @ts-ignore
         if (activityIsRemoved(item)) {
             this.logger.warn('Item is already removed');
             return;
         }
-        if (!this.dryRun) {
+        if (!dryRun) {
             // @ts-ignore
             await item.remove();
         }

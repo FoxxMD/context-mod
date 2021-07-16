@@ -11,13 +11,15 @@ import {Writable} from "stream";
 import winston from 'winston';
 import {Server as SocketServer} from 'socket.io';
 import sharedSession from 'express-socket.io-session';
+import Submission from "snoowrap/dist/objects/Submission";
 import EventEmitter from "events";
 import {
+    COMMENT_URL_ID,
     filterLogBySubreddit,
     formatLogLineToHtml,
-    isLogLineMinLevel,
+    isLogLineMinLevel, parseLinkIdentifier,
     parseSubredditLogName,
-    pollingInfo
+    pollingInfo, SUBMISSION_URL_ID
 } from "../util";
 import {Manager} from "../Subreddit/Manager";
 
@@ -32,8 +34,12 @@ app.set('view engine', 'ejs');
 
 interface ConnectedUserInfo {
     subreddits: string[],
-    level?: string
+    level?: string,
+    user: string
 }
+
+const commentReg = parseLinkIdentifier([COMMENT_URL_ID]);
+const submissionReg = parseLinkIdentifier([SUBMISSION_URL_ID]);
 
 const connectedUsers: Map<string, ConnectedUserInfo> = new Map();
 
@@ -117,7 +123,9 @@ const rcbServer = async function (options: any = {}) {
                 // @ts-ignore
                 subreddits: socket.handshake.session.subreddits,
                 // @ts-ignore
-                level: socket.handshake.session.level
+                level: socket.handshake.session.level,
+                // @ts-ignore
+                user: socket.handshake.session.user
             });
 
             // @ts-ignore
@@ -193,7 +201,7 @@ const rcbServer = async function (options: any = {}) {
         }
         const isOperator = operator !== undefined && operator.toLowerCase() === user.toLowerCase()
         // @ts-ignore
-        const logs = filterLogBySubreddit(slicedLog, req.session.subreddits, level, isOperator);
+        const logs = filterLogBySubreddit(slicedLog, req.session.subreddits, level, isOperator, user);
         const subManagerData = [];
         for (const s of subreddits) {
             const m = bot.subManagers.find(x => x.displayLabel === s) as Manager;
@@ -306,7 +314,7 @@ const rcbServer = async function (options: any = {}) {
         }
         res.send('OK');
 
-        const subMap = filterLogBySubreddit(slicedLog, req.session.subreddits, level, operator !== undefined && operator.toLowerCase() === (user as string).toLowerCase());
+        const subMap = filterLogBySubreddit(slicedLog, req.session.subreddits, level, operator !== undefined && operator.toLowerCase() === (user as string).toLowerCase(), user);
         const subArr: any = [];
         subMap.forEach((v: string[], k: string) => {
             subArr.push({name: k, logs: v.join('')});
@@ -326,7 +334,7 @@ const rcbServer = async function (options: any = {}) {
         for(const s of subreddits) {
             const manager = bot.subManagers.find(x => x.displayLabel === s);
             if(manager === undefined) {
-                logger.warn(`Manager for ${s} does not exist`);
+                logger.warn(`Manager for ${s} does not exist`, {subreddit: `/u/${req.session.user}`});
                 continue;
             }
             const mLogger = manager.logger;
@@ -356,13 +364,60 @@ const rcbServer = async function (options: any = {}) {
         res.send('OK');
     });
 
+    app.getAsync('/check', async (req, res) => {
+        const {url, dryRun: dryRunVal} = req.query as any;
+
+        let a;
+        const commentId = commentReg(url);
+        if (commentId !== undefined) {
+            // @ts-ignore
+            a = await bot.client.getComment(commentId);
+        }
+        if (a === undefined) {
+            const submissionId = submissionReg(url);
+            if (submissionId !== undefined) {
+                // @ts-ignore
+                a = await bot.client.getSubmission(submissionId);
+            }
+        }
+
+        if(a === undefined) {
+            logger.error('Could not parse Comment or Submission ID from given URL', {subreddit: `/u/${req.session.user}`});
+            return res.send('OK');
+        } else {
+            // @ts-ignore
+            const activity = await a.fetch();
+            const sub = await activity.subreddit.display_name;
+            // find manager so we can get display label
+            const manager = bot.subManagers.find(x => x.subreddit.display_name === sub);
+            if(manager === undefined) {
+                logger.error('Cannot run check on subreddit you do not moderate or bot does not run on', {subreddit: `/u/${req.session.user}`});
+                return res.send('OK');
+            }
+            if(!(req.session.subreddits as string[]).includes(manager.displayLabel)) {
+                logger.error('Cannot run check on subreddit you do not moderate or bot does not run on', {subreddit: `/u/${req.session.user}`});
+                return res.send('OK');
+            }
+            manager.logger.info(`/u/${req.session.user} running check on ${url}`);
+            await manager.runChecks(activity instanceof Submission ? 'Submission' : 'Comment', activity, { dryRun: dryRunVal.toString() === "1" ? true : undefined })
+        }
+        res.send('OK');
+    })
+
+    setInterval(() => {
+        // refresh op stats every 30 seconds
+        if (operatorSessionId !== undefined) {
+            io.to(operatorSessionId).emit('opStats', opStats(bot));
+        }
+    }, 30000);
+
     emitter.on('log', (log) => {
         const emittedSessions = [];
         const subName = parseSubredditLogName(log);
         if (subName !== undefined) {
             for (const [id, info] of connectedUsers) {
-                const {subreddits, level = 'verbose'} = info;
-                if (isLogLineMinLevel(log, level) && subreddits.includes(subName)) {
+                const {subreddits, level = 'verbose', user} = info;
+                if (isLogLineMinLevel(log, level) && (subreddits.includes(subName) || subName.includes(user))) {
                     emittedSessions.push(id);
                     io.to(id).emit('log', formatLogLineToHtml(log));
                 }

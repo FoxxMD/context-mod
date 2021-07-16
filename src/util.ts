@@ -653,7 +653,7 @@ export const formatLogLineToHtml = (val: string) => {
         .replace(HYPERLINK_REGEX, '<a href="$&">$&</a>');
 }
 
-export const filterLogBySubreddit = (rawLogs: string[] = [], subreddits: string[] = [], minLevel: string, isOperator = false): any => {
+export const filterLogBySubreddit = (rawLogs: string[] = [], subreddits: string[] = [], minLevel: string, isOperator = false, user?: string): any => {
     const subMap: Map<string, string[]> = new Map([['all', []]]);
     const logs = rawLogs.filter(x => isLogLineMinLevel(x, minLevel));
     if (isOperator) {
@@ -666,13 +666,16 @@ export const filterLogBySubreddit = (rawLogs: string[] = [], subreddits: string[
         }
         const formatted = formatLogLineToHtml(curr);
         const sub = subreddits.find(x => subName === x);
-        if (sub === undefined) {
-            return acc;
-        } else if (!acc.has(sub)) {
-            acc.set(sub, []);
+        const isUser = user !== undefined && subName.includes(user);
+        if(!isUser) {
+            if (sub === undefined) {
+                return acc;
+            } else if (!acc.has(sub)) {
+                acc.set(sub, []);
+            }
+            const subLogs = acc.get(sub) as string[];
+            acc.set(sub, subLogs.concat(formatted));
         }
-        const subLogs = acc.get(sub) as string[];
-        acc.set(sub, subLogs.concat(formatted));
         if (!isOperator) {
             acc.set('all', (acc.get('all') as string[]).concat(formatted));
         }
@@ -696,7 +699,7 @@ export const pollingInfo = (opt: PollingOptionsStrong) => {
 }
 
 export const totalFromMapStats = (val: Map<any, number>): number => {
-    return Object.entries(val).reduce((acc: number, [k, v]) => {
+    return Array.from(val.entries()).reduce((acc: number, [k, v]) => {
         return acc + v;
     }, 0);
 }

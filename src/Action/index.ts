@@ -46,7 +46,7 @@ export abstract class Action {
         return this.name === this.getKind() ? this.getKind() : `${this.getKind()} - ${this.name}`;
     }
 
-    async handle(item: Comment | Submission, ruleResults: RuleResult[]): Promise<void> {
+    async handle(item: Comment | Submission, ruleResults: RuleResult[], runtimeDryrun?: boolean): Promise<void> {
         let actionRun = false;
         const [itemPass, crit] = isItem(item, this.itemIs, this.logger);
         if (!itemPass) {
@@ -57,7 +57,7 @@ export abstract class Action {
             if (this.authorIs.include !== undefined && this.authorIs.include.length > 0) {
                 for (const auth of this.authorIs.include) {
                     if (await this.resources.testAuthorCriteria(item, auth)) {
-                        await this.process(item, ruleResults);
+                        await this.process(item, ruleResults, runtimeDryrun);
                         return true;
                     }
                 }
@@ -67,7 +67,7 @@ export abstract class Action {
             if (!actionRun && this.authorIs.exclude !== undefined && this.authorIs.exclude.length > 0) {
                 for (const auth of this.authorIs.exclude) {
                     if (await this.resources.testAuthorCriteria(item, auth, false)) {
-                        await this.process(item, ruleResults);
+                        await this.process(item, ruleResults, runtimeDryrun);
                         return true;
                     }
                 }
@@ -78,14 +78,14 @@ export abstract class Action {
         }
         const authorRunResults = await authorRun();
         if (null === authorRunResults) {
-            await this.process(item, ruleResults);
+            await this.process(item, ruleResults, runtimeDryrun);
         } else if (!authorRunResults) {
             return;
         }
         this.logger.verbose(`${this.dryRun ? 'DRYRUN - ' : ''}Done`);
     }
 
-    abstract process(item: Comment | Submission, ruleResults: RuleResult[]): Promise<void>;
+    abstract process(item: Comment | Submission, ruleResults: RuleResult[], runtimeDryun?: boolean): Promise<void>;
 }
 
 export interface ActionOptions extends ActionConfig {

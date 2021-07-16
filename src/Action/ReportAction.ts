@@ -23,12 +23,13 @@ export class ReportAction extends Action {
         return 'Report';
     }
 
-    async process(item: Comment | Submission, ruleResults: RuleResult[]): Promise<void> {
+    async process(item: Comment | Submission, ruleResults: RuleResult[], runtimeDryrun?: boolean): Promise<void> {
+        const dryRun = runtimeDryrun || this.dryRun;
         const content = await this.resources.getContent(this.content, item.subreddit);
         const renderedContent = await renderContent(content, item, ruleResults, this.resources.userNotes);
         this.logger.verbose(`Contents:\r\n${renderedContent}`);
         const truncatedContent = reportTrunc(renderedContent);
-        if(!this.dryRun) {
+        if(!dryRun) {
             // @ts-ignore
             await item.report({reason: truncatedContent});
         }

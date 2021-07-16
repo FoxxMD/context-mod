@@ -8,13 +8,14 @@ export class ApproveAction extends Action {
         return 'Approve';
     }
 
-    async process(item: Comment | Submission, ruleResults: RuleResult[]): Promise<void> {
+    async process(item: Comment | Submission, ruleResults: RuleResult[], runtimeDryrun?: boolean): Promise<void> {
+        const dryRun = runtimeDryrun || this.dryRun;
         //snoowrap typing issue, thinks comments can't be locked
         // @ts-ignore
         if (item.approved) {
             this.logger.warn('Item is already approved');
         }
-        if (!this.dryRun) {
+        if (!dryRun) {
             // @ts-ignore
             await item.approve();
         }
