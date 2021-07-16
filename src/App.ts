@@ -118,7 +118,7 @@ export class App {
             continueAfterRatelimitError: true,
         });
 
-        const retryHandler = createRetryHandler({maxRequestRetry: 5, maxOtherRetry: 1}, this.logger);
+        const retryHandler = createRetryHandler({maxRequestRetry: 8, maxOtherRetry: 1}, this.logger);
 
         const modStreamErrorListener = (name: string) => async (err: any) => {
             this.logger.error('Polling error occurred', err);
