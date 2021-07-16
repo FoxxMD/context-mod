@@ -1,0 +1,70 @@
+<head>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.0.3/tailwind.min.css"
+          integrity="sha512-wl80ucxCRpLkfaCnbM88y4AxnutbGk327762eM9E/rRTvY/ZGAHWMZrYUq66VQBYMIYDFpDdJAOGSLyIPHZ2IQ=="
+          crossorigin="anonymous"/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.0.3/tailwind-dark.min.css"
+          integrity="sha512-WvyKyiVHgInX5UQt67447ExtRRZG/8GUijaq1MpqTNYp8wY4/EJOG5bI80sRp/5crDy4Z6bBUydZI2OFV3Vbtg=="
+          crossorigin="anonymous"/>
+    <style>
+        a {
+            text-decoration: underline;
+        }
+
+        .loading {
+            height: 35px;
+            fill: black;
+            display: none;
+        }
+
+        .connected .loading {
+            display: inline;
+        }
+
+        .dark .loading {
+            fill: white;
+        }
+
+        .sub {
+            display: none;
+        }
+
+        .sub.active {
+            display: inherit;
+        }
+
+        /*https://stackoverflow.com/a/48386400/1469797*/
+        .stats {
+            display: grid;
+            grid-template-columns: max-content auto;
+            grid-gap: 5px;
+        }
+
+        .stats label {
+            text-align: right;
+        }
+
+        .stats label:after {
+            content: ":";
+        }
+
+        .has-tooltip {
+            position: relative;
+        }
+
+        .tooltip {
+            visibility: hidden;
+            position: absolute;
+            right: 0;
+        }
+
+        .has-tooltip:hover .tooltip {
+            visibility: visible;
+            z-index: 100;
+        }
+    </style>
+    <title><%= title !== undefined ? title : `RCB for /u/${botName}`%></title>
+    <!--<title><%# `RCB for /u/${botName}`%></title>-->
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width,initial-scale=1.0">
+</head>
