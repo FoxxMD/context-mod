@@ -207,7 +207,7 @@ const rcbServer = async function (options: any = {}) {
             const m = bot.subManagers.find(x => x.displayLabel === s) as Manager;
             const sd = {
                 name: s,
-                logs: logs.get(s),
+                logs: logs.get(s) || [], // provide a default empty value in case we truly have not logged anything for this subreddit yet
                 running: m.running,
                 dryRun: m.dryRun === true,
                 pollingInfo: m.pollOptions.map(pollingInfo),
@@ -268,6 +268,10 @@ const rcbServer = async function (options: any = {}) {
             checks: checks,
             stats: rest,
         };
+        if(allManagerData.logs === undefined) {
+            // this should happen but saw an edge case where potentially did
+            logger.warn(`Logs for 'all' were undefined found but should always have a default empty value`);
+        }
         if(isOperator) {
             allManagerData.startedAt = bot.startedAt.local().format('MMMM D, YYYY h:mm A Z');
             allManagerData.heartbeatHuman = dayjs.duration({seconds: bot.heartbeatInterval}).humanize();
