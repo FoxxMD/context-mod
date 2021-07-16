@@ -25,7 +25,6 @@ export class SPoll<T extends object> extends Poll<T> {
         this.interval = setInterval(async () => {
             try {
                 const batch = await this.getter();
-
                 const newItems: T[] = [];
                 for (const item of batch) {
                     const id = item[this.identifier];
@@ -41,6 +40,7 @@ export class SPoll<T extends object> extends Poll<T> {
                 this.emit("listing", newItems);
             } catch (err) {
                 this.emit('error', err);
+                this.end();
             }
         }, this.frequency);
     }
