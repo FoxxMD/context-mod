@@ -76,7 +76,8 @@
             <div class="flex items-center justify-between">
                 <div class="flex items-center flex-grow pr-4">
                     <div class="px-4 width-full relative">
-                        <div><a href="https://github.com/FoxxMD/reddit-context-bot">RCB</a> for <a href="https://reddit.com/user/<%= botName %>">/u/<%= botName %></a></div>
+                        <div><a href="https://github.com/FoxxMD/reddit-context-bot">RCB</a> for <a
+                                    href="https://reddit.com/user/<%= botName %>">/u/<%= botName %></a></div>
                         <div class="text-small absolute pl-4">
                             Operated by <%= operatorDisplay %>
                         </div>
@@ -93,18 +94,25 @@
             <div class="flex items-center justify-between">
                 <ul id="tabs" class="inline-flex px-1 pt-2 ">
                     <% subreddits.forEach(function (data){ %>
-                        <li class="px-4 py-2 dark:text-white rounded-t"><a class="tabSelect font-normal"
-                                                                           data-subreddit="<%= data.name %>"
-                                                                           href="#<%= data.name %>"><%= data.name %></a>
+                        <li class="px-4 py-2 dark:text-white rounded-t">
+                            <a class="tabSelect font-normal"
+                               data-subreddit="<%= data.name %>"
+                               href="#<%= data.name %>">
+                                <%= data.name %>
+                            </a>
+                            <% if ((data.name === 'All' && isOperator) || data.name !== 'All') { %>
+                            <span class="inline-block mb-0.5 ml-0.5 w-2 h-2 mr-2 bg-<%= data.running ? 'green' : 'red' %>-400 rounded-full"></span>
+                            <% } %>
                         </li>
                     <% }) %>
                 </ul>
                 <div class="flex items-center flex-end font-normal">
                     <div>
                         <div>Level : <%- logSettings.level %></div>
-                        <div>Sort  : <%- logSettings.sort %></div>
+                        <div>Sort : <%- logSettings.sort %></div>
                         <div>Limit : <%- logSettings.limit %></div>
-                        <div>Theme : <a id="light" href="" class="theme">Light</a> | <a id="dark" href="" class="theme">Dark</a></div>
+                        <div>Theme : <a id="light" href="" class="theme">Light</a> | <a id="dark" href="" class="theme">Dark</a>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -200,9 +208,9 @@
                                         </div>
                                         <% if (data.name !== 'All') { %>
                                             <ul class="list-disc list-inside mt-4">
-                                            <% data.pollingInfo.forEach(function (i){ %>
-                                                <li>Polling <%- i %></li>
-                                            <% }) %>
+                                                <% data.pollingInfo.forEach(function (i){ %>
+                                                    <li>Polling <%- i %></li>
+                                                <% }) %>
                                             </ul>
                                         <% } %>
                                     </div>
@@ -306,7 +314,7 @@
     document.querySelectorAll('.theme').forEach(el => {
         el.addEventListener('click', e => {
             e.preventDefault();
-            if(e.target.id === 'dark') {
+            if (e.target.id === 'dark') {
                 document.body.classList.add('dark');
                 localStorage.setItem('ms-dark', 'yes');
             } else {
@@ -446,7 +454,7 @@
             //document.querySelector('.logs').innerHTML = data.join().replaceAll(/<br\s*\/?>\,/g,'<br />');
         });
         socket.on('opStats', (data) => {
-            for(const [k, v] of Object.entries(data)) {
+            for (const [k, v] of Object.entries(data)) {
                 document.querySelector(`#${k}`).innerHTML = v;
             }
         });
