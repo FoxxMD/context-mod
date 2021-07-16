@@ -198,42 +198,16 @@ export class App {
         let subSchedule: Manager[] = [];
         // get configs for subs we want to run on and build/validate them
         for (const sub of subsToRun) {
-            let content = undefined;
-            let wiki;
+            const manager = new Manager(sub, this.client, this.logger, {dryRun: this.dryRun});
             try {
-                // @ts-ignore
-                wiki = await sub.getWikiPage(this.wikiLocation).fetch();
-                content = wiki.content_md;
-            } catch (err) {
-                this.logger.error(`Could not read wiki configuration. Please ensure the page https://reddit.com${sub.url}wiki/${this.wikiLocation} exists and is readable -- error: ${err.message}`, {subreddit: sub.display_name_prefixed});
-                continue;
-            }
-
-            if (content === '') {
-                this.logger.error('Wiki page contents was empty`', {subreddit: sub.display_name_prefixed});
-                continue;
-            }
-
-            const [configObj, jsonErr, yamlErr] = parseFromJsonOrYamlToObject(content);
-
-            if (configObj === undefined) {
-                this.logger.error(`Could not parse wiki page contents as JSON or YAML:`, {subreddit: sub.display_name_prefixed});
-                this.logger.error(jsonErr);
-                this.logger.error(yamlErr);
-                continue;
-            }
-
-            try {
-                const manager = new Manager(sub, this.client, this.logger, configObj, {dryRun: this.dryRun});
-                manager.lastWikiCheck = dayjs();
-                manager.lastWikiRevision = dayjs.unix(wiki.revision_date);
-                subSchedule.push(manager);
+                await manager.parseConfiguration(true);
             } catch (err) {
                 if (!(err instanceof LoggedError)) {
                     this.logger.error(`Config was not valid:`, {subreddit: sub.display_name_prefixed});
                     this.logger.error(err, {subreddit: sub.display_name_prefixed});
                 }
             }
+            subSchedule.push(manager);
         }
         this.subManagers = subSchedule;
     }
@@ -251,6 +225,10 @@ export class App {
                     this.logger.info(heartbeat);
                 }
                 for (const s of this.subManagers) {
+                    if(s.manuallyStopped) {
+                        this.logger.debug('Skipping config check/restart on heartbeat due to previously being stopped by user', {subreddit: s.displayLabel});
+                        continue;
+                    }
                     try {
                         const newConfig = await s.parseConfiguration();
                         if (newConfig || !s.running) {
@@ -288,8 +266,11 @@ export class App {
     }
 
     async runManagers() {
+        if(this.subManagers.every(x => !x.validConfigLoaded)) {
+            this.logger.warn('All managers have invalid configs!');
+        }
         for (const manager of this.subManagers) {
-            if (!manager.running) {
+            if (!manager.running && manager.validConfigLoaded) {
                 await manager.buildPolling();
                 manager.handle();
             }

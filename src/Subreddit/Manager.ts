@@ -30,6 +30,8 @@ import EventEmitter from "events";
 import ConfigParseError from "../Utils/ConfigParseError";
 import dayjs, { Dayjs as DayjsObj } from "dayjs";
 import Action from "../Action";
+import {JSONConfig} from "../JsonConfig";
+import {CheckStructuredJson} from "../Check";
 
 export interface runCheckOptions {
     checkNames?: string[],
@@ -41,7 +43,7 @@ export class Manager {
     subreddit: Subreddit;
     client: Snoowrap;
     logger: Logger;
-    pollOptions!: PollingOptionsStrong[];
+    pollOptions: PollingOptionsStrong[] = [];
     submissionChecks!: SubmissionCheck[];
     commentChecks!: CommentCheck[];
     resources!: SubredditResources;
@@ -61,7 +63,9 @@ export class Manager {
     currentLabels: string[] = [];
 
     startedAt?: DayjsObj;
+    validConfigLoaded: boolean = false;
     running: boolean = false;
+    manuallyStopped: boolean = false;
 
     eventsCheckedTotal: number = 0;
     eventsCheckedSinceStartTotal: number = 0;
@@ -109,7 +113,7 @@ export class Manager {
         return this.displayLabel;
     }
 
-    constructor(sub: Subreddit, client: Snoowrap, logger: Logger, sourceData: object, opts: ManagerOptions = {}) {
+    constructor(sub: Subreddit, client: Snoowrap, logger: Logger, opts: ManagerOptions = {}) {
         const {dryRun} = opts;
         this.displayLabel =  opts.nickname || `${sub.display_name_prefixed}`;
         const getLabels = this.getCurrentLabels;
@@ -127,79 +131,85 @@ export class Manager {
         this.globalDryRun = dryRun;
         this.subreddit = sub;
         this.client = client;
-        this.parseConfigurationFromObject(sourceData);
+        //this.parseConfigurationFromObject(sourceData);
     }
 
     protected parseConfigurationFromObject(configObj: object) {
-        const configBuilder = new ConfigBuilder({logger: this.logger});
-        const validJson = configBuilder.validateJson(configObj);
-        const {checks, ...configManagerOpts} = validJson;
-        const {
-            polling = [{pollOn: 'unmoderated', limit: DEFAULT_POLLING_LIMIT, interval: DEFAULT_POLLING_INTERVAL}],
-            caching,
-            dryRun,
-            footer,
-            nickname
-        } = configManagerOpts || {};
-        this.pollOptions = buildPollingOptions(polling);
-        this.dryRun = this.globalDryRun || dryRun;
+        try {
+            const configBuilder = new ConfigBuilder({logger: this.logger});
+            const validJson = configBuilder.validateJson(configObj);
+            const {checks, ...configManagerOpts} = validJson;
+            const {
+                polling = [{pollOn: 'unmoderated', limit: DEFAULT_POLLING_LIMIT, interval: DEFAULT_POLLING_INTERVAL}],
+                caching,
+                dryRun,
+                footer,
+                nickname
+            } = configManagerOpts || {};
+            this.pollOptions = buildPollingOptions(polling);
+            this.dryRun = this.globalDryRun || dryRun;
 
-        this.displayLabel = nickname || `${this.subreddit.display_name_prefixed}`;
+            this.displayLabel = nickname || `${this.subreddit.display_name_prefixed}`;
 
-        if(footer !== undefined) {
-            this.resources.footer = footer;
-        }
-
-        this.logger.info(`Dry Run: ${this.dryRun === true}`);
-        for(const p of this.pollOptions) {
-            this.logger.info(`Polling Info => ${pollingInfo(p)}`)
-        }
-
-        let resourceConfig: SubredditResourceSetOptions = {
-            footer,
-            enabled: true
-        };
-        if(caching === false) {
-            resourceConfig.enabled = false;
-        } else {
-            resourceConfig = {...resourceConfig, ...caching};
-        }
-        if(this.resources === undefined) {
-            this.resources = ResourceManager.set(this.subreddit.display_name, {
-                ...resourceConfig,
-                logger: this.logger,
-                subreddit: this.subreddit
-            });
-        }
-        this.resources.setOptions(resourceConfig);
-
-        this.logger.info('Subreddit-specific options updated');
-        this.logger.info('Building Checks...');
-
-        const commentChecks: Array<CommentCheck> = [];
-        const subChecks: Array<SubmissionCheck> = [];
-        const structuredChecks = configBuilder.parseToStructured(validJson);
-        for (const jCheck of structuredChecks) {
-            const checkConfig = {
-                ...jCheck,
-                dryRun: this.dryRun || jCheck.dryRun,
-                logger: this.logger,
-                subredditName: this.subreddit.display_name
-            };
-            if (jCheck.kind === 'comment') {
-                commentChecks.push(new CommentCheck(checkConfig));
-            } else if (jCheck.kind === 'submission') {
-                subChecks.push(new SubmissionCheck(checkConfig));
+            if (footer !== undefined) {
+                this.resources.footer = footer;
             }
-        }
 
-        this.submissionChecks = subChecks;
-        this.commentChecks = commentChecks;
-        const checkSummary = `Found Checks -- Submission: ${this.submissionChecks.length} | Comment: ${this.commentChecks.length}`;
-        if (subChecks.length === 0 && commentChecks.length === 0) {
-            this.logger.warn(checkSummary);
-        } else {
-            this.logger.info(checkSummary);
+            this.logger.info(`Dry Run: ${this.dryRun === true}`);
+            for (const p of this.pollOptions) {
+                this.logger.info(`Polling Info => ${pollingInfo(p)}`)
+            }
+
+            let resourceConfig: SubredditResourceSetOptions = {
+                footer,
+                enabled: true
+            };
+            if (caching === false) {
+                resourceConfig.enabled = false;
+            } else {
+                resourceConfig = {...resourceConfig, ...caching};
+            }
+            if (this.resources === undefined) {
+                this.resources = ResourceManager.set(this.subreddit.display_name, {
+                    ...resourceConfig,
+                    logger: this.logger,
+                    subreddit: this.subreddit
+                });
+            }
+            this.resources.setOptions(resourceConfig);
+
+            this.logger.info('Subreddit-specific options updated');
+            this.logger.info('Building Checks...');
+
+            const commentChecks: Array<CommentCheck> = [];
+            const subChecks: Array<SubmissionCheck> = [];
+            const structuredChecks = configBuilder.parseToStructured(validJson);
+            for (const jCheck of structuredChecks) {
+                const checkConfig = {
+                    ...jCheck,
+                    dryRun: this.dryRun || jCheck.dryRun,
+                    logger: this.logger,
+                    subredditName: this.subreddit.display_name
+                };
+                if (jCheck.kind === 'comment') {
+                    commentChecks.push(new CommentCheck(checkConfig));
+                } else if (jCheck.kind === 'submission') {
+                    subChecks.push(new SubmissionCheck(checkConfig));
+                }
+            }
+
+            this.submissionChecks = subChecks;
+            this.commentChecks = commentChecks;
+            const checkSummary = `Found Checks -- Submission: ${this.submissionChecks.length} | Comment: ${this.commentChecks.length}`;
+            if (subChecks.length === 0 && commentChecks.length === 0) {
+                this.logger.warn(checkSummary);
+            } else {
+                this.logger.info(checkSummary);
+            }
+            this.validConfigLoaded = true;
+        } catch (err) {
+            this.validConfigLoaded = false;
+            throw err;
         }
     }
 
@@ -207,49 +217,56 @@ export class Manager {
         this.wikiUpdateRunning = true;
         this.lastWikiCheck = dayjs();
 
-        let sourceData: string;
         try {
-            // @ts-ignore
-            const wiki = await this.subreddit.getWikiPage(this.wikiLocation).fetch();
-            const revisionDate = dayjs.unix(wiki.revision_date);
-            if (!force && (this.lastWikiRevision !== undefined && this.lastWikiRevision.isSame(revisionDate))) {
-                // nothing to do, we already have this revision
-                this.wikiUpdateRunning = false;
-                this.logger.verbose('Config is up to date');
-                return false;
+            let sourceData: string;
+            try {
+                // @ts-ignore
+                const wiki = await this.subreddit.getWikiPage(this.wikiLocation).fetch();
+                const revisionDate = dayjs.unix(wiki.revision_date);
+                if (!force && this.validConfigLoaded && (this.lastWikiRevision !== undefined && this.lastWikiRevision.isSame(revisionDate))) {
+                    // nothing to do, we already have this revision
+                    this.wikiUpdateRunning = false;
+                    this.logger.verbose('Config is up to date');
+                    return false;
+                }
+                if(force) {
+                    this.logger.info('Config update was forced');
+                } else if (!this.validConfigLoaded) {
+                    this.logger.info('Trying to load (new?) config now since there is no valid config loaded');
+                } else if (this.lastWikiRevision !== undefined) {
+                    this.logger.info(`Updating config due to stale wiki page (${dayjs.duration(dayjs().diff(revisionDate)).humanize()} old)`)
+                }
+                this.lastWikiRevision = revisionDate;
+                sourceData = await wiki.content_md;
+            } catch (err) {
+                const msg = `Could not read wiki configuration. Please ensure the page https://reddit.com${this.subreddit.url}wiki/${this.wikiLocation} exists and is readable -- error: ${err.message}`;
+                this.logger.error(msg);
+                throw new ConfigParseError(msg);
             }
-            if (this.lastWikiRevision !== undefined) {
-                this.logger.info(`Updating config due to stale wiki page (${dayjs.duration(dayjs().diff(revisionDate)).humanize()} old)`)
+
+            if (sourceData === '') {
+                this.logger.error(`Wiki page contents was empty`);
+                throw new ConfigParseError('Wiki page contents was empty');
             }
-            this.lastWikiRevision = revisionDate;
-            sourceData = await wiki.content_md;
+
+            const [configObj, jsonErr, yamlErr] = parseFromJsonOrYamlToObject(sourceData);
+
+            if (configObj === undefined) {
+                this.logger.error(`Could not parse wiki page contents as JSON or YAML:`);
+                this.logger.error(jsonErr);
+                this.logger.error(yamlErr);
+                throw new ConfigParseError('Could not parse wiki page contents as JSON or YAML')
+            }
+
+            this.parseConfigurationFromObject(configObj);
+            this.logger.info('Checks updated');
+            return true;
         } catch (err) {
-            const msg = `Could not read wiki configuration. Please ensure the page https://reddit.com${this.subreddit.url}wiki/${this.wikiLocation} exists and is readable -- error: ${err.message}`;
-            this.logger.error(msg);
+            this.validConfigLoaded = false;
+            throw err;
+        } finally {
             this.wikiUpdateRunning = false;
-            throw new ConfigParseError(msg);
         }
-
-        if (sourceData === '') {
-            this.logger.error(`Wiki page contents was empty`);
-            this.wikiUpdateRunning = false;
-            throw new ConfigParseError('Wiki page contents was empty');
-        }
-
-        const [configObj, jsonErr, yamlErr] = parseFromJsonOrYamlToObject(sourceData);
-
-        if (configObj === undefined) {
-            this.logger.error(`Could not parse wiki page contents as JSON or YAML:`);
-            this.logger.error(jsonErr);
-            this.logger.error(yamlErr);
-            this.wikiUpdateRunning = false;
-            throw new ConfigParseError('Could not parse wiki page contents as JSON or YAML')
-        }
-
-        this.wikiUpdateRunning = false;
-        this.parseConfigurationFromObject(configObj);
-        this.logger.info('Checks updated');
-        return true;
     }
 
     async runChecks(checkType: ('Comment' | 'Submission'), activity: (Submission | Comment), options?: runCheckOptions): Promise<void> {
@@ -506,6 +523,7 @@ export class Manager {
             }
             this.startedAt = dayjs();
             this.running = true;
+            this.manuallyStopped = false;
             this.logger.info('Bot Running');
 
             await pEvent(this.emitter, 'end');
@@ -516,7 +534,8 @@ export class Manager {
         }
     }
 
-    stop() {
+    stop(manually = false) {
+        this.manuallyStopped = manually;
         if(this.running) {
             for(const s of this.streams) {
                 s.end();
@@ -536,7 +555,7 @@ export class Manager {
             this.checksTriggeredSinceStart = new Map();
             this.actionsRunSinceStart = new Map();
             this.running = false;
-            this.logger.info('Bot Stopped');
+            this.logger.info(`Bot Stopped${manually ? ' (by user)' : ''}`);
         }
     }
 }

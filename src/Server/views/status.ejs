@@ -16,7 +16,7 @@
                                 <%= data.name %>
                             </a>
                             <% if ((data.name === 'All' && isOperator) || data.name !== 'All') { %>
-                            <span class="inline-block mb-0.5 ml-0.5 w-2 h-2 mr-2 bg-<%= data.running ? 'green' : 'red' %>-400 rounded-full"></span>
+                            <span class="inline-block mb-0.5 ml-0.5 w-2 h-2 mr-2 bg-<%= data.running === 'Yes' ? 'green' : 'red' %>-400 rounded-full"></span>
                             <% } %>
                         </li>
                     <% }) %>
@@ -68,6 +68,8 @@
                                         <div class="stats">
                                             <label>Running</label>
                                             <span class="font-semibold"><%= data.running %></span>
+                                            <label>Valid Config</label>
+                                            <span class="font-semibold"><%= data.validConfig %></span>
                                             <label>Dry Run</label>
                                             <span><%= data.dryRun %></span>
                                             <label>Checks</label>

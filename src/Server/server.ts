@@ -14,6 +14,7 @@ import sharedSession from 'express-socket.io-session';
 import Submission from "snoowrap/dist/objects/Submission";
 import EventEmitter from "events";
 import {
+    boolToString,
     COMMENT_URL_ID,
     filterLogBySubreddit,
     formatLogLineToHtml,
@@ -25,6 +26,7 @@ import {
 } from "../util";
 import {Manager} from "../Subreddit/Manager";
 import {getDefaultLogger} from "../Utils/loggerFactory";
+import LoggedError from "../Utils/LoggedError";
 
 const MemoryStore = createMemoryStore(session);
 const app = addAsync(express());
@@ -243,12 +245,13 @@ const rcbServer = async function (options: any = {}) {
             const sd = {
                 name: s,
                 logs: logs.get(s) || [], // provide a default empty value in case we truly have not logged anything for this subreddit yet
-                running: m.running,
-                dryRun: m.dryRun === true,
-                pollingInfo: m.pollOptions.map(pollingInfo),
+                running: `${boolToString(m.running)}${m.manuallyStopped ? ' (by user)' : ''}`,
+                validConfig: boolToString(m.validConfigLoaded),
+                dryRun: boolToString(m.dryRun === true),
+                pollingInfo: m.pollOptions.length === 0 ? ['nothing :('] : m.pollOptions.map(pollingInfo),
                 checks: {
-                    submissions: m.submissionChecks.length,
-                    comments: m.commentChecks.length,
+                    submissions: m.submissionChecks === undefined ? 0 : m.submissionChecks.length,
+                    comments: m.commentChecks === undefined ? 0 : m.commentChecks.length,
                 },
                 wikiLocation: m.wikiLocation,
                 wikiHref: `https://reddit.com/r/${m.subreddit.display_name}/wiki/${m.wikiLocation}`,
@@ -297,8 +300,8 @@ const rcbServer = async function (options: any = {}) {
 
         let allManagerData: any = {
             name: 'All',
-            running: true,
-            dryRun: bot.dryRun === true,
+            running: 'Yes',
+            dryRun: boolToString(bot.dryRun === true),
             logs: logs.get('all'),
             checks: checks,
             stats: rest,
@@ -380,25 +383,43 @@ const rcbServer = async function (options: any = {}) {
             }
             const mLogger = manager.logger;
             mLogger.info(`/u/${req.session.user} invoked '${type}' action on ${manager.displayLabel}`);
-            switch(type) {
+            switch (type) {
                 case 'start':
-                    if(manager.running) {
+                    if (manager.running) {
                         mLogger.info('Already running');
                     } else {
-                        manager.handle();
+                        try {
+                            await manager.parseConfiguration();
+                            manager.handle();
+                        } catch (err) {
+                            if (!(err instanceof LoggedError)) {
+                                mLogger.error(err, {subreddit: manager.displayLabel});
+                            }
+                        }
                     }
                     break;
                 case 'stop':
-                    if(!manager.running) {
+                    const wasRunning = manager.running;
+                    await manager.stop(true);
+                    if (!wasRunning) {
                         mLogger.info('Already stopped');
-                    } else {
-                        await manager.stop();
                     }
                     break;
                 case 'reload':
-                    await manager.stop();
-                    await manager.parseConfiguration(true);
-                    manager.handle();
+                    try {
+                        const wasRunning = manager.running;
+                        await manager.stop();
+                        await manager.parseConfiguration(true);
+                        if (wasRunning) {
+                            manager.handle();
+                        } else {
+                            mLogger.info('Must be STARTED manually since it was not running before reload');
+                        }
+                    } catch (err) {
+                        if (!(err instanceof LoggedError)) {
+                            mLogger.error(err, {subreddit: manager.displayLabel});
+                        }
+                    }
                     break;
             }
         }

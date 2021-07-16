@@ -125,8 +125,7 @@ const program = new Command();
 
         let webCommand = program.command('web');
         webCommand = addOptions(webCommand, getUniversalWebOptions());
-        webCommand.action(async () => {
-            const opts = program.opts();
+        webCommand.action(async (opts) => {
             const {
                 redirectUri = process.env.REDIRECT_URI,
                 clientId = process.env.CLIENT_ID,

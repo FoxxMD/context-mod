@@ -749,3 +749,7 @@ export const permissions = [
     'wikiread',
     'wikiedit'
 ];
+
+export const boolToString = (val: boolean): string => {
+    return val ? 'Yes' : 'No';
+}

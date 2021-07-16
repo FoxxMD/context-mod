@@ -23,7 +23,7 @@ export const createRefreshTokenOption = () => new commander.Option('-r, --refres
     .default(process.env.REFRESH_TOKEN);
 
 export const subreddits = new commander.Option('-s, --subreddits <list...>', 'List of subreddits to run on. Bot will run on all subs it has access to if not defined')
-    .default(process.env.SUBREDDITS || [], 'process.env.SUBREDDITS (comma-seperated)');
+    .default(process.env.SUBREDDITS !== undefined ? process.env.SUBREDDITS.split(',').map(x => x.trim()) : [], 'process.env.SUBREDDITS (comma-seperated)');
 
 export const logDir = new commander.Option('-d, --logDir <dir>', 'Absolute path to directory to store rotated logs in')
     .default(process.env.LOG_DIR || `${process.cwd()}/logs`, 'process.env.LOG_DIR || process.cwd()/logs');
