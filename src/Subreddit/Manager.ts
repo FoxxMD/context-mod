@@ -486,7 +486,7 @@ export class Manager {
 
                         this.logger.error('Polling error occurred', err);
                         const shouldRetry = await retryHandler(err);
-                        if (shouldRetry && stream instanceof UnmoderatedStream) {
+                        if (shouldRetry) {
                             stream.startInterval();
                         } else {
                             throw err;
