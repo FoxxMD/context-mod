@@ -189,12 +189,24 @@ const rcbServer = async function (options: any = {}) {
     });
 
     app.getAsync(/.*callback$/, async (req, res) => {
+        const {error, code} = req.query as any;
+        if (error !== undefined) {
+            let errContent: string;
+            switch (error) {
+                case 'access_denied':
+                    errContent = 'You must <b>Allow</b> this application to connect in order to proceed.';
+                    break;
+                default:
+                    errContent = error;
+            }
+            return res.render('error', {error: errContent, operatorDisplay });
+        }
         const client = await Snoowrap.fromAuthCode({
             userAgent: `web:contextBot:web`,
             clientId,
             clientSecret,
             redirectUri,
-            code: req.query.code as string,
+            code: code as string,
         });
         // @ts-ignore
         const user = await client.getMe().name as string;
