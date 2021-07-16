@@ -1,0 +1,29 @@
+<html>
+<%- include('partials/head', {title: 'RCB'}) %>
+<body class="">
+<script>localStorage.getItem('ms-dark') === 'no' ? document.body.classList.remove('dark') : document.body.classList.add('dark')</script>
+<div class="min-w-screen min-h-screen bg-gray-100 bg-gray-100 dark:bg-gray-800 font-sans">
+    <%- include('partials/title', {title: ''}) %>
+    <div class="container mx-auto">
+        <div class="grid">
+            <div class="bg-white dark:bg-gray-500 dark:text-white">
+                <div class="p-6 md:px-10 md:py-6">
+                    <div class="text-xl mb-4">Sorry!</div>
+                    <div class="space-y-3">
+                        <div>Your account was successfully logged in but you do not have access to this RCB instance because either:</div>
+                        <ul class="list-inside list-disc">
+                            <li>The Bot account used by this instance is not a Moderator of any Subreddits you are also a Moderator of or</li>
+                            <li>the Bot is a Moderator of one of your Subreddits but the Operator of this instance is not currently running the instance on your Subreddits.</li>
+                        </ul>
+                        <div>Note: You must <a href="logout">Logout</a> in order for the instance to detect changes in your subreddits/moderator status</div>
+                        <% if(operatorDisplay !== 'Anonymous') { %>
+                        <div>Operator: <%= operatorDisplay %></div>
+                        <% } %>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>

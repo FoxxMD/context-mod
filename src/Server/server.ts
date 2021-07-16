@@ -218,6 +218,11 @@ const rcbServer = async function (options: any = {}) {
         const {subreddits = [], user: userVal, limit = 200, level = 'verbose', sort = 'descending', lastCheck} = req.session;
         const user = userVal as string;
         const isOperator = operator !== undefined && operator.toLowerCase() === user.toLowerCase()
+
+        if((req.session.subreddits as string[]).length === 0 && !isOperator) {
+            return res.render('noSubs', { operatorDisplay });
+        }
+
         // @ts-ignore
         const logs = filterLogBySubreddit(subLogMap, req.session.subreddits, {level, operator, user, sort, limit});
         const subManagerData = [];
