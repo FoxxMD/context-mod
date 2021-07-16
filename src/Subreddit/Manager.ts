@@ -226,14 +226,12 @@ export class Manager {
         } catch (err) {
             const msg = `Could not read wiki configuration. Please ensure the page https://reddit.com${this.subreddit.url}wiki/${this.wikiLocation} exists and is readable -- error: ${err.message}`;
             this.logger.error(msg);
-            this.logger.info('Will retry parsing config on next heartbeat...');
             this.wikiUpdateRunning = false;
             throw new ConfigParseError(msg);
         }
 
         if (sourceData === '') {
             this.logger.error(`Wiki page contents was empty`);
-            this.logger.info('Will retry parsing config on next heartbeat...');
             this.wikiUpdateRunning = false;
             throw new ConfigParseError('Wiki page contents was empty');
         }
@@ -244,9 +242,8 @@ export class Manager {
             this.logger.error(`Could not parse wiki page contents as JSON or YAML:`);
             this.logger.error(jsonErr);
             this.logger.error(yamlErr);
-            this.logger.info('Will retry parsing config on next heartbeat...');
             this.wikiUpdateRunning = false;
-            throw new ConfigParseError('Could not parse wiki page contents as JSON or YAML:')
+            throw new ConfigParseError('Could not parse wiki page contents as JSON or YAML')
         }
 
         this.wikiUpdateRunning = false;
@@ -263,7 +260,7 @@ export class Manager {
         const itemId = await item.id;
         let allRuleResults: RuleResult[] = [];
         const itemIdentifier = `${checkType === 'Submission' ? 'SUB' : 'COM'} ${itemId}`;
-        this.currentLabels = [this.displayLabel, itemIdentifier];
+        this.currentLabels = [itemIdentifier];
         const [peek, _] = await itemContentPeek(item);
         this.logger.info(`<EVENT> ${peek}`);
 

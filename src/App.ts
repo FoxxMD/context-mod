@@ -178,7 +178,7 @@ export class App {
         let subsToRun: Subreddit[] = [];
         const subsToUse = subreddits.length > 0 ? subreddits.map(parseSubredditName) : this.subreddits;
         if (subsToUse.length > 0) {
-            this.logger.info(`User-defined subreddit constraints detected (CLI argument or environmental variable), will try to run on: ${subsToUse.join(', ')}`);
+            this.logger.info(`Operator-defined subreddit constraints detected (CLI argument or environmental variable), will try to run on: ${subsToUse.join(', ')}`);
             for (const sub of subsToUse) {
                 const asub = availSubs.find(x => x.display_name.toLowerCase() === sub.toLowerCase())
                 if (asub === undefined) {
@@ -205,19 +205,19 @@ export class App {
                 wiki = await sub.getWikiPage(this.wikiLocation).fetch();
                 content = wiki.content_md;
             } catch (err) {
-                this.logger.error(`{${sub.display_name_prefixed}} Could not read wiki configuration. Please ensure the page https://reddit.com${sub.url}wiki/${this.wikiLocation} exists and is readable -- error: ${err.message}`);
+                this.logger.error(`Could not read wiki configuration. Please ensure the page https://reddit.com${sub.url}wiki/${this.wikiLocation} exists and is readable -- error: ${err.message}`, {subreddit: sub.display_name_prefixed});
                 continue;
             }
 
             if (content === '') {
-                this.logger.error(`{${sub.display_name_prefixed}} Wiki page contents was empty`);
+                this.logger.error('Wiki page contents was empty`', {subreddit: sub.display_name_prefixed});
                 continue;
             }
 
             const [configObj, jsonErr, yamlErr] = parseFromJsonOrYamlToObject(content);
 
             if (configObj === undefined) {
-                this.logger.error(`{${sub.display_name_prefixed}} Could not parse wiki page contents as JSON or YAML:`);
+                this.logger.error(`Could not parse wiki page contents as JSON or YAML:`, {subreddit: sub.display_name_prefixed});
                 this.logger.error(jsonErr);
                 this.logger.error(yamlErr);
                 continue;
@@ -230,7 +230,8 @@ export class App {
                 subSchedule.push(manager);
             } catch (err) {
                 if (!(err instanceof LoggedError)) {
-                    this.logger.error(`{${sub.display_name_prefixed}} Config was not valid`, err);
+                    this.logger.error(`Config was not valid:`, {subreddit: sub.display_name_prefixed});
+                    this.logger.error(err, {subreddit: sub.display_name_prefixed});
                 }
             }
         }
@@ -259,7 +260,10 @@ export class App {
                     } catch (err) {
                         s.stop();
                         if(!(err instanceof LoggedError)) {
-                            this.logger.info('Will retry parsing config on next heartbeat...');
+                            this.logger.error(err, {subreddit: s.displayLabel});
+                        }
+                        if(this.nextHeartbeat !== undefined) {
+                            this.logger.info(`Will retry parsing config on next heartbeat (in ${dayjs.duration(this.nextHeartbeat.diff(dayjs())).humanize()})`, {subreddit: s.displayLabel});
                         }
                     }
                 }
