@@ -505,7 +505,7 @@ export const itemContentPeek = async (item: (Comment | Submission), peekLength =
             const commentSub = await client.getSubmission(item.link_id);
             const [p, {submissionTitle: subTitle}] = await itemContentPeek(commentSub);
             submissionTitle = subTitle;
-            peek = `${truncatePeek(content)} in ${subTitle} by ${author} https://reddit.com${item.permalink}`;
+            peek = `${truncatePeek(content)} by ${author} in https://reddit.com${item.permalink}`;
         } catch (err) {
             // possible comment is not on a submission, just swallow
         }
