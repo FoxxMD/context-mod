@@ -969,8 +969,7 @@
                 }
             },
             "required": [
-                "kind",
-                "minWordCount"
+                "kind"
             ],
             "type": "object"
         },

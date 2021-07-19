@@ -297,7 +297,7 @@ interface RepeatActivityConfig extends ActivityWindow, ReferenceSubmission {
      * @default 1
      * @example [1]
      * */
-    minWordCount: number,
+    minWordCount?: number,
 }
 
 export interface RepeatActivityOptions extends RepeatActivityConfig, RuleOptions {

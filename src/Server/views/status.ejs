@@ -1,9 +1,9 @@
 <html>
-<%- include('partials/head', {title: undefined})%>
+<%- include('partials/head', {title: undefined}) %>
 <body class="">
 <script>localStorage.getItem('ms-dark') === 'no' ? document.body.classList.remove('dark') : document.body.classList.add('dark')</script>
 <div class="min-w-screen min-h-screen bg-gray-100 bg-gray-100 dark:bg-gray-800 font-sans">
-    <%- include('partials/authTitle')%>
+    <%- include('partials/authTitle') %>
     <div class="space-x-4 py-1 md:px-10 leading-6 font-semibold bg-gray-500 dark:bg-gray-700 text-white">
         <div class="container mx-auto">
             <div class="flex items-center justify-between">
@@ -16,7 +16,7 @@
                                 <%= data.name %>
                             </a>
                             <% if ((data.name === 'All' && isOperator) || data.name !== 'All') { %>
-                            <span class="inline-block mb-0.5 ml-0.5 w-2 h-2 mr-2 bg-<%= data.running === 'Yes' ? 'green' : 'red' %>-400 rounded-full"></span>
+                                <span class="inline-block mb-0.5 ml-0.5 w-2 h-2 mr-2 bg-<%= data.indicator %>-400 rounded-full"></span>
                             <% } %>
                         </li>
                     <% }) %>
@@ -39,7 +39,9 @@
                 <div class="pb-6 pt-3 md:px-10">
                     <div class="flex items-center justify-around">
                         <div>
-                            <input id="checkUrl" style="min-width: 500px;" class="border-gray-50 placeholder-gray-500 rounded mt-2 mb-3 p-2 text-black" placeholder="Run Bot on an url (Submission/Comment)"/>
+                            <input id="checkUrl" style="min-width: 500px;"
+                                   class="border-gray-50 placeholder-gray-500 rounded mt-2 mb-3 p-2 text-black"
+                                   placeholder="Run Bot on an url (Submission/Comment)"/>
                             <span class="mx-2">
                             <input type="checkbox" id="dryrunCheck" name="dryrunCheck">
                             <label for="dryrunCheck">Test?</label>
@@ -55,21 +57,72 @@
                                     <div class="space-x-4 px-4 p-2 leading-2 font-semibold bg-gray-300 dark:bg-gray-700 dark:text-white">
                                         <div class="flex items-center justify-between">
                                             <h4>Overview</h4>
-                                            <div class="flex items-center flex-end">
-                                                <div>
-                                                    <a class="action" id="start" data-subreddit="<%= data.name %>" href="#">Start<%= data.name === 'All' ? ' All' : '' %></a> |
-                                                    <a class="action" id="stop" data-subreddit="<%= data.name %>" href="#">Stop<%= data.name === 'All' ? ' All' : '' %></a> |
-                                                    <a class="action" id="reload" data-subreddit="<%= data.name %>" href="#">Reload<%= data.name === 'All' ? ' All' : '' %></a>
+                                            <% if (data.name === 'All') { %>
+                                                <div class="flex items-center flex-end">
+                                                    <div>
+                                                        <a class="action" id="start" data-subreddit="<%= data.name %>"
+                                                           href="#">Start All</a> |
+                                                        <a class="action" id="start" data-subreddit="<%= data.name %>"
+                                                           href="#">Pause All</a> |
+                                                        <a class="action" id="stop" data-subreddit="<%= data.name %>"
+                                                           href="#">Stop All</a> |
+                                                        <a class="action" id="reload" data-subreddit="<%= data.name %>"
+                                                           href="#">Reload All</a>
+                                                    </div>
                                                 </div>
-                                            </div>
+                                            <% } %>
                                         </div>
                                     </div>
                                     <div class="p-4">
                                         <div class="stats">
-                                            <label>Running</label>
-                                            <span class="font-semibold"><%= data.running %></span>
-                                            <label>Valid Config</label>
-                                            <span class="font-semibold"><%= data.validConfig %></span>
+                                            <% if (data.name !== 'All') { %>
+                                                <label>Manager (Bot)</label>
+                                                <div class="flex items-center justify-between">
+                                                <span class="font-semibold"><%= `${data.botState.state}${data.botState.causedBy === 'system' ? '' : ' (user)'}` %></span>
+                                                    <div class="flex items-center flex-end">
+                                                        <div>
+                                                            <a class="action" id="start" data-type="bot"
+                                                               data-subreddit="<%= data.name %>" href="#">Start</a> |
+                                                            <a class="action" id="stop" data-type="bot"
+                                                               data-subreddit="<%= data.name %>" href="#">Stop</a>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <label>Queue</label>
+                                                <div class="flex items-center justify-between">
+                                                <span class="font-semibold"><%= `${data.queueState.state}${data.queueState.causedBy === 'system' ? '' : ' (user)'}` %></span>
+                                                <div class="flex items-center flex-end">
+                                                    <div>
+                                                        <a class="action" id="start" data-type="queue"
+                                                           data-subreddit="<%= data.name %>" href="#">Start</a> |
+                                                        <a class="action" id="pause" data-type="queue"
+                                                           data-subreddit="<%= data.name %>" href="#">Pause</a> |
+                                                        <a class="action" id="stop" data-type="queue"
+                                                           data-subreddit="<%= data.name %>" href="#">Stop</a>
+                                                    </div>
+                                                </div>
+                                                </div>
+                                                <label>Activity Polling</label>
+                                                <div class="flex items-center justify-between">
+                                                    <span class="font-semibold"><%= `${data.eventsState.state}${data.eventsState.causedBy === 'system' ? '' : ' (user)'}` %></span>
+                                                    <div class="flex items-center flex-end">
+                                                        <div>
+                                                            <a class="action" id="start" data-type="event"
+                                                               data-subreddit="<%= data.name %>" href="#">Start</a> |
+                                                            <a class="action" id="pause" data-type="event"
+                                                               data-subreddit="<%= data.name %>" href="#">Pause</a> |
+                                                            <a class="action" id="stop" data-type="event"
+                                                               data-subreddit="<%= data.name %>" href="#">Stop</a>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <label>Valid Config</label>
+                                                <span class="font-semibold"><%= data.validConfig %></span>
+                                                <label>Queued Activities</label>
+                                                <span><%= data.queuedActivities %></span>
+                                                <label>Running Activities (Max)</label>
+                                                <span><%= `${data.runningActivities} (${data.maxWorkers})` %></span>
+                                            <% } %>
                                             <label>Dry Run</label>
                                             <span><%= data.dryRun %></span>
                                             <label>Checks</label>
@@ -82,7 +135,7 @@
                                                     </span>
                                                     <%= data.startedAtHuman %>
                                                 </span>
-                                                <label>Wiki</label>
+                                                <label>Config</label>
                                                 <span>
                                                     <a style="display: inline"
                                                        href="<%= data.wikiHref %>"><%= data.wikiLocation %></a>
@@ -93,12 +146,16 @@
                                                     (Revised <%= data.wikiRevisionHuman %>)
                                                 </span>
                                                 </span>
-                                                <label>Wiki Checked</label>
+                                                <label>Config Checked</label>
                                                 <span class="has-tooltip">
                                                     <span class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2'>
                                                         <%= data.wikiLastCheck %>
                                                     </span>
-                                                    <%= data.wikiLastCheckHuman %>
+                                                    <%= data.wikiLastCheckHuman %> <a class="action" id="reload"
+                                                                                      data-subreddit="<%= data.name %>"
+                                                                                      href="#">Reload</a> | <a
+                                                            class="action" id="reload" data-force="true"
+                                                            data-subreddit="<%= data.name %>" href="#">Force</a>
                                                 </span>
                                             <% } %>
                                             <% if (data.name === 'All' && isOperator) { %>
@@ -238,6 +295,11 @@
     </div>
 </div>
 <script>
+    /*    const appendUser = causedBy => causedBy === 'system' ? '' : ' (user)';
+        const initialData =
+        const updateOverview = (sub, data) => {
+
+        }*/
     window.sort = 'desc';
     document.querySelectorAll('.theme').forEach(el => {
         el.addEventListener('click', e => {
@@ -327,8 +389,10 @@
             e.preventDefault()
             action = e.target.id;
             subreddit = e.target.dataset.subreddit;
+            type = e.target.dataset.type;
+            force = e.target.dataset.force === 'true';
 
-            fetch(`action?type=${action}&subreddit=${subreddit}`);
+            fetch(`action?action=${action}&subreddit=${subreddit}&force=${force}&type=${type}`);
         });
     })
 
@@ -390,7 +454,7 @@
             }
             selectors.forEach(sel => {
                 const el = document.querySelector(sel);
-                if(el !== null) {
+                if (el !== null) {
                     const currLogs = el.innerHTML;
                     document.querySelector(sel).innerHTML = window.sort === 'desc' ? data.concat(currLogs) : currLogs.concat(data)
                 }

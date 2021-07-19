@@ -27,6 +27,7 @@ import {
 import {Manager} from "../Subreddit/Manager";
 import {getDefaultLogger} from "../Utils/loggerFactory";
 import LoggedError from "../Utils/LoggedError";
+import {RUNNING, STOPPED, SYSTEM, USER} from "../Common/interfaces";
 
 const MemoryStore = createMemoryStore(session);
 const app = addAsync(express());
@@ -174,6 +175,29 @@ const rcbServer = async function (options: any = {}) {
         next();
     }
 
+    const booleanMiddle = (boolParams: string[] = []) => async (req: express.Request, res: express.Response, next: Function) => {
+        if(req.query !== undefined) {
+            for(const b of boolParams) {
+                const bVal = req.query[b] as any;
+                if(bVal !== undefined) {
+                    let truthyVal: boolean;
+                    if(bVal === 'true' || bVal === true || bVal === 1 || bVal === '1') {
+                        truthyVal = true;
+                    } else if(bVal === 'false' || bVal === false || bVal === 0 || bVal === '0') {
+                        truthyVal = false;
+                    } else {
+                        res.status(400);
+                        res.send(`Expected query parameter ${b} to be a truthy value. Got "${bVal}" but must be one of these: true/false, 1/0`);
+                        return;
+                    }
+                    // @ts-ignore
+                    req.query[b] = truthyVal;
+                }
+            }
+        }
+        next();
+    }
+
     app.getAsync('/logout', async (req, res) => {
         // @ts-ignore
         req.session.destroy();
@@ -245,7 +269,13 @@ const rcbServer = async function (options: any = {}) {
             const sd = {
                 name: s,
                 logs: logs.get(s) || [], // provide a default empty value in case we truly have not logged anything for this subreddit yet
-                running: `${boolToString(m.running)}${m.manuallyStopped ? ' (by user)' : ''}`,
+                botState: m.botState,
+                eventsState: m.eventsState,
+                queueState: m.queueState,
+                indicator: 'gray',
+                queuedActivities: m.queue.length(),
+                runningActivities: m.queue.running(),
+                maxWorkers: m.queue.concurrency,
                 validConfig: boolToString(m.validConfigLoaded),
                 dryRun: boolToString(m.dryRun === true),
                 pollingInfo: m.pollOptions.length === 0 ? ['nothing :('] : m.pollOptions.map(pollingInfo),
@@ -263,6 +293,16 @@ const rcbServer = async function (options: any = {}) {
                 startedAt: 'Not Started',
                 startedAtHuman: 'Not Started'
             };
+            // TODO replace indicator data with js on client page
+            let indicator;
+            if(m.botState.state === RUNNING && m.queueState.state === RUNNING && m.eventsState.state === RUNNING) {
+                indicator = 'green';
+            } else if (m.botState.state === STOPPED && m.queueState.state === STOPPED && m.eventsState.state === STOPPED) {
+                indicator = 'red';
+            } else {
+                indicator = 'yellow';
+            }
+            sd.indicator = indicator;
             if (m.startedAt !== undefined) {
                 sd.startedAtHuman = `${dayjs.duration(dayjs().diff(m.startedAt)).humanize()} ago`;
                 sd.startedAt = m.startedAt.local().format('MMMM D, YYYY h:mm A Z');
@@ -300,7 +340,10 @@ const rcbServer = async function (options: any = {}) {
 
         let allManagerData: any = {
             name: 'All',
-            running: 'Yes',
+            botState: {
+                state: RUNNING,
+                causedBy: SYSTEM
+            },
             dryRun: boolToString(bot.dryRun === true),
             logs: logs.get('all'),
             checks: checks,
@@ -366,8 +409,9 @@ const rcbServer = async function (options: any = {}) {
         io.emit('logClear', subArr);
     });
 
+    app.use('/action', booleanMiddle(['force']));
     app.getAsync('/action', async (req, res) => {
-        const { type, subreddit } = req.query as any;
+        const { type, action, subreddit, force = false } = req.query as any;
         let subreddits: string[] = [];
         if(subreddit === 'All') {
             subreddits = req.session.subreddits as string[];
@@ -382,45 +426,49 @@ const rcbServer = async function (options: any = {}) {
                 continue;
             }
             const mLogger = manager.logger;
-            mLogger.info(`/u/${req.session.user} invoked '${type}' action on ${manager.displayLabel}`);
-            switch (type) {
-                case 'start':
-                    if (manager.running) {
-                        mLogger.info('Already running');
-                    } else {
-                        try {
-                            await manager.parseConfiguration();
-                            manager.handle();
-                        } catch (err) {
-                            if (!(err instanceof LoggedError)) {
-                                mLogger.error(err, {subreddit: manager.displayLabel});
-                            }
-                        }
-                    }
-                    break;
-                case 'stop':
-                    const wasRunning = manager.running;
-                    await manager.stop(true);
-                    if (!wasRunning) {
-                        mLogger.info('Already stopped');
-                    }
-                    break;
-                case 'reload':
-                    try {
-                        const wasRunning = manager.running;
-                        await manager.stop();
-                        await manager.parseConfiguration(true);
-                        if (wasRunning) {
-                            manager.handle();
+            mLogger.info(`/u/${req.session.user} invoked '${action}' action for ${type} on ${manager.displayLabel}`);
+            try {
+                switch (action) {
+                    case 'start':
+                        if(type === 'bot') {
+                            await manager.start('user');
+                        } else if(type === 'queue') {
+                            manager.startQueue('user');
                         } else {
-                            mLogger.info('Must be STARTED manually since it was not running before reload');
+                            await manager.startEvents('user');
                         }
-                    } catch (err) {
-                        if (!(err instanceof LoggedError)) {
-                            mLogger.error(err, {subreddit: manager.displayLabel});
+                        break;
+                    case 'stop':
+                        if(type === 'bot') {
+                            await manager.stop('user');
+                        } else if(type === 'queue') {
+                            await manager.stopQueue('user');
+                        } else {
+                            manager.stopEvents('user');
                         }
-                    }
-                    break;
+                        break;
+                    case 'pause':
+                        if(type === 'queue') {
+                            await manager.pauseQueue('user');
+                        } else {
+                            manager.pauseEvents('user');
+                        }
+                        break;
+                    case 'reload':
+                        const prevQueueState = manager.queueState.state;
+                        const newConfig = await manager.parseConfiguration('user', force);
+                        if(newConfig === false) {
+                            mLogger.info('Config was up-to-date');
+                        }
+                        if(newConfig && prevQueueState === RUNNING) {
+                            await manager.startQueue(USER);
+                        }
+                        break;
+                }
+            } catch (err) {
+                if (!(err instanceof LoggedError)) {
+                    mLogger.error(err, {subreddit: manager.displayLabel});
+                }
             }
         }
         res.send('OK');

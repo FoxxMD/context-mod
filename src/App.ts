@@ -18,6 +18,7 @@ import LoggedError from "./Utils/LoggedError";
 import ProxiedSnoowrap from "./Utils/ProxiedSnoowrap";
 import {ModQueueStream, UnmoderatedStream} from "./Subreddit/Streams";
 import {getDefaultLogger} from "./Utils/loggerFactory";
+import {RUNNING, STOPPED, SYSTEM, USER} from "./Common/interfaces";
 
 const {transports} = winston;
 
@@ -200,7 +201,7 @@ export class App {
         for (const sub of subsToRun) {
             const manager = new Manager(sub, this.client, this.logger, {dryRun: this.dryRun});
             try {
-                await manager.parseConfiguration(true);
+                await manager.parseConfiguration('system', true);
             } catch (err) {
                 if (!(err instanceof LoggedError)) {
                     this.logger.error(`Config was not valid:`, {subreddit: sub.display_name_prefixed});
@@ -225,18 +226,29 @@ export class App {
                     this.logger.info(heartbeat);
                 }
                 for (const s of this.subManagers) {
-                    if(s.manuallyStopped) {
+                    if(s.botState.state === STOPPED && s.botState.causedBy === USER) {
                         this.logger.debug('Skipping config check/restart on heartbeat due to previously being stopped by user', {subreddit: s.displayLabel});
                         continue;
                     }
                     try {
                         const newConfig = await s.parseConfiguration();
-                        if (newConfig || !s.running) {
-                            await s.buildPolling();
-                            s.handle();
+                        if(newConfig || (s.queueState.state !== RUNNING && s.queueState.causedBy === SYSTEM))
+                        {
+                            await s.startQueue();
+                        }
+                        if(newConfig || (s.eventsState.state !== RUNNING && s.eventsState.causedBy === SYSTEM))
+                        {
+                            await s.startEvents();
+                        }
+                        if(s.botState.state !== RUNNING && s.eventsState.state === RUNNING && s.queueState.state === RUNNING) {
+                            s.botState = {
+                                state: RUNNING,
+                                causedBy: 'system',
+                            }
                         }
                     } catch (err) {
-                        s.stop();
+                        this.logger.info('Stopping event polling to prevent activity processing queue from backing up. Will be restarted when config update succeeds.')
+                        await s.stopEvents();
                         if(!(err instanceof LoggedError)) {
                             this.logger.error(err, {subreddit: s.displayLabel});
                         }
@@ -270,17 +282,16 @@ export class App {
             this.logger.warn('All managers have invalid configs!');
         }
         for (const manager of this.subManagers) {
-            if (!manager.running && manager.validConfigLoaded) {
-                await manager.buildPolling();
-                manager.handle();
+            if (manager.validConfigLoaded && manager.botState.state !== RUNNING) {
+                await manager.start();
             }
         }
+
+        await this.runModStreams();
 
         if (this.heartbeatInterval !== 0 && !this.heartBeating) {
             this.heartbeat();
         }
-
-        await this.runModStreams();
 
         const emitter = new EventEmitter();
         await pEvent(emitter, 'end');

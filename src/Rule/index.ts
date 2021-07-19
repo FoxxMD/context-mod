@@ -234,6 +234,6 @@ export interface RuleJSONConfig extends IRule {
      * The kind of rule to run
      * @examples ["recentActivity", "repeatActivity", "author", "attribution", "history"]
      */
-    kind: 'recentActivity' | 'repeatActivity' | 'author' | 'attribution' | 'history'
+    kind: 'recentActivity' | 'repeatActivity' | 'author' | 'attribution' | 'history' | 'regex'
 }
 

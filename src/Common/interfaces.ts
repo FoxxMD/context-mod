@@ -597,3 +597,11 @@ export interface DomainInfo {
 
 export const DEFAULT_POLLING_INTERVAL = 30;
 export const DEFAULT_POLLING_LIMIT = 50;
+
+export type Invokee = 'system' | 'user';
+export const SYSTEM = 'system';
+export const USER = 'user';
+export type RunState = 'running' | 'paused' | 'stopped';
+export const STOPPED = 'stopped';
+export const RUNNING = 'running';
+export const PAUSED = 'paused';

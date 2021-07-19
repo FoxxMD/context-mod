@@ -118,7 +118,11 @@ const program = new Command();
                 for (const manager of app.subManagers) {
                     const activities = await manager.subreddit.getUnmoderated({limit});
                     for (const a of activities.reverse()) {
-                        await manager.runChecks(a instanceof Submission ? 'Submission' : 'Comment', a, {checkNames: checks});
+                        manager.queue.push({
+                            checkType: a instanceof Submission ? 'Submission' : 'Comment',
+                            activity: a,
+                            options: {checkNames: checks}
+                        });
                     }
                 }
             });
