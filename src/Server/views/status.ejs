@@ -60,11 +60,9 @@
                                             <% if (data.name === 'All') { %>
                                                 <div class="flex items-center flex-end">
                                                     <div>
-                                                        <a class="action" id="start" data-subreddit="<%= data.name %>"
+                                                        <a class="action" id="start" data-type="bot" data-subreddit="<%= data.name %>"
                                                            href="#">Start All</a> |
-                                                        <a class="action" id="start" data-subreddit="<%= data.name %>"
-                                                           href="#">Pause All</a> |
-                                                        <a class="action" id="stop" data-subreddit="<%= data.name %>"
+                                                        <a class="action" id="stop" data-type="bot" data-subreddit="<%= data.name %>"
                                                            href="#">Stop All</a> |
                                                         <a class="action" id="reload" data-subreddit="<%= data.name %>"
                                                            href="#">Reload All</a>
