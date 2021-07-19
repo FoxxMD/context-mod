@@ -298,7 +298,14 @@ export class Manager {
             }
         }
 
+        // const startedWaiting = dayjs();
         while(this.wikiUpdateRunning) {
+            // if(dayjs().diff(startedWaiting, 's') > 12) {
+            //     this.logger.warn('Wiki updating is taking too long. Update process probably failed :( Hopefully something is logged otherwise report as an issue.');
+            //     this.logger.warn('Forcing wiki update status to OFF');
+            //     this.wikiUpdateRunning = false;
+            //     break;
+            // }
             // sleep for a few seconds while we get new config zzzz
             this.logger.verbose('A wiki config update is running, delaying checks by 3 seconds');
             await sleep(3000);

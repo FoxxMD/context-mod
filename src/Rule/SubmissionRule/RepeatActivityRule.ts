@@ -27,7 +27,7 @@ const getActivityIdentifier = (activity: (Submission | Comment), length = 200) =
     let identifier: string;
     if (activity instanceof Submission) {
         if (activity.is_self) {
-            identifier = activity.selftext.slice(0, length);
+            identifier = `${activity.title}${activity.selftext.slice(0, length)}`;
         } else {
             identifier = parseUsableLinkIdentifier(activity.url) as string;
         }
@@ -46,6 +46,7 @@ export class RepeatActivityRule extends SubmissionRule {
     include: string[];
     exclude: string[];
     keepRemoved: boolean;
+    minWordCount: number;
 
     constructor(options: RepeatActivityOptions) {
         super(options);
@@ -54,11 +55,13 @@ export class RepeatActivityRule extends SubmissionRule {
             window = 100,
             gapAllowance,
             useSubmissionAsReference = true,
+            minWordCount = 1,
             lookAt = 'all',
             include = [],
             exclude = [],
             keepRemoved = false,
         } = options;
+        this.minWordCount = minWordCount;
         this.keepRemoved = keepRemoved;
         this.threshold = threshold;
         this.window = window;
@@ -113,6 +116,7 @@ export class RepeatActivityRule extends SubmissionRule {
 
             let identifier = getActivityIdentifier(activity);
             const validSub = filterFunc(activity);
+            const minMet = identifier.length >= this.minWordCount;
 
             let updatedAllSets = [...allSets];
             let updatedOpenSets: RepeatActivityData[] = [];
@@ -120,10 +124,10 @@ export class RepeatActivityRule extends SubmissionRule {
             let currIdentifierInOpen = false;
             const bufferedActivities = this.gapAllowance === undefined || this.gapAllowance === 0 ? [] : activities.slice(Math.max(0, index - this.gapAllowance), Math.max(0, index));
             for (const o of openSets) {
-                if (o.identifier === identifier && validSub) {
+                if (o.identifier === identifier && validSub && minMet) {
                     updatedOpenSets.push({...o, sets: [...o.sets, activity]});
                     currIdentifierInOpen = true;
-                } else if (bufferedActivities.some(x => getActivityIdentifier(x) === identifier) && validSub) {
+                } else if (bufferedActivities.some(x => getActivityIdentifier(x) === identifier) && validSub && minMet) {
                     updatedOpenSets.push(o);
                 } else {
                     updatedAllSets.push(o);
@@ -280,6 +284,20 @@ interface RepeatActivityConfig extends ActivityWindow, ReferenceSubmission {
      * @default false
      * */
     keepRemoved?: boolean
+
+    /**
+     * For activities that are text-based this is the minimum number of words required for the activity to be considered for a repeat
+     *
+     * EX if `minimumWordCount=5` and a comment is `what about you` then it is ignored because `3 is less than 5`
+     *
+     * **For self-text submissions** -- title + body text
+     *
+     * **For comments* -- body text
+     *
+     * @default 1
+     * @example [1]
+     * */
+    minWordCount: number,
 }
 
 export interface RepeatActivityOptions extends RepeatActivityConfig, RuleOptions {
