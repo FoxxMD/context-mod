@@ -118,6 +118,8 @@ const rcbServer = async function (options: any = {}) {
 
     logger.info(`Web UI started: http://localhost:${port}`);
 
+    app.use('/public', express.static(`${__dirname}/public`));
+
     await bot.buildManagers();
     botSubreddits = bot.subManagers.map(x => x.displayLabel);
     // TODO potentially prune subLogMap of user keys? shouldn't have happened this early though
@@ -353,23 +355,30 @@ const rcbServer = async function (options: any = {}) {
             // this should happen but saw an edge case where potentially did
             logger.warn(`Logs for 'all' were undefined found but should always have a default empty value`);
         }
-        if(isOperator) {
+       // if(isOperator) {
             allManagerData.startedAt = bot.startedAt.local().format('MMMM D, YYYY h:mm A Z');
             allManagerData.heartbeatHuman = dayjs.duration({seconds: bot.heartbeatInterval}).humanize();
             allManagerData.heartbeat = bot.heartbeatInterval;
             allManagerData = {...allManagerData, ...opStats(bot)};
-        }
+        //}
 
         const data = {
             userName: user,
+            system: {
+                startedAt: bot.startedAt.local().format('MMMM D, YYYY h:mm A Z'),
+                ...opStats(bot),
+            },
             subreddits: [allManagerData, ...subManagerData],
             botName: bot.botName,
             operatorDisplay,
             isOperator,
             logSettings: {
-                limit: [10, 20, 50, 100, 200].map(x => `<a class="capitalize ${limit === x ? 'font-bold no-underline pointer-events-none' : ''}" data-limit="${x}" href="logs/settings/update?limit=${x}">${x}</a>`).join(' | '),
-                sort: ['ascending', 'descending'].map(x => `<a class="capitalize ${sort === x ? 'font-bold no-underline pointer-events-none' : ''}" data-sort="${x}" href="logs/settings/update?sort=${x}">${x}</a>`).join(' | '),
-                level: availableLevels.map(x => `<a class="capitalize log-${x} ${level === x ? `font-bold no-underline pointer-events-none` : ''}" data-log="${x}" href="logs/settings/update?level=${x}">${x}</a>`).join(' | ')
+                //limit: [10, 20, 50, 100, 200].map(x => `<a class="capitalize ${limit === x ? 'font-bold no-underline pointer-events-none' : ''}" data-limit="${x}" href="logs/settings/update?limit=${x}">${x}</a>`).join(' | '),
+                limitSelect: [10, 20, 50, 100, 200].map(x => `<option ${limit === x ? 'selected' : ''} class="capitalize ${limit === x ? 'font-bold' : ''}" data-value="${x}">${x}</option>`).join(' | '),
+                //sort: ['ascending', 'descending'].map(x => `<a class="capitalize ${sort === x ? 'font-bold no-underline pointer-events-none' : ''}" data-sort="${x}" href="logs/settings/update?sort=${x}">${x}</a>`).join(' | '),
+                sortSelect: ['ascending', 'descending'].map(x => `<option ${sort === x ? 'selected' : ''} class="capitalize ${sort === x ? 'font-bold' : ''}" data-value="${x}">${x}</option>`).join(' '),
+                //level: availableLevels.map(x => `<a class="capitalize log-${x} ${level === x ? `font-bold no-underline pointer-events-none` : ''}" data-log="${x}" href="logs/settings/update?level=${x}">${x}</a>`).join(' | '),
+                levelSelect: availableLevels.map(x => `<option ${level === x ? 'selected' : ''} class="capitalize log-${x} ${level === x ? `font-bold` : ''}" data-value="${x}">${x}</option>`).join(' '),
             },
         };
 
@@ -535,9 +544,10 @@ const rcbServer = async function (options: any = {}) {
 
     setInterval(() => {
         // refresh op stats every 30 seconds
-        if (operatorSessionId !== undefined) {
-            io.to(operatorSessionId).emit('opStats', opStats(bot));
-        }
+        io.emit('opStats', opStats(bot));
+        // if (operatorSessionId !== undefined) {
+        //     io.to(operatorSessionId).emit('opStats', opStats(bot));
+        // }
     }, 30000);
 
     emitter.on('log', (log) => {
@@ -571,7 +581,7 @@ const opStats = (bot: App) => {
     const nextHeartbeat = bot.nextHeartbeat !== undefined ? bot.nextHeartbeat.local().format('MMMM D, YYYY h:mm A Z') : 'N/A';
     const nextHeartbeatHuman = bot.nextHeartbeat !== undefined ? `in ${dayjs.duration(bot.nextHeartbeat.diff(dayjs())).humanize()}` : 'N/A'
     return {
-        startedAtHuman: `${dayjs.duration(dayjs().diff(bot.startedAt)).humanize()} ago`,
+        startedAtHuman: `${dayjs.duration(dayjs().diff(bot.startedAt)).humanize()}`,
         nextHeartbeat,
         nextHeartbeatHuman,
         apiLimit: bot.client.ratelimitRemaining,

@@ -6,8 +6,8 @@
     <%- include('partials/authTitle') %>
     <div class="space-x-4 py-1 md:px-10 leading-6 font-semibold bg-gray-500 dark:bg-gray-700 text-white">
         <div class="container mx-auto">
-            <div class="flex items-center justify-between">
-                <ul id="tabs" class="inline-flex px-1 pt-2 ">
+            <div class="flex items-center justify-between py-1">
+                <ul id="tabs" class="inline-flex">
                     <% subreddits.forEach(function (data){ %>
                         <li class="px-4 py-2 dark:text-white rounded-t">
                             <a class="tabSelect font-normal"
@@ -22,13 +22,18 @@
                     <% }) %>
                 </ul>
                 <div class="flex items-center flex-end font-normal">
-                    <div>
-                        <div>Level : <%- logSettings.level %></div>
-                        <div>Sort : <%- logSettings.sort %></div>
-                        <div>Limit : <%- logSettings.limit %></div>
-                        <div>Theme : <a id="light" href="" class="theme">Light</a> | <a id="dark" href="" class="theme">Dark</a>
+                    <label style="font-size:3px;">
+                        <input class='toggle-checkbox' type='checkbox' id="themeToggle" checked></input>
+                        <div class='toggle-slot'>
+                            <div class='sun-icon-wrapper'>
+                                <div class="iconify sun-icon" data-icon="feather-sun" data-inline="false"></div>
+                            </div>
+                            <div class='toggle-button'></div>
+                            <div class='moon-icon-wrapper'>
+                                <div class="iconify moon-icon" data-icon="feather-moon" data-inline="false"></div>
+                            </div>
                         </div>
-                    </div>
+                    </label>
                 </div>
             </div>
         </div>
@@ -36,7 +41,7 @@
     <div class="container mx-auto">
         <div class="grid">
             <div class="bg-white dark:bg-gray-500 dark:text-white">
-                <div class="pb-6 pt-3 md:px-10">
+                <div class="pb-6 pt-3 md:px-7">
                     <div class="flex items-center justify-around">
                         <div>
                             <input id="checkUrl" style="min-width: 500px;"
@@ -52,7 +57,7 @@
                     </div>
                     <% subreddits.forEach(function (data){ %>
                         <div class="sub" data-subreddit="<%= data.name %>">
-                            <div class="grid md:grid-cols-3 gap-5">
+                            <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-3 gap-5">
                                 <div class="bg-white shadow-md rounded my-3 dark:bg-gray-500 dark:text-white">
                                     <div class="space-x-4 px-4 p-2 leading-2 font-semibold bg-gray-300 dark:bg-gray-700 dark:text-white">
                                         <div class="flex items-center justify-between">
@@ -89,7 +94,7 @@
                                     <div class="p-4">
                                         <div class="stats">
                                             <% if (data.name !== 'All') { %>
-                                                <label>Manager (Bot)</label>
+                                                <label>Bot</label>
                                                 <div class="flex items-center justify-between">
                                                     <span class="font-semibold"><%= `${data.botState.state}${data.botState.causedBy === 'system' ? '' : ' (user)'}` %></span>
                                                     <div class="flex items-center flex-end">
@@ -115,7 +120,7 @@
                                                         </div>
                                                     </div>
                                                 </div>
-                                                <label>Activity Polling</label>
+                                                <label>Events</label>
                                                 <div class="flex items-center justify-between">
                                                     <span class="font-semibold"><%= `${data.eventsState.state}${data.eventsState.causedBy === 'system' ? '' : ' (user)'}` %></span>
                                                     <div class="flex items-center flex-end">
@@ -139,14 +144,8 @@
                                                     <span><%= `${data.runningActivities} Processing / ${data.queuedActivities} Queued` %></span>
                                                 </span>
                                             <% } %>
-                                            <% if (data.name === 'All' && isOperator) { %>
-                                                <label>Started At</label>
-                                                <span class="has-tooltip">
-                                                    <span class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2'>
-                                                        <%= data.startedAt %>
-                                                    </span>
-                                                    <span id="startedAtHuman"><%= data.startedAtHuman %></span>
-                                                </span>
+                                            <% if (data.name === 'All') { %>
+
                                                 <label>Heartbeat Interval</label>
                                                 <span class="has-tooltip">
                                                     <span class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2'>
@@ -233,7 +232,7 @@
                                         </div>
                                     </div>
                                 <% } %>
-                                <div class="bg-white shadow-md rounded my-3 dark:bg-gray-500 dark:text-white <% if(data.name === 'All') {%>col-start-3<% } %>">
+                                <div class="bg-white shadow-md rounded my-3 dark:bg-gray-500 dark:text-white">
                                     <div class="space-x-4 px-4 p-2 leading-2 font-semibold bg-gray-300 dark:bg-gray-700 dark:text-white">
                                         <h4>Stats</h4>
                                     </div>
@@ -313,6 +312,26 @@
                                     repeatCount="indefinite"/>
                         </path>
                     </svg>
+                            <div class="space-x-2" style="float:right;">
+                                <span>
+                                    <label for="level-select">Level: </label>
+                                    <select class="logSettingSelect rounded capitalize text-black" data-type="level" id="levels-select">
+                                        <%- logSettings.levelSelect %>
+                                    </select>
+                                </span>
+                                <span>
+                                    <label for="sort-select">Sort: </label>
+                                    <select class="logSettingSelect rounded capitalize text-black" data-type="sort" id="sort-select">
+                                        <%- logSettings.sortSelect %>
+                                    </select>
+                                </span>
+                                <span>
+                                    <label for="limit-select">Limit: </label>
+                                    <select class="logSettingSelect rounded capitalize text-black" data-type="limit" id="limit-select">
+                                        <%- logSettings.limitSelect %>
+                                    </select>
+                                </span>
+                            </div>
                             <div data-subreddit="<%= data.name %>" class="logs font-mono text-sm">
                                 <% data.logs.forEach(function (logEntry){ %>
                                     <%- logEntry %>
@@ -353,71 +372,93 @@
         })
     })
 
-    if (localStorage.getItem('ms-dark') === 'no') {
-        document.querySelector('#light.theme').classList.add('font-bold', 'no-underline', 'pointer-events-none');
-        document.body.classList.remove('dark')
-    } else {
-        document.querySelector('#dark.theme').classList.add('font-bold', 'no-underline', 'pointer-events-none');
+    document.querySelector("#themeToggle").checked = localStorage.getItem('ms-dark') !== 'no';
+    document.querySelector("#themeToggle").onchange = (e) => {
+        if (e.target.checked === true) {
+            document.body.classList.add('dark');
+            localStorage.setItem('ms-dark', 'yes');
+        } else {
+            document.body.classList.remove('dark');
+            localStorage.setItem('ms-dark', 'no');
+        }
     }
+    // if (localStorage.getItem('ms-dark') === 'no') {
+    //     document.querySelector('#light.theme').classList.add('font-bold', 'no-underline', 'pointer-events-none');
+    //     document.body.classList.remove('dark')
+    // } else {
+    //     document.querySelector('#dark.theme').classList.add('font-bold', 'no-underline', 'pointer-events-none');
+    // }
 
-    document.querySelector('.log-info').addEventListener('click', e => {
-        e.preventDefault()
-        fetch(e.target.href).then(req => {
-            if (req.ok) {
-                e.target.classList.add('font-bold', 'no-underline', 'pointer-events-none')
-                document.querySelector('.log-debug').classList.remove('font-bold', 'no-underline', 'pointer-events-none')
-            }
-        })
-    })
+    // document.querySelector('.log-info').addEventListener('click', e => {
+    //     e.preventDefault()
+    //     fetch(e.target.href).then(req => {
+    //         if (req.ok) {
+    //             e.target.classList.add('font-bold', 'no-underline', 'pointer-events-none')
+    //             document.querySelector('.log-debug').classList.remove('font-bold', 'no-underline', 'pointer-events-none')
+    //         }
+    //     })
+    // })
 
     // log click
-    document.querySelectorAll('[data-log]').forEach(el => {
-        el.addEventListener('click', e => {
-            e.preventDefault()
-            fetch(e.target.href).then(req => {
-                if (req.ok) {
-                    document.querySelectorAll('[data-log]').forEach(el => {
-                        el.classList.remove('font-bold', 'no-underline', 'pointer-events-none');
-                    });
-                    e.target.classList.add('font-bold', 'no-underline', 'pointer-events-none');
-                }
-            })
-        })
-    })
+    // document.querySelectorAll('[data-log]').forEach(el => {
+    //     el.addEventListener('click', e => {
+    //         e.preventDefault()
+    //         fetch(e.target.href).then(req => {
+    //             if (req.ok) {
+    //                 document.querySelectorAll('[data-log]').forEach(el => {
+    //                     el.classList.remove('font-bold', 'no-underline', 'pointer-events-none');
+    //                 });
+    //                 e.target.classList.add('font-bold', 'no-underline', 'pointer-events-none');
+    //             }
+    //         })
+    //     })
+    // })
+    //
+    // // sort click
+    // document.querySelectorAll('[data-sort]').forEach(el => {
+    //     el.addEventListener('click', e => {
+    //         e.preventDefault()
+    //         fetch(e.target.href).then(req => {
+    //             if (req.ok) {
+    //                 if (e.target.dataset.sort === 'descending') {
+    //                     window.sort = 'desc';
+    //                     document.querySelector('[data-sort="ascending"]').classList.remove('font-bold', 'no-underline', 'pointer-events-none')
+    //                     document.querySelector('[data-sort="descending"]').classList.add('font-bold', 'no-underline', 'pointer-events-none')
+    //                 } else {
+    //                     window.sort = 'asc';
+    //                     document.querySelector('[data-sort="descending"]').classList.remove('font-bold', 'no-underline', 'pointer-events-none')
+    //                     document.querySelector('[data-sort="ascending"]').classList.add('font-bold', 'no-underline', 'pointer-events-none')
+    //                 }
+    //             }
+    //         })
+    //     })
+    // })
+    // // sort click
+    // document.querySelectorAll('[data-limit]').forEach(el => {
+    //     el.addEventListener('click', e => {
+    //         e.preventDefault()
+    //         fetch(e.target.href).then(req => {
+    //             if (req.ok) {
+    //                 document.querySelectorAll('[data-limit]').forEach(el => {
+    //                     el.classList.remove('font-bold', 'no-underline', 'pointer-events-none');
+    //                 });
+    //                 e.target.classList.add('font-bold', 'no-underline', 'pointer-events-none')
+    //             }
+    //         })
+    //     })
+    // })
 
-    // sort click
-    document.querySelectorAll('[data-sort]').forEach(el => {
-        el.addEventListener('click', e => {
-            e.preventDefault()
-            fetch(e.target.href).then(req => {
-                if (req.ok) {
-                    if (e.target.dataset.sort === 'descending') {
-                        window.sort = 'desc';
-                        document.querySelector('[data-sort="ascending"]').classList.remove('font-bold', 'no-underline', 'pointer-events-none')
-                        document.querySelector('[data-sort="descending"]').classList.add('font-bold', 'no-underline', 'pointer-events-none')
-                    } else {
-                        window.sort = 'asc';
-                        document.querySelector('[data-sort="descending"]').classList.remove('font-bold', 'no-underline', 'pointer-events-none')
-                        document.querySelector('[data-sort="ascending"]').classList.add('font-bold', 'no-underline', 'pointer-events-none')
-                    }
-                }
-            })
-        })
-    })
-    // sort click
-    document.querySelectorAll('[data-limit]').forEach(el => {
-        el.addEventListener('click', e => {
-            e.preventDefault()
-            fetch(e.target.href).then(req => {
-                if (req.ok) {
-                    document.querySelectorAll('[data-limit]').forEach(el => {
-                        el.classList.remove('font-bold', 'no-underline', 'pointer-events-none');
-                    });
-                    e.target.classList.add('font-bold', 'no-underline', 'pointer-events-none')
-                }
-            })
-        })
-    })
+    document.querySelectorAll('.logSettingSelect').forEach(el => {
+        el.onchange = (e) => {
+            action = e.target.dataset.type;
+            value = e.target.value;
+            fetch(`logs/settings/update?${action}=${value}`);
+            document.querySelectorAll(`#${e.target.id}.logSettingSelect option`).forEach(el => {
+                el.classList.remove('font-bold');
+            });
+            document.querySelector(`#${e.target.id}.logSettingSelect option[data-value="${e.target.value}"]`).classList.add('font-bold');
+        }
+    });
 
     document.querySelectorAll('.action').forEach(el => {
         el.addEventListener('click', e => {
