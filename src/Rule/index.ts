@@ -77,35 +77,45 @@ export abstract class Rule implements IRule, Triggerable {
     }
 
     async run(item: Comment | Submission, existingResults: RuleResult[] = []): Promise<[(boolean | null), RuleResult]> {
-        const existingResult = findResultByPremise(this.getPremise(), existingResults);
-        if (existingResult) {
-            this.logger.debug(`Returning existing result of ${existingResult.triggered ? '✔️' : '❌'}`);
-            return Promise.resolve([existingResult.triggered, {...existingResult, name: this.name}]);
-        }
-        const [itemPass, crit] = isItem(item, this.itemIs, this.logger);
-        if(!itemPass) {
-            this.logger.verbose(`(Skipped) Item did not pass 'itemIs' test`);
-            return Promise.resolve([null, this.getResult(null, {result: `Item did not pass 'itemIs' test`})]);
-        }
-        if (this.authorIs.include !== undefined && this.authorIs.include.length > 0) {
-            for (const auth of this.authorIs.include) {
-                if (await this.resources.testAuthorCriteria(item, auth)) {
-                    return this.process(item);
-                }
+        try {
+            const existingResult = findResultByPremise(this.getPremise(), existingResults);
+            if (existingResult) {
+                this.logger.debug(`Returning existing result of ${existingResult.triggered ? '✔️' : '❌'}`);
+                return Promise.resolve([existingResult.triggered, {...existingResult, name: this.name}]);
             }
-            this.logger.verbose('(Skipped) Inclusive author criteria not matched');
-            return Promise.resolve([null, this.getResult(null, {result: 'Inclusive author criteria not matched'})]);
-        }
-        if (this.authorIs.exclude !== undefined && this.authorIs.exclude.length > 0) {
-            for (const auth of this.authorIs.exclude) {
-                if (await this.resources.testAuthorCriteria(item, auth, false)) {
-                    return this.process(item);
-                }
+            const [itemPass, crit] = isItem(item, this.itemIs, this.logger);
+            if (!itemPass) {
+                this.logger.verbose(`(Skipped) Item did not pass 'itemIs' test`);
+                return Promise.resolve([null, this.getResult(null, {result: `Item did not pass 'itemIs' test`})]);
             }
-            this.logger.verbose('(Skipped) Exclusive author criteria not matched');
-            return Promise.resolve([null, this.getResult(null, {result: 'Exclusive author criteria not matched'})]);
+            if (this.authorIs.include !== undefined && this.authorIs.include.length > 0) {
+                for (const auth of this.authorIs.include) {
+                    if (await this.resources.testAuthorCriteria(item, auth)) {
+                        return this.process(item);
+                    }
+                }
+                this.logger.verbose('(Skipped) Inclusive author criteria not matched');
+                return Promise.resolve([null, this.getResult(null, {result: 'Inclusive author criteria not matched'})]);
+            }
+            if (this.authorIs.exclude !== undefined && this.authorIs.exclude.length > 0) {
+                for (const auth of this.authorIs.exclude) {
+                    if (await this.resources.testAuthorCriteria(item, auth, false)) {
+                        return this.process(item);
+                    }
+                }
+                this.logger.verbose('(Skipped) Exclusive author criteria not matched');
+                return Promise.resolve([null, this.getResult(null, {result: 'Exclusive author criteria not matched'})]);
+            }
+        } catch (err) {
+            this.logger.error('Error occurred during Rule pre-process checks');
+            throw err;
         }
-        return this.process(item);
+        try {
+            return this.process(item);
+        } catch (err) {
+            this.logger.error('Error occurred while processing rule');
+            throw err;
+        }
     }
 
     protected abstract process(item: Comment | Submission): Promise<[boolean, RuleResult]>;

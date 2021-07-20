@@ -139,25 +139,30 @@ const program = new Command();
             } = opts;
             const hasClient = clientId !== undefined && clientSecret !== undefined;
             const hasNoTokens = accessToken === undefined && refreshToken === undefined;
-            if(hasClient && hasNoTokens) {
-                // run web helper
-                const server = createHelperServer(opts);
-                await server;
-            } else if(redirectUri === undefined) {
-                const logger = getDefaultLogger(opts);
-                logger.warn(`'web' command detected but no redirectUri found in arg/env. Switching to CLI only.`);
-                const app = new App(opts);
-                await app.buildManagers();
-                await app.runManagers();
-            } else {
-                const server = createWebServer(opts);
-                await server;
+            try {
+                if (hasClient && hasNoTokens) {
+                    // run web helper
+                    const server = createHelperServer(opts);
+                    await server;
+                } else if (redirectUri === undefined) {
+                    const logger = getDefaultLogger(opts);
+                    logger.warn(`'web' command detected but no redirectUri found in arg/env. Switching to CLI only.`);
+                    const app = new App(opts);
+                    await app.buildManagers();
+                    await app.runManagers();
+                } else {
+                    const server = createWebServer(opts);
+                    await server;
+                }
+            } catch (err) {
+                throw err;
             }
         });
 
         await program.parseAsync();
 
     } catch (err) {
+        debugger;
         if(!err.logged && !(err instanceof LoggedError)) {
             const logger = winston.loggers.get('default');
             if (err.name === 'StatusCodeError' && err.response !== undefined) {

@@ -157,7 +157,9 @@ export class Manager {
         this.subreddit = sub;
         this.client = client;
 
-        this.queue = queue(async (task: CheckTask, cb) => await this.runChecks(task.checkType, task.activity, task.options)
+        this.queue = queue(async (task: CheckTask, cb) => {
+            await this.runChecks(task.checkType, task.activity, task.options);
+        }
             // TODO allow concurrency??
             , 1);
         this.queue.error((err, task) => {
@@ -321,8 +323,12 @@ export class Manager {
         let allRuleResults: RuleResult[] = [];
         const itemIdentifier = `${checkType === 'Submission' ? 'SUB' : 'COM'} ${itemId}`;
         this.currentLabels = [itemIdentifier];
-        const [peek, _] = await itemContentPeek(item);
-        this.logger.info(`<EVENT> ${peek}`);
+        try {
+            const [peek, _] = await itemContentPeek(item);
+            this.logger.info(`<EVENT> ${peek}`);
+        } catch (err) {
+            this.logger.error(`Error occurred while generate item peek for ${checkType} Activity ${itemId}`, err);
+        }
 
         const {
             checkNames = [],
@@ -398,27 +404,31 @@ export class Manager {
                 this.logger.error('An unhandled error occurred while running checks', err);
             }
         } finally {
-            const cachedTotal = totalRulesRun - allRuleResults.length;
-            const triggeredRulesTotal = allRuleResults.filter(x => x.triggered).length;
+            try {
+                const cachedTotal = totalRulesRun - allRuleResults.length;
+                const triggeredRulesTotal = allRuleResults.filter(x => x.triggered).length;
 
-            this.checksRunTotal += checksRun;
-            this.checksRunSinceStartTotal += checksRun;
-            this.rulesRunTotal += totalRulesRun;
-            this.rulesRunSinceStartTotal += totalRulesRun;
-            this.rulesCachedTotal += cachedTotal;
-            this.rulesCachedSinceStartTotal += cachedTotal;
-            this.rulesTriggeredTotal += triggeredRulesTotal;
-            this.rulesTriggeredSinceStartTotal += triggeredRulesTotal;
+                this.checksRunTotal += checksRun;
+                this.checksRunSinceStartTotal += checksRun;
+                this.rulesRunTotal += totalRulesRun;
+                this.rulesRunSinceStartTotal += totalRulesRun;
+                this.rulesCachedTotal += cachedTotal;
+                this.rulesCachedSinceStartTotal += cachedTotal;
+                this.rulesTriggeredTotal += triggeredRulesTotal;
+                this.rulesTriggeredSinceStartTotal += triggeredRulesTotal;
 
-            for (const a of runActions) {
-                const name = a.getActionUniqueName();
-                this.actionsRun.set(name, (this.actionsRun.get(name) || 0) + 1);
-                this.actionsRunSinceStart.set(name, (this.actionsRunSinceStart.get(name) || 0) + 1)
+                for (const a of runActions) {
+                    const name = a.getActionUniqueName();
+                    this.actionsRun.set(name, (this.actionsRun.get(name) || 0) + 1);
+                    this.actionsRunSinceStart.set(name, (this.actionsRunSinceStart.get(name) || 0) + 1)
+                }
+
+                this.logger.verbose(`Run Stats:        Checks ${checksRun} | Rules => Total: ${totalRulesRun} Unique: ${allRuleResults.length} Cached: ${totalRulesRun - allRuleResults.length} | Actions ${actionsRun}`);
+                this.logger.verbose(`Reddit API Stats: Initial Limit ${startingApiLimit} | Current Limit ${this.client.ratelimitRemaining} | Est. Calls Made ${startingApiLimit - this.client.ratelimitRemaining}`);
+                this.currentLabels = [];
+            } catch (err) {
+                this.logger.error('Error occurred while cleaning up Activity check and generating stats', err);
             }
-
-            this.logger.verbose(`Run Stats:        Checks ${checksRun} | Rules => Total: ${totalRulesRun} Unique: ${allRuleResults.length} Cached: ${totalRulesRun - allRuleResults.length} | Actions ${actionsRun}`);
-            this.logger.verbose(`Reddit API Stats: Initial Limit ${startingApiLimit} | Current Limit ${this.client.ratelimitRemaining} | Est. Calls Made ${startingApiLimit - this.client.ratelimitRemaining}`);
-            this.currentLabels = [];
         }
     }
 
