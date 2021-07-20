@@ -35,8 +35,8 @@ const program = new Command();
             .command('run')
             .description('Runs bot normally')
         runCommand = addOptions(runCommand, getUniversalCLIOptions());
-        runCommand.action(async (run, command) => {
-            const app = new App(program.opts());
+        runCommand.action(async (opts) => {
+            const app = new App(opts);
             await app.buildManagers();
             await app.runManagers();
         });
@@ -52,7 +52,7 @@ const program = new Command();
             .addOption(checks)
             .action(async (activityIdentifier, type, commandOptions = {}) => {
                 const {checks = []} = commandOptions;
-                const app = new App(program.opts());
+                const app = new App(commandOptions);
 
                 let a;
                 const commentId = commentReg(activityIdentifier);
@@ -111,7 +111,7 @@ const program = new Command();
             .addOption(limit)
             .action(async (subreddits = [], commandOptions = {}) => {
                 const {checks = [], limit = 100} = commandOptions;
-                const app = new App(program.opts());
+                const app = new App(commandOptions);
 
                 await app.buildManagers(subreddits);
 

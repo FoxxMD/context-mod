@@ -337,7 +337,7 @@ export interface PollingOptions {
      * * they are not initially filtered by Automoderator or
      * * after they have been manually approved from modqueue
      *
-     * ## newComm
+     * ### newComm
      *
      * Get only new `Comments`
      *

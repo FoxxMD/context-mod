@@ -19,6 +19,7 @@ import ProxiedSnoowrap from "./Utils/ProxiedSnoowrap";
 import {ModQueueStream, UnmoderatedStream} from "./Subreddit/Streams";
 import {getDefaultLogger} from "./Utils/loggerFactory";
 import {RUNNING, STOPPED, SYSTEM, USER} from "./Common/interfaces";
+import {sharedModqueue} from "./Utils/CommandConfig";
 
 const {transports} = winston;
 
@@ -45,6 +46,7 @@ export class App {
     apiLimitWarning: number;
     botName?: string;
     startedAt: Dayjs = dayjs();
+    sharedModqueue: boolean = false;
 
     constructor(options: any = {}) {
         const {
@@ -62,6 +64,7 @@ export class App {
             authorTTL = process.env.AUTHOR_TTL || 10000,
             disableCache = process.env.DISABLE_CACHE || false,
             proxy = process.env.PROXY,
+            sharedModqueue = false,
         } = options;
 
         CacheManager.authorTTL = argParseInt(authorTTL);
@@ -71,6 +74,7 @@ export class App {
         this.heartbeatInterval = argParseInt(heartbeat);
         this.apiLimitWarning = argParseInt(apiLimitWarning);
         this.wikiLocation = wikiConfig;
+        this.sharedModqueue = sharedModqueue;
 
         this.logger = getDefaultLogger(options);
 
@@ -199,7 +203,7 @@ export class App {
         let subSchedule: Manager[] = [];
         // get configs for subs we want to run on and build/validate them
         for (const sub of subsToRun) {
-            const manager = new Manager(sub, this.client, this.logger, {dryRun: this.dryRun});
+            const manager = new Manager(sub, this.client, this.logger, {dryRun: this.dryRun, sharedModqueue: this.sharedModqueue});
             try {
                 await manager.parseConfiguration('system', true);
             } catch (err) {

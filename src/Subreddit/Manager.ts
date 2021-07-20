@@ -51,6 +51,10 @@ export interface CheckTask {
     options?: runCheckOptions
 }
 
+export interface RuntimeManagerOptions extends ManagerOptions {
+    sharedModqueue?: boolean;
+}
+
 export class Manager {
     subreddit: Subreddit;
     client: Snoowrap;
@@ -68,6 +72,7 @@ export class Manager {
     streams: SPoll<Snoowrap.Submission | Snoowrap.Comment>[] = [];
     modStreamCallbacks: Map<string, any> = new Map();
     dryRun?: boolean;
+    sharedModqueue: boolean;
     globalDryRun?: boolean;
     emitter: EventEmitter = new EventEmitter();
     queue: QueueObject<CheckTask>;
@@ -138,8 +143,8 @@ export class Manager {
         return this.displayLabel;
     }
 
-    constructor(sub: Subreddit, client: Snoowrap, logger: Logger, opts: ManagerOptions = {}) {
-        const {dryRun} = opts;
+    constructor(sub: Subreddit, client: Snoowrap, logger: Logger, opts: RuntimeManagerOptions = {}) {
+        const {dryRun, sharedModqueue = false} = opts;
         this.displayLabel = opts.nickname || `${sub.display_name_prefixed}`;
         const getLabels = this.getCurrentLabels;
         const getDisplay = this.getDisplay;
@@ -154,6 +159,7 @@ export class Manager {
             }
         }, mergeArr);
         this.globalDryRun = dryRun;
+        this.sharedModqueue = sharedModqueue;
         this.subreddit = sub;
         this.client = client;
 
@@ -452,7 +458,7 @@ export class Manager {
 
             switch (pollOn) {
                 case 'unmoderated':
-                    if (limit === DEFAULT_POLLING_LIMIT && interval === DEFAULT_POLLING_INTERVAL) {
+                    if (limit === DEFAULT_POLLING_LIMIT && interval === DEFAULT_POLLING_INTERVAL && this.sharedModqueue) {
                         modStreamType = 'unmoderated';
                         // use default mod stream from resources
                         stream = ResourceManager.modStreams.get('unmoderated') as SPoll<Snoowrap.Submission | Snoowrap.Comment>;

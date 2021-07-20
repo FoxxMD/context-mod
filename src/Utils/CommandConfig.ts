@@ -76,6 +76,10 @@ export const operatorDisplay = new commander.Option('--operatorDisplay <name>', 
 export const port = new commander.Option('-p, --port <port>', 'Port for web server to listen on (default: process.env.PORT || 8085)')
     .default(process.env.PORT);
 
+export const sharedModqueue = new commander.Option('-q, --shareModqueue', `If enabled then all subreddits using the default settings to poll "unmoderated" or "modqueue" will retrieve results from a shared request to /r/mod`)
+    .argParser(parseBool)
+    .default(process.env.SHARE_MODQUEUE || false, 'process.env.SHARE_MODQUEUE || false');
+
 export const getUniversalWebOptions = (): commander.Option[] => {
     return [
         clientId,
@@ -97,7 +101,8 @@ export const getUniversalWebOptions = (): commander.Option[] => {
         proxy,
         operator,
         operatorDisplay,
-        port
+        port,
+        sharedModqueue,
     ];
 }
 
@@ -124,7 +129,8 @@ export const getUniversalCLIOptions = (): commander.Option[] => {
         apiRemaining,
         dryRun,
         disableCache,
-        proxy
+        proxy,
+        sharedModqueue,
     ]
 }
 
