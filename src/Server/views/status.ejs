@@ -52,7 +52,7 @@
                     </div>
                     <% subreddits.forEach(function (data){ %>
                         <div class="sub" data-subreddit="<%= data.name %>">
-                            <div class="grid md:grid-cols-2 gap-10">
+                            <div class="grid md:grid-cols-3 gap-5">
                                 <div class="bg-white shadow-md rounded my-3 dark:bg-gray-500 dark:text-white">
                                     <div class="space-x-4 px-4 p-2 leading-2 font-semibold bg-gray-300 dark:bg-gray-700 dark:text-white">
                                         <div class="flex items-center justify-between">
@@ -60,11 +60,14 @@
                                             <% if (data.name === 'All') { %>
                                                 <div class="flex items-center flex-end">
                                                     <div>
-                                                        <a class="action" data-action="start" data-type="bot" data-subreddit="<%= data.name %>"
+                                                        <a class="action" data-action="start" data-type="bot"
+                                                           data-subreddit="<%= data.name %>"
                                                            href="#">Start All</a> |
-                                                        <a class="action" data-action="stop" data-type="bot" data-subreddit="<%= data.name %>"
+                                                        <a class="action" data-action="stop" data-type="bot"
+                                                           data-subreddit="<%= data.name %>"
                                                            href="#">Stop All</a> |
-                                                        <a class="action" data-action="reload" data-subreddit="<%= data.name %>"
+                                                        <a class="action" data-action="reload"
+                                                           data-subreddit="<%= data.name %>"
                                                            href="#">Reload All</a>
                                                     </div>
                                                 </div>
@@ -72,9 +75,11 @@
                                                 <div class="flex items-center flex-end">
                                                     <div>
                                                         <span class="mr-2">Check:</span>
-                                                        <a class="action" data-action="check" data-type="unmoderated" data-subreddit="<%= data.name %>"
+                                                        <a class="action" data-action="check" data-type="unmoderated"
+                                                           data-subreddit="<%= data.name %>"
                                                            href="#">Unmoderated</a> |
-                                                        <a class="action" data-action="check" data-type="modqueue" data-subreddit="<%= data.name %>"
+                                                        <a class="action" data-action="check" data-type="modqueue"
+                                                           data-subreddit="<%= data.name %>"
                                                            href="#">Modqueue</a>
                                                     </div>
                                                 </div>
@@ -86,7 +91,7 @@
                                             <% if (data.name !== 'All') { %>
                                                 <label>Manager (Bot)</label>
                                                 <div class="flex items-center justify-between">
-                                                <span class="font-semibold"><%= `${data.botState.state}${data.botState.causedBy === 'system' ? '' : ' (user)'}` %></span>
+                                                    <span class="font-semibold"><%= `${data.botState.state}${data.botState.causedBy === 'system' ? '' : ' (user)'}` %></span>
                                                     <div class="flex items-center flex-end">
                                                         <div>
                                                             <a class="action" data-action="start" data-type="bot"
@@ -98,17 +103,17 @@
                                                 </div>
                                                 <label>Queue</label>
                                                 <div class="flex items-center justify-between">
-                                                <span class="font-semibold"><%= `${data.queueState.state}${data.queueState.causedBy === 'system' ? '' : ' (user)'}` %></span>
-                                                <div class="flex items-center flex-end">
-                                                    <div>
-                                                        <a class="action" data-action="start" data-type="queue"
-                                                           data-subreddit="<%= data.name %>" href="#">Start</a> |
-                                                        <a class="action" data-action="pause" data-type="queue"
-                                                           data-subreddit="<%= data.name %>" href="#">Pause</a> |
-                                                        <a class="action" data-action="stop" data-type="queue"
-                                                           data-subreddit="<%= data.name %>" href="#">Stop</a>
+                                                    <span class="font-semibold"><%= `${data.queueState.state}${data.queueState.causedBy === 'system' ? '' : ' (user)'}` %></span>
+                                                    <div class="flex items-center flex-end">
+                                                        <div>
+                                                            <a class="action" data-action="start" data-type="queue"
+                                                               data-subreddit="<%= data.name %>" href="#">Start</a> |
+                                                            <a class="action" data-action="pause" data-type="queue"
+                                                               data-subreddit="<%= data.name %>" href="#">Pause</a> |
+                                                            <a class="action" data-action="stop" data-type="queue"
+                                                               data-subreddit="<%= data.name %>" href="#">Stop</a>
+                                                        </div>
                                                     </div>
-                                                </div>
                                                 </div>
                                                 <label>Activity Polling</label>
                                                 <div class="flex items-center justify-between">
@@ -124,50 +129,14 @@
                                                         </div>
                                                     </div>
                                                 </div>
-                                                <label>Valid Config</label>
-                                                <span class="font-semibold"><%= data.validConfig %></span>
                                                 <label>Activities</label>
                                                 <span class="has-tooltip">
-                                                    <span style="margin-top:-55px" class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black'>
+                                                    <span style="margin-top:-55px"
+                                                          class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black'>
                                                         <div>Max Concurrent Processing</div>
                                                         <div>Config: <%= data.maxWorkers %></div>
                                                     </span>
                                                     <span><%= `${data.runningActivities} Processing / ${data.queuedActivities} Queued` %></span>
-                                                </span>
-                                            <% } %>
-                                            <label>Dry Run</label>
-                                            <span><%= data.dryRun %></span>
-                                            <label>Checks</label>
-                                            <span><%= data.checks.submissions %> Submission | <%= data.checks.comments %> Comment </span>
-                                            <% if (data.name !== 'All') { %>
-                                                <label>Started At</label>
-                                                <span class="has-tooltip">
-                                                    <span class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2'>
-                                                        <%= data.startedAt %>
-                                                    </span>
-                                                    <%= data.startedAtHuman %>
-                                                </span>
-                                                <label>Config</label>
-                                                <span>
-                                                    <a style="display: inline"
-                                                       href="<%= data.wikiHref %>"><%= data.wikiLocation %></a>
-                                                    <span class="has-tooltip">
-                                                    <span class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2'>
-                                                        <%= data.wikiRevision %>
-                                                    </span>
-                                                    (Revised <%= data.wikiRevisionHuman %>)
-                                                </span>
-                                                </span>
-                                                <label>Config Checked</label>
-                                                <span class="has-tooltip">
-                                                    <span class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2'>
-                                                        <%= data.wikiLastCheck %>
-                                                    </span>
-                                                    <%= data.wikiLastCheckHuman %> <a class="action" data-action="reload"
-                                                                                      data-subreddit="<%= data.name %>"
-                                                                                      href="#">Update</a> | <a
-                                                            class="action" data-action="reload" data-force="true"
-                                                            data-subreddit="<%= data.name %>" href="#">Force</a>
                                                 </span>
                                             <% } %>
                                             <% if (data.name === 'All' && isOperator) { %>
@@ -212,7 +181,59 @@
                                         <% } %>
                                     </div>
                                 </div>
-                                <div class="bg-white shadow-md rounded my-3 dark:bg-gray-500 dark:text-white">
+                                <% if (data.name !== 'All') { %>
+                                    <div class="bg-white shadow-md rounded my-3 dark:bg-gray-500 dark:text-white">
+                                        <div class="space-x-4 px-4 p-2 leading-2 font-semibold bg-gray-300 dark:bg-gray-700 dark:text-white">
+                                            <h4>Config
+                                                <span>
+                                                    <span class="has-tooltip">
+                                                    <span class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2'>
+                                                        <%= data.wikiRevision %>
+                                                    </span>
+                                                    (Revised <%= data.wikiRevisionHuman %>)
+                                                </span>
+                                            </h4>
+                                        </div>
+                                        <div class="p-4">
+                                            <div class="stats">
+                                                <label>Valid</label>
+                                                <span class="font-semibold"><%= data.validConfig %></span>
+                                                <label>Checks</label>
+                                                <span><%= data.checks.submissions %> Submission | <%= data.checks.comments %> Comment </span>
+                                                <label>Dry Run</label>
+                                                <span><%= data.dryRun %></span>
+                                                <label>Updated</label>
+                                                <span class="has-tooltip">
+                                                    <span class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2'>
+                                                        <%= data.startedAt %>
+                                                    </span>
+                                                    <%= data.startedAtHuman %>
+                                                </span>
+                                                </span>
+                                                <label>Checked</label>
+                                                <span>
+                                                <span class="has-tooltip">
+                                                    <span class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2'>
+                                                        <%= data.wikiLastCheck %>
+                                                    </span>
+                                                    <%= data.wikiLastCheckHuman %>
+                                                </span>
+                                                    <a class="action" data-action="reload"
+                                                       data-subreddit="<%= data.name %>"
+                                                       href="#">Update</a> | <a
+                                                            class="action" data-action="reload" data-force="true"
+                                                            data-subreddit="<%= data.name %>" href="#">Force</a>
+                                                    </span>
+                                                <label>Location</label>
+                                                <span>
+                                                    <a style="display: inline"
+                                                       href="<%= data.wikiHref %>"><%= data.wikiLocation %></a>
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                <% } %>
+                                <div class="bg-white shadow-md rounded my-3 dark:bg-gray-500 dark:text-white <% if(data.name === 'All') {%>col-start-3<% } %>">
                                     <div class="space-x-4 px-4 p-2 leading-2 font-semibold bg-gray-300 dark:bg-gray-700 dark:text-white">
                                         <h4>Stats</h4>
                                     </div>
@@ -222,52 +243,54 @@
                                                 <div>
                                                     <h4 class="text-center text-semibold pb-2">Since Config Update</h4>
                                                     <div class="stats">
-                                                        <label>Events Checked</label>
-                                                        <span><%= data.stats.eventsCheckedSinceStartTotal === undefined ? '-' : data.stats.eventsCheckedSinceStartTotal %></span>
+                                                        <label>Events</label>
+                                                        <span><%= data.stats.eventsCheckedSinceStartTotal === undefined ? '-' : data.stats.eventsCheckedSinceStartTotal %> Checked</span>
 
-                                                        <label>Checks Run</label>
-                                                        <span><%= data.stats.checksRunSinceStartTotal === undefined ? '-' : data.stats.checksRunSinceStartTotal %></span>
+                                                        <label>Checks</label>
+                                                        <span class="has-tooltip">
+                                                            <span class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2'>
+                                                                <span><%= data.stats.checksTriggeredSinceStartTotal %></span> Triggered / <span><%= data.stats.checksRunSinceStartTotal %></span> Run
+                                                            </span>
+                                                            <span><%= data.stats.checksTriggeredSinceStartTotal %></span> T / <span><%= data.stats.checksRunSinceStartTotal %></span> R
+                                                        </span>
 
-                                                        <label>Checks Triggered</label>
-                                                        <span><%= data.stats.checksTriggeredSinceStartTotal === undefined ? '-' : data.stats.checksTriggeredSinceStartTotal %></span>
+                                                        <label>Rules</label>
+                                                        <span class="has-tooltip">
+                                                        <span class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2'>
+                                                            <span><%= data.stats.rulesTriggeredSinceStartTotal %></span> Triggered / <span><%= data.stats.rulesCachedSinceStartTotal %></span> Cached / <span><%= data.stats.rulesRunSinceStartTotal  %></span> Run
+                                                        </span>
+                                                        <span><%= data.stats.rulesTriggeredSinceStartTotal %></span> T / <span><%= data.stats.rulesCachedSinceStartTotal %></span> C / <span><%= data.stats.rulesRunSinceStartTotal  %></span> R
+                                                    </span>
 
-                                                        <label>Rules Run</label>
-                                                        <span><%= data.stats.rulesRunSinceStartTotal === undefined ? '-' : data.stats.rulesRunSinceStartTotal %></span>
-
-                                                        <label>Rules Cached</label>
-                                                        <span><%= data.stats.rulesCachedSinceStartTotal === undefined ? '-' : data.stats.rulesCachedSinceStartTotal %></span>
-
-                                                        <label>Rules Triggered</label>
-                                                        <span><%= data.stats.rulesTriggeredSinceStartTotal === undefined ? '-' : data.stats.rulesTriggeredSinceStartTotal %></span>
-
-                                                        <label>Actions Run</label>
-                                                        <span><%= data.stats.actionsRunSinceStartTotal === undefined ? '-' : data.stats.actionsRunSinceStartTotal %></span>
+                                                        <label>Actions</label>
+                                                        <span><%= data.stats.actionsRunSinceStartTotal === undefined ? '-' : data.stats.actionsRunSinceStartTotal %> Run</span>
                                                     </div>
                                                 </div>
                                             <% } %>
                                             <div>
                                                 <h4 class="text-center text-semibold pb-2">All Time</h4>
                                                 <div class="stats">
-                                                    <label>Events Checked</label>
-                                                    <span><%= data.stats.eventsCheckedTotal %></span>
+                                                    <label>Events</label>
+                                                    <span><%= data.stats.eventsCheckedTotal %> Checked</span>
 
-                                                    <label>Checks Run</label>
-                                                    <span><%= data.stats.checksRunTotal %></span>
+                                                    <label>Checks</label>
+                                                    <span class="has-tooltip">
+                                                        <span class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2'>
+                                                            <span><%= data.stats.checksTriggeredTotal %></span> Triggered / <span><%= data.stats.checksRunTotal %></span> Run
+                                                        </span>
+                                                        <span><%= data.stats.checksTriggeredTotal %></span> T / <span><%= data.stats.checksRunTotal %></span> R
+                                                    </span>
 
-                                                    <label>Checks Triggered</label>
-                                                    <span><%= data.stats.checksTriggeredTotal %></span>
+                                                    <label>Rules</label>
+                                                    <span class="has-tooltip">
+                                                        <span class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2'>
+                                                            <span><%= data.stats.rulesTriggeredTotal %></span> Triggered / <span><%= data.stats.rulesCachedTotal %></span> Cached / <span><%= data.stats.rulesRunTotal %></span> Run
+                                                        </span>
+                                                        <span><%= data.stats.rulesTriggeredTotal %></span> T / <span><%= data.stats.rulesCachedTotal %></span> C / <span><%= data.stats.rulesRunTotal %></span> R
+                                                    </span>
 
-                                                    <label>Rules Run</label>
-                                                    <span><%= data.stats.rulesRunTotal %></span>
-
-                                                    <label>Rules Cached</label>
-                                                    <span><%= data.stats.rulesCachedTotal %></span>
-
-                                                    <label>Rules Triggered</label>
-                                                    <span><%= data.stats.rulesTriggeredTotal %></span>
-
-                                                    <label>Actions Run</label>
-                                                    <span><%= data.stats.actionsRunTotal %></span>
+                                                    <label>Actions</label>
+                                                    <span><%= data.stats.actionsRunTotal %> Run</span>
                                                 </div>
                                             </div>
                                         </div>
