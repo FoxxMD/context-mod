@@ -17,7 +17,7 @@ export const getDefaultLogger = (options: any): Logger => {
             consoleTransport,
         ];
 
-        let errorTransports = [];
+        let errorTransports = [consoleTransport];
 
         for (const a of additionalTransports) {
             myTransports.push(a);
@@ -39,6 +39,7 @@ export const getDefaultLogger = (options: any): Logger => {
             });
             // @ts-ignore
             myTransports.push(rotateTransport);
+            // @ts-ignore
             errorTransports.push(rotateTransport);
         }
 
