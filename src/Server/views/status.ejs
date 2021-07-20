@@ -42,19 +42,10 @@
         <div class="grid">
             <div class="bg-white dark:bg-gray-500 dark:text-white">
                 <div class="pb-6 pt-3 md:px-7">
-                    <div class="flex items-center justify-around">
-                        <div>
-                            <input id="checkUrl" style="min-width: 500px;"
-                                   class="border-gray-50 placeholder-gray-500 rounded mt-2 mb-3 p-2 text-black"
-                                   placeholder="Run Bot on an url (Submission/Comment)"/>
-                            <span class="mx-2">
-                            <input type="checkbox" id="dryrunCheck" name="dryrunCheck">
-                            <label for="dryrunCheck">Test?</label>
-                                </span>
-                            <a id="runCheck" href="">Run</a>
-                        </div>
+<!--                    <div class="flex items-center justify-around">-->
+<!--                        -->
 
-                    </div>
+<!--                    </div>-->
                     <% subreddits.forEach(function (data){ %>
                         <div class="sub" data-subreddit="<%= data.name %>">
                             <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-3 gap-5">
@@ -73,7 +64,7 @@
                                                            href="#">Stop All</a> |
                                                         <a class="action" data-action="reload"
                                                            data-subreddit="<%= data.name %>"
-                                                           href="#">Reload All</a>
+                                                           href="#">Update All</a>
                                                     </div>
                                                 </div>
                                             <% } else { %>
@@ -145,7 +136,15 @@
                                                 </span>
                                             <% } %>
                                             <% if (data.name === 'All') { %>
-
+                                                <label>Uptime</label>
+                                                <span class="has-tooltip">
+                                                    <span class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2'>
+                                                        <%= system.startedAt %>
+                                                    </span>
+                                                    <span>
+                                                        <span id="startedAtHuman"><%= system.startedAtHuman %></span>
+                                                    </span>
+                                                </span>
                                                 <label>Heartbeat Interval</label>
                                                 <span class="has-tooltip">
                                                     <span class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2'>
@@ -297,6 +296,38 @@
                                 </div>
                             </div>
                             <br/>
+                            <div class="flex items-center justify-between flex-wrap">
+                                <div class="inline-flex items-center">
+                                    <input id="checkUrl" style="min-width: 320px;"
+                                           class="border-gray-50 placeholder-gray-500 rounded mt-2 mb-3 p-2 text-black"
+                                           placeholder="Run Bot on an url (Submission/Comment)"/>
+                                    <span class="mx-2">
+                                        <input type="checkbox" id="dryrunCheck" name="dryrunCheck">
+                                        <label for="dryrunCheck">Test?</label>
+                                    </span>
+                                    <a id="runCheck" href="">Run</a>
+                                </div>
+                                <div class="flex items-center flex-end space-x-2">
+                                <span>
+                                    <label for="level-select">Level: </label>
+                                    <select class="logSettingSelect rounded capitalize text-black" data-type="level" id="levels-select">
+                                        <%- logSettings.levelSelect %>
+                                    </select>
+                                </span>
+                                    <span>
+                                    <label for="sort-select">Sort: </label>
+                                    <select class="logSettingSelect rounded capitalize text-black" data-type="sort" id="sort-select">
+                                        <%- logSettings.sortSelect %>
+                                    </select>
+                                </span>
+                                    <span>
+                                    <label for="limit-select">Limit: </label>
+                                    <select class="logSettingSelect rounded capitalize text-black" data-type="limit" id="limit-select">
+                                        <%- logSettings.limitSelect %>
+                                    </select>
+                                </span>
+                                </div>
+                            </div>
                             <svg class="loading" version="1.1" id="L9" xmlns="http://www.w3.org/2000/svg"
                                  xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
                                  viewBox="0 0 100 100" xml:space="preserve">
@@ -312,26 +343,6 @@
                                     repeatCount="indefinite"/>
                         </path>
                     </svg>
-                            <div class="space-x-2" style="float:right;">
-                                <span>
-                                    <label for="level-select">Level: </label>
-                                    <select class="logSettingSelect rounded capitalize text-black" data-type="level" id="levels-select">
-                                        <%- logSettings.levelSelect %>
-                                    </select>
-                                </span>
-                                <span>
-                                    <label for="sort-select">Sort: </label>
-                                    <select class="logSettingSelect rounded capitalize text-black" data-type="sort" id="sort-select">
-                                        <%- logSettings.sortSelect %>
-                                    </select>
-                                </span>
-                                <span>
-                                    <label for="limit-select">Limit: </label>
-                                    <select class="logSettingSelect rounded capitalize text-black" data-type="limit" id="limit-select">
-                                        <%- logSettings.limitSelect %>
-                                    </select>
-                                </span>
-                            </div>
                             <div data-subreddit="<%= data.name %>" class="logs font-mono text-sm">
                                 <% data.logs.forEach(function (logEntry){ %>
                                     <%- logEntry %>
