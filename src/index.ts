@@ -8,7 +8,14 @@ import sameafter from 'dayjs/plugin/isSameOrAfter.js';
 import samebefore from 'dayjs/plugin/isSameOrBefore.js';
 import {Manager} from "./Subreddit/Manager";
 import {Command} from 'commander';
-import {addOptions, checks, getUniversalCLIOptions, getUniversalWebOptions, limit} from "./Utils/CommandConfig";
+import {
+    addOptions,
+    checks,
+    getUniversalCLIOptions,
+    getUniversalWebOptions,
+    limit,
+    operatorConfig
+} from "./Utils/CommandConfig";
 import {App} from "./App";
 import createWebServer from './Server/server';
 import createHelperServer from './Server/helper';
@@ -16,6 +23,7 @@ import Submission from "snoowrap/dist/objects/Submission";
 import {COMMENT_URL_ID, parseLinkIdentifier, SUBMISSION_URL_ID} from "./util";
 import LoggedError from "./Utils/LoggedError";
 import {getDefaultLogger} from "./Utils/loggerFactory";
+import {GetEnvVars} from 'env-cmd';
 
 dayjs.extend(utc);
 dayjs.extend(dduration);
@@ -26,14 +34,40 @@ dayjs.extend(samebefore);
 const commentReg = parseLinkIdentifier([COMMENT_URL_ID]);
 const submissionReg = parseLinkIdentifier([SUBMISSION_URL_ID]);
 
+const preRunCmd = new Command();
+preRunCmd.addOption(operatorConfig);
+preRunCmd.allowUnknownOption();
+
 const program = new Command();
 
 (async function () {
     try {
+        debugger;
+        preRunCmd.parse(process.argv);
+        const { operatorConfig = process.env.OPERATOR_CONFIG } = preRunCmd.opts();
+        try {
+            const vars = await GetEnvVars({
+                envFile: {
+                    filePath: operatorConfig,
+                    fallback: true
+                }
+            });
+            // if we found variables in the file of at a fallback path then add them in before we do main arg parsing
+            for(const [k,v] of Object.entries(vars)) {
+                // don't override existing
+                if(process.env[k] === undefined) {
+                    process.env[k] = v;
+                }
+            }
+        } catch(err) {
+            // mimicking --silent from env-cmd
+            //swallow silently for now 😬
+        }
 
         let runCommand = program
             .command('run')
             .description('Runs bot normally')
+            .allowUnknownOption();
         runCommand = addOptions(runCommand, getUniversalCLIOptions());
         runCommand.action(async (opts) => {
             const app = new App(opts);
@@ -43,6 +77,7 @@ const program = new Command();
 
         let checkCommand = program
             .command('check <activityIdentifier> [type]')
+            .allowUnknownOption()
             .description('Run check(s) on a specific activity', {
                 activityIdentifier: 'Either a permalink URL or the ID of the Comment or Submission',
                 type: `If activityIdentifier is not a permalink URL then the type of activity ('comment' or 'submission'). May also specify 'submission' type when using a permalink to a comment to get the Submission`,
@@ -104,7 +139,8 @@ const program = new Command();
         let unmodCommand = program.command('unmoderated <subreddits...>')
             .description('Run checks on all unmoderated activity in the modqueue', {
                 subreddits: 'The list of subreddits to run on. If not specified will run on all subreddits the account has moderation access to.'
-            });
+            })
+            .allowUnknownOption();
         unmodCommand = addOptions(unmodCommand, getUniversalCLIOptions());
         unmodCommand
             .addOption(checks)
@@ -127,7 +163,8 @@ const program = new Command();
                 }
             });
 
-        let webCommand = program.command('web');
+        let webCommand = program.command('web')
+            .allowUnknownOption();
         webCommand = addOptions(webCommand, getUniversalWebOptions());
         webCommand.action(async (opts) => {
             const {

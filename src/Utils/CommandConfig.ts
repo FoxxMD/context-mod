@@ -1,7 +1,7 @@
 import commander, {InvalidOptionArgumentError} from "commander";
 import {argParseInt, parseBool} from "../util";
 
-export const clientId = new commander.Option('-c, --clientId <id>', 'Client ID for your Reddit application (default: process.env.CLIENT_ID)')
+export const clientId = new commander.Option('-i, --clientId <id>', 'Client ID for your Reddit application (default: process.env.CLIENT_ID)')
     .default(process.env.CLIENT_ID);
 clientId.required = true;
 
@@ -137,3 +137,7 @@ export const getUniversalCLIOptions = (): commander.Option[] => {
 export const addOptions = (com: commander.Command, options: commander.Option[]): commander.Command => {
     return options.reduce((c, opt) => c.addOption(opt), com);
 }
+
+export const operatorConfig =  new commander.Option('-c, --operatorConfig <path>', 'An absolute path to a file to load ENV variables from (default: process.env.OPERATOR_CONFIG)');
+// TODO
+export const subredditConfig =  new commander.Option('-f, --subredditsConfig <path>', 'An absolute path to a JSON file to load subreddit configs from');
