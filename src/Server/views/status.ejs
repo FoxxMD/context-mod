@@ -60,12 +60,22 @@
                                             <% if (data.name === 'All') { %>
                                                 <div class="flex items-center flex-end">
                                                     <div>
-                                                        <a class="action" id="start" data-type="bot" data-subreddit="<%= data.name %>"
+                                                        <a class="action" data-action="start" data-type="bot" data-subreddit="<%= data.name %>"
                                                            href="#">Start All</a> |
-                                                        <a class="action" id="stop" data-type="bot" data-subreddit="<%= data.name %>"
+                                                        <a class="action" data-action="stop" data-type="bot" data-subreddit="<%= data.name %>"
                                                            href="#">Stop All</a> |
-                                                        <a class="action" id="reload" data-subreddit="<%= data.name %>"
+                                                        <a class="action" data-action="reload" data-subreddit="<%= data.name %>"
                                                            href="#">Reload All</a>
+                                                    </div>
+                                                </div>
+                                            <% } else { %>
+                                                <div class="flex items-center flex-end">
+                                                    <div>
+                                                        <span class="mr-2">Check:</span>
+                                                        <a class="action" data-action="check" data-type="unmoderated" data-subreddit="<%= data.name %>"
+                                                           href="#">Unmoderated</a> |
+                                                        <a class="action" data-action="check" data-type="modqueue" data-subreddit="<%= data.name %>"
+                                                           href="#">Modqueue</a>
                                                     </div>
                                                 </div>
                                             <% } %>
@@ -79,9 +89,9 @@
                                                 <span class="font-semibold"><%= `${data.botState.state}${data.botState.causedBy === 'system' ? '' : ' (user)'}` %></span>
                                                     <div class="flex items-center flex-end">
                                                         <div>
-                                                            <a class="action" id="start" data-type="bot"
+                                                            <a class="action" data-action="start" data-type="bot"
                                                                data-subreddit="<%= data.name %>" href="#">Start</a> |
-                                                            <a class="action" id="stop" data-type="bot"
+                                                            <a class="action" data-action="stop" data-type="bot"
                                                                data-subreddit="<%= data.name %>" href="#">Stop</a>
                                                         </div>
                                                     </div>
@@ -91,11 +101,11 @@
                                                 <span class="font-semibold"><%= `${data.queueState.state}${data.queueState.causedBy === 'system' ? '' : ' (user)'}` %></span>
                                                 <div class="flex items-center flex-end">
                                                     <div>
-                                                        <a class="action" id="start" data-type="queue"
+                                                        <a class="action" data-action="start" data-type="queue"
                                                            data-subreddit="<%= data.name %>" href="#">Start</a> |
-                                                        <a class="action" id="pause" data-type="queue"
+                                                        <a class="action" data-action="pause" data-type="queue"
                                                            data-subreddit="<%= data.name %>" href="#">Pause</a> |
-                                                        <a class="action" id="stop" data-type="queue"
+                                                        <a class="action" data-action="stop" data-type="queue"
                                                            data-subreddit="<%= data.name %>" href="#">Stop</a>
                                                     </div>
                                                 </div>
@@ -105,11 +115,11 @@
                                                     <span class="font-semibold"><%= `${data.eventsState.state}${data.eventsState.causedBy === 'system' ? '' : ' (user)'}` %></span>
                                                     <div class="flex items-center flex-end">
                                                         <div>
-                                                            <a class="action" id="start" data-type="event"
+                                                            <a class="action" data-action="start" data-type="event"
                                                                data-subreddit="<%= data.name %>" href="#">Start</a> |
-                                                            <a class="action" id="pause" data-type="event"
+                                                            <a class="action" data-action="pause" data-type="event"
                                                                data-subreddit="<%= data.name %>" href="#">Pause</a> |
-                                                            <a class="action" id="stop" data-type="event"
+                                                            <a class="action" data-action="stop" data-type="event"
                                                                data-subreddit="<%= data.name %>" href="#">Stop</a>
                                                         </div>
                                                     </div>
@@ -149,10 +159,10 @@
                                                     <span class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2'>
                                                         <%= data.wikiLastCheck %>
                                                     </span>
-                                                    <%= data.wikiLastCheckHuman %> <a class="action" id="reload"
+                                                    <%= data.wikiLastCheckHuman %> <a class="action" data-action="reload"
                                                                                       data-subreddit="<%= data.name %>"
                                                                                       href="#">Reload</a> | <a
-                                                            class="action" id="reload" data-force="true"
+                                                            class="action" data-action="reload" data-force="true"
                                                             data-subreddit="<%= data.name %>" href="#">Force</a>
                                                 </span>
                                             <% } %>
@@ -385,7 +395,7 @@
     document.querySelectorAll('.action').forEach(el => {
         el.addEventListener('click', e => {
             e.preventDefault()
-            action = e.target.id;
+            action = e.target.dataset.action;
             subreddit = e.target.dataset.subreddit;
             type = e.target.dataset.type;
             force = e.target.dataset.force === 'true';

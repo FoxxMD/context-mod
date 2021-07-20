@@ -464,6 +464,25 @@ const rcbServer = async function (options: any = {}) {
                             await manager.startQueue(USER);
                         }
                         break;
+                    case 'check':
+                        if(type === 'unmoderated') {
+                            const activities = await manager.subreddit.getUnmoderated({limit: 100});
+                            for (const a of activities.reverse()) {
+                                manager.queue.push({
+                                    checkType: a instanceof Submission ? 'Submission' : 'Comment',
+                                    activity: a,
+                                });
+                            }
+                        } else {
+                            const activities = await manager.subreddit.getModqueue({limit: 100});
+                            for (const a of activities.reverse()) {
+                                manager.queue.push({
+                                    checkType: a instanceof Submission ? 'Submission' : 'Comment',
+                                    activity: a,
+                                });
+                            }
+                        }
+                        break;
                 }
             } catch (err) {
                 if (!(err instanceof LoggedError)) {
