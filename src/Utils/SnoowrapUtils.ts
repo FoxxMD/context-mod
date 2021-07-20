@@ -497,33 +497,11 @@ export const itemContentPeek = async (item: (Comment | Submission), peekLength =
         peek = `${truncatePeek(item.title)} by ${author} https://reddit.com${item.permalink}`;
 
     } else if (item instanceof Comment) {
-        content = truncatePeek(item.body)
-        try {
-            // @ts-ignore
-            const client = item._r as Snoowrap; // protected? idgaf
-            // @ts-ignore
-            const commentSub = await client.getSubmission(item.link_id);
-            const [p, {submissionTitle: subTitle}] = await itemContentPeek(commentSub);
-            submissionTitle = subTitle;
-            peek = `${truncatePeek(content)} by ${author} in https://reddit.com${item.permalink}`;
-        } catch (err) {
-            // possible comment is not on a submission, just swallow
-        }
+        content = truncatePeek(item.body);
+        peek = `${truncatePeek(content)} by ${author} in https://reddit.com${item.permalink}`;
     }
 
     return [peek, {submissionTitle, content, author, permalink: item.permalink}];
-}
-
-// @ts-ignore
-export const getSubmissionFromComment = async (item: Comment): Promise<Submission> => {
-    try {
-        // @ts-ignore
-        const client = item._r as Snoowrap; // protected? idgaf
-        // @ts-ignore
-        return client.getSubmission(item.link_id);
-    } catch (err) {
-        // possible comment is not on a submission, just swallow
-    }
 }
 
 const SPOTIFY_PODCAST_AUTHOR_REGEX: RegExp = /this episode from (?<author>.*?) on Spotify./;
