@@ -5,6 +5,7 @@ import AuthorRule, {AuthorRuleJSONConfig} from "./AuthorRule";
 import {AttributionJSONConfig, AttributionRule} from "./AttributionRule";
 import {Logger} from "winston";
 import HistoryRule, {HistoryJSONConfig} from "./HistoryRule";
+import RegexRule, {RegexRuleJSONConfig} from "./RegexRule";
 
 export function ruleFactory
 (config: RuleJSONConfig, logger: Logger, subredditName: string): Rule {
@@ -25,6 +26,9 @@ export function ruleFactory
         case 'history':
             cfg = config as HistoryJSONConfig;
             return new HistoryRule({...cfg, logger, subredditName});
+        case 'regex':
+            cfg = config as RegexRuleJSONConfig;
+            return new RegexRule({...cfg, logger, subredditName});
         default:
             throw new Error('rule "kind" was not recognized.');
     }

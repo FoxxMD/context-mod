@@ -12,8 +12,8 @@ import {inflateSync, deflateSync} from "zlib";
 import {
     ActivityWindowCriteria,
     DurationComparison,
-    GenericComparison,
-    PollingOptionsStrong,
+    GenericComparison, NamedGroup,
+    PollingOptionsStrong, RegExResult,
     StringOperator
 } from "./Common/interfaces";
 import JSON5 from "json5";
@@ -427,7 +427,7 @@ export const comparisonTextOp = (val1: number, strOp: string, val2: number): boo
     }
 }
 
-const GENERIC_VALUE_COMPARISON = /^\s*(?<opStr>>|>=|<|<=)\s*(?<value>\d+)(?<extra>\s+.*)*$/
+const GENERIC_VALUE_COMPARISON = /^\s*(>|>=|<|<=)\s*(\d+)(\s+.*)*$/
 const GENERIC_VALUE_COMPARISON_URL = 'https://regexr.com/60dq4';
 export const parseGenericValueComparison = (val: string): GenericComparison => {
     const matches = val.match(GENERIC_VALUE_COMPARISON);
@@ -760,4 +760,36 @@ export const isRedditMedia = (act: Submission): boolean => {
 
 export const isExternalUrlSubmission = (act: Comment | Submission): boolean => {
     return act instanceof Submission && !act.is_self && !isRedditMedia(act);
+}
+
+export const parseRegex = (r: string | RegExp, val: string): RegExResult => {
+
+    const reg = r instanceof RegExp ? r : new RegExp(r);
+
+    try {
+        const g = Array.from(val.matchAll(reg));
+        const global = g.map(x => {
+            return {
+                match: x[0],
+                groups: x.slice(1),
+                named: x.groups,
+            }
+        });
+        return {
+            matched: g.length > 0,
+            matches: g.length > 0 ? g.map(x => x[0]) : [],
+            global: g.length > 0 ? global : [],
+        };
+    } catch (err) {
+        if (!err.message.includes('non-global RegExp argument')) {
+            throw err;
+        }
+    }
+    // want not global, try regular match
+    const m = val.match(reg)
+    return {
+        matched: m !== null,
+        matches: m !== null ? m.slice(0) : [],
+        global: [],
+    }
 }

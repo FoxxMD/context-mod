@@ -20,7 +20,7 @@ import {App} from "./App";
 import createWebServer from './Server/server';
 import createHelperServer from './Server/helper';
 import Submission from "snoowrap/dist/objects/Submission";
-import {COMMENT_URL_ID, parseLinkIdentifier, SUBMISSION_URL_ID} from "./util";
+import {COMMENT_URL_ID, parseLinkIdentifier, parseRegex, SUBMISSION_URL_ID} from "./util";
 import LoggedError from "./Utils/LoggedError";
 import {getDefaultLogger} from "./Utils/loggerFactory";
 import {GetEnvVars} from 'env-cmd';

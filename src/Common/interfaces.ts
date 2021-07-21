@@ -605,3 +605,19 @@ export type RunState = 'running' | 'paused' | 'stopped';
 export const STOPPED = 'stopped';
 export const RUNNING = 'running';
 export const PAUSED = 'paused';
+
+export interface NamedGroup {
+    [name: string]: string
+}
+
+export interface GlobalRegExResult {
+    match: string,
+    groups: string[],
+    named: NamedGroup | undefined
+}
+
+export interface RegExResult {
+    matched: boolean,
+    matches: string[],
+    global: GlobalRegExResult[]
+}

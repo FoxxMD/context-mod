@@ -11,8 +11,9 @@ import {HistoryJSONConfig} from "../Rule/HistoryRule";
 import {UserNoteActionJson} from "../Action/UserNoteAction";
 import {ApproveActionJson} from "../Action/ApproveAction";
 import {BanActionJson} from "../Action/BanAction";
+import {RegexRuleJSONConfig} from "../Rule/RegexRule";
 
-export type RuleJson = RecentActivityRuleJSONConfig | RepeatActivityJSONConfig | AuthorRuleJSONConfig | AttributionJSONConfig | HistoryJSONConfig | string;
+export type RuleJson = RecentActivityRuleJSONConfig | RepeatActivityJSONConfig | AuthorRuleJSONConfig | AttributionJSONConfig | HistoryJSONConfig | RegexRuleJSONConfig | string;
 export type RuleObjectJson = Exclude<RuleJson, string>
 
 export type ActionJson = CommentActionJson | FlairActionJson | ReportActionJson | LockActionJson | RemoveActionJson | ApproveActionJson | BanActionJson | UserNoteActionJson | string;

@@ -102,7 +102,6 @@ export class HistoryRule extends Rule {
     }
 
     protected async process(item: Submission): Promise<[boolean, RuleResult]> {
-        // TODO reuse activities between ActivityCriteria to reduce api calls
 
         let criteriaResults = [];
 
