@@ -3,9 +3,9 @@ import {Manager} from "./Subreddit/Manager";
 import winston, {Logger} from "winston";
 import {
     argParseInt,
-    createRetryHandler,
+    createRetryHandler, formatNumber,
     labelledFormat, logLevels,
-    parseBool,
+    parseBool, parseDuration,
     parseFromJsonOrYamlToObject,
     parseSubredditName,
     sleep
@@ -15,11 +15,12 @@ import EventEmitter from "events";
 import CacheManager from './Subreddit/SubredditResources';
 import dayjs, {Dayjs} from "dayjs";
 import LoggedError from "./Utils/LoggedError";
-import ProxiedSnoowrap from "./Utils/ProxiedSnoowrap";
+import {ProxiedSnoowrap, RequestTrackingSnoowrap} from "./Utils/SnoowrapClients";
 import {ModQueueStream, UnmoderatedStream} from "./Subreddit/Streams";
 import {getDefaultLogger} from "./Utils/loggerFactory";
-import {RUNNING, STOPPED, SYSTEM, USER} from "./Common/interfaces";
+import {DurationString, PAUSED, RUNNING, STOPPED, SYSTEM, USER} from "./Common/interfaces";
 import {sharedModqueue} from "./Utils/CommandConfig";
+import { Duration } from "dayjs/plugin/duration";
 
 const {transports} = winston;
 
@@ -44,9 +45,19 @@ export class App {
     nextHeartbeat?: Dayjs;
     heartBeating: boolean = false;
     apiLimitWarning: number;
+    softLimit: number | string = 250;
+    hardLimit: number | string = 50;
+    nannyMode?: 'soft' | 'hard';
+    nextExpiration!: Dayjs;
     botName?: string;
     startedAt: Dayjs = dayjs();
     sharedModqueue: boolean = false;
+
+    apiSample: number[] = [];
+    interval: any;
+    apiRollingAvg: number = 0;
+    apiEstDepletion?: Duration;
+    depletedInSecs: number = 0;
 
     constructor(options: any = {}) {
         const {
@@ -223,7 +234,7 @@ export class App {
             while (true) {
                 this.nextHeartbeat = dayjs().add(this.heartbeatInterval, 'second');
                 await sleep(this.heartbeatInterval * 1000);
-                const heartbeat = `HEARTBEAT -- Reddit API Rate Limit remaining: ${this.client.ratelimitRemaining}`
+                const heartbeat = `HEARTBEAT -- API Remaining: ${this.client.ratelimitRemaining} | Usage Rolling Avg: ${this.apiRollingAvg}/s | Est Depletion: ${this.apiEstDepletion === undefined ? 'N/A' : this.apiEstDepletion.humanize()} (${formatNumber(this.depletedInSecs, {toFixed: 0})} seconds)`
                 if (this.apiLimitWarning >= this.client.ratelimitRemaining) {
                     this.logger.warn(heartbeat);
                 } else {
@@ -282,6 +293,28 @@ export class App {
     }
 
     async runManagers() {
+        // this.apiSampleInterval = setInterval((function(self) {
+        //     return function() {
+        //         const rollingSample = self.apiSample.slice(0, 7)
+        //         rollingSample.unshift(self.client.ratelimitRemaining);
+        //         self.apiSample = rollingSample;
+        //         const diff = self.apiSample.reduceRight((acc: number[], curr, index) => {
+        //             if(self.apiSample[index + 1] !== undefined) {
+        //                 const d = Math.abs(curr - self.apiSample[index + 1]);
+        //                 if(d === 0) {
+        //                     return [...acc, 0];
+        //                 }
+        //                 return [...acc, d/10];
+        //             }
+        //             return acc;
+        //         }, []);
+        //         self.apiRollingAvg = diff.reduce((acc, curr) => acc + curr,0) / diff.length; // api requests per second
+        //         const depletedIn = self.client.ratelimitRemaining / self.apiRollingAvg; // number of seconds until current remaining limit is 0
+        //         self.apiEstDepletion = dayjs.duration({seconds: depletedIn});
+        //         self.logger.info(`API Usage Rolling Avg: ${self.apiRollingAvg}/s | Est Depletion: ${self.apiEstDepletion.humanize()} (${depletedIn} seconds)`);
+        //     }
+        // })(this), 10000);
+
         if(this.subManagers.every(x => !x.validConfigLoaded)) {
             this.logger.warn('All managers have invalid configs!');
         }
@@ -296,8 +329,126 @@ export class App {
         if (this.heartbeatInterval !== 0 && !this.heartBeating) {
             this.heartbeat();
         }
+        this.runApiNanny();
 
         const emitter = new EventEmitter();
         await pEvent(emitter, 'end');
+    }
+    
+    async runApiNanny() {
+        while(true) {
+            await sleep(10000);
+            this.nextExpiration = dayjs(this.client.ratelimitExpiration);
+            const nowish = dayjs().add(10, 'second');
+            if(nowish.isAfter(this.nextExpiration)) {
+                // it's possible no api calls are being made because of a hard limit
+                // need to make an api call to update this
+                // @ts-ignore
+                await this.client.getMe();
+                this.nextExpiration = dayjs(this.client.ratelimitExpiration);
+            }
+            const rollingSample = this.apiSample.slice(0, 7)
+            rollingSample.unshift(this.client.ratelimitRemaining);
+            this.apiSample = rollingSample;
+            const diff = this.apiSample.reduceRight((acc: number[], curr, index) => {
+                if(this.apiSample[index + 1] !== undefined) {
+                    const d = Math.abs(curr - this.apiSample[index + 1]);
+                    if(d === 0) {
+                        return [...acc, 0];
+                    }
+                    return [...acc, d/10];
+                }
+                return acc;
+            }, []);
+            this.apiRollingAvg = diff.reduce((acc, curr) => acc + curr,0) / diff.length; // api requests per second
+            this.depletedInSecs = this.client.ratelimitRemaining / this.apiRollingAvg; // number of seconds until current remaining limit is 0
+            this.apiEstDepletion = dayjs.duration({seconds: this.depletedInSecs});
+            this.logger.info(`API Usage Rolling Avg: ${formatNumber(this.apiRollingAvg)}/s | Est Depletion: ${this.apiEstDepletion.humanize()} (${formatNumber(this.depletedInSecs, {toFixed: 0})} seconds)`);
+
+
+            let hardLimitHit = false;
+            if(typeof this.hardLimit === 'string') {
+                const hardDur = parseDuration(this.hardLimit);
+                hardLimitHit = hardDur.asSeconds() > this.apiEstDepletion.asSeconds();
+            } else {
+                hardLimitHit = this.hardLimit > this.client.ratelimitRemaining;
+            }
+
+            if(hardLimitHit) {
+                if(this.nannyMode === 'hard') {
+                    continue;
+                }
+                this.logger.info(`Detected HARD LIMIT of ${this.hardLimit} remaining`, {leaf: 'Api Nanny'});
+                this.logger.info(`API Remaining: ${this.client.ratelimitRemaining} | Usage Rolling Avg: ${this.apiRollingAvg}/s | Est Depletion: ${this.apiEstDepletion.humanize()} (${formatNumber(this.depletedInSecs, {toFixed: 0})} seconds)`, {leaf: 'Api Nanny'});
+                this.logger.info(`All subreddit event polling has been paused`, {leaf: 'Api Nanny'});
+
+                for(const m of this.subManagers) {
+                    m.pauseEvents('system');
+                }
+
+                this.nannyMode = 'hard';
+                continue;
+            }
+
+            let softLimitHit = false;
+            if(typeof this.softLimit === 'string') {
+                const softDur = parseDuration(this.softLimit);
+                softLimitHit = softDur.asSeconds() > this.apiEstDepletion.asSeconds();
+            } else {
+                softLimitHit = this.softLimit > this.client.ratelimitRemaining;
+            }
+
+            if(softLimitHit) {
+                if(this.nannyMode === 'soft') {
+                    continue;
+                }
+                this.logger.info(`Detected SOFT LIMIT of ${this.softLimit} remaining`, {leaf: 'Api Nanny'});
+                this.logger.info(`API Remaining: ${this.client.ratelimitRemaining} | Usage Rolling Avg: ${formatNumber(this.apiRollingAvg)}/s | Est Depletion: ${this.apiEstDepletion.humanize()} (${formatNumber(this.depletedInSecs, {toFixed: 0})} seconds)`, {leaf: 'Api Nanny'});
+                this.logger.info('Trying to detect heavy usage subreddits...', {leaf: 'Api Nanny'});
+                let threshold = 0.5;
+                let offenders = this.subManagers.filter(x => {
+                    const combinedPerSec = x.eventsRollingAvg + x.rulesUniqueRollingAvg;
+                    return combinedPerSec > threshold;
+                });
+                if(offenders.length === 0) {
+                    threshold = 0.25;
+                    // reduce threshold
+                    offenders = this.subManagers.filter(x => {
+                        const combinedPerSec = x.eventsRollingAvg + x.rulesUniqueRollingAvg;
+                        return combinedPerSec > threshold;
+                    });
+                }
+
+                if(offenders.length > 0) {
+                    this.logger.info(`Slowing subreddits using >- ${threshold}req/s:`, {leaf: 'Api Nanny'});
+                    for(const m of offenders) {
+                        m.delayBy = 1.5;
+                        m.logger.info(`SLOW MODE (Currently ~${formatNumber(m.eventsRollingAvg + m.rulesUniqueRollingAvg)}req/sec)`, {leaf: 'Api Nanny'});
+                    }
+                } else {
+                    this.logger.info(`Couldn't detect specific offenders, slowing all...`, {leaf: 'Api Nanny'});
+                    for(const m of this.subManagers) {
+                        m.delayBy = 1.5;
+                        m.logger.info(`SLOW MODE (Currently ~${formatNumber(m.eventsRollingAvg + m.rulesUniqueRollingAvg)}req/sec)`, {leaf: 'Api Nanny'});
+                    }
+                }
+                this.nannyMode = 'soft';
+                continue;
+            }
+
+            if(this.nannyMode !== undefined) {
+                this.logger.info('Turning off due to better conditions...', {leaf: 'Api Nanny'});
+                for(const m of this.subManagers) {
+                    m.delayBy = undefined;
+                    if(m.queueState.state === PAUSED && m.queueState.causedBy === SYSTEM) {
+                        m.startQueue();
+                    }
+                    if(m.eventsState.state === PAUSED && m.eventsState.causedBy === SYSTEM) {
+                        await m.startEvents();
+                    }
+                }
+                this.nannyMode = undefined;
+            }
+        }
     }
 }

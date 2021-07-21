@@ -134,6 +134,8 @@
                                                     </span>
                                                     <span><%= `${data.runningActivities} Processing / ${data.queuedActivities} Queued` %></span>
                                                 </span>
+                                                <label>Slow Mode</label>
+                                                <span><%= data.delayBy %></span>
                                             <% } %>
                                             <% if (data.name === 'All') { %>
                                                 <label>Uptime</label>
@@ -159,15 +161,6 @@
                                                     </span>
                                                     <span id="nextHeartbeatHuman"><%= data.nextHeartbeatHuman %></span>
                                                 </span>
-                                                <label>Api Limit</label>
-                                                <span><span id="apiLimit"><%= data.apiLimit %></span>/600</span>
-                                                <label>Api Limit Reset</label>
-                                                <span class="has-tooltip">
-                                                    <span class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2'>
-                                                        <span id="limitReset"><%= data.limitReset %></span>
-                                                    </span>
-                                                    <span id="limitResetHuman"><%= data.limitResetHuman %></span>
-                                                </span>
                                             <% } %>
                                         </div>
                                         <% if (data.name !== 'All') { %>
@@ -179,6 +172,34 @@
                                         <% } %>
                                     </div>
                                 </div>
+                                <% if (data.name === 'All') { %>
+                                    <div class="bg-white shadow-md rounded my-3 dark:bg-gray-500 dark:text-white">
+                                        <div class="space-x-4 px-4 p-2 leading-2 font-semibold bg-gray-300 dark:bg-gray-700 dark:text-white">
+                                            <h4>API</h4>
+                                        </div>
+                                        <div class="p-4">
+                                            <div class="stats">
+                                                <label>Soft Limit</label>
+                                                <span>< <span id="softLimit"><%= data.softLimit %></span></span>
+                                                <label>Hard Limit</label>
+                                                <span>< <span id="softLimit"><%= data.hardLimit %></span></span>
+                                                <label>Api Nanny</label>
+                                                <span><b><span id="nannyMode"><%= data.nannyMode %></span></b></span>
+                                                <label>Api Usage</label>
+                                                <span><span id="apiLimit"><%= data.apiLimit %></span>/600 (~<span id="apiAvg"><%= data.apiAvg %></span>req/s)</span>
+                                                <label>Depleted</label>
+                                                <span>in ~<span id="apiDepletion"><%= data.apiDepletion %></span></span>
+                                                <label>Limit Reset</label>
+                                                <span class="has-tooltip">
+                                                    <span class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2'>
+                                                        <span id="limitReset"><%= data.limitReset %></span>
+                                                    </span>
+                                                    <span id="limitResetHuman"><%= data.limitResetHuman %></span>
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                <% } %>
                                 <% if (data.name !== 'All') { %>
                                     <div class="bg-white shadow-md rounded my-3 dark:bg-gray-500 dark:text-white">
                                         <div class="space-x-4 px-4 p-2 leading-2 font-semibold bg-gray-300 dark:bg-gray-700 dark:text-white">

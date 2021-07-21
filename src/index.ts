@@ -42,7 +42,6 @@ const program = new Command();
 
 (async function () {
     try {
-        debugger;
         preRunCmd.parse(process.argv);
         const { operatorConfig = process.env.OPERATOR_CONFIG } = preRunCmd.opts();
         try {
@@ -199,7 +198,6 @@ const program = new Command();
         await program.parseAsync();
 
     } catch (err) {
-        debugger;
         if(!err.logged && !(err instanceof LoggedError)) {
             const logger = winston.loggers.get('default');
             if (err.name === 'StatusCodeError' && err.response !== undefined) {

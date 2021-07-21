@@ -12,7 +12,20 @@ import Snoowrap from "snoowrap";
 //     }
 // }
 
-class ProxiedSnoowrap extends Snoowrap {
+export class RequestTrackingSnoowrap extends Snoowrap {
+    requestCount: number = 0;
+
+    oauthRequest(...args: any) {
+        // send all requests through a proxy
+        if(args[1] === undefined || args[1] === 1) {
+            this.requestCount++;
+        }
+        // @ts-ignore
+        return super.oauthRequest(...args);
+    }
+}
+
+export class ProxiedSnoowrap extends RequestTrackingSnoowrap {
     proxyEndpoint: string;
 
     constructor(args: any) {
@@ -29,6 +42,3 @@ class ProxiedSnoowrap extends Snoowrap {
         }))
     }
 }
-
-
-export default ProxiedSnoowrap;

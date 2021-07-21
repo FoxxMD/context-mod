@@ -17,7 +17,7 @@ import {
     boolToString,
     COMMENT_URL_ID,
     filterLogBySubreddit,
-    formatLogLineToHtml,
+    formatLogLineToHtml, formatNumber,
     isLogLineMinLevel,
     LogEntry,
     parseLinkIdentifier,
@@ -293,7 +293,8 @@ const rcbServer = async function (options: any = {}) {
                 wikiLastCheck: m.lastWikiCheck.local().format('MMMM D, YYYY h:mm A Z'),
                 stats: m.getStats(),
                 startedAt: 'Not Started',
-                startedAtHuman: 'Not Started'
+                startedAtHuman: 'Not Started',
+                delayBy: m.delayBy === undefined ? 'No' : `Delayed by ${m.delayBy} sec`,
             };
             // TODO replace indicator data with js on client page
             let indicator;
@@ -349,6 +350,8 @@ const rcbServer = async function (options: any = {}) {
             dryRun: boolToString(bot.dryRun === true),
             logs: logs.get('all'),
             checks: checks,
+            softLimit: bot.softLimit,
+            hardLimit: bot.hardLimit,
             stats: rest,
         };
         if(allManagerData.logs === undefined) {
@@ -585,8 +588,11 @@ const opStats = (bot: App) => {
         nextHeartbeat,
         nextHeartbeatHuman,
         apiLimit: bot.client.ratelimitRemaining,
+        apiAvg: formatNumber(bot.apiRollingAvg),
+        nannyMode: bot.nannyMode || 'Off',
+        apiDepletion: bot.apiEstDepletion === undefined ? 'Not Calculated' : bot.apiEstDepletion.humanize(),
         limitReset,
-        limitResetHuman: `in ${dayjs.duration(limitReset.diff(dayjs())).humanize()}`
+        limitResetHuman: `in ${dayjs.duration(limitReset.diff(dayjs())).humanize()}`,
     }
 }
 

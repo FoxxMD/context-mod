@@ -4,7 +4,7 @@ import {SubmissionCheck} from "../Check/SubmissionCheck";
 import {CommentCheck} from "../Check/CommentCheck";
 import {
     createRetryHandler,
-    determineNewResults,
+    determineNewResults, formatNumber,
     mergeArr, parseFromJsonOrYamlToObject, pollingInfo, sleep, totalFromMapStats,
 } from "../util";
 import {Poll} from "snoostorm";
@@ -97,8 +97,14 @@ export class Manager {
         causedBy: SYSTEM
     }
 
+    // use by api nanny to slow event consumption
+    delayBy?: number;
+
     eventsCheckedTotal: number = 0;
     eventsCheckedSinceStartTotal: number = 0;
+    eventsSample: number[] = [];
+    eventsSampleInterval: any;
+    eventsRollingAvg: number = 0;
     checksRunTotal: number = 0;
     checksRunSinceStartTotal: number = 0;
     checksTriggered: Map<string, number> = new Map();
@@ -109,6 +115,9 @@ export class Manager {
     rulesCachedSinceStartTotal: number = 0;
     rulesTriggeredTotal: number = 0;
     rulesTriggeredSinceStartTotal: number = 0;
+    rulesUniqueSample: number[] = [];
+    rulesUniqueSampleInterval: any;
+    rulesUniqueRollingAvg: number = 0;
     actionsRun: Map<string, number> = new Map();
     actionsRunSinceStart: Map<string, number> = new Map();
 
@@ -116,6 +125,7 @@ export class Manager {
         return {
             eventsCheckedTotal: this.eventsCheckedTotal,
             eventsCheckedSinceStartTotal: this.eventsCheckedSinceStartTotal,
+            eventsAvg: formatNumber(this.eventsRollingAvg),
             checksRunTotal: this.checksRunTotal,
             checksRunSinceStartTotal: this.checksRunSinceStartTotal,
             checksTriggered: this.checksTriggered,
@@ -128,6 +138,7 @@ export class Manager {
             rulesCachedSinceStartTotal: this.rulesCachedSinceStartTotal,
             rulesTriggeredTotal: this.rulesTriggeredTotal,
             rulesTriggeredSinceStartTotal: this.rulesTriggeredSinceStartTotal,
+            rulesAvg: formatNumber(this.rulesUniqueRollingAvg),
             actionsRun: this.actionsRun,
             actionsRunTotal: totalFromMapStats(this.actionsRun),
             actionsRunSinceStart: this.actionsRunSinceStart,
@@ -164,6 +175,10 @@ export class Manager {
         this.client = client;
 
         this.queue = queue(async (task: CheckTask, cb) => {
+            if(this.delayBy !== undefined) {
+                this.logger.debug(`SOFT API LIMIT MODE: Delaying Event run by ${this.delayBy} seconds`);
+                await sleep(this.delayBy * 1000);
+            }
             await this.runChecks(task.checkType, task.activity, task.options);
         }
             // TODO allow concurrency??
@@ -176,6 +191,46 @@ export class Manager {
             this.logger.debug('All queued activities have been processed.');
         });
         this.queue.pause();
+
+        this.eventsSampleInterval = setInterval((function(self) {
+            return function() {
+                const rollingSample = self.eventsSample.slice(0, 7)
+                rollingSample.unshift(self.eventsCheckedTotal)
+                self.eventsSample = rollingSample;
+                const diff = self.eventsSample.reduceRight((acc: number[], curr, index) => {
+                    if(self.eventsSample[index + 1] !== undefined) {
+                        const d = curr - self.eventsSample[index + 1];
+                        if(d === 0) {
+                            return [...acc, 0];
+                        }
+                        return [...acc, d/10];
+                    }
+                    return acc;
+                }, []);
+                self.eventsRollingAvg = diff.reduce((acc, curr) => acc + curr,0) / diff.length;
+                //self.logger.debug(`Event Rolling Avg: ${formatNumber(self.eventsRollingAvg)}/s`);
+            }
+        })(this), 10000);
+
+        this.rulesUniqueSampleInterval = setInterval((function(self) {
+            return function() {
+                const rollingSample = self.rulesUniqueSample.slice(0, 7)
+                rollingSample.unshift(self.rulesRunTotal - self.rulesCachedTotal);
+                self.rulesUniqueSample = rollingSample;
+                const diff = self.rulesUniqueSample.reduceRight((acc: number[], curr, index) => {
+                    if(self.rulesUniqueSample[index + 1] !== undefined) {
+                        const d = curr - self.rulesUniqueSample[index + 1];
+                        if(d === 0) {
+                            return [...acc, 0];
+                        }
+                        return [...acc, d/10];
+                    }
+                    return acc;
+                }, []);
+                self.rulesUniqueRollingAvg = diff.reduce((acc, curr) => acc + curr,0) / diff.length;
+                //self.logger.debug(`Unique Rules Run Rolling Avg: ${formatNumber(self.rulesUniqueRollingAvg)}/s`);
+            }
+        })(this), 10000);
     }
 
     protected parseConfigurationFromObject(configObj: object) {
@@ -429,8 +484,8 @@ export class Manager {
                     this.actionsRunSinceStart.set(name, (this.actionsRunSinceStart.get(name) || 0) + 1)
                 }
 
-                this.logger.verbose(`Run Stats:        Checks ${checksRun} | Rules => Total: ${totalRulesRun} Unique: ${allRuleResults.length} Cached: ${totalRulesRun - allRuleResults.length} | Actions ${actionsRun}`);
-                this.logger.verbose(`Reddit API Stats: Initial Limit ${startingApiLimit} | Current Limit ${this.client.ratelimitRemaining} | Est. Calls Made ${startingApiLimit - this.client.ratelimitRemaining}`);
+                this.logger.verbose(`Run Stats:        Checks ${checksRun} | Rules => Total: ${totalRulesRun} Unique: ${allRuleResults.length} Cached: ${totalRulesRun - allRuleResults.length} Rolling Avg: ~${formatNumber(this.rulesUniqueRollingAvg)}/s | Actions ${actionsRun}`);
+                this.logger.verbose(`Reddit API Stats: Initial ${startingApiLimit} | Current ${this.client.ratelimitRemaining} | Used ~${startingApiLimit - this.client.ratelimitRemaining} | Events ~${formatNumber(this.eventsRollingAvg)}/s`);
                 this.currentLabels = [];
             } catch (err) {
                 this.logger.error('Error occurred while cleaning up Activity check and generating stats', err);
@@ -692,7 +747,7 @@ export class Manager {
         } else {
             this.eventsState = {
                 state: PAUSED,
-                causedBy: USER
+                causedBy
             };
             for(const s of this.streams) {
                 s.end();
