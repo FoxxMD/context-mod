@@ -234,7 +234,7 @@ export class App {
             while (true) {
                 this.nextHeartbeat = dayjs().add(this.heartbeatInterval, 'second');
                 await sleep(this.heartbeatInterval * 1000);
-                const heartbeat = `HEARTBEAT -- API Remaining: ${this.client.ratelimitRemaining} | Usage Rolling Avg: ${this.apiRollingAvg}/s | Est Depletion: ${this.apiEstDepletion === undefined ? 'N/A' : this.apiEstDepletion.humanize()} (${formatNumber(this.depletedInSecs, {toFixed: 0})} seconds)`
+                const heartbeat = `HEARTBEAT -- API Remaining: ${this.client.ratelimitRemaining} | Usage Rolling Avg: ~${formatNumber(this.apiRollingAvg)}/s | Est Depletion: ${this.apiEstDepletion === undefined ? 'N/A' : this.apiEstDepletion.humanize()} (${formatNumber(this.depletedInSecs, {toFixed: 0})} seconds)`
                 if (this.apiLimitWarning >= this.client.ratelimitRemaining) {
                     this.logger.warn(heartbeat);
                 } else {
