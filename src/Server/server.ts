@@ -28,6 +28,7 @@ import {Manager} from "../Subreddit/Manager";
 import {getDefaultLogger} from "../Utils/loggerFactory";
 import LoggedError from "../Utils/LoggedError";
 import {RUNNING, STOPPED, SYSTEM, USER} from "../Common/interfaces";
+import {dryRun} from "../Utils/CommandConfig";
 
 const MemoryStore = createMemoryStore(session);
 const app = addAsync(express());
@@ -505,8 +506,9 @@ const rcbServer = async function (options: any = {}) {
         res.send('OK');
     });
 
+    app.use('/action', booleanMiddle(['dryRun']));
     app.getAsync('/check', async (req, res) => {
-        const {url, dryRun: dryRunVal} = req.query as any;
+        const {url, dryRun, subreddit} = req.query as any;
 
         let a;
         const commentId = commentReg(url);
@@ -529,18 +531,22 @@ const rcbServer = async function (options: any = {}) {
             // @ts-ignore
             const activity = await a.fetch();
             const sub = await activity.subreddit.display_name;
-            // find manager so we can get display label
-            const manager = bot.subManagers.find(x => x.subreddit.display_name === sub);
-            if(manager === undefined) {
-                logger.error('Cannot run check on subreddit you do not moderate or bot does not run on', {subreddit: `/u/${req.session.user}`});
+
+            let manager = subreddit === 'All' ? bot.subManagers.find(x => x.subreddit.display_name === sub) : bot.subManagers.find(x => x.displayLabel === subreddit);
+
+            if(manager === undefined || !(req.session.subreddits as string[]).includes(manager.displayLabel)) {
+                let msg = 'Activity does not belong to a subreddit you moderate or the bot runs on.';
+                if(subreddit === 'All') {
+                    msg = `${msg} If you want to test an Activity against a Subreddit\'s config it does not belong to then switch to that Subreddit's tab first.`
+                }
+                logger.error(msg, {subreddit: `/u/${req.session.user}`});
                 return res.send('OK');
             }
-            if(!(req.session.subreddits as string[]).includes(manager.displayLabel)) {
-                logger.error('Cannot run check on subreddit you do not moderate or bot does not run on', {subreddit: `/u/${req.session.user}`});
-                return res.send('OK');
-            }
-            manager.logger.info(`/u/${req.session.user} running check on ${url}`);
-            await manager.runChecks(activity instanceof Submission ? 'Submission' : 'Comment', activity, { dryRun: dryRunVal.toString() === "1" ? true : undefined })
+
+            // will run dryrun if specified or if running activity on subreddit it does not belong to
+            const dr: boolean  | undefined = (dryRun || manager.subreddit.display_name !== sub) ? true : undefined;
+            manager.logger.info(`/u/${req.session.user} running${dr === true ? ' DRY RUN ' : ' '}check on${manager.subreddit.display_name !== sub ? ' FOREIGN ACTIVITY ' : ' '}${url}`);
+            await manager.runChecks(activity instanceof Submission ? 'Submission' : 'Comment', activity, { dryRun: dr })
         }
         res.send('OK');
     })

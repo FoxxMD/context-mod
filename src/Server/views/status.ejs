@@ -6,46 +6,30 @@
     <%- include('partials/authTitle') %>
     <div class="space-x-4 py-1 md:px-10 leading-6 font-semibold bg-gray-500 dark:bg-gray-700 text-white">
         <div class="container mx-auto">
-            <div class="flex items-center justify-between py-1">
-                <ul id="tabs" class="inline-flex">
-                    <% subreddits.forEach(function (data){ %>
-                        <li class="px-4 py-2 dark:text-white rounded-t">
-                            <a class="tabSelect font-normal"
-                               data-subreddit="<%= data.name %>"
-                               href="#<%= data.name %>">
-                                <%= data.name %>
-                            </a>
-                            <% if ((data.name === 'All' && isOperator) || data.name !== 'All') { %>
-                                <span class="inline-block mb-0.5 ml-0.5 w-2 h-2 mr-2 bg-<%= data.indicator %>-400 rounded-full"></span>
-                            <% } %>
-                        </li>
-                    <% }) %>
-                </ul>
-                <div class="flex items-center flex-end font-normal">
-                    <label style="font-size:3px;">
-                        <input class='toggle-checkbox' type='checkbox' id="themeToggle" checked></input>
-                        <div class='toggle-slot'>
-                            <div class='sun-icon-wrapper'>
-                                <div class="iconify sun-icon" data-icon="feather-sun" data-inline="false"></div>
-                            </div>
-                            <div class='toggle-button'></div>
-                            <div class='moon-icon-wrapper'>
-                                <div class="iconify moon-icon" data-icon="feather-moon" data-inline="false"></div>
-                            </div>
-                        </div>
-                    </label>
-                </div>
-            </div>
+            <ul id="tabs" class="inline-flex flex-wrap">
+                <% subreddits.forEach(function (data){ %>
+                    <li class="px-4 py-2 dark:text-white rounded-t">
+                        <a class="tabSelect font-normal"
+                           data-subreddit="<%= data.name %>"
+                           href="#<%= data.name %>">
+                            <%= data.name %>
+                        </a>
+                        <% if ((data.name === 'All' && isOperator) || data.name !== 'All') { %>
+                            <span class="inline-block mb-0.5 ml-0.5 w-2 h-2 mr-2 bg-<%= data.indicator %>-400 rounded-full"></span>
+                        <% } %>
+                    </li>
+                <% }) %>
+            </ul>
         </div>
     </div>
     <div class="container mx-auto">
         <div class="grid">
             <div class="bg-white dark:bg-gray-500 dark:text-white">
                 <div class="pb-6 pt-3 md:px-7">
-<!--                    <div class="flex items-center justify-around">-->
-<!--                        -->
+                    <!--                    <div class="flex items-center justify-around">-->
+                    <!--                        -->
 
-<!--                    </div>-->
+                    <!--                    </div>-->
                     <% subreddits.forEach(function (data){ %>
                         <div class="sub" data-subreddit="<%= data.name %>">
                             <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-3 gap-5">
@@ -186,7 +170,8 @@
                                                 <label>Api Nanny</label>
                                                 <span><b><span id="nannyMode"><%= data.nannyMode %></span></b></span>
                                                 <label>Api Usage</label>
-                                                <span><span id="apiLimit"><%= data.apiLimit %></span>/600 (~<span id="apiAvg"><%= data.apiAvg %></span>req/s)</span>
+                                                <span><span id="apiLimit"><%= data.apiLimit %></span>/600 (~<span
+                                                            id="apiAvg"><%= data.apiAvg %></span>req/s)</span>
                                                 <label>Depleted</label>
                                                 <span>in ~<span id="apiDepletion"><%= data.apiDepletion %></span></span>
                                                 <label>Limit Reset</label>
@@ -276,9 +261,9 @@
                                                         <label>Rules</label>
                                                         <span class="has-tooltip">
                                                         <span class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2'>
-                                                            <span><%= data.stats.rulesTriggeredSinceStartTotal %></span> Triggered / <span><%= data.stats.rulesCachedSinceStartTotal %></span> Cached / <span><%= data.stats.rulesRunSinceStartTotal  %></span> Run
+                                                            <span><%= data.stats.rulesTriggeredSinceStartTotal %></span> Triggered / <span><%= data.stats.rulesCachedSinceStartTotal %></span> Cached / <span><%= data.stats.rulesRunSinceStartTotal %></span> Run
                                                         </span>
-                                                        <span><%= data.stats.rulesTriggeredSinceStartTotal %></span> T / <span><%= data.stats.rulesCachedSinceStartTotal %></span> C / <span><%= data.stats.rulesRunSinceStartTotal  %></span> R
+                                                        <span><%= data.stats.rulesTriggeredSinceStartTotal %></span> T / <span><%= data.stats.rulesCachedSinceStartTotal %></span> C / <span><%= data.stats.rulesRunSinceStartTotal %></span> R
                                                     </span>
 
                                                         <label>Actions</label>
@@ -319,31 +304,34 @@
                             <br/>
                             <div class="flex items-center justify-between flex-wrap">
                                 <div class="inline-flex items-center">
-                                    <input id="checkUrl" style="min-width: 320px;"
-                                           class="border-gray-50 placeholder-gray-500 rounded mt-2 mb-3 p-2 text-black"
-                                           placeholder="Run Bot on an url (Submission/Comment)"/>
+                                    <input data-subreddit="<%= data.name %>" style="min-width: 420px;"
+                                           class="border-gray-50 placeholder-gray-500 rounded mt-2 mb-3 p-2 text-black checkUrl"
+                                           placeholder="<%= data.name === 'All' ? 'Run Bot on a permalink from any moderated Subreddit' : `Run Bot on a permalink using this Subreddit's config`%>"/>
                                     <span class="mx-2">
-                                        <input type="checkbox" id="dryrunCheck" name="dryrunCheck">
-                                        <label for="dryrunCheck">Test?</label>
+                                        <input type="checkbox" class="dryrunCheck" data-subreddit="<%= data.name %>" name="dryrunCheck">
+                                        <label for="dryrunCheck">Dry Run?</label>
                                     </span>
-                                    <a id="runCheck" href="">Run</a>
+                                    <a class="runCheck" data-subreddit="<%= data.name %>" href="">Run</a>
                                 </div>
                                 <div class="flex items-center flex-end space-x-2">
                                 <span>
                                     <label for="level-select">Level: </label>
-                                    <select class="logSettingSelect rounded capitalize text-black" data-type="level" id="levels-select">
+                                    <select class="logSettingSelect rounded capitalize text-black" data-type="level"
+                                            id="levels-select">
                                         <%- logSettings.levelSelect %>
                                     </select>
                                 </span>
                                     <span>
                                     <label for="sort-select">Sort: </label>
-                                    <select class="logSettingSelect rounded capitalize text-black" data-type="sort" id="sort-select">
+                                    <select class="logSettingSelect rounded capitalize text-black" data-type="sort"
+                                            id="sort-select">
                                         <%- logSettings.sortSelect %>
                                     </select>
                                 </span>
                                     <span>
                                     <label for="limit-select">Limit: </label>
-                                    <select class="logSettingSelect rounded capitalize text-black" data-type="limit" id="limit-select">
+                                    <select class="logSettingSelect rounded capitalize text-black" data-type="limit"
+                                            id="limit-select">
                                         <%- logSettings.limitSelect %>
                                     </select>
                                 </span>
@@ -352,18 +340,18 @@
                             <svg class="loading" version="1.1" id="L9" xmlns="http://www.w3.org/2000/svg"
                                  xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
                                  viewBox="0 0 100 100" xml:space="preserve">
-                        <path
-                                d="M73,50c0-12.7-10.3-23-23-23S27,37.3,27,50 M30.9,50c0-10.5,8.5-19.1,19.1-19.1S69.1,39.5,69.1,50">
-                            <animateTransform
-                                    attributeName="transform"
-                                    attributeType="XML"
-                                    type="rotate"
-                                    dur="1s"
-                                    from="0 50 50"
-                                    to="360 50 50"
-                                    repeatCount="indefinite"/>
-                        </path>
-                    </svg>
+                                    <path
+                                            d="M73,50c0-12.7-10.3-23-23-23S27,37.3,27,50 M30.9,50c0-10.5,8.5-19.1,19.1-19.1S69.1,39.5,69.1,50">
+                                        <animateTransform
+                                                attributeName="transform"
+                                                attributeType="XML"
+                                                type="rotate"
+                                                dur="1s"
+                                                from="0 50 50"
+                                                to="360 50 50"
+                                                repeatCount="indefinite"/>
+                                    </path>
+                                </svg>
                             <div data-subreddit="<%= data.name %>" class="logs font-mono text-sm">
                                 <% data.logs.forEach(function (logEntry){ %>
                                     <%- logEntry %>
@@ -421,65 +409,6 @@
     //     document.querySelector('#dark.theme').classList.add('font-bold', 'no-underline', 'pointer-events-none');
     // }
 
-    // document.querySelector('.log-info').addEventListener('click', e => {
-    //     e.preventDefault()
-    //     fetch(e.target.href).then(req => {
-    //         if (req.ok) {
-    //             e.target.classList.add('font-bold', 'no-underline', 'pointer-events-none')
-    //             document.querySelector('.log-debug').classList.remove('font-bold', 'no-underline', 'pointer-events-none')
-    //         }
-    //     })
-    // })
-
-    // log click
-    // document.querySelectorAll('[data-log]').forEach(el => {
-    //     el.addEventListener('click', e => {
-    //         e.preventDefault()
-    //         fetch(e.target.href).then(req => {
-    //             if (req.ok) {
-    //                 document.querySelectorAll('[data-log]').forEach(el => {
-    //                     el.classList.remove('font-bold', 'no-underline', 'pointer-events-none');
-    //                 });
-    //                 e.target.classList.add('font-bold', 'no-underline', 'pointer-events-none');
-    //             }
-    //         })
-    //     })
-    // })
-    //
-    // // sort click
-    // document.querySelectorAll('[data-sort]').forEach(el => {
-    //     el.addEventListener('click', e => {
-    //         e.preventDefault()
-    //         fetch(e.target.href).then(req => {
-    //             if (req.ok) {
-    //                 if (e.target.dataset.sort === 'descending') {
-    //                     window.sort = 'desc';
-    //                     document.querySelector('[data-sort="ascending"]').classList.remove('font-bold', 'no-underline', 'pointer-events-none')
-    //                     document.querySelector('[data-sort="descending"]').classList.add('font-bold', 'no-underline', 'pointer-events-none')
-    //                 } else {
-    //                     window.sort = 'asc';
-    //                     document.querySelector('[data-sort="descending"]').classList.remove('font-bold', 'no-underline', 'pointer-events-none')
-    //                     document.querySelector('[data-sort="ascending"]').classList.add('font-bold', 'no-underline', 'pointer-events-none')
-    //                 }
-    //             }
-    //         })
-    //     })
-    // })
-    // // sort click
-    // document.querySelectorAll('[data-limit]').forEach(el => {
-    //     el.addEventListener('click', e => {
-    //         e.preventDefault()
-    //         fetch(e.target.href).then(req => {
-    //             if (req.ok) {
-    //                 document.querySelectorAll('[data-limit]').forEach(el => {
-    //                     el.classList.remove('font-bold', 'no-underline', 'pointer-events-none');
-    //                 });
-    //                 e.target.classList.add('font-bold', 'no-underline', 'pointer-events-none')
-    //             }
-    //         })
-    //     })
-    // })
-
     document.querySelectorAll('.logSettingSelect').forEach(el => {
         el.onchange = (e) => {
             action = e.target.dataset.type;
@@ -504,18 +433,23 @@
         });
     })
 
-    document.querySelector("#runCheck").addEventListener('click', e => {
-        e.preventDefault();
-        const urlInput = document.querySelector('#checkUrl');
-        const dryRunCheck = document.querySelector('#dryrunCheck');
+    document.querySelectorAll(".runCheck").forEach(el => {
+        el.addEventListener('click', e => {
+            e.preventDefault();
+            const subreddit = e.target.dataset.subreddit;
+            const urlInput = document.querySelector(`[data-subreddit="${subreddit}"].checkUrl`);
+            const dryRunCheck = document.querySelector(`[data-subreddit="${subreddit}"].dryrunCheck`);
 
-        const url = urlInput.value;
-        const dryRun = dryRunCheck.checked ? 1 : 0;
 
-        fetch(`check?url=${url}&dryRun=${dryRun}`);
+            const url = urlInput.value;
+            const dryRun = dryRunCheck.checked ? 1 : 0;
 
-        urlInput.value = '';
-        dryRunCheck.checked = false;
+            const fetchUrl = `check?url=${url}&dryRun=${dryRun}&subreddit=${subreddit}`;
+            fetch(fetchUrl);
+
+            urlInput.value = '';
+            dryRunCheck.checked = false;
+        });
     });
 
     document.querySelectorAll('[data-subreddit].tabSelect').forEach(el => {
