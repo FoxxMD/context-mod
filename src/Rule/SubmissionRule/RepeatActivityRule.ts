@@ -3,13 +3,14 @@ import {RuleOptions, RuleResult} from "../index";
 import {Comment} from "snoowrap";
 import {
     activityWindowText,
-    comparisonTextOp, FAIL,
+    comparisonTextOp, FAIL, isExternalUrlSubmission, isRedditMedia,
     parseGenericValueComparison, parseSubredditName,
     parseUsableLinkIdentifier as linkParser, PASS
 } from "../../util";
 import {ActivityWindow, ActivityWindowType, ReferenceSubmission} from "../../Common/interfaces";
 import Submission from "snoowrap/dist/objects/Submission";
 import dayjs from "dayjs";
+import Fuse from 'fuse.js'
 
 const parseUsableLinkIdentifier = linkParser();
 
@@ -28,6 +29,8 @@ const getActivityIdentifier = (activity: (Submission | Comment), length = 200) =
     if (activity instanceof Submission) {
         if (activity.is_self) {
             identifier = `${activity.title}${activity.selftext.slice(0, length)}`;
+        } else if(isRedditMedia(activity)) {
+            identifier = activity.title;
         } else {
             identifier = parseUsableLinkIdentifier(activity.url) as string;
         }
@@ -36,6 +39,11 @@ const getActivityIdentifier = (activity: (Submission | Comment), length = 200) =
     }
     return identifier;
 }
+
+const fuzzyOptions = {
+    includeScore: true,
+    distance: 15
+};
 
 export class RepeatActivityRule extends SubmissionRule {
     threshold: string;
@@ -115,8 +123,10 @@ export class RepeatActivityRule extends SubmissionRule {
             const {openSets = [], allSets = []} = acc;
 
             let identifier = getActivityIdentifier(activity);
+            const isUrl = isExternalUrlSubmission(activity);
+            let fu = new Fuse([identifier], !isUrl ? fuzzyOptions : {...fuzzyOptions, distance: 5});
             const validSub = filterFunc(activity);
-            const minMet = identifier.length >= this.minWordCount;
+            let minMet = identifier.length >= this.minWordCount;
 
             let updatedAllSets = [...allSets];
             let updatedOpenSets: RepeatActivityData[] = [];
@@ -124,18 +134,44 @@ export class RepeatActivityRule extends SubmissionRule {
             let currIdentifierInOpen = false;
             const bufferedActivities = this.gapAllowance === undefined || this.gapAllowance === 0 ? [] : activities.slice(Math.max(0, index - this.gapAllowance), Math.max(0, index));
             for (const o of openSets) {
-                if (o.identifier === identifier && validSub && minMet) {
+                const res = fu.search(o.identifier);
+                const match = res.length > 0;
+                if (match && validSub && minMet) {
                     updatedOpenSets.push({...o, sets: [...o.sets, activity]});
                     currIdentifierInOpen = true;
-                } else if (bufferedActivities.some(x => getActivityIdentifier(x) === identifier) && validSub && minMet) {
+                } else if (bufferedActivities.some(x => fu.search(getActivityIdentifier(x)).length > 0) && validSub && minMet) {
                     updatedOpenSets.push(o);
-                } else {
+                } else if(!currIdentifierInOpen && !isUrl) {
                     updatedAllSets.push(o);
                 }
             }
 
             if (!currIdentifierInOpen) {
                 updatedOpenSets.push({identifier, sets: [activity]})
+
+                if(isUrl) {
+                    // could be that a spammer is using different URLs for each submission but similar submission titles so search by title as well
+                    const sub = activity as Submission;
+                    identifier = sub.title;
+                    fu = new Fuse([identifier], !isUrl ? fuzzyOptions : {...fuzzyOptions, distance: 5});
+                    minMet = identifier.length >= this.minWordCount;
+                    for (const o of openSets) {
+                        const res = fu.search(o.identifier);
+                        const match = res.length > 0;
+                        if (match && validSub && minMet) {
+                            updatedOpenSets.push({...o, sets: [...o.sets, activity]});
+                            currIdentifierInOpen = true;
+                        } else if (bufferedActivities.some(x => fu.search(getActivityIdentifier(x)).length > 0) && validSub && minMet && !updatedOpenSets.includes(o)) {
+                            updatedOpenSets.push(o);
+                        } else if(!updatedAllSets.includes(o)) {
+                            updatedAllSets.push(o);
+                        }
+                    }
+
+                    if (!currIdentifierInOpen) {
+                        updatedOpenSets.push({identifier, sets: [activity]})
+                    }
+                }
             }
 
             return {openSets: updatedOpenSets, allSets: updatedAllSets};
@@ -156,8 +192,19 @@ export class RepeatActivityRule extends SubmissionRule {
         let applicableGroupedActivities = identifierGroupedActivities;
         if (this.useSubmissionAsReference) {
             applicableGroupedActivities = new Map();
-            const referenceSubmissions = identifierGroupedActivities.get(getActivityIdentifier(item));
-            applicableGroupedActivities.set(getActivityIdentifier(item), referenceSubmissions || [])
+            let identifier = getActivityIdentifier(item);
+            let referenceSubmissions = identifierGroupedActivities.get(identifier);
+            if(referenceSubmissions === undefined && isExternalUrlSubmission(item)) {
+                // if external url sub then try by title
+                identifier = item.title;
+                referenceSubmissions = identifierGroupedActivities.get(identifier);
+                if(referenceSubmissions === undefined) {
+                    // didn't get by title so go back to url since that's the default
+                    identifier = getActivityIdentifier(item);
+                }
+            }
+
+            applicableGroupedActivities.set(identifier, referenceSubmissions || [])
         }
 
         const {operator, value: thresholdValue} = parseGenericValueComparison(this.threshold);

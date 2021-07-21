@@ -753,3 +753,11 @@ export const permissions = [
 export const boolToString = (val: boolean): string => {
     return val ? 'Yes' : 'No';
 }
+
+export const isRedditMedia = (act: Submission): boolean => {
+    return act.is_reddit_media_domain || act.is_video || ['v.redd.it','i.redd.it'].includes(act.domain);
+}
+
+export const isExternalUrlSubmission = (act: Comment | Submission): boolean => {
+    return act instanceof Submission && !act.is_self && !isRedditMedia(act);
+}
