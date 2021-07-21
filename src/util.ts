@@ -427,7 +427,7 @@ export const comparisonTextOp = (val1: number, strOp: string, val2: number): boo
     }
 }
 
-const GENERIC_VALUE_COMPARISON = /^\s*(>|>=|<|<=)\s*(\d+)(\s+.*)*$/
+const GENERIC_VALUE_COMPARISON = /^\s*(?<opStr>>|>=|<|<=)\s*(?<value>\d+)(?<extra>\s+.*)*$/
 const GENERIC_VALUE_COMPARISON_URL = 'https://regexr.com/60dq4';
 export const parseGenericValueComparison = (val: string): GenericComparison => {
     const matches = val.match(GENERIC_VALUE_COMPARISON);
@@ -762,10 +762,33 @@ export const isExternalUrlSubmission = (act: Comment | Submission): boolean => {
     return act instanceof Submission && !act.is_self && !isRedditMedia(act);
 }
 
-export const parseRegex = (r: string | RegExp, val: string): RegExResult => {
+export const parseRegex = (r: string | RegExp, val: string, flags?: string): RegExResult => {
 
-    const reg = r instanceof RegExp ? r : new RegExp(r);
+    const reg = r instanceof RegExp ? r : new RegExp(r, flags);
 
+    if(reg.global) {
+        const g = Array.from(val.matchAll(reg));
+        const global = g.map(x => {
+            return {
+                match: x[0],
+                groups: x.slice(1),
+                named: x.groups,
+            }
+        });
+        return {
+            matched: g.length > 0,
+            matches: g.length > 0 ? g.map(x => x[0]) : [],
+            global: g.length > 0 ? global : [],
+        };
+    }
+
+    const m = val.match(reg)
+    return {
+        matched: m !== null,
+        matches: m !== null ? m.slice(0) : [],
+        global: [],
+    }
+/*
     try {
         const g = Array.from(val.matchAll(reg));
         const global = g.map(x => {
@@ -791,5 +814,5 @@ export const parseRegex = (r: string | RegExp, val: string): RegExResult => {
         matched: m !== null,
         matches: m !== null ? m.slice(0) : [],
         global: [],
-    }
+    }*/
 }

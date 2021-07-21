@@ -897,10 +897,14 @@
                     "type": "string"
                 },
                 "regex": {
-                    "description": "A valid Regular Expression to test content against",
+                    "description": "A valid Regular Expression to test content against\n\nDo not wrap expression in forward slashes\n\nEX For the expression `/reddit|FoxxMD/` use the value should be `reddit|FoxxMD`",
                     "examples": [
-                        "/poop/"
+                        "reddit|FoxxMD"
                     ],
+                    "type": "string"
+                },
+                "regexFlags": {
+                    "description": "Regex flags to use",
                     "type": "string"
                 },
                 "testOn": {

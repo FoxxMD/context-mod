@@ -21,9 +21,17 @@ export interface RegexCriteria {
     /**
      * A valid Regular Expression to test content against
      *
-     * @examples ["/poop/"]
+     * Do not wrap expression in forward slashes
+     *
+     * EX For the expression `/reddit|FoxxMD/` use the value should be `reddit|FoxxMD`
+     *
+     * @examples ["reddit|FoxxMD"]
      * */
     regex: string,
+    /**
+     * Regex flags to use
+     * */
+    regexFlags?: string,
 
     /**
      * Which content from an Activity to test the regex against
@@ -131,6 +139,7 @@ export class RegexRule extends Rule {
             const {
                 name,
                 regex,
+                regexFlags,
                 testOn: testOnVals = ['title', 'body'],
                 lookAt = 'all',
                 matchThreshold = '> 0',
@@ -167,7 +176,7 @@ export class RegexRule extends Rule {
 
             // first lets see if the activity we are checking satisfies thresholds
             // since we may be able to avoid api calls to get history
-            let actMatches = this.getMatchesFromActivity(item, testOn, reg);
+            let actMatches = this.getMatchesFromActivity(item, testOn, reg, regexFlags);
             matches = matches.concat(actMatches).slice(0, 100);
             matchCount += actMatches.length;
 
@@ -184,7 +193,7 @@ export class RegexRule extends Rule {
             }
 
             let history: (Submission | Comment)[] = [];
-            if (activityThresholdMet === false && totalThresholdMet === false && window !== undefined) {
+            if ((activityThresholdMet === false || totalThresholdMet === false) && window !== undefined) {
                 // our checking activity didn't meet threshold requirements and criteria does define window
                 // leh go
 
@@ -217,22 +226,18 @@ export class RegexRule extends Rule {
 
                 for (const h of history) {
                     activitiesTested++;
-                    const aMatches = this.getMatchesFromActivity(h, testOn, reg);
+                    const aMatches = this.getMatchesFromActivity(h, testOn, reg, regexFlags);
                     matches = matches.concat(aMatches).slice(0, 100);
-                    matchCount += actMatches.length;
-                    const matched = comparisonTextOp(actMatches.length, matchComparison.operator, matchComparison.value);
+                    matchCount += aMatches.length;
+                    const matched = comparisonTextOp(aMatches.length, matchComparison.operator, matchComparison.value);
                     if (matched) {
                         activitiesMatchedCount++;
                     }
-                    if (activityCountFunc !== undefined && activityCountFunc(activitiesMatchedCount)) {
+                    if (activityCountFunc !== undefined && activityThresholdMet !== true && activityCountFunc(activitiesMatchedCount)) {
                         activityThresholdMet = true;
-                        break;
                     }
-                    if (totalMatchComparison !== undefined) {
+                    if (totalMatchComparison !== undefined && totalThresholdMet !== true) {
                         totalThresholdMet = comparisonTextOp(matchCount, totalMatchComparison.operator, totalMatchComparison.value)
-                        if (totalThresholdMet) {
-                            break;
-                        }
                     }
                 }
             }
@@ -297,13 +302,14 @@ export class RegexRule extends Rule {
             index++;
             let msg = `Crit ${c.criteria.name || index} ${c.triggered ? PASS : FAIL}`;
             if (c.activityThresholdMet !== undefined) {
-                msg = `${msg} -- Activity Match=>${c.activityThresholdMet ? PASS : FAIL} ${c.activitiesMatchedCount} ${c.criteria.activityMatchThreshold} w/ Match Count ${c.criteria.matchThreshold}`;
+                msg = `${msg} -- Activity Match=> ${c.activityThresholdMet ? PASS : FAIL} ${c.activitiesMatchedCount} ${c.criteria.activityMatchThreshold} (Threshold ${c.criteria.matchThreshold})`;
             }
             if (c.totalThresholdMet !== undefined) {
-                msg = `${msg} -- Total Matches=>${c.totalThresholdMet ? PASS : FAIL} ${c.matchCount} ${c.criteria.totalMatchThreshold}`;
+                msg = `${msg} -- Total Matches=> ${c.totalThresholdMet ? PASS : FAIL} ${c.matchCount} ${c.criteria.totalMatchThreshold}`;
             } else {
-                msg = `${msg} (${c.matchCount} Total Matches)`;
+                msg = `${msg} and ${c.matchCount} Total Matches`;
             }
+            msg = `${msg} (Window: ${c.criteria.window})`;
             logSummary.push(msg);
         }
 
@@ -313,7 +319,7 @@ export class RegexRule extends Rule {
         return Promise.resolve([criteriaMet, this.getResult(criteriaMet, {result, data: criteriaResults})]);
     }
 
-    protected getMatchesFromActivity(a: (Submission | Comment), testOn: string[], reg: RegExp): string[] {
+    protected getMatchesFromActivity(a: (Submission | Comment), testOn: string[], reg: RegExp, flags?: string): string[] {
         let m: string[] = [];
         // determine what content we are testing
         let contents: string[] = [];
@@ -340,7 +346,7 @@ export class RegexRule extends Rule {
         }
 
         for (const c of contents) {
-            const results = parseRegex(reg, c);
+            const results = parseRegex(reg, c, flags);
             if (results.matched) {
                 m = m.concat(results.matches);
             }
