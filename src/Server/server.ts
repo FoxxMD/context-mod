@@ -27,7 +27,7 @@ import {
 import {Manager} from "../Subreddit/Manager";
 import {getLogger} from "../Utils/loggerFactory";
 import LoggedError from "../Utils/LoggedError";
-import {OperatorConfig, RUNNING, STOPPED, SYSTEM, USER} from "../Common/interfaces";
+import {OperatorConfig, ResourceStats, RUNNING, STOPPED, SYSTEM, USER} from "../Common/interfaces";
 
 const MemoryStore = createMemoryStore(session);
 const app = addAsync(express());
@@ -163,7 +163,7 @@ const rcbServer = async function (options: OperatorConfig) {
             });
 
             // @ts-ignore
-            if (operator !== undefined && socket.handshake.session.user.toLowerCase() === operator.toLowerCase()) {
+            if (name !== undefined && socket.handshake.session.user.toLowerCase() === name.toLowerCase()) {
                 // @ts-ignore
                 operatorSessionId = socket.handshake.session.id;
             }
@@ -249,7 +249,7 @@ const rcbServer = async function (options: OperatorConfig) {
 
         req.session['user'] = user;
         // @ts-ignore
-        req.session['subreddits'] = operator !== undefined && operator.toLowerCase() === user.toLowerCase() ? bot.subManagers.map(x => x.displayLabel) : subs.reduce((acc: string[], x) => {
+        req.session['subreddits'] = name !== undefined && name.toLowerCase() === user.toLowerCase() ? bot.subManagers.map(x => x.displayLabel) : subs.reduce((acc: string[], x) => {
             const sm = bot.subManagers.find(y => y.subreddit.display_name === x.display_name);
             if (sm !== undefined) {
                 return acc.concat(sm.displayLabel);
@@ -277,8 +277,14 @@ const rcbServer = async function (options: OperatorConfig) {
             return res.render('noSubs', {operatorDisplay: display});
         }
 
-        // @ts-ignore
-        const logs = filterLogBySubreddit(subLogMap, req.session.subreddits, {level, operator, user, sort, limit});
+        const logs = filterLogBySubreddit(subLogMap, req.session.subreddits, {
+            level,
+            operator: isOperator,
+            user,
+            // @ts-ignore
+            sort,
+            limit
+        });
         const subManagerData = [];
         for (const s of subreddits) {
             const m = bot.subManagers.find(x => x.displayLabel === s) as Manager;
@@ -309,6 +315,18 @@ const rcbServer = async function (options: OperatorConfig) {
                 startedAt: 'Not Started',
                 startedAtHuman: 'Not Started',
                 delayBy: m.delayBy === undefined ? 'No' : `Delayed by ${m.delayBy} sec`,
+                cache: {
+                    //currentKeyCount: await m.resources.getCacheKeyCount(),
+                    totalRequests: Object.values(m.resources.stats.cache).reduce((acc, curr) => acc + curr.requests, 0),
+                    types: {
+                        ...Object.keys(m.resources.stats.cache).reduce((acc, curr) => {
+                            const per = acc[curr].miss === 0 ? 0 : formatNumber(acc[curr].miss / acc[curr].requests) * 100;
+                            // @ts-ignore
+                            acc[curr].missPercent = `${per}%`;
+                            return acc;
+                        }, m.resources.stats.cache),
+                    },
+                }
             };
             // TODO replace indicator data with js on client page
             let indicator;
@@ -355,6 +373,25 @@ const rcbServer = async function (options: OperatorConfig) {
         });
         const {checks, ...rest} = totalStats;
 
+        const resCum: ResourceStats = {
+            author: {requests: 0, miss: 0},
+            authorCrit: {requests: 0, miss: 0},
+            content: {requests: 0, miss: 0}
+        };
+
+        let cumRaw = subManagerData.reduce((acc, curr) => {
+            Object.keys(curr.cache.types as ResourceStats).forEach((k) => {
+                acc[k].requests += curr.cache.types[k].requests;
+                acc[k].miss += curr.cache.types[k].miss;
+            });
+            return acc;
+        }, resCum);
+        cumRaw = Object.keys(cumRaw).reduce((acc, curr) => {
+            const per = acc[curr].miss === 0 ? 0 : formatNumber(acc[curr].miss / acc[curr].requests) * 100;
+            // @ts-ignore
+            acc[curr].missPercent = `${per}%`;
+            return acc;
+        }, cumRaw);
         let allManagerData: any = {
             name: 'All',
             botState: {
@@ -367,6 +404,14 @@ const rcbServer = async function (options: OperatorConfig) {
             softLimit: bot.softLimit,
             hardLimit: bot.hardLimit,
             stats: rest,
+            cache: {
+                // naive
+                currentKeyCount: await bot.subManagers[0].resources.getCacheKeyCount(),
+                totalRequests: subManagerData.reduce((acc, curr) => acc + curr.cache.totalRequests, 0),
+                types: {
+                    ...cumRaw
+                }
+            }
         };
         if (allManagerData.logs === undefined) {
             // this should happen but saw an edge case where potentially did

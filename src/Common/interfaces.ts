@@ -379,25 +379,27 @@ export interface PollingOptions extends PollingDefaults {
 
 export interface SubredditCacheConfig {
     /**
-     * Amount of time, in milliseconds, author activities (Comments/Submission) should be cached
-     * @examples [10000]
-     * @default 10000
+     * Amount of time, in seconds, author activities (Comments/Submission) should be cached
+     * @examples [60]
+     * @default 60
      * */
     authorTTL?: number;
     /**
-     * Amount of time, in milliseconds, wiki content pages should be cached
-     * @examples [300000]
-     * @default 300000
+     * Amount of time, in seconds, wiki content pages should be cached
+     * @examples [300]
+     * @default 300
      * */
     wikiTTL?: number;
 
     /**
      * Amount of time, in milliseconds, [Toolbox User Notes](https://www.reddit.com/r/toolbox/wiki/docs/usernotes) should be cached
-     * @examples [60000]
-     * @default 60000
+     * @examples [300]
+     * @default 300
      * */
     userNotesTTL?: number;
 }
+
+export type StrongSubredditCacheConfig = Required<SubredditCacheConfig>;
 
 export interface Footer {
     /**
@@ -459,7 +461,7 @@ export interface ManagerOptions {
     /**
      * Per-subreddit config for caching TTL values. If set to `false` caching is disabled.
      * */
-    caching?: false | SubredditCacheConfig
+    caching?: SubredditCacheConfig
 
     /**
      * Use this option to override the `dryRun` setting for all `Checks`
@@ -766,3 +768,12 @@ export interface OperatorConfig extends OperatorJsonConfig {
 }
 
 //export type OperatorConfig = Required<OperatorJsonConfig>;
+
+interface CacheTypeStat {
+    requests: number,
+    miss: number,
+}
+
+export interface ResourceStats {
+    [key: string]: CacheTypeStat
+}

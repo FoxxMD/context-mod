@@ -5,7 +5,7 @@ export const clientId = new commander.Option('-i, --clientId <id>', 'Client ID f
 
 export const clientSecret = new commander.Option('-e, --clientSecret <secret>', 'Client Secret for your Reddit application (default: process.env.CLIENT_SECRET)');
 
-export const redirectURI = new commander.Option('-u, --redirectUri <uri>', 'Redirect URI for your Reddit application (default: process.env.REDIRECT_URI)');
+export const redirectUri = new commander.Option('-u, --redirectUri <uri>', 'Redirect URI for your Reddit application (default: process.env.REDIRECT_URI)');
 
 export const sessionSecret = new commander.Option('-t, --sessionSecret <secret>', 'Secret use to encrypt session id/data (default: process.env.SESSION_SECRET)');
 
@@ -67,7 +67,7 @@ export const getUniversalWebOptions = (): commander.Option[] => {
         clientSecret,
         createAccessTokenOption(),
         createRefreshTokenOption(),
-        redirectURI,
+        redirectUri,
         sessionSecret,
         subreddits,
         logDir,

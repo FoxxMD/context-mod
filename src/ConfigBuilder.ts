@@ -251,6 +251,7 @@ export const parseOpConfigFromArgs = (args: any): OperatorJsonConfig => {
         clientSecret,
         accessToken,
         refreshToken,
+        redirectUri,
         wikiConfig,
         dryRun,
         heartbeat,
@@ -278,7 +279,8 @@ export const parseOpConfigFromArgs = (args: any): OperatorJsonConfig => {
             clientId,
             clientSecret,
             accessToken,
-            refreshToken
+            refreshToken,
+            redirectUri,
         },
         subreddits: {
             names: subreddits,
@@ -342,6 +344,7 @@ export const parseOpConfigFromEnv = (): OperatorJsonConfig => {
             clientSecret: process.env.CLIENT_SECRET,
             accessToken: process.env.ACCESS_TOKEN,
             refreshToken: process.env.REFRESH_TOKEN,
+            redirectUri: process.env.REDIRECT_URI,
         },
         subreddits: {
             names: subs,
@@ -469,7 +472,7 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
         } = {},
         snoowrap = {},
         web: {
-            port = 5058,
+            port = 8085,
             sessionSecret,
             maxLogs = 200,
         } = {},
@@ -486,7 +489,7 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
     } = data;
 
     const cacheOptDefaults = {ttl: 60, max: 500};
-    const cacheDefaults = {authorTTL: 60000, userNotesTTL: 60000, wikiTTL: 300000};
+    const cacheDefaults = {authorTTL: 60, userNotesTTL: 300, wikiTTL: 300};
 
     let cache = {
         ...cacheDefaults,

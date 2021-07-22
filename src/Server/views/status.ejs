@@ -295,6 +295,14 @@
 
                                                     <label>Actions</label>
                                                     <span><%= data.stats.actionsRunTotal %> Run</span>
+                                                    <% if (data.name === 'All') { %>
+                                                        <label>Cached Keys</label>
+                                                        <span><%= data.cache.currentKeyCount %></span>
+                                                    <% } %>
+                                                    <label>Total Cache Reqs</label>
+                                                    <span><%= data.cache.totalRequests %></span>
+                                                    <label>Author Cache</label>
+                                                    <span><%= data.cache.types.author.requests %> (<%= data.cache.types.author.missPercent %> Miss)</span>
                                                 </div>
                                             </div>
                                         </div>

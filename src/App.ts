@@ -109,8 +109,7 @@ export class App {
             }
         } = config;
 
-        CacheManager.authorTTL = argParseInt(authorTTL);
-        CacheManager.enabled = store !== 'none';
+        CacheManager.setDefaultsFromConfig(config);
 
         this.dryRun = parseBool(dryRun) === true ? true : undefined;
         this.heartbeatInterval = heartbeatInterval;

@@ -12,14 +12,21 @@ import winston, {Logger} from "winston";
 import fetch from 'node-fetch';
 import {mergeArr, parseExternalUrl, parseWikiContext} from "../util";
 import LoggedError from "../Utils/LoggedError";
-import {Footer, SubredditCacheConfig} from "../Common/interfaces";
+import {
+    CacheOptions, CacheProvider,
+    Footer, OperatorConfig, ResourceStats,
+    StrongCache,
+    StrongSubredditCacheConfig,
+    SubredditCacheConfig
+} from "../Common/interfaces";
 import UserNotes from "./UserNotes";
 import Mustache from "mustache";
 import he from "he";
 import {AuthorCriteria} from "../Author/Author";
 import Poll from "snoostorm/out/util/Poll";
 import {SPoll} from "./Streams";
-import cacheManager from 'cache-manager';
+import cacheManager, {Cache} from 'cache-manager';
+import redisStore from 'cache-manager-redis-store';
 
 export const DEFAULT_FOOTER = '\r\n*****\r\nThis action was performed by [a bot.]({{botLink}}) Mention a moderator or [send a modmail]({{modmailLink}}) if you any ideas, questions, or concerns about this action.';
 
@@ -29,14 +36,38 @@ export interface SubredditResourceOptions extends SubredditCacheConfig, Footer {
     logger: Logger;
 }
 
-export interface SubredditResourceSetOptions extends SubredditCacheConfig, Footer {
-    enabled: boolean;
+interface StrongSubredditResourceOptions extends SubredditResourceOptions {
+    cache?: Cache
 }
 
-//const memoryCache = cacheManager.caching({store: 'memory', max: 1000, ttl: 60/*seconds*/});
+export interface SubredditResourceSetOptions extends SubredditCacheConfig, Footer {
+    enabled: boolean,
+}
+
+
+//
+// interface ResourceStats {
+//     cache: {
+//         //keys: number,
+//         author: {
+//             requests: number,
+//             miss: number,
+//         },
+//         authorCrit: {
+//             requests: number,
+//             miss: number,
+//         }
+//         content: {
+//             requests: number,
+//             miss: number,
+//         }
+//     }
+// }
+
+
 
 export class SubredditResources {
-    enabled!: boolean;
+    //enabled!: boolean;
     protected authorTTL!: number;
     protected useSubredditAuthorCache!: boolean;
     protected wikiTTL!: number;
@@ -45,15 +76,20 @@ export class SubredditResources {
     userNotes: UserNotes;
     footer!: false | string;
     subreddit: Subreddit
+    cache?: Cache
 
-    constructor(name: string, options: SubredditResourceOptions) {
+    stats: { cache: ResourceStats };
+
+    constructor(name: string, options: StrongSubredditResourceOptions) {
         const {
             subreddit,
             logger,
             enabled = true,
             userNotesTTL = 60000,
+            cache,
         } = options || {};
 
+        this.cache = cache;
         this.subreddit = subreddit;
         this.name = name;
         if (logger === undefined) {
@@ -63,21 +99,36 @@ export class SubredditResources {
             this.logger = logger.child({labels: ['Resource Cache']}, mergeArr);
         }
 
+        this.stats = {
+            cache: {
+                author: {
+                    requests: 0,
+                    miss: 0,
+                },
+                authorCrit: {
+                    requests: 0,
+                    miss: 0,
+                },
+                content: {
+                    requests: 0,
+                    miss: 0
+                }
+            }
+        };
+
         this.userNotes = new UserNotes(enabled ? userNotesTTL : 0, this.subreddit, this.logger)
         this.setOptions(options);
     }
 
-    setOptions (options: SubredditResourceSetOptions) {
+    setOptions(options: SubredditResourceSetOptions) {
         const {
-            enabled = true,
-            authorTTL = 10000,
-            userNotesTTL = 60000,
-            wikiTTL = 300000, // 5 minutes
+            authorTTL,
+            userNotesTTL,
+            wikiTTL,
             footer = DEFAULT_FOOTER
         } = options || {};
 
         this.footer = footer;
-        this.enabled = manager.enabled ? enabled : false;
         if (authorTTL === undefined) {
             this.useSubredditAuthorCache = false;
             this.authorTTL = manager.authorTTL;
@@ -85,35 +136,40 @@ export class SubredditResources {
             this.useSubredditAuthorCache = true;
             this.authorTTL = authorTTL;
         }
-        this.wikiTTL = wikiTTL;
-        this.userNotes.notesTTL = enabled ? userNotesTTL : 0;
+        this.wikiTTL = wikiTTL || this.wikiTTL;
+        this.userNotes.notesTTL = userNotesTTL || this.userNotes.notesTTL;
+    }
+
+    async getCacheKeyCount() {
+        if (this.cache !== undefined && this.cache.store.keys !== undefined) {
+            return (await this.cache.store.keys()).length;
+        }
+        return 0;
     }
 
     async getAuthorActivities(user: RedditUser, options: AuthorTypedActivitiesOptions): Promise<Array<Submission | Comment>> {
-        const useCache = this.enabled && this.authorTTL > 0;
-        let hash;
-        if (useCache) {
+        if (this.cache !== undefined && this.authorTTL > 0) {
             const userName = user.name;
             const hashObj: any = {...options, userName};
             if (this.useSubredditAuthorCache) {
                 hashObj.subreddit = this.name;
             }
-            hash = objectHash.sha1({...options, userName});
+            const hash = objectHash.sha1({...options, userName});
 
-            const cacheVal = cache.get(hash);
-            if (null !== cacheVal) {
+            this.stats.cache.author.requests++;
+            let miss = false;
+            const cacheVal = await this.cache.wrap(hash, async () => {
+                miss = true;
+                return await getAuthorActivities(user, options);
+            }, {ttl: this.authorTTL});
+            if (!miss) {
                 this.logger.debug(`Cache Hit: ${userName} (${options.type || 'overview'})`);
-                return cacheVal as Array<Submission | Comment>;
+            } else {
+                this.stats.cache.author.miss++;
             }
+            return cacheVal as Array<Submission | Comment>;
         }
-
-
-        const items = await getAuthorActivities(user, options);
-
-        if (useCache) {
-            cache.put(hash, items, this.authorTTL);
-        }
-        return Promise.resolve(items);
+        return await getAuthorActivities(user, options);
     }
 
     async getAuthorComments(user: RedditUser, options: AuthorActivitiesOptions): Promise<Comment[]> {
@@ -143,14 +199,13 @@ export class SubredditResources {
             return val;
         }
 
-        const useCache = this.enabled && this.wikiTTL > 0;
         // try to get cached value first
         let hash = `${subreddit.display_name}-${cacheKey}`;
-        if (useCache) {
-            const cachedContent = cache.get(hash);
+        if (this.cache !== undefined && this.wikiTTL > 0) {
+            const cachedContent = await this.cache.get(hash);
             if (cachedContent !== null) {
                 this.logger.debug(`Cache Hit: ${cacheKey}`);
-                return cachedContent;
+                return cachedContent as string;
             }
         }
 
@@ -185,37 +240,34 @@ export class SubredditResources {
             }
         }
 
-        if (useCache) {
-            cache.put(hash, wikiContent, this.wikiTTL);
+        if (this.cache !== undefined && this.wikiTTL > 0) {
+            this.cache.set(hash, wikiContent, this.wikiTTL);
         }
 
         return wikiContent;
     }
 
     async testAuthorCriteria(item: (Comment | Submission), authorOpts: AuthorCriteria, include = true) {
-        const useCache = this.enabled && this.authorTTL > 0;
-        let hash;
-        if (useCache) {
+        if (this.cache !== undefined && this.authorTTL > 0) {
             const hashObj = {itemId: item.id, ...authorOpts, include};
-            hash = `authorCrit-${objectHash.sha1(hashObj)}`;
-            const cachedAuthorTest = cache.get(hash);
-            if (null !== cachedAuthorTest) {
+            const hash = `authorCrit-${objectHash.sha1(hashObj)}`;
+            let miss = false;
+            const cachedAuthorTest = await this.cache.wrap(hash, async () => {
+                miss = true;
+                return await testAuthorCriteria(item, authorOpts, include, this.userNotes);
+            }, {ttl: this.authorTTL});
+            if (!miss) {
                 this.logger.debug(`Cache Hit: Author Check on ${item.id}`);
-                return cachedAuthorTest;
             }
+            return cachedAuthorTest;
         }
 
-        const result = await testAuthorCriteria(item, authorOpts, include, this.userNotes);
-        if (useCache) {
-            cache.put(hash, result, this.authorTTL);
-        }
-        return result;
+        return await testAuthorCriteria(item, authorOpts, include, this.userNotes);
     }
 
-    async generateFooter(item: Submission | Comment, actionFooter?: false | string)
-    {
+    async generateFooter(item: Submission | Comment, actionFooter?: false | string) {
         let footer = actionFooter !== undefined ? actionFooter : this.footer;
-        if(footer === false) {
+        if (footer === false) {
             return '';
         }
         const subName = await item.subreddit.display_name;
@@ -227,11 +279,54 @@ export class SubredditResources {
     }
 }
 
+export const createCacheManager = (options: CacheOptions) => {
+    const {store, max, ttl = 60, host = 'localhost', port, auth_pass, db} = options;
+    switch (store) {
+        case 'none':
+            return undefined;
+        case 'redis':
+            return cacheManager.caching({
+                store: redisStore,
+                host,
+                port,
+                auth_pass,
+                db,
+                ttl
+            });
+        case 'memory':
+        default:
+            return cacheManager.caching({store: 'memory', max, ttl});
+    }
+}
+
 class SubredditResourcesManager {
     resources: Map<string, SubredditResources> = new Map();
     authorTTL: number = 10000;
     enabled: boolean = true;
     modStreams: Map<string, SPoll<Snoowrap.Submission | Snoowrap.Comment>> = new Map();
+    defaultCache?: Cache;
+    ttlDefaults!: StrongSubredditCacheConfig;
+
+    setDefaultsFromConfig(config: OperatorConfig) {
+        const {
+            caching: {
+                authorTTL,
+                userNotesTTL,
+                wikiTTL,
+                provider,
+            },
+        } = config;
+        this.setDefaultCache(provider);
+        this.setTTLDefaults({authorTTL, userNotesTTL, wikiTTL});
+    }
+
+    setDefaultCache(options: CacheOptions) {
+        this.defaultCache = createCacheManager(options);
+    }
+
+    setTTLDefaults(def: StrongSubredditCacheConfig) {
+        this.ttlDefaults = def;
+    }
 
     get(subName: string): SubredditResources | undefined {
         if (this.resources.has(subName)) {
@@ -241,7 +336,7 @@ class SubredditResourcesManager {
     }
 
     set(subName: string, initOptions: SubredditResourceOptions): SubredditResources {
-        const resource = new SubredditResources(subName, initOptions);
+        const resource = new SubredditResources(subName, {...this.ttlDefaults, ...initOptions, cache: this.defaultCache});
         this.resources.set(subName, resource);
         return resource;
     }
