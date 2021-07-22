@@ -285,9 +285,25 @@ const rcbServer = async function (options: OperatorConfig) {
             sort,
             limit
         });
+        const resCum: ResourceStats = {
+            author: {requests: 0, miss: 0},
+            authorCrit: {requests: 0, miss: 0},
+            content: {requests: 0, miss: 0}
+        };
+
         const subManagerData = [];
         for (const s of subreddits) {
             const m = bot.subManagers.find(x => x.displayLabel === s) as Manager;
+            let cacheTypes = resCum;
+            if(m.resources !== undefined) {
+                cacheTypes = Object.keys(m.resources.stats.cache).reduce((acc, curr) => {
+                    const per = acc[curr].miss === 0 ? 0 : formatNumber(acc[curr].miss / acc[curr].requests) * 100;
+                    // @ts-ignore
+                    acc[curr].missPercent = `${per}%`;
+                    return acc;
+                }, m.resources.stats.cache)
+            }
+
             const sd = {
                 name: s,
                 logs: logs.get(s) || [], // provide a default empty value in case we truly have not logged anything for this subreddit yet
@@ -317,15 +333,8 @@ const rcbServer = async function (options: OperatorConfig) {
                 delayBy: m.delayBy === undefined ? 'No' : `Delayed by ${m.delayBy} sec`,
                 cache: {
                     //currentKeyCount: await m.resources.getCacheKeyCount(),
-                    totalRequests: Object.values(m.resources.stats.cache).reduce((acc, curr) => acc + curr.requests, 0),
-                    types: {
-                        ...Object.keys(m.resources.stats.cache).reduce((acc, curr) => {
-                            const per = acc[curr].miss === 0 ? 0 : formatNumber(acc[curr].miss / acc[curr].requests) * 100;
-                            // @ts-ignore
-                            acc[curr].missPercent = `${per}%`;
-                            return acc;
-                        }, m.resources.stats.cache),
-                    },
+                    totalRequests: m.resources !== undefined ? Object.values(m.resources.stats.cache).reduce((acc, curr) => acc + curr.requests, 0) : 0,
+                    types: cacheTypes,
                 }
             };
             // TODO replace indicator data with js on client page
@@ -372,12 +381,6 @@ const rcbServer = async function (options: OperatorConfig) {
             actionsRunTotal: 0,
         });
         const {checks, ...rest} = totalStats;
-
-        const resCum: ResourceStats = {
-            author: {requests: 0, miss: 0},
-            authorCrit: {requests: 0, miss: 0},
-            content: {requests: 0, miss: 0}
-        };
 
         let cumRaw = subManagerData.reduce((acc, curr) => {
             Object.keys(curr.cache.types as ResourceStats).forEach((k) => {
