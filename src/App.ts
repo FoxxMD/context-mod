@@ -17,9 +17,8 @@ import dayjs, {Dayjs} from "dayjs";
 import LoggedError from "./Utils/LoggedError";
 import {ProxiedSnoowrap, RequestTrackingSnoowrap} from "./Utils/SnoowrapClients";
 import {ModQueueStream, UnmoderatedStream} from "./Subreddit/Streams";
-import {getDefaultLogger} from "./Utils/loggerFactory";
-import {DurationString, PAUSED, RUNNING, STOPPED, SYSTEM, USER} from "./Common/interfaces";
-import {sharedModqueue} from "./Utils/CommandConfig";
+import {getLogger} from "./Utils/loggerFactory";
+import {DurationString, OperatorConfig, PAUSED, RUNNING, STOPPED, SYSTEM, USER} from "./Common/interfaces";
 import { Duration } from "dayjs/plugin/duration";
 
 const {transports} = winston;
@@ -44,7 +43,7 @@ export class App {
     heartbeatInterval: number;
     nextHeartbeat?: Dayjs;
     heartBeating: boolean = false;
-    apiLimitWarning: number;
+    //apiLimitWarning: number;
     softLimit: number | string = 250;
     hardLimit: number | string = 50;
     nannyMode?: 'soft' | 'hard';
@@ -59,52 +58,78 @@ export class App {
     apiEstDepletion?: Duration;
     depletedInSecs: number = 0;
 
-    constructor(options: any = {}) {
+    constructor(config: OperatorConfig) {
+        // const {
+        //     subreddits = [],
+        //     clientId = process.env.CLIENT_ID,
+        //     clientSecret = process.env.CLIENT_SECRET,
+        //     accessToken = process.env.ACCESS_TOKEN,
+        //     refreshToken = process.env.REFRESH_TOKEN,
+        //     wikiConfig = process.env.WIKI_CONFIG || 'botconfig/contextbot',
+        //     snooDebug = process.env.SNOO_DEBUG || false,
+        //     dryRun = process.env.DRYRUN || false,
+        //     heartbeat = process.env.HEARTBEAT || 300,
+        //     apiLimitWarning = process.env.API_REMAINING || 250,
+        //     version,
+        //     authorTTL = process.env.AUTHOR_TTL || 10000,
+        //     disableCache = process.env.DISABLE_CACHE || false,
+        //     proxy = process.env.PROXY,
+        //     sharedModqueue = false,
+        // } = options;
+
         const {
-            subreddits = [],
-            clientId = process.env.CLIENT_ID,
-            clientSecret = process.env.CLIENT_SECRET,
-            accessToken = process.env.ACCESS_TOKEN,
-            refreshToken = process.env.REFRESH_TOKEN,
-            wikiConfig = process.env.WIKI_CONFIG || 'botconfig/contextbot',
-            snooDebug = process.env.SNOO_DEBUG || false,
-            dryRun = process.env.DRYRUN || false,
-            heartbeat = process.env.HEARTBEAT || 300,
-            apiLimitWarning = process.env.API_REMAINING || 250,
-            version,
-            authorTTL = process.env.AUTHOR_TTL || 10000,
-            disableCache = process.env.DISABLE_CACHE || false,
-            proxy = process.env.PROXY,
-            sharedModqueue = false,
-        } = options;
+            subreddits: {
+              names = [],
+              wikiConfig,
+                dryRun,
+                heartbeatInterval,
+            },
+            credentials: {
+                clientId,
+                clientSecret,
+                refreshToken,
+                accessToken,
+            },
+            snoowrap: {
+                proxy,
+                debug,
+            },
+            polling: {
+                sharedMod,
+            },
+            caching: {
+                authorTTL,
+                provider: {
+                    store
+                }
+            },
+            api: {
+                softLimit,
+                hardLimit,
+            }
+        } = config;
 
         CacheManager.authorTTL = argParseInt(authorTTL);
-        CacheManager.enabled = !parseBool(disableCache);
+        CacheManager.enabled = store !== 'none';
 
         this.dryRun = parseBool(dryRun) === true ? true : undefined;
-        this.heartbeatInterval = argParseInt(heartbeat);
-        this.apiLimitWarning = argParseInt(apiLimitWarning);
+        this.heartbeatInterval = heartbeatInterval;
+        //this.apiLimitWarning = argParseInt(apiLimitWarning);
+        this.softLimit = softLimit;
+        this.hardLimit = hardLimit;
         this.wikiLocation = wikiConfig;
-        this.sharedModqueue = sharedModqueue;
+        this.sharedModqueue = sharedMod;
 
-        this.logger = getDefaultLogger(options);
+        this.logger = getLogger(config.logging);
 
         if (this.dryRun) {
             this.logger.info('Running in DRYRUN mode');
         }
 
-        let subredditsArg = [];
-        if (subreddits !== undefined) {
-            if (Array.isArray(subreddits)) {
-                subredditsArg = subreddits;
-            } else {
-                subredditsArg = subreddits.split(',');
-            }
-        }
-        this.subreddits = subredditsArg.map(parseSubredditName);
+        this.subreddits = names.map(parseSubredditName);
 
         const creds = {
-            userAgent: `web:contextBot:${version}`,
+            userAgent: `web:contextBot:dev`,
             clientId,
             clientSecret,
             refreshToken,
@@ -129,7 +154,7 @@ export class App {
         this.client.config({
             warnings: true,
             maxRetryAttempts: 5,
-            debug: parseBool(snooDebug),
+            debug,
             logger: snooLogWrapper(this.logger.child({labels: ['Snoowrap']})),
             continueAfterRatelimitError: true,
         });
@@ -235,11 +260,7 @@ export class App {
                 this.nextHeartbeat = dayjs().add(this.heartbeatInterval, 'second');
                 await sleep(this.heartbeatInterval * 1000);
                 const heartbeat = `HEARTBEAT -- API Remaining: ${this.client.ratelimitRemaining} | Usage Rolling Avg: ~${formatNumber(this.apiRollingAvg)}/s | Est Depletion: ${this.apiEstDepletion === undefined ? 'N/A' : this.apiEstDepletion.humanize()} (${formatNumber(this.depletedInSecs, {toFixed: 0})} seconds)`
-                if (this.apiLimitWarning >= this.client.ratelimitRemaining) {
-                    this.logger.warn(heartbeat);
-                } else {
-                    this.logger.info(heartbeat);
-                }
+                this.logger.info(heartbeat);
                 for (const s of this.subManagers) {
                     if(s.botState.state === STOPPED && s.botState.causedBy === USER) {
                         this.logger.debug('Skipping config check/restart on heartbeat due to previously being stopped by user', {subreddit: s.displayLabel});
@@ -293,28 +314,6 @@ export class App {
     }
 
     async runManagers() {
-        // this.apiSampleInterval = setInterval((function(self) {
-        //     return function() {
-        //         const rollingSample = self.apiSample.slice(0, 7)
-        //         rollingSample.unshift(self.client.ratelimitRemaining);
-        //         self.apiSample = rollingSample;
-        //         const diff = self.apiSample.reduceRight((acc: number[], curr, index) => {
-        //             if(self.apiSample[index + 1] !== undefined) {
-        //                 const d = Math.abs(curr - self.apiSample[index + 1]);
-        //                 if(d === 0) {
-        //                     return [...acc, 0];
-        //                 }
-        //                 return [...acc, d/10];
-        //             }
-        //             return acc;
-        //         }, []);
-        //         self.apiRollingAvg = diff.reduce((acc, curr) => acc + curr,0) / diff.length; // api requests per second
-        //         const depletedIn = self.client.ratelimitRemaining / self.apiRollingAvg; // number of seconds until current remaining limit is 0
-        //         self.apiEstDepletion = dayjs.duration({seconds: depletedIn});
-        //         self.logger.info(`API Usage Rolling Avg: ${self.apiRollingAvg}/s | Est Depletion: ${self.apiEstDepletion.humanize()} (${depletedIn} seconds)`);
-        //     }
-        // })(this), 10000);
-
         if(this.subManagers.every(x => !x.validConfigLoaded)) {
             this.logger.warn('All managers have invalid configs!');
         }

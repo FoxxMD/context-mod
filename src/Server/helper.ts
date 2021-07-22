@@ -2,7 +2,8 @@ import {addAsync, Router} from '@awaitjs/express';
 import express from 'express';
 import Snoowrap from "snoowrap";
 import {permissions} from "../util";
-import {getDefaultLogger} from "../Utils/loggerFactory";
+import {getLogger} from "../Utils/loggerFactory";
+import {OperatorConfig} from "../Common/interfaces";
 
 const app = addAsync(express());
 const router = Router();
@@ -11,17 +12,22 @@ app.set('view engine', 'ejs');
 
 app.use(router);
 
-const helperServer = async function (options: any = {}) {
+const helperServer = async function (options: OperatorConfig) {
     let rUri: string;
+
     const {
-        clientId = process.env.CLIENT_ID,
-        clientSecret = process.env.CLIENT_SECRET,
-        redirectUri = process.env.REDIRECT_URI,
-        port = process.env.PORT || 8085,
+        credentials: {
+            clientId,
+            clientSecret,
+            redirectUri
+        },
+        web: {
+            port
+        }
     } = options;
 
     const server = await app.listen(port);
-    const logger = getDefaultLogger(options);
+    const logger = getLogger(options);
     logger.info(`Helper UI started: http://localhost:${port}`);
     app.getAsync('/', async (req, res) => {
         res.render('helper', {

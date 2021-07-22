@@ -19,6 +19,7 @@ import he from "he";
 import {AuthorCriteria} from "../Author/Author";
 import Poll from "snoostorm/out/util/Poll";
 import {SPoll} from "./Streams";
+import cacheManager from 'cache-manager';
 
 export const DEFAULT_FOOTER = '\r\n*****\r\nThis action was performed by [a bot.]({{botLink}}) Mention a moderator or [send a modmail]({{modmailLink}}) if you any ideas, questions, or concerns about this action.';
 
@@ -31,6 +32,8 @@ export interface SubredditResourceOptions extends SubredditCacheConfig, Footer {
 export interface SubredditResourceSetOptions extends SubredditCacheConfig, Footer {
     enabled: boolean;
 }
+
+//const memoryCache = cacheManager.caching({store: 'memory', max: 1000, ttl: 60/*seconds*/});
 
 export class SubredditResources {
     enabled!: boolean;
@@ -67,7 +70,7 @@ export class SubredditResources {
     setOptions (options: SubredditResourceSetOptions) {
         const {
             enabled = true,
-            authorTTL,
+            authorTTL = 10000,
             userNotesTTL = 60000,
             wikiTTL = 300000, // 5 minutes
             footer = DEFAULT_FOOTER

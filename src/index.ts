@@ -13,17 +13,16 @@ import {
     checks,
     getUniversalCLIOptions,
     getUniversalWebOptions,
-    limit,
     operatorConfig
 } from "./Utils/CommandConfig";
 import {App} from "./App";
 import createWebServer from './Server/server';
 import createHelperServer from './Server/helper';
 import Submission from "snoowrap/dist/objects/Submission";
-import {COMMENT_URL_ID, parseLinkIdentifier, parseRegex, SUBMISSION_URL_ID} from "./util";
+import {COMMENT_URL_ID, parseLinkIdentifier, SUBMISSION_URL_ID} from "./util";
 import LoggedError from "./Utils/LoggedError";
-import {getDefaultLogger} from "./Utils/loggerFactory";
-import {GetEnvVars} from 'env-cmd';
+import {getLogger} from "./Utils/loggerFactory";
+import {buildOperatorConfigWithDefaults, parseOperatorConfigFromSources} from "./ConfigBuilder";
 
 dayjs.extend(utc);
 dayjs.extend(dduration);
@@ -42,26 +41,6 @@ const program = new Command();
 
 (async function () {
     try {
-        preRunCmd.parse(process.argv);
-        const { operatorConfig = process.env.OPERATOR_CONFIG } = preRunCmd.opts();
-        try {
-            const vars = await GetEnvVars({
-                envFile: {
-                    filePath: operatorConfig,
-                    fallback: true
-                }
-            });
-            // if we found variables in the file of at a fallback path then add them in before we do main arg parsing
-            for(const [k,v] of Object.entries(vars)) {
-                // don't override existing
-                if(process.env[k] === undefined) {
-                    process.env[k] = v;
-                }
-            }
-        } catch(err) {
-            // mimicking --silent from env-cmd
-            //swallow silently for now 😬
-        }
 
         let runCommand = program
             .command('run')
@@ -69,7 +48,8 @@ const program = new Command();
             .allowUnknownOption();
         runCommand = addOptions(runCommand, getUniversalCLIOptions());
         runCommand.action(async (opts) => {
-            const app = new App(opts);
+            const config = buildOperatorConfigWithDefaults(await parseOperatorConfigFromSources(opts));
+            const app = new App(config);
             await app.buildManagers();
             await app.runManagers();
         });
@@ -85,8 +65,9 @@ const program = new Command();
         checkCommand
             .addOption(checks)
             .action(async (activityIdentifier, type, commandOptions = {}) => {
+                const config = buildOperatorConfigWithDefaults(await parseOperatorConfigFromSources(commandOptions));
                 const {checks = []} = commandOptions;
-                const app = new App(commandOptions);
+                const app = new App(config);
 
                 let a;
                 const commentId = commentReg(activityIdentifier);
@@ -143,15 +124,16 @@ const program = new Command();
         unmodCommand = addOptions(unmodCommand, getUniversalCLIOptions());
         unmodCommand
             .addOption(checks)
-            .addOption(limit)
-            .action(async (subreddits = [], commandOptions = {}) => {
-                const {checks = [], limit = 100} = commandOptions;
-                const app = new App(commandOptions);
+            .action(async (subreddits = [], opts = {}) => {
+                const config = buildOperatorConfigWithDefaults(await parseOperatorConfigFromSources(opts));
+                const {checks = []} = opts;
+                const {subreddits: {names}} = config;
+                const app = new App(config);
 
-                await app.buildManagers(subreddits);
+                await app.buildManagers(names);
 
                 for (const manager of app.subManagers) {
-                    const activities = await manager.subreddit.getUnmoderated({limit});
+                    const activities = await manager.subreddit.getUnmoderated();
                     for (const a of activities.reverse()) {
                         manager.queue.push({
                             checkType: a instanceof Submission ? 'Submission' : 'Comment',
@@ -166,28 +148,31 @@ const program = new Command();
             .allowUnknownOption();
         webCommand = addOptions(webCommand, getUniversalWebOptions());
         webCommand.action(async (opts) => {
+            const config = buildOperatorConfigWithDefaults(await parseOperatorConfigFromSources(opts));
             const {
-                redirectUri = process.env.REDIRECT_URI,
-                clientId = process.env.CLIENT_ID,
-                clientSecret = process.env.CLIENT_SECRET,
-                accessToken = process.env.ACCESS_TOKEN,
-                refreshToken = process.env.REFRESH_TOKEN,
-            } = opts;
+                credentials: {
+                    redirectUri,
+                    clientId,
+                    clientSecret,
+                    accessToken,
+                    refreshToken,
+                }
+            } = config;
             const hasClient = clientId !== undefined && clientSecret !== undefined;
             const hasNoTokens = accessToken === undefined && refreshToken === undefined;
             try {
                 if (hasClient && hasNoTokens) {
                     // run web helper
-                    const server = createHelperServer(opts);
+                    const server = createHelperServer(config);
                     await server;
                 } else if (redirectUri === undefined) {
-                    const logger = getDefaultLogger(opts);
+                    const logger = getLogger(config.logging);
                     logger.warn(`'web' command detected but no redirectUri found in arg/env. Switching to CLI only.`);
-                    const app = new App(opts);
+                    const app = new App(config);
                     await app.buildManagers();
                     await app.runManagers();
                 } else {
-                    const server = createWebServer(opts);
+                    const server = createWebServer(config);
                     await server;
                 }
             } catch (err) {
@@ -198,7 +183,7 @@ const program = new Command();
         await program.parseAsync();
 
     } catch (err) {
-        if(!err.logged && !(err instanceof LoggedError)) {
+        if (!err.logged && !(err instanceof LoggedError)) {
             const logger = winston.loggers.get('default');
             if (err.name === 'StatusCodeError' && err.response !== undefined) {
                 const authHeader = err.response.headers['www-authenticate'];

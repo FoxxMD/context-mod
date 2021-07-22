@@ -1,27 +1,94 @@
 import {Logger} from "winston";
-import {createAjvFactory, mergeArr, normalizeName} from "./util";
+import {
+    createAjvFactory,
+    mergeArr,
+    normalizeName,
+    overwriteMerge,
+    parseBool,
+    readJson,
+    removeUndefinedKeys
+} from "./util";
 import {CommentCheck} from "./Check/CommentCheck";
 import {SubmissionCheck} from "./Check/SubmissionCheck";
 
-import Ajv from 'ajv';
-import * as schema from './Schema/App.json';
+import Ajv, {Schema} from 'ajv';
+import * as appSchema from './Schema/App.json';
+import * as operatorSchema from './Schema/OperatorConfig.json';
 import {JSONConfig} from "./JsonConfig";
 import LoggedError from "./Utils/LoggedError";
 import {CheckStructuredJson} from "./Check";
 import {
     DEFAULT_POLLING_INTERVAL,
     DEFAULT_POLLING_LIMIT,
+    OperatorJsonConfig,
+    OperatorConfig,
     PollingOptions,
     PollingOptionsStrong,
-    PollOn
+    PollOn, StrongCache, CacheProvider, CacheOptions
 } from "./Common/interfaces";
 import {isRuleSetJSON, RuleSetJson, RuleSetObjectJson} from "./Rule/RuleSet";
 import deepEqual from "fast-deep-equal";
 import {ActionJson, ActionObjectJson, RuleJson, RuleObjectJson} from "./Common/types";
 import {isActionJson} from "./Action";
+import {getLogger} from "./Utils/loggerFactory";
+import {GetEnvVars} from 'env-cmd';
+import {operatorConfig} from "./Utils/CommandConfig";
+import merge from 'deepmerge';
+import * as process from "process";
 
 export interface ConfigBuilderOptions {
     logger: Logger,
+}
+
+export const validateJson = (config: object, schema: Schema, logger: Logger): any => {
+    const ajv = createAjvFactory(logger);
+    const valid = ajv.validate(schema, config);
+    if (valid) {
+        return config;
+    } else {
+        logger.error('Json config was not valid. Please use schema to check validity.', {leaf: 'Config'});
+        if (Array.isArray(ajv.errors)) {
+            for (const err of ajv.errors) {
+                let parts = [
+                    `At: ${err.dataPath}`,
+                ];
+                let data;
+                if (typeof err.data === 'string') {
+                    data = err.data;
+                } else if (err.data !== null && typeof err.data === 'object' && (err.data as any).name !== undefined) {
+                    data = `Object named '${(err.data as any).name}'`;
+                }
+                if (data !== undefined) {
+                    parts.push(`Data: ${data}`);
+                }
+                let suffix = '';
+                // @ts-ignore
+                if (err.params.allowedValues !== undefined) {
+                    // @ts-ignore
+                    suffix = err.params.allowedValues.join(', ');
+                    suffix = ` [${suffix}]`;
+                }
+                parts.push(`${err.keyword}: ${err.schemaPath} => ${err.message}${suffix}`);
+
+                // if we have a reference in the description parse it out so we can log it here for context
+                if (err.parentSchema !== undefined && err.parentSchema.description !== undefined) {
+                    const desc = err.parentSchema.description as string;
+                    const seeIndex = desc.indexOf('[See]');
+                    if (seeIndex !== -1) {
+                        let newLineIndex: number | undefined = desc.indexOf('\n', seeIndex);
+                        if (newLineIndex === -1) {
+                            newLineIndex = undefined;
+                        }
+                        const seeFragment = desc.slice(seeIndex + 5, newLineIndex);
+                        parts.push(`See:${seeFragment}`);
+                    }
+                }
+
+                logger.error(`Schema Error:\r\n${parts.join('\r\n')}`, {leaf: 'Config'});
+            }
+        }
+        throw new LoggedError('Config schema validity failure');
+    }
 }
 
 export class ConfigBuilder {
@@ -35,54 +102,8 @@ export class ConfigBuilder {
     }
 
     validateJson(config: object): JSONConfig {
-        const ajv = createAjvFactory(this.logger);
-        const valid = ajv.validate(schema, config);
-        if (valid) {
-            return config as JSONConfig;
-        } else {
-            this.configLogger.error('Json config was not valid. Please use schema to check validity.');
-            if (Array.isArray(ajv.errors)) {
-                for (const err of ajv.errors) {
-                    let parts = [
-                        `At: ${err.dataPath}`,
-                    ];
-                    let data;
-                    if (typeof err.data === 'string') {
-                        data = err.data;
-                    } else if (err.data !== null && typeof err.data === 'object' && (err.data as any).name !== undefined) {
-                        data = `Object named '${(err.data as any).name}'`;
-                    }
-                    if (data !== undefined) {
-                        parts.push(`Data: ${data}`);
-                    }
-                    let suffix = '';
-                    // @ts-ignore
-                    if (err.params.allowedValues !== undefined) {
-                        // @ts-ignore
-                        suffix = err.params.allowedValues.join(', ');
-                        suffix = ` [${suffix}]`;
-                    }
-                    parts.push(`${err.keyword}: ${err.schemaPath} => ${err.message}${suffix}`);
-
-                    // if we have a reference in the description parse it out so we can log it here for context
-                    if(err.parentSchema !== undefined && err.parentSchema.description !== undefined) {
-                        const desc = err.parentSchema.description as string;
-                        const seeIndex = desc.indexOf('[See]');
-                        if(seeIndex !== -1) {
-                            let newLineIndex: number | undefined = desc.indexOf('\n', seeIndex);
-                            if(newLineIndex === -1) {
-                                newLineIndex = undefined;
-                            }
-                            const seeFragment = desc.slice(seeIndex + 5, newLineIndex);
-                            parts.push(`See:${seeFragment}`);
-                        }
-                    }
-
-                    this.configLogger.error(`Schema Error:\r\n${parts.join('\r\n')}`);
-                }
-            }
-            throw new LoggedError('Config schema validity failure');
-        }
+        const validConfig = validateJson(config, appSchema, this.logger);
+        return validConfig as JSONConfig;
     }
 
     parseToStructured(config: JSONConfig): CheckStructuredJson[] {
@@ -221,4 +242,332 @@ export const insertNamedActions = (actions: Array<ActionJson>, namedActions: Map
     }
 
     return strongActions;
+}
+
+export const parseOpConfigFromArgs = (args: any): OperatorJsonConfig => {
+    const {
+        subreddits,
+        clientId,
+        clientSecret,
+        accessToken,
+        refreshToken,
+        wikiConfig,
+        dryRun,
+        heartbeat,
+        softLimit,
+        hardLimit,
+        authorTTL,
+        operator,
+        operatorDisplay,
+        snooProxy,
+        snooDebug,
+        sharedMod,
+        logLevel,
+        logDir,
+        port,
+        sessionSecret,
+        caching
+    } = args || {};
+
+    const data = {
+        operator: {
+            name: operator,
+            display: operatorDisplay
+        },
+        credentials: {
+            clientId,
+            clientSecret,
+            accessToken,
+            refreshToken
+        },
+        subreddits: {
+            names: subreddits,
+            wikiConfig,
+            heartbeatInterval: heartbeat,
+            dryRun
+        },
+        logging: {
+            level: logLevel,
+            path: logDir === true ? `${process.cwd()}/logs` : undefined,
+        },
+        snoowrap: {
+            proxy: snooProxy,
+            debug: snooDebug,
+        },
+        web: {
+            port,
+            sessionSecret,
+        },
+        polling: {
+            sharedMod,
+        },
+        caching: {
+            provider: caching,
+            authorTTL
+        },
+        api: {
+            softLimit,
+            hardLimit
+        }
+    }
+
+    return removeUndefinedKeys(data) as OperatorJsonConfig;
+}
+
+export const parseOpConfigFromEnv = (): OperatorJsonConfig => {
+    let subsVal = process.env.SUBREDDITS;
+    let subs;
+    if (subsVal !== undefined) {
+        subsVal = subsVal.trim();
+        if (subsVal.includes(',')) {
+            // try to parse using comma
+            subs = subsVal.split(',').map(x => x.trim()).filter(x => x !== '');
+        } else {
+            // otherwise try spaces
+            subs = subsVal.split(' ')
+                // remove any extraneous spaces
+                .filter(x => x !== ' ' && x !== '');
+        }
+        if (subs.length === 0) {
+            subs = undefined;
+        }
+    }
+    const data = {
+        operator: {
+            name: process.env.OPERATOR,
+            display: process.env.OPERATOR_DISPLAY
+        },
+        credentials: {
+            clientId: process.env.CLIENT_ID,
+            clientSecret: process.env.CLIENT_SECRET,
+            accessToken: process.env.ACCESS_TOKEN,
+            refreshToken: process.env.REFRESH_TOKEN,
+        },
+        subreddits: {
+            names: subs,
+            wikiConfig: process.env.WIKI_CONFIG,
+            heartbeatInterval: process.env.HEARTBEAT !== undefined ? parseInt(process.env.HEARTBEAT) : undefined,
+            dryRun: parseBool(process.env.DRYRUN, undefined),
+        },
+        logging: {
+            // @ts-ignore
+            level: process.env.LOG_LEVEL,
+            path: process.env.LOG_DIR === 'true' ? `${process.cwd()}/logs` : undefined,
+        },
+        snoowrap: {
+            proxy: process.env.PROXY,
+            debug: parseBool(process.env.SNOO_DEBUG, undefined),
+        },
+        web: {
+            port: process.env.PORT !== undefined ? parseInt(process.env.PORT) : undefined,
+            sessionSecret: process.env.SESSION_SECRET,
+        },
+        polling: {
+            sharedMod: parseBool(process.env.SHARE_MOD),
+        },
+        caching: {
+            provider: {
+                // @ts-ignore
+                store: process.env.CACHING
+            },
+            authorTTL: process.env.AUTHOR_TTL !== undefined ? parseInt(process.env.AUTHOR_TTL) : undefined
+        },
+        api: {
+            softLimit: process.env.SOFT_LIMIT !== undefined ? parseInt(process.env.SOFT_LIMIT) : undefined,
+            hardLimit: process.env.HARD_LIMIT !== undefined ? parseInt(process.env.HARD_LIMIT) : undefined
+        }
+    }
+
+    return removeUndefinedKeys(data) as OperatorJsonConfig;
+}
+
+// Hierarchy (lower level overwrites above)
+//
+// .env file
+// Actual ENVs (from environment)
+// json config
+// args from cli
+export const parseOperatorConfigFromSources = async (args: any): Promise<OperatorJsonConfig> => {
+    const {logLevel = process.env.LOG_LEVEL, logDir = process.env.LOG_DIR || false} = args || {};
+    const envPath = process.env.OPERATOR_ENV;
+
+    // create a pre config logger to help with debugging
+    const initLogger = getLogger({logLevel, logDir: logDir === true ? `${process.cwd()}/logs` : logDir}, 'init');
+
+    try {
+        const vars = await GetEnvVars({
+            envFile: {
+                filePath: envPath,
+                fallback: true
+            }
+        });
+        // if we found variables in the file of at a fallback path then add them in before we do main arg parsing
+        for (const [k, v] of Object.entries(vars)) {
+            // don't override existing
+            if (process.env[k] === undefined) {
+                process.env[k] = v;
+            }
+        }
+    } catch (err) {
+        let msg = 'No .env file found at default location (./env)';
+        if (envPath !== undefined) {
+            msg = `${msg} or OPERATOR_ENV path (${envPath})`;
+        }
+        initLogger.warn(`${msg} -- this may be normal if neither was provided.`);
+        // mimicking --silent from env-cmd
+        //swallow silently for now 😬
+    }
+
+    const {operatorConfig = process.env.OPERATOR_CONFIG} = args;
+    let configFromFile: OperatorJsonConfig = {};
+    if (operatorConfig !== undefined) {
+        let rawConfig;
+        try {
+            rawConfig = await readJson(operatorConfig, {log: initLogger});
+        } catch (err) {
+            initLogger.error('Cannot continue app startup because operator config file was not parseable.');
+            err.logged = true;
+            throw err;
+        }
+        try {
+            configFromFile = validateJson(rawConfig, operatorSchema, initLogger) as OperatorJsonConfig;
+        } catch (err) {
+            initLogger.error('Cannot continue app startup because operator config file was not valid.');
+            throw err;
+        }
+    }
+    const configFromArgs = parseOpConfigFromArgs(args);
+    const configFromEnv = parseOpConfigFromEnv();
+
+    const mergedConfig = merge.all([configFromEnv, configFromFile, configFromArgs], {
+        arrayMerge: overwriteMerge,
+    });
+
+    return removeUndefinedKeys(mergedConfig) as OperatorJsonConfig;
+}
+
+export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): OperatorConfig => {
+    const {
+        operator: {
+            name,
+            display = 'Anonymous'
+        } = {},
+        credentials: {
+            clientId: ci,
+            clientSecret: cs,
+            ...restCred
+        } = {},
+        subreddits: {
+            names = [],
+            wikiConfig = 'botconfig/contextbot',
+            heartbeatInterval = 300,
+            dryRun
+        } = {},
+        logging: {
+            level = 'verbose',
+            path,
+        } = {},
+        snoowrap = {},
+        web: {
+            port = 5058,
+            sessionSecret,
+            maxLogs = 200,
+        } = {},
+        polling: {
+            sharedMod = false,
+            limit = 100,
+            interval = 30,
+        } = {},
+        caching = 'memory',
+        api: {
+            softLimit = 250,
+            hardLimit = 50
+        } = {},
+    } = data;
+
+    const cacheOptDefaults = {ttl: 60, max: 500};
+    const cacheDefaults = {authorTTL: 60000, userNotesTTL: 60000, wikiTTL: 300000};
+
+    let cache = {
+        ...cacheDefaults,
+        provider: {
+            store: 'memory',
+            ...cacheOptDefaults
+        }
+    };
+
+    if (typeof caching === 'string') {
+        cache = {
+            provider: {
+                store: caching as CacheProvider,
+                ...cacheOptDefaults
+            },
+            ...cacheDefaults
+        };
+    } else if (typeof caching === 'object') {
+        const {provider, ...restConfig} = caching;
+        if (typeof provider === 'string') {
+            cache = {
+                ...cacheDefaults,
+                ...restConfig,
+                provider: {
+                    store: provider as CacheProvider,
+                    ...cacheOptDefaults
+                }
+            }
+        } else {
+            const {ttl = 60, max = 500, store = 'memory', ...rest} = provider || {};
+            cache = {
+                ...cacheDefaults,
+                ...restConfig,
+                provider: {
+                    store,
+                    ttl,
+                    max,
+                    ...rest,
+                },
+            }
+        }
+    }
+
+    const config: OperatorConfig = {
+        operator: {
+            name,
+            display
+        },
+        credentials: {
+            clientId: (ci as string),
+            clientSecret: (cs as string),
+            ...restCred,
+        },
+        logging: {
+            level,
+            path
+        },
+        snoowrap,
+        subreddits: {
+            names,
+            wikiConfig,
+            heartbeatInterval,
+            dryRun,
+        },
+        web: {
+            port,
+            sessionSecret,
+            maxLogs,
+        },
+        // @ts-ignore
+        caching: cache,
+        polling: {
+            sharedMod,
+            limit,
+            interval,
+        },
+        api: {
+            softLimit,
+            hardLimit
+        }
+    };
+
+    return config;
 }

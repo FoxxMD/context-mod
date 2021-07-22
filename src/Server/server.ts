@@ -25,10 +25,9 @@ import {
     pollingInfo, SUBMISSION_URL_ID
 } from "../util";
 import {Manager} from "../Subreddit/Manager";
-import {getDefaultLogger} from "../Utils/loggerFactory";
+import {getLogger} from "../Utils/loggerFactory";
 import LoggedError from "../Utils/LoggedError";
-import {RUNNING, STOPPED, SYSTEM, USER} from "../Common/interfaces";
-import {dryRun} from "../Utils/CommandConfig";
+import {OperatorConfig, RUNNING, STOPPED, SYSTEM, USER} from "../Common/interfaces";
 
 const MemoryStore = createMemoryStore(session);
 const app = addAsync(express());
@@ -72,16 +71,23 @@ const subLogMap: Map<string, LogEntry[]> = new Map();
 const emitter = new EventEmitter();
 const stream = new Writable()
 
-const rcbServer = async function (options: any = {}) {
+const rcbServer = async function (options: OperatorConfig) {
+
     const {
-        clientId = process.env.CLIENT_ID,
-        clientSecret = process.env.CLIENT_SECRET,
-        redirectUri = process.env.REDIRECT_URI,
-        sessionSecret = process.env.SESSION_SECRET || defaultSessionSecret,
-        operator = process.env.OPERATOR,
-        operatorDisplay = process.env.OPERATOR_DISPLAY || 'Anonymous',
-        port = process.env.PORT || 8085,
-        maxLogs = 200
+        credentials: {
+            clientId,
+            clientSecret,
+            redirectUri
+        },
+        operator: {
+            name,
+            display,
+        },
+        web: {
+            port,
+            sessionSecret = defaultSessionSecret,
+            maxLogs,
+        },
     } = options;
 
     let botSubreddits: string[] = [];
@@ -109,9 +115,9 @@ const rcbServer = async function (options: any = {}) {
         stream,
     })
 
-    const logger = getDefaultLogger({...options, additionalTransports: [streamTransport]})
+    const logger = getLogger({...options.logging, additionalTransports: [streamTransport]})
 
-    const bot = new App({...options, additionalTransports: [streamTransport]});
+    const bot = new App(options);
     await bot.testClient();
 
     const server = await app.listen(port);
@@ -179,14 +185,14 @@ const rcbServer = async function (options: any = {}) {
     }
 
     const booleanMiddle = (boolParams: string[] = []) => async (req: express.Request, res: express.Response, next: Function) => {
-        if(req.query !== undefined) {
-            for(const b of boolParams) {
+        if (req.query !== undefined) {
+            for (const b of boolParams) {
                 const bVal = req.query[b] as any;
-                if(bVal !== undefined) {
+                if (bVal !== undefined) {
                     let truthyVal: boolean;
-                    if(bVal === 'true' || bVal === true || bVal === 1 || bVal === '1') {
+                    if (bVal === 'true' || bVal === true || bVal === 1 || bVal === '1') {
                         truthyVal = true;
-                    } else if(bVal === 'false' || bVal === false || bVal === 0 || bVal === '0') {
+                    } else if (bVal === 'false' || bVal === false || bVal === 0 || bVal === '0') {
                         truthyVal = false;
                     } else {
                         res.status(400);
@@ -211,7 +217,7 @@ const rcbServer = async function (options: any = {}) {
         const authUrl = Snoowrap.getAuthUrl({
             clientId,
             scope: ['identity', 'mysubreddits'],
-            redirectUri,
+            redirectUri: redirectUri as string,
             permanent: false,
         });
         return res.redirect(authUrl);
@@ -228,13 +234,13 @@ const rcbServer = async function (options: any = {}) {
                 default:
                     errContent = error;
             }
-            return res.render('error', {error: errContent, operatorDisplay });
+            return res.render('error', {error: errContent, operatorDisplay: display});
         }
         const client = await Snoowrap.fromAuthCode({
             userAgent: `web:contextBot:web`,
             clientId,
             clientSecret,
-            redirectUri,
+            redirectUri: redirectUri as string,
             code: code as string,
         });
         // @ts-ignore
@@ -256,12 +262,19 @@ const rcbServer = async function (options: any = {}) {
 
     app.use('/', redditUserMiddleware);
     app.getAsync('/', async (req, res) => {
-        const {subreddits = [], user: userVal, limit = 200, level = 'verbose', sort = 'descending', lastCheck} = req.session;
+        const {
+            subreddits = [],
+            user: userVal,
+            limit = 200,
+            level = 'verbose',
+            sort = 'descending',
+            lastCheck
+        } = req.session;
         const user = userVal as string;
-        const isOperator = operator !== undefined && operator.toLowerCase() === user.toLowerCase()
+        const isOperator = name !== undefined && name.toLowerCase() === user.toLowerCase()
 
-        if((req.session.subreddits as string[]).length === 0 && !isOperator) {
-            return res.render('noSubs', { operatorDisplay });
+        if ((req.session.subreddits as string[]).length === 0 && !isOperator) {
+            return res.render('noSubs', {operatorDisplay: display});
         }
 
         // @ts-ignore
@@ -299,7 +312,7 @@ const rcbServer = async function (options: any = {}) {
             };
             // TODO replace indicator data with js on client page
             let indicator;
-            if(m.botState.state === RUNNING && m.queueState.state === RUNNING && m.eventsState.state === RUNNING) {
+            if (m.botState.state === RUNNING && m.queueState.state === RUNNING && m.eventsState.state === RUNNING) {
                 indicator = 'green';
             } else if (m.botState.state === STOPPED && m.queueState.state === STOPPED && m.eventsState.state === STOPPED) {
                 indicator = 'red';
@@ -355,15 +368,15 @@ const rcbServer = async function (options: any = {}) {
             hardLimit: bot.hardLimit,
             stats: rest,
         };
-        if(allManagerData.logs === undefined) {
+        if (allManagerData.logs === undefined) {
             // this should happen but saw an edge case where potentially did
             logger.warn(`Logs for 'all' were undefined found but should always have a default empty value`);
         }
-       // if(isOperator) {
-            allManagerData.startedAt = bot.startedAt.local().format('MMMM D, YYYY h:mm A Z');
-            allManagerData.heartbeatHuman = dayjs.duration({seconds: bot.heartbeatInterval}).humanize();
-            allManagerData.heartbeat = bot.heartbeatInterval;
-            allManagerData = {...allManagerData, ...opStats(bot)};
+        // if(isOperator) {
+        allManagerData.startedAt = bot.startedAt.local().format('MMMM D, YYYY h:mm A Z');
+        allManagerData.heartbeatHuman = dayjs.duration({seconds: bot.heartbeatInterval}).humanize();
+        allManagerData.heartbeat = bot.heartbeatInterval;
+        allManagerData = {...allManagerData, ...opStats(bot)};
         //}
 
         const data = {
@@ -374,7 +387,7 @@ const rcbServer = async function (options: any = {}) {
             },
             subreddits: [allManagerData, ...subManagerData],
             botName: bot.botName,
-            operatorDisplay,
+            operatorDisplay: display,
             isOperator,
             logSettings: {
                 //limit: [10, 20, 50, 100, 200].map(x => `<a class="capitalize ${limit === x ? 'font-bold no-underline pointer-events-none' : ''}" data-limit="${x}" href="logs/settings/update?limit=${x}">${x}</a>`).join(' | '),
@@ -410,7 +423,7 @@ const rcbServer = async function (options: any = {}) {
 
         const subMap = filterLogBySubreddit(subLogMap, req.session.subreddits, {
             level,
-            operator: operator !== undefined && operator.toLowerCase() === (user as string).toLowerCase(),
+            operator: name !== undefined && name.toLowerCase() === (user as string).toLowerCase(),
             user,
             limit,
             sort: (sort as 'descending' | 'ascending'),
@@ -424,17 +437,17 @@ const rcbServer = async function (options: any = {}) {
 
     app.use('/action', booleanMiddle(['force']));
     app.getAsync('/action', async (req, res) => {
-        const { type, action, subreddit, force = false } = req.query as any;
+        const {type, action, subreddit, force = false} = req.query as any;
         let subreddits: string[] = [];
-        if(subreddit === 'All') {
+        if (subreddit === 'All') {
             subreddits = req.session.subreddits as string[];
-        } else if((req.session.subreddits as string[]).includes(subreddit)) {
+        } else if ((req.session.subreddits as string[]).includes(subreddit)) {
             subreddits = [subreddit];
         }
 
-        for(const s of subreddits) {
+        for (const s of subreddits) {
             const manager = bot.subManagers.find(x => x.displayLabel === s);
-            if(manager === undefined) {
+            if (manager === undefined) {
                 logger.warn(`Manager for ${s} does not exist`, {subreddit: `/u/${req.session.user}`});
                 continue;
             }
@@ -443,25 +456,25 @@ const rcbServer = async function (options: any = {}) {
             try {
                 switch (action) {
                     case 'start':
-                        if(type === 'bot') {
+                        if (type === 'bot') {
                             await manager.start('user');
-                        } else if(type === 'queue') {
+                        } else if (type === 'queue') {
                             manager.startQueue('user');
                         } else {
                             await manager.startEvents('user');
                         }
                         break;
                     case 'stop':
-                        if(type === 'bot') {
+                        if (type === 'bot') {
                             await manager.stop('user');
-                        } else if(type === 'queue') {
+                        } else if (type === 'queue') {
                             await manager.stopQueue('user');
                         } else {
                             manager.stopEvents('user');
                         }
                         break;
                     case 'pause':
-                        if(type === 'queue') {
+                        if (type === 'queue') {
                             await manager.pauseQueue('user');
                         } else {
                             manager.pauseEvents('user');
@@ -470,15 +483,15 @@ const rcbServer = async function (options: any = {}) {
                     case 'reload':
                         const prevQueueState = manager.queueState.state;
                         const newConfig = await manager.parseConfiguration('user', force);
-                        if(newConfig === false) {
+                        if (newConfig === false) {
                             mLogger.info('Config was up-to-date');
                         }
-                        if(newConfig && prevQueueState === RUNNING) {
+                        if (newConfig && prevQueueState === RUNNING) {
                             await manager.startQueue(USER);
                         }
                         break;
                     case 'check':
-                        if(type === 'unmoderated') {
+                        if (type === 'unmoderated') {
                             const activities = await manager.subreddit.getUnmoderated({limit: 100});
                             for (const a of activities.reverse()) {
                                 manager.queue.push({
@@ -524,7 +537,7 @@ const rcbServer = async function (options: any = {}) {
             }
         }
 
-        if(a === undefined) {
+        if (a === undefined) {
             logger.error('Could not parse Comment or Submission ID from given URL', {subreddit: `/u/${req.session.user}`});
             return res.send('OK');
         } else {
@@ -534,9 +547,9 @@ const rcbServer = async function (options: any = {}) {
 
             let manager = subreddit === 'All' ? bot.subManagers.find(x => x.subreddit.display_name === sub) : bot.subManagers.find(x => x.displayLabel === subreddit);
 
-            if(manager === undefined || !(req.session.subreddits as string[]).includes(manager.displayLabel)) {
+            if (manager === undefined || !(req.session.subreddits as string[]).includes(manager.displayLabel)) {
                 let msg = 'Activity does not belong to a subreddit you moderate or the bot runs on.';
-                if(subreddit === 'All') {
+                if (subreddit === 'All') {
                     msg = `${msg} If you want to test an Activity against a Subreddit\'s config it does not belong to then switch to that Subreddit's tab first.`
                 }
                 logger.error(msg, {subreddit: `/u/${req.session.user}`});
@@ -544,9 +557,9 @@ const rcbServer = async function (options: any = {}) {
             }
 
             // will run dryrun if specified or if running activity on subreddit it does not belong to
-            const dr: boolean  | undefined = (dryRun || manager.subreddit.display_name !== sub) ? true : undefined;
+            const dr: boolean | undefined = (dryRun || manager.subreddit.display_name !== sub) ? true : undefined;
             manager.logger.info(`/u/${req.session.user} running${dr === true ? ' DRY RUN ' : ' '}check on${manager.subreddit.display_name !== sub ? ' FOREIGN ACTIVITY ' : ' '}${url}`);
-            await manager.runChecks(activity instanceof Submission ? 'Submission' : 'Comment', activity, { dryRun: dr })
+            await manager.runChecks(activity instanceof Submission ? 'Submission' : 'Comment', activity, {dryRun: dr})
         }
         res.send('OK');
     })

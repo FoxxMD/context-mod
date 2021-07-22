@@ -20,6 +20,7 @@ import JSON5 from "json5";
 import yaml, {JSON_SCHEMA} from "js-yaml";
 import SimpleError from "./Utils/SimpleError";
 import InvalidRegexError from "./Utils/InvalidRegexError";
+import {constants, promises} from "fs";
 
 const {format} = winston;
 const {combine, printf, timestamp, label, splat, errors} = format;
@@ -788,31 +789,58 @@ export const parseRegex = (r: string | RegExp, val: string, flags?: string): Reg
         matches: m !== null ? m.slice(0) : [],
         global: [],
     }
-/*
+}
+
+export async function readJson(path: string, opts: any) {
+    const {log, throwOnNotFound = true} = opts;
     try {
-        const g = Array.from(val.matchAll(reg));
-        const global = g.map(x => {
-            return {
-                match: x[0],
-                groups: x.slice(1),
-                named: x.groups,
+        await promises.access(path, constants.R_OK);
+        const data = await promises.readFile(path);
+        return JSON.parse(data as unknown as string);
+    } catch (e) {
+        const {code} = e;
+        if (code === 'ENOENT') {
+            if (throwOnNotFound) {
+                if (log) {
+                    log.warn('No file found at given path', {filePath: path});
+                }
+                throw e;
+            } else {
+                return;
             }
-        });
-        return {
-            matched: g.length > 0,
-            matches: g.length > 0 ? g.map(x => x[0]) : [],
-            global: g.length > 0 ? global : [],
-        };
-    } catch (err) {
-        if (!err.message.includes('non-global RegExp argument')) {
-            throw err;
+        } else if (log) {
+            log.warn(`Encountered error while parsing file`, {filePath: path});
+            log.error(e);
         }
+        throw e;
     }
-    // want not global, try regular match
-    const m = val.match(reg)
-    return {
-        matched: m !== null,
-        matches: m !== null ? m.slice(0) : [],
-        global: [],
-    }*/
+}
+
+// export function isObject(item: any): boolean {
+//     return (item && typeof item === 'object' && !Array.isArray(item));
+// }
+
+export const overwriteMerge = (destinationArray: any[], sourceArray: any[], options: any): any[] => sourceArray;
+
+export const removeUndefinedKeys = (obj: any) => {
+    let newObj: any = {};
+    Object.keys(obj).forEach((key) => {
+        if(Array.isArray(obj[key])) {
+            newObj[key] = obj[key];
+        } else if (obj[key] === Object(obj[key])) {
+            newObj[key] = removeUndefinedKeys(obj[key]);
+        } else if (obj[key] !== undefined) {
+            newObj[key] = obj[key];
+        }
+    });
+    if(Object.keys(newObj).length === 0) {
+        return undefined;
+    }
+    Object.keys(newObj).forEach(key => {
+        if(newObj[key] === undefined || (null !== newObj[key] && typeof newObj[key] === 'object' && Object.keys(newObj[key]).length === 0)) {
+            delete newObj[key]
+        }
+    });
+    //Object.keys(newObj).forEach(key => newObj[key] === undefined || newObj[key] && delete newObj[key])
+    return newObj;
 }

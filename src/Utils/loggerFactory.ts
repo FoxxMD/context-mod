@@ -3,13 +3,13 @@ import winston, {Logger} from "winston";
 
 const {transports} = winston;
 
-export const getDefaultLogger = (options: any): Logger => {
-    if(!winston.loggers.has('default')) {
+export const getLogger = (options: any, name = 'default'): Logger => {
+    if(!winston.loggers.has(name)) {
         const {
-            logDir = process.env.LOG_DIR || `${process.cwd()}/logs`,
-            logLevel = process.env.LOG_LEVEL || 'verbose',
+            path,
+            level,
             additionalTransports = [],
-        } = options;
+        } = options || {};
 
         const consoleTransport = new transports.Console();
 
@@ -24,13 +24,9 @@ export const getDefaultLogger = (options: any): Logger => {
             errorTransports.push(a);
         }
 
-        if (logDir !== false) {
-            let logPath = logDir;
-            if (logPath === true) {
-                logPath = `${process.cwd()}/logs`;
-            }
+        if (path !== undefined) {
             const rotateTransport = new winston.transports.DailyRotateFile({
-                dirname: logPath,
+                dirname: path,
                 createSymlink: true,
                 symlinkName: 'contextBot-current.log',
                 filename: 'contextBot-%DATE%.log',
@@ -44,7 +40,7 @@ export const getDefaultLogger = (options: any): Logger => {
         }
 
         const loggerOptions = {
-            level: logLevel || 'info',
+            level: level || 'info',
             format: labelledFormat(),
             transports: myTransports,
             levels: logLevels,
@@ -52,8 +48,8 @@ export const getDefaultLogger = (options: any): Logger => {
             rejectionHandlers: errorTransports,
         };
 
-        winston.loggers.add('default', loggerOptions);
+        winston.loggers.add(name, loggerOptions);
     }
 
-    return winston.loggers.get('default');
+    return winston.loggers.get(name);
 }

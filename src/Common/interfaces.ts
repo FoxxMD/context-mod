@@ -304,12 +304,39 @@ export interface PollingOptionsStrong extends PollingOptions {
     interval: number,
 }
 
+export interface PollingDefaults {
+    /**
+     * The maximum number of Activities to get on every request
+     * @default 50
+     * @examples [50]
+     * */
+    limit?: number
+
+    /**
+     * Amount of time, in seconds, to wait between requests
+     *
+     * @default 30
+     * @examples [30]
+     * */
+    interval?: number,
+
+    /**
+     * Delay processing Activity until it is `N` seconds old
+     *
+     * Useful if there are other bots that may process an Activity and you want this bot to run first/last/etc.
+     *
+     * If the Activity is already `N` seconds old when it is initially retrieved no refresh of the Activity occurs (no API request is made) and it is immediately processed.
+     *
+     * */
+    delayUntil?: number,
+}
+
 /**
  * A configuration for where, how, and when to poll Reddit for Activities to process
  *
  * @examples [{"pollOn": "unmoderated","limit": 25, "interval": 20000}]
  * */
-export interface PollingOptions {
+export interface PollingOptions extends PollingDefaults {
 
     /**
      * What source to get Activities from. The source you choose will modify how the bots behaves so choose carefully.
@@ -348,30 +375,6 @@ export interface PollingOptions {
      *
      * */
     pollOn: 'unmoderated' | 'modqueue' | 'newSub' | 'newComm'
-    /**
-     * The maximum number of Activities to get on every request
-     * @default 50
-     * @examples [50]
-     * */
-    limit?: number
-
-    /**
-     * Amount of time, in secibds, to wait between requests
-     *
-     * @default 30
-     * @examples [30]
-     * */
-    interval?: number,
-
-    /**
-     * Delay processing Activity until it is `N` seconds old
-     *
-     * Useful if there are other bots that may process an Activity and you want this bot to run first/last/etc.
-     *
-     * If the Activity is already `N` seconds old when it is initially retrieved no refresh of the Activity occurs (no API request is made) and it is immediately processed.
-     *
-     * */
-    delayUntil?: number,
 }
 
 export interface SubredditCacheConfig {
@@ -450,8 +453,8 @@ export interface ManagerOptions {
      *
      * @default [["unmoderated"]]
      * @example [["unmoderated","newComm"]]
-    * */
-    polling?: (string|PollingOptions)[]
+     * */
+    polling?: (string | PollingOptions)[]
 
     /**
      * Per-subreddit config for caching TTL values. If set to `false` caching is disabled.
@@ -621,3 +624,145 @@ export interface RegExResult {
     matches: string[],
     global: GlobalRegExResult[]
 }
+
+type LogLevel = "error" | "warn" | "info" | "verbose" | "debug";
+export type CacheProvider = 'memory' | 'redis' | 'none';
+
+// export type StrongCache = SubredditCacheConfig & {
+//     provider: CacheOptions
+// }
+export type StrongCache = {
+    authorTTL: number,
+    userNotesTTL: number,
+    wikiTTL: number
+    provider: CacheOptions
+}
+
+export interface CacheOptions {
+    store: CacheProvider,
+    host?: string | undefined,
+    port?: number | undefined,
+    auth_pass?: string | undefined,
+    db?: number | undefined,
+    ttl?: number,
+    max?: number
+}
+
+export interface OperatorJsonConfig {
+    operator?: {
+        name?: string,
+        display?: string,
+    },
+    credentials?: {
+        clientId?: string,
+        clientSecret?: string,
+        redirectUri?: string,
+        accessToken?: string,
+        refreshToken?: string
+    },
+    logging?: {
+        level?: LogLevel,
+        path?: string,
+    },
+    snoowrap?: {
+        proxy?: string,
+        debug?: boolean,
+    }
+    subreddits?: {
+        names?: string[],
+        dryRun?: boolean,
+        wikiConfig?: string,
+        heartbeatInterval?: number,
+    },
+    polling?: PollingDefaults & {
+        sharedMod?: boolean,
+        limit?: number,
+        interval?: number,
+    },
+    web?: {
+        port?: number,
+        sessionSecret?: string,
+        logLevel?: LogLevel,
+        maxLogs?: number,
+    }
+    // caching?:  (SubredditCacheConfig & {
+    //     provider?: CacheProvider | CacheOptions | undefined
+    // }) | CacheProvider | undefined
+    caching?: {
+        /**
+         * Amount of time, in milliseconds, author activities (Comments/Submission) should be cached
+         * @examples [10000]
+         * @default 10000
+         * */
+        authorTTL?: number;
+        /**
+         * Amount of time, in milliseconds, wiki content pages should be cached
+         * @examples [300000]
+         * @default 300000
+         * */
+        wikiTTL?: number;
+
+        /**
+         * Amount of time, in milliseconds, [Toolbox User Notes](https://www.reddit.com/r/toolbox/wiki/docs/usernotes) should be cached
+         * @examples [60000]
+         * @default 60000
+         * */
+        userNotesTTL?: number;
+        provider?: CacheProvider | CacheOptions
+    } | CacheProvider
+    api?: {
+        softLimit?: number,
+        hardLimit?: number,
+    }
+}
+
+export interface OperatorConfig extends OperatorJsonConfig {
+    operator: {
+        name?: string
+        display?: string,
+    },
+    credentials: {
+        clientId: string,
+        clientSecret: string,
+        redirectUri?: string,
+        accessToken?: string,
+        refreshToken?: string
+    },
+    logging: {
+        level: LogLevel,
+        path?: string,
+    },
+    snoowrap: {
+        proxy?: string,
+        debug?: boolean,
+    }
+    subreddits: {
+        names?: string[],
+        dryRun?: boolean,
+        wikiConfig: string,
+        heartbeatInterval: number,
+    },
+    polling: {
+        sharedMod: boolean,
+        limit: number,
+        interval: number,
+    },
+    web: {
+        port: number,
+        sessionSecret?: string,
+        logLevel?: LogLevel,
+        maxLogs: number,
+    }
+    caching: {
+        authorTTL: number,
+        userNotesTTL: number,
+        wikiTTL: number
+        provider: CacheOptions
+    },
+    api: {
+        softLimit: number,
+        hardLimit: number,
+    }
+}
+
+//export type OperatorConfig = Required<OperatorJsonConfig>;
