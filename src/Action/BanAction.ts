@@ -48,8 +48,10 @@ export class BanAction extends Action {
         this.logger.verbose(`\r\n${banPieces.join('\r\n')}`);
         if (!dryRun) {
             // @ts-ignore
-            await item.subreddit.banUser({
-                name: item.author.id,
+            const fetchedSub = await item.subreddit.fetch();
+            const fetchedId = await item.author.id;
+            await fetchedSub.banUser({
+                name: fetchedId,
                 banMessage: renderedContent === undefined ? undefined : renderedContent,
                 banReason: this.reason,
                 banNote: this.note,
