@@ -122,7 +122,7 @@ export class Manager {
     actionsRun: Map<string, number> = new Map();
     actionsRunSinceStart: Map<string, number> = new Map();
 
-    getStats = () => {
+    getStats = async () => {
         const data: any = {
             eventsCheckedTotal: this.eventsCheckedTotal,
             eventsCheckedSinceStartTotal: this.eventsCheckedSinceStartTotal,
@@ -145,6 +145,8 @@ export class Manager {
             actionsRunSinceStart: this.actionsRunSinceStart,
             actionsRunSinceStartTotal: totalFromMapStats(this.actionsRunSinceStart),
             cache: {
+                currentKeyCount: 0,
+                isShared: false,
                 totalRequests: 0,
                 types: cacheStats()
             },
@@ -153,6 +155,8 @@ export class Manager {
         if (this.resources !== undefined) {
             const resStats = this.resources.getStats();
             data.cache = resStats.cache;
+            data.cache.currentKeyCount = await this.resources.getCacheKeyCount();
+            data.cache.isShared = this.resources.cacheSettingsHash === 'default';
         }
         return data;
     }

@@ -23,7 +23,7 @@ import {
     isLogLineMinLevel,
     LogEntry,
     parseLinkIdentifier,
-    parseSubredditLogName,
+    parseSubredditLogName, parseSubredditName,
     pollingInfo, SUBMISSION_URL_ID
 } from "../util";
 import {Manager} from "../Subreddit/Manager";
@@ -294,6 +294,7 @@ const rcbServer = async function (options: OperatorConfig) {
             const m = bot.subManagers.find(x => x.displayLabel === s) as Manager;
             const sd = {
                 name: s,
+                //linkName: s.replace(/\W/g, ''),
                 logs: logs.get(s) || [], // provide a default empty value in case we truly have not logged anything for this subreddit yet
                 botState: m.botState,
                 eventsState: m.eventsState,
@@ -315,7 +316,7 @@ const rcbServer = async function (options: OperatorConfig) {
                 wikiRevision: m.lastWikiRevision === undefined ? 'N/A' : m.lastWikiRevision.local().format('MMMM D, YYYY h:mm A Z'),
                 wikiLastCheckHuman: `${dayjs.duration(dayjs().diff(m.lastWikiCheck)).humanize()} ago`,
                 wikiLastCheck: m.lastWikiCheck.local().format('MMMM D, YYYY h:mm A Z'),
-                stats: m.getStats(),
+                stats: await m.getStats(),
                 startedAt: 'Not Started',
                 startedAtHuman: 'Not Started',
                 delayBy: m.delayBy === undefined ? 'No' : `Delayed by ${m.delayBy} sec`,
@@ -380,6 +381,8 @@ const rcbServer = async function (options: OperatorConfig) {
         }, cumRaw);
         let allManagerData: any = {
             name: 'All',
+            linkName: 'All',
+            indicator: 'green',
             botState: {
                 state: RUNNING,
                 causedBy: SYSTEM
@@ -393,6 +396,7 @@ const rcbServer = async function (options: OperatorConfig) {
                 ...rest,
                 cache: {
                     currentKeyCount: await bot.subManagers[0].resources.getCacheKeyCount(),
+                    isShared: false,
                     totalRequests: subManagerData.reduce((acc, curr) => acc + curr.stats.cache.totalRequests, 0),
                     types: {
                         ...cumRaw,
@@ -418,6 +422,7 @@ const rcbServer = async function (options: OperatorConfig) {
                 ...opStats(bot),
             },
             subreddits: [allManagerData, ...subManagerData],
+            show: 'All',
             botName: bot.botName,
             operatorDisplay: display,
             isOperator,
@@ -430,6 +435,13 @@ const rcbServer = async function (options: OperatorConfig) {
                 levelSelect: availableLevels.map(x => `<option ${level === x ? 'selected' : ''} class="capitalize log-${x} ${level === x ? `font-bold` : ''}" data-value="${x}">${x}</option>`).join(' '),
             },
         };
+        if(req.query.sub !== undefined) {
+            const encoded = encodeURI(req.query.sub as string).toLowerCase();
+            const shouldShow = data.subreddits.find(x => x.name.toLowerCase() === encoded);
+            if(shouldShow !== undefined) {
+                data.show = shouldShow.name;
+            }
+        }
 
         res.render('status', data);
     });
