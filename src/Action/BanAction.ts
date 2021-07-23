@@ -49,9 +49,9 @@ export class BanAction extends Action {
         if (!dryRun) {
             // @ts-ignore
             const fetchedSub = await item.subreddit.fetch();
-            const fetchedId = await item.author.id;
+            const fetchedName = await item.author.name;
             await fetchedSub.banUser({
-                name: fetchedId,
+                name: fetchedName,
                 banMessage: renderedContent === undefined ? undefined : renderedContent,
                 banReason: this.reason,
                 banNote: this.note,
