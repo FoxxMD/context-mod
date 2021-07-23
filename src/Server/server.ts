@@ -14,7 +14,7 @@ import sharedSession from 'express-socket.io-session';
 import Submission from "snoowrap/dist/objects/Submission";
 import EventEmitter from "events";
 import {
-    boolToString,
+    boolToString, cacheStats,
     COMMENT_URL_ID,
     filterLogBySubreddit,
     formatLogLineToHtml, formatNumber,
@@ -285,25 +285,10 @@ const rcbServer = async function (options: OperatorConfig) {
             sort,
             limit
         });
-        const resCum: ResourceStats = {
-            author: {requests: 0, miss: 0},
-            authorCrit: {requests: 0, miss: 0},
-            content: {requests: 0, miss: 0}
-        };
 
         const subManagerData = [];
         for (const s of subreddits) {
             const m = bot.subManagers.find(x => x.displayLabel === s) as Manager;
-            let cacheTypes = resCum;
-            if(m.resources !== undefined) {
-                cacheTypes = Object.keys(m.resources.stats.cache).reduce((acc, curr) => {
-                    const per = acc[curr].miss === 0 ? 0 : formatNumber(acc[curr].miss / acc[curr].requests) * 100;
-                    // @ts-ignore
-                    acc[curr].missPercent = `${per}%`;
-                    return acc;
-                }, m.resources.stats.cache)
-            }
-
             const sd = {
                 name: s,
                 logs: logs.get(s) || [], // provide a default empty value in case we truly have not logged anything for this subreddit yet
@@ -331,11 +316,6 @@ const rcbServer = async function (options: OperatorConfig) {
                 startedAt: 'Not Started',
                 startedAtHuman: 'Not Started',
                 delayBy: m.delayBy === undefined ? 'No' : `Delayed by ${m.delayBy} sec`,
-                cache: {
-                    //currentKeyCount: await m.resources.getCacheKeyCount(),
-                    totalRequests: m.resources !== undefined ? Object.values(m.resources.stats.cache).reduce((acc, curr) => acc + curr.requests, 0) : 0,
-                    types: cacheTypes,
-                }
             };
             // TODO replace indicator data with js on client page
             let indicator;
@@ -383,12 +363,12 @@ const rcbServer = async function (options: OperatorConfig) {
         const {checks, ...rest} = totalStats;
 
         let cumRaw = subManagerData.reduce((acc, curr) => {
-            Object.keys(curr.cache.types as ResourceStats).forEach((k) => {
-                acc[k].requests += curr.cache.types[k].requests;
-                acc[k].miss += curr.cache.types[k].miss;
+            Object.keys(curr.stats.cache.types as ResourceStats).forEach((k) => {
+                acc[k].requests += curr.stats.cache.types[k].requests;
+                acc[k].miss += curr.stats.cache.types[k].miss;
             });
             return acc;
-        }, resCum);
+        }, cacheStats());
         cumRaw = Object.keys(cumRaw).reduce((acc, curr) => {
             const per = acc[curr].miss === 0 ? 0 : formatNumber(acc[curr].miss / acc[curr].requests) * 100;
             // @ts-ignore
@@ -406,15 +386,16 @@ const rcbServer = async function (options: OperatorConfig) {
             checks: checks,
             softLimit: bot.softLimit,
             hardLimit: bot.hardLimit,
-            stats: rest,
-            cache: {
-                // naive
-                currentKeyCount: await bot.subManagers[0].resources.getCacheKeyCount(),
-                totalRequests: subManagerData.reduce((acc, curr) => acc + curr.cache.totalRequests, 0),
-                types: {
-                    ...cumRaw
+            stats: {
+                ...rest,
+                cache: {
+                    currentKeyCount: await bot.subManagers[0].resources.getCacheKeyCount(),
+                    totalRequests: subManagerData.reduce((acc, curr) => acc + curr.stats.cache.totalRequests, 0),
+                    types: {
+                        ...cumRaw,
+                    }
                 }
-            }
+            },
         };
         if (allManagerData.logs === undefined) {
             // this should happen but saw an edge case where potentially did

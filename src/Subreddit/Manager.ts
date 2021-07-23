@@ -3,6 +3,7 @@ import {Logger} from "winston";
 import {SubmissionCheck} from "../Check/SubmissionCheck";
 import {CommentCheck} from "../Check/CommentCheck";
 import {
+    cacheStats,
     createRetryHandler,
     determineNewResults, formatNumber,
     mergeArr, parseFromJsonOrYamlToObject, pollingInfo, sleep, totalFromMapStats,
@@ -122,7 +123,7 @@ export class Manager {
     actionsRunSinceStart: Map<string, number> = new Map();
 
     getStats = () => {
-        return {
+        const data: any = {
             eventsCheckedTotal: this.eventsCheckedTotal,
             eventsCheckedSinceStartTotal: this.eventsCheckedSinceStartTotal,
             eventsAvg: formatNumber(this.eventsRollingAvg),
@@ -142,8 +143,18 @@ export class Manager {
             actionsRun: this.actionsRun,
             actionsRunTotal: totalFromMapStats(this.actionsRun),
             actionsRunSinceStart: this.actionsRunSinceStart,
-            actionsRunSinceStartTotal: totalFromMapStats(this.actionsRunSinceStart)
+            actionsRunSinceStartTotal: totalFromMapStats(this.actionsRunSinceStart),
+            cache: {
+                totalRequests: 0,
+                types: cacheStats()
+            },
+        };
+
+        if (this.resources !== undefined) {
+            const resStats = this.resources.getStats();
+            data.cache = resStats.cache;
         }
+        return data;
     }
 
     getCurrentLabels = () => {

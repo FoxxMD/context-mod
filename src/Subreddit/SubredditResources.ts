@@ -10,7 +10,7 @@ import {
 import Subreddit from 'snoowrap/dist/objects/Subreddit';
 import winston, {Logger} from "winston";
 import fetch from 'node-fetch';
-import {mergeArr, parseExternalUrl, parseWikiContext} from "../util";
+import {formatNumber, mergeArr, parseExternalUrl, parseWikiContext} from "../util";
 import LoggedError from "../Utils/LoggedError";
 import {
     CacheOptions, CacheProvider,
@@ -145,6 +145,21 @@ export class SubredditResources {
             return (await this.cache.store.keys()).length;
         }
         return 0;
+    }
+
+    getStats() {
+        return {
+            cache: {
+                // TODO could probably combine these two
+                totalRequests: Object.values(this.stats.cache).reduce((acc, curr) => acc + curr.requests, 0),
+                types: Object.keys(this.stats.cache).reduce((acc, curr) => {
+                    const per = acc[curr].miss === 0 ? 0 : formatNumber(acc[curr].miss / acc[curr].requests) * 100;
+                    // @ts-ignore
+                    acc[curr].missPercent = `${per}%`;
+                    return acc;
+                }, this.stats.cache)
+            }
+        }
     }
 
     async getAuthorActivities(user: RedditUser, options: AuthorTypedActivitiesOptions): Promise<Array<Submission | Comment>> {

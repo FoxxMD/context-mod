@@ -13,7 +13,7 @@ import {
     ActivityWindowCriteria,
     DurationComparison,
     GenericComparison, NamedGroup,
-    PollingOptionsStrong, RegExResult,
+    PollingOptionsStrong, RegExResult, ResourceStats,
     StringOperator
 } from "./Common/interfaces";
 import JSON5 from "json5";
@@ -865,4 +865,12 @@ export const removeUndefinedKeys = (obj: any) => {
     });
     //Object.keys(newObj).forEach(key => newObj[key] === undefined || newObj[key] && delete newObj[key])
     return newObj;
+}
+
+export const cacheStats = (): ResourceStats => {
+    return {
+        author: {requests: 0, miss: 0},
+        authorCrit: {requests: 0, miss: 0},
+        content: {requests: 0, miss: 0}
+    };
 }
