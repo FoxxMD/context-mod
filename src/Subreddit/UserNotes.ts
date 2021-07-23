@@ -138,7 +138,7 @@ export class UserNotes {
 
     async retrieveData(): Promise<RawUserNotesPayload> {
         if (this.notesTTL > 0 && this.cache !== undefined) {
-            const cachedPayload = this.cache.get(this.identifier);
+            const cachedPayload = await this.cache.get(this.identifier);
             if (cachedPayload !== undefined) {
                 this.cacheCB(false);
                 return cachedPayload as unknown as RawUserNotesPayload;
