@@ -203,7 +203,7 @@ export class SubredditResources {
         let hash = `${subreddit.display_name}-${cacheKey}`;
         if (this.cache !== undefined && this.wikiTTL > 0) {
             const cachedContent = await this.cache.get(hash);
-            if (cachedContent !== null) {
+            if (cachedContent !== undefined) {
                 this.logger.debug(`Cache Hit: ${cacheKey}`);
                 return cachedContent as string;
             }
