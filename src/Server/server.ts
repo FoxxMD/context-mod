@@ -567,7 +567,7 @@ const rcbServer = async function (options: OperatorConfig) {
         res.send('OK');
     });
 
-    app.use('/action', booleanMiddle(['dryRun']));
+    app.use('/check', booleanMiddle(['dryRun']));
     app.getAsync('/check', async (req, res) => {
         const {url, dryRun, subreddit} = req.query as any;
 
