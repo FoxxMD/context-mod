@@ -377,7 +377,7 @@ export interface PollingOptions extends PollingDefaults {
     pollOn: 'unmoderated' | 'modqueue' | 'newSub' | 'newComm'
 }
 
-export interface SubredditCacheConfig {
+export interface TTLConfig {
     /**
      * Amount of time, in seconds, author activities (Comments/Submission) should be cached
      * @examples [60]
@@ -399,7 +399,9 @@ export interface SubredditCacheConfig {
     userNotesTTL?: number;
 }
 
-export type StrongSubredditCacheConfig = Required<SubredditCacheConfig>;
+export interface SubredditCacheConfig extends TTLConfig {
+    provider?: CacheProvider | CacheOptions
+}
 
 export interface Footer {
     /**
@@ -683,7 +685,10 @@ export interface OperatorJsonConfig {
     },
     web?: {
         port?: number,
-        sessionSecret?: string,
+        session?: {
+            provider?: 'memory' | 'redis' | CacheOptions,
+            secret?: string,
+        }
         logLevel?: LogLevel,
         maxLogs?: number,
     }
@@ -751,7 +756,10 @@ export interface OperatorConfig extends OperatorJsonConfig {
     },
     web: {
         port: number,
-        sessionSecret?: string,
+        session: {
+            provider: CacheOptions,
+            secret: string,
+        }
         logLevel?: LogLevel,
         maxLogs: number,
     }

@@ -2,9 +2,10 @@ import {addAsync, Router} from '@awaitjs/express';
 import express from 'express';
 import bodyParser from 'body-parser';
 import session from 'express-session';
-import createMemoryStore from 'memorystore';
+import {Cache} from 'cache-manager';
+// @ts-ignore
+import CacheManagerStore from 'express-session-cache-manager'
 import Snoowrap from "snoowrap";
-import crypto from 'crypto';
 import {App} from "../App";
 import dayjs from 'dayjs';
 import {Writable} from "stream";
@@ -13,9 +14,10 @@ import {Server as SocketServer} from 'socket.io';
 import sharedSession from 'express-socket.io-session';
 import Submission from "snoowrap/dist/objects/Submission";
 import EventEmitter from "events";
+
 import {
     boolToString, cacheStats,
-    COMMENT_URL_ID,
+    COMMENT_URL_ID, createCacheManager,
     filterLogBySubreddit,
     formatLogLineToHtml, formatNumber,
     isLogLineMinLevel,
@@ -29,7 +31,6 @@ import {getLogger} from "../Utils/loggerFactory";
 import LoggedError from "../Utils/LoggedError";
 import {OperatorConfig, ResourceStats, RUNNING, STOPPED, SYSTEM, USER} from "../Common/interfaces";
 
-const MemoryStore = createMemoryStore(session);
 const app = addAsync(express());
 const router = Router();
 
@@ -51,9 +52,7 @@ const connectedUsers: Map<string, ConnectedUserInfo> = new Map();
 
 const availableLevels = ['error', 'warn', 'info', 'verbose', 'debug'];
 
-const randomId = () => crypto.randomBytes(20).toString('hex');
 let operatorSessionId: (string | undefined);
-const defaultSessionSecret = randomId();
 
 declare module 'express-session' {
     interface SessionData {
@@ -85,7 +84,10 @@ const rcbServer = async function (options: OperatorConfig) {
         },
         web: {
             port,
-            sessionSecret = defaultSessionSecret,
+            session: {
+                provider,
+                secret,
+            },
             maxLogs,
         },
     } = options;
@@ -131,17 +133,18 @@ const rcbServer = async function (options: OperatorConfig) {
     botSubreddits = bot.subManagers.map(x => x.displayLabel);
     // TODO potentially prune subLogMap of user keys? shouldn't have happened this early though
 
+    if(provider.store === 'none') {
+        logger.warn(`Cannot use 'none' for session store or else no one can use the interface...falling back to 'memory'`);
+        provider.store = 'memory';
+    }
     const sessionObj = session({
         cookie: {
-            maxAge: 86400000,
+            maxAge: provider.ttl,
         },
-        store: new MemoryStore({
-            checkPeriod: 86400000, // prune expired entries every 24h
-            ttl: 86400000
-        }),
+        store: new CacheManagerStore(createCacheManager(provider) as Cache),
         resave: false,
         saveUninitialized: false,
-        secret: sessionSecret
+        secret,
     });
 
     app.use(sessionObj);

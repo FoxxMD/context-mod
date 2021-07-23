@@ -1,12 +1,12 @@
 import dayjs, {Dayjs} from "dayjs";
 import {Comment, RedditUser, WikiPage} from "snoowrap";
-import cache from 'memory-cache';
 import {COMMENT_URL_ID, deflateUserNotes, inflateUserNotes, parseLinkIdentifier, SUBMISSION_URL_ID} from "../util";
 import Subreddit from "snoowrap/dist/objects/Subreddit";
 import {Logger} from "winston";
 import LoggedError from "../Utils/LoggedError";
 import Submission from "snoowrap/dist/objects/Submission";
 import {RichContent} from "../Common/interfaces";
+import {Cache} from 'cache-manager';
 
 interface RawUserNotesPayload {
     ver: number,
@@ -54,15 +54,19 @@ export class UserNotes {
     moderators?: RedditUser[];
     logger: Logger;
     identifier: string;
+    cache?: Cache
+    cacheCB: Function;
 
     users: Map<string, UserNote[]> = new Map();
 
-    constructor(ttl: number, subreddit: Subreddit, logger: Logger) {
+    constructor(ttl: number, subreddit: Subreddit, logger: Logger, cache: Cache | undefined, cacheCB: Function) {
         this.notesTTL = ttl;
         this.subreddit = subreddit;
         this.logger = logger;
         this.wiki = subreddit.getWikiPage('usernotes');
         this.identifier = `${this.subreddit.display_name}-usernotes`;
+        this.cache = cache;
+        this.cacheCB = cacheCB;
     }
 
     async getUserNotes(user: RedditUser): Promise<UserNote[]> {
@@ -85,7 +89,7 @@ export class UserNotes {
             const notes = rawNotes.ns.map(x => UserNote.fromRaw(x, payload.constants, this.moderators as RedditUser[]));
             // sort in ascending order by time
             notes.sort((a, b) => a.time.isBefore(b.time) ? -1 : 1);
-            if (this.notesTTL > 0) {
+            if (this.notesTTL > 0 && this.cache !== undefined) {
                 this.users.set(user.name, notes);
             }
             return notes;
@@ -118,7 +122,7 @@ export class UserNotes {
         payload.blob[item.author.name].ns.push(newNote.toRaw(payload.constants));
 
         await this.saveData(payload);
-        if(this.notesTTL > 0) {
+        if(this.notesTTL > 0 && this.cache !== undefined) {
             const currNotes = this.users.get(item.author.name) || [];
             currNotes.push(newNote);
             this.users.set(item.author.name, currNotes);
@@ -133,11 +137,13 @@ export class UserNotes {
     }
 
     async retrieveData(): Promise<RawUserNotesPayload> {
-        if (this.notesTTL > 0) {
-            const cachedPayload = cache.get(this.identifier);
-            if (cachedPayload !== null) {
-                return cachedPayload as RawUserNotesPayload;
+        if (this.notesTTL > 0 && this.cache !== undefined) {
+            const cachedPayload = this.cache.get(this.identifier);
+            if (cachedPayload !== undefined) {
+                this.cacheCB(false);
+                return cachedPayload as unknown as RawUserNotesPayload;
             }
+            this.cacheCB(true);
         }
 
         try {
@@ -149,10 +155,9 @@ export class UserNotes {
 
             userNotes.blob = inflateUserNotes(userNotes.blob);
 
-            if (this.notesTTL > 0) {
-                cache.put(`${this.subreddit.display_name}-usernotes`, userNotes, this.notesTTL, () => {
-                    this.users = new Map();
-                });
+            if (this.notesTTL > 0 && this.cache !== undefined) {
+                await this.cache.set(`${this.subreddit.display_name}-usernotes`, userNotes, this.notesTTL);
+                this.users = new Map();
             }
 
             return userNotes as RawUserNotesPayload;
@@ -173,10 +178,9 @@ export class UserNotes {
             //this.wiki = await this.wiki.refresh();
             // @ts-ignore
             this.wiki = await this.subreddit.getWikiPage('usernotes').edit({text: JSON.stringify(wikiPayload), reason: 'ContextBot edited usernotes'});
-            if (this.notesTTL > 0) {
-                cache.put(this.identifier, payload, this.notesTTL, () => {
-                    this.users = new Map();
-                });
+            if (this.notesTTL > 0 && this.cache !== undefined) {
+                await this.cache.set(this.identifier, payload, this.notesTTL);
+                this.users = new Map();
             }
 
             return payload as RawUserNotesPayload;

@@ -1,10 +1,11 @@
 import {Logger} from "winston";
 import {
+    buildCacheOptionsFromProvider,
     createAjvFactory,
     mergeArr,
     normalizeName,
     overwriteMerge,
-    parseBool,
+    parseBool, randomId,
     readJson,
     removeUndefinedKeys
 } from "./util";
@@ -35,6 +36,7 @@ import {GetEnvVars} from 'env-cmd';
 import {operatorConfig} from "./Utils/CommandConfig";
 import merge from 'deepmerge';
 import * as process from "process";
+import {cacheOptDefaults, cacheTTLDefaults} from "./Common/defaults";
 
 export interface ConfigBuilderOptions {
     logger: Logger,
@@ -298,7 +300,9 @@ export const parseOpConfigFromArgs = (args: any): OperatorJsonConfig => {
         },
         web: {
             port,
-            sessionSecret,
+            session: {
+                secret: sessionSecret
+            }
         },
         polling: {
             sharedMod,
@@ -363,7 +367,10 @@ export const parseOpConfigFromEnv = (): OperatorJsonConfig => {
         },
         web: {
             port: process.env.PORT !== undefined ? parseInt(process.env.PORT) : undefined,
-            sessionSecret: process.env.SESSION_SECRET,
+            session: {
+                provider: process.env.SESSION_PROVIDER,
+                secret: process.env.SESSION_SECRET
+            }
         },
         polling: {
             sharedMod: parseBool(process.env.SHARE_MOD),
@@ -473,8 +480,11 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
         snoowrap = {},
         web: {
             port = 8085,
-            sessionSecret,
             maxLogs = 200,
+            session: {
+                secret = randomId(),
+                provider: sessionProvider = { store: 'memory' },
+            } = {}
         } = {},
         polling: {
             sharedMod = false,
@@ -488,11 +498,8 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
         } = {},
     } = data;
 
-    const cacheOptDefaults = {ttl: 60, max: 500};
-    const cacheDefaults = {authorTTL: 60, userNotesTTL: 300, wikiTTL: 300};
-
     let cache = {
-        ...cacheDefaults,
+        ...cacheTTLDefaults,
         provider: {
             store: 'memory',
             ...cacheOptDefaults
@@ -505,13 +512,13 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
                 store: caching as CacheProvider,
                 ...cacheOptDefaults
             },
-            ...cacheDefaults
+            ...cacheTTLDefaults
         };
     } else if (typeof caching === 'object') {
         const {provider, ...restConfig} = caching;
         if (typeof provider === 'string') {
             cache = {
-                ...cacheDefaults,
+                ...cacheTTLDefaults,
                 ...restConfig,
                 provider: {
                     store: provider as CacheProvider,
@@ -521,12 +528,11 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
         } else {
             const {ttl = 60, max = 500, store = 'memory', ...rest} = provider || {};
             cache = {
-                ...cacheDefaults,
+                ...cacheTTLDefaults,
                 ...restConfig,
                 provider: {
                     store,
-                    ttl,
-                    max,
+                    ...cacheOptDefaults,
                     ...rest,
                 },
             }
@@ -556,7 +562,18 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
         },
         web: {
             port,
-            sessionSecret,
+            session: {
+                secret,
+                provider: typeof sessionProvider === 'string' ? {
+                    ...buildCacheOptionsFromProvider({
+                        ttl: 86400000,
+                        store: sessionProvider,
+                    })
+                } : {
+                    ...buildCacheOptionsFromProvider(sessionProvider),
+                    ttl: 86400000,
+                },
+            },
             maxLogs,
         },
         // @ts-ignore

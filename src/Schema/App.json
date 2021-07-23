@@ -670,6 +670,46 @@
             ],
             "type": "object"
         },
+        "CacheOptions": {
+            "properties": {
+                "auth_pass": {
+                    "type": "string"
+                },
+                "checkPeriod": {
+                    "type": "number"
+                },
+                "db": {
+                    "type": "number"
+                },
+                "host": {
+                    "type": "string"
+                },
+                "max": {
+                    "type": "number"
+                },
+                "port": {
+                    "type": "number"
+                },
+                "store": {
+                    "$ref": "#/definitions/CacheProvider"
+                },
+                "ttl": {
+                    "type": "number"
+                }
+            },
+            "required": [
+                "store"
+            ],
+            "type": "object"
+        },
+        "CacheProvider": {
+            "enum": [
+                "memory",
+                "none",
+                "redis"
+            ],
+            "type": "string"
+        },
         "CommentActionJson": {
             "description": "Reply to the Activity. For a submission the reply will be a top-level comment.",
             "properties": {
@@ -2235,26 +2275,41 @@
         "SubredditCacheConfig": {
             "properties": {
                 "authorTTL": {
-                    "default": 10000,
-                    "description": "Amount of time, in milliseconds, author activities (Comments/Submission) should be cached",
+                    "default": 60,
+                    "description": "Amount of time, in seconds, author activities (Comments/Submission) should be cached",
                     "examples": [
-                        10000
+                        60
                     ],
                     "type": "number"
                 },
+                "provider": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/definitions/CacheOptions"
+                        },
+                        {
+                            "enum": [
+                                "memory",
+                                "none",
+                                "redis"
+                            ],
+                            "type": "string"
+                        }
+                    ]
+                },
                 "userNotesTTL": {
-                    "default": 60000,
+                    "default": 300,
                     "description": "Amount of time, in milliseconds, [Toolbox User Notes](https://www.reddit.com/r/toolbox/wiki/docs/usernotes) should be cached",
                     "examples": [
-                        60000
+                        300
                     ],
                     "type": "number"
                 },
                 "wikiTTL": {
-                    "default": 300000,
-                    "description": "Amount of time, in milliseconds, wiki content pages should be cached",
+                    "default": 300,
+                    "description": "Amount of time, in seconds, wiki content pages should be cached",
                     "examples": [
-                        300000
+                        300
                     ],
                     "type": "number"
                 }
@@ -2395,17 +2450,7 @@
     },
     "properties": {
         "caching": {
-            "anyOf": [
-                {
-                    "$ref": "#/definitions/SubredditCacheConfig"
-                },
-                {
-                    "enum": [
-                        false
-                    ],
-                    "type": "boolean"
-                }
-            ],
+            "$ref": "#/definitions/SubredditCacheConfig",
             "description": "Per-subreddit config for caching TTL values. If set to `false` caching is disabled."
         },
         "checks": {

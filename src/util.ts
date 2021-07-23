@@ -10,7 +10,7 @@ import Submission from "snoowrap/dist/objects/Submission";
 import {Comment} from "snoowrap";
 import {inflateSync, deflateSync} from "zlib";
 import {
-    ActivityWindowCriteria,
+    ActivityWindowCriteria, CacheOptions, CacheProvider,
     DurationComparison,
     GenericComparison, NamedGroup,
     PollingOptionsStrong, RegExResult, ResourceStats,
@@ -21,6 +21,10 @@ import yaml, {JSON_SCHEMA} from "js-yaml";
 import SimpleError from "./Utils/SimpleError";
 import InvalidRegexError from "./Utils/InvalidRegexError";
 import {constants, promises} from "fs";
+import {cacheOptDefaults} from "./Common/defaults";
+import cacheManager from "cache-manager";
+import redisStore from "cache-manager-redis-store";
+import crypto from "crypto";
 
 const {format} = winston;
 const {combine, printf, timestamp, label, splat, errors} = format;
@@ -374,8 +378,6 @@ export function normalizeName(val: string) {
 
 // https://github.com/toolbox-team/reddit-moderator-toolbox/wiki/Subreddit-Wikis%3A-usernotes#working-with-the-blob
 export const inflateUserNotes = (blob: string) => {
-    //const binaryData = Buffer.from(blob, 'base64').toString('binary');
-    //const str = pako.inflate(binaryData, {to: 'string'});
 
     const buffer = Buffer.from(blob, 'base64');
     const str = inflateSync(buffer).toString('utf-8');
@@ -388,7 +390,6 @@ export const deflateUserNotes = (usersObject: object) => {
     const jsonString = JSON.stringify(usersObject);
 
     // Deflate/compress the string
-    //const binaryData = pako.deflate(jsonString);
     const binaryData = deflateSync(jsonString);
 
     // Convert binary data to a base64 string with a Buffer
@@ -871,6 +872,43 @@ export const cacheStats = (): ResourceStats => {
     return {
         author: {requests: 0, miss: 0},
         authorCrit: {requests: 0, miss: 0},
-        content: {requests: 0, miss: 0}
+        content: {requests: 0, miss: 0},
+        userNotes: {requests: 0, miss: 0},
     };
 }
+
+export const buildCacheOptionsFromProvider = (provider: CacheProvider | any): CacheOptions => {
+    if(typeof provider === 'string') {
+        return {
+            store: provider as CacheProvider,
+            ...cacheOptDefaults
+        }
+    }
+    return {
+        store: 'memory',
+        ...cacheOptDefaults,
+        ...provider,
+    }
+}
+
+export const createCacheManager = (options: CacheOptions) => {
+    const {store, max, ttl = 60, host = 'localhost', port, auth_pass, db} = options;
+    switch (store) {
+        case 'none':
+            return undefined;
+        case 'redis':
+            return cacheManager.caching({
+                store: redisStore,
+                host,
+                port,
+                auth_pass,
+                db,
+                ttl
+            });
+        case 'memory':
+        default:
+            return cacheManager.caching({store: 'memory', max, ttl});
+    }
+}
+
+export const randomId = () => crypto.randomBytes(20).toString('hex');

@@ -1,5 +1,4 @@
 import Snoowrap, {RedditUser, Comment, Submission} from "snoowrap";
-import cache from 'memory-cache';
 import objectHash from 'object-hash';
 import {
     AuthorActivitiesOptions,
@@ -10,61 +9,45 @@ import {
 import Subreddit from 'snoowrap/dist/objects/Subreddit';
 import winston, {Logger} from "winston";
 import fetch from 'node-fetch';
-import {formatNumber, mergeArr, parseExternalUrl, parseWikiContext} from "../util";
+import {
+    buildCacheOptionsFromProvider,
+    cacheStats, createCacheManager,
+    formatNumber,
+    mergeArr,
+    parseExternalUrl,
+    parseWikiContext
+} from "../util";
 import LoggedError from "../Utils/LoggedError";
 import {
-    CacheOptions, CacheProvider,
+    CacheOptions,
     Footer, OperatorConfig, ResourceStats,
-    StrongCache,
-    StrongSubredditCacheConfig,
-    SubredditCacheConfig
+    SubredditCacheConfig, TTLConfig
 } from "../Common/interfaces";
 import UserNotes from "./UserNotes";
 import Mustache from "mustache";
 import he from "he";
 import {AuthorCriteria} from "../Author/Author";
-import Poll from "snoostorm/out/util/Poll";
 import {SPoll} from "./Streams";
-import cacheManager, {Cache} from 'cache-manager';
-import redisStore from 'cache-manager-redis-store';
+import {Cache} from 'cache-manager';
 
 export const DEFAULT_FOOTER = '\r\n*****\r\nThis action was performed by [a bot.]({{botLink}}) Mention a moderator or [send a modmail]({{modmailLink}}) if you any ideas, questions, or concerns about this action.';
 
-export interface SubredditResourceOptions extends SubredditCacheConfig, Footer {
-    enabled: boolean;
+export interface SubredditResourceConfig extends Footer {
+    caching?: SubredditCacheConfig,
     subreddit: Subreddit,
     logger: Logger;
 }
 
-interface StrongSubredditResourceOptions extends SubredditResourceOptions {
+interface SubredditResourceOptions extends Footer {
+    ttl: Required<TTLConfig>
     cache?: Cache
+    cacheSettingsHash: string
+    subreddit: Subreddit,
+    logger: Logger;
 }
 
 export interface SubredditResourceSetOptions extends SubredditCacheConfig, Footer {
-    enabled: boolean,
 }
-
-
-//
-// interface ResourceStats {
-//     cache: {
-//         //keys: number,
-//         author: {
-//             requests: number,
-//             miss: number,
-//         },
-//         authorCrit: {
-//             requests: number,
-//             miss: number,
-//         }
-//         content: {
-//             requests: number,
-//             miss: number,
-//         }
-//     }
-// }
-
-
 
 export class SubredditResources {
     //enabled!: boolean;
@@ -74,22 +57,30 @@ export class SubredditResources {
     name: string;
     protected logger: Logger;
     userNotes: UserNotes;
-    footer!: false | string;
+    footer: false | string = DEFAULT_FOOTER;
     subreddit: Subreddit
     cache?: Cache
+    cacheSettingsHash?: string;
 
     stats: { cache: ResourceStats };
 
-    constructor(name: string, options: StrongSubredditResourceOptions) {
+    constructor(name: string, options: SubredditResourceOptions) {
         const {
             subreddit,
             logger,
-            enabled = true,
-            userNotesTTL = 60000,
+            ttl: {
+                userNotesTTL,
+                authorTTL,
+                wikiTTL,
+            },
             cache,
+            cacheSettingsHash,
         } = options || {};
 
+        this.cacheSettingsHash = cacheSettingsHash;
         this.cache = cache;
+        this.authorTTL = authorTTL;
+        this.wikiTTL = wikiTTL;
         this.subreddit = subreddit;
         this.name = name;
         if (logger === undefined) {
@@ -100,44 +91,14 @@ export class SubredditResources {
         }
 
         this.stats = {
-            cache: {
-                author: {
-                    requests: 0,
-                    miss: 0,
-                },
-                authorCrit: {
-                    requests: 0,
-                    miss: 0,
-                },
-                content: {
-                    requests: 0,
-                    miss: 0
-                }
-            }
+            cache: cacheStats()
         };
 
-        this.userNotes = new UserNotes(enabled ? userNotesTTL : 0, this.subreddit, this.logger)
-        this.setOptions(options);
-    }
-
-    setOptions(options: SubredditResourceSetOptions) {
-        const {
-            authorTTL,
-            userNotesTTL,
-            wikiTTL,
-            footer = DEFAULT_FOOTER
-        } = options || {};
-
-        this.footer = footer;
-        if (authorTTL === undefined) {
-            this.useSubredditAuthorCache = false;
-            this.authorTTL = manager.authorTTL;
-        } else {
-            this.useSubredditAuthorCache = true;
-            this.authorTTL = authorTTL;
+        const cacheUseCB = (miss: boolean) => {
+            this.stats.cache.userNotes.requests++;
+            this.stats.cache.userNotes.miss += miss ? 1 : 0;
         }
-        this.wikiTTL = wikiTTL || this.wikiTTL;
-        this.userNotes.notesTTL = userNotesTTL || this.userNotes.notesTTL;
+        this.userNotes = new UserNotes(userNotesTTL, this.subreddit, this.logger, this.cache, cacheUseCB)
     }
 
     async getCacheKeyCount() {
@@ -294,33 +255,13 @@ export class SubredditResources {
     }
 }
 
-export const createCacheManager = (options: CacheOptions) => {
-    const {store, max, ttl = 60, host = 'localhost', port, auth_pass, db} = options;
-    switch (store) {
-        case 'none':
-            return undefined;
-        case 'redis':
-            return cacheManager.caching({
-                store: redisStore,
-                host,
-                port,
-                auth_pass,
-                db,
-                ttl
-            });
-        case 'memory':
-        default:
-            return cacheManager.caching({store: 'memory', max, ttl});
-    }
-}
-
 class SubredditResourcesManager {
     resources: Map<string, SubredditResources> = new Map();
     authorTTL: number = 10000;
     enabled: boolean = true;
     modStreams: Map<string, SPoll<Snoowrap.Submission | Snoowrap.Comment>> = new Map();
     defaultCache?: Cache;
-    ttlDefaults!: StrongSubredditCacheConfig;
+    ttlDefaults!: Required<TTLConfig>;
 
     setDefaultsFromConfig(config: OperatorConfig) {
         const {
@@ -339,7 +280,7 @@ class SubredditResourcesManager {
         this.defaultCache = createCacheManager(options);
     }
 
-    setTTLDefaults(def: StrongSubredditCacheConfig) {
+    setTTLDefaults(def: Required<TTLConfig>) {
         this.ttlDefaults = def;
     }
 
@@ -350,9 +291,52 @@ class SubredditResourcesManager {
         return undefined;
     }
 
-    set(subName: string, initOptions: SubredditResourceOptions): SubredditResources {
-        const resource = new SubredditResources(subName, {...this.ttlDefaults, ...initOptions, cache: this.defaultCache});
-        this.resources.set(subName, resource);
+    set(subName: string, initOptions: SubredditResourceConfig): SubredditResources {
+        let hash = 'default';
+        const { caching, ...init } = initOptions;
+        let opts: SubredditResourceOptions;
+        if(caching !== undefined) {
+            const {provider = 'memory', ...rest} = caching;
+            let cacheConfig = {
+                provider: buildCacheOptionsFromProvider(provider),
+                ttl: {
+                    ...this.ttlDefaults,
+                    ...rest
+                },
+            }
+            hash = objectHash.sha1(cacheConfig);
+            const {provider: trueProvider, ...trueRest} = cacheConfig;
+            opts = {
+                cache: createCacheManager(trueProvider),
+                cacheSettingsHash: hash,
+                ...init,
+                ...trueRest,
+            };
+        } else {
+            opts = {
+                cache: this.defaultCache,
+                cacheSettingsHash: hash,
+                ttl: this.ttlDefaults,
+                ...init,
+            }
+        }
+
+        let resource: SubredditResources;
+        const res = this.get(subName);
+        if(res === undefined || res.cacheSettingsHash !== hash) {
+            if(res !== undefined && res.cache !== undefined) {
+                res.cache.reset();
+            }
+            resource = new SubredditResources(subName, opts);
+            this.resources.set(subName, resource);
+        } else {
+            // just set non-cache related settings
+            resource = res;
+            if(opts.footer !== resource.footer) {
+                resource.footer = opts.footer || DEFAULT_FOOTER;
+            }
+        }
+
         return resource;
     }
 }

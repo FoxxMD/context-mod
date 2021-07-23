@@ -22,7 +22,7 @@ import Submission from "snoowrap/dist/objects/Submission";
 import {activityIsRemoved, itemContentPeek} from "../Utils/SnoowrapUtils";
 import LoggedError from "../Utils/LoggedError";
 import ResourceManager, {
-    SubredditResourceOptions,
+    SubredditResourceConfig,
     SubredditResources,
     SubredditResourceSetOptions
 } from "./SubredditResources";
@@ -270,23 +270,13 @@ export class Manager {
                 this.logger.info(`Polling Info => ${pollingInfo(p)}`)
             }
 
-            let resourceConfig: SubredditResourceSetOptions = {
+            let resourceConfig: SubredditResourceConfig = {
                 footer,
-                enabled: true
+                logger: this.logger,
+                subreddit: this.subreddit,
+                caching
             };
-            if (caching === false) {
-                resourceConfig.enabled = false;
-            } else {
-                resourceConfig = {...resourceConfig, ...caching};
-            }
-            if (this.resources === undefined) {
-                this.resources = ResourceManager.set(this.subreddit.display_name, {
-                    ...resourceConfig,
-                    logger: this.logger,
-                    subreddit: this.subreddit
-                });
-            }
-            this.resources.setOptions(resourceConfig);
+            this.resources = ResourceManager.set(this.subreddit.display_name, resourceConfig);
 
             this.logger.info('Subreddit-specific options updated');
             this.logger.info('Building Checks...');

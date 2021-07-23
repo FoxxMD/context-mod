@@ -6,6 +6,9 @@
                 "auth_pass": {
                     "type": "string"
                 },
+                "checkPeriod": {
+                    "type": "number"
+                },
                 "db": {
                     "type": "number"
                 },
@@ -251,8 +254,27 @@
                 "port": {
                     "type": "number"
                 },
-                "sessionSecret": {
-                    "type": "string"
+                "session": {
+                    "properties": {
+                        "provider": {
+                            "anyOf": [
+                                {
+                                    "$ref": "#/definitions/CacheOptions"
+                                },
+                                {
+                                    "enum": [
+                                        "memory",
+                                        "redis"
+                                    ],
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "secret": {
+                            "type": "string"
+                        }
+                    },
+                    "type": "object"
                 }
             },
             "type": "object"
