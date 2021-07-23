@@ -39,6 +39,28 @@ const errorAwareFormat = {
     transform: (info: any, opts: any) => {
         // don't need to log stack trace if we know the error is just a simple message (we handled it)
         const stack = !(info instanceof SimpleError) && !(info.message instanceof SimpleError);
+        const {name, response, message, stack: errStack, error, statusCode} = info;
+        if(name === 'StatusCodeError' && response !== undefined && response.headers !== undefined && response.headers['content-type'].includes('html')) {
+            // reddit returns html even when we specify raw_json in the querystring (via snoowrap)
+            // which means the html gets set as the message for the error AND gets added to the stack as the message
+            // and we end up with a h u g e log statement full of noisy html >:(
+
+            const errorSample = error.slice(0, 10);
+            const messageBeforeIndex = message.indexOf(errorSample);
+            let newMessage = `Status Error ${statusCode} from Reddit`;
+            if(messageBeforeIndex > 0) {
+                newMessage = `${message.slice(0, messageBeforeIndex)} - ${newMessage}`;
+            }
+            let cleanStack = errStack;
+
+            // try to get just stacktrace by finding beginning of what we assume is the actual trace
+            if(errStack) {
+                cleanStack = `${newMessage}\n${errStack.slice(errStack.indexOf('at new StatusCodeError'))}`;
+            }
+            // now put it all together so its nice and clean
+            info.message = newMessage;
+            info.stack = cleanStack;
+        }
         return errors().transform(info, { stack });
     }
 }
