@@ -376,7 +376,7 @@ const rcbServer = async function (options: OperatorConfig) {
         cumRaw = Object.keys(cumRaw).reduce((acc, curr) => {
             const per = acc[curr].miss === 0 ? 0 : formatNumber(acc[curr].miss / acc[curr].requests) * 100;
             // @ts-ignore
-            acc[curr].missPercent = `${per}%`;
+            acc[curr].missPercent = `${formatNumber(per)}%`;
             return acc;
         }, cumRaw);
         let allManagerData: any = {

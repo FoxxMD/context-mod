@@ -116,7 +116,7 @@ export class SubredditResources {
                 types: Object.keys(this.stats.cache).reduce((acc, curr) => {
                     const per = acc[curr].miss === 0 ? 0 : formatNumber(acc[curr].miss / acc[curr].requests) * 100;
                     // @ts-ignore
-                    acc[curr].missPercent = `${per}%`;
+                    acc[curr].missPercent = `${formatNumber(per)}%`;
                     return acc;
                 }, this.stats.cache)
             }
