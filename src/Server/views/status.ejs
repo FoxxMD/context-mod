@@ -14,9 +14,9 @@
                            data-subreddit="<%= data.name %>">
                             <%= data.name %>
                         </a>
-                        <% if ((data.name === 'All' && isOperator) || data.name !== 'All') { %>
-                            <span class="inline-block mb-0.5 ml-0.5 w-2 h-2 bg-<%= data.indicator %>-400 rounded-full"></span>
-                        <% } %>
+                            <% if ((data.name === 'All' && isOperator) || data.name !== 'All') { %>
+                                <span class="inline-block mb-0.5 ml-0.5 w-2 h-2 bg-<%= data.indicator %>-400 rounded-full"></span>
+                            <% } %>
                         </span>
                     </li>
                 <% }) %>
@@ -70,7 +70,27 @@
                                     <div class="p-4">
                                         <div class="stats">
                                             <% if (data.name !== 'All') { %>
-                                                <label>Bot</label>
+                                                <label>
+                                                    <span class="has-tooltip">
+                                                                <span class="tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2 space-y-3 p-2 text-left">
+                                                                    <div>The "main" process monitoring Activity for the subreddit.</div>
+                                                                    <div><b>Starting</b> or <b>Stopping</b> this will also Start/Stop <b>Queue/Events.</b></div>
+                                                                    <div>Additionally, the <b>Stopped</b> state will prevent configuration from being checked on heartbeat. This is useful if the subreddit's config is really broken and you want to essentially ignore this subreddit until manually interacted with.</div>
+                                                                </span>
+                                                                <span>
+                                                                    Bot
+                                                                    <svg xmlns="http://www.w3.org/2000/svg"
+                                                                         class="h-4 w-4 inline-block cursor-help"
+                                                                         fill="none"
+                                                                         viewBox="0 0 24 24" stroke="currentColor">
+                                                                        <path stroke-linecap="round"
+                                                                              stroke-linejoin="round"
+                                                                              stroke-width="2"
+                                                                              d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                                                    </svg>
+                                                                </span>
+                                                        </span>
+                                                </label>
                                                 <div class="flex items-center justify-between">
                                                     <span class="font-semibold"><%= `${data.botState.state}${data.botState.causedBy === 'system' ? '' : ' (user)'}` %></span>
                                                     <div class="flex items-center flex-end">
@@ -82,7 +102,30 @@
                                                         </div>
                                                     </div>
                                                 </div>
-                                                <label>Queue</label>
+                                                <label>
+                                                        <span class="has-tooltip">
+                                                                <span class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2 space-y-3 p-2 text-left'>
+                                                                    <div>The <b>Queue</b> controls processing of <b>Activities</b> ingested from <b>Events.</b></div>
+                                                                    <ul class="list-inside list-disc">
+                                                                        <li><b>Starting</b> the Queue will being Processing (running checks on) queued Activities based on the max number of workers available</li>
+                                                                        <li><b>Stopping</b> the Queue will prevent queued Activities from being Processed, after any current Activities are finished Processing.</li>
+                                                                    </ul>
+                                                                    <div>If all available workers are processing Activities then new Activities returned from <b>Events</b> will be put marked as <b>Queued</b></div>
+                                                                </span>
+                                                                <span>
+                                                                    Queue
+                                                                    <svg xmlns="http://www.w3.org/2000/svg"
+                                                                         class="h-4 w-4 inline-block cursor-help"
+                                                                         fill="none"
+                                                                         viewBox="0 0 24 24" stroke="currentColor">
+                                                                        <path stroke-linecap="round"
+                                                                              stroke-linejoin="round"
+                                                                              stroke-width="2"
+                                                                              d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                                                    </svg>
+                                                                </span>
+                                                        </span>
+                                                </label>
                                                 <div class="flex items-center justify-between">
                                                     <span class="font-semibold"><%= `${data.queueState.state}${data.queueState.causedBy === 'system' ? '' : ' (user)'}` %></span>
                                                     <div class="flex items-center flex-end">
@@ -96,7 +139,29 @@
                                                         </div>
                                                     </div>
                                                 </div>
-                                                <label>Events</label>
+                                                <label>
+                                                    <span class="has-tooltip">
+                                                                <span class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2 space-y-3 p-2 text-left'>
+                                                                    <div><b>Events</b> controls polling (monitoring) of <b>Activity Sources</b> (unmoderated, modqueue, comments, etc.)</div>
+                                                                    <ul class="list-inside list-disc">
+                                                                        <li><b>Starting</b> Events will cause polling to begin. Any new Activities discovered after polling begins will be sent to <b>Queue</b></li>
+                                                                        <li><b>Stopping</b> Events will cause polling to stop.</li>
+                                                                    </ul>
+                                                                </span>
+                                                                <span>
+                                                                    Events
+                                                                    <svg xmlns="http://www.w3.org/2000/svg"
+                                                                         class="h-4 w-4 inline-block cursor-help"
+                                                                         fill="none"
+                                                                         viewBox="0 0 24 24" stroke="currentColor">
+                                                                        <path stroke-linecap="round"
+                                                                              stroke-linejoin="round"
+                                                                              stroke-width="2"
+                                                                              d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                                                    </svg>
+                                                                </span>
+                                                        </span>
+                                                </label>
                                                 <div class="flex items-center justify-between">
                                                     <span class="font-semibold"><%= `${data.eventsState.state}${data.eventsState.causedBy === 'system' ? '' : ' (user)'}` %></span>
                                                     <div class="flex items-center flex-end">
@@ -245,10 +310,17 @@
                                     <div class="p-4">
                                         <div class="flex items-top justify-evenly">
                                             <div>
-                                                <h4 class="text-left font-semibold pb-2">Bot</h4>
-                                                <% if (data.name !== 'All') { %><span class="text-center pb-2"><a data-subreddit="<%= data.name %>" data-stattype="reloadStats" class="statsToggle" href="">Last Reload</a> | <a data-subreddit="<%= data.name %>" data-stattype="allStats"  class="statsToggle allStatsToggle" href="">All Time</a> </span><% } %>
+                                                <div class="text-left font-semibold pb-2">Bot</div>
+                                                <% if (data.name !== 'All') { %><span class="text-center pb-2"><a
+                                                            data-subreddit="<%= data.name %>"
+                                                            data-stattype="reloadStats" class="statsToggle" href="">Last Reload</a> | <a
+                                                            data-subreddit="<%= data.name %>" data-stattype="allStats"
+                                                            class="statsToggle allStatsToggle"
+                                                            href="">All Time</a> </span>
+                                                <% } %>
                                                 <% if (data.name !== 'All') { %>
-                                                    <div data-subreddit="<%= data.name %>" class="stats botStats reloadStats">
+                                                    <div data-subreddit="<%= data.name %>"
+                                                         class="stats botStats reloadStats">
                                                         <label>Events</label>
                                                         <span><%= data.stats.eventsCheckedSinceStartTotal === undefined ? '-' : data.stats.eventsCheckedSinceStartTotal %></span>
 
@@ -265,23 +337,24 @@
                                                     <span class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2'>
                                                         <span><%= data.stats.rulesTriggeredSinceStartTotal %></span> Triggered / <span><%= data.stats.rulesCachedSinceStartTotal %></span> Cached / <span><%= data.stats.rulesRunSinceStartTotal %></span> Run
                                                     </span>
-                                                    <span><%= data.stats.rulesTriggeredSinceStartTotal %></span> T / <span><%= data.stats.rulesCachedSinceStartTotal %></span> C / <span><%= data.stats.rulesRunSinceStartTotal %></span> R
+                                                    <span class="cursor-help">
+                                                        <span><%= data.stats.rulesTriggeredSinceStartTotal %></span> T / <span><%= data.stats.rulesCachedSinceStartTotal %></span> C / <span><%= data.stats.rulesRunSinceStartTotal %></span> R</span>
                                                 </span>
 
                                                         <label>Actions</label>
-                                                        <span><%= data.stats.actionsRunSinceStartTotal === undefined ? '-' : data.stats.actionsRunSinceStartTotal %> Run</span>
+                                                        <span class="cursor-help"><%= data.stats.actionsRunSinceStartTotal === undefined ? '-' : data.stats.actionsRunSinceStartTotal %></span>
                                                     </div>
                                                 <% } %>
                                                 <div data-subreddit="<%= data.name %>" class="stats botStats allStats">
                                                     <label>Events</label>
-                                                    <span><%= data.stats.eventsCheckedTotal %> Checked</span>
+                                                    <span><%= data.stats.eventsCheckedTotal %></span>
 
                                                     <label>Checks</label>
                                                     <span class="has-tooltip">
                                                         <span class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2'>
                                                             <span><%= data.stats.checksTriggeredTotal %></span> Triggered / <span><%= data.stats.checksRunTotal %></span> Run
                                                         </span>
-                                                        <span><%= data.stats.checksTriggeredTotal %></span> T / <span><%= data.stats.checksRunTotal %></span> R
+                                                        <span class="cursor-help"><span><%= data.stats.checksTriggeredTotal %></span> T / <span><%= data.stats.checksRunTotal %></span> R</span>
                                                     </span>
 
                                                     <label>Rules</label>
@@ -289,7 +362,7 @@
                                                         <span class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2'>
                                                             <span><%= data.stats.rulesTriggeredTotal %></span> Triggered / <span><%= data.stats.rulesCachedTotal %></span> Cached / <span><%= data.stats.rulesRunTotal %></span> Run
                                                         </span>
-                                                        <span><%= data.stats.rulesTriggeredTotal %></span> T / <span><%= data.stats.rulesCachedTotal %></span> C / <span><%= data.stats.rulesRunTotal %></span> R
+                                                        <span class="cursor-help"><span><%= data.stats.rulesTriggeredTotal %></span> T / <span><%= data.stats.rulesCachedTotal %></span> C / <span><%= data.stats.rulesRunTotal %></span> R</span>
                                                     </span>
 
                                                     <label>Actions</label>
@@ -297,19 +370,120 @@
                                                 </div>
                                             </div>
                                             <div>
-                                                <h4 class="text-left font-semibold pb-2">Cache</h4>
+                                                <div class="text-left pb-2">
+                                                    <% if (data.name === 'All') { %>
+                                                        <span class="font-semibold">Cache</span>
+                                                    <% } else { %>
+                                                        <div>
+                                                            <span class="font-semibold capitalize">Cache - <%= data.stats.cache.provider %><%= data.stats.cache.isShared ? ' (Shared)' : '' %></span>
+                                                            <span class="has-tooltip">
+                                                                <span style="right: 0;"
+                                                                      class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2 space-y-3 p-2'>
+                                                                    <% if (data.stats.cache.isShared) { %>
+                                                                        <div>This subreddit is using the default, <b>application-wide shared cache</b> because its <b
+                                                                                    class="font-mono">caching</b> configuration is not specified.</div>
+                                                                        <div>Pros:
+                                                                        <ul class="list-inside list-disc">
+                                                                            <li>All subreddits can utilize any cached authors/etc., reduces overall api usage</li>
+                                                                            <li>Bot Operator can fine tune cache without subreddit interaction</li>
+                                                                        </ul>
+                                                                    </div>
+                                                                        <div>
+                                                                        Cons:
+                                                                        <ul class="list-inside list-disc">
+                                                                            <li>Subreddits must use default TTLs which may not fit use case for rules</li>
+                                                                            <li>Bots operating subreddits with dramatically contrasting caching requirements may suffer in performance/api usage</li>
+                                                                        </ul>
+                                                                    </div>
+                                                                    <% } else { %>
+                                                                        <div>This subreddit is using the default, <b>application-wide shared cache</b> because its <b
+                                                                                    class="font-mono">caching</b> configuration is not specified.</div>
+                                                                        <div>Pros:
+                                                                        <ul class="list-inside list-disc">
+                                                                            <li>All subreddits can utilize any cached authors/etc., reduces overall api usage</li>
+                                                                            <li>Bot Operator can fine tune cache without subreddit interaction</li>
+                                                                        </ul>
+                                                                    </div>
+                                                                        <div>
+                                                                        Cons:
+                                                                        <ul class="list-inside list-disc">
+                                                                            <li>Subreddits must use default TTLs which may not fit use case for rules</li>
+                                                                            <li>Bots operating subreddits with dramatically contrasting caching requirements may suffer in performance/api usage</li>
+                                                                        </ul>
+                                                                    </div>
+                                                                    <% } %>
+                                                                </span>
+                                                                <span>
+                                                                    <svg xmlns="http://www.w3.org/2000/svg"
+                                                                         class="h-4 w-4 inline-block cursor-help"
+                                                                         fill="none"
+                                                                         viewBox="0 0 24 24" stroke="currentColor">
+                                                                        <path stroke-linecap="round"
+                                                                              stroke-linejoin="round"
+                                                                              stroke-width="2"
+                                                                              d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                                                    </svg>
+                                                                </span>
+                                                        </span>
+                                                        </div>
+                                                    <% } %>
+                                                </div>
                                                 <div class="stats">
                                                     <label>Keys</label>
-                                                    <span><%= data.stats.cache.currentKeyCount %> <%= data.stats.cache.isShared ? ' (Shared)' : ''%></span>
-                                                    <label>Total Reqs</label>
-                                                    <span><%= data.stats.cache.totalRequests %></span>
+                                                    <span><%= data.stats.cache.currentKeyCount %></span>
+                                                    <label>Calls</label>
+                                                    <span><span><%= data.stats.cache.totalRequests %></span> <span>(<%= data.stats.cache.requestRate %>/10min)</span></span>
                                                 </div>
-                                                <h4 class="text-left font-semibold py-2">Request Breakdown</h4>
+                                                <div class="text-left py-2">
+                                                    <span class="font-semibold">Calls Breakdown</span>
+                                                    <span class="has-tooltip">
+                                                                <span style="right: 0;"
+                                                                      class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2 space-y-3 p-2'>
+                                                                    <div>Number of calls to cache made for each type of cached item.</div>
+                                                                    <div>The <b>miss %</b> is the percentage of cache calls that were empty and data had to be fully acquired/processed.</div>
+                                                                    <div>
+                                                                        <ul class="list-inside list-disc">
+                                                                            <li><b>Author</b> - Cached history for an Activity's Author acquired from <span
+                                                                                        class="font-mono">window</span> criteria. A missed cached call means at least one API call must be made.</li>
+                                                                            <li><b>Criteria</b> - Cached results of an <span
+                                                                                        class="font-mono">authorIs</span> test. A missed cached call may require at least one API call.</li>
+                                                                            <li><b>Content</b> - Cached content for footer/comment/ban content. A missed cached call requires one API call.</li>
+                                                                            <li><b>UserNote</b> - Cached UserNotes. A missed cached call requires one API call.</li>
+                                                                        </ul>
+                                                                    </div>
+                                                                    <div>
+                                                                        Some tips/tricks for cache:
+                                                                    </div>
+                                                                    <ul class="list-inside list-disc">
+                                                                        <li>Only need to pay attention to caching if a subreddit uses the API/cache heavily IE high-volume comment checks or very large check sets for submissions</li>
+                                                                        <li>Increasing TTL will reduce cache misses and api usage at the expensive of a larger cache and stale results</li>
+                                                                        <li>Re-using <span
+                                                                                    class="font-mono">window</span> and <span
+                                                                                    class="font-mono">authorIs</span> values in configuration will enable the bot to re-use these results and thus reduce cache misses/api usage</li>
+                                                                    </ul>
+                                                                </span>
+                                                                <span>
+                                                                    <svg xmlns="http://www.w3.org/2000/svg"
+                                                                         class="h-4 w-4 inline-block cursor-help"
+                                                                         fill="none"
+                                                                         viewBox="0 0 24 24" stroke="currentColor">
+                                                                        <path stroke-linecap="round"
+                                                                              stroke-linejoin="round"
+                                                                              stroke-width="2"
+                                                                              d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                                                    </svg>
+                                                                </span>
+                                                        </span>
+                                                </div>
                                                 <div class="stats">
                                                     <label>Author</label>
-                                                    <span><%= data.stats.cache.types.author.requests %> (<%= data.stats.cache.types.author.missPercent %> Miss)</span>
+                                                    <span><%= data.stats.cache.types.author.requests %> (<%= data.stats.cache.types.author.missPercent %> miss)</span>
                                                     <label>Criteria</label>
-                                                    <span><%= data.stats.cache.types.authorCrit.requests %> (<%= data.stats.cache.types.authorCrit.missPercent %> Miss)</span>
+                                                    <span><%= data.stats.cache.types.authorCrit.requests %> (<%= data.stats.cache.types.authorCrit.missPercent %> miss)</span>
+                                                    <label>Content</label>
+                                                    <span><%= data.stats.cache.types.content.requests %> (<%= data.stats.cache.types.content.missPercent %> miss)</span>
+                                                    <label>UserNote</label>
+                                                    <span><%= data.stats.cache.types.userNotes.requests %> (<%= data.stats.cache.types.userNotes.missPercent %> miss)</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -321,9 +495,10 @@
                                 <div class="inline-flex items-center">
                                     <input data-subreddit="<%= data.name %>" style="min-width: 420px;"
                                            class="border-gray-50 placeholder-gray-500 rounded mt-2 mb-3 p-2 text-black checkUrl"
-                                           placeholder="<%= data.name === 'All' ? 'Run Bot on a permalink from any moderated Subreddit' : `Run Bot on a permalink using this Subreddit's config`%>"/>
+                                           placeholder="<%= data.name === 'All' ? 'Run Bot on a permalink from any moderated Subreddit' : `Run Bot on a permalink using this Subreddit's config` %>"/>
                                     <span class="mx-2">
-                                        <input type="checkbox" class="dryrunCheck" data-subreddit="<%= data.name %>" name="dryrunCheck">
+                                        <input type="checkbox" class="dryrunCheck" data-subreddit="<%= data.name %>"
+                                               name="dryrunCheck">
                                         <label for="dryrunCheck">Dry Run?</label>
                                     </span>
                                     <a class="runCheck" data-subreddit="<%= data.name %>" href="">Run</a>

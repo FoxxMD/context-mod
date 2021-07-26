@@ -54,6 +54,8 @@
         }
 
         .tooltip {
+            transition-delay: 0.5s;
+            transition-property: visibility;
             visibility: hidden;
             position: absolute;
             /*right: 0;*/
@@ -62,6 +64,8 @@
 
         .has-tooltip:hover .tooltip {
             visibility: visible;
+            transition-delay: 0.2s;
+            transition-property: visibility;
             z-index: 100;
         }
 
@@ -78,4 +82,5 @@
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width,initial-scale=1.0">
+    <!--icons from https://heroicons.com -->
 </head>

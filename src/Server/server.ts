@@ -351,8 +351,20 @@ const rcbServer = async function (options: OperatorConfig) {
             }
             sd.indicator = indicator;
             if (m.startedAt !== undefined) {
-                sd.startedAtHuman = `${dayjs.duration(dayjs().diff(m.startedAt)).humanize()} ago`;
+                const dur = dayjs.duration(dayjs().diff(m.startedAt));
+                sd.startedAtHuman = `${dur.humanize()} ago`;
                 sd.startedAt = m.startedAt.local().format('MMMM D, YYYY h:mm A Z');
+
+                if(sd.stats.cache.totalRequests > 0) {
+                    const minutes = dur.asMinutes();
+                    if(minutes < 10) {
+                        sd.stats.cache.requestRate = formatNumber((10/minutes) * sd.stats.cache.totalRequests, {toFixed: 0, round: {enable: true, indicate: true}});
+                    } else {
+                        sd.stats.cache.requestRate = formatNumber((minutes/10) * sd.stats.cache.totalRequests, {toFixed: 0, round: {enable: true, indicate: true}});
+                    }
+                } else {
+                    sd.stats.cache.requestRate = 0;
+                }
             }
             subManagerData.push(sd);
         }
@@ -395,7 +407,7 @@ const rcbServer = async function (options: OperatorConfig) {
         cumRaw = Object.keys(cumRaw).reduce((acc, curr) => {
             const per = acc[curr].miss === 0 ? 0 : formatNumber(acc[curr].miss / acc[curr].requests) * 100;
             // @ts-ignore
-            acc[curr].missPercent = `${formatNumber(per)}%`;
+            acc[curr].missPercent = `${formatNumber(per, {toFixed: 0})}%`;
             return acc;
         }, cumRaw);
         let allManagerData: any = {
@@ -433,6 +445,18 @@ const rcbServer = async function (options: OperatorConfig) {
         allManagerData.heartbeat = bot.heartbeatInterval;
         allManagerData = {...allManagerData, ...opStats(bot)};
         //}
+
+        const botDur = dayjs.duration(dayjs().diff(bot.startedAt))
+        if(allManagerData.stats.cache.totalRequests > 0) {
+            const minutes = botDur.asMinutes();
+            if(minutes < 10) {
+                allManagerData.stats.cache.requestRate = formatNumber((10/minutes) * allManagerData.stats.cache.totalRequests, {toFixed: 0, round: {enable: true, indicate: true}});
+            } else {
+                allManagerData.stats.cache.requestRate = formatNumber((minutes/10) * allManagerData.stats.cache.totalRequests, {toFixed: 0, round: {enable: true, indicate: true}});
+            }
+        } else {
+            allManagerData.stats.cache.requestRate = 0;
+        }
 
         const data = {
             userName: user,

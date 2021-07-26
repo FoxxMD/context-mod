@@ -64,7 +64,7 @@ const program = new Command();
                 },
                 logging,
             } = config;
-            const logger = getLogger(logging);
+            const logger = getLogger(logging, 'init');
             const hasClient = clientId !== undefined && clientSecret !== undefined;
             const hasNoTokens = accessToken === undefined && refreshToken === undefined;
             try {

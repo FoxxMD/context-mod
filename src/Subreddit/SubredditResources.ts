@@ -41,6 +41,7 @@ export interface SubredditResourceConfig extends Footer {
 interface SubredditResourceOptions extends Footer {
     ttl: Required<TTLConfig>
     cache?: Cache
+    cacheType: string;
     cacheSettingsHash: string
     subreddit: Subreddit,
     logger: Logger;
@@ -60,6 +61,7 @@ export class SubredditResources {
     footer: false | string = DEFAULT_FOOTER;
     subreddit: Subreddit
     cache?: Cache
+    cacheType: string
     cacheSettingsHash?: string;
 
     stats: { cache: ResourceStats };
@@ -74,11 +76,13 @@ export class SubredditResources {
                 wikiTTL,
             },
             cache,
+            cacheType,
             cacheSettingsHash,
         } = options || {};
 
         this.cacheSettingsHash = cacheSettingsHash;
         this.cache = cache;
+        this.cacheType = cacheType;
         this.authorTTL = authorTTL;
         this.wikiTTL = wikiTTL;
         this.subreddit = subreddit;
@@ -116,7 +120,7 @@ export class SubredditResources {
                 types: Object.keys(this.stats.cache).reduce((acc, curr) => {
                     const per = acc[curr].miss === 0 ? 0 : formatNumber(acc[curr].miss / acc[curr].requests) * 100;
                     // @ts-ignore
-                    acc[curr].missPercent = `${formatNumber(per)}%`;
+                    acc[curr].missPercent = `${formatNumber(per, {toFixed: 0})}%`;
                     return acc;
                 }, this.stats.cache)
             }
@@ -178,10 +182,13 @@ export class SubredditResources {
         // try to get cached value first
         let hash = `${subreddit.display_name}-${cacheKey}`;
         if (this.cache !== undefined && this.wikiTTL > 0) {
+            this.stats.cache.content.requests++;
             const cachedContent = await this.cache.get(hash);
             if (cachedContent !== undefined) {
                 this.logger.debug(`Cache Hit: ${cacheKey}`);
                 return cachedContent as string;
+            } else {
+                this.stats.cache.content.miss++;
             }
         }
 
@@ -227,6 +234,7 @@ export class SubredditResources {
         if (this.cache !== undefined && this.authorTTL > 0) {
             const hashObj = {itemId: item.id, ...authorOpts, include};
             const hash = `authorCrit-${objectHash.sha1(hashObj)}`;
+            this.stats.cache.authorCrit.requests++;
             let miss = false;
             const cachedAuthorTest = await this.cache.wrap(hash, async () => {
                 miss = true;
@@ -234,6 +242,8 @@ export class SubredditResources {
             }, {ttl: this.authorTTL});
             if (!miss) {
                 this.logger.debug(`Cache Hit: Author Check on ${item.id}`);
+            } else {
+                this.stats.cache.authorCrit.miss++;
             }
             return cachedAuthorTest;
         }
@@ -261,6 +271,7 @@ class SubredditResourcesManager {
     enabled: boolean = true;
     modStreams: Map<string, SPoll<Snoowrap.Submission | Snoowrap.Comment>> = new Map();
     defaultCache?: Cache;
+    cacheType: string = 'none';
     ttlDefaults!: Required<TTLConfig>;
 
     setDefaultsFromConfig(config: OperatorConfig) {
@@ -277,6 +288,7 @@ class SubredditResourcesManager {
     }
 
     setDefaultCache(options: CacheOptions) {
+        this.cacheType = options.store;
         this.defaultCache = createCacheManager(options);
     }
 
@@ -308,6 +320,7 @@ class SubredditResourcesManager {
             const {provider: trueProvider, ...trueRest} = cacheConfig;
             opts = {
                 cache: createCacheManager(trueProvider),
+                cacheType: trueProvider.store,
                 cacheSettingsHash: hash,
                 ...init,
                 ...trueRest,
@@ -315,6 +328,7 @@ class SubredditResourcesManager {
         } else {
             opts = {
                 cache: this.defaultCache,
+                cacheType: this.cacheType,
                 cacheSettingsHash: hash,
                 ttl: this.ttlDefaults,
                 ...init,
@@ -335,6 +349,8 @@ class SubredditResourcesManager {
             if(opts.footer !== resource.footer) {
                 resource.footer = opts.footer || DEFAULT_FOOTER;
             }
+            // reset cache stats when configuration is reloaded
+            resource.stats.cache = cacheStats();
         }
 
         return resource;

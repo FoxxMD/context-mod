@@ -145,18 +145,22 @@ export class Manager {
             actionsRunSinceStart: this.actionsRunSinceStart,
             actionsRunSinceStartTotal: totalFromMapStats(this.actionsRunSinceStart),
             cache: {
+                provider: 'none',
                 currentKeyCount: 0,
                 isShared: false,
                 totalRequests: 0,
+                requestRate: 0,
                 types: cacheStats()
             },
         };
 
         if (this.resources !== undefined) {
             const resStats = this.resources.getStats();
+
             data.cache = resStats.cache;
             data.cache.currentKeyCount = await this.resources.getCacheKeyCount();
             data.cache.isShared = this.resources.cacheSettingsHash === 'default';
+            data.cache.provider = this.resources.cacheType;
         }
         return data;
     }
