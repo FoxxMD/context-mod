@@ -12,6 +12,7 @@
   * [Action](#action)
     * [Examples](#available-actions)
   * [Filters](#filters)
+* [Configuration](#configuration)
 * [Common Resources](#common-resources)
   * [Activities `window`](#activities-window)
   * [Comparisons](#thresholds-and-comparisons)
@@ -125,6 +126,11 @@ For detailed explanation and options of what individual Actions can do [see the 
 ### Filters
 
 TODO
+
+## Configuration
+
+* For **Operator/Bot maintainers** see **[Operation Configuration](/docs/operatorConfiguration.md)**
+* For **Moderators** see the [App Schema](https://json-schema.app/view/%23?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Freddit-context-bot%2Fmaster%2Fsrc%2FSchema%2FApp.json) and [examples](/docs/examples)
 
 ## Common Resources
 

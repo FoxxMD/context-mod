@@ -119,4 +119,4 @@ export const addOptions = (com: commander.Command, options: commander.Option[]):
 }
 
 // TODO
-export const subredditConfig = new commander.Option('-f, --subredditsConfig <path>', 'An absolute path to a JSON file to load subreddit configs from');
+export const subredditConfig = new commander.Option('--subredditsConfig <path>', 'An absolute path to a JSON file to load subreddit configs from');
