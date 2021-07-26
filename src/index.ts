@@ -7,7 +7,8 @@ import relTime from 'dayjs/plugin/relativeTime.js';
 import sameafter from 'dayjs/plugin/isSameOrAfter.js';
 import samebefore from 'dayjs/plugin/isSameOrBefore.js';
 import {Manager} from "./Subreddit/Manager";
-import {Command} from 'commander';
+import {Command, Argument} from 'commander';
+
 import {
     addOptions,
     checks,
@@ -44,14 +45,49 @@ const program = new Command();
 
         let runCommand = program
             .command('run')
-            .description('Runs bot normally')
+            .addArgument(new Argument('[interface]', 'Which interface to start the bot with').choices(['web', 'cli']).default(undefined, 'process.env.WEB || true'))
+            .description('Monitor new activities from configured subreddits.')
             .allowUnknownOption();
-        runCommand = addOptions(runCommand, getUniversalCLIOptions());
-        runCommand.action(async (opts) => {
-            const config = buildOperatorConfigWithDefaults(await parseOperatorConfigFromSources(opts));
-            const app = new App(config);
-            await app.buildManagers();
-            await app.runManagers();
+        runCommand = addOptions(runCommand, getUniversalWebOptions());
+        runCommand.action(async (interfaceVal, opts) => {
+            const config = buildOperatorConfigWithDefaults(await parseOperatorConfigFromSources({...opts, web: interfaceVal !== undefined ? interfaceVal === 'web': undefined}));
+            const {
+                credentials: {
+                    redirectUri,
+                    clientId,
+                    clientSecret,
+                    accessToken,
+                    refreshToken,
+                },
+                web: {
+                    enabled: web,
+                },
+                logging,
+            } = config;
+            const logger = getLogger(logging);
+            const hasClient = clientId !== undefined && clientSecret !== undefined;
+            const hasNoTokens = accessToken === undefined && refreshToken === undefined;
+            try {
+                if (web) {
+                    if (hasClient && hasNoTokens) {
+                        // run web helper
+                        const server = createHelperServer(config);
+                        await server;
+                    } else {
+                        if (redirectUri === undefined) {
+                            logger.warn(`No 'redirectUri' found in arg/env. Bot will still run but web interface will not be accessible.`);
+                        }
+                        const server = createWebServer(config);
+                        await server;
+                    }
+                } else {
+                    const app = new App(config);
+                    await app.buildManagers();
+                    await app.runManagers();
+                }
+            } catch (err) {
+                throw err;
+            }
         });
 
         let checkCommand = program
@@ -143,42 +179,6 @@ const program = new Command();
                     }
                 }
             });
-
-        let webCommand = program.command('web')
-            .allowUnknownOption();
-        webCommand = addOptions(webCommand, getUniversalWebOptions());
-        webCommand.action(async (opts) => {
-            const config = buildOperatorConfigWithDefaults(await parseOperatorConfigFromSources(opts));
-            const {
-                credentials: {
-                    redirectUri,
-                    clientId,
-                    clientSecret,
-                    accessToken,
-                    refreshToken,
-                }
-            } = config;
-            const hasClient = clientId !== undefined && clientSecret !== undefined;
-            const hasNoTokens = accessToken === undefined && refreshToken === undefined;
-            try {
-                if (hasClient && hasNoTokens) {
-                    // run web helper
-                    const server = createHelperServer(config);
-                    await server;
-                } else if (redirectUri === undefined) {
-                    const logger = getLogger(config.logging);
-                    logger.warn(`'web' command detected but no redirectUri found in arg/env. Switching to CLI only.`);
-                    const app = new App(config);
-                    await app.buildManagers();
-                    await app.runManagers();
-                } else {
-                    const server = createWebServer(config);
-                    await server;
-                }
-            } catch (err) {
-                throw err;
-            }
-        });
 
         await program.parseAsync();
 

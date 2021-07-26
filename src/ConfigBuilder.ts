@@ -269,7 +269,8 @@ export const parseOpConfigFromArgs = (args: any): OperatorJsonConfig => {
         logDir,
         port,
         sessionSecret,
-        caching
+        caching,
+        web
     } = args || {};
 
     const data = {
@@ -299,6 +300,7 @@ export const parseOpConfigFromArgs = (args: any): OperatorJsonConfig => {
             debug: snooDebug,
         },
         web: {
+            enabled: web,
             port,
             session: {
                 secret: sessionSecret
@@ -366,6 +368,7 @@ export const parseOpConfigFromEnv = (): OperatorJsonConfig => {
             debug: parseBool(process.env.SNOO_DEBUG, undefined),
         },
         web: {
+            enabled: process.env.WEB !== undefined ? parseBool(process.env.WEB) : undefined,
             port: process.env.PORT !== undefined ? parseInt(process.env.PORT) : undefined,
             session: {
                 provider: process.env.SESSION_PROVIDER,
@@ -479,6 +482,7 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
         } = {},
         snoowrap = {},
         web: {
+            enabled = true,
             port = 8085,
             maxLogs = 200,
             session: {
@@ -561,6 +565,7 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
             dryRun,
         },
         web: {
+            enabled,
             port,
             session: {
                 secret,

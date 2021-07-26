@@ -6,9 +6,6 @@
                 "auth_pass": {
                     "type": "string"
                 },
-                "checkPeriod": {
-                    "type": "number"
-                },
                 "db": {
                     "type": "number"
                 },
@@ -238,6 +235,9 @@
         },
         "web": {
             "properties": {
+                "enabled": {
+                    "type": "boolean"
+                },
                 "logLevel": {
                     "enum": [
                         "debug",

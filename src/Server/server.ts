@@ -14,6 +14,7 @@ import {Server as SocketServer} from 'socket.io';
 import sharedSession from 'express-socket.io-session';
 import Submission from "snoowrap/dist/objects/Submission";
 import EventEmitter from "events";
+import tcpUsed from 'tcp-port-used';
 
 import {
     boolToString, cacheStats,
@@ -30,6 +31,8 @@ import {Manager} from "../Subreddit/Manager";
 import {getLogger} from "../Utils/loggerFactory";
 import LoggedError from "../Utils/LoggedError";
 import {OperatorConfig, ResourceStats, RUNNING, STOPPED, SYSTEM, USER} from "../Common/interfaces";
+import http from "http";
+import SimpleError from "../Utils/SimpleError";
 
 const app = addAsync(express());
 const router = Router();
@@ -119,13 +122,26 @@ const rcbServer = async function (options: OperatorConfig) {
 
     const logger = getLogger({...options.logging, additionalTransports: [streamTransport]})
 
-    const bot = new App(options);
-    await bot.testClient();
+    if (await tcpUsed.check(port)) {
+        throw new SimpleError(`Specified port for web interface (${port}) is in use or not available. Cannot start web server.`);
+    }
 
-    const server = await app.listen(port);
-    const io = new SocketServer(server);
+    let server: http.Server,
+        io: SocketServer;
+
+    try {
+        server = await app.listen(port);
+        io = new SocketServer(server);
+    } catch (err) {
+        logger.error('Error occurred while initializing web or socket.io server', err);
+        err.logged = true;
+        throw err;
+    }
 
     logger.info(`Web UI started: http://localhost:${port}`);
+
+    const bot = new App(options);
+    await bot.testClient();
 
     app.use('/public', express.static(`${__dirname}/public`));
 
@@ -217,6 +233,9 @@ const rcbServer = async function (options: OperatorConfig) {
     })
 
     app.getAsync('/login', async (req, res) => {
+        if(redirectUri === undefined) {
+            return res.render('error', {error: `No <b>redirectUri</b> was specified through environmental variables or program argument. This must be provided in order to use the web interface.`});
+        }
         const authUrl = Snoowrap.getAuthUrl({
             clientId,
             scope: ['identity', 'mysubreddits'],

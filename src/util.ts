@@ -361,6 +361,8 @@ export function parseBool(value: any, prev: any = false): boolean {
     throw new InvalidOptionArgumentError('Not a boolean value.');
 }
 
+export const parseBoolWithDefault = (defaultValue: any) => (arg: any) => parseBool(arg, defaultValue);
+
 export function activityWindowText(activities: (Submission | Comment)[], suffix = false): (string | undefined) {
     if (activities.length === 0) {
         return undefined;

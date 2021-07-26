@@ -24,7 +24,7 @@ export const getLogger = (options: any, name = 'default'): Logger => {
             errorTransports.push(a);
         }
 
-        if (path !== undefined) {
+        if (path !== undefined && path !== '') {
             const rotateTransport = new winston.transports.DailyRotateFile({
                 dirname: path,
                 createSymlink: true,

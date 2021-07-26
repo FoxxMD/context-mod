@@ -684,6 +684,7 @@ export interface OperatorJsonConfig {
         interval?: number,
     },
     web?: {
+        enabled?: boolean,
         port?: number,
         session?: {
             provider?: 'memory' | 'redis' | CacheOptions,
@@ -755,6 +756,7 @@ export interface OperatorConfig extends OperatorJsonConfig {
         interval: number,
     },
     web: {
+        enabled: boolean,
         port: number,
         session: {
             provider: CacheOptions,

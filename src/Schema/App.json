@@ -675,9 +675,6 @@
                 "auth_pass": {
                     "type": "string"
                 },
-                "checkPeriod": {
-                    "type": "number"
-                },
                 "db": {
                     "type": "number"
                 },
