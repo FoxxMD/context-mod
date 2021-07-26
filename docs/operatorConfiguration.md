@@ -33,7 +33,7 @@ configuration.
 
 * **ENV** -- Environment variables loaded from an [`.env`](https://github.com/toddbluhm/env-cmd) file (path may be
   specified with `--file` cli argument)
-* **ENV** -- Any already environment variables (exported on command line/terminal profile/etc.)
+* **ENV** -- Any already existing environment variables (exported on command line/terminal profile/etc.)
 * **FILE** -- Values specified in a JSON configuration file using the structure shown below (TODO example json file)
 * **ARG** -- Values specified as CLI arguments to the program (see [Usage](/README.md#usage)
   or `node src/index.js run help` for details)
