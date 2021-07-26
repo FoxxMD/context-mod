@@ -609,7 +609,7 @@ export const createRetryHandler = (opts: RetryOptions, logger: Logger) => {
         lastErrorAt = dayjs();
 
         if(err.name === 'RequestError' || err.name === 'StatusCodeError') {
-            if (err.statusCode === undefined || ([500, 503, 502, 504, 522].includes(err.statusCode))) {
+            if (err.statusCode === undefined || ([401, 500, 503, 502, 504, 522].includes(err.statusCode))) {
                 timeoutCount++;
                 if (timeoutCount > maxRequestRetry) {
                     logger.error(`Reddit request error retries (${timeoutCount}) exceeded max allowed (${maxRequestRetry})`);
