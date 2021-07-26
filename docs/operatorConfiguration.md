@@ -209,10 +209,11 @@ const config = {
 
 ## Minimum Config
 
-Below are examples of the minimum required config to run the application using all three config approaches.
+Below are examples of the minimum required config to run the application using all three config approaches independently.
 
 Using **FILE**
 <details>
+
 ```json
 {
   "credentials": {
@@ -223,23 +224,30 @@ Using **FILE**
   }
 }
 ```
+
 </details>
 
 Using **ENV** (`.env`)
 
 <details>
+
 ```
 CLIENT_ID=f4b4df1c7b2
 CLIENT_SECRET=34v5q1c56ub
 REFRESH_TOKEN=34_f1w1v4
 ACCESS_TOKEN=p75_1c467b2
 ```
+
 </details>
 
 Using **ARG**
 
 <details>
-`node src/index.js run --clientId=f4b4df1c7b2 --clientSecret=34v5q1c56ub --refreshToken=34_f1w1v4 --accessToken=p75_1c467b2`
+
+```
+node src/index.js run --clientId=f4b4df1c7b2 --clientSecret=34v5q1c56ub --refreshToken=34_f1w1v4 --accessToken=p75_1c467b2
+```
+
 </details>
 
 ## Using Config Overrides
@@ -248,42 +256,50 @@ Using all three configs together:
 
 **FILE**
 <details>
+
 ```json
 {
   "credentials": {
     "clientId": "f4b4df1c7b2",
-    "clientSecret": "34v5q1c56ub",
     "refreshToken": "34_f1w1v4",
     "accessToken": "p75_1c467b2"
   }
 }
 ```
+
 </details>
 
 **ENV** (`.env`)
 
 <details>
+
 ```
+CLIENT_SECRET=34v5q1c56ub
 SUBREDDITS=sub1,sub2,sub3
 PORT=9008
 LOG_LEVEL=DEBUG
 ```
+
 </details>
 
 **ARG**
 
 <details>
-`node src/index.js run --subreddits=sub1`
+
+```
+node src/index.js run --subreddits=sub1
+```
+
 </details>
 
-Produces these variables:
+Produces these variables at runtime for the application:
 
 ```
 clientId: f4b4df1c7b2
 clientSecret: 34v5q1c56ub
 refreshToken: 34_f1w1v4
 accessToken: accessToken
-subreddits: sub1,
+subreddits: sub1
 port: 9008
 log level: debug
 ```
