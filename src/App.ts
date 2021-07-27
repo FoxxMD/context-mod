@@ -168,7 +168,7 @@ export class App {
 
         const onTerm = () => {
             for(const m of this.subManagers) {
-                m.notificationManager.handle('runStateChanged', 'Application Shutdown', 'The application was shutdown unexpectedly due to an error.');
+                m.notificationManager.handle('runStateChanged', 'Application Shutdown', 'The application was shutdown');
             }
         }
 
