@@ -38,6 +38,92 @@
             ],
             "type": "string"
         },
+        "DiscordProviderConfig": {
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "type": {
+                    "enum": [
+                        "discord"
+                    ],
+                    "type": "string"
+                },
+                "url": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "name",
+                "type",
+                "url"
+            ],
+            "type": "object"
+        },
+        "NotificationConfig": {
+            "properties": {
+                "events": {
+                    "items": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/definitions/NotificationEventConfig"
+                            },
+                            {
+                                "items": {
+                                    "enum": [
+                                        "configUpdated",
+                                        "eventActioned",
+                                        "pollingError",
+                                        "runStateChanged"
+                                    ],
+                                    "type": "string"
+                                },
+                                "type": "array"
+                            }
+                        ]
+                    },
+                    "type": "array"
+                },
+                "providers": {
+                    "items": {
+                        "$ref": "#/definitions/DiscordProviderConfig"
+                    },
+                    "type": "array"
+                }
+            },
+            "required": [
+                "events",
+                "providers"
+            ],
+            "type": "object"
+        },
+        "NotificationEventConfig": {
+            "properties": {
+                "providers": {
+                    "items": {
+                        "type": "string"
+                    },
+                    "type": "array"
+                },
+                "types": {
+                    "items": {
+                        "enum": [
+                            "configUpdated",
+                            "eventActioned",
+                            "pollingError",
+                            "runStateChanged"
+                        ],
+                        "type": "string"
+                    },
+                    "type": "array"
+                }
+            },
+            "required": [
+                "providers",
+                "types"
+            ],
+            "type": "object"
+        },
         "PollingDefaults": {
             "properties": {
                 "delayUntil": {
@@ -169,6 +255,9 @@
                 }
             },
             "type": "object"
+        },
+        "notifications": {
+            "$ref": "#/definitions/NotificationConfig"
         },
         "operator": {
             "properties": {

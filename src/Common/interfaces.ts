@@ -507,6 +507,8 @@ export interface ManagerOptions {
     * @example ["shortName"]
     * */
     nickname?: string
+
+    notifications?: NotificationConfig
 }
 
 /**
@@ -652,6 +654,51 @@ export interface CacheOptions {
     max?: number
 }
 
+export type NotificationProvider = 'discord';
+
+export type NotificationEventType = 'runStateChanged' | 'pollingError' | 'eventActioned' | 'configUpdated'
+
+export interface NotificationProviderConfig {
+    name: string
+    type: NotificationProvider
+}
+
+export interface DiscordProviderConfig extends NotificationProviderConfig {
+    url: string
+}
+
+export type NotificationProviders = DiscordProviderConfig;
+
+export interface NotificationEventConfig {
+    types: NotificationEventType[]
+    providers: string[]
+}
+
+export interface NotificationContent {
+    logLevel?: string
+    title: string
+    body?: string
+    footer?: string
+}
+
+export type NotificationEvents = (NotificationEventType[] | NotificationEventConfig)[];
+
+export interface NotificationConfig {
+    providers: NotificationProviders[],
+    events: NotificationEvents
+}
+
+export interface Notifier {
+    name: string
+    type: string;
+    handle: Function
+}
+
+export interface ManagerStateChangeOption {
+    reason?: string
+    suppressNotification?: boolean
+}
+
 export interface OperatorJsonConfig {
     operator?: {
         name?: string,
@@ -664,6 +711,7 @@ export interface OperatorJsonConfig {
         accessToken?: string,
         refreshToken?: string
     },
+    notifications?: NotificationConfig
     logging?: {
         level?: LogLevel,
         path?: string,
@@ -736,6 +784,7 @@ export interface OperatorConfig extends OperatorJsonConfig {
         accessToken?: string,
         refreshToken?: string
     },
+    notifications?: NotificationConfig
     logging: {
         level: LogLevel,
         path?: string,

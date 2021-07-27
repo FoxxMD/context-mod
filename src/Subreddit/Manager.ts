@@ -15,7 +15,7 @@ import {ConfigBuilder, buildPollingOptions} from "../ConfigBuilder";
 import {
     DEFAULT_POLLING_INTERVAL,
     DEFAULT_POLLING_LIMIT, Invokee,
-    ManagerOptions, PAUSED,
+    ManagerOptions, ManagerStateChangeOption, PAUSED,
     PollingOptionsStrong, RUNNING, RunState, STOPPED, SYSTEM, USER
 } from "../Common/interfaces";
 import Submission from "snoowrap/dist/objects/Submission";
@@ -34,6 +34,7 @@ import Action from "../Action";
 import {queue, QueueObject} from 'async';
 import {JSONConfig} from "../JsonConfig";
 import {CheckStructuredJson} from "../Check";
+import NotificationManager from "../Notification/NotificationManager";
 
 export interface RunningState {
     state: RunState,
@@ -97,6 +98,8 @@ export class Manager {
         state: STOPPED,
         causedBy: SYSTEM
     }
+
+    notificationManager!: NotificationManager;
 
     // use by api nanny to slow event consumption
     delayBy?: number;
@@ -262,7 +265,8 @@ export class Manager {
                 caching,
                 dryRun,
                 footer,
-                nickname
+                nickname,
+                notifications,
             } = configManagerOpts || {};
             this.pollOptions = buildPollingOptions(polling);
             this.dryRun = this.globalDryRun || dryRun;
@@ -277,6 +281,12 @@ export class Manager {
             for (const p of this.pollOptions) {
                 this.logger.info(`Polling Info => ${pollingInfo(p)}`)
             }
+
+            this.notificationManager = new NotificationManager(this.logger, this.subreddit, this.displayLabel, notifications);
+            const {events, notifiers} = this.notificationManager.getStats();
+            const notifierContent = notifiers.length === 0 ? 'None' : notifiers.join(', ');
+            const eventContent = events.length === 0 ? 'None' : events.join(', ');
+            this.logger.info(`Notification Info => Providers: ${notifierContent} | Events: ${eventContent}`);
 
             let resourceConfig: SubredditResourceConfig = {
                 footer,
@@ -321,7 +331,8 @@ export class Manager {
         }
     }
 
-    async parseConfiguration(causedBy: Invokee = 'system', force: boolean = false) {
+    async parseConfiguration(causedBy: Invokee = 'system', force: boolean = false, options?: ManagerStateChangeOption) {
+        const {reason, suppressNotification = false} = options || {};
         //this.wikiUpdateRunning = true;
         this.lastWikiCheck = dayjs();
 
@@ -377,6 +388,11 @@ export class Manager {
 
             this.parseConfigurationFromObject(configObj);
             this.logger.info('Checks updated');
+
+            if(!suppressNotification) {
+                this.notificationManager.handle('configUpdated', 'Configuration Updated', reason, causedBy)
+            }
+
             return true;
         } catch (err) {
             this.validConfigLoaded = false;
@@ -393,8 +409,10 @@ export class Manager {
         let allRuleResults: RuleResult[] = [];
         const itemIdentifier = `${checkType === 'Submission' ? 'SUB' : 'COM'} ${itemId}`;
         this.currentLabels = [itemIdentifier];
+        let ePeek = '';
         try {
             const [peek, _] = await itemContentPeek(item);
+            ePeek = peek;
             this.logger.info(`<EVENT> ${peek}`);
         } catch (err) {
             this.logger.error(`Error occurred while generate item peek for ${checkType} Activity ${itemId}`, err);
@@ -461,6 +479,11 @@ export class Manager {
                     this.checksTriggeredSinceStart.set(check.name, (this.checksTriggeredSinceStart.get(check.name) || 0) + 1);
                     runActions = await check.runActions(item, currentResults.filter(x => x.triggered), dryRun);
                     actionsRun = runActions.length;
+
+                    if(!check.notifyOnTrigger) {
+                        const ar = runActions.map(x => x.getActionUniqueName()).join(', ');
+                        this.notificationManager.handle('eventActioned', 'Check Triggered', `Check "${check.name}" was triggered on Event: \n ${ePeek} \n\n with the following actions run: ${ar}`);
+                    }
                     break;
                 }
             }
@@ -641,7 +664,8 @@ export class Manager {
         }
     }
 
-    startQueue(causedBy: Invokee = 'system') {
+    startQueue(causedBy: Invokee = 'system', options?: ManagerStateChangeOption) {
+        const {reason, suppressNotification = false} = options || {};
         if(this.queueState.state === RUNNING) {
             this.logger.info(`Activity processing queue is already RUNNING with (${this.queue.length()} queued activities)`);
         } else if (!this.validConfigLoaded) {
@@ -653,10 +677,14 @@ export class Manager {
                 state: RUNNING,
                 causedBy
             }
+            if(!suppressNotification) {
+                this.notificationManager.handle('runStateChanged', 'Queue Started', reason, causedBy)
+            }
         }
     }
 
-    async pauseQueue(causedBy: Invokee = 'system') {
+    async pauseQueue(causedBy: Invokee = 'system', options?: ManagerStateChangeOption) {
+        const {reason, suppressNotification = false} = options || {};
         if(this.queueState.state === PAUSED) {
             if(this.queueState.causedBy !== causedBy) {
                 this.logger.info(`Activity processing queue state set to PAUSED by ${causedBy}`);
@@ -686,10 +714,14 @@ export class Manager {
                 state: PAUSED,
                 causedBy
             }
+            if(!suppressNotification) {
+                this.notificationManager.handle('runStateChanged', 'Queue Paused', reason, causedBy)
+            }
         }
     }
 
-    async stopQueue(causedBy: Invokee = 'system') {
+    async stopQueue(causedBy: Invokee = 'system', options?: ManagerStateChangeOption) {
+        const {reason, suppressNotification = false} = options || {};
         if(this.queueState.state === STOPPED) {
             if(this.queueState.causedBy !== causedBy) {
                 this.logger.info(`Activity processing queue state set to STOPPED by ${causedBy}`);
@@ -715,11 +747,15 @@ export class Manager {
                 state: STOPPED,
                 causedBy
             }
+            if(!suppressNotification) {
+                this.notificationManager.handle('runStateChanged', 'Queue Stopped', reason, causedBy)
+            }
         }
     }
 
 
-    async startEvents(causedBy: Invokee = 'system') {
+    async startEvents(causedBy: Invokee = 'system', options?: ManagerStateChangeOption) {
+        const {reason, suppressNotification = false} = options || {};
         if(!this.validConfigLoaded) {
             this.logger.warn('Cannot start event polling while manager has an invalid configuration');
             return;
@@ -748,9 +784,13 @@ export class Manager {
             state: RUNNING,
             causedBy
         }
+        if(!suppressNotification) {
+            this.notificationManager.handle('runStateChanged', 'Events Polling Started', reason, causedBy)
+        }
     }
 
-    pauseEvents(causedBy: Invokee = 'system') {
+    pauseEvents(causedBy: Invokee = 'system', options?: ManagerStateChangeOption) {
+        const {reason, suppressNotification = false} = options || {};
         if(this.eventsState.state !== RUNNING) {
             this.logger.warn('Events must be in RUNNING state in order to be paused.');
         } else {
@@ -766,10 +806,14 @@ export class Manager {
             } else {
                 this.logger.info('Event polling is PAUSED.');
             }
+            if(!suppressNotification) {
+                this.notificationManager.handle('runStateChanged', 'Events Polling Paused', reason, causedBy)
+            }
         }
     }
 
-    stopEvents(causedBy: Invokee = 'system') {
+    stopEvents(causedBy: Invokee = 'system', options?: ManagerStateChangeOption) {
+        const {reason, suppressNotification = false} = options || {};
         if(this.eventsState.state !== STOPPED) {
             for (const s of this.streams) {
                 s.end();
@@ -793,6 +837,9 @@ export class Manager {
                 causedBy
             }
             this.logger.info('Note: Polling behavior will be re-built from configuration when next started');
+            if(!suppressNotification) {
+                this.notificationManager.handle('runStateChanged', 'Events Polling Stopped', reason, causedBy)
+            }
         } else if(causedBy !== this.eventsState.causedBy) {
             this.logger.info(`Events STOPPED by ${causedBy}`);
             this.logger.info('Note: Polling behavior will be re-built from configuration when next started');
@@ -802,25 +849,33 @@ export class Manager {
         }
     }
 
-    async start(causedBy: Invokee = 'system') {
+    async start(causedBy: Invokee = 'system', options?: ManagerStateChangeOption) {
+        const {reason, suppressNotification = false} = options || {};
         if(!this.validConfigLoaded) {
             this.logger.warn('Cannot put bot in RUNNING state while manager has an invalid configuration');
             return;
         }
-        await this.startEvents(causedBy);
-        this.startQueue(causedBy);
+        await this.startEvents(causedBy, {suppressNotification: true});
+        this.startQueue(causedBy, {suppressNotification: true});
         this.botState = {
             state: RUNNING,
             causedBy
         }
+        if(!suppressNotification) {
+            this.notificationManager.handle('runStateChanged', 'Bot Started', reason, causedBy)
+        }
     }
 
-    async stop(causedBy: Invokee = 'system') {
-        this.stopEvents(causedBy);
-        await this.stopQueue(causedBy);
+    async stop(causedBy: Invokee = 'system', options?: ManagerStateChangeOption) {
+        const {reason, suppressNotification = false} = options || {};
+        this.stopEvents(causedBy, {suppressNotification: true});
+        await this.stopQueue(causedBy, {suppressNotification: true});
         this.botState = {
             state: STOPPED,
             causedBy
+        }
+        if(!suppressNotification) {
+            this.notificationManager.handle('runStateChanged', 'Bot Stopped', reason, causedBy)
         }
     }
 }

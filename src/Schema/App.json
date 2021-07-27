@@ -924,6 +924,11 @@
                     "pattern": "^[a-zA-Z]([\\w -]*[\\w])?$",
                     "type": "string"
                 },
+                "notifyOnTrigger": {
+                    "default": false,
+                    "description": "If notifications are configured and this is `true` then an `eventActioned` event will be sent when this check is triggered.",
+                    "type": "boolean"
+                },
                 "rules": {
                     "description": "A list of Rules to run.\n\nIf `Rule` objects are triggered based on `condition` then `actions` will be performed.\n\nCan be `Rule`, `RuleSet`, or the `name` of any **named** `Rule` in your subreddit's configuration.\n\n**If `rules` is an empty array or not present then `actions` are performed immediately.**",
                     "items": {
@@ -1001,6 +1006,28 @@
                     "type": "boolean"
                 }
             },
+            "type": "object"
+        },
+        "DiscordProviderConfig": {
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "type": {
+                    "enum": [
+                        "discord"
+                    ],
+                    "type": "string"
+                },
+                "url": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "name",
+                "type",
+                "url"
+            ],
             "type": "object"
         },
         "DurationObject": {
@@ -1350,6 +1377,70 @@
             },
             "required": [
                 "kind"
+            ],
+            "type": "object"
+        },
+        "NotificationConfig": {
+            "properties": {
+                "events": {
+                    "items": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/definitions/NotificationEventConfig"
+                            },
+                            {
+                                "items": {
+                                    "enum": [
+                                        "configUpdated",
+                                        "eventActioned",
+                                        "pollingError",
+                                        "runStateChanged"
+                                    ],
+                                    "type": "string"
+                                },
+                                "type": "array"
+                            }
+                        ]
+                    },
+                    "type": "array"
+                },
+                "providers": {
+                    "items": {
+                        "$ref": "#/definitions/DiscordProviderConfig"
+                    },
+                    "type": "array"
+                }
+            },
+            "required": [
+                "events",
+                "providers"
+            ],
+            "type": "object"
+        },
+        "NotificationEventConfig": {
+            "properties": {
+                "providers": {
+                    "items": {
+                        "type": "string"
+                    },
+                    "type": "array"
+                },
+                "types": {
+                    "items": {
+                        "enum": [
+                            "configUpdated",
+                            "eventActioned",
+                            "pollingError",
+                            "runStateChanged"
+                        ],
+                        "type": "string"
+                    },
+                    "type": "array"
+                }
+            },
+            "required": [
+                "providers",
+                "types"
             ],
             "type": "object"
         },
@@ -2180,6 +2271,11 @@
                     "pattern": "^[a-zA-Z]([\\w -]*[\\w])?$",
                     "type": "string"
                 },
+                "notifyOnTrigger": {
+                    "default": false,
+                    "description": "If notifications are configured and this is `true` then an `eventActioned` event will be sent when this check is triggered.",
+                    "type": "boolean"
+                },
                 "rules": {
                     "description": "A list of Rules to run.\n\nIf `Rule` objects are triggered based on `condition` then `actions` will be performed.\n\nCan be `Rule`, `RuleSet`, or the `name` of any **named** `Rule` in your subreddit's configuration.\n\n**If `rules` is an empty array or not present then `actions` are performed immediately.**",
                     "items": {
@@ -2491,6 +2587,9 @@
         },
         "nickname": {
             "type": "string"
+        },
+        "notifications": {
+            "$ref": "#/definitions/NotificationConfig"
         },
         "polling": {
             "default": [

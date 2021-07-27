@@ -59,24 +59,6 @@ export class App {
     depletedInSecs: number = 0;
 
     constructor(config: OperatorConfig) {
-        // const {
-        //     subreddits = [],
-        //     clientId = process.env.CLIENT_ID,
-        //     clientSecret = process.env.CLIENT_SECRET,
-        //     accessToken = process.env.ACCESS_TOKEN,
-        //     refreshToken = process.env.REFRESH_TOKEN,
-        //     wikiConfig = process.env.WIKI_CONFIG || 'botconfig/contextbot',
-        //     snooDebug = process.env.SNOO_DEBUG || false,
-        //     dryRun = process.env.DRYRUN || false,
-        //     heartbeat = process.env.HEARTBEAT || 300,
-        //     apiLimitWarning = process.env.API_REMAINING || 250,
-        //     version,
-        //     authorTTL = process.env.AUTHOR_TTL || 10000,
-        //     disableCache = process.env.DISABLE_CACHE || false,
-        //     proxy = process.env.PROXY,
-        //     sharedModqueue = false,
-        // } = options;
-
         const {
             subreddits: {
               names = [],
@@ -166,6 +148,11 @@ export class App {
             if(shouldRetry) {
                 defaultUnmoderatedStream.startInterval();
             } else {
+                for(const m of this.subManagers) {
+                    if(m.modStreamCallbacks.size > 0) {
+                        m.notificationManager.handle('runStateChanged', `${name.toUpperCase()} Polling Stopped`, 'Encountered too many errors from Reddit while polling. Will try to restart on next heartbeat.');
+                    }
+                }
                 this.logger.error(`Mod stream ${name.toUpperCase()} encountered too many errors while polling. Will try to restart on next heartbeat.`);
             }
         }
@@ -178,6 +165,16 @@ export class App {
         defaultModqueueStream.on('error', modStreamErrorListener('modqueue'));
         CacheManager.modStreams.set('unmoderated', defaultUnmoderatedStream);
         CacheManager.modStreams.set('modqueue', defaultModqueueStream);
+
+        const onTerm = () => {
+            for(const m of this.subManagers) {
+                m.notificationManager.handle('runStateChanged', 'Application Shutdown', 'The application was shutdown unexpectedly due to an error.');
+            }
+        }
+
+        process.on('SIGTERM', () => {
+            onTerm();
+        });
     }
 
     async testClient() {
@@ -240,7 +237,7 @@ export class App {
         for (const sub of subsToRun) {
             const manager = new Manager(sub, this.client, this.logger, {dryRun: this.dryRun, sharedModqueue: this.sharedModqueue});
             try {
-                await manager.parseConfiguration('system', true);
+                await manager.parseConfiguration('system', true, {suppressNotification: true});
             } catch (err) {
                 if (!(err instanceof LoggedError)) {
                     this.logger.error(`Config was not valid:`, {subreddit: sub.display_name_prefixed});
@@ -269,11 +266,11 @@ export class App {
                         const newConfig = await s.parseConfiguration();
                         if(newConfig || (s.queueState.state !== RUNNING && s.queueState.causedBy === SYSTEM))
                         {
-                            await s.startQueue();
+                            await s.startQueue('system', {reason: newConfig ? 'Config updated on heartbeat triggered reload' : 'Heartbeat detected non-running queue'});
                         }
                         if(newConfig || (s.eventsState.state !== RUNNING && s.eventsState.causedBy === SYSTEM))
                         {
-                            await s.startEvents();
+                            await s.startEvents('system', {reason: newConfig ? 'Config updated on heartbeat triggered reload' : 'Heartbeat detected non-running events'});
                         }
                         if(s.botState.state !== RUNNING && s.eventsState.state === RUNNING && s.queueState.state === RUNNING) {
                             s.botState = {
@@ -283,7 +280,7 @@ export class App {
                         }
                     } catch (err) {
                         this.logger.info('Stopping event polling to prevent activity processing queue from backing up. Will be restarted when config update succeeds.')
-                        await s.stopEvents();
+                        await s.stopEvents('system', {reason: 'Invalid config will cause events to pile up in queue. Will be restarted when config update succeeds (next heartbeat).'});
                         if(!(err instanceof LoggedError)) {
                             this.logger.error(err, {subreddit: s.displayLabel});
                         }
@@ -292,7 +289,7 @@ export class App {
                         }
                     }
                 }
-                await this.runModStreams();
+                await this.runModStreams(true);
             }
         } catch (err) {
             this.logger.error('Error occurred during heartbeat', err);
@@ -303,11 +300,18 @@ export class App {
         }
     }
 
-    async runModStreams() {
+    async runModStreams(notify = false) {
         for(const [k,v] of CacheManager.modStreams) {
             if(!v.running && v.listeners('item').length > 0) {
                 v.startInterval();
                 this.logger.info(`Starting default ${k.toUpperCase()} mod stream`);
+                if(notify) {
+                    for(const m of this.subManagers) {
+                        if(m.modStreamCallbacks.size > 0) {
+                            m.notificationManager.handle('runStateChanged', `${k.toUpperCase()} Polling Started`, 'Polling was successfully restarted on heartbeat.');
+                        }
+                    }
+                }
             }
         }
     }
@@ -318,7 +322,7 @@ export class App {
         }
         for (const manager of this.subManagers) {
             if (manager.validConfigLoaded && manager.botState.state !== RUNNING) {
-                await manager.start();
+                await manager.start('system', {reason: 'Caused by application startup'});
             }
         }
 
@@ -382,6 +386,7 @@ export class App {
 
                 for(const m of this.subManagers) {
                     m.pauseEvents('system');
+                    m.notificationManager.handle('runStateChanged', 'Hard Limit Triggered', `Hard Limit of ${this.hardLimit} hit (API Remaining: ${this.client.ratelimitRemaining}). Subreddit event polling has been paused.`, 'system', 'warn');
                 }
 
                 this.nannyMode = 'hard';
@@ -422,12 +427,14 @@ export class App {
                     for(const m of offenders) {
                         m.delayBy = 1.5;
                         m.logger.info(`SLOW MODE (Currently ~${formatNumber(m.eventsRollingAvg + m.rulesUniqueRollingAvg)}req/sec)`, {leaf: 'Api Nanny'});
+                        m.notificationManager.handle('runStateChanged', 'Soft Limit Triggered', `Soft Limit of ${this.softLimit} hit (API Remaining: ${this.client.ratelimitRemaining}). Subreddit queue processing will be slowed to 1.5 seconds per.`, 'system', 'warn');
                     }
                 } else {
                     this.logger.info(`Couldn't detect specific offenders, slowing all...`, {leaf: 'Api Nanny'});
                     for(const m of this.subManagers) {
                         m.delayBy = 1.5;
                         m.logger.info(`SLOW MODE (Currently ~${formatNumber(m.eventsRollingAvg + m.rulesUniqueRollingAvg)}req/sec)`, {leaf: 'Api Nanny'});
+                        m.notificationManager.handle('runStateChanged', 'Soft Limit Triggered', `Soft Limit of ${this.softLimit} hit (API Remaining: ${this.client.ratelimitRemaining}). Subreddit queue processing will be slowed to 1.5 seconds per.`, 'system', 'warn');
                     }
                 }
                 this.nannyMode = 'soft';
@@ -437,12 +444,15 @@ export class App {
             if(this.nannyMode !== undefined) {
                 this.logger.info('Turning off due to better conditions...', {leaf: 'Api Nanny'});
                 for(const m of this.subManagers) {
-                    m.delayBy = undefined;
+                    if(m.delayBy !== undefined) {
+                        m.delayBy = undefined;
+                        m.notificationManager.handle('runStateChanged', 'Normal Processing Resumed', 'Slow Mode has been turned off due to better API conditions', 'system');
+                    }
                     if(m.queueState.state === PAUSED && m.queueState.causedBy === SYSTEM) {
-                        m.startQueue();
+                        m.startQueue('system', {reason: 'API Nanny has been turned off due to better API conditions'});
                     }
                     if(m.eventsState.state === PAUSED && m.eventsState.causedBy === SYSTEM) {
-                        await m.startEvents();
+                        await m.startEvents('system', {reason: 'API Nanny has been turned off due to better API conditions'});
                     }
                 }
                 this.nannyMode = undefined;

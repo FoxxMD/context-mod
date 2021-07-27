@@ -45,6 +45,7 @@ export class Check implements ICheck {
         exclude: AuthorCriteria[]
     };
     dryRun?: boolean;
+    notifyOnTrigger: boolean;
     resources: SubredditResources;
 
     constructor(options: CheckOptions) {
@@ -54,6 +55,7 @@ export class Check implements ICheck {
             condition = 'AND',
             rules = [],
             actions = [],
+            notifyOnTrigger = false,
             subredditName,
             itemIs = [],
             authorIs: {
@@ -71,6 +73,7 @@ export class Check implements ICheck {
 
         this.name = name;
         this.description = description;
+        this.notifyOnTrigger = notifyOnTrigger;
         this.condition = condition;
         this.itemIs = itemIs;
         this.authorIs = {
@@ -139,7 +142,7 @@ export class Check implements ICheck {
         }
         runStats.push(`${this.actions.length} Actions`);
         // not sure if this should be info or verbose
-        this.logger.info(`${type.toUpperCase()} (${this.condition}) => ${runStats.join(' | ')}${this.description !== undefined ? ` => ${this.description}` : ''}`);
+        this.logger.info(`${type.toUpperCase()} (${this.condition})${this.notifyOnTrigger ? ' ||Notify on Trigger|| ' : ''} => ${runStats.join(' | ')}${this.description !== undefined ? ` => ${this.description}` : ''}`);
         if (this.rules.length === 0 && this.itemIs.length === 0 && this.authorIs.exclude.length === 0 && this.authorIs.include.length === 0) {
             this.logger.warn('No rules, item tests, or author test found -- this check will ALWAYS PASS!');
         }
@@ -300,6 +303,7 @@ export interface CheckOptions extends ICheck {
     actions: ActionConfig[]
     logger: Logger
     subredditName: string
+    notifyOnTrigger?: boolean
 }
 
 export interface CheckJson extends ICheck {
@@ -327,6 +331,13 @@ export interface CheckJson extends ICheck {
      * @examples [[{"kind": "comment", "content": "this is the content of the comment", "distinguish": true}, {"kind": "lock"}]]
      * */
     actions: Array<ActionTypeJson>
+
+    /**
+     * If notifications are configured and this is `true` then an `eventActioned` event will be sent when this check is triggered.
+     *
+     * @default false
+     * */
+    notifyOnTrigger?: boolean,
 }
 
 export interface SubmissionCheckJson extends CheckJson {
