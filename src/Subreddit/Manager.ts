@@ -99,7 +99,7 @@ export class Manager {
         causedBy: SYSTEM
     }
 
-    notificationManager!: NotificationManager;
+    notificationManager: NotificationManager;
 
     // use by api nanny to slow event consumption
     delayBy?: number;
@@ -195,6 +195,7 @@ export class Manager {
         this.sharedModqueue = sharedModqueue;
         this.subreddit = sub;
         this.client = client;
+        this.notificationManager = new NotificationManager(this.logger, this.subreddit, this.displayLabel);
 
         this.queue = queue(async (task: CheckTask, cb) => {
             if(this.delayBy !== undefined) {
