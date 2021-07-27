@@ -481,7 +481,7 @@ export class Manager {
                     runActions = await check.runActions(item, currentResults.filter(x => x.triggered), dryRun);
                     actionsRun = runActions.length;
 
-                    if(!check.notifyOnTrigger) {
+                    if(check.notifyOnTrigger) {
                         const ar = runActions.map(x => x.getActionUniqueName()).join(', ');
                         this.notificationManager.handle('eventActioned', 'Check Triggered', `Check "${check.name}" was triggered on Event: \n ${ePeek} \n\n with the following actions run: ${ar}`);
                     }
