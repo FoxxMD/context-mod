@@ -106,6 +106,8 @@ class NotificationManager {
         }
         footer.push(`* Notification triggered by "${name}"`);
 
+        this.logger.info(`Sending notification for ${name} to providers: ${notifiers.map(x => `${x.name} (${x.type})`).join(', ')}`);
+
         for (const n of notifiers) {
             n.handle({
                 title: `${title} (${this.name})`,
