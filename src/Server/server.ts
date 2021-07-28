@@ -360,7 +360,7 @@ const rcbServer = async function (options: OperatorConfig) {
                     if(minutes < 10) {
                         sd.stats.cache.requestRate = formatNumber((10/minutes) * sd.stats.cache.totalRequests, {toFixed: 0, round: {enable: true, indicate: true}});
                     } else {
-                        sd.stats.cache.requestRate = formatNumber((minutes/10) * sd.stats.cache.totalRequests, {toFixed: 0, round: {enable: true, indicate: true}});
+                        sd.stats.cache.requestRate = formatNumber(sd.stats.cache.totalRequests / (minutes/10), {toFixed: 0, round: {enable: true, indicate: true}});
                     }
                 } else {
                     sd.stats.cache.requestRate = 0;
