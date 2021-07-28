@@ -73,12 +73,18 @@ To provide data/environmental variables to your application refer to the [operat
 
 ### Locally
 
+Requirements:
+
+* Typescript >=4.3.5
+* Node >=15
+
 Clone this repository somewhere and then install from the working directory
 
 ```bash
 git clone https://github.com/FoxxMD/reddit-context-bot.git .
 cd reddit-context-bot
 npm install
+tsc -p .
 ```
 
 ### [Docker](https://hub.docker.com/r/foxxmd/reddit-context-bot)
