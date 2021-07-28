@@ -11,7 +11,7 @@ class DiscordNotifier {
         this.url = url;
     }
 
-    handle(val: NotificationContent) {
+    async handle(val: NotificationContent) {
         const h = new webhook.Webhook(this.url);
 
         const hook = new webhook.MessageBuilder();
@@ -39,7 +39,7 @@ class DiscordNotifier {
                 break;
         }
 
-        h.send(hook);
+        await h.send(hook);
     }
 }
 
