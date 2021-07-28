@@ -483,7 +483,7 @@ export class Manager {
 
                     if(check.notifyOnTrigger) {
                         const ar = runActions.map(x => x.getActionUniqueName()).join(', ');
-                        this.notificationManager.handle('eventActioned', 'Check Triggered', `Check "${check.name}" was triggered on Event: \n ${ePeek} \n\n with the following actions run: ${ar}`);
+                        this.notificationManager.handle('eventActioned', 'Check Triggered', `Check "${check.name}" was triggered on Event: \n\n ${ePeek} \n\n with the following actions run: ${ar}`);
                     }
                     break;
                 }
