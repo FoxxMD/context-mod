@@ -5,3 +5,4 @@ Dockerfile
 .git
 src/logs
 /docs
+.github
