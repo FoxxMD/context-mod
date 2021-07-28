@@ -41,6 +41,15 @@ preRunCmd.allowUnknownOption();
 const program = new Command();
 
 (async function () {
+    let app: App;
+    let errorReason: string | undefined;
+    process.on('SIGTERM', async () => {
+        debugger;
+        if(app !== undefined) {
+            await app.onTerminate(errorReason);
+        }
+        process.exit(errorReason === undefined ? 0 : 1);
+    });
     try {
 
         let runCommand = program
@@ -77,11 +86,12 @@ const program = new Command();
                         if (redirectUri === undefined) {
                             logger.warn(`No 'redirectUri' found in arg/env. Bot will still run but web interface will not be accessible.`);
                         }
-                        const server = createWebServer(config);
-                        await server;
+                        const [server, bot] = createWebServer(config);
+                        app = bot;
+                        await server();
                     }
                 } else {
-                    const app = new App(config);
+                    app = new App(config);
                     await app.buildManagers();
                     await app.runManagers();
                 }
@@ -103,7 +113,7 @@ const program = new Command();
             .action(async (activityIdentifier, type, commandOptions = {}) => {
                 const config = buildOperatorConfigWithDefaults(await parseOperatorConfigFromSources(commandOptions));
                 const {checks = []} = commandOptions;
-                const app = new App(config);
+                app = new App(config);
 
                 let a;
                 const commentId = commentReg(activityIdentifier);
@@ -164,7 +174,7 @@ const program = new Command();
                 const config = buildOperatorConfigWithDefaults(await parseOperatorConfigFromSources(opts));
                 const {checks = []} = opts;
                 const {subreddits: {names}} = config;
-                const app = new App(config);
+                app = new App(config);
 
                 await app.buildManagers(names);
 
@@ -193,6 +203,7 @@ const program = new Command();
             }
             console.log(err);
         }
+        errorReason = `Application crashed due to an uncaught error: ${err.message}`;
         process.kill(process.pid, 'SIGTERM');
     }
 }());

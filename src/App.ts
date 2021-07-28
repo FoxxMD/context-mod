@@ -165,16 +165,12 @@ export class App {
         defaultModqueueStream.on('error', modStreamErrorListener('modqueue'));
         CacheManager.modStreams.set('unmoderated', defaultUnmoderatedStream);
         CacheManager.modStreams.set('modqueue', defaultModqueueStream);
+    }
 
-        const onTerm = () => {
-            for(const m of this.subManagers) {
-                m.notificationManager.handle('runStateChanged', 'Application Shutdown', 'The application was shutdown');
-            }
+    async onTerminate(reason = 'The application was shutdown') {
+        for(const m of this.subManagers) {
+            await m.notificationManager.handle('runStateChanged', 'Application Shutdown', reason);
         }
-
-        process.on('SIGTERM', () => {
-            onTerm();
-        });
     }
 
     async testClient() {
@@ -235,7 +231,7 @@ export class App {
         let subSchedule: Manager[] = [];
         // get configs for subs we want to run on and build/validate them
         for (const sub of subsToRun) {
-            const manager = new Manager(sub, this.client, this.logger, {dryRun: this.dryRun, sharedModqueue: this.sharedModqueue});
+            const manager = new Manager(sub, this.client, this.logger, {dryRun: this.dryRun, sharedModqueue: this.sharedModqueue, wikiLocation: this.wikiLocation});
             try {
                 await manager.parseConfiguration('system', true, {suppressNotification: true});
             } catch (err) {

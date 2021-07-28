@@ -16,13 +16,14 @@
 * [Common Resources](#common-resources)
   * [Activities `window`](#activities-window)
   * [Comparisons](#thresholds-and-comparisons)
+  * [Activity Templating](/docs/actionTemplating.md)
 * [Best Practices](#best-practices)
 * [Subreddit-ready Configurations](#subreddit-ready-configurations)
 * FAQ
 
 ## Getting Started
 
-Review **at least** the **How It Works** and **Concepts** below and then head to the [**Getting Started documentation.**](/docs/gettingStarted.md)
+Review **at least** the **How It Works** and **Concepts** below and then head to the [**Getting Started documentation.**](/docs/gettingStartedMod.md)
 
 ## How It Works
 
@@ -32,7 +33,7 @@ RCB's lifecycle looks like this:
 
 #### 1) A new event in your subreddit is received by RCB
 
-The events RCB watches for are configured by you. These can be new modqueue items, submissions, or comments.
+The events RCB watches for are configured by you. These can be new modqueue/unmoderated items, submissions, or comments.
 
 #### 2) RCB sequentially processes each Check in your configuration
 
@@ -125,7 +126,7 @@ For detailed explanation and options of what individual Actions can do [see the 
 
 ### Filters
 
-TODO
+authorIs/itemIs TODO
 
 ## Configuration
 

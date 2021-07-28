@@ -55,6 +55,7 @@ export interface CheckTask {
 
 export interface RuntimeManagerOptions extends ManagerOptions {
     sharedModqueue?: boolean;
+    wikiLocation?: string;
 }
 
 export class Manager {
@@ -65,7 +66,7 @@ export class Manager {
     submissionChecks!: SubmissionCheck[];
     commentChecks!: CommentCheck[];
     resources!: SubredditResources;
-    wikiLocation: string = 'botconfig/contextbot';
+    wikiLocation: string;
     lastWikiRevision?: DayjsObj
     lastWikiCheck: DayjsObj = dayjs();
     //wikiUpdateRunning: boolean = false;
@@ -177,7 +178,7 @@ export class Manager {
     }
 
     constructor(sub: Subreddit, client: Snoowrap, logger: Logger, opts: RuntimeManagerOptions = {}) {
-        const {dryRun, sharedModqueue = false} = opts;
+        const {dryRun, sharedModqueue = false, wikiLocation = 'botconfig/contextbot'} = opts;
         this.displayLabel = opts.nickname || `${sub.display_name_prefixed}`;
         const getLabels = this.getCurrentLabels;
         const getDisplay = this.getDisplay;
@@ -192,6 +193,7 @@ export class Manager {
             }
         }, mergeArr);
         this.globalDryRun = dryRun;
+        this.wikiLocation = wikiLocation;
         this.sharedModqueue = sharedModqueue;
         this.subreddit = sub;
         this.client = client;
@@ -483,7 +485,7 @@ export class Manager {
 
                     if(check.notifyOnTrigger) {
                         const ar = runActions.map(x => x.getActionUniqueName()).join(', ');
-                        this.notificationManager.handle('eventActioned', 'Check Triggered', `Check "${check.name}" was triggered on Event: \n ${ePeek} \n\n with the following actions run: ${ar}`);
+                        this.notificationManager.handle('eventActioned', 'Check Triggered', `Check "${check.name}" was triggered on Event: \n\n ${ePeek} \n\n with the following actions run: ${ar}`);
                     }
                     break;
                 }

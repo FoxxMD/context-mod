@@ -17,18 +17,19 @@ An example of the above that Context Bot can do now:
 
 Some feature highlights:
 * Simple rule-action behavior can be combined to create any level of complexity in behavior
-* One instance can handle managing many subreddits (as many as it has moderator permissions in!)
-* Per-subreddit configuration is handled by JSON stored in the subreddit wiki
-* Any text-based actions (comment, submission, message, usernotes, etc...) can be configured via a wiki page or raw text in JSON
-* All text-based actions support [mustache](https://mustache.github.io) templating
+* One instance can manage all moderated subreddits for the authenticated account
+* **Per-subreddit configuration** is handled by JSON stored in the subreddit wiki
+* Any text-based actions (comment, submission, message, usernotes, ban, etc...) can be configured via a wiki page or raw text in JSON and support [mustache](https://mustache.github.io) [templating](/docs/actionTemplating.md)
 * History-based rules support multiple "valid window" types -- [ISO 8601 Durations](https://en.wikipedia.org/wiki/ISO_8601#Durations), [Day.js Durations](https://day.js.org/docs/en/durations/creating), and submission/comment count limits.
-* Checks/Rules support skipping behavior based on:
-  * author criteria (name, css flair/text, moderator status, and [Toolbox User Notes](https://www.reddit.com/r/toolbox/wiki/docs/usernotes))
+* Support Activity skipping based on:
+  * Author criteria (name, css flair/text, age, karma, moderator status, and [Toolbox User Notes](https://www.reddit.com/r/toolbox/wiki/docs/usernotes))
   * Activity state (removed, locked, distinguished, etc.)
-* Rules and Actions support named references so you write rules/actions once and reference them anywhere
-* User-configurable global/subreddit-level API caching with optional redis-backend
+* Rules and Actions support named references (write once, reference anywhere)
+* Global/subreddit-level **API caching**
 * Support for [Toolbox User Notes](https://www.reddit.com/r/toolbox/wiki/docs/usernotes) as criteria or Actions (writing notes)
 * Docker container support
+* Event notification via Discord
+* **Web interface** for monitoring and administration
 
 # Table of Contents
 
@@ -36,10 +37,13 @@ Some feature highlights:
 * [Installation](#installation)
 * [Configuration And Docs](#configuration)
 * [Usage](#usage)
+* [Web UI and Screenshots](#web-ui-and-screenshots)
 
 ### How It Works
 
-Context Bot's configuration is made up of a list of **Checks**. Each **Check** consists of :
+Each subreddit using the RCB bot configures its behavior via their own wiki page. 
+
+When a monitored **Event** (new comment/submission, new modqueue item, etc.) is detected the bot runs through a list of **Checks** to determine what to do with the **Activity** from that Event. Each **Check** consists of :
 
 #### Kind
 
@@ -47,22 +51,32 @@ Is this check for a submission or comment?
 
 #### Rules
 
-A list of **Rule** objects to run against the activity. Triggered Rules can cause the whole Check to trigger and run its **Actions**
+A list of **Rule** objects to run against the **Activity**. Triggered Rules can cause the whole Check to trigger and run its **Actions**
 
 #### Actions
 
-A list of **Action** objects that describe what the bot should do with the activity or author of the activity. The bot will run **all** Actions in this list.
+A list of **Action** objects that describe what the bot should do with the **Activity** or **Author** of the activity (comment, remove, approve, etc.). The bot will run **all** Actions in this list.
 
 ___
 
 The **Checks** for a subreddit are split up into **Submission Checks** and **Comment Checks** based on their **kind**. Each list of checks is run independently based on when events happen (submission or comment).
 
-When an event occurs all Checks of that type are run in the order they were listed in the configuration. When one check is triggered (an action is performed) the remaining checks will not be run.
+When an Event occurs all Checks of that type are run in the order they were listed in the configuration. When one check is triggered (an Action is performed) the remaining checks will not be run.
+
+___
+
+[Learn more about the RCB lifecycle and core concepts in the docs.](/docs#how-it-works)
 
 ## Installation
 
+To provide data/environmental variables to your application refer to the [operator configuration guide.](docs/operatorConfiguration.md)
 
 ### Locally
+
+Requirements:
+
+* Typescript >=4.3.5
+* Node >=15
 
 Clone this repository somewhere and then install from the working directory
 
@@ -70,6 +84,7 @@ Clone this repository somewhere and then install from the working directory
 git clone https://github.com/FoxxMD/reddit-context-bot.git .
 cd reddit-context-bot
 npm install
+tsc -p .
 ```
 
 ### [Docker](https://hub.docker.com/r/foxxmd/reddit-context-bot)
@@ -78,7 +93,7 @@ npm install
 foxxmd/reddit-context-bot:latest
 ```
 
-Adding [**environmental variables**](#usage) to your `docker run` command will pass them through to the app EX:
+Adding **environmental variables** to your `docker run` command will pass them through to the app EX:
 ```
 docker run -e "CLIENT_ID=myId" ... foxxmd/reddit-context-bot
 ```
@@ -95,154 +110,30 @@ Context Bot's configuration can be written in JSON, [JSON5](https://json5.org/) 
 
 I suggest using [Atlassian JSON Schema Viewer](https://json-schema.app/start) ([direct link](https://json-schema.app/view/%23?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Freddit-context-bot%2Fmaster%2Fsrc%2FSchema%2FApp.json)) so you can view all documentation while also interactively writing and validating your config! From there you can drill down into any object, see its requirements, view an example JSON document, and live-edit your configuration on the right-hand side.
 
-### Action Templating
-
-Actions that can submit text (Report, Comment) will have their `content` values run through a [Mustache Template](https://mustache.github.io/). This means you can insert data generated by Rules into your text before the Action is performed.
-
-See here for a [cheatsheet](https://gist.github.com/FoxxMD/d365707cf99fdb526a504b8b833a5b78) and [here](https://www.tsmean.com/articles/mustache/the-ultimate-mustache-tutorial/) for a more thorough tutorial.
-
-All Actions with `content` have access to this data:
-
-```json5
-{
-    item: {
-        kind: 'string', // the type of item (comment/submission)
-        author: 'string', // name of the item author (reddit user)
-        permalink: 'string', // a url to the item
-        url: 'string', // if the item is a Submission then its URL (external for link type submission, reddit link for self-posts)
-        title: 'string', // if the item is a Submission, then the title of the Submission,
-        botLink: 'string' // a link to the bot's FAQ
-    },
-    rules: {
-        // contains all rules that were run and are accessible using the name, lowercased, with all spaces/dashes/underscores removed
-    }
-}
-
-```
-
-The properties of `rules` are accessible using the name, lower-cased, with all spaces/dashes/underscores. If no name is given `kind` is used as `name` Example:
-
-```
-"rules": [
-  {
-    "name": "My Custom-Recent Activity Rule", // mycustomrecentactivityrule
-    "kind": "recentActivity"
-  },
-  {
-    // name = repeatsubmission
-    "kind": "repeatActivity",
-  }
-]
-```
-
-**To see what data is available for individual Rules [consult the schema](#configuration) for each Rule.**
-
-#### Quick Templating Tutorial
-
-<details>
-
-As a quick example for how you will most likely be using templating -- wrapping a variable in curly brackets, `{{variable}}`, will cause the variable value to be rendered instead of the brackets:
-```
-myVariable = 50;
-myOtherVariable = "a text fragment"
-template = "This is my template, the variable is {{myVariable}}, my other variable is {{myOtherVariable}}, and that's it!";
-
-console.log(Mustache.render(template, {myVariable});
-// will render...
-"This is my template, the variable is 50, my other variable is a text fragment, and that's it!";
-```
-
-**Note: When accessing an object or its properties you must use dot notation**
-```
-const item = {
-aProperty: 'something',
-anotherObject: {
-bProperty: 'something else'
-}
-}
-const content = "My content will render the property {{item.aProperty}} like this, and another nested property {{item.anotherObject.bProperty}} like this."
-```
-</details>
-
 ## Usage
 
-```
-Usage: index [options] [command]
+* For operating your own application/bot see [Operator Configuration](docs/operatorConfiguration.md)
+  * CLI usage specifically is at  [Operator Configuration#Cli Usage](docs/operatorConfiguration.md#cli-usage)
+* For subreddit moderators visit your operator's web interface or refer to the web interface documentation (TODO)
 
-Options:
-  -h, --help                                   display help for command
+## Web UI and Screenshots
 
-Commands:
-  run [options] [interface]                    Monitor new activities from configured subreddits.
-  check [options] <activityIdentifier> [type]  Run check(s) on a specific activity
-  unmoderated [options] <subreddits...>        Run checks on all unmoderated activity in the modqueue
-  help [command]                               display help for command
+RCB comes equipped with a web interface designed for use by both moderators and bot operators. Some feature highlights:
 
+* Authentication via Reddit OAuth -- only accessible if you are the bot operator or a moderator of a subreddit the bot moderates
+* Monitor API usage/rates
+* Monitoring and administration **per subreddit:**
+  * Start/stop/pause various bot components
+  * View statistics on bot usage (# of events, checks run, actions performed) and cache usage
+  * View various parts of your subreddit's configuration and manually update configuration
+  * View **real-time logs** of what the bot is doing on your subreddit
+  * **Run bot on any permalink**
 
-Options:
-  -c, --operatorConfig <path>   An absolute path to a JSON file to load all parameters from (default: process.env.OPERATOR_CONFIG)
-  -i, --clientId <id>           Client ID for your Reddit application (default: process.env.CLIENT_ID)
-  -e, --clientSecret <secret>   Client Secret for your Reddit application (default: process.env.CLIENT_SECRET)
-  -a, --accessToken <token>     Access token retrieved from authenticating an account with your Reddit Application (default: process.env.ACCESS_TOKEN)
-  -r, --refreshToken <token>    Refresh token retrieved from authenticating an account with your Reddit Application (default: process.env.REFRESH_TOKEN)
-  -u, --redirectUri <uri>       Redirect URI for your Reddit application (default: process.env.REDIRECT_URI)
-  -t, --sessionSecret <secret>  Secret use to encrypt session id/data (default: process.env.SESSION_SECRET || a random string)
-  -s, --subreddits <list...>    List of subreddits to run on. Bot will run on all subs it has access to if not defined (default: process.env.SUBREDDITS)
-  -d, --logDir [dir]            Absolute path to directory to store rotated logs in. Leaving undefined disables rotating logs (default: process.env.LOG_DIR)
-  -l, --logLevel <level>        Minimum level to log at (default: process.env.LOG_LEVEL || verbose)
-  -w, --wikiConfig <path>       Relative url to contextbot wiki page EX https://reddit.com/r/subreddit/wiki/<path> (default: process.env.WIKI_CONFIG || 'botconfig/contextbot')
-  --snooDebug                   Set Snoowrap to debug. If undefined will be on if logLevel='debug' (default: process.env.SNOO_DEBUG)
-  --authorTTL <ms>              Set the TTL (ms) for the Author Activities shared cache (default: process.env.AUTHOR_TTL || 60000)
-  --heartbeat <s>               Interval, in seconds, between heartbeat checks. (default: process.env.HEARTBEAT || 300)
-  --softLimit <limit>           When API limit remaining (600/10min) is lower than this subreddits will have SLOW MODE enabled (default: process.env.SOFT_LIMIT || 250)
-  --hardLimit <limit>           When API limit remaining (600/10min) is lower than this all subreddit polling will be paused until api limit reset (default: process.env.SOFT_LIMIT || 250)
-  --dryRun                      Set all subreddits in dry run mode, overriding configurations (default: process.env.DRYRUN || false)
-  --proxy <proxyEndpoint>       Proxy Snoowrap requests through this endpoint (default: process.env.PROXY)
-  --operator <name>             Username of the reddit user operating this application, used for displaying OP level info/actions in UI (default: process.env.OPERATOR)
-  --operatorDisplay <name>      An optional name to display who is operating this application in the UI (default: process.env.OPERATOR_DISPLAY || Anonymous)
-  -p, --port <port>             Port for web server to listen on (default: process.env.PORT || 8085)
-  -q, --shareMod                If enabled then all subreddits using the default settings to poll "unmoderated" or "modqueue" will retrieve results from a shared request to /r/mod (default: process.env.SHARE_MOD || false)
-  -h, --help                    display help for command
-```
+![Subreddit View](docs/screenshots/subredditStatus.jpg)
 
-### Logging
+Additionally, a helper webpage is available to help initial setup of your bot with reddit's oauth authentication. [Learn more about using the oauth helper.](docs/botAuthentication.md#rcb-oauth-helper-recommended)
 
-### Reddit App??
-
-To use this bot you must do two things:
-* Create a reddit application
-* Authenticate that application to act as a user (login to the application with an account)
-
-#### Create Application
-
-Visit [your reddit preferences](https://www.reddit.com/prefs/apps) and at the bottom of the page go through the **create an(other) app** process.
-* Choose **script**
-* For redirect uri use https://not-an-aardvark.github.io/reddit-oauth-helper/
-* Write down your **Client ID** and **Client Secret** somewhere
-
-#### Authenticate an Account
-
-Visit https://not-an-aardvark.github.io/reddit-oauth-helper/
-* Input your **Client ID** and **Client Secret** in the text boxes with those names.
-* Choose scopes. **It is very important you check everything on this list or Context Bot will not work correctly**
-    * edit
-    * flair
-    * history
-    * identity
-    * modcontributors
-    * modflair
-    * modposts
-    * modself
-    * mysubreddits
-    * read
-    * report
-    * submit
-    * wikiread
-    * wikiedit (if you are using Toolbox User Notes)
-* Click **Generate tokens**, you will get a popup asking you to approve access (or login) -- **the account you approve access with is the account that Bot will control.**
-* After approving an **Access Token** and **Refresh Token** will be shown at the bottom of the page. Write these down. 
-  
-You should now have all the information you need to start the bot.
+![Oauth View](docs/screenshots/oauth.jpg)
 
 ## License
 

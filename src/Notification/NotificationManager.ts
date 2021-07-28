@@ -64,7 +64,7 @@ class NotificationManager {
         }
     }
 
-    handle(name: NotificationEventType, title: string, body?: string, causedBy?: string, logLevel?: string) {
+    async handle(name: NotificationEventType, title: string, body?: string, causedBy?: string, logLevel?: string) {
 
         if (this.notifiers.length === 0 || this.events.length === 0) {
             return;
@@ -109,7 +109,7 @@ class NotificationManager {
         this.logger.info(`Sending notification for ${name} to providers: ${notifiers.map(x => `${x.name} (${x.type})`).join(', ')}`);
 
         for (const n of notifiers) {
-            n.handle({
+            await n.handle({
                 title: `${title} (${this.name})`,
                 body: body || '',
                 footer: footer.length > 0 ? footer.join('\n') : undefined,
