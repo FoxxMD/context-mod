@@ -6,7 +6,7 @@
   "scripts": {
     "test": "echo \"Error: no tests installed\" && exit 1",
     "build": "tsc",
-    "start": "node server.js",
+    "start": "node src/index.js run",
     "guard": "ts-auto-guard src/JsonConfig.ts",
     "schema": "npm run -s schema-app & npm run -s schema-ruleset & npm run -s schema-rule & npm run -s schema-action & npm run -s schema-config",
     "schema-app": "typescript-json-schema tsconfig.json JSONConfig --out src/Schema/App.json --required --tsNodeRegister --refs",
