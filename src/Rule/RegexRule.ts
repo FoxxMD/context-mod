@@ -379,7 +379,7 @@ export interface RegexRuleOptions extends RegexConfig, RuleOptions {
  *
  * Optionally, specify a `window` of the User's history to additionally test against
  *
- * Available data for [Action templating](https://github.com/FoxxMD/reddit-context-bot#action-templating):
+ * Available data for [Action templating](https://github.com/FoxxMD/context-mod#action-templating):
  *
  * */
 export interface RegexRuleJSONConfig extends RegexConfig, RuleJSONConfig {

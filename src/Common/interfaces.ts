@@ -240,7 +240,7 @@ export interface RichContent {
      *
      *  * EX `this is **bold** markdown text` => "this is **bold** markdown text"
      *
-     * All Content is rendered using [mustache](https://github.com/janl/mustache.js/#templates) to enable [Action Templating](https://github.com/FoxxMD/reddit-context-bot#action-templating).
+     * All Content is rendered using [mustache](https://github.com/janl/mustache.js/#templates) to enable [Action Templating](https://github.com/FoxxMD/context-mod#action-templating).
      *
      * The following properties are always available in the template (view individual Rules to see rule-specific template data):
      * ```
@@ -409,7 +409,7 @@ export interface Footer {
      *
      * If `false` no footer is appended
      *
-     * If `string` the value is rendered as markdown or will use `wiki:` parser the same way `content` properties on Actions are rendered with [templating](https://github.com/FoxxMD/reddit-context-bot#action-templating).
+     * If `string` the value is rendered as markdown or will use `wiki:` parser the same way `content` properties on Actions are rendered with [templating](https://github.com/FoxxMD/context-mod#action-templating).
      *
      * If footer is `undefined` (not set) the default footer will be used:
      *
@@ -418,7 +418,7 @@ export interface Footer {
      *
      * *****
      *
-     * The following properties are available for [templating](https://github.com/FoxxMD/reddit-context-bot#action-templating):
+     * The following properties are available for [templating](https://github.com/FoxxMD/context-mod#action-templating):
      * ```
      * subName    => name of subreddit Action was performed in (EX 'mealtimevideos')
      * permaLink  => The permalink for the Activity the Action was performed on EX https://reddit.com/r/yourSub/comments/o1h0i0/title_name/1v3b7x
@@ -478,7 +478,7 @@ export interface ManagerOptions {
      *
      * If `false` no footer is appended
      *
-     * If `string` the value is rendered as markdown or will use `wiki:` parser the same way `content` properties on Actions are rendered with [templating](https://github.com/FoxxMD/reddit-context-bot#action-templating).
+     * If `string` the value is rendered as markdown or will use `wiki:` parser the same way `content` properties on Actions are rendered with [templating](https://github.com/FoxxMD/context-mod#action-templating).
      *
      * If footer is `undefined` (not set) the default footer will be used:
      *
@@ -487,7 +487,7 @@ export interface ManagerOptions {
      *
      * *****
      *
-     * The following properties are available for [templating](https://github.com/FoxxMD/reddit-context-bot#action-templating):
+     * The following properties are available for [templating](https://github.com/FoxxMD/context-mod#action-templating):
      * ```
      * subName    => name of subreddit Action was performed in (EX 'mealtimevideos')
      * permaLink  => The permalink for the Activity the Action was performed on EX https://reddit.com/r/yourSub/comments/o1h0i0/title_name/1v3b7x

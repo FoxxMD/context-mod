@@ -212,7 +212,7 @@ export interface RecentActivityRuleOptions extends RecentActivityConfig, RuleOpt
 /**
  * Checks a user's history for any Activity (Submission/Comment) in the subreddits specified in thresholds
  *
- * Available data for [Action templating](https://github.com/FoxxMD/reddit-context-bot#action-templating):
+ * Available data for [Action templating](https://github.com/FoxxMD/context-mod#action-templating):
  *
  * ```
  * summary    => comma-deliminated list of subreddits that hit the threshold and their count EX subredditA(1), subredditB(4),...
