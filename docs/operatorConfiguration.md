@@ -151,6 +151,15 @@ const config = {
         // Default interval, in seconds, to poll activity sources at
         interval: 30,
     },
+    queue: {
+        // Set the number of maximum concurrent workers any subreddit can use.
+        //
+        // Subreddits may define their own number of max workers in their config but 
+        // the application will never allow any subreddit's max workers to be larger than the operator 
+        //
+        // NOTE: Do not increase this unless you are certain you know what you are doing! The default is suitable for the majority of use cases.
+        maxWorkers: 1,  
+    },
     web: {
         // Whether the web server interface should be started
         // In most cases this does not need to be specified as the application will automatically detect if it is possible to start it --
