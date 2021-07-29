@@ -17,7 +17,7 @@ class NotificationManager {
     subreddit: Subreddit;
     name: string;
 
-    constructor(logger: Logger, subreddit: Subreddit, displayName: string, config?: NotificationConfig) {
+    constructor(logger: Logger, subreddit: Subreddit, displayName: string, botName: string, config?: NotificationConfig) {
         this.logger = logger.child({leaf: 'Notifications'}, mergeArr);
         this.subreddit = subreddit;
         this.name = displayName;
@@ -27,7 +27,7 @@ class NotificationManager {
             for (const p of providers) {
                 switch (p.type) {
                     case 'discord':
-                        this.notifiers.push(new DiscordNotifier(p.name, p.url));
+                        this.notifiers.push(new DiscordNotifier(p.name, botName, p.url));
                         break;
                     default:
                         this.logger.warn(`Notification provider type of ${p.type} not recognized.`);

@@ -3,12 +3,14 @@ import {NotificationContent} from "../Common/interfaces";
 
 class DiscordNotifier {
     name: string
+    botName: string
     type: string = 'Discord';
     url: string;
 
-    constructor(name: string, url: string) {
+    constructor(name: string, botName: string, url: string) {
         this.name = name;
         this.url = url;
+        this.botName = botName;
     }
 
     async handle(val: NotificationContent) {
@@ -18,7 +20,7 @@ class DiscordNotifier {
 
         const {logLevel, title, footer, body = ''} = val;
 
-        hook.setName('RCB')
+        hook.setName(this.botName === 'ContextMod' ? 'ContextMod' : `(ContextMod) ${this.botName}`)
             .setTitle(title)
             .setDescription(body)
 

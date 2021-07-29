@@ -57,6 +57,9 @@ const config = {
         // ENV => OPERATOR_DISPLAY
         // ARG => --operator <name>
         display: undefined,
+        // Name to display for the bot in web interface, logs, notifications...
+        // If not defined will use authenticated Reddit account IE u/yourBot
+        botName: undefined
     },
     // Values required to interact with Reddit's API
     credentials: {

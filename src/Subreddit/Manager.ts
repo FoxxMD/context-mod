@@ -56,12 +56,14 @@ export interface CheckTask {
 export interface RuntimeManagerOptions extends ManagerOptions {
     sharedModqueue?: boolean;
     wikiLocation?: string;
+    botName: string;
 }
 
 export class Manager {
     subreddit: Subreddit;
     client: Snoowrap;
     logger: Logger;
+    botName: string;
     pollOptions: PollingOptionsStrong[] = [];
     submissionChecks!: SubmissionCheck[];
     commentChecks!: CommentCheck[];
@@ -177,8 +179,8 @@ export class Manager {
         return this.displayLabel;
     }
 
-    constructor(sub: Subreddit, client: Snoowrap, logger: Logger, opts: RuntimeManagerOptions = {}) {
-        const {dryRun, sharedModqueue = false, wikiLocation = 'botconfig/contextbot'} = opts;
+    constructor(sub: Subreddit, client: Snoowrap, logger: Logger, opts: RuntimeManagerOptions = {botName: 'ContextMod'}) {
+        const {dryRun, sharedModqueue = false, wikiLocation = 'botconfig/contextbot', botName} = opts;
         this.displayLabel = opts.nickname || `${sub.display_name_prefixed}`;
         const getLabels = this.getCurrentLabels;
         const getDisplay = this.getDisplay;
@@ -197,7 +199,8 @@ export class Manager {
         this.sharedModqueue = sharedModqueue;
         this.subreddit = sub;
         this.client = client;
-        this.notificationManager = new NotificationManager(this.logger, this.subreddit, this.displayLabel);
+        this.botName = botName;
+        this.notificationManager = new NotificationManager(this.logger, this.subreddit, this.displayLabel, botName);
 
         this.queue = queue(async (task: CheckTask, cb) => {
             if(this.delayBy !== undefined) {
@@ -285,7 +288,7 @@ export class Manager {
                 this.logger.info(`Polling Info => ${pollingInfo(p)}`)
             }
 
-            this.notificationManager = new NotificationManager(this.logger, this.subreddit, this.displayLabel, notifications);
+            this.notificationManager = new NotificationManager(this.logger, this.subreddit, this.displayLabel, this.botName, notifications);
             const {events, notifiers} = this.notificationManager.getStats();
             const notifierContent = notifiers.length === 0 ? 'None' : notifiers.join(', ');
             const eventContent = events.length === 0 ? 'None' : events.join(', ');

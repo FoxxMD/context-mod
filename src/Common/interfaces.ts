@@ -701,8 +701,24 @@ export interface ManagerStateChangeOption {
 
 export interface OperatorJsonConfig {
     operator?: {
+        /**
+         * The name of the Reddit account, without prefix, that the operator of this bot uses.
+         *
+         * This is used for showing more information in the web interface IE show all logs/subreddits if even not a moderator.
+         *
+         * EX -- User is /u/FoxxMD then `"name": "FoxxMD"`
+         * */
         name?: string,
+        /**
+         * A **public** name to display to users of the web interface. Use this to help moderators using your bot identify who is the operator in case they need to contact you.
+         *
+         * Leave undefined for no public name to be displayed.
+         * */
         display?: string,
+        /**
+         * The name to use when identifying the bot. Defaults to name of the authenticated Reddit account IE `u/yourBotAccount`
+         * */
+        botName?: string,
     },
     credentials?: {
         clientId?: string,
@@ -776,6 +792,7 @@ export interface OperatorConfig extends OperatorJsonConfig {
     operator: {
         name?: string
         display?: string,
+        botName?: string,
     },
     credentials: {
         clientId: string,
