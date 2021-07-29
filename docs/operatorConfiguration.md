@@ -6,6 +6,7 @@ activities the Bot runs on.
 
 * [Minimum Required Configuration](#minimum-required-configuration)
 * [Defining Configuration](#defining-configuration)
+* [CLI Usage](#cli-usage)
 * [Examples](#example-configurations)
   * [Minimum Config](#minimum-config)
   * [Using Config Overrides](#using-config-overrides)
@@ -36,13 +37,16 @@ configuration.
 * **ENV** -- Environment variables loaded from an [`.env`](https://github.com/toddbluhm/env-cmd) file (path may be
   specified with `--file` cli argument)
 * **ENV** -- Any already existing environment variables (exported on command line/terminal profile/etc.)
-* **FILE** -- Values specified in a JSON configuration file using the structure shown below (TODO example json file)
+* **FILE** -- Values specified in a JSON configuration file using the structure shown below -- or [view the schema with an example and validation here](https://json-schema.app/view/%23?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Fcontext-mod%2Fmaster%2Fsrc%2FSchema%2FOperatorConfig.json)
 * **ARG** -- Values specified as CLI arguments to the program (see [ClI Usage](#cli-usage) below)
 
 In the below configuration, if the variable is available at a level of configuration other than **FILE** it will be
 noted with the same symbol as above. The value shown is the default.
 
-**NOTE:** To load a JSON configuration (for **FILE**) use the `-c` cli argument EX: `node src/index.js -c /path/to/JSON/config.json`
+**NOTE:** 
+* To load a JSON configuration (for **FILE**) **from the command line** use the `-c` cli argument EX: `node src/index.js -c /path/to/JSON/config.json`
+* To load a JSON configuration (for **FILE**) **using an environmental variable** use `OPERATOR_CONFIG` EX: `OPERATOR_CONFIG=/path/to/JSON/config.json`
+
 
 ```js
 const config = {

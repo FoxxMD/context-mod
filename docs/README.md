@@ -12,7 +12,7 @@
   * [Action](#action)
     * [Examples](#available-actions)
   * [Filters](#filters)
-* [Configuration](#configuration)
+* [Configuration and Usage](#configuration-and-usage)
 * [Common Resources](#common-resources)
   * [Activities `window`](#activities-window)
   * [Comparisons](#thresholds-and-comparisons)
@@ -23,7 +23,10 @@
 
 ## Getting Started
 
-Review **at least** the **How It Works** and **Concepts** below and then head to the [**Getting Started documentation.**](/docs/gettingStartedMod.md)
+Review **at least** the **How It Works** and **Concepts** below, then:
+
+* For **Operators** (running a bot instance) refer to [**Moderator Getting Started**](/docs/gettingStartedMod.md) guide
+* For **Moderators** (configuring an existing bot for your subreddit) refer to the [**Operator Getting Started**](/docs/gettingStartedOperator.md) guide
 
 ## How It Works
 
@@ -78,6 +81,7 @@ Find detailed descriptions of all the Rules, with examples, below:
 * [Repeat Activity](/docs/examples/repeatActivity)
 * [History](/docs/examples/history)
 * [Author](/docs/examples/author)
+* Regex
 
 ### Rule Set
 
@@ -128,10 +132,12 @@ For detailed explanation and options of what individual Actions can do [see the 
 
 authorIs/itemIs TODO
 
-## Configuration
+## Configuration And Usage
 
 * For **Operator/Bot maintainers** see **[Operation Configuration](/docs/operatorConfiguration.md)**
+  * [CLI Usage](docs/operatorConfiguration.md#cli-usage)
 * For **Moderators** see the [App Schema](https://json-schema.app/view/%23?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Fcontext-mod%2Fmaster%2Fsrc%2FSchema%2FApp.json) and [examples](/docs/examples)
+  * For usage TODO
 
 ## Common Resources
 

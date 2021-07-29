@@ -32,10 +32,9 @@ Some feature highlights:
 # Table of Contents
 
 * [How It Works](#how-it-works)
-* [Installation](#installation)
-* [Configuration And Docs](#configuration)
-* [Usage](#usage)
+* [Configuration And Documentation](#configuration-and-documentation)
 * [Web UI and Screenshots](#web-ui-and-screenshots)
+* [Getting Started](#getting-started)
 
 ### How It Works
 
@@ -65,54 +64,15 @@ ___
 
 [Learn more about the RCB lifecycle and core concepts in the docs.](/docs#how-it-works)
 
-## Installation
 
-To provide data/environmental variables to your application refer to the [operator configuration guide.](docs/operatorConfiguration.md)
+## Configuration and Documentation
 
-### Locally
+Context Bot's configuration can be written in JSON, [JSON5](https://json5.org/) or YAML. Its schema conforms to [JSON Schema Draft 7](https://json-schema.org/). Additionally, many **operator** settings can be passed via command line or environmental variables.
 
-Requirements:
+* For **operators** (running the bot instance) see the [Operator Configuration](/docs/operatorConfiguration.md) guide
+* For **moderators** consult the [app schema and examples folder](/docs/#configuration)
 
-* Typescript >=4.3.5
-* Node >=15
-
-Clone this repository somewhere and then install from the working directory
-
-```bash
-git clone https://github.com/FoxxMD/context-mod.git .
-cd context-mod
-npm install
-tsc -p .
-```
-
-### [Docker](https://hub.docker.com/r/foxxmd/context-mod)
-
-```
-foxxmd/context-mod:latest
-```
-
-Adding **environmental variables** to your `docker run` command will pass them through to the app EX:
-```
-docker run -e "CLIENT_ID=myId" ... foxxmd/context-mod
-```
-
-### [Heroku Quick Deploy](https://heroku.com/about)
-[![Deploy](https://www.herokucdn.com/deploy/button.svg)](https://dashboard.heroku.com/new?template=https://github.com/FoxxMD/context-mod)
-
-
-## Configuration
-
-[**Check the docs for in-depth explanations of all concepts and examples**](/docs)
-
-Context Bot's configuration can be written in JSON, [JSON5](https://json5.org/) or YAML. It's [schema](/src/Schema/App.json) conforms to [JSON Schema Draft 7](https://json-schema.org/).
-
-I suggest using [Atlassian JSON Schema Viewer](https://json-schema.app/start) ([direct link](https://json-schema.app/view/%23?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Fcontext-mod%2Fmaster%2Fsrc%2FSchema%2FApp.json)) so you can view all documentation while also interactively writing and validating your config! From there you can drill down into any object, see its requirements, view an example JSON document, and live-edit your configuration on the right-hand side.
-
-## Usage
-
-* For operating your own application/bot see [Operator Configuration](docs/operatorConfiguration.md)
-  * CLI usage specifically is at  [Operator Configuration#Cli Usage](docs/operatorConfiguration.md#cli-usage)
-* For subreddit moderators visit your operator's web interface or refer to the web interface documentation (TODO)
+[**Check the full docs for in-depth explanations of all concepts and examples**](/docs)
 
 ## Web UI and Screenshots
 
@@ -132,6 +92,20 @@ RCB comes equipped with a web interface designed for use by both moderators and 
 Additionally, a helper webpage is available to help initial setup of your bot with reddit's oauth authentication. [Learn more about using the oauth helper.](docs/botAuthentication.md#cm-oauth-helper-recommended)
 
 ![Oauth View](docs/screenshots/oauth.jpg)
+
+## Getting Started
+
+#### Operators
+
+This guide is for users who want to **run their own bot on a ContextMod instance.**
+
+See the [Operator's Getting Started Guide](/docs/gettingStartedOperator.md)
+
+#### Moderators
+
+This guide is for **reddit moderators** who want to configure an existing CM bot to run on their subreddit.
+
+See the [Moderator's Getting Started Guide](/docs/gettingStartedMod.md)
 
 ## License
 
