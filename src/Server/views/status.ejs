@@ -177,15 +177,6 @@
                                                         </div>
                                                     </div>
                                                 </div>
-                                                <label>Activities</label>
-                                                <span class="has-tooltip">
-                                                    <span style="margin-top:-55px"
-                                                          class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black'>
-                                                        <div>Max Concurrent Processing</div>
-                                                        <div>Config: <%= data.maxWorkers %></div>
-                                                    </span>
-                                                    <span><%= `${data.runningActivities} Processing / ${data.queuedActivities} Queued` %></span>
-                                                </span>
                                                 <label>Slow Mode</label>
                                                 <span><%= data.delayBy %></span>
                                             <% } %>
@@ -214,6 +205,35 @@
                                                     <span id="nextHeartbeatHuman"><%= data.nextHeartbeatHuman %></span>
                                                 </span>
                                             <% } %>
+                                            <label>
+                                                    <span class="has-tooltip">
+                                                    <span style="margin-top:35px"
+                                                          class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2 space-y-3 p-2 text-left'>
+                                                        <div>The total number of <b>Activities</b> (Comment/Submission) currently being processed by the bot or queued to be processed.</div>
+                                                        <div>
+                                                            Max Concurrent Processing
+                                                            <ul class="list-inside list-disc">
+                                                                <li>Real Max: <%= data.maxWorkers %></li>
+                                                                <% if (data.name !== 'All') { %>
+                                                                    <li>Config Max: <%= data.subMaxWorkers %></li>
+                                                                <% } %>
+                                                                <li>Global Max: <%= data.globalMaxWorkers %></li>
+                                                            </ul>
+                                                        </div>
+                                                    </span>
+                                                    <span>Activities <svg xmlns="http://www.w3.org/2000/svg"
+                                                                          class="h-4 w-4 inline-block cursor-help"
+                                                                          fill="none"
+                                                                          viewBox="0 0 24 24" stroke="currentColor">
+                                                                        <path stroke-linecap="round"
+                                                                              stroke-linejoin="round"
+                                                                              stroke-width="2"
+                                                                              d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                                                    </svg>
+                                                    </span>
+                                                </span>
+                                            </label>
+                                            <span><%= `${data.runningActivities} Processing / ${data.queuedActivities} Queued` %></span>
                                         </div>
                                         <% if (data.name !== 'All') { %>
                                             <ul class="list-disc list-inside mt-4">

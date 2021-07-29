@@ -57,6 +57,7 @@ export interface RuntimeManagerOptions extends ManagerOptions {
     sharedModqueue?: boolean;
     wikiLocation?: string;
     botName: string;
+    maxWorkers: number;
 }
 
 export class Manager {
@@ -81,6 +82,8 @@ export class Manager {
     globalDryRun?: boolean;
     emitter: EventEmitter = new EventEmitter();
     queue: QueueObject<CheckTask>;
+    globalMaxWorkers: number;
+    subMaxWorkers?: number;
 
     displayLabel: string;
     currentLabels: string[] = [];
@@ -179,8 +182,8 @@ export class Manager {
         return this.displayLabel;
     }
 
-    constructor(sub: Subreddit, client: Snoowrap, logger: Logger, opts: RuntimeManagerOptions = {botName: 'ContextMod'}) {
-        const {dryRun, sharedModqueue = false, wikiLocation = 'botconfig/contextbot', botName} = opts;
+    constructor(sub: Subreddit, client: Snoowrap, logger: Logger, opts: RuntimeManagerOptions = {botName: 'ContextMod', maxWorkers: 1}) {
+        const {dryRun, sharedModqueue = false, wikiLocation = 'botconfig/contextbot', botName, maxWorkers} = opts;
         this.displayLabel = opts.nickname || `${sub.display_name_prefixed}`;
         const getLabels = this.getCurrentLabels;
         const getDisplay = this.getDisplay;
@@ -200,24 +203,10 @@ export class Manager {
         this.subreddit = sub;
         this.client = client;
         this.botName = botName;
+        this.globalMaxWorkers = maxWorkers;
         this.notificationManager = new NotificationManager(this.logger, this.subreddit, this.displayLabel, botName);
 
-        this.queue = queue(async (task: CheckTask, cb) => {
-            if(this.delayBy !== undefined) {
-                this.logger.debug(`SOFT API LIMIT MODE: Delaying Event run by ${this.delayBy} seconds`);
-                await sleep(this.delayBy * 1000);
-            }
-            await this.runChecks(task.checkType, task.activity, task.options);
-        }
-            // TODO allow concurrency??
-            , 1);
-        this.queue.error((err, task) => {
-            this.logger.error('Encountered unhandled error while processing Activity, processing stopped early');
-            this.logger.error(err);
-        });
-        this.queue.drain(() => {
-            this.logger.debug('All queued activities have been processed.');
-        });
+        this.queue = this.generateQueue(this.getMaxWorkers(this.globalMaxWorkers));
         this.queue.pause();
 
         this.eventsSampleInterval = setInterval((function(self) {
@@ -261,6 +250,49 @@ export class Manager {
         })(this), 10000);
     }
 
+    protected getMaxWorkers(subMaxWorkers?: number) {
+        let maxWorkers = this.globalMaxWorkers;
+
+        if (subMaxWorkers !== undefined) {
+            if (subMaxWorkers > maxWorkers) {
+                this.logger.warn(`Config specified ${subMaxWorkers} max queue workers but global max is set to ${this.globalMaxWorkers} -- will use global max`);
+            } else {
+                maxWorkers = subMaxWorkers;
+            }
+        }
+        if (maxWorkers < 1) {
+            this.logger.warn(`Max queue workers must be greater than or equal to 1, specified: ${maxWorkers}. Will use 1.`);
+            maxWorkers = 1;
+        }
+
+        return maxWorkers;
+    }
+
+    protected generateQueue(maxWorkers: number) {
+        if (maxWorkers > 1) {
+            this.logger.warn(`Setting max queue workers above 1 (specified: ${maxWorkers}) may have detrimental effects to log readability and api usage. Consult the documentation before using this advanced/experimental feature.`);
+        }
+
+        const q = queue(async (task: CheckTask, cb) => {
+                if (this.delayBy !== undefined) {
+                    this.logger.debug(`SOFT API LIMIT MODE: Delaying Event run by ${this.delayBy} seconds`);
+                    await sleep(this.delayBy * 1000);
+                }
+                await this.runChecks(task.checkType, task.activity, task.options);
+            }
+            , maxWorkers);
+        q.error((err, task) => {
+            this.logger.error('Encountered unhandled error while processing Activity, processing stopped early');
+            this.logger.error(err);
+        });
+        q.drain(() => {
+            this.logger.debug('All queued activities have been processed.');
+        });
+
+        this.logger.info(`Generated new Queue with ${maxWorkers} max workers`);
+        return q;
+    }
+
     protected parseConfigurationFromObject(configObj: object) {
         try {
             const configBuilder = new ConfigBuilder({logger: this.logger});
@@ -273,6 +305,9 @@ export class Manager {
                 footer,
                 nickname,
                 notifications,
+                queue: {
+                    maxWorkers = undefined,
+                } = {},
             } = configManagerOpts || {};
             this.pollOptions = buildPollingOptions(polling);
             this.dryRun = this.globalDryRun || dryRun;
@@ -281,6 +316,13 @@ export class Manager {
 
             if (footer !== undefined) {
                 this.resources.footer = footer;
+            }
+
+            this.subMaxWorkers = maxWorkers;
+            const realMax = this.getMaxWorkers(this.subMaxWorkers);
+            if(realMax !== this.queue.concurrency) {
+                this.queue = this.generateQueue(realMax);
+                this.queue.pause();
             }
 
             this.logger.info(`Dry Run: ${this.dryRun === true}`);

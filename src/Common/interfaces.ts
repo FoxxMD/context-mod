@@ -460,6 +460,23 @@ export interface ManagerOptions {
      * */
     polling?: (string | PollingOptions)[]
 
+    queue?: {
+        /**
+         * The maximum number of events that can be processed simultaneously.
+         *
+         * **Do not modify this setting unless you know what you are doing.** The default of `1` is suitable for the majority of use-cases.
+         *
+         * Raising the max above `1` could be useful if you require very fast response time to short bursts of high-volume events. However logs may become unreadable as many events are processed at the same time. Additionally, any events that depend on past actions from your bot may not be processed correctly given the concurrent nature of this use case.
+         *
+         * **Note:** Max workers are also enforced at the operator level so a subreddit cannot raise their max above what is specified by the operator.
+         *
+         * @default 1
+         * @minimum 1
+         * @examples [1]
+         * */
+        maxWorkers?: number
+    }
+
     /**
      * Per-subreddit config for caching TTL values. If set to `false` caching is disabled.
      * */
@@ -747,6 +764,9 @@ export interface OperatorJsonConfig {
         limit?: number,
         interval?: number,
     },
+    queue?: {
+      maxWorkers?: number,
+    },
     web?: {
         enabled?: boolean,
         port?: number,
@@ -820,6 +840,9 @@ export interface OperatorConfig extends OperatorJsonConfig {
         sharedMod: boolean,
         limit: number,
         interval: number,
+    },
+    queue: {
+      maxWorkers: number,
     },
     web: {
         enabled: boolean,

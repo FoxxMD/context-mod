@@ -496,6 +496,9 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
             limit = 100,
             interval = 30,
         } = {},
+        queue: {
+            maxWorkers = 1,
+        } = {},
         caching = 'memory',
         api: {
             softLimit = 250,
@@ -589,6 +592,9 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
             sharedMod,
             limit,
             interval,
+        },
+        queue: {
+          maxWorkers,
         },
         api: {
             softLimit,

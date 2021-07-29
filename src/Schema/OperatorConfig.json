@@ -261,10 +261,16 @@
         },
         "operator": {
             "properties": {
+                "botName": {
+                    "description": "The name to use when identifying the bot. Defaults to name of the authenticated Reddit account IE `u/yourBotAccount`",
+                    "type": "string"
+                },
                 "display": {
+                    "description": "A **public** name to display to users of the web interface. Use this to help moderators using your bot identify who is the operator in case they need to contact you.\n\nLeave undefined for no public name to be displayed.",
                     "type": "string"
                 },
                 "name": {
+                    "description": "The name of the Reddit account, without prefix, that the operator of this bot uses.\n\nThis is used for showing more information in the web interface IE show all logs/subreddits if even not a moderator.\n\nEX -- User is /u/FoxxMD then `\"name\": \"FoxxMD\"`",
                     "type": "string"
                 }
             },
@@ -290,6 +296,14 @@
                     "type": "object"
                 }
             ]
+        },
+        "queue": {
+            "properties": {
+                "maxWorkers": {
+                    "type": "number"
+                }
+            },
+            "type": "object"
         },
         "snoowrap": {
             "properties": {

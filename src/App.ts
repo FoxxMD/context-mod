@@ -49,6 +49,7 @@ export class App {
     nannyMode?: 'soft' | 'hard';
     nextExpiration!: Dayjs;
     botName!: string;
+    maxWorkers: number;
     startedAt: Dayjs = dayjs();
     sharedModqueue: boolean = false;
 
@@ -82,6 +83,9 @@ export class App {
             polling: {
                 sharedMod,
             },
+            queue: {
+              maxWorkers,
+            },
             caching: {
                 authorTTL,
                 provider: {
@@ -108,6 +112,13 @@ export class App {
         }
 
         this.logger = getLogger(config.logging);
+
+        let mw = maxWorkers;
+        if(maxWorkers < 1) {
+            this.logger.warn(`Max queue workers must be greater than or equal to 1 (Specified: ${maxWorkers})`);
+            mw = 1;
+        }
+        this.maxWorkers = mw;
 
         if (this.dryRun) {
             this.logger.info('Running in DRYRUN mode');
@@ -243,7 +254,7 @@ export class App {
         let subSchedule: Manager[] = [];
         // get configs for subs we want to run on and build/validate them
         for (const sub of subsToRun) {
-            const manager = new Manager(sub, this.client, this.logger, {dryRun: this.dryRun, sharedModqueue: this.sharedModqueue, wikiLocation: this.wikiLocation, botName: this.botName});
+            const manager = new Manager(sub, this.client, this.logger, {dryRun: this.dryRun, sharedModqueue: this.sharedModqueue, wikiLocation: this.wikiLocation, botName: this.botName, maxWorkers: this.maxWorkers});
             try {
                 await manager.parseConfiguration('system', true, {suppressNotification: true});
             } catch (err) {
