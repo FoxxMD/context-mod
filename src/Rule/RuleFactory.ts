@@ -1,5 +1,5 @@
 import {RecentActivityRule, RecentActivityRuleJSONConfig} from "./RecentActivityRule";
-import RepeatActivityRule, {RepeatActivityJSONConfig} from "./SubmissionRule/RepeatActivityRule";
+import RepeatActivityRule, {RepeatActivityJSONConfig} from "./RepeatActivityRule";
 import {Rule, RuleJSONConfig} from "./index";
 import AuthorRule, {AuthorRuleJSONConfig} from "./AuthorRule";
 import {AttributionJSONConfig, AttributionRule} from "./AttributionRule";

@@ -1,5 +1,5 @@
 import {RecentActivityRuleJSONConfig} from "../Rule/RecentActivityRule";
-import {RepeatActivityJSONConfig} from "../Rule/SubmissionRule/RepeatActivityRule";
+import {RepeatActivityJSONConfig} from "../Rule/RepeatActivityRule";
 import {AuthorRuleJSONConfig} from "../Rule/AuthorRule";
 import {AttributionJSONConfig} from "../Rule/AttributionRule";
 import {FlairActionJson} from "../Action/SubmissionAction/FlairAction";
