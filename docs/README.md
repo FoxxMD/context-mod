@@ -27,15 +27,15 @@ Review **at least** the **How It Works** and **Concepts** below and then head to
 
 ## How It Works
 
-Where possible Reddit Context Bot (RCB) uses the same terminology as, and emulates the behavior, of **automoderator** so if you are familiar with that much of this may seem familiar to you.
+Where possible Context Mod (CM) uses the same terminology as, and emulates the behavior, of **automoderator** so if you are familiar with that much of this may seem familiar to you.
 
-RCB's lifecycle looks like this:
+CM's lifecycle looks like this:
 
-#### 1) A new event in your subreddit is received by RCB
+#### 1) A new event in your subreddit is received by CM
 
-The events RCB watches for are configured by you. These can be new modqueue/unmoderated items, submissions, or comments.
+The events CM watches for are configured by you. These can be new modqueue/unmoderated items, submissions, or comments.
 
-#### 2) RCB sequentially processes each Check in your configuration
+#### 2) CM sequentially processes each Check in your configuration
 
 A **Check** is a set of:
 
@@ -48,11 +48,11 @@ Once a Check is **triggered** no more Checks will be processed. This means all s
 
 #### 4) All Actions from that Check are executed
 
-After all Actions are executed RCB returns to waiting for the next Event.
+After all Actions are executed CM returns to waiting for the next Event.
 
 ## Concepts
 
-Core, high-level concepts regarding how RCB works.
+Core, high-level concepts regarding how CM works.
 
 ### Checks
 
@@ -68,7 +68,7 @@ There are generally three main properties for a Rule:
 * **Activities Window** -- If applicable, the range of activities that the **criteria** will be tested against.
 * **Rule-specific options** -- Any number of options that modify how the **criteria** are tested.
 
-RCB has different **Rules** that can test against different types of behavior and aspects of a User, their history, and the Activity (submission/common) being checked.
+CM has different **Rules** that can test against different types of behavior and aspects of a User, their history, and the Activity (submission/common) being checked.
 
 #### Available Rules
 Find detailed descriptions of all the Rules, with examples, below:
@@ -109,7 +109,7 @@ Example
 
 ### Action
 
-An **Action** is some action the bot can take against the checked Activity (comment/submission) or Author of the Activity. RCB has Actions for most things a normal reddit user or moderator can do.
+An **Action** is some action the bot can take against the checked Activity (comment/submission) or Author of the Activity. CM has Actions for most things a normal reddit user or moderator can do.
 
 ### Available Actions
 
@@ -122,7 +122,7 @@ An **Action** is some action the bot can take against the checked Activity (comm
 * Report (Comment/Submission)
 * [UserNote](/docs/examples/userNotes) (User, when /r/Toolbox is used)
 
-For detailed explanation and options of what individual Actions can do [see the links in the `actions` property in the schema.](https://json-schema.app/view/%23/%23%2Fdefinitions%2FSubmissionCheckJson?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Freddit-context-bot%2Fmaster%2Fsrc%2FSchema%2FApp.json)
+For detailed explanation and options of what individual Actions can do [see the links in the `actions` property in the schema.](https://json-schema.app/view/%23/%23%2Fdefinitions%2FSubmissionCheckJson?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Fcontext-mod%2Fmaster%2Fsrc%2FSchema%2FApp.json)
 
 ### Filters
 
@@ -131,11 +131,11 @@ authorIs/itemIs TODO
 ## Configuration
 
 * For **Operator/Bot maintainers** see **[Operation Configuration](/docs/operatorConfiguration.md)**
-* For **Moderators** see the [App Schema](https://json-schema.app/view/%23?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Freddit-context-bot%2Fmaster%2Fsrc%2FSchema%2FApp.json) and [examples](/docs/examples)
+* For **Moderators** see the [App Schema](https://json-schema.app/view/%23?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Fcontext-mod%2Fmaster%2Fsrc%2FSchema%2FApp.json) and [examples](/docs/examples)
 
 ## Common Resources
 
-Technical information on recurring, common data/patterns used in RCB.
+Technical information on recurring, common data/patterns used in CM.
 
 ### Activities `window`
 
@@ -153,7 +153,7 @@ TODO
 
 All **Rules** in a subreddit's configuration can be assigned a **name** that can then be referenced from any other Check. 
 
-Create general-use rules so they can be reused and de-clutter your configuration. Additionally RCB will automatically cache the result of a rule so there is a performance and api usage benefit to re-using Rules.
+Create general-use rules so they can be reused and de-clutter your configuration. Additionally, CM will automatically cache the result of a rule so there is a performance and api usage benefit to re-using Rules.
 
 See [ruleNameReuse.json5](/docs/examples/advancedConcepts/ruleNameReuse.json5) for a detailed configuration with annotations.
 

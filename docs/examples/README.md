@@ -1,6 +1,6 @@
 # Examples
 
-This directory contains example of valid, ready-to-go configurations for Context Bot for the purpose of:
+This directory contains example of valid, ready-to-go configurations for Context Mod for the purpose of:
 
 * showcasing what the bot can do
 * providing best practices for writing your configuration
