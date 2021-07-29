@@ -415,7 +415,7 @@ export interface AttributionOptions extends AttributionConfig, RuleOptions {
 /**
  * Aggregates all of the domain/media accounts attributed to an author's Submission history. If any domain is over the threshold the rule is triggered
  *
- * Available data for [Action templating](https://github.com/FoxxMD/reddit-context-bot#action-templating):
+ * Available data for [Action templating](https://github.com/FoxxMD/context-mod#action-templating):
  *
  * ```
  * triggeredDomainCount => Number of domains that met the threshold

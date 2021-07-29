@@ -354,7 +354,7 @@ export interface RepeatActivityOptions extends RepeatActivityConfig, RuleOptions
 /**
  * Checks a user's history for Submissions with identical content
  *
- * Available data for [Action templating](https://github.com/FoxxMD/reddit-context-bot#action-templating):
+ * Available data for [Action templating](https://github.com/FoxxMD/context-mod#action-templating):
  *
  * ```
  * count      => Total number of repeat Submissions

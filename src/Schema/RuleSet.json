@@ -207,7 +207,7 @@
             "type": "object"
         },
         "AttributionJSONConfig": {
-            "description": "Aggregates all of the domain/media accounts attributed to an author's Submission history. If any domain is over the threshold the rule is triggered\n\nAvailable data for [Action templating](https://github.com/FoxxMD/reddit-context-bot#action-templating):\n\n```\ntriggeredDomainCount => Number of domains that met the threshold\nactivityTotal        => Number of Activities considered from window\nwindow               => The date range of the Activities considered\nlargestCount         => The count from the largest aggregated domain\nlargestPercentage    => The percentage of Activities the largest aggregated domain comprises\nsmallestCount        => The count from the smallest aggregated domain\nsmallestPercentage   => The percentage of Activities the smallest aggregated domain comprises\ncountRange           => A convenience string displaying \"smallestCount - largestCount\" or just one number if both are the same\npercentRange         => A convenience string displaying \"smallestPercentage - largestPercentage\" or just one percentage if both are the same\ndomains              => An array of all the domain URLs that met the threshold\ndomainsDelim         => A comma-delimited string of all the domain URLs that met the threshold\ntitles               => The friendly-name of the domain if one is present, otherwise the URL (IE youtube.com/c/34ldfa343 => \"My Youtube Channel Title\")\ntitlesDelim          => A comma-delimited string of all the domain friendly-names\nthreshold            => The threshold you configured for this Rule to trigger\nurl                  => Url of the submission that triggered the rule\n```",
+            "description": "Aggregates all of the domain/media accounts attributed to an author's Submission history. If any domain is over the threshold the rule is triggered\n\nAvailable data for [Action templating](https://github.com/FoxxMD/context-mod#action-templating):\n\n```\ntriggeredDomainCount => Number of domains that met the threshold\nactivityTotal        => Number of Activities considered from window\nwindow               => The date range of the Activities considered\nlargestCount         => The count from the largest aggregated domain\nlargestPercentage    => The percentage of Activities the largest aggregated domain comprises\nsmallestCount        => The count from the smallest aggregated domain\nsmallestPercentage   => The percentage of Activities the smallest aggregated domain comprises\ncountRange           => A convenience string displaying \"smallestCount - largestCount\" or just one number if both are the same\npercentRange         => A convenience string displaying \"smallestPercentage - largestPercentage\" or just one percentage if both are the same\ndomains              => An array of all the domain URLs that met the threshold\ndomainsDelim         => A comma-delimited string of all the domain URLs that met the threshold\ntitles               => The friendly-name of the domain if one is present, otherwise the URL (IE youtube.com/c/34ldfa343 => \"My Youtube Channel Title\")\ntitlesDelim          => A comma-delimited string of all the domain friendly-names\nthreshold            => The threshold you configured for this Rule to trigger\nurl                  => Url of the submission that triggered the rule\n```",
             "properties": {
                 "authorIs": {
                     "$ref": "#/definitions/AuthorOptions",
@@ -627,7 +627,7 @@
             "type": "object"
         },
         "HistoryJSONConfig": {
-            "description": "Aggregates an Author's submission and comment history. Rule can be triggered on count/percent of total (for either or both comment/sub totals) as well as comment OP total.\n\nAvailable data for [Action templating](https://github.com/FoxxMD/reddit-context-bot#action-templating):\n\n```\nactivityTotal    => Total number of activities\nsubmissionTotal  => Total number of submissions\ncommentTotal     => Total number of comments\nopTotal          => Total number of comments as OP\nthresholdSummary => A text summary of the first Criteria triggered with totals/percentages\ncriteria         => The ThresholdCriteria object\nwindow           => A text summary of the range of Activities considered (# of Items if number, time range if Duration)\n```",
+            "description": "Aggregates an Author's submission and comment history. Rule can be triggered on count/percent of total (for either or both comment/sub totals) as well as comment OP total.\n\nAvailable data for [Action templating](https://github.com/FoxxMD/context-mod#action-templating):\n\n```\nactivityTotal    => Total number of activities\nsubmissionTotal  => Total number of submissions\ncommentTotal     => Total number of comments\nopTotal          => Total number of comments as OP\nthresholdSummary => A text summary of the first Criteria triggered with totals/percentages\ncriteria         => The ThresholdCriteria object\nwindow           => A text summary of the range of Activities considered (# of Items if number, time range if Duration)\n```",
             "properties": {
                 "authorIs": {
                     "$ref": "#/definitions/AuthorOptions",
@@ -728,7 +728,7 @@
             "type": "object"
         },
         "RecentActivityRuleJSONConfig": {
-            "description": "Checks a user's history for any Activity (Submission/Comment) in the subreddits specified in thresholds\n\nAvailable data for [Action templating](https://github.com/FoxxMD/reddit-context-bot#action-templating):\n\n```\nsummary    => comma-deliminated list of subreddits that hit the threshold and their count EX subredditA(1), subredditB(4),...\nsubCount   => Total number of subreddits that hit the threshold\ntotalCount => Total number of all activity occurrences in subreddits\n```",
+            "description": "Checks a user's history for any Activity (Submission/Comment) in the subreddits specified in thresholds\n\nAvailable data for [Action templating](https://github.com/FoxxMD/context-mod#action-templating):\n\n```\nsummary    => comma-deliminated list of subreddits that hit the threshold and their count EX subredditA(1), subredditB(4),...\nsubCount   => Total number of subreddits that hit the threshold\ntotalCount => Total number of all activity occurrences in subreddits\n```",
             "properties": {
                 "authorIs": {
                     "$ref": "#/definitions/AuthorOptions",
@@ -936,7 +936,7 @@
             "type": "object"
         },
         "RegexRuleJSONConfig": {
-            "description": "Test a (list of) Regular Expression against the contents or title of an Activity\n\nOptionally, specify a `window` of the User's history to additionally test against\n\nAvailable data for [Action templating](https://github.com/FoxxMD/reddit-context-bot#action-templating):",
+            "description": "Test a (list of) Regular Expression against the contents or title of an Activity\n\nOptionally, specify a `window` of the User's history to additionally test against\n\nAvailable data for [Action templating](https://github.com/FoxxMD/context-mod#action-templating):",
             "properties": {
                 "authorIs": {
                     "$ref": "#/definitions/AuthorOptions",
@@ -1023,7 +1023,7 @@
             "type": "object"
         },
         "RepeatActivityJSONConfig": {
-            "description": "Checks a user's history for Submissions with identical content\n\nAvailable data for [Action templating](https://github.com/FoxxMD/reddit-context-bot#action-templating):\n\n```\ncount      => Total number of repeat Submissions\nthreshold  => The threshold you configured for this Rule to trigger\nurl        => Url of the submission that triggered the rule\n```",
+            "description": "Checks a user's history for Submissions with identical content\n\nAvailable data for [Action templating](https://github.com/FoxxMD/context-mod#action-templating):\n\n```\ncount      => Total number of repeat Submissions\nthreshold  => The threshold you configured for this Rule to trigger\nurl        => Url of the submission that triggered the rule\n```",
             "properties": {
                 "authorIs": {
                     "$ref": "#/definitions/AuthorOptions",

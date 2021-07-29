@@ -1,6 +1,6 @@
-[![Latest Release](https://img.shields.io/github/v/release/foxxmd/reddit-context-bot)](https://github.com/FoxxMD/reddit-context-bot/releases)
+[![Latest Release](https://img.shields.io/github/v/release/foxxmd/context-mod)](https://github.com/FoxxMD/context-mod/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Docker Pulls](https://img.shields.io/docker/pulls/foxxmd/reddit-context-bot)](https://hub.docker.com/r/foxxmd/reddit-context-bot)
+[![Docker Pulls](https://img.shields.io/docker/pulls/foxxmd/context-mod)](https://hub.docker.com/r/foxxmd/context-mod)
 
 **Context Mod** (CM) is an event-based, [reddit](https://reddit.com) moderation bot built on top of [snoowrap](https://github.com/not-an-aardvark/snoowrap) and written in [typescript](https://www.typescriptlang.org/).
 

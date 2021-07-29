@@ -322,7 +322,7 @@ export interface HistoryOptions extends HistoryConfig, RuleOptions {
 /**
  * Aggregates an Author's submission and comment history. Rule can be triggered on count/percent of total (for either or both comment/sub totals) as well as comment OP total.
  *
- * Available data for [Action templating](https://github.com/FoxxMD/reddit-context-bot#action-templating):
+ * Available data for [Action templating](https://github.com/FoxxMD/context-mod#action-templating):
  *
  * ```
  * activityTotal    => Total number of activities

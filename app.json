@@ -1,7 +1,7 @@
 {
   "name": "Reddit Context Bot",
   "description": "An event-based, reddit moderation bot built on top of snoowrap and written in typescript",
-  "repository": "https://github.com/FoxxMD/reddit-context-bot",
+  "repository": "https://github.com/FoxxMD/context-mod",
   "stack": "container",
   "env": {
     "CLIENT_ID": {
