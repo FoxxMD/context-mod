@@ -70,7 +70,7 @@ ___
 Context Bot's configuration can be written in JSON, [JSON5](https://json5.org/) or YAML. Its schema conforms to [JSON Schema Draft 7](https://json-schema.org/). Additionally, many **operator** settings can be passed via command line or environmental variables.
 
 * For **operators** (running the bot instance) see the [Operator Configuration](/docs/operatorConfiguration.md) guide
-* For **moderators** consult the [app schema and examples folder](/docs/#configuration)
+* For **moderators** consult the [app schema and examples folder](/docs/#configuration-and-usage)
 
 [**Check the full docs for in-depth explanations of all concepts and examples**](/docs)
 
