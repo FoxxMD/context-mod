@@ -107,10 +107,11 @@
                                                                 <span class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2 space-y-3 p-2 text-left'>
                                                                     <div>The <b>Queue</b> controls processing of <b>Activities</b> ingested from <b>Events.</b></div>
                                                                     <ul class="list-inside list-disc">
-                                                                        <li><b>Starting</b> the Queue will being Processing (running checks on) queued Activities based on the max number of workers available</li>
-                                                                        <li><b>Stopping</b> the Queue will prevent queued Activities from being Processed, after any current Activities are finished Processing.</li>
+                                                                        <li><b>Starting</b> the Queue will begin Processing (running checks on) Queued Activities based on the max number of workers available</li>
+                                                                        <li><b>Pausing</b> the Queue will prevent any Queued Activities from being Processed (excluding already running Activities)</li>
+                                                                        <li><b>Stopping</b> the Queue will <b>clear any existing Queued Activities</b> and prevent any subsequently queued Activities from being Processed</li>
                                                                     </ul>
-                                                                    <div>If all available workers are processing Activities then new Activities returned from <b>Events</b> will be put marked as <b>Queued</b></div>
+                                                                    <div>If all available workers are processing Activities then new Activities returned from <b>Events</b> will be <b>Queued</b></div>
                                                                 </span>
                                                                 <span>
                                                                     Queue
@@ -145,7 +146,8 @@
                                                                     <div><b>Events</b> controls polling (monitoring) of <b>Activity Sources</b> (unmoderated, modqueue, comments, etc.)</div>
                                                                     <ul class="list-inside list-disc">
                                                                         <li><b>Starting</b> Events will cause polling to begin. Any new Activities discovered after polling begins will be sent to <b>Queue</b></li>
-                                                                        <li><b>Stopping</b> Events will cause polling to stop.</li>
+                                                                        <li><b>Pausing</b> Events will cause polling to stop.</li>
+                                                                        <li><b>Stopping</b> Events will cause polling to stop and rebuild polling behavior on next start.</li>
                                                                     </ul>
                                                                 </span>
                                                                 <span>
@@ -396,19 +398,19 @@
                                                                         </ul>
                                                                     </div>
                                                                     <% } else { %>
-                                                                        <div>This subreddit is using the default, <b>application-wide shared cache</b> because its <b
-                                                                                    class="font-mono">caching</b> configuration is not specified.</div>
+                                                                        <div>This subreddit is using <b>a private cache instance</b> because its <b
+                                                                                    class="font-mono">caching</b> configuration is non-default.</div>
                                                                         <div>Pros:
                                                                         <ul class="list-inside list-disc">
-                                                                            <li>All subreddits can utilize any cached authors/etc., reduces overall api usage</li>
-                                                                            <li>Bot Operator can fine tune cache without subreddit interaction</li>
+                                                                            <li>Custom configuration (TTLs, max size) may fit subreddit usage of the bot better</li>
+                                                                            <li>Using a redis backend may increase performance for very large caches</li>
                                                                         </ul>
                                                                     </div>
                                                                         <div>
                                                                         Cons:
                                                                         <ul class="list-inside list-disc">
-                                                                            <li>Subreddits must use default TTLs which may not fit use case for rules</li>
-                                                                            <li>Bots operating subreddits with dramatically contrasting caching requirements may suffer in performance/api usage</li>
+                                                                            <li>Using a private <span class="font-mono">memory</span> cache produces a larger memory burden for the operator's host machine since it is not shared</li>
+                                                                            <li>Bot Operator cannot fine-tune caching parameters for this subreddit</li>
                                                                         </ul>
                                                                     </div>
                                                                     <% } %>
@@ -455,7 +457,7 @@
                                                                         Some tips/tricks for cache:
                                                                     </div>
                                                                     <ul class="list-inside list-disc">
-                                                                        <li>Only need to pay attention to caching if a subreddit uses the API/cache heavily IE high-volume comment checks or very large check sets for submissions</li>
+                                                                        <li>Only need to pay attention to caching if a subreddit uses the API/cache heavily IE high-volume comment checks or very large check sets for submissions -- check <b>Calls</b> rate</li>
                                                                         <li>Increasing TTL will reduce cache misses and api usage at the expensive of a larger cache and stale results</li>
                                                                         <li>Re-using <span
                                                                                     class="font-mono">window</span> and <span

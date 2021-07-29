@@ -23,11 +23,11 @@ The minimum required configuration variables to run the bot on subreddits are:
 However, only **clientId** and **clientSecret** are required to run the **oauth helper** mode in order to generate the last two
 configuration variables.
 
-Refer to the **[Bot Autentication guide](/docs/botAuthentication.md)** to retrieve the above credentials.
+Refer to the **[Bot Authentication guide](/docs/botAuthentication.md)** to retrieve the above credentials.
 
 # Defining Configuration
 
-RCB can be configured using **any or all** of the approaches below. **At each level ALL configuration values are
+CM can be configured using **any or all** of the approaches below. **At each level ALL configuration values are
 optional** but some are required depending on the mode of operation for the application.
 
 Any values defined at a **lower-listed** level of configuration will override any values from a higher-listed
@@ -208,7 +208,7 @@ const config = {
 
 ## CLI Usage
 
-Running RCB from the command line is accomplished with the following command:
+Running CM from the command line is accomplished with the following command:
 
 ```bash
 
@@ -362,7 +362,7 @@ log level: debug
 
 # Cache Configuration
 
-RCB implements two caching backend **providers**. By default all providers use `memory`:
+CM implements two caching backend **providers**. By default all providers use `memory`:
 
 * `memory` -- in-memory (non-persistent) backend
 * `redis` -- [Redis](https://redis.io/) backend

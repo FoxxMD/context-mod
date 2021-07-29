@@ -1,10 +1,8 @@
-# reddit-context-bot
-
 [![Latest Release](https://img.shields.io/github/v/release/foxxmd/reddit-context-bot)](https://github.com/FoxxMD/reddit-context-bot/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Docker Pulls](https://img.shields.io/docker/pulls/foxxmd/reddit-context-bot)](https://hub.docker.com/r/foxxmd/reddit-context-bot)
 
-**Context Bot** is an event-based, [reddit](https://reddit.com) moderation bot built on top of [snoowrap](https://github.com/not-an-aardvark/snoowrap) and written in [typescript](https://www.typescriptlang.org/).
+**Context Mod** (CM) is an event-based, [reddit](https://reddit.com) moderation bot built on top of [snoowrap](https://github.com/not-an-aardvark/snoowrap) and written in [typescript](https://www.typescriptlang.org/).
 
 It is designed to help fill in the gaps for [automoderator](https://www.reddit.com/wiki/automoderator/full-documentation) in regard to more complex behavior with a focus on **user-history based moderation.**
 
@@ -81,25 +79,25 @@ Requirements:
 Clone this repository somewhere and then install from the working directory
 
 ```bash
-git clone https://github.com/FoxxMD/reddit-context-bot.git .
-cd reddit-context-bot
+git clone https://github.com/FoxxMD/context-mod.git .
+cd context-mod
 npm install
 tsc -p .
 ```
 
-### [Docker](https://hub.docker.com/r/foxxmd/reddit-context-bot)
+### [Docker](https://hub.docker.com/r/foxxmd/context-mod)
 
 ```
-foxxmd/reddit-context-bot:latest
+foxxmd/context-mod:latest
 ```
 
 Adding **environmental variables** to your `docker run` command will pass them through to the app EX:
 ```
-docker run -e "CLIENT_ID=myId" ... foxxmd/reddit-context-bot
+docker run -e "CLIENT_ID=myId" ... foxxmd/context-mod
 ```
 
 ### [Heroku Quick Deploy](https://heroku.com/about)
-[![Deploy](https://www.herokucdn.com/deploy/button.svg)](https://dashboard.heroku.com/new?template=https://github.com/FoxxMD/reddit-context-bot)
+[![Deploy](https://www.herokucdn.com/deploy/button.svg)](https://dashboard.heroku.com/new?template=https://github.com/FoxxMD/context-mod)
 
 
 ## Configuration
@@ -108,7 +106,7 @@ docker run -e "CLIENT_ID=myId" ... foxxmd/reddit-context-bot
 
 Context Bot's configuration can be written in JSON, [JSON5](https://json5.org/) or YAML. It's [schema](/src/Schema/App.json) conforms to [JSON Schema Draft 7](https://json-schema.org/).
 
-I suggest using [Atlassian JSON Schema Viewer](https://json-schema.app/start) ([direct link](https://json-schema.app/view/%23?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Freddit-context-bot%2Fmaster%2Fsrc%2FSchema%2FApp.json)) so you can view all documentation while also interactively writing and validating your config! From there you can drill down into any object, see its requirements, view an example JSON document, and live-edit your configuration on the right-hand side.
+I suggest using [Atlassian JSON Schema Viewer](https://json-schema.app/start) ([direct link](https://json-schema.app/view/%23?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Fcontext-mod%2Fmaster%2Fsrc%2FSchema%2FApp.json)) so you can view all documentation while also interactively writing and validating your config! From there you can drill down into any object, see its requirements, view an example JSON document, and live-edit your configuration on the right-hand side.
 
 ## Usage
 
@@ -131,7 +129,7 @@ RCB comes equipped with a web interface designed for use by both moderators and 
 
 ![Subreddit View](docs/screenshots/subredditStatus.jpg)
 
-Additionally, a helper webpage is available to help initial setup of your bot with reddit's oauth authentication. [Learn more about using the oauth helper.](docs/botAuthentication.md#rcb-oauth-helper-recommended)
+Additionally, a helper webpage is available to help initial setup of your bot with reddit's oauth authentication. [Learn more about using the oauth helper.](docs/botAuthentication.md#cm-oauth-helper-recommended)
 
 ![Oauth View](docs/screenshots/oauth.jpg)
 

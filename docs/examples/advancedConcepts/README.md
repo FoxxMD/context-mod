@@ -23,7 +23,7 @@ The `rules` array on a `Checks` can contain both `Rule` objects and `RuleSet` ob
 
 A **Rule Set** is a "nested" set of `Rule` objects with a passing condition specified. These allow you to create more complex trigger behavior by combining multiple rules. 
 
-See **[ruleSets.json5](/docs/examples/advancedConcepts/ruleSets.json5)** for a complete example as well as consulting the [schema](https://json-schema.app/view/%23%2Fdefinitions%2FRuleSetJson?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Freddit-context-bot%2Fmaster%2Fsrc%2FSchema%2FApp.json).
+See **[ruleSets.json5](/docs/examples/advancedConcepts/ruleSets.json5)** for a complete example as well as consulting the [schema](https://json-schema.app/view/%23%2Fdefinitions%2FRuleSetJson?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Fcontext-mod%2Fmaster%2Fsrc%2FSchema%2FApp.json).
 
 ### Rule Order
 
@@ -45,7 +45,7 @@ If the Check is using `AND` condition for its rules (default) then if either Rul
 
 ### API Caching
 
-Context bot implements some basic caching functionality for **Author Activities** and wiki pages (on Comment/Report Actions).
+Context Mod implements some basic caching functionality for **Author Activities** and wiki pages (on Comment/Report Actions).
 
 **Author Activities** are cached for a subreddit-configurable amount of time (10 seconds by default). A cached activities set can be re-used if the **window on a Rule is identical to the window on another Rule**.
 
