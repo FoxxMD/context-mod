@@ -21,5 +21,4 @@ This directory contains example of valid, ready-to-go configurations for Context
   * [Rule Sets](/docs/examples/advancedConcepts/ruleSets.json5)
   * [Name Rules](/docs/examples/advancedConcepts/ruleNameReuse.json5)
   * [Check Ordering](/docs/examples/advancedConcepts)
-* Subreddit-ready examples
-  * Coming soon...
+* [Subreddit-ready examples](/docs/examples/subredditReady)

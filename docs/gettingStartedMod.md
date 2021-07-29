@@ -47,7 +47,7 @@ If you already have a configuration you may skip the below step and go directly 
 
 ### Using an Example Config
 
-Visit the [Examples](https://github.com/FoxxMD/context-mod/tree/master/docs/examples) folder to find various examples of individual rules as well as full, subreddit-ready configurations (coming soon...)
+Visit the [Examples](https://github.com/FoxxMD/context-mod/tree/master/docs/examples) folder to find various examples of individual rules or see the [subreddit-ready examples.](/docs/examples/subredditReady)
 
 After you have found a configuration to use as a starting point:
 

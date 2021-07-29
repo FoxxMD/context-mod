@@ -1,0 +1,42 @@
+{
+  "polling": ["newComm"],
+  "checks": [
+    {
+      //
+      // Stop users who spam the same comment many times
+      //
+      // Remove a COMMENT if the user has crossposted it at least 4 times in recent history
+      //
+      "name": "low xp comment spam",
+      "description": "X-posted comment >=4x",
+      "kind": "comment",
+      "condition": "AND",
+      "rules": [
+        {
+          "name": "xPostLow",
+          "kind": "repeatActivity",
+          "gapAllowance": 2,
+          "threshold": ">= 4",
+          "window": {
+            "count": 50,
+            "duration": "6 months"
+          }
+        },
+      ],
+      "actions": [
+        // remove this after confirming behavior is acceptable
+        {
+          "kind": "report",
+          "content": "Remove=> Posted same comment {{rules.xpostlow.largestRepeat}}x times"
+        },
+        //
+        //
+        {
+          "kind": "remove",
+          // remove the line below after confirming behavior is acceptable
+          "dryRun": true,
+        }
+      ]
+    }
+  ]
+}
