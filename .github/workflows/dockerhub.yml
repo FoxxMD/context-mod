@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - 'master'
-      - 'develop'
+      - 'edge'
     tags:
       - 'v*.*.*'
 
@@ -27,7 +27,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v3
         with:
-          images: foxxmd/reddit-context-bot
+          images: foxxmd/context-mod
           # generate Docker tags based on the following events/attributes
           tags: |
             type=raw,value=latest,enable=${{ endsWith(github.ref, 'master') }}
