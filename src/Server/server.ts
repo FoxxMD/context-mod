@@ -327,6 +327,8 @@ const rcbServer = function (options: OperatorConfig): ([() => Promise<void>, App
                     queuedActivities: m.queue.length(),
                     runningActivities: m.queue.running(),
                     maxWorkers: m.queue.concurrency,
+                    subMaxWorkers: m.subMaxWorkers || bot.maxWorkers,
+                    globalMaxWorkers: bot.maxWorkers,
                     validConfig: boolToString(m.validConfigLoaded),
                     dryRun: boolToString(m.dryRun === true),
                     pollingInfo: m.pollOptions.length === 0 ? ['nothing :('] : m.pollOptions.map(pollingInfo),
@@ -392,6 +394,11 @@ const rcbServer = function (options: OperatorConfig): ([() => Promise<void>, App
                     rulesCachedTotal: acc.rulesCachedTotal + curr.stats.rulesCachedTotal,
                     rulesTriggeredTotal: acc.rulesTriggeredTotal + curr.stats.rulesTriggeredTotal,
                     actionsRunTotal: acc.actionsRunTotal + curr.stats.actionsRunTotal,
+                    maxWorkers: acc.maxWorkers + curr.maxWorkers,
+                    subMaxWorkers: acc.subMaxWorkers + curr.subMaxWorkers,
+                    globalMaxWorkers: acc.globalMaxWorkers + curr.globalMaxWorkers,
+                    runningActivities: acc.runningActivities + curr.runningActivities,
+                    queuedActivities:  acc.queuedActivities + curr.queuedActivities,
                 };
             }, {
                 checks: {
@@ -405,8 +412,21 @@ const rcbServer = function (options: OperatorConfig): ([() => Promise<void>, App
                 rulesCachedTotal: 0,
                 rulesTriggeredTotal: 0,
                 actionsRunTotal: 0,
+                maxWorkers: 0,
+                subMaxWorkers: 0,
+                globalMaxWorkers: 0,
+                runningActivities: 0,
+                queuedActivities: 0,
             });
-            const {checks, ...rest} = totalStats;
+            const {
+                checks,
+                maxWorkers,
+                globalMaxWorkers,
+                subMaxWorkers,
+                runningActivities,
+                queuedActivities,
+                ...rest
+            } = totalStats;
 
             let cumRaw = subManagerData.reduce((acc, curr) => {
                 Object.keys(curr.stats.cache.types as ResourceStats).forEach((k) => {
@@ -425,6 +445,11 @@ const rcbServer = function (options: OperatorConfig): ([() => Promise<void>, App
                 name: 'All',
                 linkName: 'All',
                 indicator: 'green',
+                maxWorkers,
+                globalMaxWorkers,
+                subMaxWorkers,
+                runningActivities,
+                queuedActivities,
                 botState: {
                     state: RUNNING,
                     causedBy: SYSTEM

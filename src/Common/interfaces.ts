@@ -460,6 +460,23 @@ export interface ManagerOptions {
      * */
     polling?: (string | PollingOptions)[]
 
+    queue?: {
+        /**
+         * The maximum number of events that can be processed simultaneously.
+         *
+         * **Do not modify this setting unless you know what you are doing.** The default of `1` is suitable for the majority of use-cases.
+         *
+         * Raising the max above `1` could be useful if you require very fast response time to short bursts of high-volume events. However logs may become unreadable as many events are processed at the same time. Additionally, any events that depend on past actions from your bot may not be processed correctly given the concurrent nature of this use case.
+         *
+         * **Note:** Max workers are also enforced at the operator level so a subreddit cannot raise their max above what is specified by the operator.
+         *
+         * @default 1
+         * @minimum 1
+         * @examples [1]
+         * */
+        maxWorkers?: number
+    }
+
     /**
      * Per-subreddit config for caching TTL values. If set to `false` caching is disabled.
      * */
@@ -701,8 +718,24 @@ export interface ManagerStateChangeOption {
 
 export interface OperatorJsonConfig {
     operator?: {
+        /**
+         * The name of the Reddit account, without prefix, that the operator of this bot uses.
+         *
+         * This is used for showing more information in the web interface IE show all logs/subreddits if even not a moderator.
+         *
+         * EX -- User is /u/FoxxMD then `"name": "FoxxMD"`
+         * */
         name?: string,
+        /**
+         * A **public** name to display to users of the web interface. Use this to help moderators using your bot identify who is the operator in case they need to contact you.
+         *
+         * Leave undefined for no public name to be displayed.
+         * */
         display?: string,
+        /**
+         * The name to use when identifying the bot. Defaults to name of the authenticated Reddit account IE `u/yourBotAccount`
+         * */
+        botName?: string,
     },
     credentials?: {
         clientId?: string,
@@ -730,6 +763,9 @@ export interface OperatorJsonConfig {
         sharedMod?: boolean,
         limit?: number,
         interval?: number,
+    },
+    queue?: {
+      maxWorkers?: number,
     },
     web?: {
         enabled?: boolean,
@@ -776,6 +812,7 @@ export interface OperatorConfig extends OperatorJsonConfig {
     operator: {
         name?: string
         display?: string,
+        botName?: string,
     },
     credentials: {
         clientId: string,
@@ -803,6 +840,9 @@ export interface OperatorConfig extends OperatorJsonConfig {
         sharedMod: boolean,
         limit: number,
         interval: number,
+    },
+    queue: {
+      maxWorkers: number,
     },
     web: {
         enabled: boolean,

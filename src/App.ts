@@ -48,7 +48,8 @@ export class App {
     hardLimit: number | string = 50;
     nannyMode?: 'soft' | 'hard';
     nextExpiration!: Dayjs;
-    botName?: string;
+    botName!: string;
+    maxWorkers: number;
     startedAt: Dayjs = dayjs();
     sharedModqueue: boolean = false;
 
@@ -60,6 +61,9 @@ export class App {
 
     constructor(config: OperatorConfig) {
         const {
+            operator: {
+              botName,
+            },
             subreddits: {
               names = [],
               wikiConfig,
@@ -78,6 +82,9 @@ export class App {
             },
             polling: {
                 sharedMod,
+            },
+            queue: {
+              maxWorkers,
             },
             caching: {
                 authorTTL,
@@ -100,8 +107,18 @@ export class App {
         this.hardLimit = hardLimit;
         this.wikiLocation = wikiConfig;
         this.sharedModqueue = sharedMod;
+        if(botName !== undefined) {
+            this.botName = botName;
+        }
 
         this.logger = getLogger(config.logging);
+
+        let mw = maxWorkers;
+        if(maxWorkers < 1) {
+            this.logger.warn(`Max queue workers must be greater than or equal to 1 (Specified: ${maxWorkers})`);
+            mw = 1;
+        }
+        this.maxWorkers = mw;
 
         if (this.dryRun) {
             this.logger.info('Running in DRYRUN mode');
@@ -200,13 +217,19 @@ export class App {
         let availSubs = [];
         const name = await this.client.getMe().name;
         this.logger.info(`Reddit API Limit Remaining: ${this.client.ratelimitRemaining}`);
-        this.logger.info(`Authenticated Account: /u/${name}`);
-        this.botName = name;
+        this.logger.info(`Authenticated Account: u/${name}`);
+
+        const botNameFromConfig = this.botName !== undefined;
+        if(this.botName === undefined) {
+            this.botName = `u/${name}`;
+        }
+        this.logger.info(`Bot Name${botNameFromConfig ? ' (from config)' : ''}: ${this.botName}`);
+
         for (const sub of await this.client.getModeratedSubreddits()) {
             // TODO don't know a way to check permissions yet
             availSubs.push(sub);
         }
-        this.logger.info(`/u/${name} is a moderator of these subreddits: ${availSubs.map(x => x.display_name_prefixed).join(', ')}`);
+        this.logger.info(`${this.botName} is a moderator of these subreddits: ${availSubs.map(x => x.display_name_prefixed).join(', ')}`);
 
         let subsToRun: Subreddit[] = [];
         const subsToUse = subreddits.length > 0 ? subreddits.map(parseSubredditName) : this.subreddits;
@@ -231,7 +254,7 @@ export class App {
         let subSchedule: Manager[] = [];
         // get configs for subs we want to run on and build/validate them
         for (const sub of subsToRun) {
-            const manager = new Manager(sub, this.client, this.logger, {dryRun: this.dryRun, sharedModqueue: this.sharedModqueue, wikiLocation: this.wikiLocation});
+            const manager = new Manager(sub, this.client, this.logger, {dryRun: this.dryRun, sharedModqueue: this.sharedModqueue, wikiLocation: this.wikiLocation, botName: this.botName, maxWorkers: this.maxWorkers});
             try {
                 await manager.parseConfiguration('system', true, {suppressNotification: true});
             } catch (err) {
