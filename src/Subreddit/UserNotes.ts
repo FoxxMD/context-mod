@@ -156,7 +156,7 @@ export class UserNotes {
             userNotes.blob = inflateUserNotes(userNotes.blob);
 
             if (this.notesTTL > 0 && this.cache !== undefined) {
-                await this.cache.set(`${this.subreddit.display_name}-usernotes`, userNotes, this.notesTTL);
+                await this.cache.set(`${this.subreddit.display_name}-usernotes`, userNotes, {ttl: this.notesTTL});
                 this.users = new Map();
             }
 
@@ -179,7 +179,7 @@ export class UserNotes {
             // @ts-ignore
             this.wiki = await this.subreddit.getWikiPage('usernotes').edit({text: JSON.stringify(wikiPayload), reason: 'ContextBot edited usernotes'});
             if (this.notesTTL > 0 && this.cache !== undefined) {
-                await this.cache.set(this.identifier, payload, this.notesTTL);
+                await this.cache.set(this.identifier, payload, {ttl: this.notesTTL});
                 this.users = new Map();
             }
 

@@ -63,6 +63,7 @@ export class SubredditResources {
     cache?: Cache
     cacheType: string
     cacheSettingsHash?: string;
+    pruneInterval?: any;
 
     stats: { cache: ResourceStats };
 
@@ -103,6 +104,19 @@ export class SubredditResources {
             this.stats.cache.userNotes.miss += miss ? 1 : 0;
         }
         this.userNotes = new UserNotes(userNotesTTL, this.subreddit, this.logger, this.cache, cacheUseCB)
+
+        if(this.cacheType === 'memory' && this.cacheSettingsHash !== 'default') {
+            const min = Math.min(...([wikiTTL, authorTTL, userNotesTTL].filter(x => x !== 0)));
+            if(min > 0) {
+                // set default prune interval
+                this.pruneInterval = setInterval(() => {
+                    // @ts-ignore
+                    this.defaultCache?.store.prune();
+                    this.logger.debug('Pruned cache');
+                    // prune interval should be twice the smallest TTL
+                },min * 1000 * 2)
+            }
+        }
     }
 
     async getCacheKeyCount() {
@@ -224,7 +238,7 @@ export class SubredditResources {
         }
 
         if (this.cache !== undefined && this.wikiTTL > 0) {
-            this.cache.set(hash, wikiContent, this.wikiTTL);
+            this.cache.set(hash, wikiContent, {ttl: this.wikiTTL});
         }
 
         return wikiContent;
@@ -274,6 +288,7 @@ class SubredditResourcesManager {
     cacheType: string = 'none';
     cacheHash!: string;
     ttlDefaults!: Required<TTLConfig>;
+    pruneInterval: any;
 
     setDefaultsFromConfig(config: OperatorConfig) {
         const {
@@ -286,13 +301,27 @@ class SubredditResourcesManager {
             caching,
         } = config;
         this.cacheHash = objectHash.sha1(caching);
-        this.setDefaultCache(provider);
         this.setTTLDefaults({authorTTL, userNotesTTL, wikiTTL});
+        this.setDefaultCache(provider);
     }
 
     setDefaultCache(options: CacheOptions) {
         this.cacheType = options.store;
         this.defaultCache = createCacheManager(options);
+        if(this.cacheType === 'memory') {
+            const min = Math.min(...([this.ttlDefaults.wikiTTL, this.ttlDefaults.authorTTL, this.ttlDefaults.userNotesTTL].filter(x => x !== 0)));
+            if(min > 0) {
+                // set default prune interval
+                this.pruneInterval = setInterval(() => {
+                    // @ts-ignore
+                    this.defaultCache?.store.prune();
+                    // kinda hacky but whatever
+                    const logger = winston.loggers.get('default');
+                    logger.debug('Pruned Shared Cache');
+                    // prune interval should be twice the smallest TTL
+                },min * 1000 * 2)
+            }
+        }
     }
 
     setTTLDefaults(def: Required<TTLConfig>) {
