@@ -565,7 +565,23 @@ const rcbServer = function (options: OperatorConfig): ([() => Promise<void>, App
             io.emit('logClear', subArr);
         });
 
-        app.use('/action', booleanMiddle(['force']));
+        app.use('/config', [redditUserMiddleware]);
+        app.getAsync('/config', async (req, res) => {
+            const {subreddit} = req.query as any;
+            if(!(req.session.subreddits as string[]).includes(subreddit)) {
+                return res.render('error', {error: 'Cannot retrieve config for subreddit you do not manage or is not run by the bot', operatorDisplay: display});
+            }
+            const manager = bot.subManagers.find(x => x.displayLabel === subreddit);
+            if (manager === undefined) {
+                return res.render('error', {error: 'Cannot retrieve config for subreddit you do not manage or is not run by the bot', operatorDisplay: display});
+            }
+
+            // @ts-ignore
+            const wiki = await manager.subreddit.getWikiPage(manager.wikiLocation).fetch();
+            return res.send(wiki.content_md);
+        });
+
+        app.use('/action', [redditUserMiddleware, booleanMiddle(['force'])]);
         app.getAsync('/action', async (req, res) => {
             const {type, action, subreddit, force = false} = req.query as any;
             let subreddits: string[] = [];
@@ -649,7 +665,7 @@ const rcbServer = function (options: OperatorConfig): ([() => Promise<void>, App
             res.send('OK');
         });
 
-        app.use('/check', booleanMiddle(['dryRun']));
+        app.use('/check', [redditUserMiddleware, booleanMiddle(['dryRun'])]);
         app.getAsync('/check', async (req, res) => {
             const {url, dryRun, subreddit} = req.query as any;
 
