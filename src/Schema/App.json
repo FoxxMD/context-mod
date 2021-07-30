@@ -674,7 +674,7 @@
             "description": "Configure granular settings for a cache provider with this object",
             "properties": {
                 "auth_pass": {
-                    "description": "(`redis``) the authentication passphrase (if enabled)",
+                    "description": "(`redis`) the authentication passphrase (if enabled)",
                     "type": "string"
                 },
                 "db": {
@@ -695,7 +695,7 @@
                 },
                 "max": {
                     "default": 500,
-                    "description": "(`memory`) The maximum number of keys to store in cache\n\nThis will determine roughly how large in **RAM** each `memory` cache can be, based on how large your `window` criteria are. Consider this example:\n\n* `\"window\": 100` (in your rules)\n* `\"max: 500\"`\n* Maximum size of cache will be `500 x 100 activities = 50,000 activities`",
+                    "description": "(`memory`) The maximum number of keys (unique cache calls) to store in cache\n\nThis will determine roughly how large in **RAM** each `memory` cache can be, based on how large your `window` criteria are. Consider this example:\n\n* all `window` criteria in a subreddit's rules are `\"window\": 100`\n* `\"max\": 500`\n* Maximum size of **each** memory cache will be `500 x 100 activities = 50,000 activities`\n  * So the shared cache would be max 50k activities and\n  * Every additional private cache (when a subreddit configures their cache separately) will also be max 50k activities",
                     "examples": [
                         500
                     ],

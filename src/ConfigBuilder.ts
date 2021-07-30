@@ -380,8 +380,7 @@ export const parseOpConfigFromEnv = (): OperatorJsonConfig => {
         },
         caching: {
             provider: {
-                // @ts-ignore
-                store: process.env.CACHING
+                store: process.env.CACHING as (CacheProvider | undefined)
             },
             authorTTL: process.env.AUTHOR_TTL !== undefined ? parseInt(process.env.AUTHOR_TTL) : undefined
         },
@@ -499,30 +498,24 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
         queue: {
             maxWorkers = 1,
         } = {},
-        caching = 'memory',
+        caching,
         api: {
             softLimit = 250,
             hardLimit = 50
         } = {},
     } = data;
 
-    let cache = {
-        ...cacheTTLDefaults,
-        provider: {
-            store: 'memory',
-            ...cacheOptDefaults
-        }
-    };
+    let cache: StrongCache;
 
-    if (typeof caching === 'string') {
+    if(caching === undefined) {
         cache = {
+            ...cacheTTLDefaults,
             provider: {
-                store: caching as CacheProvider,
+                store: 'memory',
                 ...cacheOptDefaults
-            },
-            ...cacheTTLDefaults
+            }
         };
-    } else if (typeof caching === 'object') {
+    } else {
         const {provider, ...restConfig} = caching;
         if (typeof provider === 'string') {
             cache = {
@@ -586,7 +579,6 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
             },
             maxLogs,
         },
-        // @ts-ignore
         caching: cache,
         polling: {
             sharedMod,

@@ -272,6 +272,7 @@ class SubredditResourcesManager {
     modStreams: Map<string, SPoll<Snoowrap.Submission | Snoowrap.Comment>> = new Map();
     defaultCache?: Cache;
     cacheType: string = 'none';
+    cacheHash!: string;
     ttlDefaults!: Required<TTLConfig>;
 
     setDefaultsFromConfig(config: OperatorConfig) {
@@ -282,7 +283,9 @@ class SubredditResourcesManager {
                 wikiTTL,
                 provider,
             },
+            caching,
         } = config;
+        this.cacheHash = objectHash.sha1(caching);
         this.setDefaultCache(provider);
         this.setTTLDefaults({authorTTL, userNotesTTL, wikiTTL});
     }
@@ -306,7 +309,15 @@ class SubredditResourcesManager {
     set(subName: string, initOptions: SubredditResourceConfig): SubredditResources {
         let hash = 'default';
         const { caching, ...init } = initOptions;
-        let opts: SubredditResourceOptions;
+
+        let opts: SubredditResourceOptions = {
+            cache: this.defaultCache,
+            cacheType: this.cacheType,
+            cacheSettingsHash: hash,
+            ttl: this.ttlDefaults,
+            ...init,
+        };
+
         if(caching !== undefined) {
             const {provider = 'memory', ...rest} = caching;
             let cacheConfig = {
@@ -317,21 +328,16 @@ class SubredditResourcesManager {
                 },
             }
             hash = objectHash.sha1(cacheConfig);
-            const {provider: trueProvider, ...trueRest} = cacheConfig;
-            opts = {
-                cache: createCacheManager(trueProvider),
-                cacheType: trueProvider.store,
-                cacheSettingsHash: hash,
-                ...init,
-                ...trueRest,
-            };
-        } else {
-            opts = {
-                cache: this.defaultCache,
-                cacheType: this.cacheType,
-                cacheSettingsHash: hash,
-                ttl: this.ttlDefaults,
-                ...init,
+            // only need to create private if there settings are actually different than the default
+            if(hash !== this.cacheHash) {
+                const {provider: trueProvider, ...trueRest} = cacheConfig;
+                opts = {
+                    cache: createCacheManager(trueProvider),
+                    cacheType: trueProvider.store,
+                    cacheSettingsHash: hash,
+                    ...init,
+                    ...trueRest,
+                };
             }
         }
 

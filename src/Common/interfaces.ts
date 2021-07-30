@@ -684,7 +684,7 @@ export interface CacheOptions {
      * */
     port?: number | undefined,
     /**
-     * (`redis``) the authentication passphrase (if enabled)
+     * (`redis`) the authentication passphrase (if enabled)
      * */
     auth_pass?: string | undefined,
     /**
@@ -704,13 +704,17 @@ export interface CacheOptions {
      * */
     ttl?: number,
     /**
-     * (`memory`) The maximum number of keys to store in cache
+     * (`memory`) The maximum number of keys (unique cache calls) to store in cache
+     *
+     * When the maximum number of keys is reached the cache will being dropping the [least-recently-used](https://github.com/isaacs/node-lru-cache) key to keep the cache at `max` size.
      *
      * This will determine roughly how large in **RAM** each `memory` cache can be, based on how large your `window` criteria are. Consider this example:
      *
-     * * `"window": 100` (in your rules)
-     * * `"max: 500"`
-     * * Maximum size of cache will be `500 x 100 activities = 50,000 activities`
+     * * all `window` criteria in a subreddit's rules are `"window": 100`
+     * * `"max": 500`
+     * * Maximum size of **each** memory cache will be `500 x 100 activities = 50,000 activities`
+     *   * So the shared cache would be max 50k activities and
+     *   * Every additional private cache (when a subreddit configures their cache separately) will also be max 50k activities
      *
      * @default 500
      * @examples [500]
@@ -1104,9 +1108,13 @@ export interface OperatorJsonConfig {
         userNotesTTL?: number;
         /**
          * The cache provider and, optionally, a custom configuration for that provider
+         *
+         * If not present or `null` provider will be `memory`.
+         *
+         * To specify another `provider` but use its default configuration set this property to a string of one of the available providers: `memory`, `redis`, or `none`
          * */
         provider?: CacheProvider | CacheOptions
-    } | CacheProvider
+    }
     /**
      * Settings related to managing heavy API usage.
      * */
@@ -1174,12 +1182,7 @@ export interface OperatorConfig extends OperatorJsonConfig {
         logLevel?: LogLevel,
         maxLogs: number,
     }
-    caching: {
-        authorTTL: number,
-        userNotesTTL: number,
-        wikiTTL: number
-        provider: CacheOptions
-    },
+    caching: StrongCache,
     api: {
         softLimit: number,
         hardLimit: number,
