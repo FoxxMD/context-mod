@@ -234,6 +234,10 @@
                                                 </span>
                                             </label>
                                             <span><%= `${data.runningActivities} Processing / ${data.queuedActivities} Queued` %></span>
+                                            <% if (data.name === 'All' && isOperator) { %>
+                                                <label>Operators</label>
+                                                <span><%= operators %></span>
+                                            <% } %>
                                         </div>
                                         <% if (data.name !== 'All') { %>
                                             <ul class="list-disc list-inside mt-4">
@@ -319,7 +323,8 @@
                                                 <label>Location</label>
                                                 <span>
                                                     <a style="display: inline"
-                                                       href="<%= data.wikiHref %>"><%= data.wikiLocation %></a>
+                                                       href="<%= data.wikiHref %>"><%= data.wikiLocation %></a> | <a style="display: inline" target="_blank"
+                                                                                                                     href="/config?subreddit=<%= data.name %>">Download</a>
                                                 </span>
                                             </div>
                                         </div>

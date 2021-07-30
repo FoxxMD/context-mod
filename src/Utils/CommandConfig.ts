@@ -46,7 +46,7 @@ export const checks = new commander.Option('-h, --checks <checkNames...>', 'An o
 
 export const proxy = new commander.Option('--proxy <proxyEndpoint>', 'Proxy Snoowrap requests through this endpoint (default: process.env.PROXY)');
 
-export const operator = new commander.Option('--operator <name>', 'Username of the reddit user operating this application, used for displaying OP level info/actions in UI (default: process.env.OPERATOR)');
+export const operator = new commander.Option('--operator <name...>', 'Username(s) of the reddit user(s) operating this application, used for displaying OP level info/actions in UI (default: process.env.OPERATOR)');
 
 export const operatorDisplay = new commander.Option('--operatorDisplay <name>', 'An optional name to display who is operating this application in the UI (default: process.env.OPERATOR_DISPLAY || Anonymous)');
 

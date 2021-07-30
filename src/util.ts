@@ -25,6 +25,7 @@ import {cacheOptDefaults} from "./Common/defaults";
 import cacheManager from "cache-manager";
 import redisStore from "cache-manager-redis-store";
 import crypto from "crypto";
+import {create as createMemoryStore} from './Utils/memoryStore';
 
 const {format} = winston;
 const {combine, printf, timestamp, label, splat, errors} = format;
@@ -909,7 +910,8 @@ export const createCacheManager = (options: CacheOptions) => {
             });
         case 'memory':
         default:
-            return cacheManager.caching({store: 'memory', max, ttl});
+            //return cacheManager.caching({store: 'memory', max, ttl});
+            return cacheManager.caching({store: {create: createMemoryStore}, max, ttl});
     }
 }
 

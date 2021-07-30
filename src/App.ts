@@ -49,6 +49,7 @@ export class App {
     nannyMode?: 'soft' | 'hard';
     nextExpiration!: Dayjs;
     botName!: string;
+    botLink!: string;
     maxWorkers: number;
     startedAt: Dayjs = dayjs();
     sharedModqueue: boolean = false;
@@ -63,6 +64,7 @@ export class App {
         const {
             operator: {
               botName,
+                name,
             },
             subreddits: {
               names = [],
@@ -112,6 +114,8 @@ export class App {
         }
 
         this.logger = getLogger(config.logging);
+
+        this.logger.info(`Operators: ${name.length === 0 ? 'None Specified' : name.join(', ')}`)
 
         let mw = maxWorkers;
         if(maxWorkers < 1) {
@@ -215,13 +219,15 @@ export class App {
 
     async buildManagers(subreddits: string[] = []) {
         let availSubs = [];
-        const name = await this.client.getMe().name;
+        // @ts-ignore
+        const user = await this.client.getMe().fetch();
+        this.botLink = `https://reddit.com/user/${user.name}`;
         this.logger.info(`Reddit API Limit Remaining: ${this.client.ratelimitRemaining}`);
-        this.logger.info(`Authenticated Account: u/${name}`);
+        this.logger.info(`Authenticated Account: u/${user.name}`);
 
         const botNameFromConfig = this.botName !== undefined;
         if(this.botName === undefined) {
-            this.botName = `u/${name}`;
+            this.botName = `u/${user.name}`;
         }
         this.logger.info(`Bot Name${botNameFromConfig ? ' (from config)' : ''}: ${this.botName}`);
 

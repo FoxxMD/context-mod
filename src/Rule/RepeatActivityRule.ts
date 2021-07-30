@@ -1,13 +1,12 @@
-import {SubmissionRule, SubmissionRuleJSONConfig} from "./index";
-import {RuleOptions, RuleResult} from "../index";
+import {Rule, RuleJSONConfig, RuleOptions, RuleResult} from "./index";
 import {Comment} from "snoowrap";
 import {
     activityWindowText,
     comparisonTextOp, FAIL, isExternalUrlSubmission, isRedditMedia,
     parseGenericValueComparison, parseSubredditName,
     parseUsableLinkIdentifier as linkParser, PASS
-} from "../../util";
-import {ActivityWindow, ActivityWindowType, ReferenceSubmission} from "../../Common/interfaces";
+} from "../util";
+import {ActivityWindow, ActivityWindowType, ReferenceSubmission} from "../Common/interfaces";
 import Submission from "snoowrap/dist/objects/Submission";
 import dayjs from "dayjs";
 import Fuse from 'fuse.js'
@@ -45,7 +44,7 @@ const fuzzyOptions = {
     distance: 15
 };
 
-export class RepeatActivityRule extends SubmissionRule {
+export class RepeatActivityRule extends Rule {
     threshold: string;
     window: ActivityWindowType;
     gapAllowance?: number;
@@ -95,11 +94,10 @@ export class RepeatActivityRule extends SubmissionRule {
         }
     }
 
-    async process(item: Submission): Promise<[boolean, RuleResult]> {
-        const referenceUrl = await item.url;
-        if (referenceUrl === undefined && this.useSubmissionAsReference) {
-            this.logger.warn(`Rule not triggered because useSubmissionAsReference=true but submission is not a link`);
-            return Promise.resolve([false, this.getResult(false)]);
+    async process(item: Submission|Comment): Promise<[boolean, RuleResult]> {
+        let referenceUrl;
+        if(item instanceof Submission && this.useSubmissionAsReference) {
+            referenceUrl = await item.url;
         }
 
         let filterFunc = (x: any) => true;
@@ -196,7 +194,7 @@ export class RepeatActivityRule extends SubmissionRule {
             let referenceSubmissions = identifierGroupedActivities.get(identifier);
             if(referenceSubmissions === undefined && isExternalUrlSubmission(item)) {
                 // if external url sub then try by title
-                identifier = item.title;
+                identifier = (item as Submission).title;
                 referenceSubmissions = identifierGroupedActivities.get(identifier);
                 if(referenceSubmissions === undefined) {
                     // didn't get by title so go back to url since that's the default
@@ -362,7 +360,7 @@ export interface RepeatActivityOptions extends RepeatActivityConfig, RuleOptions
  * url        => Url of the submission that triggered the rule
  * ```
  * */
-export interface RepeatActivityJSONConfig extends RepeatActivityConfig, SubmissionRuleJSONConfig {
+export interface RepeatActivityJSONConfig extends RepeatActivityConfig, RuleJSONConfig {
     kind: 'repeatActivity'
 }
 

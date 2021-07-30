@@ -21,5 +21,6 @@ This directory contains example of valid, ready-to-go configurations for Context
   * [Rule Sets](/docs/examples/advancedConcepts/ruleSets.json5)
   * [Name Rules](/docs/examples/advancedConcepts/ruleNameReuse.json5)
   * [Check Ordering](/docs/examples/advancedConcepts)
-* Subreddit-ready examples
-  * Coming soon...
+* [Subreddit-ready examples](/docs/examples/subredditReady)
+
+PROTIP: You can edit/build on examples by using the [schema editor.](https://json-schema.app/view/%23?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Fcontext-mod%2Fmaster%2Fsrc%2FSchema%2FApp.json)

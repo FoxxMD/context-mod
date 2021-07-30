@@ -55,7 +55,7 @@ const connectedUsers: Map<string, ConnectedUserInfo> = new Map();
 
 const availableLevels = ['error', 'warn', 'info', 'verbose', 'debug'];
 
-let operatorSessionId: (string | undefined);
+let operatorSessionIds: string[] = [];
 
 declare module 'express-session' {
     interface SessionData {
@@ -95,6 +95,7 @@ const rcbServer = function (options: OperatorConfig): ([() => Promise<void>, App
         },
     } = options;
 
+    const opNames = name.map(x => x.toLowerCase());
     let bot: App;
     let botSubreddits: string[] = [];
 
@@ -187,18 +188,16 @@ const rcbServer = function (options: OperatorConfig): ([() => Promise<void>, App
                 });
 
                 // @ts-ignore
-                if (name !== undefined && socket.handshake.session.user.toLowerCase() === name.toLowerCase()) {
+                if (opNames.includes(socket.handshake.session.user.toLowerCase())) {
                     // @ts-ignore
-                    operatorSessionId = socket.handshake.session.id;
+                    operatorSessionIds.push(socket.handshake.session.id)
                 }
             }
         });
         io.on('disconnect', (socket) => {
             // @ts-ignore
             connectedUsers.delete(socket.handshake.session.id);
-            if (operatorSessionId === socket.handshake.session.id) {
-                operatorSessionId = undefined;
-            }
+            operatorSessionIds = operatorSessionIds.filter(x => x !== socket.handshake.session.id)
         });
 
         const redditUserMiddleware = async (req: express.Request, res: express.Response, next: Function) => {
@@ -276,7 +275,7 @@ const rcbServer = function (options: OperatorConfig): ([() => Promise<void>, App
 
             req.session['user'] = user;
             // @ts-ignore
-            req.session['subreddits'] = name !== undefined && name.toLowerCase() === user.toLowerCase() ? bot.subManagers.map(x => x.displayLabel) : subs.reduce((acc: string[], x) => {
+            req.session['subreddits'] = opNames.includes(user.toLowerCase()) ? bot.subManagers.map(x => x.displayLabel) : subs.reduce((acc: string[], x) => {
                 const sm = bot.subManagers.find(y => y.subreddit.display_name === x.display_name);
                 if (sm !== undefined) {
                     return acc.concat(sm.displayLabel);
@@ -298,7 +297,7 @@ const rcbServer = function (options: OperatorConfig): ([() => Promise<void>, App
                 lastCheck
             } = req.session;
             const user = userVal as string;
-            const isOperator = name !== undefined && name.toLowerCase() === user.toLowerCase()
+            const isOperator = opNames.includes(user.toLowerCase())
 
             if ((req.session.subreddits as string[]).length === 0 && !isOperator) {
                 return res.render('noSubs', {operatorDisplay: display});
@@ -509,8 +508,10 @@ const rcbServer = function (options: OperatorConfig): ([() => Promise<void>, App
                 subreddits: [allManagerData, ...subManagerData],
                 show: 'All',
                 botName: bot.botName,
+                botLink: bot.botLink,
                 operatorDisplay: display,
                 isOperator,
+                operators: opNames.length === 0 ? 'None Specified' : name.join(', '),
                 logSettings: {
                     //limit: [10, 20, 50, 100, 200].map(x => `<a class="capitalize ${limit === x ? 'font-bold no-underline pointer-events-none' : ''}" data-limit="${x}" href="logs/settings/update?limit=${x}">${x}</a>`).join(' | '),
                     limitSelect: [10, 20, 50, 100, 200].map(x => `<option ${limit === x ? 'selected' : ''} class="capitalize ${limit === x ? 'font-bold' : ''}" data-value="${x}">${x}</option>`).join(' | '),
@@ -552,7 +553,7 @@ const rcbServer = function (options: OperatorConfig): ([() => Promise<void>, App
 
             const subMap = filterLogBySubreddit(subLogMap, req.session.subreddits, {
                 level,
-                operator: name !== undefined && name.toLowerCase() === (user as string).toLowerCase(),
+                operator: opNames.includes((user as string).toLowerCase()),
                 user,
                 limit,
                 sort: (sort as 'descending' | 'ascending'),
@@ -564,7 +565,23 @@ const rcbServer = function (options: OperatorConfig): ([() => Promise<void>, App
             io.emit('logClear', subArr);
         });
 
-        app.use('/action', booleanMiddle(['force']));
+        app.use('/config', [redditUserMiddleware]);
+        app.getAsync('/config', async (req, res) => {
+            const {subreddit} = req.query as any;
+            if(!(req.session.subreddits as string[]).includes(subreddit)) {
+                return res.render('error', {error: 'Cannot retrieve config for subreddit you do not manage or is not run by the bot', operatorDisplay: display});
+            }
+            const manager = bot.subManagers.find(x => x.displayLabel === subreddit);
+            if (manager === undefined) {
+                return res.render('error', {error: 'Cannot retrieve config for subreddit you do not manage or is not run by the bot', operatorDisplay: display});
+            }
+
+            // @ts-ignore
+            const wiki = await manager.subreddit.getWikiPage(manager.wikiLocation).fetch();
+            return res.send(wiki.content_md);
+        });
+
+        app.use('/action', [redditUserMiddleware, booleanMiddle(['force'])]);
         app.getAsync('/action', async (req, res) => {
             const {type, action, subreddit, force = false} = req.query as any;
             let subreddits: string[] = [];
@@ -648,7 +665,7 @@ const rcbServer = function (options: OperatorConfig): ([() => Promise<void>, App
             res.send('OK');
         });
 
-        app.use('/check', booleanMiddle(['dryRun']));
+        app.use('/check', [redditUserMiddleware, booleanMiddle(['dryRun'])]);
         app.getAsync('/check', async (req, res) => {
             const {url, dryRun, subreddit} = req.query as any;
 
@@ -713,12 +730,14 @@ const rcbServer = function (options: OperatorConfig): ([() => Promise<void>, App
                     }
                 }
             }
-            if (operatorSessionId !== undefined) {
-                io.to(operatorSessionId).emit('opStats', opStats(bot));
-                if (subName === undefined || !emittedSessions.includes(operatorSessionId)) {
-                    const {level = 'verbose'} = connectedUsers.get(operatorSessionId) || {};
-                    if (isLogLineMinLevel(log, level)) {
-                        io.to(operatorSessionId).emit('log', formatLogLineToHtml(log));
+            if (operatorSessionIds.length > 0) {
+                for(const id of operatorSessionIds) {
+                    io.to(id).emit('opStats', opStats(bot));
+                    if (subName === undefined || !emittedSessions.includes(id)) {
+                        const {level = 'verbose'} = connectedUsers.get(id) || {};
+                        if (isLogLineMinLevel(log, level)) {
+                            io.to(id).emit('log', formatLogLineToHtml(log));
+                        }
                     }
                 }
             }
