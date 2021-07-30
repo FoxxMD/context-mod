@@ -322,27 +322,31 @@ export const parseOpConfigFromArgs = (args: any): OperatorJsonConfig => {
     return removeUndefinedKeys(data) as OperatorJsonConfig;
 }
 
-export const parseOpConfigFromEnv = (): OperatorJsonConfig => {
-    let subsVal = process.env.SUBREDDITS;
-    let subs;
-    if (subsVal !== undefined) {
-        subsVal = subsVal.trim();
-        if (subsVal.includes(',')) {
-            // try to parse using comma
-            subs = subsVal.split(',').map(x => x.trim()).filter(x => x !== '');
-        } else {
-            // otherwise try spaces
-            subs = subsVal.split(' ')
-                // remove any extraneous spaces
-                .filter(x => x !== ' ' && x !== '');
-        }
-        if (subs.length === 0) {
-            subs = undefined;
-        }
+const parseListFromEnv = (val: string|undefined) => {
+    let listVals: undefined | string[];
+    if(val === undefined) {
+        return listVals;
     }
+    const trimmedVal = val.trim();
+    if (trimmedVal.includes(',')) {
+        // try to parse using comma
+        listVals = trimmedVal.split(',').map(x => x.trim()).filter(x => x !== '');
+    } else {
+        // otherwise try spaces
+        listVals = trimmedVal.split(' ')
+            // remove any extraneous spaces
+            .filter(x => x !== ' ' && x !== '');
+    }
+    if (listVals.length === 0) {
+        return undefined;
+    }
+    return listVals;
+}
+
+export const parseOpConfigFromEnv = (): OperatorJsonConfig => {
     const data = {
         operator: {
-            name: process.env.OPERATOR,
+            name: parseListFromEnv(process.env.OPERATOR),
             display: process.env.OPERATOR_DISPLAY
         },
         credentials: {
@@ -353,7 +357,7 @@ export const parseOpConfigFromEnv = (): OperatorJsonConfig => {
             redirectUri: process.env.REDIRECT_URI,
         },
         subreddits: {
-            names: subs,
+            names: parseListFromEnv(process.env.SUBREDDITS),
             wikiConfig: process.env.WIKI_CONFIG,
             heartbeatInterval: process.env.HEARTBEAT !== undefined ? parseInt(process.env.HEARTBEAT) : undefined,
             dryRun: parseBool(process.env.DRYRUN, undefined),
@@ -461,7 +465,7 @@ export const parseOperatorConfigFromSources = async (args: any): Promise<Operato
 export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): OperatorConfig => {
     const {
         operator: {
-            name,
+            name = [],
             display = 'Anonymous',
             botName,
         } = {},
@@ -542,7 +546,7 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
 
     const config: OperatorConfig = {
         operator: {
-            name,
+            name: typeof name === 'string' ? [name] : name,
             display,
             botName,
         },

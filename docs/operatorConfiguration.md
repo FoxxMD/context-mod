@@ -94,7 +94,7 @@ Options:
   --hardLimit <limit>           When API limit remaining (600/10min) is lower than this all subreddit polling will be paused until api limit reset (default: process.env.SOFT_LIMIT || 250)
   --dryRun                      Set all subreddits in dry run mode, overriding configurations (default: process.env.DRYRUN || false)
   --proxy <proxyEndpoint>       Proxy Snoowrap requests through this endpoint (default: process.env.PROXY)
-  --operator <name>             Username of the reddit user operating this application, used for displaying OP level info/actions in UI (default: process.env.OPERATOR)
+  --operator <name...>          Username(s) of the reddit user(s) operating this application, used for displaying OP level info/actions in UI (default: process.env.OPERATOR)
   --operatorDisplay <name>      An optional name to display who is operating this application in the UI (default: process.env.OPERATOR_DISPLAY || Anonymous)
   -p, --port <port>             Port for web server to listen on (default: process.env.PORT || 8085)
   -q, --shareMod                If enabled then all subreddits using the default settings to poll "unmoderated" or "modqueue" will retrieve results from a shared request to /r/mod (default: process.env.SHARE_MOD || false)

@@ -26,7 +26,7 @@
                 },
                 "max": {
                     "default": 500,
-                    "description": "(`memory`) The maximum number of keys (unique cache calls) to store in cache\n\nThis will determine roughly how large in **RAM** each `memory` cache can be, based on how large your `window` criteria are. Consider this example:\n\n* all `window` criteria in a subreddit's rules are `\"window\": 100`\n* `\"max\": 500`\n* Maximum size of **each** memory cache will be `500 x 100 activities = 50,000 activities`\n  * So the shared cache would be max 50k activities and\n  * Every additional private cache (when a subreddit configures their cache separately) will also be max 50k activities",
+                    "description": "(`memory`) The maximum number of keys (unique cache calls) to store in cache\n\nWhen the maximum number of keys is reached the cache will being dropping the [least-recently-used](https://github.com/isaacs/node-lru-cache) key to keep the cache at `max` size.\n\nThis will determine roughly how large in **RAM** each `memory` cache can be, based on how large your `window` criteria are. Consider this example:\n\n* all `window` criteria in a subreddit's rules are `\"window\": 100`\n* `\"max\": 500`\n* Maximum size of **each** memory cache will be `500 x 100 activities = 50,000 activities`\n  * So the shared cache would be max 50k activities and\n  * Every additional private cache (when a subreddit configures their cache separately) will also be max 50k activities",
                     "examples": [
                         500
                     ],
@@ -341,11 +341,24 @@
                     "type": "string"
                 },
                 "name": {
-                    "description": "The name of the Reddit account, without prefix, that the operator of this bot uses.\n\nThis is used for showing more information in the web interface IE show all logs/subreddits if even not a moderator.\n\nEX -- User is /u/FoxxMD then `\"name\": \"FoxxMD\"`\n\n* ENV => `OPERATOR`\n* ARG => `--operator <name>`",
-                    "examples": [
-                        "FoxxMD"
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "string"
+                        }
                     ],
-                    "type": "string"
+                    "description": "The name, or names, of the Reddit accounts, without prefix, that the operators of this bot uses.\n\nThis is used for showing more information in the web interface IE show all logs/subreddits if even not a moderator.\n\nEX -- User is /u/FoxxMD then `\"name\": [\"FoxxMD\"]`\n\n* ENV => `OPERATOR` (if list, comma-delimited)\n* ARG => `--operator <name...>`",
+                    "examples": [
+                        [
+                            "FoxxMD",
+                            "AnotherUser"
+                        ]
+                    ]
                 }
             },
             "type": "object"

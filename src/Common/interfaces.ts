@@ -782,18 +782,18 @@ export interface OperatorJsonConfig {
     * */
     operator?: {
         /**
-         * The name of the Reddit account, without prefix, that the operator of this bot uses.
+         * The name, or names, of the Reddit accounts, without prefix, that the operators of this bot uses.
          *
          * This is used for showing more information in the web interface IE show all logs/subreddits if even not a moderator.
          *
-         * EX -- User is /u/FoxxMD then `"name": "FoxxMD"`
+         * EX -- User is /u/FoxxMD then `"name": ["FoxxMD"]`
          *
-         * * ENV => `OPERATOR`
-         * * ARG => `--operator <name>`
+         * * ENV => `OPERATOR` (if list, comma-delimited)
+         * * ARG => `--operator <name...>`
          *
-         * @examples ["FoxxMD"]
+         * @examples [["FoxxMD","AnotherUser"]]
          * */
-        name?: string,
+        name?: string | string[],
         /**
          * A **public** name to display to users of the web interface. Use this to help moderators using your bot identify who is the operator in case they need to contact you.
          *
@@ -1138,7 +1138,7 @@ export interface OperatorJsonConfig {
 
 export interface OperatorConfig extends OperatorJsonConfig {
     operator: {
-        name?: string
+        name: string[]
         display?: string,
         botName?: string,
     },
