@@ -32,9 +32,9 @@ Some feature highlights:
 # Table of Contents
 
 * [How It Works](#how-it-works)
+* [Getting Started](#getting-started)
 * [Configuration And Documentation](#configuration-and-documentation)
 * [Web UI and Screenshots](#web-ui-and-screenshots)
-* [Getting Started](#getting-started)
 
 ### How It Works
 
@@ -64,6 +64,19 @@ ___
 
 [Learn more about the RCB lifecycle and core concepts in the docs.](/docs#how-it-works)
 
+## Getting Started
+
+#### Operators
+
+This guide is for users who want to **run their own bot on a ContextMod instance.**
+
+See the [Operator's Getting Started Guide](/docs/gettingStartedOperator.md)
+
+#### Moderators
+
+This guide is for **reddit moderators** who want to configure an existing CM bot to run on their subreddit.
+
+See the [Moderator's Getting Started Guide](/docs/gettingStartedMod.md)
 
 ## Configuration and Documentation
 
@@ -92,20 +105,6 @@ RCB comes equipped with a web interface designed for use by both moderators and 
 Additionally, a helper webpage is available to help initial setup of your bot with reddit's oauth authentication. [Learn more about using the oauth helper.](docs/botAuthentication.md#cm-oauth-helper-recommended)
 
 ![Oauth View](docs/screenshots/oauth.jpg)
-
-## Getting Started
-
-#### Operators
-
-This guide is for users who want to **run their own bot on a ContextMod instance.**
-
-See the [Operator's Getting Started Guide](/docs/gettingStartedOperator.md)
-
-#### Moderators
-
-This guide is for **reddit moderators** who want to configure an existing CM bot to run on their subreddit.
-
-See the [Moderator's Getting Started Guide](/docs/gettingStartedMod.md)
 
 ## License
 
