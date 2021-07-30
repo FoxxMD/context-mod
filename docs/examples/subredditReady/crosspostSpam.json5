@@ -61,7 +61,7 @@
         {
           "kind": "remove",
           // remove the line below after confirming behavior is acceptable
-          "dryRun": true,
+          "dryRun": true
         },
         // optionally remove "dryRun" from below if you want to leave a comment on removal
         // PROTIP: the comment is bland, you should make it better
@@ -69,7 +69,7 @@
           "kind": "comment",
           "content": "Your submission has been removed because you cross-posted it {{rules.xpostlow.largestRepeat}} times and you have very low engagement outside of making submissions",
           "distinguish": true,
-          "dryRun": true,
+          "dryRun": true
         }
       ]
     }

@@ -34,7 +34,7 @@
         {
           "kind": "remove",
           // remove the line below after confirming behavior is acceptable
-          "dryRun": true,
+          "dryRun": true
         }
       ]
     }

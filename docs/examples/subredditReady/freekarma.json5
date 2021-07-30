@@ -18,27 +18,20 @@
       "condition": "AND",
       "rules": [
         {
-          "condition": "AND",
-          "rules": [
+          "name": "freekarma",
+          "kind": "recentActivity",
+          "window": {
+            "count": 50,
+            "duration": "6 months"
+          },
+          "useSubmissionAsReference": false,
+          "thresholds": [
             {
-              "name": "freekarma",
-              "kind": "recentActivity",
-              "window": {
-                "count": 50,
-                "duration": "6 months"
-              },
-              "useSubmissionAsReference": false,
-              "thresholds": [
-                {
-                  "subreddits": [
-                    "FreeKarma4U",
-                    "FreeKarma4You",
-                    "KarmaStore",
-                    "promote",
-                    "shamelessplug",
-                    "upvote"
-                  ]
-                }
+              "subreddits": [
+                "FreeKarma4U",
+                "FreeKarma4You",
+                "KarmaStore",
+                "upvote"
               ]
             }
           ]
