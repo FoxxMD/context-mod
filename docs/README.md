@@ -28,8 +28,8 @@
 
 Review **at least** the **How It Works** and **Concepts** below, then:
 
-* For **Operators** (running a bot instance) refer to [**Moderator Getting Started**](/docs/gettingStartedMod.md) guide
-* For **Moderators** (configuring an existing bot for your subreddit) refer to the [**Operator Getting Started**](/docs/gettingStartedOperator.md) guide
+* For **Operators** (running a bot instance) refer to [**Operator Getting Started**](/docs/gettingStartedOperator.md)  guide
+* For **Moderators** (configuring an existing bot for your subreddit) refer to the [**Moderator Getting Started**](/docs/gettingStartedMod.md) guide
 
 ## How It Works
 
