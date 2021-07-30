@@ -5,6 +5,7 @@
 * [Getting Started](#getting-started)
 * [How It Works](#how-it-works)
 * [Concepts](#concepts)
+  * [Check](#checks)
   * [Rule](#rule)
     * [Examples](#available-rules)
   * [Rule Set](#rule-set)
@@ -59,8 +60,24 @@ Core, high-level concepts regarding how CM works.
 
 ### Checks
 
-TODO
+A **Check** is the main logical unit of behavior for the bot. It is equivalent to "if X then Y". A Check is comprised of:
 
+* One or more **Rules** that are tested against an **Activity**
+* One of more **Actions** that are performed when the **Rules** are satisfied
+
+The bot's configuration can be made up of one or more **Checks** that are processed **in the order they are listed in the configuration.**
+
+Once a Check is **triggered** (its Rules are satisfied and Actions performed) all subsequent Checks are skipped.
+
+Some other important concepts regarding Checks:
+
+* All Checks have a **kind** (defined in the configuration) that determine if they should run on **Submissions** or **Comments**
+* Checks have a **condition** property that determines when they are considered **triggered**
+  * If the **condition** is `AND` then ALL of their **Rules** must be **triggered** for the Check to be **triggered**
+  * If the **condition** is `OR` then if ANY **Rules** is triggered **triggered** then the Check is **triggered**
+
+Examples of different types of Checks can be found in the [subreddit-ready examples.](/docs/examples/subredditReady)
+  
 ### Rule
 
 A **Rule** is some set of **criteria** (conditions) that are tested against an Activity (comment/submission), a User, or a User's history. A Rule is considered **triggered** when the **criteria** for that rule are found to be **true** for whatever is being tested against.
@@ -115,7 +132,7 @@ Example
 
 An **Action** is some action the bot can take against the checked Activity (comment/submission) or Author of the Activity. CM has Actions for most things a normal reddit user or moderator can do.
 
-### Available Actions
+#### Available Actions
 
 * Remove (Comment/Submission)
 * Flair (Submission)
@@ -130,14 +147,66 @@ For detailed explanation and options of what individual Actions can do [see the 
 
 ### Filters
 
-authorIs/itemIs TODO
+**Checks, Rules, and Actions** all have two additional (optional) criteria "tests". These tests behave differently than rule/check triggers in that:
+
+* When they **pass** the thing being tested continues to process as usual
+* When they **fail** the thing being tested **is skipped, not failed.**
+
+For **Checks** and **Actions** skipping means that the thing is not processed. The Action is not run, the Check is not triggered.
+
+In the context of **Rules** (in a Check) skipping means the Rule does not get run BUT it does not fail. The Check will continue processing as if the Rule did not exist. However, if ALL Rules in a Check are skipped then the Check does "fail" (is not triggered).
+
+#### Available Filters
+
+##### Item Filter (`itemIs`)
+
+This filter will test against the **state of the Activity currently being run.** Some criteria available to test against IE "Is the activity...":
+
+* removed
+* nsfw
+* locked
+* stickied
+* deleted
+* etc...
+
+The `itemIs` filter is made up of an array (list) of `State` criteria objects. **All** criteria in the array must pass for this filter to pass.
+
+There are two different State criteria depending on what type of Activity is being tested:
+
+* Submission -- [SubmissionState](https://json-schema.app/view/%23/%23%2Fdefinitions%2FSubmissionCheckJson/%23%2Fdefinitions%2FSubmissionState?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Fcontext-mod%2Fmaster%2Fsrc%2FSchema%2FApp.json)
+* Comment -- [CommentState](https://json-schema.app/view/%23/%23%2Fdefinitions%2FCommentCheckJson/%23%2Fdefinitions%2FCommentState?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Fcontext-mod%2Fmaster%2Fsrc%2FSchema%2FApp.json)
+
+##### Author Filter (`authorIs`)
+
+This filter will test against the **Author of the Activity currently being run.** Some criteria available to test against:
+
+* account age
+* comment, link, and total karma
+* subreddit flair text/css
+* name
+* User Notes
+* verified
+* etc...
+
+The `authorIs` filter is made up two (optional) lists of [`AuthorCriteria`](https://json-schema.app/view/%23/%23%2Fdefinitions%2FSubmissionCheckJson/%23%2Fdefinitions%2FAuthorOptions/%23%2Fdefinitions%2FAuthorCriteria?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Fcontext-mod%2Fmaster%2Fsrc%2FSchema%2FApp.json) criteria objects that define how the test behaves:
+
+* `include` list -- If **any** `AuthorCriteria` from this list passes then the `authorIs` test passes
+* `exclude` list -- If **any** `AuthorCriteria` from this list **does not pass** then the `authorIs` test passes. **Note:** This property is ignored if `include` is also present IE you cannot use both properties at the same time.
+
+Refer to the [app schema for `AuthorCriteria`](https://json-schema.app/view/%23/%23%2Fdefinitions%2FSubmissionCheckJson/%23%2Fdefinitions%2FAuthorOptions/%23%2Fdefinitions%2FAuthorCriteria?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Fcontext-mod%2Fmaster%2Fsrc%2FSchema%2FApp.json) for all available properties to test against.
+
+Some examples of using `authorIs` can be found in the [Author examples.](/docs/examples/author)
 
 ## Configuration And Usage
 
 * For **Operator/Bot maintainers** see **[Operation Configuration](/docs/operatorConfiguration.md)**
   * [CLI Usage](docs/operatorConfiguration.md#cli-usage)
-* For **Moderators** see the [App Schema](https://json-schema.app/view/%23?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Fcontext-mod%2Fmaster%2Fsrc%2FSchema%2FApp.json) and [examples](/docs/examples)
-  * For usage TODO
+* For **Moderators** 
+  * Refer to the [examples folder](/docs/examples) or the [subreddit-ready examples](/docs/examples/subredditReady)
+  * as well as the [schema editor](https://json-schema.app/view/%23?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Fcontext-mod%2Fmaster%2Fsrc%2FSchema%2FApp.json) which has
+    * fully annotated configuration data/structure
+    * generated examples in json/yaml
+    * built-in editor that automatically validates your config
 
 ## Common Resources
 
@@ -207,11 +276,6 @@ This means that when possible you should re-use window values.
 IE If you want to check an Author's Activities for a time range try to always use **7 Days** or always use **50 Items** for absolute counts.
 
 Re-use will result in less API calls and faster Check times.
-
-
-## Subreddit-ready Configurations
-
-TODO
 
 ## FAQ
 
