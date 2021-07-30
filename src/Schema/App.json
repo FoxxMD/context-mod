@@ -671,26 +671,53 @@
             "type": "object"
         },
         "CacheOptions": {
+            "description": "Configure granular settings for a cache provider with this object",
             "properties": {
                 "auth_pass": {
+                    "description": "(`redis``) the authentication passphrase (if enabled)",
                     "type": "string"
                 },
                 "db": {
+                    "default": 0,
+                    "description": "(`redis`) the db number to use",
+                    "examples": [
+                        0
+                    ],
                     "type": "number"
                 },
                 "host": {
+                    "default": "localhost",
+                    "description": "(`redis`) hostname",
+                    "examples": [
+                        "localhost"
+                    ],
                     "type": "string"
                 },
                 "max": {
+                    "default": 500,
+                    "description": "(`memory`) The maximum number of keys to store in cache\n\nThis will determine roughly how large in **RAM** each `memory` cache can be, based on how large your `window` criteria are. Consider this example:\n\n* `\"window\": 100` (in your rules)\n* `\"max: 500\"`\n* Maximum size of cache will be `500 x 100 activities = 50,000 activities`",
+                    "examples": [
+                        500
+                    ],
                     "type": "number"
                 },
                 "port": {
+                    "default": 6379,
+                    "description": "(`redis`) port to connect on",
+                    "examples": [
+                        6379
+                    ],
                     "type": "number"
                 },
                 "store": {
                     "$ref": "#/definitions/CacheProvider"
                 },
                 "ttl": {
+                    "default": 60,
+                    "description": "The default TTL, in seconds, for the cache provider.\n\nCan mostly be ignored since TTLs are defined for each cache object",
+                    "examples": [
+                        60
+                    ],
                     "type": "number"
                 }
             },
@@ -700,6 +727,7 @@
             "type": "object"
         },
         "CacheProvider": {
+            "description": "Available cache providers",
             "enum": [
                 "memory",
                 "none",
@@ -1405,6 +1433,7 @@
                     "type": "array"
                 },
                 "providers": {
+                    "description": "A list of notification providers (Discord, etc..) to configure. Each object in the list is one provider. Multiple of the same provider can be provided but must have different names",
                     "items": {
                         "$ref": "#/definitions/DiscordProviderConfig"
                     },
