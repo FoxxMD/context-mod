@@ -54,6 +54,16 @@ After you have found a configuration to use as a starting point:
 * In a new tab open the github page for the configuration you want ([example](/docs/examples/repeatActivity/crosspostSpamming.json5))
 * Click the **Raw** button, then select all and copy all of the text to your clipboard.
 
+### Build Your Own Config
+
+Additionally, you can use [this schema editor](https://json-schema.app/view/%23?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Fcontext-mod%2Fmaster%2Fsrc%2FSchema%2FApp.json) to build your configuration. The editor features a ton of handy features:
+
+* fully annotated configuration data/structure
+* generated examples in json/yaml
+* built-in editor that automatically validates your config
+
+PROTIP: Find an example config to use as a starting point and then build on it using the editor.
+
 ## Saving Your Configuration
 
 * Open the wiki page you created in the [previous step](#setup-wiki-page) and click **edit**
