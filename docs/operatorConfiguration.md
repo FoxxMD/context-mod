@@ -28,8 +28,8 @@ Refer to the **[Bot Authentication guide](/docs/botAuthentication.md)** to retri
 
 # Defining Configuration
 
-CM can be configured using **any or all** of the approaches below. **At each level ALL configuration values are
-optional** but some are required depending on the mode of operation for the application.
+CM can be configured using **any or all** of the approaches below. Note that **at each level ALL configuration values are
+optional** but the "required configuration" mentioned above must be available when all levels are combined.
 
 Any values defined at a **lower-listed** level of configuration will override any values from a higher-listed
 configuration.
@@ -150,7 +150,7 @@ node src/index.js run --clientId=f4b4df1c7b2 --clientSecret=34v5q1c56ub --refres
 
 ## Using Config Overrides
 
-Using all three configs together:
+An example of using multiple configuration levels together IE all are provided to the application:
 
 **FILE**
 <details>
@@ -190,7 +190,7 @@ node src/index.js run --subreddits=sub1
 
 </details>
 
-Produces these variables at runtime for the application:
+When all three are used together they produce these variables at runtime for the application:
 
 ```
 clientId: f4b4df1c7b2
