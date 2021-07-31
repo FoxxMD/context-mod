@@ -911,7 +911,7 @@ export const createCacheManager = (options: CacheOptions) => {
         case 'memory':
         default:
             //return cacheManager.caching({store: 'memory', max, ttl});
-            return cacheManager.caching({store: {create: createMemoryStore}, max, ttl});
+            return cacheManager.caching({store: {create: createMemoryStore}, max, ttl, shouldCloneBeforeSet: false});
     }
 }
 
