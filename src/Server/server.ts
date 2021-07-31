@@ -578,7 +578,7 @@ const rcbServer = function (options: OperatorConfig): ([() => Promise<void>, App
 
             // @ts-ignore
             const wiki = await manager.subreddit.getWikiPage(manager.wikiLocation).fetch();
-            return res.send(wiki.content_md);
+            return res.send(wiki.content_md.replaceAll('\n', '<br />'));
         });
 
         app.use('/action', [redditUserMiddleware, booleanMiddle(['force'])]);
