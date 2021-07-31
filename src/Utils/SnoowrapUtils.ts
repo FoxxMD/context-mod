@@ -256,7 +256,7 @@ export const renderContent = async (template: string, data: (Submission | Commen
         //         ...grouped,
         //     };
         // },
-        permalink: data.permalink,
+        permalink: `https://reddit.com${data.permalink}`,
         botLink: BOT_LINK,
     }
     if (template.includes('{{item.notes')) {

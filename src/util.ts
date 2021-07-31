@@ -767,6 +767,8 @@ export const permissions = [
     'identity',
     'modcontributors',
     'modflair',
+    'modmail',
+    'privatemessages',
     'modposts',
     'modself',
     'mysubreddits',

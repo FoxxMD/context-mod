@@ -130,7 +130,7 @@ export interface ActionJson extends ActionConfig {
     /**
      * The type of action that will be performed
      */
-    kind: 'comment' | 'lock' | 'remove' | 'report' | 'approve' | 'ban' | 'flair' | 'usernote'
+    kind: 'comment' | 'lock' | 'remove' | 'report' | 'approve' | 'ban' | 'flair' | 'usernote' | 'message'
 }
 
 export const isActionJson = (obj: object): obj is ActionJson => {

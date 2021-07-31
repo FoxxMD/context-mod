@@ -311,6 +311,7 @@
                 "comment",
                 "flair",
                 "lock",
+                "message",
                 "remove",
                 "report",
                 "usernote"
