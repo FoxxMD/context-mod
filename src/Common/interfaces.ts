@@ -605,10 +605,14 @@ export interface SubmissionState extends ActivityState {
  * @examples [{"op": true, "removed": false}]
  * */
 export interface CommentState extends ActivityState {
-    /*
+    /**
     * Is this Comment Author also the Author of the Submission this comment is in?
     * */
     op?: boolean
+    /**
+    * A list of SubmissionState attributes to test the Submission this comment is in
+    * */
+    submissionState?: SubmissionState[]
 }
 
 export type TypedActivityStates = SubmissionState[] | CommentState[];

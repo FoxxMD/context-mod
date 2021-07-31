@@ -166,7 +166,7 @@ export class Check implements ICheck {
         try {
             let allRuleResults: RuleResult[] = [];
             let allResults: (RuleResult | RuleSetResult)[] = [];
-            const [itemPass, crit] = isItem(item, this.itemIs, this.logger);
+            const [itemPass, crit] = await isItem(item, this.itemIs, this.logger);
             if (!itemPass) {
                 this.logger.verbose(`${FAIL} => Item did not pass 'itemIs' test`);
                 return [false, allRuleResults];

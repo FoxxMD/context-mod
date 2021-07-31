@@ -49,7 +49,7 @@ export abstract class Action {
     async handle(item: Comment | Submission, ruleResults: RuleResult[], runtimeDryrun?: boolean): Promise<void> {
         const dryRun = runtimeDryrun || this.dryRun;
         let actionRun = false;
-        const [itemPass, crit] = isItem(item, this.itemIs, this.logger);
+        const [itemPass, crit] = await isItem(item, this.itemIs, this.logger);
         if (!itemPass) {
             this.logger.verbose(`Activity did not pass 'itemIs' test, Action not run`);
             return;

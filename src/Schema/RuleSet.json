@@ -509,6 +509,7 @@
                     "type": "boolean"
                 },
                 "op": {
+                    "description": "Is this Comment Author also the Author of the Submission this comment is in?",
                     "type": "boolean"
                 },
                 "removed": {
@@ -519,6 +520,13 @@
                 },
                 "stickied": {
                     "type": "boolean"
+                },
+                "submissionState": {
+                    "description": "A list of SubmissionState attributes to test the Submission this comment is in",
+                    "items": {
+                        "$ref": "#/definitions/SubmissionState"
+                    },
+                    "type": "array"
                 }
             },
             "type": "object"
