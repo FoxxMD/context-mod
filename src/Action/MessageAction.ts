@@ -36,7 +36,7 @@ export class MessageAction extends Action {
 
     async process(item: Comment | Submission, ruleResults: RuleResult[], runtimeDryrun?: boolean): Promise<void> {
         const dryRun = runtimeDryrun || this.dryRun;
-        const content = await this.resources.getContent(this.content, item.subreddit);
+        const content = await this.resources.getContent(this.content);
         const body = await renderContent(content, item, ruleResults, this.resources.userNotes);
 
         const footer = await this.resources.generateFooter(item, this.footer);
