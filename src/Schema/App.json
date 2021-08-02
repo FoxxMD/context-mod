@@ -933,6 +933,14 @@
                     ],
                     "type": "boolean"
                 },
+                "enable": {
+                    "default": true,
+                    "description": "Should this check be run by the bot?",
+                    "examples": [
+                        true
+                    ],
+                    "type": "boolean"
+                },
                 "itemIs": {
                     "description": "A list of criteria to test the state of the `Activity` against before running the check.\n\nIf any set of criteria passes the Check will be run. If the criteria fails then the Check will fail.\n\n* @examples [[{\"over_18\": true, \"removed': false}]]",
                     "items": {
@@ -2385,6 +2393,14 @@
                     "description": "Use this option to override the `dryRun` setting for all of its `Actions`",
                     "examples": [
                         false,
+                        true
+                    ],
+                    "type": "boolean"
+                },
+                "enable": {
+                    "default": true,
+                    "description": "Should this check be run by the bot?",
+                    "examples": [
                         true
                     ],
                     "type": "boolean"
