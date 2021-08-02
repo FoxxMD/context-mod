@@ -136,10 +136,16 @@ export class SubredditResources {
     }
 
     getStats() {
+        const totals = Object.values(this.stats.cache).reduce((acc, curr) => ({
+            miss: acc.miss + curr.miss,
+            req: acc.req + curr.requests,
+        }), {miss: 0, req: 0});
         return {
             cache: {
                 // TODO could probably combine these two
-                totalRequests: Object.values(this.stats.cache).reduce((acc, curr) => acc + curr.requests, 0),
+                totalRequests: totals.req,
+                totalMiss: totals.miss,
+                missPercent: `${formatNumber(totals.miss === 0 || totals.req === 0 ? 0 :(totals.miss/totals.req) * 100, {toFixed: 0})}%`,
                 types: Object.keys(this.stats.cache).reduce((acc, curr) => {
                     const per = acc[curr].miss === 0 ? 0 : formatNumber(acc[curr].miss / acc[curr].requests) * 100;
                     // @ts-ignore

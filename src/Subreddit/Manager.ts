@@ -158,6 +158,8 @@ export class Manager {
                 currentKeyCount: 0,
                 isShared: false,
                 totalRequests: 0,
+                totalMiss: 0,
+                missPercent: '0%',
                 requestRate: 0,
                 types: cacheStats()
             },

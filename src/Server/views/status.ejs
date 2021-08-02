@@ -460,9 +460,32 @@
                                                     <span><%= data.stats.cache.currentKeyCount %></span>
                                                     <label>Calls</label>
                                                     <span><span><%= data.stats.cache.totalRequests %></span> <span>(<%= data.stats.cache.requestRate %>/10min)</span></span>
+                                                    <label>Missed^</label>
+                                                    <span><span><%= data.stats.cache.totalMiss %></span> <span>(<%= data.stats.cache.missPercent %>)</span></span>
                                                 </div>
                                                 <div class="text-left py-2">
-                                                    <span class="font-semibold">Calls Breakdown</span>
+                                                        <span class="has-tooltip">
+                                                            <span style="margin-top:30px;"
+                                                                  class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2 space-y-3 p-2'>
+                                                                <div class="stats">
+                                                    <label>Author</label>
+                                                    <span><%= data.stats.cache.types.author.requests %> (<%= data.stats.cache.types.author.missPercent %> miss)</span>
+                                                    <label>Author Criteria</label>
+                                                    <span><%= data.stats.cache.types.authorCrit.requests %> (<%= data.stats.cache.types.authorCrit.missPercent %> miss)</span>
+                                                    <label>Item Criteria</label>
+                                                    <span><%= data.stats.cache.types.itemCrit.requests %> (<%= data.stats.cache.types.itemCrit.missPercent %> miss)</span>
+                                                    <label>Submissions</label>
+                                                    <span><%= data.stats.cache.types.submission.requests %> (<%= data.stats.cache.types.submission.missPercent %> miss)</span>
+                                                    <label>Comments</label>
+                                                    <span><%= data.stats.cache.types.comment.requests %> (<%= data.stats.cache.types.comment.missPercent %> miss)</span>
+                                                    <label>Content</label>
+                                                    <span><%= data.stats.cache.types.content.requests %> (<%= data.stats.cache.types.content.missPercent %> miss)</span>
+                                                    <label>UserNote</label>
+                                                    <span><%= data.stats.cache.types.userNotes.requests %> (<%= data.stats.cache.types.userNotes.missPercent %> miss)</span>
+                                                </div>
+                                                            </span>
+                                                            <span class="font-semibold underline" style="text-decoration-style: dotted">Calls Breakdown</span>
+                                                        </span>
                                                     <span class="has-tooltip">
                                                                 <span style="right: 0;"
                                                                       class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2 space-y-3 p-2'>
@@ -501,16 +524,6 @@
                                                                     </svg>
                                                                 </span>
                                                         </span>
-                                                </div>
-                                                <div class="stats">
-                                                    <label>Author</label>
-                                                    <span><%= data.stats.cache.types.author.requests %> (<%= data.stats.cache.types.author.missPercent %> miss)</span>
-                                                    <label>Criteria</label>
-                                                    <span><%= data.stats.cache.types.authorCrit.requests %> (<%= data.stats.cache.types.authorCrit.missPercent %> miss)</span>
-                                                    <label>Content</label>
-                                                    <span><%= data.stats.cache.types.content.requests %> (<%= data.stats.cache.types.content.missPercent %> miss)</span>
-                                                    <label>UserNote</label>
-                                                    <span><%= data.stats.cache.types.userNotes.requests %> (<%= data.stats.cache.types.userNotes.missPercent %> miss)</span>
                                                 </div>
                                             </div>
                                         </div>
