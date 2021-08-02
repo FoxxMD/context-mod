@@ -660,6 +660,24 @@ export const isItem = async (item: Submission | Comment, stateCriteria: TypedAct
                                 return [false, crit];
                             }
                             break;
+                        case 'title':
+                            if((item instanceof Comment)) {
+                                log.warn('`title` is not allowed in `itemIs` criteria when the main Activity is a Comment');
+                                continue;
+                            }
+                            // @ts-ignore
+                            const titleReg = crit[k] as string;
+                            try {
+                                if(null === item.title.match(titleReg)) {
+                                    // @ts-ignore
+                                    log.debug(`Failed to match title as regular expression: ${titleReg}`);
+                                    return [false, crit];
+                                }
+                            } catch (err) {
+                                log.error(`An error occurred while attempting to match title against string as regular expression: ${titleReg}. Most likely the string does not make a valid regular expression.`, err);
+                                return [false, crit];
+                            }
+                            break;
                         default:
                             // @ts-ignore
                             if (item[k] !== undefined) {

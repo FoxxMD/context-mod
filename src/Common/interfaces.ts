@@ -598,6 +598,10 @@ export interface SubmissionState extends ActivityState {
      * */
     over_18?: boolean
     is_self?: boolean
+    /**
+     * A valid regular expression to match against the title of the submission
+     * */
+    title?: string
 }
 
 /**

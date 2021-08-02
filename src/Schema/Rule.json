@@ -1269,6 +1269,10 @@
                 },
                 "stickied": {
                     "type": "boolean"
+                },
+                "title": {
+                    "description": "A valid regular expression to match against the title of the submission",
+                    "type": "string"
                 }
             },
             "type": "object"
