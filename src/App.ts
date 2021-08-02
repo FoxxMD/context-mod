@@ -20,6 +20,7 @@ import {ModQueueStream, UnmoderatedStream} from "./Subreddit/Streams";
 import {getLogger} from "./Utils/loggerFactory";
 import {DurationString, OperatorConfig, PAUSED, RUNNING, STOPPED, SYSTEM, USER} from "./Common/interfaces";
 import { Duration } from "dayjs/plugin/duration";
+import {singleton} from "./Utils/SnoowrapUtils";
 
 const {transports} = winston;
 
@@ -160,6 +161,8 @@ export class App {
             logger: snooLogWrapper(this.logger.child({labels: ['Snoowrap']})),
             continueAfterRatelimitError: true,
         });
+
+        singleton.setClient(this.client);
 
         const retryHandler = createRetryHandler({maxRequestRetry: 8, maxOtherRetry: 1}, this.logger);
 

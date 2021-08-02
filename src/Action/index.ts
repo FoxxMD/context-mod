@@ -49,7 +49,7 @@ export abstract class Action {
     async handle(item: Comment | Submission, ruleResults: RuleResult[], runtimeDryrun?: boolean): Promise<void> {
         const dryRun = runtimeDryrun || this.dryRun;
         let actionRun = false;
-        const [itemPass, crit] = isItem(item, this.itemIs, this.logger);
+        const [itemPass, crit] = await isItem(item, this.itemIs, this.logger);
         if (!itemPass) {
             this.logger.verbose(`Activity did not pass 'itemIs' test, Action not run`);
             return;
@@ -130,7 +130,7 @@ export interface ActionJson extends ActionConfig {
     /**
      * The type of action that will be performed
      */
-    kind: 'comment' | 'lock' | 'remove' | 'report' | 'approve' | 'ban' | 'flair' | 'usernote'
+    kind: 'comment' | 'lock' | 'remove' | 'report' | 'approve' | 'ban' | 'flair' | 'usernote' | 'message'
 }
 
 export const isActionJson = (obj: object): obj is ActionJson => {

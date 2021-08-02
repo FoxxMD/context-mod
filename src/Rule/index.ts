@@ -83,7 +83,7 @@ export abstract class Rule implements IRule, Triggerable {
                 this.logger.debug(`Returning existing result of ${existingResult.triggered ? '✔️' : '❌'}`);
                 return Promise.resolve([existingResult.triggered, {...existingResult, name: this.name}]);
             }
-            const [itemPass, crit] = isItem(item, this.itemIs, this.logger);
+            const [itemPass, crit] = await isItem(item, this.itemIs, this.logger);
             if (!itemPass) {
                 this.logger.verbose(`(Skipped) Item did not pass 'itemIs' test`);
                 return Promise.resolve([null, this.getResult(null, {result: `Item did not pass 'itemIs' test`})]);

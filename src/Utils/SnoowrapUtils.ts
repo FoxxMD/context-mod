@@ -24,7 +24,7 @@ import {Logger} from "winston";
 import InvalidRegexError from "./InvalidRegexError";
 import SimpleError from "./SimpleError";
 import {AuthorCriteria} from "../Author/Author";
-import { URL } from "url";
+import {URL} from "url";
 
 export const BOT_LINK = 'https://www.reddit.com/r/ContextModBot/comments/otz396/introduction_to_contextmodbot';
 
@@ -58,7 +58,7 @@ export async function getAuthorActivities(user: RedditUser, options: AuthorTyped
     let includes: string[] = [];
     let excludes: string[] = [];
 
-    if(isActivityWindowCriteria(optWindow)) {
+    if (isActivityWindowCriteria(optWindow)) {
         const {
             satisfyOn = 'any',
             count,
@@ -72,25 +72,25 @@ export async function getAuthorActivities(user: RedditUser, options: AuthorTyped
         includes = include.map(x => parseSubredditName(x).toLowerCase());
         excludes = exclude.map(x => parseSubredditName(x).toLowerCase());
 
-        if(includes.length > 0 && excludes.length > 0) {
+        if (includes.length > 0 && excludes.length > 0) {
             // TODO add logger so this can be logged...
             // this.logger.warn('include and exclude both specified, exclude will be ignored');
         }
         satisfiedCount = count;
         durVal = duration;
         satisfy = satisfyOn
-    } else if(typeof optWindow === 'number') {
+    } else if (typeof optWindow === 'number') {
         satisfiedCount = optWindow;
     } else {
         durVal = optWindow as DurationVal;
     }
 
     // if count is less than max limit (100) go ahead and just get that many. may result in faster response time for low numbers
-    if(satisfiedCount !== undefined) {
+    if (satisfiedCount !== undefined) {
         chunkSize = Math.min(chunkSize, satisfiedCount);
     }
 
-    if(durVal !== undefined) {
+    if (durVal !== undefined) {
         const endTime = dayjs();
         if (typeof durVal === 'object') {
             duration = dayjs.duration(durVal);
@@ -110,9 +110,9 @@ export async function getAuthorActivities(user: RedditUser, options: AuthorTyped
         satisfiedEndtime = endTime.subtract(duration.asMilliseconds(), 'milliseconds');
     }
 
-    if(satisfiedCount === undefined && satisfiedEndtime === undefined) {
+    if (satisfiedCount === undefined && satisfiedEndtime === undefined) {
         throw new Error('window value was not valid');
-    } else if(satisfy === 'all' && !(satisfiedCount !== undefined && satisfiedEndtime !== undefined)) {
+    } else if (satisfy === 'all' && !(satisfiedCount !== undefined && satisfiedEndtime !== undefined)) {
         // even though 'all' was requested we don't have two criteria so its really 'any' logic
         satisfy = 'any';
     }
@@ -152,23 +152,16 @@ export async function getAuthorActivities(user: RedditUser, options: AuthorTyped
             });
         }
 
-        if(!keepRemoved) {
+        if (!keepRemoved) {
             // snoowrap typings think 'removed' property does not exist on submission
             // @ts-ignore
             listSlice = listSlice.filter(x => !activityIsRemoved(x));
         }
 
-        if (satisfiedCount !== undefined && items.length + listSlice.length >= satisfiedCount) {
-            // satisfied count
-            if(satisfy === 'any') {
-                items = items.concat(listSlice).slice(0, satisfiedCount);
-                break;
-            }
-            countOk = true;
-        }
-
+        // its more likely the time criteria is going to be hit before the count criteria
+        // so check this first
         let truncatedItems: Array<Submission | Comment> = [];
-        if(satisfiedEndtime !== undefined) {
+        if (satisfiedEndtime !== undefined) {
             truncatedItems = listSlice.filter((x) => {
                 const utc = x.created_utc * 1000;
                 const itemDate = dayjs(utc);
@@ -177,7 +170,7 @@ export async function getAuthorActivities(user: RedditUser, options: AuthorTyped
             });
 
             if (truncatedItems.length !== listSlice.length) {
-                if(satisfy === 'any') {
+                if (satisfy === 'any') {
                     // satisfied duration
                     items = items.concat(truncatedItems);
                     break;
@@ -186,9 +179,18 @@ export async function getAuthorActivities(user: RedditUser, options: AuthorTyped
             }
         }
 
+        if (satisfiedCount !== undefined && items.length + listSlice.length >= satisfiedCount) {
+            // satisfied count
+            if (satisfy === 'any') {
+                items = items.concat(listSlice).slice(0, satisfiedCount);
+                break;
+            }
+            countOk = true;
+        }
+
         // if we've satisfied everything take whichever is bigger
-        if(satisfy === 'all' && countOk && timeOk) {
-            if(satisfiedCount as number > items.length + truncatedItems.length) {
+        if (satisfy === 'all' && countOk && timeOk) {
+            if (satisfiedCount as number > items.length + truncatedItems.length) {
                 items = items.concat(listSlice).slice(0, satisfiedCount);
             } else {
                 items = items.concat(truncatedItems);
@@ -256,14 +258,14 @@ export const renderContent = async (template: string, data: (Submission | Commen
         //         ...grouped,
         //     };
         // },
-        permalink: data.permalink,
+        permalink: `https://reddit.com${data.permalink}`,
         botLink: BOT_LINK,
     }
-    if(template.includes('{{item.notes')) {
+    if (template.includes('{{item.notes')) {
         // we need to get notes
         const notesData = await usernotes.getUserNotes(data.author);
         // return usable notes data with some stats
-        const current = notesData.length > 0 ? notesData[notesData.length -1] : undefined;
+        const current = notesData.length > 0 ? notesData[notesData.length - 1] : undefined;
         // group by type
         const grouped = notesData.reduce((acc: any, x) => {
             const {[x.noteType]: nt = []} = acc;
@@ -379,10 +381,10 @@ export const testAuthorCriteria = async (item: (Comment | Submission), authorOpt
                 case 'linkKarma':
                     const lkCompare = parseGenericValueOrPercentComparison(await authorOpts.linkKarma as string);
                     let lkMatch;
-                    if(lkCompare.isPercent) {
+                    if (lkCompare.isPercent) {
                         // @ts-ignore
                         const tk = author.total_karma as number;
-                        lkMatch = comparisonTextOp(author.link_karma / tk, lkCompare.operator, lkCompare.value/100);
+                        lkMatch = comparisonTextOp(author.link_karma / tk, lkCompare.operator, lkCompare.value / 100);
                     } else {
                         lkMatch = comparisonTextOp(author.link_karma, lkCompare.operator, lkCompare.value);
                     }
@@ -393,10 +395,10 @@ export const testAuthorCriteria = async (item: (Comment | Submission), authorOpt
                 case 'commentKarma':
                     const ckCompare = parseGenericValueOrPercentComparison(await authorOpts.commentKarma as string);
                     let ckMatch;
-                    if(ckCompare.isPercent) {
+                    if (ckCompare.isPercent) {
                         // @ts-ignore
                         const ck = author.total_karma as number;
-                        ckMatch = comparisonTextOp(author.comment_karma / ck, ckCompare.operator, ckCompare.value/100);
+                        ckMatch = comparisonTextOp(author.comment_karma / ck, ckCompare.operator, ckCompare.value / 100);
                     } else {
                         ckMatch = comparisonTextOp(author.comment_karma, ckCompare.operator, ckCompare.value);
                     }
@@ -406,7 +408,7 @@ export const testAuthorCriteria = async (item: (Comment | Submission), authorOpt
                     break;
                 case 'totalKarma':
                     const tkCompare = parseGenericValueComparison(await authorOpts.totalKarma as string);
-                    if(tkCompare.isPercent) {
+                    if (tkCompare.isPercent) {
                         throw new SimpleError(`'totalKarma' value on AuthorCriteria cannot be a percentage`);
                     }
                     // @ts-ignore
@@ -427,7 +429,12 @@ export const testAuthorCriteria = async (item: (Comment | Submission), authorOpt
                     const notePass = () => {
                         for (const noteCriteria of authorOpts[k] as UserNoteCriteria[]) {
                             const {count = '>= 1', search = 'current', type} = noteCriteria;
-                            const {value, operator, isPercent, extra = ''} = parseGenericValueOrPercentComparison(count);
+                            const {
+                                value,
+                                operator,
+                                isPercent,
+                                extra = ''
+                            } = parseGenericValueOrPercentComparison(count);
                             const order = extra.includes('asc') ? 'ascending' : 'descending';
                             switch (search) {
                                 case 'current':
@@ -448,7 +455,7 @@ export const testAuthorCriteria = async (item: (Comment | Submission), authorOpt
                                         } else {
                                             currCount = 0;
                                         }
-                                        if(isPercent) {
+                                        if (isPercent) {
                                             throw new SimpleError(`When comparing UserNotes with 'consecutive' search 'count' cannot be a percentage. Given: ${count}`);
                                         }
                                         if (comparisonTextOp(currCount, operator, value)) {
@@ -457,11 +464,11 @@ export const testAuthorCriteria = async (item: (Comment | Submission), authorOpt
                                     }
                                     break;
                                 case 'total':
-                                    if(isPercent) {
-                                        if(comparisonTextOp(notes.filter(x => x.noteType === type).length / notes.length, operator, value/100)) {
+                                    if (isPercent) {
+                                        if (comparisonTextOp(notes.filter(x => x.noteType === type).length / notes.length, operator, value / 100)) {
                                             return true;
                                         }
-                                    } else if(comparisonTextOp(notes.filter(x => x.noteType === type).length, operator, value)) {
+                                    } else if (comparisonTextOp(notes.filter(x => x.noteType === type).length, operator, value)) {
                                         return true;
                                     }
                             }
@@ -526,18 +533,18 @@ export const getAttributionIdentifier = (sub: Submission, useParentMediaDomain =
             description,
             provider_name,
         } = sub.secure_media?.oembed;
-        switch(provider_name) {
+        switch (provider_name) {
             case 'Spotify':
-                if(description !== undefined) {
+                if (description !== undefined) {
                     let match = description.match(SPOTIFY_PODCAST_AUTHOR_REGEX);
-                    if(match !== null) {
+                    if (match !== null) {
                         const {author} = match.groups as any;
                         displayDomain = author;
                         domainIdents.push(author);
                         mediaType = 'Podcast';
                     } else {
                         match = description.match(SPOTIFY_MUSIC_AUTHOR_REGEX);
-                        if(match !== null) {
+                        if (match !== null) {
                             const {author, mediaType: mt} = match.groups as any;
                             displayDomain = author;
                             domainIdents.push(author);
@@ -545,26 +552,26 @@ export const getAttributionIdentifier = (sub: Submission, useParentMediaDomain =
                         }
                     }
                 }
-            break;
+                break;
             case 'Anchor FM Inc.':
-                if(author_name !== undefined) {
+                if (author_name !== undefined) {
                     let match = author_name.match(ANCHOR_AUTHOR_REGEX);
-                    if(match !== null) {
+                    if (match !== null) {
                         const {author} = match.groups as any;
                         displayDomain = author;
                         domainIdents.push(author);
                         mediaType = 'podcast';
                     }
                 }
-            break;
+                break;
             case 'YouTube':
                 mediaType = 'Video/Audio';
                 break;
             default:
-                // nah
+            // nah
         }
         // handles yt, vimeo, twitter fine
-        if(displayDomain === '') {
+        if (displayDomain === '') {
             if (author_name !== undefined) {
                 domainIdents.push(author_name);
                 if (displayDomain === '') {
@@ -579,21 +586,21 @@ export const getAttributionIdentifier = (sub: Submission, useParentMediaDomain =
                 }
             }
         }
-        if(displayDomain === '') {
+        if (displayDomain === '') {
             // we have media but could not parse stuff for some reason just use url
             const u = new URL(sub.url);
             displayDomain = u.pathname;
             domainIdents.push(u.pathname);
         }
         provider = provider_name;
-    } else if(sub.secure_media?.type !== undefined) {
+    } else if (sub.secure_media?.type !== undefined) {
         domainIdents.push(sub.secure_media?.type);
         domain = sub.secure_media?.type;
     } else {
         domain = sub.domain;
     }
 
-    if(domain === '') {
+    if (domain === '') {
         domain = sub.domain;
     }
     if (displayDomain === '') {
@@ -603,7 +610,7 @@ export const getAttributionIdentifier = (sub: Submission, useParentMediaDomain =
     return {display: displayDomain, domain, aliases: domainIdents, provider, mediaType};
 }
 
-export const isItem = (item: Submission | Comment, stateCriteria: TypedActivityStates, logger: Logger): [boolean, SubmissionState|CommentState|undefined] => {
+export const isItem = async (item: Submission | Comment, stateCriteria: TypedActivityStates, logger: Logger): Promise<[boolean, SubmissionState | CommentState | undefined]> => {
     if (stateCriteria.length === 0) {
         return [true, undefined];
     }
@@ -611,11 +618,26 @@ export const isItem = (item: Submission | Comment, stateCriteria: TypedActivityS
     const log = logger.child({leaf: 'Item Check'});
 
     for (const crit of stateCriteria) {
-        const [pass, passCrit] = (() => {
+        const [pass, passCrit] = await (async () => {
             for (const k of Object.keys(crit)) {
                 // @ts-ignore
                 if (crit[k] !== undefined) {
-                    switch(k) {
+                    switch (k) {
+                        case 'submissionState':
+                            if(!(item instanceof Comment)) {
+                                log.warn('`submissionState` is not allowed in `itemIs` criteria when the main Activity is a Submission');
+                                continue;
+                            }
+                            // get submission
+                            const client = singleton.getClient();
+                            // @ts-ignore
+                            const sub = await client.getSubmission(item.link_id).fetch();
+                            // @ts-ignore
+                            const [res, _] = await isItem(sub, crit[k] as SubmissionState[], logger);
+                            if(res === false) {
+                                return [false, crit];
+                            }
+                            break;
                         case 'removed':
                             const removed = activityIsRemoved(item);
                             if (removed !== crit['removed']) {
@@ -640,6 +662,24 @@ export const isItem = (item: Submission | Comment, stateCriteria: TypedActivityS
                                 return [false, crit];
                             }
                             break;
+                        case 'title':
+                            if((item instanceof Comment)) {
+                                log.warn('`title` is not allowed in `itemIs` criteria when the main Activity is a Comment');
+                                continue;
+                            }
+                            // @ts-ignore
+                            const titleReg = crit[k] as string;
+                            try {
+                                if(null === item.title.match(titleReg)) {
+                                    // @ts-ignore
+                                    log.debug(`Failed to match title as regular expression: ${titleReg}`);
+                                    return [false, crit];
+                                }
+                            } catch (err) {
+                                log.error(`An error occurred while attempting to match title against string as regular expression: ${titleReg}. Most likely the string does not make a valid regular expression.`, err);
+                                return [false, crit];
+                            }
+                            break;
                         default:
                             // @ts-ignore
                             if (item[k] !== undefined) {
@@ -658,7 +698,7 @@ export const isItem = (item: Submission | Comment, stateCriteria: TypedActivityS
             }
             log.debug(`Passed: ${JSON.stringify(crit)}`);
             return [true, crit];
-        })() as [boolean, SubmissionState|CommentState|undefined];
+        })() as [boolean, SubmissionState | CommentState | undefined];
         if (pass) {
             return [true, passCrit];
         }
@@ -666,8 +706,8 @@ export const isItem = (item: Submission | Comment, stateCriteria: TypedActivityS
     return [false, undefined];
 }
 
-export const activityIsRemoved = (item: Submission|Comment): boolean => {
-    if(item instanceof Submission) {
+export const activityIsRemoved = (item: Submission | Comment): boolean => {
+    if (item instanceof Submission) {
         // when automod filters a post it gets this category
         return item.banned_at_utc !== null && item.removed_by_category !== 'automod_filtered';
     }
@@ -676,8 +716,8 @@ export const activityIsRemoved = (item: Submission|Comment): boolean => {
     return item.banned_at_utc !== null && item.removed;
 }
 
-export const activityIsFiltered = (item: Submission|Comment): boolean => {
-    if(item instanceof Submission) {
+export const activityIsFiltered = (item: Submission | Comment): boolean => {
+    if (item instanceof Submission) {
         // when automod filters a post it gets this category
         return item.banned_at_utc !== null && item.removed_by_category === 'automod_filtered';
     }
@@ -686,9 +726,30 @@ export const activityIsFiltered = (item: Submission|Comment): boolean => {
     return item.banned_at_utc !== null && !item.removed;
 }
 
-export const activityIsDeleted = (item: Submission|Comment): boolean => {
-    if(item instanceof Submission) {
+export const activityIsDeleted = (item: Submission | Comment): boolean => {
+    if (item instanceof Submission) {
         return item.removed_by_category === 'deleted';
     }
     return item.author.name === '[deleted]'
 }
+
+class ClientSingleton {
+    client!: Snoowrap;
+
+    constructor(client?: Snoowrap) {
+        if (client !== undefined) {
+            this.client = client;
+        }
+    }
+
+    setClient(client: Snoowrap) {
+        this.client = client;
+    }
+
+    getClient(): Snoowrap {
+        return this.client;
+    }
+}
+
+// quick little hack to get access to the client without having to pass it all the way down the chain
+export const singleton = new ClientSingleton();

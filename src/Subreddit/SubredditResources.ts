@@ -3,7 +3,7 @@ import objectHash from 'object-hash';
 import {
     AuthorActivitiesOptions,
     AuthorTypedActivitiesOptions, BOT_LINK,
-    getAuthorActivities,
+    getAuthorActivities, singleton,
     testAuthorCriteria
 } from "../Utils/SnoowrapUtils";
 import Subreddit from 'snoowrap/dist/objects/Subreddit';
@@ -215,14 +215,22 @@ export class SubredditResources {
                 sub = subreddit;
             } else {
                 // @ts-ignore
-                const client = subreddit._r as Snoowrap;
+                const client = singleton.getClient();
                 sub = client.getSubreddit(wikiContext.subreddit);
             }
             try {
+                // @ts-ignore
                 const wikiPage = sub.getWikiPage(wikiContext.wiki);
                 wikiContent = await wikiPage.content_md;
             } catch (err) {
-                const msg = `Could not read wiki page. Please ensure the page 'https://reddit.com${sub.display_name_prefixed}wiki/${wikiContext}' exists and is readable`;
+                let msg = `Could not read wiki page for an unknown reason. Please ensure the page 'https://reddit.com${sub.display_name_prefixed}/wiki/${wikiContext.wiki}' exists and is readable`;
+                if(err.statusCode !== undefined) {
+                    if(err.statusCode === 404) {
+                        msg = `Could not find a wiki page at https://reddit.com${sub.display_name_prefixed}/wiki/${wikiContext.wiki} -- Reddit returned a 404`;
+                    } else if(err.statusCode === 403 || err.statusCode === 401) {
+                        msg = `Bot either does not have permission visibility permissions for the wiki page at https://reddit.com${sub.display_name_prefixed}wiki/${wikiContext.wiki} (due to subreddit restrictions) or the bot does have have oauth permissions to read wiki pages (operator error). Reddit returned a ${err.statusCode}`;
+                    }
+                }
                 this.logger.error(msg, err);
                 throw new LoggedError(msg);
             }

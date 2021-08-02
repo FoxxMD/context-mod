@@ -148,6 +148,7 @@
                     "type": "boolean"
                 },
                 "op": {
+                    "description": "Is this Comment Author also the Author of the Submission this comment is in?",
                     "type": "boolean"
                 },
                 "removed": {
@@ -158,6 +159,13 @@
                 },
                 "stickied": {
                     "type": "boolean"
+                },
+                "submissionState": {
+                    "description": "A list of SubmissionState attributes to test the Submission this comment is in",
+                    "items": {
+                        "$ref": "#/definitions/SubmissionState"
+                    },
+                    "type": "array"
                 }
             },
             "type": "object"
@@ -207,6 +215,10 @@
                 },
                 "stickied": {
                     "type": "boolean"
+                },
+                "title": {
+                    "description": "A valid regular expression to match against the title of the submission",
+                    "type": "string"
                 }
             },
             "type": "object"
@@ -303,6 +315,7 @@
                 "comment",
                 "flair",
                 "lock",
+                "message",
                 "remove",
                 "report",
                 "usernote"
