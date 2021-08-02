@@ -4,7 +4,6 @@ import {RuleResult} from "../Rule";
 import ResourceManager, {SubredditResources} from "../Subreddit/SubredditResources";
 import {ChecksActivityState, TypedActivityStates} from "../Common/interfaces";
 import Author, {AuthorOptions} from "../Author/Author";
-import {isItem} from "../Utils/SnoowrapUtils";
 
 export abstract class Action {
     name?: string;
@@ -49,7 +48,7 @@ export abstract class Action {
     async handle(item: Comment | Submission, ruleResults: RuleResult[], runtimeDryrun?: boolean): Promise<void> {
         const dryRun = runtimeDryrun || this.dryRun;
         let actionRun = false;
-        const [itemPass, crit] = await isItem(item, this.itemIs, this.logger);
+        const itemPass = await this.resources.testItemCriteria(item, this.itemIs);
         if (!itemPass) {
             this.logger.verbose(`Activity did not pass 'itemIs' test, Action not run`);
             return;

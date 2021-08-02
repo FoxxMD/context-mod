@@ -397,6 +397,27 @@ export interface TTLConfig {
      * @default 300
      * */
     userNotesTTL?: number;
+    /**
+     * Amount of time, in seconds, a submission should be cached
+     * @examples [60]
+     * @default 60
+     * */
+    submissionTTL?: number;
+    /**
+     * Amount of time, in seconds, a comment should be cached
+     * @examples [60]
+     * @default 60
+     * */
+    commentTTL?: number;
+    /**
+     * Amount of time, in seconds, to cache filter criteria results (`authorIs` and `itemIs` results)
+     *
+     * This is especially useful if when polling high-volume comments and your checks rely on author/item filters
+     *
+     * @examples [60]
+     * @default 60
+     * */
+    filterCriteriaTTL?: number;
 }
 
 export interface SubredditCacheConfig extends TTLConfig {
@@ -668,7 +689,10 @@ export type CacheProvider = 'memory' | 'redis' | 'none';
 export type StrongCache = {
     authorTTL: number,
     userNotesTTL: number,
-    wikiTTL: number
+    wikiTTL: number,
+    submissionTTL: number,
+    commentTTL: number,
+    filterCriteriaTTL: number,
     provider: CacheOptions
 }
 
@@ -1114,6 +1138,27 @@ export interface OperatorJsonConfig {
          * @default 300
          * */
         userNotesTTL?: number;
+        /**
+         * Amount of time, in seconds, a submission should be cached
+         * @examples [60]
+         * @default 60
+         * */
+        submissionTTL?: number;
+        /**
+         * Amount of time, in seconds, a comment should be cached
+         * @examples [60]
+         * @default 60
+         * */
+        commentTTL?: number;
+        /**
+         * Amount of time, in seconds, to cache filter criteria results (`authorIs` and `itemIs` results)
+         *
+         * This is especially useful if when polling high-volume comments and your checks rely on author/item filters
+         *
+         * @examples [60]
+         * @default 60
+         * */
+        filterCriteriaTTL?: number;
         /**
          * The cache provider and, optionally, a custom configuration for that provider
          *

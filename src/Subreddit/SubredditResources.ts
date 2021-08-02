@@ -1,6 +1,8 @@
-import Snoowrap, {RedditUser, Comment, Submission} from "snoowrap";
+import Snoowrap, {RedditUser} from "snoowrap";
 import objectHash from 'object-hash';
 import {
+    activityIsDeleted, activityIsFiltered,
+    activityIsRemoved,
     AuthorActivitiesOptions,
     AuthorTypedActivitiesOptions, BOT_LINK,
     getAuthorActivities, singleton,
@@ -19,9 +21,9 @@ import {
 } from "../util";
 import LoggedError from "../Utils/LoggedError";
 import {
-    CacheOptions,
-    Footer, OperatorConfig, ResourceStats,
-    SubredditCacheConfig, TTLConfig
+    CacheOptions, CommentState,
+    Footer, OperatorConfig, ResourceStats, SubmissionState,
+    SubredditCacheConfig, TTLConfig, TypedActivityStates
 } from "../Common/interfaces";
 import UserNotes from "./UserNotes";
 import Mustache from "mustache";
@@ -29,6 +31,8 @@ import he from "he";
 import {AuthorCriteria} from "../Author/Author";
 import {SPoll} from "./Streams";
 import {Cache} from 'cache-manager';
+import {Submission, Comment} from "snoowrap/dist/objects";
+import {cacheTTLDefaults} from "../Common/defaults";
 
 export const DEFAULT_FOOTER = '\r\n*****\r\nThis action was performed by [a bot.]({{botLink}}) Mention a moderator or [send a modmail]({{modmailLink}}) if you any ideas, questions, or concerns about this action.';
 
@@ -52,9 +56,12 @@ export interface SubredditResourceSetOptions extends SubredditCacheConfig, Foote
 
 export class SubredditResources {
     //enabled!: boolean;
-    protected authorTTL!: number;
     protected useSubredditAuthorCache!: boolean;
-    protected wikiTTL!: number;
+    protected authorTTL: number = cacheTTLDefaults.authorTTL;
+    protected wikiTTL: number = cacheTTLDefaults.wikiTTL;
+    protected submissionTTL: number = cacheTTLDefaults.submissionTTL;
+    protected commentTTL: number = cacheTTLDefaults.commentTTL;
+    protected filterCriteriaTTL: number = cacheTTLDefaults.filterCriteriaTTL;
     name: string;
     protected logger: Logger;
     userNotes: UserNotes;
@@ -75,6 +82,7 @@ export class SubredditResources {
                 userNotesTTL,
                 authorTTL,
                 wikiTTL,
+                filterCriteriaTTL,
             },
             cache,
             cacheType,
@@ -86,6 +94,7 @@ export class SubredditResources {
         this.cacheType = cacheType;
         this.authorTTL = authorTTL;
         this.wikiTTL = wikiTTL;
+        this.filterCriteriaTTL = filterCriteriaTTL;
         this.subreddit = subreddit;
         this.name = name;
         if (logger === undefined) {
@@ -139,6 +148,47 @@ export class SubredditResources {
                 }, this.stats.cache)
             }
         }
+    }
+
+    setLogger(logger: Logger) {
+        this.logger = logger.child({labels: ['Resource Cache']}, mergeArr);
+    }
+
+    async getActivity(item: Submission | Comment) {
+        if (this.cache !== undefined) {
+            try {
+                if (item instanceof Submission && this.submissionTTL > 0) {
+                    this.stats.cache.submission.requests++;
+                    const cachedSubmission = await this.cache.get(`sub-${item.name}`);
+                    if(cachedSubmission !== undefined) {
+                        this.logger.debug(`Cache Hit: Submission ${item.name}`);
+                        return cachedSubmission;
+                    }
+                    // @ts-ignore
+                    const submission = await item.fetch();
+                    this.stats.cache.submission.miss++;
+                    await this.cache.set(`sub-${item.name}`, submission, {ttl: this.submissionTTL});
+                    return submission;
+                } else if (this.commentTTL > 0) {
+                    this.stats.cache.comment.requests++;
+                    const cachedComment = await this.cache.get(`comm-${item.name}`);
+                    if(cachedComment !== undefined) {
+                        this.logger.debug(`Cache Hit: Comment ${item.name}`);
+                        return cachedComment;
+                    }
+                    // @ts-ignore
+                    const comment = await item.fetch();
+                    this.stats.cache.comment.miss++;
+                    await this.cache.set(`comm-${item.name}`, comment, {ttl: this.commentTTL});
+                    return comment;
+                }
+            } catch (err) {
+                this.logger.error('Error while trying to fetch a cached activity', err);
+                throw err.logged;
+            }
+        }
+        // @ts-ignore
+        return await item.fetch();
     }
 
     async getAuthorActivities(user: RedditUser, options: AuthorTypedActivitiesOptions): Promise<Array<Submission | Comment>> {
@@ -253,7 +303,7 @@ export class SubredditResources {
     }
 
     async testAuthorCriteria(item: (Comment | Submission), authorOpts: AuthorCriteria, include = true) {
-        if (this.cache !== undefined && this.authorTTL > 0) {
+        if (this.cache !== undefined && this.filterCriteriaTTL > 0) {
             const hashObj = {itemId: item.id, ...authorOpts, include};
             const hash = `authorCrit-${objectHash.sha1(hashObj)}`;
             this.stats.cache.authorCrit.requests++;
@@ -271,6 +321,130 @@ export class SubredditResources {
         }
 
         return await testAuthorCriteria(item, authorOpts, include, this.userNotes);
+    }
+
+    async testItemCriteria(item: (Comment | Submission), states: TypedActivityStates) {
+        if (this.cache !== undefined && this.filterCriteriaTTL > 0) {
+            try {
+                const hashObj = {itemId: item.name, ...states};
+                const hash = `itemCrit-${objectHash.sha1(hashObj)}`;
+                this.stats.cache.itemCrit.requests++;
+                const cachedItem = await this.cache.get(hash);
+                if(cachedItem !== undefined) {
+                    this.logger.debug(`Cache Hit: Item Check on ${item.name}`);
+                    return cachedItem as boolean;
+                }
+                const itemResult = await this.isItem(item, states, this.logger);
+                this.stats.cache.itemCrit.miss++;
+                const res = await this.cache.set(hash, itemResult, {ttl: this.filterCriteriaTTL});
+                return itemResult;
+            } catch (err) {
+                if(err.logged !== true) {
+                    this.logger.error('Error occurred while testing item criteria', err);
+                }
+                throw err;
+            }
+        }
+
+        return await this.isItem(item, states, this.logger);
+    }
+
+    async isItem (item: Submission | Comment, stateCriteria: TypedActivityStates, logger: Logger) {
+        if (stateCriteria.length === 0) {
+            return true;
+        }
+
+        const log = logger.child({leaf: 'Item Check'});
+
+        for (const crit of stateCriteria) {
+            const pass = await (async () => {
+                for (const k of Object.keys(crit)) {
+                    // @ts-ignore
+                    if (crit[k] !== undefined) {
+                        switch (k) {
+                            case 'submissionState':
+                                if(!(item instanceof Comment)) {
+                                    log.warn('`submissionState` is not allowed in `itemIs` criteria when the main Activity is a Submission');
+                                    continue;
+                                }
+                                // get submission
+                                const client = singleton.getClient();
+                                // @ts-ignore
+                                const subProxy = await client.getSubmission(await item.link_id);
+                                // @ts-ignore
+                                const sub = await this.getActivity(subProxy);
+                                // @ts-ignore
+                                const res = await this.testItemCriteria(sub, crit[k] as SubmissionState[], logger);
+                                if(!res) {
+                                    return false;
+                                }
+                                break;
+                            case 'removed':
+                                const removed = activityIsRemoved(item);
+                                if (removed !== crit['removed']) {
+                                    // @ts-ignore
+                                    log.debug(`Failed: Expected => ${k}:${crit[k]} | Found => ${k}:${removed}`)
+                                    return false
+                                }
+                                break;
+                            case 'deleted':
+                                const deleted = activityIsDeleted(item);
+                                if (deleted !== crit['deleted']) {
+                                    // @ts-ignore
+                                    log.debug(`Failed: Expected => ${k}:${crit[k]} | Found => ${k}:${deleted}`)
+                                    return false
+                                }
+                                break;
+                            case 'filtered':
+                                const filtered = activityIsFiltered(item);
+                                if (filtered !== crit['filtered']) {
+                                    // @ts-ignore
+                                    log.debug(`Failed: Expected => ${k}:${crit[k]} | Found => ${k}:${filtered}`)
+                                    return false
+                                }
+                                break;
+                            case 'title':
+                                if((item instanceof Comment)) {
+                                    log.warn('`title` is not allowed in `itemIs` criteria when the main Activity is a Comment');
+                                    continue;
+                                }
+                                // @ts-ignore
+                                const titleReg = crit[k] as string;
+                                try {
+                                    if(null === item.title.match(titleReg)) {
+                                        // @ts-ignore
+                                        log.debug(`Failed to match title as regular expression: ${titleReg}`);
+                                        return false;
+                                    }
+                                } catch (err) {
+                                    log.error(`An error occurred while attempting to match title against string as regular expression: ${titleReg}. Most likely the string does not make a valid regular expression.`, err);
+                                    return false
+                                }
+                                break;
+                            default:
+                                // @ts-ignore
+                                if (item[k] !== undefined) {
+                                    // @ts-ignore
+                                    if (item[k] !== crit[k]) {
+                                        // @ts-ignore
+                                        log.debug(`Failed: Expected => ${k}:${crit[k]} | Found => ${k}:${item[k]}`)
+                                        return false
+                                    }
+                                } else {
+                                    log.warn(`Tried to test for Item property '${k}' but it did not exist`);
+                                }
+                                break;
+                        }
+                    }
+                }
+                log.debug(`Passed: ${JSON.stringify(crit)}`);
+                return true;
+            })() as boolean;
+            if (pass) {
+                return true
+            }
+        }
+        return false
     }
 
     async generateFooter(item: Submission | Comment, actionFooter?: false | string) {
@@ -304,12 +478,15 @@ class SubredditResourcesManager {
                 authorTTL,
                 userNotesTTL,
                 wikiTTL,
+                commentTTL,
+                submissionTTL,
+                filterCriteriaTTL,
                 provider,
             },
             caching,
         } = config;
         this.cacheHash = objectHash.sha1(caching);
-        this.setTTLDefaults({authorTTL, userNotesTTL, wikiTTL});
+        this.setTTLDefaults({authorTTL, userNotesTTL, wikiTTL, commentTTL, submissionTTL, filterCriteriaTTL});
         this.setDefaultCache(provider);
     }
 

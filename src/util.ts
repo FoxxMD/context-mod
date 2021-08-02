@@ -877,8 +877,11 @@ export const cacheStats = (): ResourceStats => {
     return {
         author: {requests: 0, miss: 0},
         authorCrit: {requests: 0, miss: 0},
+        itemCrit: {requests: 0, miss: 0},
         content: {requests: 0, miss: 0},
         userNotes: {requests: 0, miss: 0},
+        submission: {requests: 0, miss: 0},
+        comment: {requests: 0, miss: 0},
     };
 }
 

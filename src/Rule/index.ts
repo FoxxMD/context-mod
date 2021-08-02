@@ -4,7 +4,6 @@ import {Logger} from "winston";
 import {findResultByPremise, mergeArr} from "../util";
 import ResourceManager, {SubredditResources} from "../Subreddit/SubredditResources";
 import {ChecksActivityState, TypedActivityStates} from "../Common/interfaces";
-import {isItem} from "../Utils/SnoowrapUtils";
 import Author, {AuthorOptions} from "../Author/Author";
 
 export interface RuleOptions {
@@ -83,7 +82,7 @@ export abstract class Rule implements IRule, Triggerable {
                 this.logger.debug(`Returning existing result of ${existingResult.triggered ? '✔️' : '❌'}`);
                 return Promise.resolve([existingResult.triggered, {...existingResult, name: this.name}]);
             }
-            const [itemPass, crit] = await isItem(item, this.itemIs, this.logger);
+            const itemPass = await this.resources.testItemCriteria(item, this.itemIs);
             if (!itemPass) {
                 this.logger.verbose(`(Skipped) Item did not pass 'itemIs' test`);
                 return Promise.resolve([null, this.getResult(null, {result: `Item did not pass 'itemIs' test`})]);

@@ -343,6 +343,7 @@ export class Manager {
                 caching
             };
             this.resources = ResourceManager.set(this.subreddit.display_name, resourceConfig);
+            this.resources.setLogger(this.logger);
 
             this.logger.info('Subreddit-specific options updated');
             this.logger.info('Building Checks...');

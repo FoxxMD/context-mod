@@ -2519,6 +2519,22 @@
                     ],
                     "type": "number"
                 },
+                "commentTTL": {
+                    "default": 60,
+                    "description": "Amount of time, in seconds, a comment should be cached",
+                    "examples": [
+                        60
+                    ],
+                    "type": "number"
+                },
+                "filterCriteriaTTL": {
+                    "default": 60,
+                    "description": "Amount of time, in seconds, to cache filter criteria results (`authorIs` and `itemIs` results)\n\nThis is especially useful if when polling high-volume comments and your checks rely on author/item filters",
+                    "examples": [
+                        60
+                    ],
+                    "type": "number"
+                },
                 "provider": {
                     "anyOf": [
                         {
@@ -2533,6 +2549,14 @@
                             "type": "string"
                         }
                     ]
+                },
+                "submissionTTL": {
+                    "default": 60,
+                    "description": "Amount of time, in seconds, a submission should be cached",
+                    "examples": [
+                        60
+                    ],
+                    "type": "number"
                 },
                 "userNotesTTL": {
                     "default": 300,

@@ -44,7 +44,6 @@ const program = new Command();
     let app: App;
     let errorReason: string | undefined;
     process.on('SIGTERM', async () => {
-        debugger;
         if(app !== undefined) {
             await app.onTerminate(errorReason);
         }

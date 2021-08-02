@@ -26,7 +26,6 @@ import * as RuleSchema from '../Schema/Rule.json';
 import * as RuleSetSchema from '../Schema/RuleSet.json';
 import * as ActionSchema from '../Schema/Action.json';
 import {ActionObjectJson, RuleJson, RuleObjectJson, ActionJson as ActionTypeJson} from "../Common/types";
-import {isItem} from "../Utils/SnoowrapUtils";
 import ResourceManager, {SubredditResources} from "../Subreddit/SubredditResources";
 import {Author, AuthorCriteria, AuthorOptions} from "../Author/Author";
 
@@ -166,7 +165,7 @@ export class Check implements ICheck {
         try {
             let allRuleResults: RuleResult[] = [];
             let allResults: (RuleResult | RuleSetResult)[] = [];
-            const [itemPass, crit] = await isItem(item, this.itemIs, this.logger);
+            const itemPass = await this.resources.testItemCriteria(item, this.itemIs);
             if (!itemPass) {
                 this.logger.verbose(`${FAIL} => Item did not pass 'itemIs' test`);
                 return [false, allRuleResults];
