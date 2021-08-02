@@ -329,14 +329,27 @@ export class SubredditResources {
         return await testAuthorCriteria(item, authorOpts, include, this.userNotes);
     }
 
-    async testItemCriteria(item: (Comment | Submission), states: TypedActivityStates) {
+    async testItemCriteria(i: (Comment | Submission), s: TypedActivityStates) {
         if (this.cache !== undefined && this.filterCriteriaTTL > 0) {
+            let item = i;
+            let states = s;
+            debugger;
+            // optimize for submission only checks on comment item
+            if (item instanceof Comment && states.length === 1 && (states[0] as CommentState).submissionState !== undefined) {
+                // get submission
+                const client = singleton.getClient();
+                // @ts-ignore
+                const subProxy = await client.getSubmission(await i.link_id);
+                // @ts-ignore
+                item = await this.getActivity(subProxy);
+                states = (states[0] as CommentState).submissionState as SubmissionState[];
+            }
             try {
                 const hashObj = {itemId: item.name, ...states};
                 const hash = `itemCrit-${objectHash.sha1(hashObj)}`;
                 this.stats.cache.itemCrit.requests++;
                 const cachedItem = await this.cache.get(hash);
-                if(cachedItem !== undefined) {
+                if (cachedItem !== undefined) {
                     this.logger.debug(`Cache Hit: Item Check on ${item.name}`);
                     return cachedItem as boolean;
                 }
@@ -345,14 +358,14 @@ export class SubredditResources {
                 const res = await this.cache.set(hash, itemResult, {ttl: this.filterCriteriaTTL});
                 return itemResult;
             } catch (err) {
-                if(err.logged !== true) {
+                if (err.logged !== true) {
                     this.logger.error('Error occurred while testing item criteria', err);
                 }
                 throw err;
             }
         }
 
-        return await this.isItem(item, states, this.logger);
+        return await this.isItem(i, s, this.logger);
     }
 
     async isItem (item: Submission | Comment, stateCriteria: TypedActivityStates, logger: Logger) {
