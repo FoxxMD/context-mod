@@ -158,15 +158,8 @@ export async function getAuthorActivities(user: RedditUser, options: AuthorTyped
             listSlice = listSlice.filter(x => !activityIsRemoved(x));
         }
 
-        if (satisfiedCount !== undefined && items.length + listSlice.length >= satisfiedCount) {
-            // satisfied count
-            if (satisfy === 'any') {
-                items = items.concat(listSlice).slice(0, satisfiedCount);
-                break;
-            }
-            countOk = true;
-        }
-
+        // its more likely the time criteria is going to be hit before the count criteria
+        // so check this first
         let truncatedItems: Array<Submission | Comment> = [];
         if (satisfiedEndtime !== undefined) {
             truncatedItems = listSlice.filter((x) => {
@@ -184,6 +177,15 @@ export async function getAuthorActivities(user: RedditUser, options: AuthorTyped
                 }
                 timeOk = true;
             }
+        }
+
+        if (satisfiedCount !== undefined && items.length + listSlice.length >= satisfiedCount) {
+            // satisfied count
+            if (satisfy === 'any') {
+                items = items.concat(listSlice).slice(0, satisfiedCount);
+                break;
+            }
+            countOk = true;
         }
 
         // if we've satisfied everything take whichever is bigger
