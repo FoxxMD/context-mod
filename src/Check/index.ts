@@ -35,6 +35,7 @@ export class Check implements ICheck {
     actions: Action[] = [];
     description?: string;
     name: string;
+    enabled: boolean;
     condition: JoinOperands;
     rules: Array<RuleSet | Rule> = [];
     logger: Logger;
@@ -49,6 +50,7 @@ export class Check implements ICheck {
 
     constructor(options: CheckOptions) {
         const {
+            enable = true,
             name,
             description,
             condition = 'AND',
@@ -63,6 +65,8 @@ export class Check implements ICheck {
             } = {},
             dryRun,
         } = options;
+
+        this.enabled = enable;
 
         this.logger = options.logger.child({labels: [`CHK ${checkLogName(name)}`]}, mergeArr);
 
@@ -141,7 +145,7 @@ export class Check implements ICheck {
         }
         runStats.push(`${this.actions.length} Actions`);
         // not sure if this should be info or verbose
-        this.logger.info(`${type.toUpperCase()} (${this.condition})${this.notifyOnTrigger ? ' ||Notify on Trigger|| ' : ''} => ${runStats.join(' | ')}${this.description !== undefined ? ` => ${this.description}` : ''}`);
+        this.logger.info(`=${this.enabled ? 'Enabled' : 'Disabled'}= ${type.toUpperCase()} (${this.condition})${this.notifyOnTrigger ? ' ||Notify on Trigger|| ' : ''} => ${runStats.join(' | ')}${this.description !== undefined ? ` => ${this.description}` : ''}`);
         if (this.rules.length === 0 && this.itemIs.length === 0 && this.authorIs.exclude.length === 0 && this.authorIs.include.length === 0) {
             this.logger.warn('No rules, item tests, or author test found -- this check will ALWAYS PASS!');
         }
@@ -295,6 +299,14 @@ export interface ICheck extends JoinCondition, ChecksActivityState {
      * If present then these Author criteria are checked before running the Check. If criteria fails then the Check will fail.
      * */
     authorIs?: AuthorOptions
+
+    /**
+     * Should this check be run by the bot?
+     *
+     * @default true
+     * @examples [true]
+     * */
+    enable?: boolean,
 }
 
 export interface CheckOptions extends ICheck {

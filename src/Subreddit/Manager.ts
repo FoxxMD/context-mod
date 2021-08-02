@@ -507,7 +507,11 @@ export class Manager {
             let triggered = false;
             for (const check of checks) {
                 if (checkNames.length > 0 && !checkNames.map(x => x.toLowerCase()).some(x => x === check.name.toLowerCase())) {
-                    this.logger.warn(`Check ${check.name} not in array of requested checks to run, skipping`);
+                    this.logger.warn(`Check ${check.name} not in array of requested checks to run, skipping...`);
+                    continue;
+                }
+                if(!check.enabled) {
+                    this.logger.info(`Check ${check.name} is DISABLED, skipping...`);
                     continue;
                 }
                 checksRun++;
