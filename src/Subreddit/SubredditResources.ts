@@ -335,7 +335,7 @@ export class SubredditResources {
             let states = s;
             debugger;
             // optimize for submission only checks on comment item
-            if (item instanceof Comment && states.length === 1 && (states[0] as CommentState).submissionState !== undefined) {
+            if (item instanceof Comment && states.length === 1 && Object.keys(states[0]).length === 1 && (states[0] as CommentState).submissionState !== undefined) {
                 // get submission
                 const client = singleton.getClient();
                 // @ts-ignore
