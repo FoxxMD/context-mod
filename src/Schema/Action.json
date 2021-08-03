@@ -194,6 +194,12 @@
                 "is_self": {
                     "type": "boolean"
                 },
+                "link_flair_css_class": {
+                    "type": "string"
+                },
+                "link_flair_text": {
+                    "type": "string"
+                },
                 "locked": {
                     "type": "boolean"
                 },
