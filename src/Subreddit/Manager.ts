@@ -519,6 +519,7 @@ export class Manager {
                 let currentResults: RuleResult[] = [];
                 try {
                     const [checkTriggered, checkResults] = await check.runRules(item, allRuleResults);
+                    await check.setCacheResult(item, checkTriggered);
                     currentResults = checkResults;
                     totalRulesRun += checkResults.length;
                     allRuleResults = allRuleResults.concat(determineNewResults(allRuleResults, checkResults));

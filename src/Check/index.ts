@@ -6,6 +6,7 @@ import {Comment, Submission} from "snoowrap";
 import {actionFactory} from "../Action/ActionFactory";
 import {ruleFactory} from "../Rule/RuleFactory";
 import {
+    boolToString,
     createAjvFactory,
     FAIL,
     mergeArr,
@@ -31,7 +32,7 @@ import {Author, AuthorCriteria, AuthorOptions} from "../Author/Author";
 
 const checkLogName = truncateStringToLength(25);
 
-export class Check implements ICheck {
+export abstract class Check implements ICheck {
     actions: Action[] = [];
     description?: string;
     name: string;
@@ -165,10 +166,21 @@ export class Check implements ICheck {
         }
     }
 
+    abstract getCacheResult(item: Submission | Comment) : Promise<boolean | undefined>;
+    abstract setCacheResult(item: Submission | Comment, result: boolean): void;
+
     async runRules(item: Submission | Comment, existingResults: RuleResult[] = []): Promise<[boolean, RuleResult[]]> {
         try {
             let allRuleResults: RuleResult[] = [];
             let allResults: (RuleResult | RuleSetResult)[] = [];
+
+            // check cache results
+            const cacheResult = await this.getCacheResult(item);
+            if(cacheResult !== undefined) {
+                this.logger.verbose(`Skipping rules run because Check Result found in cache: ${boolToString(cacheResult)}`);
+                return [cacheResult, allRuleResults];
+            }
+
             const itemPass = await this.resources.testItemCriteria(item, this.itemIs);
             if (!itemPass) {
                 this.logger.verbose(`${FAIL} => Item did not pass 'itemIs' test`);
@@ -360,9 +372,35 @@ export interface SubmissionCheckJson extends CheckJson {
     itemIs?: SubmissionState[]
 }
 
+/**
+ * Cache the result of this check based on the comment author and the submission id
+ *
+ * This is useful in this type of scenario:
+ *
+ * 1. This check is configured to run on comments for specific submissions with high volume activity
+ * 2. The rules being run are not dependent on the content of the comment
+ * 3. The rule results are not likely to change while cache is valid
+ * */
+export interface UserResultCacheOptions {
+    enable?: boolean,
+    /**
+     * The amount of time, in seconds, to cache this result
+     *
+     * @default 60
+     * @examples [60]
+     * */
+    ttl?: number,
+}
+
+export const userResultCacheDefault: Required<UserResultCacheOptions> = {
+    enable: false,
+    ttl: 60,
+}
+
 export interface CommentCheckJson extends CheckJson {
     kind: 'comment'
     itemIs?: CommentState[]
+    cacheUserResult?:  UserResultCacheOptions
 }
 
 export type CheckStructuredJson = SubmissionCheckStructuredJson | CommentCheckStructuredJson;

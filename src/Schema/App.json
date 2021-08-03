@@ -931,6 +931,10 @@
                         }
                     ]
                 },
+                "cacheUserResult": {
+                    "$ref": "#/definitions/UserResultCacheOptions",
+                    "description": "Cache the result of this check based on the comment author and the submission id\n\nThis is useful in this type of scenario:\n\n1. This check is configured to run on comments for specific submissions with high volume activity\n2. The rules being run are not dependent on the content of the comment\n3. The rule results are not likely to change while cache is valid"
+                },
                 "condition": {
                     "default": "AND",
                     "description": "Under what condition should a set of run `Rule` objects be considered \"successful\"?\n\nIf `OR` then **any** triggered `Rule` object results in success.\n\nIf `AND` then **all** `Rule` objects must be triggered to result in success.",
@@ -2800,6 +2804,23 @@
             "required": [
                 "type"
             ],
+            "type": "object"
+        },
+        "UserResultCacheOptions": {
+            "description": "Cache the result of this check based on the comment author and the submission id\n\nThis is useful in this type of scenario:\n\n1. This check is configured to run on comments for specific submissions with high volume activity\n2. The rules being run are not dependent on the content of the comment\n3. The rule results are not likely to change while cache is valid",
+            "properties": {
+                "enable": {
+                    "type": "boolean"
+                },
+                "ttl": {
+                    "default": 60,
+                    "description": "The amount of time, in seconds, to cache this result",
+                    "examples": [
+                        60
+                    ],
+                    "type": "number"
+                }
+            },
             "type": "object"
         }
     },
