@@ -623,6 +623,9 @@ export interface SubmissionState extends ActivityState {
      * A valid regular expression to match against the title of the submission
      * */
     title?: string
+
+    link_flair_text?: string
+    link_flair_css_class?: string
 }
 
 /**

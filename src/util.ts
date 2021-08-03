@@ -22,7 +22,7 @@ import SimpleError from "./Utils/SimpleError";
 import InvalidRegexError from "./Utils/InvalidRegexError";
 import {constants, promises} from "fs";
 import {cacheOptDefaults} from "./Common/defaults";
-import cacheManager from "cache-manager";
+import cacheManager, {Cache} from "cache-manager";
 import redisStore from "cache-manager-redis-store";
 import crypto from "crypto";
 import {create as createMemoryStore} from './Utils/memoryStore';
@@ -882,6 +882,7 @@ export const cacheStats = (): ResourceStats => {
         userNotes: {requests: 0, miss: 0},
         submission: {requests: 0, miss: 0},
         comment: {requests: 0, miss: 0},
+        commentCheck: {requests: 0, miss: 0}
     };
 }
 
@@ -899,11 +900,11 @@ export const buildCacheOptionsFromProvider = (provider: CacheProvider | any): Ca
     }
 }
 
-export const createCacheManager = (options: CacheOptions) => {
+export const createCacheManager = (options: CacheOptions): Cache => {
     const {store, max, ttl = 60, host = 'localhost', port, auth_pass, db} = options;
     switch (store) {
         case 'none':
-            return undefined;
+            return cacheManager.caching({store: 'none', max, ttl});
         case 'redis':
             return cacheManager.caching({
                 store: redisStore,

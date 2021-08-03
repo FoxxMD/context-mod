@@ -44,7 +44,7 @@ export interface SubredditResourceConfig extends Footer {
 
 interface SubredditResourceOptions extends Footer {
     ttl: Required<TTLConfig>
-    cache?: Cache
+    cache: Cache
     cacheType: string;
     cacheSettingsHash: string
     subreddit: Subreddit,
@@ -67,7 +67,7 @@ export class SubredditResources {
     userNotes: UserNotes;
     footer: false | string = DEFAULT_FOOTER;
     subreddit: Subreddit
-    cache?: Cache
+    cache: Cache
     cacheType: string
     cacheSettingsHash?: string;
     pruneInterval?: any;
@@ -129,7 +129,7 @@ export class SubredditResources {
     }
 
     async getCacheKeyCount() {
-        if (this.cache !== undefined && this.cache.store.keys !== undefined) {
+        if (this.cache.store.keys !== undefined) {
             return (await this.cache.store.keys()).length;
         }
         return 0;
@@ -161,44 +161,43 @@ export class SubredditResources {
     }
 
     async getActivity(item: Submission | Comment) {
-        if (this.cache !== undefined) {
-            try {
-                if (item instanceof Submission && this.submissionTTL > 0) {
-                    this.stats.cache.submission.requests++;
-                    const cachedSubmission = await this.cache.get(`sub-${item.name}`);
-                    if(cachedSubmission !== undefined) {
-                        this.logger.debug(`Cache Hit: Submission ${item.name}`);
-                        return cachedSubmission;
-                    }
-                    // @ts-ignore
-                    const submission = await item.fetch();
-                    this.stats.cache.submission.miss++;
-                    await this.cache.set(`sub-${item.name}`, submission, {ttl: this.submissionTTL});
-                    return submission;
-                } else if (this.commentTTL > 0) {
-                    this.stats.cache.comment.requests++;
-                    const cachedComment = await this.cache.get(`comm-${item.name}`);
-                    if(cachedComment !== undefined) {
-                        this.logger.debug(`Cache Hit: Comment ${item.name}`);
-                        return cachedComment;
-                    }
-                    // @ts-ignore
-                    const comment = await item.fetch();
-                    this.stats.cache.comment.miss++;
-                    await this.cache.set(`comm-${item.name}`, comment, {ttl: this.commentTTL});
-                    return comment;
+        try {
+            if (item instanceof Submission && this.submissionTTL > 0) {
+                this.stats.cache.submission.requests++;
+                const cachedSubmission = await this.cache.get(`sub-${item.name}`);
+                if (cachedSubmission !== undefined) {
+                    this.logger.debug(`Cache Hit: Submission ${item.name}`);
+                    return cachedSubmission;
                 }
-            } catch (err) {
-                this.logger.error('Error while trying to fetch a cached activity', err);
-                throw err.logged;
+                // @ts-ignore
+                const submission = await item.fetch();
+                this.stats.cache.submission.miss++;
+                await this.cache.set(`sub-${item.name}`, submission, {ttl: this.submissionTTL});
+                return submission;
+            } else if (this.commentTTL > 0) {
+                this.stats.cache.comment.requests++;
+                const cachedComment = await this.cache.get(`comm-${item.name}`);
+                if (cachedComment !== undefined) {
+                    this.logger.debug(`Cache Hit: Comment ${item.name}`);
+                    return cachedComment;
+                }
+                // @ts-ignore
+                const comment = await item.fetch();
+                this.stats.cache.comment.miss++;
+                await this.cache.set(`comm-${item.name}`, comment, {ttl: this.commentTTL});
+                return comment;
+            } else {
+                // @ts-ignore
+                return await item.fetch();
             }
+        } catch (err) {
+            this.logger.error('Error while trying to fetch a cached activity', err);
+            throw err.logged;
         }
-        // @ts-ignore
-        return await item.fetch();
     }
 
     async getAuthorActivities(user: RedditUser, options: AuthorTypedActivitiesOptions): Promise<Array<Submission | Comment>> {
-        if (this.cache !== undefined && this.authorTTL > 0) {
+        if (this.authorTTL > 0) {
             const userName = user.name;
             const hashObj: any = {...options, userName};
             if (this.useSubredditAuthorCache) {
@@ -251,7 +250,7 @@ export class SubredditResources {
 
         // try to get cached value first
         let hash = `${subreddit.display_name}-${cacheKey}`;
-        if (this.cache !== undefined && this.wikiTTL > 0) {
+        if (this.wikiTTL > 0) {
             this.stats.cache.content.requests++;
             const cachedContent = await this.cache.get(hash);
             if (cachedContent !== undefined) {
@@ -301,7 +300,7 @@ export class SubredditResources {
             }
         }
 
-        if (this.cache !== undefined && this.wikiTTL > 0) {
+        if (this.wikiTTL > 0) {
             this.cache.set(hash, wikiContent, {ttl: this.wikiTTL});
         }
 
@@ -309,7 +308,7 @@ export class SubredditResources {
     }
 
     async testAuthorCriteria(item: (Comment | Submission), authorOpts: AuthorCriteria, include = true) {
-        if (this.cache !== undefined && this.filterCriteriaTTL > 0) {
+        if (this.filterCriteriaTTL > 0) {
             const hashObj = {itemId: item.id, ...authorOpts, include};
             const hash = `authorCrit-${objectHash.sha1(hashObj)}`;
             this.stats.cache.authorCrit.requests++;
@@ -330,10 +329,9 @@ export class SubredditResources {
     }
 
     async testItemCriteria(i: (Comment | Submission), s: TypedActivityStates) {
-        if (this.cache !== undefined && this.filterCriteriaTTL > 0) {
+        if (this.filterCriteriaTTL > 0) {
             let item = i;
             let states = s;
-            debugger;
             // optimize for submission only checks on comment item
             if (item instanceof Comment && states.length === 1 && Object.keys(states[0]).length === 1 && (states[0] as CommentState).submissionState !== undefined) {
                 // get submission
@@ -466,6 +464,38 @@ export class SubredditResources {
         return false
     }
 
+    async getCommentCheckCacheResult(item: Comment, checkConfig: object): Promise<boolean | undefined> {
+        const criteria = {
+            author: item.author.name,
+            submission: item.link_id,
+            ...checkConfig
+        }
+        const hash = objectHash.sha1(criteria);
+        this.stats.cache.commentCheck.requests++;
+        const result = await this.cache.get(hash) as boolean | undefined;
+        if(result === undefined) {
+            this.stats.cache.commentCheck.miss++;
+        }
+        this.logger.debug(`Cache Hit: Comment Check for ${item.author.name} in Submission ${item.link_id}`);
+        return result;
+    }
+
+    async setCommentCheckCacheResult(item: Comment, checkConfig: object, result: boolean, ttl: number) {
+        const criteria = {
+            author: item.author.name,
+            submission: item.link_id,
+            ...checkConfig
+        }
+        const hash = objectHash.sha1(criteria);
+        // don't set if result is already cached
+        if(undefined !== await this.cache.get(hash)) {
+            this.logger.debug(`Check result already cached for User ${item.author.name} on Submission ${item.link_id}`);
+        } else {
+            await this.cache.set(hash, result, { ttl });
+            this.logger.debug(`Cached check result '${result}' for User ${item.author.name} on Submission ${item.link_id} for ${ttl} seconds`);
+        }
+    }
+
     async generateFooter(item: Submission | Comment, actionFooter?: false | string) {
         let footer = actionFooter !== undefined ? actionFooter : this.footer;
         if (footer === false) {
@@ -485,7 +515,7 @@ class SubredditResourcesManager {
     authorTTL: number = 10000;
     enabled: boolean = true;
     modStreams: Map<string, SPoll<Snoowrap.Submission | Snoowrap.Comment>> = new Map();
-    defaultCache?: Cache;
+    defaultCache!: Cache;
     cacheType: string = 'none';
     cacheHash!: string;
     ttlDefaults!: Required<TTLConfig>;

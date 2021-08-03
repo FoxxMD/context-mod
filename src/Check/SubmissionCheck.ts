@@ -1,6 +1,6 @@
-
 import {Check, CheckOptions} from "./index";
 import {SubmissionState} from "../Common/interfaces";
+import {Submission, Comment} from "snoowrap/dist/objects";
 
 export class SubmissionCheck extends Check {
     itemIs: SubmissionState[];
@@ -14,5 +14,12 @@ export class SubmissionCheck extends Check {
 
     logSummary() {
         super.logSummary('submission');
+    }
+
+    async getCacheResult(item: Submission | Comment) {
+        return undefined;
+    }
+
+    async setCacheResult(item: Submission | Comment, result: boolean) {
     }
 }

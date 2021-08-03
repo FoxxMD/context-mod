@@ -12,9 +12,11 @@ export abstract class Action {
     authorIs: AuthorOptions;
     itemIs: TypedActivityStates;
     dryRun: boolean;
+    enabled: boolean;
 
     constructor(options: ActionOptions) {
         const {
+            enable = true,
             name = this.getKind(),
             logger,
             subredditName,
@@ -28,6 +30,7 @@ export abstract class Action {
 
         this.name = name;
         this.dryRun = dryRun;
+        this.enabled = enable;
         this.resources = ResourceManager.get(subredditName) as SubredditResources;
         this.logger = logger.child({labels: [`Action ${this.getActionUniqueName()}`]});
 
@@ -123,6 +126,14 @@ export interface ActionConfig extends ChecksActivityState {
      *
      * */
     itemIs?: TypedActivityStates
+
+    /**
+     * If set to `false` the Action will not be run
+     *
+     * @default true
+     * @examples [true]
+     * */
+    enable?: boolean
 }
 
 export interface ActionJson extends ActionConfig {

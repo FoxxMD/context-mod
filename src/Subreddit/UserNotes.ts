@@ -54,7 +54,7 @@ export class UserNotes {
     moderators?: RedditUser[];
     logger: Logger;
     identifier: string;
-    cache?: Cache
+    cache: Cache
     cacheCB: Function;
 
     users: Map<string, UserNote[]> = new Map();
@@ -62,7 +62,7 @@ export class UserNotes {
     saveDebounce: any;
     debounceCB: any;
 
-    constructor(ttl: number, subreddit: Subreddit, logger: Logger, cache: Cache | undefined, cacheCB: Function) {
+    constructor(ttl: number, subreddit: Subreddit, logger: Logger, cache: Cache, cacheCB: Function) {
         this.notesTTL = ttl;
         this.subreddit = subreddit;
         this.logger = logger;
@@ -125,7 +125,7 @@ export class UserNotes {
         payload.blob[item.author.name].ns.push(newNote.toRaw(payload.constants));
 
         await this.saveData(payload);
-        if(this.notesTTL > 0 && this.cache !== undefined) {
+        if(this.notesTTL > 0) {
             const currNotes = this.users.get(item.author.name) || [];
             currNotes.push(newNote);
             this.users.set(item.author.name, currNotes);
@@ -141,7 +141,7 @@ export class UserNotes {
 
     async retrieveData(): Promise<RawUserNotesPayload> {
         let cacheMiss;
-        if (this.notesTTL > 0 && this.cache !== undefined) {
+        if (this.notesTTL > 0) {
             const cachedPayload = await this.cache.get(this.identifier);
             if (cachedPayload !== undefined) {
                 this.cacheCB(false);
@@ -167,7 +167,7 @@ export class UserNotes {
 
             userNotes.blob = inflateUserNotes(userNotes.blob);
 
-            if (this.notesTTL > 0 && this.cache !== undefined) {
+            if (this.notesTTL > 0) {
                 await this.cache.set(`${this.subreddit.display_name}-usernotes`, userNotes, {ttl: this.notesTTL});
                 this.users = new Map();
             }
@@ -185,7 +185,11 @@ export class UserNotes {
         const blob = deflateUserNotes(payload.blob);
         const wikiPayload = {text: JSON.stringify({...payload, blob}), reason: 'ContextBot edited usernotes'};
         try {
-            if (this.notesTTL > 0 && this.cache !== undefined) {
+            // @ts-ignore
+            //this.wiki = await this.wiki.refresh();
+            // @ts-ignore
+            this.wiki = await this.subreddit.getWikiPage('usernotes').edit({text: JSON.stringify(wikiPayload), reason: 'ContextBot edited usernotes'});
+            if (this.notesTTL > 0) {
                 // debounce usernote save by 5 seconds -- effectively batch usernote saves
                 //
                 // so that if we are processing a ton of checks that write user notes we aren't calling to save the wiki page on every call

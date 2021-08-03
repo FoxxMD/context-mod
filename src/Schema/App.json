@@ -117,6 +117,14 @@
                     ],
                     "type": "boolean"
                 },
+                "enable": {
+                    "default": true,
+                    "description": "If set to `false` the Action will not be run",
+                    "examples": [
+                        true
+                    ],
+                    "type": "boolean"
+                },
                 "itemIs": {
                     "anyOf": [
                         {
@@ -593,6 +601,14 @@
                     "minimum": 1,
                     "type": "number"
                 },
+                "enable": {
+                    "default": true,
+                    "description": "If set to `false` the Action will not be run",
+                    "examples": [
+                        true
+                    ],
+                    "type": "boolean"
+                },
                 "footer": {
                     "anyOf": [
                         {
@@ -774,6 +790,14 @@
                     ],
                     "type": "boolean"
                 },
+                "enable": {
+                    "default": true,
+                    "description": "If set to `false` the Action will not be run",
+                    "examples": [
+                        true
+                    ],
+                    "type": "boolean"
+                },
                 "footer": {
                     "anyOf": [
                         {
@@ -906,6 +930,10 @@
                             ]
                         }
                     ]
+                },
+                "cacheUserResult": {
+                    "$ref": "#/definitions/UserResultCacheOptions",
+                    "description": "Cache the result of this check based on the comment author and the submission id\n\nThis is useful in this type of scenario:\n\n1. This check is configured to run on comments for specific submissions with high volume activity\n2. The rules being run are not dependent on the content of the comment\n3. The rule results are not likely to change while cache is valid"
                 },
                 "condition": {
                     "default": "AND",
@@ -1168,6 +1196,14 @@
                     ],
                     "type": "boolean"
                 },
+                "enable": {
+                    "default": true,
+                    "description": "If set to `false` the Action will not be run",
+                    "examples": [
+                        true
+                    ],
+                    "type": "boolean"
+                },
                 "itemIs": {
                     "anyOf": [
                         {
@@ -1389,6 +1425,14 @@
                     ],
                     "type": "boolean"
                 },
+                "enable": {
+                    "default": true,
+                    "description": "If set to `false` the Action will not be run",
+                    "examples": [
+                        true
+                    ],
+                    "type": "boolean"
+                },
                 "itemIs": {
                     "anyOf": [
                         {
@@ -1462,6 +1506,14 @@
                     "description": "If `true` the Action will not make the API request to Reddit to perform its action.",
                     "examples": [
                         false,
+                        true
+                    ],
+                    "type": "boolean"
+                },
+                "enable": {
+                    "default": true,
+                    "description": "If set to `false` the Action will not be run",
+                    "examples": [
                         true
                     ],
                     "type": "boolean"
@@ -1961,6 +2013,14 @@
                     ],
                     "type": "boolean"
                 },
+                "enable": {
+                    "default": true,
+                    "description": "If set to `false` the Action will not be run",
+                    "examples": [
+                        true
+                    ],
+                    "type": "boolean"
+                },
                 "itemIs": {
                     "anyOf": [
                         {
@@ -2172,6 +2232,14 @@
                     "description": "If `true` the Action will not make the API request to Reddit to perform its action.",
                     "examples": [
                         false,
+                        true
+                    ],
+                    "type": "boolean"
+                },
+                "enable": {
+                    "default": true,
+                    "description": "If set to `false` the Action will not be run",
+                    "examples": [
                         true
                     ],
                     "type": "boolean"
@@ -2496,6 +2564,12 @@
                 "is_self": {
                     "type": "boolean"
                 },
+                "link_flair_css_class": {
+                    "type": "string"
+                },
+                "link_flair_text": {
+                    "type": "string"
+                },
                 "locked": {
                     "type": "boolean"
                 },
@@ -2641,6 +2715,14 @@
                     ],
                     "type": "boolean"
                 },
+                "enable": {
+                    "default": true,
+                    "description": "If set to `false` the Action will not be run",
+                    "examples": [
+                        true
+                    ],
+                    "type": "boolean"
+                },
                 "itemIs": {
                     "anyOf": [
                         {
@@ -2722,6 +2804,23 @@
             "required": [
                 "type"
             ],
+            "type": "object"
+        },
+        "UserResultCacheOptions": {
+            "description": "Cache the result of this check based on the comment author and the submission id\n\nThis is useful in this type of scenario:\n\n1. This check is configured to run on comments for specific submissions with high volume activity\n2. The rules being run are not dependent on the content of the comment\n3. The rule results are not likely to change while cache is valid",
+            "properties": {
+                "enable": {
+                    "type": "boolean"
+                },
+                "ttl": {
+                    "default": 60,
+                    "description": "The amount of time, in seconds, to cache this result",
+                    "examples": [
+                        60
+                    ],
+                    "type": "number"
+                }
+            },
             "type": "object"
         }
     },
