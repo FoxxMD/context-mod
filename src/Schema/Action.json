@@ -296,6 +296,14 @@
             ],
             "type": "boolean"
         },
+        "enable": {
+            "default": true,
+            "description": "If set to `false` the Action will not be run",
+            "examples": [
+                true
+            ],
+            "type": "boolean"
+        },
         "itemIs": {
             "anyOf": [
                 {

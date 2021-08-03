@@ -511,7 +511,7 @@ export class Manager {
                     continue;
                 }
                 if(!check.enabled) {
-                    this.logger.info(`Check ${check.name} is DISABLED, skipping...`);
+                    this.logger.info(`Check ${check.name} not run because it is not enabled, skipping...`);
                     continue;
                 }
                 checksRun++;

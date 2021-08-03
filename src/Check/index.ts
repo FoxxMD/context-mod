@@ -253,6 +253,10 @@ export class Check implements ICheck {
         this.logger.debug(`${dr ? 'DRYRUN - ' : ''}Running Actions`);
         const runActions: Action[] = [];
         for (const a of this.actions) {
+            if(!a.enabled) {
+                this.logger.info(`Action ${a.getActionUniqueName()} not run because it is not enabled.`);
+                continue;
+            }
             try {
                 await a.handle(item, ruleResults, runtimeDryrun);
                 runActions.push(a);

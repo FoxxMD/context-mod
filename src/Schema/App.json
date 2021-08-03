@@ -117,6 +117,14 @@
                     ],
                     "type": "boolean"
                 },
+                "enable": {
+                    "default": true,
+                    "description": "If set to `false` the Action will not be run",
+                    "examples": [
+                        true
+                    ],
+                    "type": "boolean"
+                },
                 "itemIs": {
                     "anyOf": [
                         {
@@ -593,6 +601,14 @@
                     "minimum": 1,
                     "type": "number"
                 },
+                "enable": {
+                    "default": true,
+                    "description": "If set to `false` the Action will not be run",
+                    "examples": [
+                        true
+                    ],
+                    "type": "boolean"
+                },
                 "footer": {
                     "anyOf": [
                         {
@@ -770,6 +786,14 @@
                     "description": "If `true` the Action will not make the API request to Reddit to perform its action.",
                     "examples": [
                         false,
+                        true
+                    ],
+                    "type": "boolean"
+                },
+                "enable": {
+                    "default": true,
+                    "description": "If set to `false` the Action will not be run",
+                    "examples": [
                         true
                     ],
                     "type": "boolean"
@@ -1168,6 +1192,14 @@
                     ],
                     "type": "boolean"
                 },
+                "enable": {
+                    "default": true,
+                    "description": "If set to `false` the Action will not be run",
+                    "examples": [
+                        true
+                    ],
+                    "type": "boolean"
+                },
                 "itemIs": {
                     "anyOf": [
                         {
@@ -1389,6 +1421,14 @@
                     ],
                     "type": "boolean"
                 },
+                "enable": {
+                    "default": true,
+                    "description": "If set to `false` the Action will not be run",
+                    "examples": [
+                        true
+                    ],
+                    "type": "boolean"
+                },
                 "itemIs": {
                     "anyOf": [
                         {
@@ -1462,6 +1502,14 @@
                     "description": "If `true` the Action will not make the API request to Reddit to perform its action.",
                     "examples": [
                         false,
+                        true
+                    ],
+                    "type": "boolean"
+                },
+                "enable": {
+                    "default": true,
+                    "description": "If set to `false` the Action will not be run",
+                    "examples": [
                         true
                     ],
                     "type": "boolean"
@@ -1961,6 +2009,14 @@
                     ],
                     "type": "boolean"
                 },
+                "enable": {
+                    "default": true,
+                    "description": "If set to `false` the Action will not be run",
+                    "examples": [
+                        true
+                    ],
+                    "type": "boolean"
+                },
                 "itemIs": {
                     "anyOf": [
                         {
@@ -2172,6 +2228,14 @@
                     "description": "If `true` the Action will not make the API request to Reddit to perform its action.",
                     "examples": [
                         false,
+                        true
+                    ],
+                    "type": "boolean"
+                },
+                "enable": {
+                    "default": true,
+                    "description": "If set to `false` the Action will not be run",
+                    "examples": [
                         true
                     ],
                     "type": "boolean"
@@ -2643,6 +2707,14 @@
                     "description": "If `true` the Action will not make the API request to Reddit to perform its action.",
                     "examples": [
                         false,
+                        true
+                    ],
+                    "type": "boolean"
+                },
+                "enable": {
+                    "default": true,
+                    "description": "If set to `false` the Action will not be run",
+                    "examples": [
                         true
                     ],
                     "type": "boolean"
