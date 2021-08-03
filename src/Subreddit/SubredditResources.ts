@@ -332,7 +332,6 @@ export class SubredditResources {
         if (this.filterCriteriaTTL > 0) {
             let item = i;
             let states = s;
-            debugger;
             // optimize for submission only checks on comment item
             if (item instanceof Comment && states.length === 1 && Object.keys(states[0]).length === 1 && (states[0] as CommentState).submissionState !== undefined) {
                 // get submission
@@ -488,7 +487,13 @@ export class SubredditResources {
             ...checkConfig
         }
         const hash = objectHash.sha1(criteria);
-        return await this.cache.set(hash, result, { ttl });
+        // don't set if result is already cached
+        if(undefined !== await this.cache.get(hash)) {
+            this.logger.debug(`Check result already cached for User ${item.author.name} on Submission ${item.link_id}`);
+        } else {
+            await this.cache.set(hash, result, { ttl });
+            this.logger.debug(`Cached check result '${result}' for User ${item.author.name} on Submission ${item.link_id} for ${ttl} seconds`);
+        }
     }
 
     async generateFooter(item: Submission | Comment, actionFooter?: false | string) {
@@ -510,7 +515,7 @@ class SubredditResourcesManager {
     authorTTL: number = 10000;
     enabled: boolean = true;
     modStreams: Map<string, SPoll<Snoowrap.Submission | Snoowrap.Comment>> = new Map();
-    defaultCache: Cache = createCacheManager({store: 'none'});
+    defaultCache!: Cache;
     cacheType: string = 'none';
     cacheHash!: string;
     ttlDefaults!: Required<TTLConfig>;

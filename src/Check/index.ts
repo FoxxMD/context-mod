@@ -177,7 +177,7 @@ export abstract class Check implements ICheck {
             // check cache results
             const cacheResult = await this.getCacheResult(item);
             if(cacheResult !== undefined) {
-                this.logger.verbose(`Skipping rules run because Check Result found in cache: ${boolToString(cacheResult)}`);
+                this.logger.verbose(`Skipping rules run because result was found in cache, Check Triggered Result: ${cacheResult}`);
                 return [cacheResult, allRuleResults];
             }
 
