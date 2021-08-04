@@ -15,6 +15,7 @@ import sharedSession from 'express-socket.io-session';
 import Submission from "snoowrap/dist/objects/Submission";
 import EventEmitter from "events";
 import tcpUsed from 'tcp-port-used';
+import { prettyPrintJson } from 'pretty-print-json';
 
 import {
     boolToString, cacheStats,
@@ -22,7 +23,7 @@ import {
     filterLogBySubreddit,
     formatLogLineToHtml, formatNumber,
     isLogLineMinLevel,
-    LogEntry,
+    LogEntry, parseFromJsonOrYamlToObject,
     parseLinkIdentifier,
     parseSubredditLogName, parseSubredditName,
     pollingInfo, SUBMISSION_URL_ID
@@ -582,7 +583,13 @@ const rcbServer = function (options: OperatorConfig): ([() => Promise<void>, App
 
             // @ts-ignore
             const wiki = await manager.subreddit.getWikiPage(manager.wikiLocation).fetch();
-            return res.send(wiki.content_md.replaceAll('\n', '<br />'));
+            const [obj, jsonErr, yamlErr] = parseFromJsonOrYamlToObject(wiki.content_md);
+            res.render('config', {
+                config: prettyPrintJson.toHtml(obj, {quoteKeys: true, indent: 2}),
+                botName: bot.botName,
+                botLink: bot.botLink,
+                operatorDisplay: display,
+            });
         });
 
         app.use('/action', [redditUserMiddleware, booleanMiddle(['force'])]);
