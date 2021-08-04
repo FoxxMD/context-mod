@@ -776,28 +776,62 @@
         reconnectionAttempts: 5, // bail after 5 attempts
     });
 
+    const newBufferedLogs = () => new Map([["All", []]])
+
+    let bufferedLogs = newBufferedLogs();
+    let lastFlush;
+    let bufferTimeout;
+
     socket.on("connect", () => {
         document.body.classList.add('connected')
         socket.on("log", data => {
-            const selectors = ['[data-subreddit="All"].logs'];
+            bufferedLogs.set('All', bufferedLogs.get('All').concat(data));
             const sub = parseSubredditLogName(data);
             if (sub !== undefined) {
-                selectors.push(`[data-subreddit="${sub}"].logs`);
+                bufferedLogs.set(sub, (bufferedLogs.get(sub) || []).concat(data));
             }
-            selectors.forEach(sel => {
-                const el = document.querySelector(sel);
-                if (el !== null) {
-                    const currLogs = el.innerHTML;
-                    document.querySelector(sel).innerHTML = window.sort === 'desc' ? data.concat(currLogs) : currLogs.concat(data)
-                }
-            });
+
+            const flushLogs = () => {
+                bufferedLogs.forEach((logs, subKey) => {
+                    const limit = Number.parseInt(document.querySelector(`[data-subreddit="${subKey}"] [data-type="limit"]`).value);
+                    const logContainer = document.querySelector(`[data-subreddit="${subKey}"].logs`);
+                    let existingLogs;
+                    if(window.sort === 'desc') {
+                        logs.forEach((l) => {
+                            logContainer.insertAdjacentHTML('afterbegin', l);
+                        })
+                        existingLogs = Array.from(document.querySelectorAll(`[data-subreddit="${subKey}"].logs .logLine`));
+                        logContainer.replaceChildren(...existingLogs.slice(0, limit));
+                    } else {
+                        logs.forEach((l) => {
+                            logContainer.insertAdjacentHTML('beforeend', l);
+                            existingLogs = Array.from(document.querySelectorAll(`[data-subreddit="${subKey}"].logs .logLine`));
+                            const overLimit = limit - existingLogs.length;
+                            logContainer.replaceChildren(...existingLogs.slice(overLimit -1, limit));
+                        })
+                    }
+                });
+                lastFlush = Date.now();
+                bufferedLogs = newBufferedLogs();
+                //console.log('Flushed Logs');
+            }
+
+            if(lastFlush !== undefined && bufferTimeout !== undefined && ((Date.now() - lastFlush)/1000) > 3) {
+                //console.log('Immediate flush');
+                clearTimeout(bufferTimeout);
+                bufferTimeout = undefined;
+                flushLogs();
+            } else {
+                //console.log('Using timeout');
+                clearTimeout(bufferTimeout);
+                bufferTimeout = setTimeout(() => {flushLogs();}, 1000);
+            }
         });
         socket.on("logClear", data => {
             data.forEach((obj) => {
                 const n = obj.name === 'all' ? 'All' : obj.name;
                 document.querySelector(`[data-subreddit="${n}"].logs`).innerHTML = obj.logs;
             })
-            //document.querySelector('.logs').innerHTML = data.join().replaceAll(/<br\s*\/?>\,/g,'<br />');
         });
         socket.on('opStats', (data) => {
             for (const [k, v] of Object.entries(data)) {

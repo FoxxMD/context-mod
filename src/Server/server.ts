@@ -101,7 +101,8 @@ const rcbServer = function (options: OperatorConfig): ([() => Promise<void>, App
     let botSubreddits: string[] = [];
 
     stream._write = (chunk, encoding, next) => {
-        let logLine = chunk.toString();
+        // remove newline (\n) from end of string since we deal with it with css/html
+        const logLine = chunk.toString().slice(0, -1);
         const now = Date.now();
         const logEntry: LogEntry = [now, logLine];
 
