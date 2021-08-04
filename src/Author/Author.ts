@@ -65,7 +65,7 @@ export interface AuthorCriteria {
      *
      * [See] https://regexr.com/609n8 for example
      *
-     * @pattern ^\s*(?<opStr>>|>=|<|<=)\s*(?<time>\d+)\s*(?<unit>days?|weeks?|months?|years?|hours?|minutes?|seconds?|milliseconds?)\s*$
+     * @pattern ^\s*(>|>=|<|<=)\s*(\d+)\s*(days?|weeks?|months?|years?|hours?|minutes?|seconds?|milliseconds?)\s*$
      * */
     age?: DurationComparor
 
