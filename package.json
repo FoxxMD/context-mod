@@ -52,6 +52,7 @@
     "node-fetch": "^2.6.1",
     "object-hash": "^2.2.0",
     "p-event": "^4.2.0",
+    "pretty-print-json": "^1.0.3",
     "safe-stable-stringify": "^1.1.1",
     "snoostorm": "^1.5.2",
     "snoowrap": "^1.23.0",
