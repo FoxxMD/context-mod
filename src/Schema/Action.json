@@ -194,6 +194,12 @@
                 "is_self": {
                     "type": "boolean"
                 },
+                "link_flair_css_class": {
+                    "type": "string"
+                },
+                "link_flair_text": {
+                    "type": "string"
+                },
                 "locked": {
                     "type": "boolean"
                 },
@@ -286,6 +292,14 @@
             "description": "If `true` the Action will not make the API request to Reddit to perform its action.",
             "examples": [
                 false,
+                true
+            ],
+            "type": "boolean"
+        },
+        "enable": {
+            "default": true,
+            "description": "If set to `false` the Action will not be run",
+            "examples": [
                 true
             ],
             "type": "boolean"

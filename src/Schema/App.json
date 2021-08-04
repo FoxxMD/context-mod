@@ -117,6 +117,14 @@
                     ],
                     "type": "boolean"
                 },
+                "enable": {
+                    "default": true,
+                    "description": "If set to `false` the Action will not be run",
+                    "examples": [
+                        true
+                    ],
+                    "type": "boolean"
+                },
                 "itemIs": {
                     "anyOf": [
                         {
@@ -593,6 +601,14 @@
                     "minimum": 1,
                     "type": "number"
                 },
+                "enable": {
+                    "default": true,
+                    "description": "If set to `false` the Action will not be run",
+                    "examples": [
+                        true
+                    ],
+                    "type": "boolean"
+                },
                 "footer": {
                     "anyOf": [
                         {
@@ -774,6 +790,14 @@
                     ],
                     "type": "boolean"
                 },
+                "enable": {
+                    "default": true,
+                    "description": "If set to `false` the Action will not be run",
+                    "examples": [
+                        true
+                    ],
+                    "type": "boolean"
+                },
                 "footer": {
                     "anyOf": [
                         {
@@ -907,6 +931,10 @@
                         }
                     ]
                 },
+                "cacheUserResult": {
+                    "$ref": "#/definitions/UserResultCacheOptions",
+                    "description": "Cache the result of this check based on the comment author and the submission id\n\nThis is useful in this type of scenario:\n\n1. This check is configured to run on comments for specific submissions with high volume activity\n2. The rules being run are not dependent on the content of the comment\n3. The rule results are not likely to change while cache is valid"
+                },
                 "condition": {
                     "default": "AND",
                     "description": "Under what condition should a set of run `Rule` objects be considered \"successful\"?\n\nIf `OR` then **any** triggered `Rule` object results in success.\n\nIf `AND` then **all** `Rule` objects must be triggered to result in success.",
@@ -929,6 +957,14 @@
                     "description": "Use this option to override the `dryRun` setting for all of its `Actions`",
                     "examples": [
                         false,
+                        true
+                    ],
+                    "type": "boolean"
+                },
+                "enable": {
+                    "default": true,
+                    "description": "Should this check be run by the bot?",
+                    "examples": [
                         true
                     ],
                     "type": "boolean"
@@ -1160,6 +1196,14 @@
                     ],
                     "type": "boolean"
                 },
+                "enable": {
+                    "default": true,
+                    "description": "If set to `false` the Action will not be run",
+                    "examples": [
+                        true
+                    ],
+                    "type": "boolean"
+                },
                 "itemIs": {
                     "anyOf": [
                         {
@@ -1381,6 +1425,14 @@
                     ],
                     "type": "boolean"
                 },
+                "enable": {
+                    "default": true,
+                    "description": "If set to `false` the Action will not be run",
+                    "examples": [
+                        true
+                    ],
+                    "type": "boolean"
+                },
                 "itemIs": {
                     "anyOf": [
                         {
@@ -1454,6 +1506,14 @@
                     "description": "If `true` the Action will not make the API request to Reddit to perform its action.",
                     "examples": [
                         false,
+                        true
+                    ],
+                    "type": "boolean"
+                },
+                "enable": {
+                    "default": true,
+                    "description": "If set to `false` the Action will not be run",
+                    "examples": [
                         true
                     ],
                     "type": "boolean"
@@ -1953,6 +2013,14 @@
                     ],
                     "type": "boolean"
                 },
+                "enable": {
+                    "default": true,
+                    "description": "If set to `false` the Action will not be run",
+                    "examples": [
+                        true
+                    ],
+                    "type": "boolean"
+                },
                 "itemIs": {
                     "anyOf": [
                         {
@@ -2164,6 +2232,14 @@
                     "description": "If `true` the Action will not make the API request to Reddit to perform its action.",
                     "examples": [
                         false,
+                        true
+                    ],
+                    "type": "boolean"
+                },
+                "enable": {
+                    "default": true,
+                    "description": "If set to `false` the Action will not be run",
+                    "examples": [
                         true
                     ],
                     "type": "boolean"
@@ -2389,6 +2465,14 @@
                     ],
                     "type": "boolean"
                 },
+                "enable": {
+                    "default": true,
+                    "description": "Should this check be run by the bot?",
+                    "examples": [
+                        true
+                    ],
+                    "type": "boolean"
+                },
                 "itemIs": {
                     "description": "A list of criteria to test the state of the `Activity` against before running the check.\n\nIf any set of criteria passes the Check will be run. If the criteria fails then the Check will fail.\n\n* @examples [[{\"over_18\": true, \"removed': false}]]",
                     "items": {
@@ -2480,6 +2564,12 @@
                 "is_self": {
                     "type": "boolean"
                 },
+                "link_flair_css_class": {
+                    "type": "string"
+                },
+                "link_flair_text": {
+                    "type": "string"
+                },
                 "locked": {
                     "type": "boolean"
                 },
@@ -2519,6 +2609,22 @@
                     ],
                     "type": "number"
                 },
+                "commentTTL": {
+                    "default": 60,
+                    "description": "Amount of time, in seconds, a comment should be cached",
+                    "examples": [
+                        60
+                    ],
+                    "type": "number"
+                },
+                "filterCriteriaTTL": {
+                    "default": 60,
+                    "description": "Amount of time, in seconds, to cache filter criteria results (`authorIs` and `itemIs` results)\n\nThis is especially useful if when polling high-volume comments and your checks rely on author/item filters",
+                    "examples": [
+                        60
+                    ],
+                    "type": "number"
+                },
                 "provider": {
                     "anyOf": [
                         {
@@ -2533,6 +2639,14 @@
                             "type": "string"
                         }
                     ]
+                },
+                "submissionTTL": {
+                    "default": 60,
+                    "description": "Amount of time, in seconds, a submission should be cached",
+                    "examples": [
+                        60
+                    ],
+                    "type": "number"
                 },
                 "userNotesTTL": {
                     "default": 300,
@@ -2597,6 +2711,14 @@
                     "description": "If `true` the Action will not make the API request to Reddit to perform its action.",
                     "examples": [
                         false,
+                        true
+                    ],
+                    "type": "boolean"
+                },
+                "enable": {
+                    "default": true,
+                    "description": "If set to `false` the Action will not be run",
+                    "examples": [
                         true
                     ],
                     "type": "boolean"
@@ -2682,6 +2804,23 @@
             "required": [
                 "type"
             ],
+            "type": "object"
+        },
+        "UserResultCacheOptions": {
+            "description": "Cache the result of this check based on the comment author and the submission id\n\nThis is useful in this type of scenario:\n\n1. This check is configured to run on comments for specific submissions with high volume activity\n2. The rules being run are not dependent on the content of the comment\n3. The rule results are not likely to change while cache is valid",
+            "properties": {
+                "enable": {
+                    "type": "boolean"
+                },
+                "ttl": {
+                    "default": 60,
+                    "description": "The amount of time, in seconds, to cache this result",
+                    "examples": [
+                        60
+                    ],
+                    "type": "number"
+                }
+            },
             "type": "object"
         }
     },

@@ -54,12 +54,16 @@ export class UserNotes {
     moderators?: RedditUser[];
     logger: Logger;
     identifier: string;
-    cache?: Cache
+    cache: Cache
     cacheCB: Function;
 
     users: Map<string, UserNote[]> = new Map();
 
-    constructor(ttl: number, subreddit: Subreddit, logger: Logger, cache: Cache | undefined, cacheCB: Function) {
+    saveDebounce: any;
+    debounceCB: any;
+    batchCount: number = 0;
+
+    constructor(ttl: number, subreddit: Subreddit, logger: Logger, cache: Cache, cacheCB: Function) {
         this.notesTTL = ttl;
         this.subreddit = subreddit;
         this.logger = logger;
@@ -122,7 +126,7 @@ export class UserNotes {
         payload.blob[item.author.name].ns.push(newNote.toRaw(payload.constants));
 
         await this.saveData(payload);
-        if(this.notesTTL > 0 && this.cache !== undefined) {
+        if(this.notesTTL > 0) {
             const currNotes = this.users.get(item.author.name) || [];
             currNotes.push(newNote);
             this.users.set(item.author.name, currNotes);
@@ -137,16 +141,26 @@ export class UserNotes {
     }
 
     async retrieveData(): Promise<RawUserNotesPayload> {
-        if (this.notesTTL > 0 && this.cache !== undefined) {
+        let cacheMiss;
+        if (this.notesTTL > 0) {
             const cachedPayload = await this.cache.get(this.identifier);
             if (cachedPayload !== undefined) {
                 this.cacheCB(false);
                 return cachedPayload as unknown as RawUserNotesPayload;
             }
             this.cacheCB(true);
+            cacheMiss = true;
         }
 
         try {
+            if(cacheMiss && this.debounceCB !== undefined) {
+                // timeout is still delayed. its our wiki data and we want it now! cm cacheworth 877 cache now
+                this.logger.debug(`Detected missed cache on usernotes retrieval while batch (${this.batchCount}) save is in progress, executing save immediately before retrieving new notes...`);
+                clearTimeout(this.saveDebounce);
+                await this.debounceCB();
+                this.debounceCB = undefined;
+                this.saveDebounce = undefined;
+            }
             // @ts-ignore
             this.wiki = await this.subreddit.getWikiPage('usernotes').fetch();
             const wikiContent = this.wiki.content_md;
@@ -155,7 +169,7 @@ export class UserNotes {
 
             userNotes.blob = inflateUserNotes(userNotes.blob);
 
-            if (this.notesTTL > 0 && this.cache !== undefined) {
+            if (this.notesTTL > 0) {
                 await this.cache.set(`${this.subreddit.display_name}-usernotes`, userNotes, {ttl: this.notesTTL});
                 this.users = new Map();
             }
@@ -171,16 +185,37 @@ export class UserNotes {
     async saveData(payload: RawUserNotesPayload): Promise<RawUserNotesPayload> {
 
         const blob = deflateUserNotes(payload.blob);
-        const wikiPayload = {...payload, blob};
-
+        const wikiPayload = {text: JSON.stringify({...payload, blob}), reason: 'ContextBot edited usernotes'};
         try {
-            // @ts-ignore
-            //this.wiki = await this.wiki.refresh();
-            // @ts-ignore
-            this.wiki = await this.subreddit.getWikiPage('usernotes').edit({text: JSON.stringify(wikiPayload), reason: 'ContextBot edited usernotes'});
-            if (this.notesTTL > 0 && this.cache !== undefined) {
+            if (this.notesTTL > 0) {
+                // debounce usernote save by 5 seconds -- effectively batch usernote saves
+                //
+                // so that if we are processing a ton of checks that write user notes we aren't calling to save the wiki page on every call
+                // since we also have everything in cache (most likely...)
+                //
+                // TODO might want to increase timeout to 10 seconds
+                if(this.saveDebounce !== undefined) {
+                    clearTimeout(this.saveDebounce);
+                }
+                this.debounceCB = (async function () {
+                    const p = wikiPayload;
+                    // @ts-ignore
+                    const self = this as UserNotes;
+                    // @ts-ignore
+                    self.wiki = await self.subreddit.getWikiPage('usernotes').edit(p);
+                    self.logger.debug(`Batch saved ${self.batchCount} usernotes`);
+                    self.debounceCB = undefined;
+                    self.saveDebounce = undefined;
+                    self.batchCount = 0;
+                }).bind(this);
+                this.saveDebounce = setTimeout(this.debounceCB,5000);
+                this.batchCount++;
+                this.logger.debug(`Saving Usernotes has been debounced for 5 seconds (${this.batchCount} batched)`)
                 await this.cache.set(this.identifier, payload, {ttl: this.notesTTL});
                 this.users = new Map();
+            } else {
+                // @ts-ignore
+                this.wiki = await this.subreddit.getWikiPage('usernotes').edit(wikiPayload);
             }
 
             return payload as RawUserNotesPayload;

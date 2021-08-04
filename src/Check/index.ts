@@ -6,6 +6,7 @@ import {Comment, Submission} from "snoowrap";
 import {actionFactory} from "../Action/ActionFactory";
 import {ruleFactory} from "../Rule/RuleFactory";
 import {
+    boolToString,
     createAjvFactory,
     FAIL,
     mergeArr,
@@ -26,16 +27,16 @@ import * as RuleSchema from '../Schema/Rule.json';
 import * as RuleSetSchema from '../Schema/RuleSet.json';
 import * as ActionSchema from '../Schema/Action.json';
 import {ActionObjectJson, RuleJson, RuleObjectJson, ActionJson as ActionTypeJson} from "../Common/types";
-import {isItem} from "../Utils/SnoowrapUtils";
 import ResourceManager, {SubredditResources} from "../Subreddit/SubredditResources";
 import {Author, AuthorCriteria, AuthorOptions} from "../Author/Author";
 
 const checkLogName = truncateStringToLength(25);
 
-export class Check implements ICheck {
+export abstract class Check implements ICheck {
     actions: Action[] = [];
     description?: string;
     name: string;
+    enabled: boolean;
     condition: JoinOperands;
     rules: Array<RuleSet | Rule> = [];
     logger: Logger;
@@ -50,6 +51,7 @@ export class Check implements ICheck {
 
     constructor(options: CheckOptions) {
         const {
+            enable = true,
             name,
             description,
             condition = 'AND',
@@ -64,6 +66,8 @@ export class Check implements ICheck {
             } = {},
             dryRun,
         } = options;
+
+        this.enabled = enable;
 
         this.logger = options.logger.child({labels: [`CHK ${checkLogName(name)}`]}, mergeArr);
 
@@ -142,7 +146,7 @@ export class Check implements ICheck {
         }
         runStats.push(`${this.actions.length} Actions`);
         // not sure if this should be info or verbose
-        this.logger.info(`${type.toUpperCase()} (${this.condition})${this.notifyOnTrigger ? ' ||Notify on Trigger|| ' : ''} => ${runStats.join(' | ')}${this.description !== undefined ? ` => ${this.description}` : ''}`);
+        this.logger.info(`=${this.enabled ? 'Enabled' : 'Disabled'}= ${type.toUpperCase()} (${this.condition})${this.notifyOnTrigger ? ' ||Notify on Trigger|| ' : ''} => ${runStats.join(' | ')}${this.description !== undefined ? ` => ${this.description}` : ''}`);
         if (this.rules.length === 0 && this.itemIs.length === 0 && this.authorIs.exclude.length === 0 && this.authorIs.include.length === 0) {
             this.logger.warn('No rules, item tests, or author test found -- this check will ALWAYS PASS!');
         }
@@ -162,11 +166,22 @@ export class Check implements ICheck {
         }
     }
 
+    abstract getCacheResult(item: Submission | Comment) : Promise<boolean | undefined>;
+    abstract setCacheResult(item: Submission | Comment, result: boolean): void;
+
     async runRules(item: Submission | Comment, existingResults: RuleResult[] = []): Promise<[boolean, RuleResult[]]> {
         try {
             let allRuleResults: RuleResult[] = [];
             let allResults: (RuleResult | RuleSetResult)[] = [];
-            const [itemPass, crit] = await isItem(item, this.itemIs, this.logger);
+
+            // check cache results
+            const cacheResult = await this.getCacheResult(item);
+            if(cacheResult !== undefined) {
+                this.logger.verbose(`Skipping rules run because result was found in cache, Check Triggered Result: ${cacheResult}`);
+                return [cacheResult, allRuleResults];
+            }
+
+            const itemPass = await this.resources.testItemCriteria(item, this.itemIs);
             if (!itemPass) {
                 this.logger.verbose(`${FAIL} => Item did not pass 'itemIs' test`);
                 return [false, allRuleResults];
@@ -250,6 +265,10 @@ export class Check implements ICheck {
         this.logger.debug(`${dr ? 'DRYRUN - ' : ''}Running Actions`);
         const runActions: Action[] = [];
         for (const a of this.actions) {
+            if(!a.enabled) {
+                this.logger.info(`Action ${a.getActionUniqueName()} not run because it is not enabled.`);
+                continue;
+            }
             try {
                 await a.handle(item, ruleResults, runtimeDryrun);
                 runActions.push(a);
@@ -296,6 +315,14 @@ export interface ICheck extends JoinCondition, ChecksActivityState {
      * If present then these Author criteria are checked before running the Check. If criteria fails then the Check will fail.
      * */
     authorIs?: AuthorOptions
+
+    /**
+     * Should this check be run by the bot?
+     *
+     * @default true
+     * @examples [true]
+     * */
+    enable?: boolean,
 }
 
 export interface CheckOptions extends ICheck {
@@ -345,9 +372,35 @@ export interface SubmissionCheckJson extends CheckJson {
     itemIs?: SubmissionState[]
 }
 
+/**
+ * Cache the result of this check based on the comment author and the submission id
+ *
+ * This is useful in this type of scenario:
+ *
+ * 1. This check is configured to run on comments for specific submissions with high volume activity
+ * 2. The rules being run are not dependent on the content of the comment
+ * 3. The rule results are not likely to change while cache is valid
+ * */
+export interface UserResultCacheOptions {
+    enable?: boolean,
+    /**
+     * The amount of time, in seconds, to cache this result
+     *
+     * @default 60
+     * @examples [60]
+     * */
+    ttl?: number,
+}
+
+export const userResultCacheDefault: Required<UserResultCacheOptions> = {
+    enable: false,
+    ttl: 60,
+}
+
 export interface CommentCheckJson extends CheckJson {
     kind: 'comment'
     itemIs?: CommentState[]
+    cacheUserResult?:  UserResultCacheOptions
 }
 
 export type CheckStructuredJson = SubmissionCheckStructuredJson | CommentCheckStructuredJson;

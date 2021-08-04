@@ -440,6 +440,8 @@ const rcbServer = function (options: OperatorConfig): ([() => Promise<void>, App
                 acc[curr].missPercent = `${formatNumber(per, {toFixed: 0})}%`;
                 return acc;
             }, cumRaw);
+            const cacheReq = subManagerData.reduce((acc, curr) => acc + curr.stats.cache.totalRequests, 0);
+            const cacheMiss = subManagerData.reduce((acc, curr) => acc + curr.stats.cache.totalMiss, 0);
             let allManagerData: any = {
                 name: 'All',
                 linkName: 'All',
@@ -463,7 +465,9 @@ const rcbServer = function (options: OperatorConfig): ([() => Promise<void>, App
                     cache: {
                         currentKeyCount: await bot.subManagers[0].resources.getCacheKeyCount(),
                         isShared: false,
-                        totalRequests: subManagerData.reduce((acc, curr) => acc + curr.stats.cache.totalRequests, 0),
+                        totalRequests: cacheReq,
+                        totalMiss: cacheMiss,
+                        missPercent: `${formatNumber(cacheMiss === 0 || cacheReq === 0 ? 0 :(cacheMiss/cacheReq) * 100, {toFixed: 0})}%`,
                         types: {
                             ...cumRaw,
                         }

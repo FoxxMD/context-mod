@@ -158,6 +158,8 @@ export class Manager {
                 currentKeyCount: 0,
                 isShared: false,
                 totalRequests: 0,
+                totalMiss: 0,
+                missPercent: '0%',
                 requestRate: 0,
                 types: cacheStats()
             },
@@ -343,6 +345,7 @@ export class Manager {
                 caching
             };
             this.resources = ResourceManager.set(this.subreddit.display_name, resourceConfig);
+            this.resources.setLogger(this.logger);
 
             this.logger.info('Subreddit-specific options updated');
             this.logger.info('Building Checks...');
@@ -504,7 +507,11 @@ export class Manager {
             let triggered = false;
             for (const check of checks) {
                 if (checkNames.length > 0 && !checkNames.map(x => x.toLowerCase()).some(x => x === check.name.toLowerCase())) {
-                    this.logger.warn(`Check ${check.name} not in array of requested checks to run, skipping`);
+                    this.logger.warn(`Check ${check.name} not in array of requested checks to run, skipping...`);
+                    continue;
+                }
+                if(!check.enabled) {
+                    this.logger.info(`Check ${check.name} not run because it is not enabled, skipping...`);
                     continue;
                 }
                 checksRun++;
@@ -512,6 +519,7 @@ export class Manager {
                 let currentResults: RuleResult[] = [];
                 try {
                     const [checkTriggered, checkResults] = await check.runRules(item, allRuleResults);
+                    await check.setCacheResult(item, checkTriggered);
                     currentResults = checkResults;
                     totalRulesRun += checkResults.length;
                     allRuleResults = allRuleResults.concat(determineNewResults(allRuleResults, checkResults));

@@ -4,7 +4,6 @@ import {RuleResult} from "../Rule";
 import ResourceManager, {SubredditResources} from "../Subreddit/SubredditResources";
 import {ChecksActivityState, TypedActivityStates} from "../Common/interfaces";
 import Author, {AuthorOptions} from "../Author/Author";
-import {isItem} from "../Utils/SnoowrapUtils";
 
 export abstract class Action {
     name?: string;
@@ -13,9 +12,11 @@ export abstract class Action {
     authorIs: AuthorOptions;
     itemIs: TypedActivityStates;
     dryRun: boolean;
+    enabled: boolean;
 
     constructor(options: ActionOptions) {
         const {
+            enable = true,
             name = this.getKind(),
             logger,
             subredditName,
@@ -29,6 +30,7 @@ export abstract class Action {
 
         this.name = name;
         this.dryRun = dryRun;
+        this.enabled = enable;
         this.resources = ResourceManager.get(subredditName) as SubredditResources;
         this.logger = logger.child({labels: [`Action ${this.getActionUniqueName()}`]});
 
@@ -49,7 +51,7 @@ export abstract class Action {
     async handle(item: Comment | Submission, ruleResults: RuleResult[], runtimeDryrun?: boolean): Promise<void> {
         const dryRun = runtimeDryrun || this.dryRun;
         let actionRun = false;
-        const [itemPass, crit] = await isItem(item, this.itemIs, this.logger);
+        const itemPass = await this.resources.testItemCriteria(item, this.itemIs);
         if (!itemPass) {
             this.logger.verbose(`Activity did not pass 'itemIs' test, Action not run`);
             return;
@@ -124,6 +126,14 @@ export interface ActionConfig extends ChecksActivityState {
      *
      * */
     itemIs?: TypedActivityStates
+
+    /**
+     * If set to `false` the Action will not be run
+     *
+     * @default true
+     * @examples [true]
+     * */
+    enable?: boolean
 }
 
 export interface ActionJson extends ActionConfig {

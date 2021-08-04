@@ -1,0 +1,72 @@
+a {
+    text-decoration: underline;
+}
+
+.loading {
+    height: 35px;
+    fill: black;
+    display: none;
+}
+
+.connected .loading {
+    display: inline;
+}
+
+.dark .loading {
+    fill: white;
+}
+
+.sub {
+    display: none;
+}
+
+.sub.active {
+    display: inherit;
+}
+
+/*https://stackoverflow.com/a/48386400/1469797*/
+.stats {
+    display: grid;
+    grid-template-columns: max-content auto;
+    grid-gap: 5px;
+}
+
+.stats.three {
+    grid-template-columns: max-content max-content auto;
+}
+
+.stats label {
+    text-align: right;
+}
+
+.stats label:after {
+    content: ":";
+}
+
+.has-tooltip {
+    /*position: relative;*/
+}
+
+.tooltip {
+    transition-delay: 0.5s;
+    transition-property: visibility;
+    visibility: hidden;
+    position: absolute;
+    /*right: 0;*/
+    margin-top:-35px;
+}
+
+.has-tooltip:hover .tooltip {
+    visibility: visible;
+    transition-delay: 0.2s;
+    transition-property: visibility;
+    z-index: 100;
+}
+
+.pointer {
+    cursor: pointer;
+}
+
+.botStats.hidden {
+    display: none;
+}
