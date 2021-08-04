@@ -40,7 +40,7 @@ export const hardLimit = new commander.Option('--hardLimit <limit>', 'When API l
     .argParser(argParseInt);
 
 export const dryRun = new commander.Option('--dryRun', 'Set all subreddits in dry run mode, overriding configurations (default: process.env.DRYRUN || false)')
-    .argParser(parseBoolWithDefault(undefined));
+    .default(undefined);
 
 export const checks = new commander.Option('-h, --checks <checkNames...>', 'An optional list of Checks, by name, that should be run. If none are specified all Checks for the Subreddit the Activity is in will be run');
 
