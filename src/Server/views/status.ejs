@@ -459,59 +459,75 @@
                                                     <label>Keys</label>
                                                     <span><%= data.stats.cache.currentKeyCount %></span>
                                                     <label>Calls</label>
-                                                    <span><span><%= data.stats.cache.totalRequests %></span> <span>(<%= data.stats.cache.requestRate %>/10min)</span></span>
-                                                    <label>Missed^</label>
-                                                    <span><span><%= data.stats.cache.totalMiss %></span> <span>(<%= data.stats.cache.missPercent %>)</span></span>
+                                                    <span><span><%= data.stats.cache.totalRequests %></span> | <%= data.stats.cache.totalMiss %> (<%= data.stats.cache.missPercent %>) miss</span>
+                                                    <label>Call Rate</label>
+                                                    <span><%= data.stats.cache.requestRate %>/10min</span>
                                                 </div>
                                                 <div class="text-left py-2">
                                                         <span class="has-tooltip">
-                                                            <span style="margin-top:30px;"
+                                                            <span style="margin-top:30px; margin-left: -25em"
                                                                   class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2 space-y-3 p-2'>
-                                                                <div class="stats">
-                                                    <label>Author</label>
-                                                    <span><%= data.stats.cache.types.author.requests %> (<%= data.stats.cache.types.author.missPercent %> miss)</span>
-                                                    <label>Author Criteria</label>
-                                                    <span><%= data.stats.cache.types.authorCrit.requests %> (<%= data.stats.cache.types.authorCrit.missPercent %> miss)</span>
-                                                    <label>Item Criteria</label>
-                                                    <span><%= data.stats.cache.types.itemCrit.requests %> (<%= data.stats.cache.types.itemCrit.missPercent %> miss)</span>
-                                                    <label>Comment Check</label>
-                                                    <span><%= data.stats.cache.types.commentCheck.requests %> (<%= data.stats.cache.types.commentCheck.missPercent %> miss)</span>
-                                                    <label>Submissions</label>
-                                                    <span><%= data.stats.cache.types.submission.requests %> (<%= data.stats.cache.types.submission.missPercent %> miss)</span>
-                                                    <label>Comments</label>
-                                                    <span><%= data.stats.cache.types.comment.requests %> (<%= data.stats.cache.types.comment.missPercent %> miss)</span>
-                                                    <label>Content</label>
-                                                    <span><%= data.stats.cache.types.content.requests %> (<%= data.stats.cache.types.content.missPercent %> miss)</span>
-                                                    <label>UserNote</label>
-                                                    <span><%= data.stats.cache.types.userNotes.requests %> (<%= data.stats.cache.types.userNotes.missPercent %> miss)</span>
-                                                </div>
+                                                                <div>Number of cache requests for each type of cacheable item.</div>
+                                                                <div class="mb-2"><b>Miss</b> means the cache was empty and data had to be fully acquired/processed.</div>
+                                                                <div class="stats three">
+                                                                    <label>Author</label>
+                                                                    <span><%= data.stats.cache.types.author.requests %> | <%= data.stats.cache.types.author.miss %> (<%= data.stats.cache.types.author.missPercent %>) miss</span>
+                                                                    <span>
+                                                                        - Results from <span class="font-mono">window</span> criteria.
+                                                                    </span>
+                                                                    <label>Author Criteria</label>
+                                                                    <span><%= data.stats.cache.types.authorCrit.requests %> | <%= data.stats.cache.types.authorCrit.miss %> (<%= data.stats.cache.types.authorCrit.missPercent %>) miss</span>
+                                                                    <span>
+                                                                        - <span class="font-mono">authorIs</span> results
+                                                                    </span>
+                                                                    <label>Item Criteria</label>
+                                                                    <span><%= data.stats.cache.types.itemCrit.requests %> | <%= data.stats.cache.types.itemCrit.miss %> (<%= data.stats.cache.types.itemCrit.missPercent %>) miss</span>
+                                                                    <span>
+                                                                        - <span class="font-mono">itemIs</span> results
+                                                                    </span>
+                                                                    <label>Comment Check</label>
+                                                                    <span><%= data.stats.cache.types.commentCheck.requests %> | <%= data.stats.cache.types.commentCheck.miss %> (<%= data.stats.cache.types.commentCheck.missPercent %>) miss</span>
+                                                                    <span>
+                                                                        - <span class="font-mono">cacheUserResult</span> results
+                                                                    </span>
+                                                                    <label>Submissions</label>
+                                                                    <span><%= data.stats.cache.types.submission.requests %> | <%= data.stats.cache.types.submission.miss %> (<%= data.stats.cache.types.submission.missPercent %>) miss</span>
+                                                                    <span>
+
+                                                                    </span>
+                                                                    <label>Comments</label>
+                                                                    <span><%= data.stats.cache.types.comment.requests %> | <%= data.stats.cache.types.comment.miss %> (<%= data.stats.cache.types.comment.missPercent %>) miss</span>
+                                                                    <span>
+
+                                                                    </span>
+                                                                    <label>Content</label>
+                                                                    <span><%= data.stats.cache.types.content.requests %> | <%= data.stats.cache.types.content.miss %> (<%= data.stats.cache.types.content.missPercent %>) miss</span>
+                                                                    <span>
+                                                                        - footer/comment/ban/message content.
+                                                                    </span>
+                                                                    <label>UserNote</label>
+                                                                    <span><%= data.stats.cache.types.userNotes.requests %> | <%= data.stats.cache.types.userNotes.miss %> (<%= data.stats.cache.types.userNotes.missPercent %>) miss</span>
+                                                                    <span>
+
+                                                                    </span>
+                                                                </div>
                                                             </span>
                                                             <span class="font-semibold underline" style="text-decoration-style: dotted">Calls Breakdown</span>
                                                         </span>
                                                     <span class="has-tooltip">
-                                                                <span style="right: 0;"
+                                                                <span style="margin-top:30px; margin-left:-15em;"
                                                                       class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2 space-y-3 p-2'>
-                                                                    <div>Number of calls to cache made for each type of cached item.</div>
-                                                                    <div>The <b>miss %</b> is the percentage of cache calls that were empty and data had to be fully acquired/processed.</div>
-                                                                    <div>
-                                                                        <ul class="list-inside list-disc">
-                                                                            <li><b>Author</b> - Cached history for an Activity's Author acquired from <span
-                                                                                        class="font-mono">window</span> criteria. A missed cached call means at least one API call must be made.</li>
-                                                                            <li><b>Criteria</b> - Cached results of an <span
-                                                                                        class="font-mono">authorIs</span> test. A missed cached call may require at least one API call.</li>
-                                                                            <li><b>Content</b> - Cached content for footer/comment/ban content. A missed cached call requires one API call.</li>
-                                                                            <li><b>UserNote</b> - Cached UserNotes. A missed cached call requires one API call.</li>
-                                                                        </ul>
-                                                                    </div>
                                                                     <div>
                                                                         Some tips/tricks for cache:
                                                                     </div>
-                                                                    <ul class="list-inside list-disc">
+                                                                    <ul class="list-inside list-disc space-y-2">
                                                                         <li>Only need to pay attention to caching if a subreddit uses the API/cache heavily IE high-volume comment checks or very large check sets for submissions -- check <b>Calls</b> rate</li>
-                                                                        <li>Increasing TTL will reduce cache misses and api usage at the expensive of a larger cache and stale results</li>
+                                                                        <li>Cache misses are roughly 1 to 1 with making an API call -- IE reducing cache miss by 1 reduces api calls by 1.</li>
                                                                         <li>Re-using <span
-                                                                                    class="font-mono">window</span> and <span
-                                                                                    class="font-mono">authorIs</span> values in configuration will enable the bot to re-use these results and thus reduce cache misses/api usage</li>
+                                                                                    class="font-mono">window,authorIs,</span> and <span
+                                                                                    class="font-mono">itemIs</span> values in configuration will enable the bot to re-use these results and reduce cache misses</li>
+                                                                        <li>A high miss % can indicate that above values are not being re-used, TTLs are not long enough, or most items are are new which means the cache can't be used efficiently.</li>
+                                                                        <li>Increasing TTL will reduce cache misses at the expensive of a larger cache and stale results</li>
                                                                     </ul>
                                                                 </span>
                                                                 <span>

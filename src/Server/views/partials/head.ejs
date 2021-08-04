@@ -7,76 +7,7 @@
           crossorigin="anonymous"/>
     <script src="https://code.iconify.design/1/1.0.4/iconify.min.js"></script>
     <link rel="stylesheet" href="public/themeToggle.css">
-    <style>
-        a {
-            text-decoration: underline;
-        }
-
-        .loading {
-            height: 35px;
-            fill: black;
-            display: none;
-        }
-
-        .connected .loading {
-            display: inline;
-        }
-
-        .dark .loading {
-            fill: white;
-        }
-
-        .sub {
-            display: none;
-        }
-
-        .sub.active {
-            display: inherit;
-        }
-
-        /*https://stackoverflow.com/a/48386400/1469797*/
-        .stats {
-            display: grid;
-            grid-template-columns: max-content auto;
-            grid-gap: 5px;
-        }
-
-        .stats label {
-            text-align: right;
-        }
-
-        .stats label:after {
-            content: ":";
-        }
-
-        .has-tooltip {
-            /*position: relative;*/
-        }
-
-        .tooltip {
-            transition-delay: 0.5s;
-            transition-property: visibility;
-            visibility: hidden;
-            position: absolute;
-            /*right: 0;*/
-            margin-top:-35px;
-        }
-
-        .has-tooltip:hover .tooltip {
-            visibility: visible;
-            transition-delay: 0.2s;
-            transition-property: visibility;
-            z-index: 100;
-        }
-
-        .pointer {
-            cursor: pointer;
-        }
-
-        .botStats.hidden {
-            display: none;
-        }
-    </style>
+    <link rel="stylesheet" href="public/app.css">
     <title><%= title !== undefined ? title : `CM for ${botName}`%></title>
     <!--<title><%# `CM for /u/${botName}`%></title>-->
     <meta charset="utf-8">
