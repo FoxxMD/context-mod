@@ -1,4 +1,5 @@
 import {Duration} from "dayjs/plugin/duration";
+import {Cache} from 'cache-manager';
 import Poll from "snoostorm/out/util/Poll";
 import Snoowrap from "snoowrap";
 
@@ -1250,8 +1251,13 @@ export interface OperatorConfig extends OperatorJsonConfig {
 interface CacheTypeStat {
     requests: number,
     miss: number,
+    missPercent?: string,
+    identifierRequestCount: Cache
+    identifierAverageHit: number
+    requestTimestamps: number[]
+    averageTimeBetweenHits: string
 }
 
 export interface ResourceStats {
-    [key: string]: CacheTypeStat
+    [key: string]: CacheTypeStat;
 }

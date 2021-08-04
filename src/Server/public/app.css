@@ -43,6 +43,10 @@ a {
     content: ":";
 }
 
+.newRow {
+    margin-top: 15px;
+}
+
 .has-tooltip {
     /*position: relative;*/
 }

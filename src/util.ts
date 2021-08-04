@@ -876,16 +876,26 @@ export const removeUndefinedKeys = (obj: any) => {
     return newObj;
 }
 
+const timestampArr = () => {
+    const arr: number[] = [];
+    arr.length = 20;
+    return arr;
+}
+
+const statMetricCache = () => {
+    return cacheManager.caching({store: 'memory', max: 50, ttl: 0});
+}
+
 export const cacheStats = (): ResourceStats => {
     return {
-        author: {requests: 0, miss: 0},
-        authorCrit: {requests: 0, miss: 0},
-        itemCrit: {requests: 0, miss: 0},
-        content: {requests: 0, miss: 0},
-        userNotes: {requests: 0, miss: 0},
-        submission: {requests: 0, miss: 0},
-        comment: {requests: 0, miss: 0},
-        commentCheck: {requests: 0, miss: 0}
+        author: {requests: 0, miss: 0, identifierRequestCount: statMetricCache(), requestTimestamps: timestampArr(), averageTimeBetweenHits: 'N/A', identifierAverageHit: 0},
+        authorCrit: {requests: 0, miss: 0, identifierRequestCount: statMetricCache(), requestTimestamps: timestampArr(), averageTimeBetweenHits: 'N/A', identifierAverageHit: 0},
+        itemCrit: {requests: 0, miss: 0, identifierRequestCount: statMetricCache(), requestTimestamps: timestampArr(), averageTimeBetweenHits: 'N/A', identifierAverageHit: 0},
+        content: {requests: 0, miss: 0, identifierRequestCount: statMetricCache(), requestTimestamps: timestampArr(), averageTimeBetweenHits: 'N/A', identifierAverageHit: 0},
+        userNotes: {requests: 0, miss: 0, identifierRequestCount: statMetricCache(), requestTimestamps: timestampArr(), averageTimeBetweenHits: 'N/A', identifierAverageHit: 0},
+        submission: {requests: 0, miss: 0, identifierRequestCount: statMetricCache(), requestTimestamps: timestampArr(), averageTimeBetweenHits: 'N/A', identifierAverageHit: 0},
+        comment: {requests: 0, miss: 0, identifierRequestCount: statMetricCache(), requestTimestamps: timestampArr(), averageTimeBetweenHits: 'N/A', identifierAverageHit: 0},
+        commentCheck: {requests: 0, miss: 0, identifierRequestCount: statMetricCache(), requestTimestamps: timestampArr(), averageTimeBetweenHits: 'N/A', identifierAverageHit: 0}
     };
 }
 

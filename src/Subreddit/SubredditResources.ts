@@ -109,6 +109,7 @@ export class SubredditResources {
         };
 
         const cacheUseCB = (miss: boolean) => {
+            this.stats.cache.userNotes.requestTimestamps.push(Date.now());
             this.stats.cache.userNotes.requests++;
             this.stats.cache.userNotes.miss += miss ? 1 : 0;
         }
@@ -135,23 +136,56 @@ export class SubredditResources {
         return 0;
     }
 
-    getStats() {
+    async getStats() {
         const totals = Object.values(this.stats.cache).reduce((acc, curr) => ({
             miss: acc.miss + curr.miss,
             req: acc.req + curr.requests,
         }), {miss: 0, req: 0});
+        const cacheKeys = Object.keys(this.stats.cache);
         return {
             cache: {
                 // TODO could probably combine these two
                 totalRequests: totals.req,
                 totalMiss: totals.miss,
                 missPercent: `${formatNumber(totals.miss === 0 || totals.req === 0 ? 0 :(totals.miss/totals.req) * 100, {toFixed: 0})}%`,
-                types: Object.keys(this.stats.cache).reduce((acc, curr) => {
+                types: await cacheKeys.reduce(async (accProm, curr) => {
+                    const acc = await accProm;
+                    // calculate miss percent
+
                     const per = acc[curr].miss === 0 ? 0 : formatNumber(acc[curr].miss / acc[curr].requests) * 100;
-                    // @ts-ignore
                     acc[curr].missPercent = `${formatNumber(per, {toFixed: 0})}%`;
+
+                    // calculate average identifier hits
+
+                    const idCache = acc[curr].identifierRequestCount;
+                    // @ts-expect-error
+                    const idKeys = await idCache.store.keys() as string[];
+                    if(idKeys.length > 0) {
+                        let hits = 0;
+                        for (const k of idKeys) {
+                            hits += await idCache.get(k) as number;
+                        }
+                        acc[curr].identifierAverageHit = formatNumber(hits/idKeys.length);
+                    }
+
+                    if(acc[curr].requestTimestamps.length > 1) {
+                        // calculate average time between request
+                        const diffData = acc[curr].requestTimestamps.reduce((acc, curr: number) => {
+                            if(acc.last === 0) {
+                                acc.last = curr;
+                                return acc;
+                            }
+                            acc.diffs.push(curr - acc.last);
+                            acc.last = curr;
+                            return acc;
+                        },{last: 0, diffs: [] as number[]});
+                        const avgDiff = diffData.diffs.reduce((acc, curr) => acc + curr, 0) / diffData.diffs.length;
+
+                        acc[curr].averageTimeBetweenHits = formatNumber(avgDiff/1000);
+                    }
+
                     return acc;
-                }, this.stats.cache)
+                }, Promise.resolve(this.stats.cache))
             }
         }
     }
@@ -162,9 +196,13 @@ export class SubredditResources {
 
     async getActivity(item: Submission | Comment) {
         try {
+            let hash = '';
             if (item instanceof Submission && this.submissionTTL > 0) {
+                hash = `sub-${item.name}`;
+                await this.stats.cache.submission.identifierRequestCount.set(hash, (await this.stats.cache.submission.identifierRequestCount.wrap(hash, () => 0) as number) + 1);
+                this.stats.cache.submission.requestTimestamps.push(Date.now());
                 this.stats.cache.submission.requests++;
-                const cachedSubmission = await this.cache.get(`sub-${item.name}`);
+                const cachedSubmission = await this.cache.get(hash);
                 if (cachedSubmission !== undefined) {
                     this.logger.debug(`Cache Hit: Submission ${item.name}`);
                     return cachedSubmission;
@@ -172,11 +210,14 @@ export class SubredditResources {
                 // @ts-ignore
                 const submission = await item.fetch();
                 this.stats.cache.submission.miss++;
-                await this.cache.set(`sub-${item.name}`, submission, {ttl: this.submissionTTL});
+                await this.cache.set(hash, submission, {ttl: this.submissionTTL});
                 return submission;
             } else if (this.commentTTL > 0) {
+                hash = `comm-${item.name}`;
+                await this.stats.cache.comment.identifierRequestCount.set(hash, (await this.stats.cache.comment.identifierRequestCount.wrap(hash, () => 0) as number) + 1);
+                this.stats.cache.comment.requestTimestamps.push(Date.now());
                 this.stats.cache.comment.requests++;
-                const cachedComment = await this.cache.get(`comm-${item.name}`);
+                const cachedComment = await this.cache.get(hash);
                 if (cachedComment !== undefined) {
                     this.logger.debug(`Cache Hit: Comment ${item.name}`);
                     return cachedComment;
@@ -184,7 +225,7 @@ export class SubredditResources {
                 // @ts-ignore
                 const comment = await item.fetch();
                 this.stats.cache.comment.miss++;
-                await this.cache.set(`comm-${item.name}`, comment, {ttl: this.commentTTL});
+                await this.cache.set(hash, comment, {ttl: this.commentTTL});
                 return comment;
             } else {
                 // @ts-ignore
@@ -206,6 +247,8 @@ export class SubredditResources {
             const hash = objectHash.sha1({...options, userName});
 
             this.stats.cache.author.requests++;
+            await this.stats.cache.author.identifierRequestCount.set(user.name, (await this.stats.cache.author.identifierRequestCount.wrap(user.name, () => 0) as number) + 1);
+            this.stats.cache.author.requestTimestamps.push(Date.now());
             let miss = false;
             const cacheVal = await this.cache.wrap(hash, async () => {
                 miss = true;
@@ -251,6 +294,8 @@ export class SubredditResources {
         // try to get cached value first
         let hash = `${subreddit.display_name}-${cacheKey}`;
         if (this.wikiTTL > 0) {
+            await this.stats.cache.content.identifierRequestCount.set(cacheKey, (await this.stats.cache.content.identifierRequestCount.wrap(cacheKey, () => 0) as number) + 1);
+            this.stats.cache.content.requestTimestamps.push(Date.now());
             this.stats.cache.content.requests++;
             const cachedContent = await this.cache.get(hash);
             if (cachedContent !== undefined) {
@@ -311,6 +356,8 @@ export class SubredditResources {
         if (this.filterCriteriaTTL > 0) {
             const hashObj = {itemId: item.id, ...authorOpts, include};
             const hash = `authorCrit-${objectHash.sha1(hashObj)}`;
+            await this.stats.cache.authorCrit.identifierRequestCount.set(hash, (await this.stats.cache.authorCrit.identifierRequestCount.wrap(hash, () => 0) as number) + 1);
+            this.stats.cache.authorCrit.requestTimestamps.push(Date.now());
             this.stats.cache.authorCrit.requests++;
             let miss = false;
             const cachedAuthorTest = await this.cache.wrap(hash, async () => {
@@ -345,6 +392,8 @@ export class SubredditResources {
             try {
                 const hashObj = {itemId: item.name, ...states};
                 const hash = `itemCrit-${objectHash.sha1(hashObj)}`;
+                await this.stats.cache.itemCrit.identifierRequestCount.set(hash, (await this.stats.cache.itemCrit.identifierRequestCount.wrap(hash, () => 0) as number) + 1);
+                this.stats.cache.itemCrit.requestTimestamps.push(Date.now());
                 this.stats.cache.itemCrit.requests++;
                 const cachedItem = await this.cache.get(hash);
                 if (cachedItem !== undefined) {

@@ -433,6 +433,8 @@ const rcbServer = function (options: OperatorConfig): ([() => Promise<void>, App
                 Object.keys(curr.stats.cache.types as ResourceStats).forEach((k) => {
                     acc[k].requests += curr.stats.cache.types[k].requests;
                     acc[k].miss += curr.stats.cache.types[k].miss;
+                    acc[k].identifierAverageHit += Number.parseFloat(curr.stats.cache.types[k].identifierAverageHit);
+                    acc[k].averageTimeBetweenHits += curr.stats.cache.types[k].averageTimeBetweenHits === 'N/A' ? 0 : Number.parseFloat(curr.stats.cache.types[k].averageTimeBetweenHits)
                 });
                 return acc;
             }, cacheStats());
@@ -440,6 +442,8 @@ const rcbServer = function (options: OperatorConfig): ([() => Promise<void>, App
                 const per = acc[curr].miss === 0 ? 0 : formatNumber(acc[curr].miss / acc[curr].requests) * 100;
                 // @ts-ignore
                 acc[curr].missPercent = `${formatNumber(per, {toFixed: 0})}%`;
+                acc[curr].identifierAverageHit = formatNumber(acc[curr].identifierAverageHit);
+                acc[curr].averageTimeBetweenHits = formatNumber(acc[curr].averageTimeBetweenHits)
                 return acc;
             }, cumRaw);
             const cacheReq = subManagerData.reduce((acc, curr) => acc + curr.stats.cache.totalRequests, 0);

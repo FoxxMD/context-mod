@@ -475,40 +475,72 @@
                                                                     <span>
                                                                         - Results from <span class="font-mono">window</span> criteria.
                                                                     </span>
-                                                                    <label>Author Criteria</label>
-                                                                    <span><%= data.stats.cache.types.authorCrit.requests %> | <%= data.stats.cache.types.authorCrit.miss %> (<%= data.stats.cache.types.authorCrit.missPercent %>) miss</span>
+                                                                    <label>Avgs</label>
+                                                                    <span>Hits/Key <%= data.stats.cache.types.author.identifierAverageHit %> | Hit Interval <%= data.stats.cache.types.author.averageTimeBetweenHits %>s</span>
                                                                     <span>
+                                                                    </span>
+                                                                    <label class="newRow">Author Criteria</label>
+                                                                    <span class="newRow"><%= data.stats.cache.types.authorCrit.requests %> | <%= data.stats.cache.types.authorCrit.miss %> (<%= data.stats.cache.types.authorCrit.missPercent %>) miss</span>
+                                                                    <span class="newRow">
                                                                         - <span class="font-mono">authorIs</span> results
                                                                     </span>
-                                                                    <label>Item Criteria</label>
-                                                                    <span><%= data.stats.cache.types.itemCrit.requests %> | <%= data.stats.cache.types.itemCrit.miss %> (<%= data.stats.cache.types.itemCrit.missPercent %>) miss</span>
+                                                                    <label>Avgs</label>
+                                                                    <span>Hits/Key <%= data.stats.cache.types.authorCrit.identifierAverageHit %> | Hit Interval <%= data.stats.cache.types.authorCrit.averageTimeBetweenHits %>s</span>
                                                                     <span>
+                                                                    </span>
+
+                                                                    <label class="newRow">Item Criteria</label>
+                                                                    <span class="newRow"><%= data.stats.cache.types.itemCrit.requests %> | <%= data.stats.cache.types.itemCrit.miss %> (<%= data.stats.cache.types.itemCrit.missPercent %>) miss</span>
+                                                                    <span class="newRow">
                                                                         - <span class="font-mono">itemIs</span> results
                                                                     </span>
-                                                                    <label>Comment Check</label>
-                                                                    <span><%= data.stats.cache.types.commentCheck.requests %> | <%= data.stats.cache.types.commentCheck.miss %> (<%= data.stats.cache.types.commentCheck.missPercent %>) miss</span>
+                                                                    <label>Avgs</label>
+                                                                    <span>Hits/Key <%= data.stats.cache.types.itemCrit.identifierAverageHit %> | Hit Interval <%= data.stats.cache.types.itemCrit.averageTimeBetweenHits %>s</span>
                                                                     <span>
+                                                                    </span>
+
+                                                                    <label class="newRow">Comment Check</label>
+                                                                    <span class="newRow"><%= data.stats.cache.types.commentCheck.requests %> | <%= data.stats.cache.types.commentCheck.miss %> (<%= data.stats.cache.types.commentCheck.missPercent %>) miss</span>
+                                                                    <span class="newRow">
                                                                         - <span class="font-mono">cacheUserResult</span> results
                                                                     </span>
-                                                                    <label>Submissions</label>
-                                                                    <span><%= data.stats.cache.types.submission.requests %> | <%= data.stats.cache.types.submission.miss %> (<%= data.stats.cache.types.submission.missPercent %>) miss</span>
+                                                                    <label>Avgs</label>
+                                                                    <span>Hits/Key <%= data.stats.cache.types.commentCheck.identifierAverageHit %> | Hit Interval <%= data.stats.cache.types.commentCheck.averageTimeBetweenHits %>s</span>
                                                                     <span>
-
                                                                     </span>
-                                                                    <label>Comments</label>
-                                                                    <span><%= data.stats.cache.types.comment.requests %> | <%= data.stats.cache.types.comment.miss %> (<%= data.stats.cache.types.comment.missPercent %>) miss</span>
-                                                                    <span>
 
-                                                                    </span>
-                                                                    <label>Content</label>
-                                                                    <span><%= data.stats.cache.types.content.requests %> | <%= data.stats.cache.types.content.miss %> (<%= data.stats.cache.types.content.missPercent %>) miss</span>
+                                                                    <label class="newRow">Submissions</label>
+                                                                    <span class="newRow"><%= data.stats.cache.types.submission.requests %> | <%= data.stats.cache.types.submission.miss %> (<%= data.stats.cache.types.submission.missPercent %>) miss</span>
+                                                                    <span class="newRow"></span>
+                                                                    <label>Avgs</label>
+                                                                    <span>Hits/Key <%= data.stats.cache.types.submission.identifierAverageHit %> | Hit Interval <%= data.stats.cache.types.submission.averageTimeBetweenHits %>s</span>
                                                                     <span>
+                                                                    </span>
+
+                                                                    <label class="newRow">Comments</label>
+                                                                    <span class="newRow"><%= data.stats.cache.types.comment.requests %> | <%= data.stats.cache.types.comment.miss %> (<%= data.stats.cache.types.comment.missPercent %>) miss</span>
+                                                                    <span class="newRow"></span>
+                                                                    <label>Avgs</label>
+                                                                    <span>Hits/Key <%= data.stats.cache.types.comment.identifierAverageHit %> | Hit Interval <%= data.stats.cache.types.comment.averageTimeBetweenHits %>s</span>
+                                                                    <span>
+                                                                    </span>
+
+                                                                    <label class="newRow">Content</label>
+                                                                    <span class="newRow"><%= data.stats.cache.types.content.requests %> | <%= data.stats.cache.types.content.miss %> (<%= data.stats.cache.types.content.missPercent %>) miss</span>
+                                                                    <span class="newRow">
                                                                         - footer/comment/ban/message content.
                                                                     </span>
-                                                                    <label>UserNote</label>
-                                                                    <span><%= data.stats.cache.types.userNotes.requests %> | <%= data.stats.cache.types.userNotes.miss %> (<%= data.stats.cache.types.userNotes.missPercent %>) miss</span>
+                                                                    <label>Avgs</label>
+                                                                    <span>Hits/Key <%= data.stats.cache.types.content.identifierAverageHit %> | Hit Interval <%= data.stats.cache.types.content.averageTimeBetweenHits %>s</span>
                                                                     <span>
+                                                                    </span>
 
+                                                                    <label class="newRow">UserNote</label>
+                                                                    <span class="newRow"><%= data.stats.cache.types.userNotes.requests %> | <%= data.stats.cache.types.userNotes.miss %> (<%= data.stats.cache.types.userNotes.missPercent %>) miss</span>
+                                                                    <span class="newRow"></span>
+                                                                    <label>Avgs</label>
+                                                                    <span>Hits/Key <%= data.stats.cache.types.userNotes.identifierAverageHit %> | Hit Interval <%= data.stats.cache.types.userNotes.averageTimeBetweenHits %>s</span>
+                                                                    <span>
                                                                     </span>
                                                                 </div>
                                                             </span>
