@@ -443,6 +443,7 @@ const rcbServer = function (options: OperatorConfig): ([() => Promise<void>, App
             }, cumRaw);
             const cacheReq = subManagerData.reduce((acc, curr) => acc + curr.stats.cache.totalRequests, 0);
             const cacheMiss = subManagerData.reduce((acc, curr) => acc + curr.stats.cache.totalMiss, 0);
+            const aManagerWithDefaultResources = bot.subManagers.find(x => x.resources !== undefined && x.resources.cacheSettingsHash === 'default');
             let allManagerData: any = {
                 name: 'All',
                 linkName: 'All',
@@ -464,7 +465,7 @@ const rcbServer = function (options: OperatorConfig): ([() => Promise<void>, App
                 stats: {
                     ...rest,
                     cache: {
-                        currentKeyCount: await bot.subManagers[0].resources.getCacheKeyCount(),
+                        currentKeyCount: aManagerWithDefaultResources !== undefined ? await aManagerWithDefaultResources.resources.getCacheKeyCount() : 'N/A',
                         isShared: false,
                         totalRequests: cacheReq,
                         totalMiss: cacheMiss,
