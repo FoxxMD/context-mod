@@ -101,7 +101,8 @@ const rcbServer = function (options: OperatorConfig): ([() => Promise<void>, App
     let botSubreddits: string[] = [];
 
     stream._write = (chunk, encoding, next) => {
-        let logLine = chunk.toString();
+        // remove newline (\n) from end of string since we deal with it with css/html
+        const logLine = chunk.toString().slice(0, -1);
         const now = Date.now();
         const logEntry: LogEntry = [now, logLine];
 
@@ -432,6 +433,8 @@ const rcbServer = function (options: OperatorConfig): ([() => Promise<void>, App
                 Object.keys(curr.stats.cache.types as ResourceStats).forEach((k) => {
                     acc[k].requests += curr.stats.cache.types[k].requests;
                     acc[k].miss += curr.stats.cache.types[k].miss;
+                    acc[k].identifierAverageHit += Number.parseFloat(curr.stats.cache.types[k].identifierAverageHit);
+                    acc[k].averageTimeBetweenHits += curr.stats.cache.types[k].averageTimeBetweenHits === 'N/A' ? 0 : Number.parseFloat(curr.stats.cache.types[k].averageTimeBetweenHits)
                 });
                 return acc;
             }, cacheStats());
@@ -439,10 +442,13 @@ const rcbServer = function (options: OperatorConfig): ([() => Promise<void>, App
                 const per = acc[curr].miss === 0 ? 0 : formatNumber(acc[curr].miss / acc[curr].requests) * 100;
                 // @ts-ignore
                 acc[curr].missPercent = `${formatNumber(per, {toFixed: 0})}%`;
+                acc[curr].identifierAverageHit = formatNumber(acc[curr].identifierAverageHit);
+                acc[curr].averageTimeBetweenHits = formatNumber(acc[curr].averageTimeBetweenHits)
                 return acc;
             }, cumRaw);
             const cacheReq = subManagerData.reduce((acc, curr) => acc + curr.stats.cache.totalRequests, 0);
             const cacheMiss = subManagerData.reduce((acc, curr) => acc + curr.stats.cache.totalMiss, 0);
+            const aManagerWithDefaultResources = bot.subManagers.find(x => x.resources !== undefined && x.resources.cacheSettingsHash === 'default');
             let allManagerData: any = {
                 name: 'All',
                 linkName: 'All',
@@ -464,7 +470,7 @@ const rcbServer = function (options: OperatorConfig): ([() => Promise<void>, App
                 stats: {
                     ...rest,
                     cache: {
-                        currentKeyCount: await bot.subManagers[0].resources.getCacheKeyCount(),
+                        currentKeyCount: aManagerWithDefaultResources !== undefined ? await aManagerWithDefaultResources.resources.getCacheKeyCount() : 'N/A',
                         isShared: false,
                         totalRequests: cacheReq,
                         totalMiss: cacheMiss,

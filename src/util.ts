@@ -362,7 +362,9 @@ export function parseBool(value: any, prev: any = false): boolean {
     throw new InvalidOptionArgumentError('Not a boolean value.');
 }
 
-export const parseBoolWithDefault = (defaultValue: any) => (arg: any) => parseBool(arg, defaultValue);
+export const parseBoolWithDefault = (defaultValue: any) => (arg: any, prevVal: any) => {
+    parseBool(arg, defaultValue)
+};
 
 export function activityWindowText(activities: (Submission | Comment)[], suffix = false): (string | undefined) {
     if (activities.length === 0) {
@@ -670,7 +672,7 @@ export const isLogLineMinLevel = (line: string, minLevelText: string): boolean =
 // https://regexr.com/3e6m0
 const HYPERLINK_REGEX: RegExp = /(http(s)?:\/\/.)?(www\.)?[-a-zA-Z0-9@:%._\+~#=]{2,256}\.[a-z]{2,6}\b([-a-zA-Z0-9@:%_\+.~#?&//=]*)/;
 export const formatLogLineToHtml = (val: string) => {
-    return val
+    const logContent = val
         .replace(/(\s*debug\s*):/i, '<span class="debug text-pink-400">$1</span>:')
         .replace(/(\s*warn\s*):/i, '<span class="warn text-yellow-400">$1</span>:')
         .replace(/(\s*info\s*):/i, '<span class="info text-blue-300">$1</span>:')
@@ -678,6 +680,7 @@ export const formatLogLineToHtml = (val: string) => {
         .replace(/(\s*verbose\s*):/i, '<span class="error text-purple-400">$1</span>:')
         .replaceAll('\n', '<br />')
         .replace(HYPERLINK_REGEX, '<a target="_blank" href="$&">$&</a>');
+    return `<div class="logLine">${logContent}</div>`
 }
 
 export type LogEntry = [number, string];
@@ -873,16 +876,26 @@ export const removeUndefinedKeys = (obj: any) => {
     return newObj;
 }
 
+const timestampArr = () => {
+    const arr: number[] = [];
+    arr.length = 50;
+    return arr;
+}
+
+const statMetricCache = () => {
+    return cacheManager.caching({store: 'memory', max: 50, ttl: 0});
+}
+
 export const cacheStats = (): ResourceStats => {
     return {
-        author: {requests: 0, miss: 0},
-        authorCrit: {requests: 0, miss: 0},
-        itemCrit: {requests: 0, miss: 0},
-        content: {requests: 0, miss: 0},
-        userNotes: {requests: 0, miss: 0},
-        submission: {requests: 0, miss: 0},
-        comment: {requests: 0, miss: 0},
-        commentCheck: {requests: 0, miss: 0}
+        author: {requests: 0, miss: 0, identifierRequestCount: statMetricCache(), requestTimestamps: timestampArr(), averageTimeBetweenHits: 'N/A', identifierAverageHit: 0},
+        authorCrit: {requests: 0, miss: 0, identifierRequestCount: statMetricCache(), requestTimestamps: timestampArr(), averageTimeBetweenHits: 'N/A', identifierAverageHit: 0},
+        itemCrit: {requests: 0, miss: 0, identifierRequestCount: statMetricCache(), requestTimestamps: timestampArr(), averageTimeBetweenHits: 'N/A', identifierAverageHit: 0},
+        content: {requests: 0, miss: 0, identifierRequestCount: statMetricCache(), requestTimestamps: timestampArr(), averageTimeBetweenHits: 'N/A', identifierAverageHit: 0},
+        userNotes: {requests: 0, miss: 0, identifierRequestCount: statMetricCache(), requestTimestamps: timestampArr(), averageTimeBetweenHits: 'N/A', identifierAverageHit: 0},
+        submission: {requests: 0, miss: 0, identifierRequestCount: statMetricCache(), requestTimestamps: timestampArr(), averageTimeBetweenHits: 'N/A', identifierAverageHit: 0},
+        comment: {requests: 0, miss: 0, identifierRequestCount: statMetricCache(), requestTimestamps: timestampArr(), averageTimeBetweenHits: 'N/A', identifierAverageHit: 0},
+        commentCheck: {requests: 0, miss: 0, identifierRequestCount: statMetricCache(), requestTimestamps: timestampArr(), averageTimeBetweenHits: 'N/A', identifierAverageHit: 0}
     };
 }
 

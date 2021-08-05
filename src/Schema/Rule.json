@@ -330,7 +330,7 @@
             "properties": {
                 "age": {
                     "description": "Test the age of the Author's account (when it was created) against this comparison\n\nThe syntax is `(< OR > OR <= OR >=) <number> <unit>`\n\n* EX `> 100 days` => Passes if Author's account is older than 100 days\n* EX `<= 2 months` => Passes if Author's account is younger than or equal to 2 months\n\nUnit must be one of [DayJS Duration units](https://day.js.org/docs/en/durations/creating)\n\n[See] https://regexr.com/609n8 for example",
-                    "pattern": "^\\s*(?<opStr>>|>=|<|<=)\\s*(?<time>\\d+)\\s*(?<unit>days?|weeks?|months?|years?|hours?|minutes?|seconds?|milliseconds?)\\s*$",
+                    "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(days?|weeks?|months?|years?|hours?|minutes?|seconds?|milliseconds?)\\s*$",
                     "type": "string"
                 },
                 "commentKarma": {

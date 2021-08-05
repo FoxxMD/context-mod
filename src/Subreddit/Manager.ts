@@ -166,7 +166,7 @@ export class Manager {
         };
 
         if (this.resources !== undefined) {
-            const resStats = this.resources.getStats();
+            const resStats = await this.resources.getStats();
 
             data.cache = resStats.cache;
             data.cache.currentKeyCount = await this.resources.getCacheKeyCount();
