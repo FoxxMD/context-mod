@@ -6,7 +6,7 @@ on:
       - 'master'
       - 'edge'
     tags:
-      - 'v*.*.*'
+      - '*.*.*'
     # don't trigger if just updating docs
     paths-ignore:
       - '**.md'
