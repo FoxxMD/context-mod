@@ -313,7 +313,7 @@ export const parseOpConfigFromArgs = (args: any): OperatorJsonConfig => {
             provider: caching,
             authorTTL
         },
-        api: {
+        nanny: {
             softLimit,
             hardLimit
         }
@@ -388,7 +388,7 @@ export const parseOpConfigFromEnv = (): OperatorJsonConfig => {
             },
             authorTTL: process.env.AUTHOR_TTL !== undefined ? parseInt(process.env.AUTHOR_TTL) : undefined
         },
-        api: {
+        nanny: {
             softLimit: process.env.SOFT_LIMIT !== undefined ? parseInt(process.env.SOFT_LIMIT) : undefined,
             hardLimit: process.env.HARD_LIMIT !== undefined ? parseInt(process.env.HARD_LIMIT) : undefined
         }
@@ -492,7 +492,12 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
             session: {
                 secret = randomId(),
                 provider: sessionProvider = { store: 'memory' },
-            } = {}
+            } = {},
+            clients,
+        } = {},
+        api: {
+            port: apiPort = 8095,
+            secret: apiSecret = randomId(),
         } = {},
         polling: {
             sharedMod = false,
@@ -503,7 +508,7 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
             maxWorkers = 1,
         } = {},
         caching,
-        api: {
+        nanny: {
             softLimit = 250,
             hardLimit = 50
         } = {},
@@ -582,6 +587,11 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
                 },
             },
             maxLogs,
+            clients: clients === undefined ? [{host: 'http://localhost', port: apiPort, secret: apiSecret}] : clients,
+        },
+        api: {
+            port: apiPort,
+            secret: apiSecret
         },
         caching: cache,
         polling: {
@@ -592,7 +602,7 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
         queue: {
           maxWorkers,
         },
-        api: {
+        nanny: {
             softLimit,
             hardLimit
         }

@@ -1,21 +1,23 @@
 import {addAsync, Router} from '@awaitjs/express';
-import express from 'express';
+import express, {Request, Response} from 'express';
 import bodyParser from 'body-parser';
 import session from 'express-session';
 import {Cache} from 'cache-manager';
 // @ts-ignore
 import CacheManagerStore from 'express-session-cache-manager'
 import Snoowrap from "snoowrap";
-import {App} from "../App";
+import {App} from "../../App";
 import dayjs from 'dayjs';
-import {Writable} from "stream";
+import {Writable, Transform} from "stream";
 import winston from 'winston';
 import {Server as SocketServer} from 'socket.io';
 import sharedSession from 'express-socket.io-session';
 import Submission from "snoowrap/dist/objects/Submission";
 import EventEmitter from "events";
+import {Strategy as JwtStrategy, ExtractJwt} from 'passport-jwt';
+import passport from 'passport';
 import tcpUsed from 'tcp-port-used';
-import { prettyPrintJson } from 'pretty-print-json';
+import {prettyPrintJson} from 'pretty-print-json';
 
 import {
     boolToString, cacheStats,
@@ -27,21 +29,20 @@ import {
     parseLinkIdentifier,
     parseSubredditLogName, parseSubredditName,
     pollingInfo, SUBMISSION_URL_ID
-} from "../util";
-import {Manager} from "../Subreddit/Manager";
-import {getLogger} from "../Utils/loggerFactory";
-import LoggedError from "../Utils/LoggedError";
-import {OperatorConfig, ResourceStats, RUNNING, STOPPED, SYSTEM, USER} from "../Common/interfaces";
+} from "../../util";
+import {Manager} from "../../Subreddit/Manager";
+import {getLogger} from "../../Utils/loggerFactory";
+import LoggedError from "../../Utils/LoggedError";
+import {OperatorConfig, ResourceStats, RUNNING, STOPPED, SYSTEM, USER} from "../../Common/interfaces";
 import http from "http";
-import SimpleError from "../Utils/SimpleError";
+import SimpleError from "../../Utils/SimpleError";
+import {booleanMiddle} from "../Common/middleware";
 
 const app = addAsync(express());
 const router = Router();
 
 app.use(router);
 app.use(bodyParser.json());
-app.set('views', `${__dirname}/views`);
-app.set('view engine', 'ejs');
 
 interface ConnectedUserInfo {
     subreddits: string[],
@@ -73,6 +74,12 @@ const subLogMap: Map<string, LogEntry[]> = new Map();
 
 const emitter = new EventEmitter();
 const stream = new Writable()
+const logStream = new Transform({
+    transform(chunk, encoding, callback) {
+        callback();
+    }
+})
+
 
 const rcbServer = function (options: OperatorConfig): ([() => Promise<void>, App]) {
 
@@ -86,14 +93,10 @@ const rcbServer = function (options: OperatorConfig): ([() => Promise<void>, App
             name,
             display,
         },
-        web: {
-            port,
-            session: {
-                provider,
-                secret,
-            },
-            maxLogs,
-        },
+        api: {
+            secret: secret,
+            port
+        }
     } = options;
 
     const opNames = name.map(x => x.toLowerCase());
@@ -110,19 +113,21 @@ const rcbServer = function (options: OperatorConfig): ([() => Promise<void>, App
         if (subName !== undefined && (botSubreddits.length === 0 || botSubreddits.includes(subName))) {
             const subLogs = subLogMap.get(subName) || [];
             subLogs.unshift(logEntry);
-            subLogMap.set(subName, subLogs.slice(0, maxLogs + 1));
+            subLogMap.set(subName, subLogs.slice(0, 200 + 1));
         } else {
             const appLogs = subLogMap.get('app') || [];
             appLogs.unshift(logEntry);
-            subLogMap.set('app', appLogs.slice(0, maxLogs + 1));
+            subLogMap.set('app', appLogs.slice(0, 200 + 1));
         }
 
         emitter.emit('log', logLine);
+        logStream.push(logLine);
         next();
     }
+
     const streamTransport = new winston.transports.Stream({
         stream,
-    })
+    });
 
     const logger = getLogger({...options.logging, additionalTransports: [streamTransport]})
 
@@ -132,7 +137,7 @@ const rcbServer = function (options: OperatorConfig): ([() => Promise<void>, App
     const serverFunc = async function () {
 
         if (await tcpUsed.check(port)) {
-            throw new SimpleError(`Specified port for web interface (${port}) is in use or not available. Cannot start web server.`);
+            throw new SimpleError(`Specified port for API (${port}) is in use or not available. Cannot start API.`);
         }
 
         let server: http.Server,
@@ -147,148 +152,48 @@ const rcbServer = function (options: OperatorConfig): ([() => Promise<void>, App
             throw err;
         }
 
-        logger.info(`Web UI started: http://localhost:${port}`);
+        logger.info(`API started => localhost:${port}`);
 
-        await bot.testClient();
 
-        app.use('/public', express.static(`${__dirname}/public`));
-
-        await bot.buildManagers();
         botSubreddits = bot.subManagers.map(x => x.displayLabel);
         // TODO potentially prune subLogMap of user keys? shouldn't have happened this early though
 
-        if (provider.store === 'none') {
-            logger.warn(`Cannot use 'none' for session store or else no one can use the interface...falling back to 'memory'`);
-            provider.store = 'memory';
-        }
-        const sessionObj = session({
-            cookie: {
-                maxAge: provider.ttl,
-            },
-            store: new CacheManagerStore(createCacheManager(provider) as Cache),
-            resave: false,
-            saveUninitialized: false,
-            secret,
-        });
-
-        app.use(sessionObj);
-        io.use(sharedSession(sessionObj));
-
-        io.on("connection", function (socket) {
-            // @ts-ignore
-            if (socket.handshake.session.user !== undefined) {
+        const authUserCheck = (userRequired = true) => async (req: express.Request, res: express.Response, next: Function) => {
+            if (req.isAuthenticated()) {
                 // @ts-ignore
-                socket.join(socket.handshake.session.id);
-                // @ts-ignore
-                connectedUsers.set(socket.handshake.session.id, {
-                    // @ts-ignore
-                    subreddits: socket.handshake.session.subreddits,
-                    // @ts-ignore
-                    level: socket.handshake.session.level,
-                    // @ts-ignore
-                    user: socket.handshake.session.user
-                });
-
-                // @ts-ignore
-                if (opNames.includes(socket.handshake.session.user.toLowerCase())) {
-                    // @ts-ignore
-                    operatorSessionIds.push(socket.handshake.session.id)
+                if (userRequired && req.user.machine === true) {
+                    return res.status(403).json({message: 'Must be authenticated as a user to access this route'});
                 }
+                next();
+            } else {
+                res.status(401).json('Must be authenticated to access this route');
             }
-        });
-        io.on('disconnect', (socket) => {
-            // @ts-ignore
-            connectedUsers.delete(socket.handshake.session.id);
-            operatorSessionIds = operatorSessionIds.filter(x => x !== socket.handshake.session.id)
-        });
-
-        const redditUserMiddleware = async (req: express.Request, res: express.Response, next: Function) => {
-            if (req.session.user === undefined) {
-                return res.redirect('/login');
-            }
-            next();
         }
 
-        const booleanMiddle = (boolParams: string[] = []) => async (req: express.Request, res: express.Response, next: Function) => {
-            if (req.query !== undefined) {
-                for (const b of boolParams) {
-                    const bVal = req.query[b] as any;
-                    if (bVal !== undefined) {
-                        let truthyVal: boolean;
-                        if (bVal === 'true' || bVal === true || bVal === 1 || bVal === '1') {
-                            truthyVal = true;
-                        } else if (bVal === 'false' || bVal === false || bVal === 0 || bVal === '0') {
-                            truthyVal = false;
-                        } else {
-                            res.status(400);
-                            res.send(`Expected query parameter ${b} to be a truthy value. Got "${bVal}" but must be one of these: true/false, 1/0`);
-                            return;
-                        }
-                        // @ts-ignore
-                        req.query[b] = truthyVal;
-                    }
-                }
-            }
-            next();
-        }
+        passport.use(new JwtStrategy({
+            secretOrKey: secret,
+            jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+        }, function (jwt_payload, done) {
+            done(null, jwt_payload);
+        }));
 
-        app.getAsync('/logout', async (req, res) => {
-            // @ts-ignore
-            req.session.destroy();
-            res.send('Bye!');
+        app.getAsync('/heartbeat', [passport.authenticate('jwt', {session: false}), authUserCheck(false)], (req: Request, res: Response) => {
+            return res.json({
+                subreddits: bot.subManagers.map(x => x.subreddit.display_name),
+                operators: name,
+                friendly: bot.botName,
+                running: bot.heartBeating,
+                nanny: bot.nannyMode
+            });
+        });
+
+        app.getAsync('/log', [passport.authenticate('jwt', {session: false}), authUserCheck(true)], async (req: Request, res: Response) => {
+            for await (const chunk of logStream) {
+                res.write(chunk);
+            }
         })
 
-        app.getAsync('/login', async (req, res) => {
-            if (redirectUri === undefined) {
-                return res.render('error', {error: `No <b>redirectUri</b> was specified through environmental variables or program argument. This must be provided in order to use the web interface.`});
-            }
-            const authUrl = Snoowrap.getAuthUrl({
-                clientId,
-                scope: ['identity', 'mysubreddits'],
-                redirectUri: redirectUri as string,
-                permanent: false,
-            });
-            return res.redirect(authUrl);
-        });
-
-        app.getAsync(/.*callback$/, async (req, res) => {
-            const {error, code} = req.query as any;
-            if (error !== undefined) {
-                let errContent: string;
-                switch (error) {
-                    case 'access_denied':
-                        errContent = 'You must <b>Allow</b> this application to connect in order to proceed.';
-                        break;
-                    default:
-                        errContent = error;
-                }
-                return res.render('error', {error: errContent, operatorDisplay: display});
-            }
-            const client = await Snoowrap.fromAuthCode({
-                userAgent: `web:contextBot:web`,
-                clientId,
-                clientSecret,
-                redirectUri: redirectUri as string,
-                code: code as string,
-            });
-            // @ts-ignore
-            const user = await client.getMe().name as string;
-            const subs = await client.getModeratedSubreddits();
-
-            req.session['user'] = user;
-            // @ts-ignore
-            req.session['subreddits'] = opNames.includes(user.toLowerCase()) ? bot.subManagers.map(x => x.displayLabel) : subs.reduce((acc: string[], x) => {
-                const sm = bot.subManagers.find(y => y.subreddit.display_name === x.display_name);
-                if (sm !== undefined) {
-                    return acc.concat(sm.displayLabel);
-                }
-                return acc;
-            }, []);
-            req.session['lastCheck'] = dayjs().unix();
-            res.redirect('/');
-        });
-
-        app.use('/', redditUserMiddleware);
+        app.use('/', authUserCheck);
         app.getAsync('/', async (req, res) => {
             const {
                 subreddits = [],
@@ -399,7 +304,7 @@ const rcbServer = function (options: OperatorConfig): ([() => Promise<void>, App
                     subMaxWorkers: acc.subMaxWorkers + curr.subMaxWorkers,
                     globalMaxWorkers: acc.globalMaxWorkers + curr.globalMaxWorkers,
                     runningActivities: acc.runningActivities + curr.runningActivities,
-                    queuedActivities:  acc.queuedActivities + curr.queuedActivities,
+                    queuedActivities: acc.queuedActivities + curr.queuedActivities,
                 };
             }, {
                 checks: {
@@ -474,7 +379,7 @@ const rcbServer = function (options: OperatorConfig): ([() => Promise<void>, App
                         isShared: false,
                         totalRequests: cacheReq,
                         totalMiss: cacheMiss,
-                        missPercent: `${formatNumber(cacheMiss === 0 || cacheReq === 0 ? 0 :(cacheMiss/cacheReq) * 100, {toFixed: 0})}%`,
+                        missPercent: `${formatNumber(cacheMiss === 0 || cacheReq === 0 ? 0 : (cacheMiss / cacheReq) * 100, {toFixed: 0})}%`,
                         types: {
                             ...cumRaw,
                         }
@@ -576,15 +481,21 @@ const rcbServer = function (options: OperatorConfig): ([() => Promise<void>, App
             io.emit('logClear', subArr);
         });
 
-        app.use('/config', [redditUserMiddleware]);
+        app.use('/config', [authUserCheck]);
         app.getAsync('/config', async (req, res) => {
             const {subreddit} = req.query as any;
-            if(!(req.session.subreddits as string[]).includes(subreddit)) {
-                return res.render('error', {error: 'Cannot retrieve config for subreddit you do not manage or is not run by the bot', operatorDisplay: display});
+            if (!(req.session.subreddits as string[]).includes(subreddit)) {
+                return res.render('error', {
+                    error: 'Cannot retrieve config for subreddit you do not manage or is not run by the bot',
+                    operatorDisplay: display
+                });
             }
             const manager = bot.subManagers.find(x => x.displayLabel === subreddit);
             if (manager === undefined) {
-                return res.render('error', {error: 'Cannot retrieve config for subreddit you do not manage or is not run by the bot', operatorDisplay: display});
+                return res.render('error', {
+                    error: 'Cannot retrieve config for subreddit you do not manage or is not run by the bot',
+                    operatorDisplay: display
+                });
             }
 
             // @ts-ignore
@@ -598,7 +509,7 @@ const rcbServer = function (options: OperatorConfig): ([() => Promise<void>, App
             });
         });
 
-        app.use('/action', [redditUserMiddleware, booleanMiddle(['force'])]);
+        app.use('/action', [authUserCheck, booleanMiddle(['force'])]);
         app.getAsync('/action', async (req, res) => {
             const {type, action, subreddit, force = false} = req.query as any;
             let subreddits: string[] = [];
@@ -682,7 +593,7 @@ const rcbServer = function (options: OperatorConfig): ([() => Promise<void>, App
             res.send('OK');
         });
 
-        app.use('/check', [redditUserMiddleware, booleanMiddle(['dryRun'])]);
+        app.use('/check', [authUserCheck, booleanMiddle(['dryRun'])]);
         app.getAsync('/check', async (req, res) => {
             const {url, dryRun, subreddit} = req.query as any;
 
@@ -748,7 +659,7 @@ const rcbServer = function (options: OperatorConfig): ([() => Promise<void>, App
                 }
             }
             if (operatorSessionIds.length > 0) {
-                for(const id of operatorSessionIds) {
+                for (const id of operatorSessionIds) {
                     io.to(id).emit('opStats', opStats(bot));
                     if (subName === undefined || !emittedSessions.includes(id)) {
                         const {level = 'verbose'} = connectedUsers.get(id) || {};
@@ -760,7 +671,7 @@ const rcbServer = function (options: OperatorConfig): ([() => Promise<void>, App
             }
         });
 
-        await bot.runManagers();
+        //await bot.runManagers();
     }
 
     return [serverFunc, bot];

@@ -95,7 +95,7 @@ export class App {
                     store
                 }
             },
-            api: {
+            nanny: {
                 softLimit,
                 hardLimit,
             }

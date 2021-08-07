@@ -1,9 +1,9 @@
 import {addAsync, Router} from '@awaitjs/express';
 import express from 'express';
 import Snoowrap from "snoowrap";
-import {permissions} from "../util";
-import {getLogger} from "../Utils/loggerFactory";
-import {OperatorConfig} from "../Common/interfaces";
+import {permissions} from "../../util";
+import {getLogger} from "../../Utils/loggerFactory";
+import {OperatorConfig} from "../../Common/interfaces";
 
 const app = addAsync(express());
 const router = Router();

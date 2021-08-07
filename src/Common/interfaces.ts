@@ -806,6 +806,12 @@ export interface ManagerStateChangeOption {
     suppressNotification?: boolean
 }
 
+export interface WebClient {
+    host: string
+    secret: string
+    port?: number
+}
+
 /**
  * Configuration for application-level settings IE for running the bot instance
  *
@@ -1116,6 +1122,11 @@ export interface OperatorJsonConfig {
          * @examples [200]
          * */
         maxLogs?: number,
+        clients?: WebClient[]
+    }
+    api?: {
+        port?: number,
+        secret?: string,
     }
     /**
      * Settings to configure the default caching behavior for each suberddit
@@ -1175,7 +1186,7 @@ export interface OperatorJsonConfig {
     /**
      * Settings related to managing heavy API usage.
      * */
-    api?: {
+    nanny?: {
         /**
          * When `api limit remaining` reaches this number the application will attempt to put heavy-usage subreddits in a **slow mode** where activity processed is slowed to one every 1.5 seconds until the api limit is reset.
          *
@@ -1238,9 +1249,14 @@ export interface OperatorConfig extends OperatorJsonConfig {
         }
         logLevel?: LogLevel,
         maxLogs: number,
+        clients: WebClient[]
+    }
+    api: {
+        port: number,
+        secret: string,
     }
     caching: StrongCache,
-    api: {
+    nanny: {
         softLimit: number,
         hardLimit: number,
     }

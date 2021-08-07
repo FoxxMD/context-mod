@@ -17,8 +17,9 @@ import {
     operatorConfig
 } from "./Utils/CommandConfig";
 import {App} from "./App";
-import createWebServer from './Server/server';
-import createHelperServer from './Server/helper';
+import createWebServer from './Web/Server/server';
+import client from './Web/Client';
+import createHelperServer from './Web/Server/helper';
 import Submission from "snoowrap/dist/objects/Submission";
 import {COMMENT_URL_ID, parseLinkIdentifier, SUBMISSION_URL_ID} from "./util";
 import LoggedError from "./Utils/LoggedError";
@@ -85,9 +86,17 @@ const program = new Command();
                         if (redirectUri === undefined) {
                             logger.warn(`No 'redirectUri' found in arg/env. Bot will still run but web interface will not be accessible.`);
                         }
+                        debugger;
                         const [server, bot] = createWebServer(config);
                         app = bot;
+
                         await server();
+                        await client(config);
+
+                        await bot.testClient();
+                        await bot.buildManagers();
+
+                        await bot.runManagers();
                     }
                 } else {
                     app = new App(config);

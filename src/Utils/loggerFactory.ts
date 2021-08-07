@@ -9,6 +9,7 @@ export const getLogger = (options: any, name = 'default'): Logger => {
             path,
             level,
             additionalTransports = [],
+            defaultLabel = 'App',
         } = options || {};
 
         const consoleTransport = new transports.Console();
@@ -41,7 +42,7 @@ export const getLogger = (options: any, name = 'default'): Logger => {
 
         const loggerOptions = {
             level: level || 'info',
-            format: labelledFormat(),
+            format: labelledFormat(defaultLabel),
             transports: myTransports,
             levels: logLevels,
             exceptionHandlers: errorTransports,
