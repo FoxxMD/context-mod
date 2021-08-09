@@ -37,12 +37,15 @@ import {OperatorConfig, ResourceStats, RUNNING, STOPPED, SYSTEM, USER} from "../
 import http from "http";
 import SimpleError from "../../Utils/SimpleError";
 import {booleanMiddle} from "../Common/middleware";
+import is from "@sindresorhus/is";
+import pEvent from "p-event";
 
 const app = addAsync(express());
 const router = Router();
 
 app.use(router);
 app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({extended: false}));
 
 interface ConnectedUserInfo {
     subreddits: string[],
@@ -73,13 +76,20 @@ declare module 'express-session' {
 const subLogMap: Map<string, LogEntry[]> = new Map();
 
 const emitter = new EventEmitter();
-const stream = new Writable()
+const winstonStream = new Transform({
+    transform(chunk, encoding, callback) {
+        callback(null, chunk);
+    }
+});
 const logStream = new Transform({
     transform(chunk, encoding, callback) {
-        callback();
+        callback(null, chunk);
     }
-})
+});
 
+logStream.on('end', () => {
+    console.log('log end');
+});
 
 const rcbServer = function (options: OperatorConfig): ([() => Promise<void>, App]) {
 
@@ -103,7 +113,7 @@ const rcbServer = function (options: OperatorConfig): ([() => Promise<void>, App
     let bot: App;
     let botSubreddits: string[] = [];
 
-    stream._write = (chunk, encoding, next) => {
+    winstonStream._write = (chunk, encoding, next) => {
         // remove newline (\n) from end of string since we deal with it with css/html
         const logLine = chunk.toString().slice(0, -1);
         const now = Date.now();
@@ -121,12 +131,12 @@ const rcbServer = function (options: OperatorConfig): ([() => Promise<void>, App
         }
 
         emitter.emit('log', logLine);
-        logStream.push(logLine);
+        logStream.write(logLine);
         next();
     }
 
     const streamTransport = new winston.transports.Stream({
-        stream,
+        stream: winstonStream,
     });
 
     const logger = getLogger({...options.logging, additionalTransports: [streamTransport]})
@@ -160,8 +170,7 @@ const rcbServer = function (options: OperatorConfig): ([() => Promise<void>, App
 
         const authUserCheck = (userRequired = true) => async (req: express.Request, res: express.Response, next: Function) => {
             if (req.isAuthenticated()) {
-                // @ts-ignore
-                if (userRequired && req.user.machine === true) {
+                if(userRequired && req.user.machine === true) {
                     return res.status(403).json({message: 'Must be authenticated as a user to access this route'});
                 }
                 next();
@@ -173,11 +182,20 @@ const rcbServer = function (options: OperatorConfig): ([() => Promise<void>, App
         passport.use(new JwtStrategy({
             secretOrKey: secret,
             jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
-        }, function (jwt_payload, done) {
-            done(null, jwt_payload);
+        }, function (jwtPayload, done) {
+            const {name, subreddits = [], machine = true} = jwtPayload.data;
+            if(machine) {
+                return done(null, {machine});
+            }
+            const isOperator = opNames.includes(name.toLowerCase());
+            const usableSubreddits = bot.subManagers.filter(x => subreddits.includes(x.subreddit.display_name)).map(x => x.displayLabel);
+            return done(null, { name, subreddits, isOperator, usableSubreddits });
         }));
 
-        app.getAsync('/heartbeat', [passport.authenticate('jwt', {session: false}), authUserCheck(false)], (req: Request, res: Response) => {
+        router.use('/*', passport.authenticate('jwt', {session: false}));
+        router.use('/^(?!\\/heartbeat).*$/', authUserCheck(true));
+
+        app.getAsync('/heartbeat', authUserCheck(false), (req: Request, res: Response) => {
             return res.json({
                 subreddits: bot.subManagers.map(x => x.subreddit.display_name),
                 operators: name,
@@ -187,36 +205,92 @@ const rcbServer = function (options: OperatorConfig): ([() => Promise<void>, App
             });
         });
 
-        app.getAsync('/log', [passport.authenticate('jwt', {session: false}), authUserCheck(true)], async (req: Request, res: Response) => {
-            for await (const chunk of logStream) {
-                res.write(chunk);
-            }
-        })
+        app.getAsync('/logs', booleanMiddle([{
+            name: 'stream',
+            defaultVal: false
+        }]), async (req: Request, res: Response) => {
+            const {name: userName, usableSubreddits = [], isOperator} = req.user as Express.User;
+            const {level = 'verbose', stream, limit = 200, sort = 'descending'} = req.query;
+            if (stream) {
+                const userStream = new Transform({
+                    transform(chunk, encoding, callback) {
+                        const log = chunk.toString();
+                        if (isLogLineMinLevel(log, level as string)) {
+                            const subName = parseSubredditLogName(log);
+                            if (isOperator || (subName !== undefined && (usableSubreddits.includes(subName) || subName.includes(userName)))) {
+                                callback(null, chunk);
+                            } else {
+                                callback(null);
+                            }
+                        } else {
+                            callback(null);
+                        }
+                    }
+                });
+                try {
+                    userStream.on('end', () => {
+                        console.log('user end');
+                    });
 
-        app.use('/', authUserCheck);
-        app.getAsync('/', async (req, res) => {
+                    logStream.pipe(userStream, {end: false});
+
+                    userStream.pipe(res, {end: false});
+                    await pEvent(req, 'close');
+                    console.log('Request closed detected with "close" listener');
+                    userStream.end();
+                    res.destroy();
+                    return;
+                } catch (e) {
+
+                    if (e.code !== 'ECONNRESET') {
+                        logger.error(e);
+                    }
+                } finally {
+                    userStream.end();
+                    res.destroy();
+                }
+            } else {
+                const logs = filterLogBySubreddit(subLogMap, isOperator ? botSubreddits : usableSubreddits, {
+                    level: (level as string),
+                    operator: isOperator,
+                    user: userName,
+                    sort: sort as 'descending' | 'ascending',
+                    limit: Number.parseInt((limit as string))
+                });
+                const subArr: any = [];
+                logs.forEach((v: string[], k: string) => {
+                    subArr.push({name: k, logs: v.join('')});
+                });
+                return res.json(subArr);
+            }
+        });
+
+        app.getAsync('/status', async (req: Request, res: Response) => {
             const {
-                subreddits = [],
-                user: userVal,
+                //subreddits = [],
+                //user: userVal,
                 limit = 200,
                 level = 'verbose',
                 sort = 'descending',
                 lastCheck
-            } = req.session;
-            const user = userVal as string;
-            const isOperator = opNames.includes(user.toLowerCase())
+            } = req.query;
+            const { name: userName, usableSubreddits = [], isOperator } = req.user as Express.User;
+            const user = userName as string;
+            const subreddits = usableSubreddits;
+            //const isOperator = opNames.includes(user.toLowerCase())
 
-            if ((req.session.subreddits as string[]).length === 0 && !isOperator) {
-                return res.render('noSubs', {operatorDisplay: display});
+            if (usableSubreddits.length === 0 && !isOperator) {
+                return res.json({});
+                //return res.render('noSubs', {operatorDisplay: display});
             }
 
-            const logs = filterLogBySubreddit(subLogMap, req.session.subreddits, {
-                level,
+            const logs = filterLogBySubreddit(subLogMap, isOperator ? botSubreddits : usableSubreddits, {
+                level: (level as string),
                 operator: isOperator,
                 user,
                 // @ts-ignore
                 sort,
-                limit
+                limit: Number.parseInt((limit as string))
             });
 
             const subManagerData = [];
@@ -445,7 +519,8 @@ const rcbServer = function (options: OperatorConfig): ([() => Promise<void>, App
                 }
             }
 
-            res.render('status', data);
+            return res.json(data);
+            //res.render('status', data);
         });
 
         app.getAsync('/logs/settings/update', async function (req, res) {
@@ -481,10 +556,10 @@ const rcbServer = function (options: OperatorConfig): ([() => Promise<void>, App
             io.emit('logClear', subArr);
         });
 
-        app.use('/config', [authUserCheck]);
         app.getAsync('/config', async (req, res) => {
             const {subreddit} = req.query as any;
-            if (!(req.session.subreddits as string[]).includes(subreddit)) {
+            const { name: userName, usableSubreddits = [], isOperator } = req.user as Express.User;
+            if (!isOperator && !usableSubreddits.includes(subreddit)) {
                 return res.render('error', {
                     error: 'Cannot retrieve config for subreddit you do not manage or is not run by the bot',
                     operatorDisplay: display
@@ -509,24 +584,24 @@ const rcbServer = function (options: OperatorConfig): ([() => Promise<void>, App
             });
         });
 
-        app.use('/action', [authUserCheck, booleanMiddle(['force'])]);
-        app.getAsync('/action', async (req, res) => {
+        app.getAsync('/action', [booleanMiddle(['force'])], async (req: express.Request, res: express.Response) => {
             const {type, action, subreddit, force = false} = req.query as any;
+            const { name: userName, usableSubreddits = [], isOperator } = req.user as Express.User;
             let subreddits: string[] = [];
             if (subreddit === 'All') {
-                subreddits = req.session.subreddits as string[];
-            } else if ((req.session.subreddits as string[]).includes(subreddit)) {
+                subreddits = isOperator ? botSubreddits : usableSubreddits;
+            } else if (isOperator || usableSubreddits.includes(subreddit)) {
                 subreddits = [subreddit];
             }
 
             for (const s of subreddits) {
                 const manager = bot.subManagers.find(x => x.displayLabel === s);
                 if (manager === undefined) {
-                    logger.warn(`Manager for ${s} does not exist`, {subreddit: `/u/${req.session.user}`});
+                    logger.warn(`Manager for ${s} does not exist`, {subreddit: `/u/${userName}`});
                     continue;
                 }
                 const mLogger = manager.logger;
-                mLogger.info(`/u/${req.session.user} invoked '${action}' action for ${type} on ${manager.displayLabel}`);
+                mLogger.info(`/u/${userName} invoked '${action}' action for ${type} on ${manager.displayLabel}`);
                 try {
                     switch (action) {
                         case 'start':
@@ -593,9 +668,10 @@ const rcbServer = function (options: OperatorConfig): ([() => Promise<void>, App
             res.send('OK');
         });
 
-        app.use('/check', [authUserCheck, booleanMiddle(['dryRun'])]);
+        app.use('/check', [booleanMiddle(['dryRun'])]);
         app.getAsync('/check', async (req, res) => {
             const {url, dryRun, subreddit} = req.query as any;
+            const { name: userName, usableSubreddits = [], isOperator } = req.user as Express.User;
 
             let a;
             const commentId = commentReg(url);
@@ -612,7 +688,7 @@ const rcbServer = function (options: OperatorConfig): ([() => Promise<void>, App
             }
 
             if (a === undefined) {
-                logger.error('Could not parse Comment or Submission ID from given URL', {subreddit: `/u/${req.session.user}`});
+                logger.error('Could not parse Comment or Submission ID from given URL', {subreddit: `/u/${userName}`});
                 return res.send('OK');
             } else {
                 // @ts-ignore
@@ -621,7 +697,7 @@ const rcbServer = function (options: OperatorConfig): ([() => Promise<void>, App
 
                 let manager = subreddit === 'All' ? bot.subManagers.find(x => x.subreddit.display_name === sub) : bot.subManagers.find(x => x.displayLabel === subreddit);
 
-                if (manager === undefined || !(req.session.subreddits as string[]).includes(manager.displayLabel)) {
+                if (manager === undefined || (!isOperator && !usableSubreddits.includes(manager.displayLabel))) {
                     let msg = 'Activity does not belong to a subreddit you moderate or the bot runs on.';
                     if (subreddit === 'All') {
                         msg = `${msg} If you want to test an Activity against a Subreddit\'s config it does not belong to then switch to that Subreddit's tab first.`
@@ -632,11 +708,18 @@ const rcbServer = function (options: OperatorConfig): ([() => Promise<void>, App
 
                 // will run dryrun if specified or if running activity on subreddit it does not belong to
                 const dr: boolean | undefined = (dryRun || manager.subreddit.display_name !== sub) ? true : undefined;
-                manager.logger.info(`/u/${req.session.user} running${dr === true ? ' DRY RUN ' : ' '}check on${manager.subreddit.display_name !== sub ? ' FOREIGN ACTIVITY ' : ' '}${url}`);
+                manager.logger.info(`/u/${userName} running${dr === true ? ' DRY RUN ' : ' '}check on${manager.subreddit.display_name !== sub ? ' FOREIGN ACTIVITY ' : ' '}${url}`);
                 await manager.runChecks(activity instanceof Submission ? 'Submission' : 'Comment', activity, {dryRun: dr})
             }
             res.send('OK');
-        })
+        });
+
+        app.getAsync('/*', (req, res, next) => {
+            next();
+        });
+        app.getAsync('*', (req, res, next) => {
+            next();
+        });
 
         setInterval(() => {
             // refresh op stats every 30 seconds
@@ -646,30 +729,30 @@ const rcbServer = function (options: OperatorConfig): ([() => Promise<void>, App
             // }
         }, 30000);
 
-        emitter.on('log', (log) => {
-            const emittedSessions = [];
-            const subName = parseSubredditLogName(log);
-            if (subName !== undefined) {
-                for (const [id, info] of connectedUsers) {
-                    const {subreddits, level = 'verbose', user} = info;
-                    if (isLogLineMinLevel(log, level) && (subreddits.includes(subName) || subName.includes(user))) {
-                        emittedSessions.push(id);
-                        io.to(id).emit('log', formatLogLineToHtml(log));
-                    }
-                }
-            }
-            if (operatorSessionIds.length > 0) {
-                for (const id of operatorSessionIds) {
-                    io.to(id).emit('opStats', opStats(bot));
-                    if (subName === undefined || !emittedSessions.includes(id)) {
-                        const {level = 'verbose'} = connectedUsers.get(id) || {};
-                        if (isLogLineMinLevel(log, level)) {
-                            io.to(id).emit('log', formatLogLineToHtml(log));
-                        }
-                    }
-                }
-            }
-        });
+        // emitter.on('log', (log) => {
+        //     const emittedSessions = [];
+        //     const subName = parseSubredditLogName(log);
+        //     if (subName !== undefined) {
+        //         for (const [id, info] of connectedUsers) {
+        //             const {subreddits, level = 'verbose', user} = info;
+        //             if (isLogLineMinLevel(log, level) && (subreddits.includes(subName) || subName.includes(user))) {
+        //                 emittedSessions.push(id);
+        //                 io.to(id).emit('log', formatLogLineToHtml(log));
+        //             }
+        //         }
+        //     }
+        //     if (operatorSessionIds.length > 0) {
+        //         for (const id of operatorSessionIds) {
+        //             io.to(id).emit('opStats', opStats(bot));
+        //             if (subName === undefined || !emittedSessions.includes(id)) {
+        //                 const {level = 'verbose'} = connectedUsers.get(id) || {};
+        //                 if (isLogLineMinLevel(log, level)) {
+        //                     io.to(id).emit('log', formatLogLineToHtml(log));
+        //                 }
+        //             }
+        //         }
+        //     }
+        // });
 
         //await bot.runManagers();
     }

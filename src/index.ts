@@ -86,12 +86,19 @@ const program = new Command();
                         if (redirectUri === undefined) {
                             logger.warn(`No 'redirectUri' found in arg/env. Bot will still run but web interface will not be accessible.`);
                         }
-                        debugger;
                         const [server, bot] = createWebServer(config);
                         app = bot;
 
-                        await server();
-                        await client(config);
+                        try {
+                            await server();
+                        } catch (e) {
+                            throw e;
+                        }
+                        try {
+                            await client(config);
+                        } catch(e) {
+                            throw e;
+                        }
 
                         await bot.testClient();
                         await bot.buildManagers();

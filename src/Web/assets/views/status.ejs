@@ -693,7 +693,7 @@
         el.onchange = (e) => {
             action = e.target.dataset.type;
             value = e.target.value;
-            fetch(`logs/settings/update?${action}=${value}`);
+            fetch(`/logs/settings/update?${action}=${value}`);
             document.querySelectorAll(`#${e.target.id}.logSettingSelect option`).forEach(el => {
                 el.classList.remove('font-bold');
             });
@@ -709,7 +709,7 @@
             type = e.target.dataset.type;
             force = e.target.dataset.force === 'true';
 
-            fetch(`action?action=${action}&subreddit=${subreddit}&force=${force}&type=${type}`);
+            fetch(`/bot/<%= botId %>/api/action?action=${action}&subreddit=${subreddit}&force=${force}&type=${type}`);
         });
     })
 
@@ -724,7 +724,7 @@
             const url = urlInput.value;
             const dryRun = dryRunCheck.checked ? 1 : 0;
 
-            const fetchUrl = `check?url=${url}&dryRun=${dryRun}&subreddit=${subreddit}`;
+            const fetchUrl = `/bot/<%= botId %>/api/check?url=${url}&dryRun=${dryRun}&subreddit=${subreddit}`;
             fetch(fetchUrl);
 
             urlInput.value = '';

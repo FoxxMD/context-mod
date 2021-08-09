@@ -587,7 +587,7 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
                 },
             },
             maxLogs,
-            clients: clients === undefined ? [{host: 'http://localhost', port: apiPort, secret: apiSecret}] : clients,
+            clients: clients === undefined ? [{host: 'localhost', port: apiPort, secret: apiSecret}] : clients,
         },
         api: {
             port: apiPort,

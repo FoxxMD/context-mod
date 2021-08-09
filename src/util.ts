@@ -75,10 +75,10 @@ export const FAIL = '✘';
 
 export const truncateStringToLength = (length: number, truncStr = '...') => (str: string) => str.length > length ? `${str.slice(0, length - truncStr.length - 1)}${truncStr}` : str;
 
-export const defaultFormat = printf(({
+export const defaultFormat = (defaultLabel = 'App') => printf(({
                                          level,
                                          message,
-                                         labels = ['App'],
+                                         labels = [defaultLabel],
                                          subreddit,
                                          leaf,
                                          itemId,
@@ -117,18 +117,18 @@ export const defaultFormat = printf(({
 
 
 export const labelledFormat = (labelName = 'App') => {
-    const l = label({label: labelName, message: false});
+    //const l = label({label: labelName, message: false});
     return combine(
         timestamp(
             {
                 format: () => dayjs().local().format(),
             }
         ),
-        l,
+      // l,
         s,
         errorAwareFormat,
         //errorsFormat,
-        defaultFormat,
+        defaultFormat(labelName),
     );
 }
 
@@ -935,3 +935,10 @@ export const createCacheManager = (options: CacheOptions): Cache => {
 }
 
 export const randomId = () => crypto.randomBytes(20).toString('hex');
+
+export const intersect = (a: Array<any>, b: Array<any>) => {
+    const setA = new Set(a);
+    const setB = new Set(b);
+    const intersection = new Set([...setA].filter(x => setB.has(x)));
+    return Array.from(intersection);
+}
