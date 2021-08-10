@@ -143,10 +143,11 @@ const webClient = async (options: OperatorConfig) => {
                 clientSecret,
                 redirectUri
             },
+            operators = [],
         },
     } = options;
 
-    const webOps = name.map(x => x.toLowerCase());
+    const webOps = operators.map(x => x.toLowerCase());
 
     stream._write = (chunk, encoding, next) => {
         // remove newline (\n) from end of string since we deal with it with css/html
@@ -181,7 +182,7 @@ const webClient = async (options: OperatorConfig) => {
 
     passport.serializeUser(async function (data: any, done) {
         const {user, subreddits} = data;
-        await webCache.set(`userSession-${user}`, { subreddits: subreddits.map((x: Subreddit) => x.display_name) }, {ttl: provider.ttl as number});
+        await webCache.set(`userSession-${user}`, { subreddits: subreddits.map((x: Subreddit) => x.display_name), isOperator: webOps.includes(user.toLowerCase()) }, {ttl: provider.ttl as number});
         done(null, user);
     });
 
@@ -456,7 +457,7 @@ const webClient = async (options: OperatorConfig) => {
 
         const user = req.user as Express.User;
 
-        const shownBots = webOps.includes(user.name) ? bots : bots.filter(x => intersect(user.subreddits, x.subreddits).length > 0 || x.operators.includes(user.name));
+        const shownBots = user.isOperator ? bots : bots.filter(x => intersect(user.subreddits, x.subreddits).length > 0 || x.operators.includes(user.name.toLowerCase()));
 
         res.render('status', {
             show: 'All',
@@ -590,7 +591,7 @@ const webClient = async (options: OperatorConfig) => {
             const url = new URL(normalized);
             let botStat: BotClient = {
                 ...client,
-                indicator: 'grey',
+                indicator: 'gray',
                 subreddits: [] as string[],
                 operators: [] as string[],
                 operatorDisplay: '',

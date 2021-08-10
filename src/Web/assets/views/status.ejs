@@ -10,11 +10,25 @@
                     <ul class="inline-flex flex-wrap">
                         <% bots.forEach(function (data) { %>
                             <li class="my-3 px-3 dark:text-white">
-                                <span data-bot="<%= data.friendly %>" class="rounded-md py-3 px-3 <%= data.shown ? 'border-2' : 'border'%>">
-                                <a class="tabSelect hover:font-bold <%= data.shown ? 'pointer-events-none no-underline font-bold' : 'font-normal pointer'%>" href="/?bot=<%= data.friendly %>">
-                                    <%= data.friendly %>
-                                </a>
-                                    <span class="inline-block mb-0.5 ml-0.5 w-2 h-2 bg-<%= data.indicator %>-400 rounded-full"></span>
+                                <span data-bot="<%= data.friendly %>" class="has-tooltip rounded-md py-3 px-3 <%= data.shown ? 'border-2' : 'border'%>">
+                                    <span class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black' style="margin-top:3em">
+                                        <div class="stats">
+                                            <label>Location</label>
+                                            <span><%= data.normalUrl %></span>
+                                            <label>Online</label>
+                                            <span><%= data.online %></span>
+                                            <label>Running</label>
+                                            <span><%= data.running %></span>
+                                            <label>Error</label>
+                                            <span><%= data.error %></span>
+                                        </div>
+                                    </span>
+                                    <span>
+                                        <a class="tabSelect hover:font-bold <%= data.shown ? 'pointer-events-none no-underline font-bold' : 'font-normal pointer'%>" href="/?bot=<%= data.friendly %>">
+                                        <%= data.friendly %>
+                                        </a>
+                                        <span class="inline-block mb-0.5 ml-0.5 w-2 h-2 bg-<%= data.indicator %>-400 rounded-full"></span>
+                                    </span>
                                 </span>
                             </li>
                         <% }) %>

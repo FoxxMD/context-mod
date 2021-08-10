@@ -231,7 +231,6 @@
                     "examples": [
                         "http://localhost:8085/callback"
                     ],
-                    "format": "uri",
                     "type": "string"
                 },
                 "refreshToken": {
@@ -273,7 +272,6 @@
                     "examples": [
                         "http://localhost:8085/callback"
                     ],
-                    "format": "uri",
                     "type": "string"
                 }
             },
@@ -403,6 +401,16 @@
                 }
             },
             "type": "object"
+        },
+        "mode": {
+            "default": "all",
+            "description": "Mode to run ContextMod in\n\n* `all` (default) - Run the api and the web interface\n* `web` - Run web interface only\n* `api` - Run the api only",
+            "enum": [
+                "all",
+                "bot",
+                "web"
+            ],
+            "type": "string"
         },
         "nanny": {
             "description": "Settings related to managing heavy API usage.",
@@ -581,11 +589,6 @@
                             "redirectUri": "http://localhost:8085/callback"
                         }
                     ]
-                },
-                "enabled": {
-                    "default": true,
-                    "description": "Whether the web server interface should be started\n\nIn most cases this does not need to be specified as the application will automatically detect if it is possible to start it --\nuse this to specify \"cli only\" behavior if you encounter errors with port/address or are paranoid\n\n* ENV => `WEB`\n* ARG => `node src/index.js run [interface]` -- interface can be `web` or `cli`",
-                    "type": "boolean"
                 },
                 "logLevel": {
                     "description": "The default log level to filter to in the web interface\n\nIf not specified or `null` will be same as global `logLevel`",

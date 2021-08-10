@@ -43,72 +43,33 @@ const program = new Command();
 
 (async function () {
     let app: App;
-    let errorReason: string | undefined;
-    process.on('SIGTERM', async () => {
-        if(app !== undefined) {
-            await app.onTerminate(errorReason);
-        }
-        process.exit(errorReason === undefined ? 0 : 1);
-    });
+    // let errorReason: string | undefined;
+    // process.on('SIGTERM', async () => {
+    //     if(app !== undefined) {
+    //         await app.onTerminate(errorReason);
+    //     }
+    //     process.exit(errorReason === undefined ? 0 : 1);
+    // });
     try {
 
         let runCommand = program
             .command('run')
-            .addArgument(new Argument('[interface]', 'Which interface to start the bot with').choices(['web', 'cli']).default(undefined, 'process.env.WEB || true'))
+            .addArgument(new Argument('[interface]', 'Which interface to start the bot with').choices(['web', 'bot', 'all']).default(undefined, 'process.env.MODE || all'))
             .description('Monitor new activities from configured subreddits.')
             .allowUnknownOption();
         runCommand = addOptions(runCommand, getUniversalWebOptions());
         runCommand.action(async (interfaceVal, opts) => {
-            const config = buildOperatorConfigWithDefaults(await parseOperatorConfigFromSources({...opts, web: interfaceVal !== undefined ? interfaceVal === 'web': undefined}));
+            const config = buildOperatorConfigWithDefaults(await parseOperatorConfigFromSources({...opts, mode: interfaceVal}));
             const {
-                credentials: {
-                    redirectUri,
-                    clientId,
-                    clientSecret,
-                    accessToken,
-                    refreshToken,
-                },
-                web: {
-                    enabled: web,
-                },
-                logging,
+                mode,
             } = config;
-            const logger = getLogger(logging, 'init');
-            const hasClient = clientId !== undefined && clientSecret !== undefined;
-            const hasNoTokens = accessToken === undefined && refreshToken === undefined;
             try {
-                if (web) {
-                    if (hasClient && hasNoTokens) {
-                        // run web helper
-                        const server = createHelperServer(config);
-                        await server;
-                    } else {
-                        if (redirectUri === undefined) {
-                            logger.warn(`No 'redirectUri' found in arg/env. Bot will still run but web interface will not be accessible.`);
-                        }
-                        const [server, bot] = createWebServer(config);
-                        app = bot;
-
-                        try {
-                            await server();
-                        } catch (e) {
-                            throw e;
-                        }
-                        try {
-                            await client(config);
-                        } catch(e) {
-                            throw e;
-                        }
-
-                        await bot.testClient();
-                        await bot.buildManagers();
-
-                        await bot.runManagers();
-                    }
-                } else {
-                    app = new App(config);
-                    await app.buildManagers();
-                    await app.runManagers();
+                if(mode === 'all' || mode === 'web') {
+                    await client(config);
+                }
+                if(mode === 'all' || mode === 'bot') {
+                    const [server, bot] = createWebServer(config);
+                    await server();
                 }
             } catch (err) {
                 throw err;
@@ -216,9 +177,8 @@ const program = new Command();
                     logger.error('Reddit responded with a 403 insufficient_scope, did you choose the correct scopes?');
                 }
             }
-            console.log(err);
+            logger.error(err);
         }
-        errorReason = `Application crashed due to an uncaught error: ${err.message}`;
         process.kill(process.pid, 'SIGTERM');
     }
 }());

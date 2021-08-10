@@ -270,10 +270,12 @@ export const parseOpConfigFromArgs = (args: any): OperatorJsonConfig => {
         port,
         sessionSecret,
         caching,
-        web
+        web,
+        mode,
     } = args || {};
 
     const data = {
+        mode,
         operator: {
             name: operator,
             display: operatorDisplay
@@ -345,7 +347,8 @@ const parseListFromEnv = (val: string|undefined) => {
 
 export const parseOpConfigFromEnv = (): OperatorJsonConfig => {
     const data = {
-        operator: {
+        mode: process.env.MODE !== undefined ? process.env.MODE as ('all' | 'bot' | 'web') : undefined,
+            operator: {
             name: parseListFromEnv(process.env.OPERATOR),
             display: process.env.OPERATOR_DISPLAY
         },
@@ -372,7 +375,6 @@ export const parseOpConfigFromEnv = (): OperatorJsonConfig => {
             debug: parseBool(process.env.SNOO_DEBUG, undefined),
         },
         web: {
-            enabled: process.env.WEB !== undefined ? parseBool(process.env.WEB) : undefined,
             port: process.env.PORT !== undefined ? parseInt(process.env.PORT) : undefined,
             session: {
                 provider: process.env.SESSION_PROVIDER,
@@ -464,6 +466,7 @@ export const parseOperatorConfigFromSources = async (args: any): Promise<Operato
 
 export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): OperatorConfig => {
     const {
+        mode = 'all',
         operator: {
             name = [],
             display = 'Anonymous',
@@ -487,7 +490,6 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
         } = {},
         snoowrap = {},
         web: {
-            enabled = true,
             port = 8085,
             maxLogs = 200,
             session: {
@@ -500,7 +502,7 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
                 clientSecret: webSecret = cs,
                 redirectUri: webUri = redirectUri
             } = {},
-            operators = [],
+            operators,
         } = {},
         api: {
             port: apiPort = 8095,
@@ -556,9 +558,12 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
         }
     }
 
+    const defaultOperators = typeof name === 'string' ? [name] : name;
+
     const config: OperatorConfig = {
+        mode,
         operator: {
-            name: typeof name === 'string' ? [name] : name,
+            name: defaultOperators,
             display,
             botName,
         },
@@ -580,7 +585,6 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
             dryRun,
         },
         web: {
-            enabled,
             port,
             session: {
                 secret,
@@ -601,7 +605,7 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
                 clientSecret: webSecret as string,
                 redirectUri: webUri as string,
             },
-            operators,
+            operators: operators || defaultOperators,
         },
         api: {
             port: apiPort,

@@ -61,6 +61,8 @@ export class App {
     apiEstDepletion?: Duration;
     depletedInSecs: number = 0;
 
+    error: any;
+
     constructor(config: OperatorConfig) {
         const {
             operator: {
@@ -189,6 +191,28 @@ export class App {
         defaultModqueueStream.on('error', modStreamErrorListener('modqueue'));
         CacheManager.modStreams.set('unmoderated', defaultUnmoderatedStream);
         CacheManager.modStreams.set('modqueue', defaultModqueueStream);
+
+        process.on('uncaughtException', (e) => {
+            this.error = e;
+        });
+        process.on('unhandledRejection', (e) => {
+            this.error = e;
+        });
+        process.on('exit', async (code) => {
+            if(code === 0) {
+                await this.onTerminate();
+            } else if(this.error !== undefined) {
+                let errMsg;
+                if(typeof this.error === 'object' && this.error.message !== undefined) {
+                    errMsg = this.error.message;
+                } else if(typeof this.error === 'string') {
+                    errMsg = this.error;
+                }
+                await this.onTerminate(`Application exited due to an unexpected error${errMsg !== undefined ? `: ${errMsg}` : ''}`);
+            } else {
+                await this.onTerminate(`Application exited with unclean exit signal (${code})`);
+            }
+        });
     }
 
     async onTerminate(reason = 'The application was shutdown') {

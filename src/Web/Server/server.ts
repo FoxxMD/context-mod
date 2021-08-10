@@ -699,6 +699,10 @@ const rcbServer = function (options: OperatorConfig): ([() => Promise<void>, App
             }
             res.send('OK');
         });
+
+        await bot.testClient();
+        await bot.buildManagers();
+        await bot.runManagers();
     }
 
     return [serverFunc, bot];

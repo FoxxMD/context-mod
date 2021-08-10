@@ -851,7 +851,6 @@ export interface RedditCredentials {
      * * ARG => `--redirectUri <uri>`
      *
      * @examples ["http://localhost:8085/callback"]
-     * @format uri
      * */
     redirectUri?: string,
 
@@ -901,7 +900,6 @@ export interface WebCredentials {
      * Redirect URI for your Reddit application
      *
      * @examples ["http://localhost:8085/callback"]
-     * @format uri
      * */
     redirectUri?: string,
 }
@@ -913,6 +911,16 @@ export interface WebCredentials {
  * * To load a JSON configuration **using an environmental variable** use `OPERATOR_CONFIG` EX: `OPERATOR_CONFIG=/path/to/JSON/config.json`
  * */
 export interface OperatorJsonConfig {
+    /**
+     * Mode to run ContextMod in
+     *
+     * * `all` (default) - Run the api and the web interface
+     * * `web` - Run web interface only
+     * * `api` - Run the api only
+     *
+     * @default "all"
+     * */
+    mode?: 'bot' | 'web' | 'all',
     /**
      * Settings related to the user(s) running this ContextMod instance and information on the bot
      * */
@@ -1107,18 +1115,6 @@ export interface OperatorJsonConfig {
      * */
     web?: {
         /**
-         * Whether the web server interface should be started
-         *
-         * In most cases this does not need to be specified as the application will automatically detect if it is possible to start it --
-         * use this to specify "cli only" behavior if you encounter errors with port/address or are paranoid
-         *
-         * * ENV => `WEB`
-         * * ARG => `node src/index.js run [interface]` -- interface can be `web` or `cli`
-         *
-         * @default true
-         * */
-        enabled?: boolean,
-        /**
          * The port for the web interface
          *
          * * ENV => `PORT`
@@ -1273,6 +1269,7 @@ export interface RequiredWebRedditCredentials extends RedditCredentials {
 }
 
 export interface OperatorConfig extends OperatorJsonConfig {
+    mode: 'all' | 'web' | 'bot',
     operator: {
         name: string[]
         display?: string,
@@ -1303,7 +1300,6 @@ export interface OperatorConfig extends OperatorJsonConfig {
         maxWorkers: number,
     },
     web: {
-        enabled: boolean,
         port: number,
         session: {
             provider: CacheOptions,
