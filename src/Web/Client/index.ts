@@ -292,6 +292,7 @@ const webClient = async (options: OperatorConfig) => {
                 await refreshClient(c);
             }
             init = true;
+            loopHeartbeat();
         }
         next();
     });
@@ -330,6 +331,9 @@ const webClient = async (options: OperatorConfig) => {
                 });
                 s.on('destroy', () => {
                     console.log('destroying');
+                });
+                s.on('error', (e) => {
+                    logger.error(`Error occurred while streaming logs from ${currBot.friendly} -- ${e.message}`);
                 })
                 connectedUsers[sessionId] = {logStream: s, botId: currBot.friendly}
             }
@@ -429,16 +433,22 @@ const webClient = async (options: OperatorConfig) => {
             }
         }
         const bot = req.bot as BotClient;
-        const resp = await got.get(`${bot.normalUrl}/status`, {
-            headers: {
-                'Authorization': `Bearer ${req.token}`,
-            },
-            searchParams: {
-                limit: req.session.limit,
-                sort: req.session.sort,
-                level: req.session.level,
-            },
-        }).json() as any;
+        let resp;
+        try {
+            resp = await got.get(`${bot.normalUrl}/status`, {
+                headers: {
+                    'Authorization': `Bearer ${req.token}`,
+                },
+                searchParams: {
+                    limit: req.session.limit,
+                    sort: req.session.sort,
+                    level: req.session.level,
+                },
+            }).json() as any;
+        } catch(err) {
+            logger.error(`Error occurred while retrieving bot information. Will update heartbeat -- ${err.message}`);
+            await refreshClient(clients.find(x => normalizeUrl(x.host) === bot.normalUrl) as BotConnection);
+        }
 
         if (req.query.sub !== undefined) {
             const encoded = encodeURI(req.query.sub as string).toLowerCase();
@@ -488,14 +498,20 @@ const webClient = async (options: OperatorConfig) => {
                 const u = req.user;
                 const b = req.bot as BotClient;
                 const sessionId = req.session.id;
-                connectedUsers[req.session.id].statInterval = setInterval(async () => {
-                    const resp = await got.get(`${b.normalUrl}/stats`, {
-                        headers: {
-                            'Authorization': `Bearer ${createToken(b, u)}`,
-                        }
-                    }).json() as object;
-                    io.to(sessionId).emit('opStats', resp);
+                const interval = setInterval(async () => {
+                    try {
+                        const resp = await got.get(`${b.normalUrl}/stats`, {
+                            headers: {
+                                'Authorization': `Bearer ${createToken(b, u)}`,
+                            }
+                        }).json() as object;
+                        io.to(sessionId).emit('opStats', resp);
+                    } catch (err) {
+                        logger.error(`Could not retrieve stats from ${b.friendly} -- ${err.message}`);
+                        clearInterval(interval);
+                    }
                 }, 5000);
+                connectedUsers[req.session.id].statInterval = interval;
             }
             startLogStream(req.session, req.token as string);
         }
@@ -573,11 +589,38 @@ const webClient = async (options: OperatorConfig) => {
         }
     });
 
+    const loopHeartbeat = async () => {
+        while(true) {
+            logger.debug('Starting heartbeat check');
+            for(const c of clients) {
+                await refreshClient(c);
+            }
+            // sleep for 10 seconds then do heartbeat check again
+            await sleep(10000);
+        }
+    }
+
     const refreshClient = async (client: BotConnection, force = false) => {
         const normalized = normalizeUrl(client.host);
         const existingClientIndex = bots.findIndex(x => x.normalUrl === normalized);
         const existingClient = existingClientIndex === -1 ? undefined : bots[existingClientIndex];
-        if(!existingClient || (existingClient && (force || dayjs().diff(dayjs.unix(existingClient.lastCheck), 's') > 300)))
+
+        let shouldCheck = false;
+        if(!existingClient) {
+            shouldCheck = true;
+        } else if(force) {
+            shouldCheck = true;
+        } else  {
+            const lastCheck = dayjs().diff(dayjs.unix(existingClient.lastCheck), 's');
+            if((!existingClient.online || !existingClient.running)) {
+                if(lastCheck > 15) {
+                    shouldCheck = true;
+                }
+            } else if(lastCheck > 300) {
+                shouldCheck = true;
+            }
+        }
+        if(shouldCheck)
         {
             const machineToken = jwt.sign({
                 data: {
@@ -623,9 +666,10 @@ const webClient = async (options: OperatorConfig) => {
                 } else {
                     botStat.indicator = 'red';
                 }
+                logger.verbose(`Updated heartbeat for ${botStat.friendly}`);
             } catch (err) {
                 botStat.error = err.message;
-                logger.error(err);
+                logger.error(`Heartbeat response from ${botStat.friendly} was not ok`, err);
             } finally {
                 if(existingClientIndex !== -1) {
                     bots.splice(existingClientIndex, 1, botStat);
