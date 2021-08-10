@@ -171,8 +171,15 @@ const rcbServer = function (options: OperatorConfig): ([() => Promise<void>, App
                 return done(null, {machine});
             }
             const isOperator = opNames.includes(name.toLowerCase());
-            const usableSubreddits = bot.subManagers.filter(x => subreddits.includes(x.subreddit.display_name)).map(x => x.displayLabel);
-            return done(null, { name, subreddits, isOperator, usableSubreddits });
+            const moderatedManagers = bot.subManagers.filter(x => subreddits.includes(x.subreddit.display_name)).map(x => x.displayLabel);
+
+            return done(null, {
+                name,
+                subreddits,
+                isOperator,
+                moderatedManagers,
+                realManagers: isOperator ? bot.subManagers.map(x => x.displayLabel) : moderatedManagers
+            });
         }));
 
         router.use('/*', passport.authenticate('jwt', {session: false}));
@@ -196,7 +203,7 @@ const rcbServer = function (options: OperatorConfig): ([() => Promise<void>, App
             name: 'stream',
             defaultVal: false
         }]), async (req: Request, res: Response) => {
-            const {name: userName, usableSubreddits = [], isOperator} = req.user as Express.User;
+            const {name: userName, realManagers = [], isOperator} = req.user as Express.User;
             const {level = 'verbose', stream, limit = 200, sort = 'descending'} = req.query;
             if (stream) {
                 const userStream = new Transform({
@@ -204,7 +211,7 @@ const rcbServer = function (options: OperatorConfig): ([() => Promise<void>, App
                         const log = chunk.toString();
                         if (isLogLineMinLevel(log, level as string)) {
                             const subName = parseSubredditLogName(log);
-                            if (isOperator || (subName !== undefined && (usableSubreddits.includes(subName) || subName.includes(userName)))) {
+                            if (isOperator || (subName !== undefined && (realManagers.includes(subName) || subName.includes(userName)))) {
                                 callback(null, `${chunk}\r\n`);
                             } else {
                                 callback(null);
@@ -237,7 +244,7 @@ const rcbServer = function (options: OperatorConfig): ([() => Promise<void>, App
                     res.destroy();
                 }
             } else {
-                const logs = filterLogBySubreddit(subLogMap, isOperator ? bot.subManagers.map(x => x.displayLabel) : usableSubreddits, {
+                const logs = filterLogBySubreddit(subLogMap, realManagers, {
                     level: (level as string),
                     operator: isOperator,
                     user: userName,
@@ -265,17 +272,17 @@ const rcbServer = function (options: OperatorConfig): ([() => Promise<void>, App
                 sort = 'descending',
                 lastCheck
             } = req.query;
-            const { name: userName, usableSubreddits = [], isOperator } = req.user as Express.User;
+            const { name: userName, realManagers = [], isOperator } = req.user as Express.User;
             const user = userName as string;
-            const subreddits = usableSubreddits;
+            const subreddits = realManagers;
             //const isOperator = opNames.includes(user.toLowerCase())
 
-            if (usableSubreddits.length === 0 && !isOperator) {
+            if (realManagers.length === 0) {
                 return res.json({});
                 //return res.render('noSubs', {operatorDisplay: display});
             }
 
-            const logs = filterLogBySubreddit(subLogMap, isOperator ? bot.subManagers.map(x => x.displayLabel) : usableSubreddits, {
+            const logs = filterLogBySubreddit(subLogMap, realManagers, {
                 level: (level as string),
                 operator: isOperator,
                 user,
@@ -549,8 +556,8 @@ const rcbServer = function (options: OperatorConfig): ([() => Promise<void>, App
 
         app.getAsync('/config', async (req, res) => {
             const {subreddit} = req.query as any;
-            const { name: userName, usableSubreddits = [], isOperator } = req.user as Express.User;
-            if (!isOperator && !usableSubreddits.includes(subreddit)) {
+            const { name: userName, realManagers = [], isOperator } = req.user as Express.User;
+            if (!isOperator && !realManagers.includes(subreddit)) {
                 return res.status(400).send('Cannot retrieve config for subreddit you do not manage or is not run by the bot')
             }
             const manager = bot.subManagers.find(x => x.displayLabel === subreddit);
@@ -565,11 +572,11 @@ const rcbServer = function (options: OperatorConfig): ([() => Promise<void>, App
 
         app.getAsync('/action', [booleanMiddle(['force'])], async (req: express.Request, res: express.Response) => {
             const {type, action, subreddit, force = false} = req.query as any;
-            const { name: userName, usableSubreddits = [], isOperator } = req.user as Express.User;
+            const { name: userName, realManagers = [], isOperator } = req.user as Express.User;
             let subreddits: string[] = [];
             if (subreddit === 'All') {
-                subreddits = isOperator ? bot.subManagers.map(x => x.displayLabel) : usableSubreddits;
-            } else if (isOperator || usableSubreddits.includes(subreddit)) {
+                subreddits = realManagers;
+            } else if (realManagers.includes(subreddit)) {
                 subreddits = [subreddit];
             }
 
@@ -650,7 +657,7 @@ const rcbServer = function (options: OperatorConfig): ([() => Promise<void>, App
         app.use('/check', [booleanMiddle(['dryRun'])]);
         app.getAsync('/check', async (req, res) => {
             const {url, dryRun, subreddit} = req.query as any;
-            const { name: userName, usableSubreddits = [], isOperator } = req.user as Express.User;
+            const { name: userName, realManagers = [], isOperator } = req.user as Express.User;
 
             let a;
             const commentId = commentReg(url);
@@ -676,7 +683,7 @@ const rcbServer = function (options: OperatorConfig): ([() => Promise<void>, App
 
                 let manager = subreddit === 'All' ? bot.subManagers.find(x => x.subreddit.display_name === sub) : bot.subManagers.find(x => x.displayLabel === subreddit);
 
-                if (manager === undefined || (!isOperator && !usableSubreddits.includes(manager.displayLabel))) {
+                if (manager === undefined || (!realManagers.includes(manager.displayLabel))) {
                     let msg = 'Activity does not belong to a subreddit you moderate or the bot runs on.';
                     if (subreddit === 'All') {
                         msg = `${msg} If you want to test an Activity against a Subreddit\'s config it does not belong to then switch to that Subreddit's tab first.`

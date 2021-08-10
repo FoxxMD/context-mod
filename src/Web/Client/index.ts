@@ -39,9 +39,6 @@ const emitter = new EventEmitter();
 const stream = new Writable()
 
 const app = addAsync(express());
-const router = Router();
-
-app.use(router);
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({extended: false}));
 app.use(cookieParser());
@@ -71,7 +68,8 @@ declare global {
             subreddits: string[]
             machine?: boolean
             isOperator?: boolean
-            usableSubreddits?: string[]
+            realManagers?: string[]
+            moderatedManagers?: string[]
         }
     }
 }
@@ -80,17 +78,7 @@ declare module 'express' {
     interface Request {
         token?: string,
         bot?: BotClient,
-        usableSubreddits?: string[]
     }
-}
-
-const reqClient = async (req: Request, res: Response, next: Function) => {
-    const {bot} = req.query;
-    if (bot === '' || bot === undefined) {
-        res.status(400);
-        res.send(`Expected a 'bot' identifier`);
-    }
-    next();
 }
 
 interface BotClient extends BotConnection {
@@ -271,17 +259,19 @@ const webClient = async (options: OperatorConfig) => {
         return res.redirect(authUrl);
     });
 
-    app.getAsync(/.*callback$/, passport.authenticate('snoowrap', {
-        successRedirect: '/',
-        failureRedirect: '/error'
-    }), (err: any, req: express.Request, res: express.Response, next: Function) => {
-        if (err !== null) {
-            return res.render('error', {error: err});
-        }
-        req.session.limit = 200;
-        req.session.level = 'debug';
-        req.session.sort = 'descending';
-        return res.redirect('/');
+    app.getAsync(/.*callback$/, (req: express.Request, res: express.Response, next: Function) => {
+        passport.authenticate('snoowrap', (err, user, info) => {
+            if(err) {
+                return res.render('error', {error: err});
+            }
+            req.logIn(user, (e) => {
+                // don't know why we'd get an error here but ¯\_(ツ)_/¯
+                if(e !== undefined) {
+                    return res.render('err', {error: err});
+                }
+               return res.redirect('/');
+            });
+        })(req, res, next);
     });
 
     app.getAsync('/logout', async (req, res) => {
@@ -382,8 +372,25 @@ const webClient = async (options: OperatorConfig) => {
         next();
     }
 
+    const defaultSession = (req: express.Request, res: express.Response, next: Function) => {
+        if(req.session.limit === undefined) {
+            req.session.limit = 200;
+            req.session.level = 'verbose';
+            req.session.sort = 'descending';
+            req.session.save();
+        }
+        next();
+    }
 
-    app.useAsync('/api/*', [ensureAuthenticated, botWithPermissions, createUserToken], (req: express.Request, res: express.Response) => {
+    // const authenticatedRouter = Router();
+    // authenticatedRouter.use([ensureAuthenticated, defaultSession]);
+    // app.use(authenticatedRouter);
+    //
+    // const botUserRouter = Router();
+    // botUserRouter.use([ensureAuthenticated, defaultSession, botWithPermissions, createUserToken]);
+    // app.use(botUserRouter);
+
+    app.useAsync('/api/*', [ensureAuthenticated, defaultSession, botWithPermissions, createUserToken], (req: express.Request, res: express.Response) => {
         req.headers.Authorization = `Bearer ${req.token}`
 
         const bot = req.bot as BotClient;
@@ -409,7 +416,7 @@ const webClient = async (options: OperatorConfig) => {
         next();
     }
 
-    app.getAsync('/', [ensureAuthenticated, defaultBot, botWithPermissions, createUserToken], async (req: express.Request, res: express.Response) => {
+    app.getAsync('/', [ensureAuthenticated, defaultSession, defaultBot, botWithPermissions, createUserToken], async (req: express.Request, res: express.Response) => {
 
         let newBot = true;
         if(req.isAuthenticated() && connectedUsers[req.session.id] !== undefined && connectedUsers[req.session.id].statInterval !== undefined && connectedUsers[req.session.id].botId === req.params.botId) {
@@ -473,7 +480,7 @@ const webClient = async (options: OperatorConfig) => {
 
         if(req.isAuthenticated()) {
             connectedUsers[req.session.id] = {
-                botId: req.params.botId
+                botId: bot.friendly
             }
             if(newBot) {
 
@@ -493,7 +500,7 @@ const webClient = async (options: OperatorConfig) => {
         }
     });
 
-    app.getAsync('/config', [ensureAuthenticated, botWithPermissions, createUserToken], async (req: express.Request, res: express.Response) => {
+    app.getAsync('/config', [ensureAuthenticated, defaultSession, botWithPermissions, createUserToken], async (req: express.Request, res: express.Response) => {
         const {subreddit} = req.query as any;
         const resp = await got.get(`${(req.bot as BotClient).normalUrl}/config`, {
             headers: {
