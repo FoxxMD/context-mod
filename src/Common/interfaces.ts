@@ -806,10 +806,9 @@ export interface ManagerStateChangeOption {
     suppressNotification?: boolean
 }
 
-export interface WebClient {
+export interface BotConnection {
     host: string
     secret: string
-    port?: number
 }
 
 /**
@@ -1122,7 +1121,7 @@ export interface OperatorJsonConfig {
          * @examples [200]
          * */
         maxLogs?: number,
-        clients?: WebClient[]
+        clients?: BotConnection[]
     }
     api?: {
         port?: number,
@@ -1249,7 +1248,7 @@ export interface OperatorConfig extends OperatorJsonConfig {
         }
         logLevel?: LogLevel,
         maxLogs: number,
-        clients: WebClient[]
+        clients: BotConnection[]
     }
     api: {
         port: number,

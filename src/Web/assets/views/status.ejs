@@ -324,7 +324,7 @@
                                                 <span>
                                                     <a style="display: inline"
                                                        href="<%= data.wikiHref %>"><%= data.wikiLocation %></a> | <a style="display: inline" target="_blank"
-                                                                                                                     href="/config?subreddit=<%= data.name %>">View</a>
+                                                                                                                     href="/config?bot=<%= locals.botId %>&subreddit=<%= data.name %>">View</a>
                                                 </span>
                                             </div>
                                         </div>
@@ -709,7 +709,7 @@
             type = e.target.dataset.type;
             force = e.target.dataset.force === 'true';
 
-            fetch(`/bot/<%= botId %>/api/action?action=${action}&subreddit=${subreddit}&force=${force}&type=${type}`);
+            fetch(`/api/action?bot=<%= botId %>&action=${action}&subreddit=${subreddit}&force=${force}&type=${type}`);
         });
     })
 
@@ -724,7 +724,7 @@
             const url = urlInput.value;
             const dryRun = dryRunCheck.checked ? 1 : 0;
 
-            const fetchUrl = `/bot/<%= botId %>/api/check?url=${url}&dryRun=${dryRun}&subreddit=${subreddit}`;
+            const fetchUrl = `/api/check?bot=<%= botId %>&url=${url}&dryRun=${dryRun}&subreddit=${subreddit}`;
             fetch(fetchUrl);
 
             urlInput.value = '';

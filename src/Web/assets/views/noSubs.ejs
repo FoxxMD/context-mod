@@ -16,7 +16,7 @@
                             <li>the Bot is a Moderator of one of your Subreddits but the Operator of this instance is not currently running the instance on your Subreddits.</li>
                         </ul>
                         <div>Note: You must <a href="logout">Logout</a> in order for the instance to detect changes in your subreddits/moderator status</div>
-                        <% if(operatorDisplay !== 'Anonymous') { %>
+                        <% if(locals.operatorDisplay !== undefined && locals.operatorDisplay !== 'Anonymous') { %>
                         <div>Operated By: <%= operatorDisplay %></div>
                         <% } %>
                     </div>

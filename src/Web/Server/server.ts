@@ -1,23 +1,16 @@
 import {addAsync, Router} from '@awaitjs/express';
 import express, {Request, Response} from 'express';
 import bodyParser from 'body-parser';
-import session from 'express-session';
-import {Cache} from 'cache-manager';
-// @ts-ignore
-import CacheManagerStore from 'express-session-cache-manager'
-import Snoowrap from "snoowrap";
 import {App} from "../../App";
 import dayjs from 'dayjs';
 import {Writable, Transform} from "stream";
 import winston from 'winston';
 import {Server as SocketServer} from 'socket.io';
-import sharedSession from 'express-socket.io-session';
 import Submission from "snoowrap/dist/objects/Submission";
 import EventEmitter from "events";
 import {Strategy as JwtStrategy, ExtractJwt} from 'passport-jwt';
 import passport from 'passport';
 import tcpUsed from 'tcp-port-used';
-import {prettyPrintJson} from 'pretty-print-json';
 
 import {
     boolToString, cacheStats,
@@ -47,20 +40,10 @@ app.use(router);
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({extended: false}));
 
-interface ConnectedUserInfo {
-    subreddits: string[],
-    level?: string,
-    user: string
-}
-
 const commentReg = parseLinkIdentifier([COMMENT_URL_ID]);
 const submissionReg = parseLinkIdentifier([SUBMISSION_URL_ID]);
 
-const connectedUsers: Map<string, ConnectedUserInfo> = new Map();
-
 const availableLevels = ['error', 'warn', 'info', 'verbose', 'debug'];
-
-let operatorSessionIds: string[] = [];
 
 declare module 'express-session' {
     interface SessionData {
@@ -196,13 +179,17 @@ const rcbServer = function (options: OperatorConfig): ([() => Promise<void>, App
         router.use('/^(?!\\/heartbeat).*$/', authUserCheck(true));
 
         app.getAsync('/heartbeat', authUserCheck(false), (req: Request, res: Response) => {
-            return res.json({
+            const heartbeatData = {
                 subreddits: bot.subManagers.map(x => x.subreddit.display_name),
                 operators: name,
+                operatorDisplay: display,
                 friendly: bot.botName,
                 running: bot.heartBeating,
-                nanny: bot.nannyMode
-            });
+                nanny: bot.nannyMode,
+                botName: bot.botName,
+                botLink: bot.botLink,
+            };
+            return res.json(heartbeatData);
         });
 
         app.getAsync('/logs', booleanMiddle([{
@@ -218,7 +205,7 @@ const rcbServer = function (options: OperatorConfig): ([() => Promise<void>, App
                         if (isLogLineMinLevel(log, level as string)) {
                             const subName = parseSubredditLogName(log);
                             if (isOperator || (subName !== undefined && (usableSubreddits.includes(subName) || subName.includes(userName)))) {
-                                callback(null, chunk);
+                                callback(null, `${chunk}\r\n`);
                             } else {
                                 callback(null);
                             }
@@ -250,7 +237,7 @@ const rcbServer = function (options: OperatorConfig): ([() => Promise<void>, App
                     res.destroy();
                 }
             } else {
-                const logs = filterLogBySubreddit(subLogMap, isOperator ? botSubreddits : usableSubreddits, {
+                const logs = filterLogBySubreddit(subLogMap, isOperator ? bot.subManagers.map(x => x.displayLabel) : usableSubreddits, {
                     level: (level as string),
                     operator: isOperator,
                     user: userName,
@@ -263,6 +250,10 @@ const rcbServer = function (options: OperatorConfig): ([() => Promise<void>, App
                 });
                 return res.json(subArr);
             }
+        });
+
+        app.getAsync('/stats', async (req: Request, res: Response) => {
+            return res.json(opStats(bot));
         });
 
         app.getAsync('/status', async (req: Request, res: Response) => {
@@ -284,7 +275,7 @@ const rcbServer = function (options: OperatorConfig): ([() => Promise<void>, App
                 //return res.render('noSubs', {operatorDisplay: display});
             }
 
-            const logs = filterLogBySubreddit(subLogMap, isOperator ? botSubreddits : usableSubreddits, {
+            const logs = filterLogBySubreddit(subLogMap, isOperator ? bot.subManagers.map(x => x.displayLabel) : usableSubreddits, {
                 level: (level as string),
                 operator: isOperator,
                 user,
@@ -496,28 +487,28 @@ const rcbServer = function (options: OperatorConfig): ([() => Promise<void>, App
                     ...opStats(bot),
                 },
                 subreddits: [allManagerData, ...subManagerData],
-                show: 'All',
-                botName: bot.botName,
-                botLink: bot.botLink,
-                operatorDisplay: display,
-                isOperator,
-                operators: opNames.length === 0 ? 'None Specified' : name.join(', '),
-                logSettings: {
-                    //limit: [10, 20, 50, 100, 200].map(x => `<a class="capitalize ${limit === x ? 'font-bold no-underline pointer-events-none' : ''}" data-limit="${x}" href="logs/settings/update?limit=${x}">${x}</a>`).join(' | '),
-                    limitSelect: [10, 20, 50, 100, 200].map(x => `<option ${limit === x ? 'selected' : ''} class="capitalize ${limit === x ? 'font-bold' : ''}" data-value="${x}">${x}</option>`).join(' | '),
-                    //sort: ['ascending', 'descending'].map(x => `<a class="capitalize ${sort === x ? 'font-bold no-underline pointer-events-none' : ''}" data-sort="${x}" href="logs/settings/update?sort=${x}">${x}</a>`).join(' | '),
-                    sortSelect: ['ascending', 'descending'].map(x => `<option ${sort === x ? 'selected' : ''} class="capitalize ${sort === x ? 'font-bold' : ''}" data-value="${x}">${x}</option>`).join(' '),
-                    //level: availableLevels.map(x => `<a class="capitalize log-${x} ${level === x ? `font-bold no-underline pointer-events-none` : ''}" data-log="${x}" href="logs/settings/update?level=${x}">${x}</a>`).join(' | '),
-                    levelSelect: availableLevels.map(x => `<option ${level === x ? 'selected' : ''} class="capitalize log-${x} ${level === x ? `font-bold` : ''}" data-value="${x}">${x}</option>`).join(' '),
-                },
+                // show: 'All',
+                // botName: bot.botName,
+                // botLink: bot.botLink,
+                //operatorDisplay: display,
+                // isOperator,
+                // operators: opNames.length === 0 ? 'None Specified' : name.join(', '),
+                // logSettings: {
+                //     //limit: [10, 20, 50, 100, 200].map(x => `<a class="capitalize ${limit === x ? 'font-bold no-underline pointer-events-none' : ''}" data-limit="${x}" href="logs/settings/update?limit=${x}">${x}</a>`).join(' | '),
+                //     limitSelect: [10, 20, 50, 100, 200].map(x => `<option ${limit === x ? 'selected' : ''} class="capitalize ${limit === x ? 'font-bold' : ''}" data-value="${x}">${x}</option>`).join(' | '),
+                //     //sort: ['ascending', 'descending'].map(x => `<a class="capitalize ${sort === x ? 'font-bold no-underline pointer-events-none' : ''}" data-sort="${x}" href="logs/settings/update?sort=${x}">${x}</a>`).join(' | '),
+                //     sortSelect: ['ascending', 'descending'].map(x => `<option ${sort === x ? 'selected' : ''} class="capitalize ${sort === x ? 'font-bold' : ''}" data-value="${x}">${x}</option>`).join(' '),
+                //     //level: availableLevels.map(x => `<a class="capitalize log-${x} ${level === x ? `font-bold no-underline pointer-events-none` : ''}" data-log="${x}" href="logs/settings/update?level=${x}">${x}</a>`).join(' | '),
+                //     levelSelect: availableLevels.map(x => `<option ${level === x ? 'selected' : ''} class="capitalize log-${x} ${level === x ? `font-bold` : ''}" data-value="${x}">${x}</option>`).join(' '),
+                // },
             };
-            if (req.query.sub !== undefined) {
-                const encoded = encodeURI(req.query.sub as string).toLowerCase();
-                const shouldShow = data.subreddits.find(x => x.name.toLowerCase() === encoded);
-                if (shouldShow !== undefined) {
-                    data.show = shouldShow.name;
-                }
-            }
+            // if (req.query.sub !== undefined) {
+            //     const encoded = encodeURI(req.query.sub as string).toLowerCase();
+            //     const shouldShow = data.subreddits.find(x => x.name.toLowerCase() === encoded);
+            //     if (shouldShow !== undefined) {
+            //         data.show = shouldShow.name;
+            //     }
+            // }
 
             return res.json(data);
             //res.render('status', data);
@@ -560,28 +551,16 @@ const rcbServer = function (options: OperatorConfig): ([() => Promise<void>, App
             const {subreddit} = req.query as any;
             const { name: userName, usableSubreddits = [], isOperator } = req.user as Express.User;
             if (!isOperator && !usableSubreddits.includes(subreddit)) {
-                return res.render('error', {
-                    error: 'Cannot retrieve config for subreddit you do not manage or is not run by the bot',
-                    operatorDisplay: display
-                });
+                return res.status(400).send('Cannot retrieve config for subreddit you do not manage or is not run by the bot')
             }
             const manager = bot.subManagers.find(x => x.displayLabel === subreddit);
             if (manager === undefined) {
-                return res.render('error', {
-                    error: 'Cannot retrieve config for subreddit you do not manage or is not run by the bot',
-                    operatorDisplay: display
-                });
+                return res.status(400).send('Cannot retrieve config for subreddit you do not manage or is not run by the bot')
             }
 
             // @ts-ignore
             const wiki = await manager.subreddit.getWikiPage(manager.wikiLocation).fetch();
-            const [obj, jsonErr, yamlErr] = parseFromJsonOrYamlToObject(wiki.content_md);
-            res.render('config', {
-                config: prettyPrintJson.toHtml(obj, {quoteKeys: true, indent: 2}),
-                botName: bot.botName,
-                botLink: bot.botLink,
-                operatorDisplay: display,
-            });
+            return res.send(wiki.content_md);
         });
 
         app.getAsync('/action', [booleanMiddle(['force'])], async (req: express.Request, res: express.Response) => {
@@ -589,7 +568,7 @@ const rcbServer = function (options: OperatorConfig): ([() => Promise<void>, App
             const { name: userName, usableSubreddits = [], isOperator } = req.user as Express.User;
             let subreddits: string[] = [];
             if (subreddit === 'All') {
-                subreddits = isOperator ? botSubreddits : usableSubreddits;
+                subreddits = isOperator ? bot.subManagers.map(x => x.displayLabel) : usableSubreddits;
             } else if (isOperator || usableSubreddits.includes(subreddit)) {
                 subreddits = [subreddit];
             }
@@ -713,48 +692,6 @@ const rcbServer = function (options: OperatorConfig): ([() => Promise<void>, App
             }
             res.send('OK');
         });
-
-        app.getAsync('/*', (req, res, next) => {
-            next();
-        });
-        app.getAsync('*', (req, res, next) => {
-            next();
-        });
-
-        setInterval(() => {
-            // refresh op stats every 30 seconds
-            io.emit('opStats', opStats(bot));
-            // if (operatorSessionId !== undefined) {
-            //     io.to(operatorSessionId).emit('opStats', opStats(bot));
-            // }
-        }, 30000);
-
-        // emitter.on('log', (log) => {
-        //     const emittedSessions = [];
-        //     const subName = parseSubredditLogName(log);
-        //     if (subName !== undefined) {
-        //         for (const [id, info] of connectedUsers) {
-        //             const {subreddits, level = 'verbose', user} = info;
-        //             if (isLogLineMinLevel(log, level) && (subreddits.includes(subName) || subName.includes(user))) {
-        //                 emittedSessions.push(id);
-        //                 io.to(id).emit('log', formatLogLineToHtml(log));
-        //             }
-        //         }
-        //     }
-        //     if (operatorSessionIds.length > 0) {
-        //         for (const id of operatorSessionIds) {
-        //             io.to(id).emit('opStats', opStats(bot));
-        //             if (subName === undefined || !emittedSessions.includes(id)) {
-        //                 const {level = 'verbose'} = connectedUsers.get(id) || {};
-        //                 if (isLogLineMinLevel(log, level)) {
-        //                     io.to(id).emit('log', formatLogLineToHtml(log));
-        //                 }
-        //             }
-        //         }
-        //     }
-        // });
-
-        //await bot.runManagers();
     }
 
     return [serverFunc, bot];
