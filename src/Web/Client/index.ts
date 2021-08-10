@@ -98,6 +98,7 @@ interface BotClient extends BotConnection {
     botName: string
     botLink: string
     online: boolean
+    indicator: string
     lastCheck: number
     error?: string
     subreddits: string[]
@@ -448,10 +449,12 @@ const webClient = async (options: OperatorConfig) => {
 
         const user = req.user as Express.User;
 
+        const shownBots = webOps.includes(user.name) ? bots : bots.filter(x => intersect(user.subreddits, x.subreddits).length > 0 || x.operators.includes(user.name));
+
         res.render('status', {
             show: 'All',
             ...resp,
-            bots: webOps.includes(user.name) ? bots : bots.filter(x => intersect(user.subreddits, x.subreddits).length > 0 || x.operators.includes(user.name)),
+            bots: shownBots.map(x => ({...x, shown: x.friendly === bot.friendly})),
             botId: bot.friendly,
             botName: bot.botName,
             botLink: bot.botLink,
@@ -580,6 +583,7 @@ const webClient = async (options: OperatorConfig) => {
             const url = new URL(normalized);
             let botStat: BotClient = {
                 ...client,
+                indicator: 'grey',
                 subreddits: [] as string[],
                 operators: [] as string[],
                 operatorDisplay: '',
@@ -600,8 +604,19 @@ const webClient = async (options: OperatorConfig) => {
                 }).json() as BotClient;
 
                 botStat = {...botStat, ...resp, online: true};
+                const sameNameIndex = bots.findIndex(x => x.friendly === botStat.friendly);
+                if(sameNameIndex > -1 && sameNameIndex !== existingClientIndex) {
+                    logger.warn(`Client returned a friendly name that is not unique (${botStat.friendly}), will fallback to host as friendly (${botStat.normalUrl})`);
+                    botStat.friendly = botStat.normalUrl;
+                }
                 botStat.online = true;
+                if(botStat.online) {
+                    botStat.indicator = botStat.running ? 'green' : 'orange';
+                } else {
+                    botStat.indicator = 'red';
+                }
             } catch (err) {
+                botStat.error = err.message;
                 logger.error(err);
             } finally {
                 if(existingClientIndex !== -1) {
