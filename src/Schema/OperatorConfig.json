@@ -1,6 +1,21 @@
 {
     "$schema": "http://json-schema.org/draft-07/schema#",
     "definitions": {
+        "BotConnection": {
+            "properties": {
+                "host": {
+                    "type": "string"
+                },
+                "secret": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "host",
+                "secret"
+            ],
+            "type": "object"
+        },
         "CacheOptions": {
             "description": "Configure granular settings for a cache provider with this object",
             "properties": {
@@ -177,28 +192,103 @@
                 }
             },
             "type": "object"
+        },
+        "RedditCredentials": {
+            "description": "Credentials required for the bot to interact with Reddit's API\n\nThese credentials will provided to both the API and Web interface unless otherwise specified with the `web.credentials` property\n\nRefer to the [required credentials table](https://github.com/FoxxMD/context-mod/blob/master/docs/operatorConfiguration.md#minimum-required-configuration) to see what is necessary to run the bot.",
+            "examples": [
+                {
+                    "accessToken": "p75_1c467b2",
+                    "clientId": "f4b4df1_9oiu",
+                    "clientSecret": "34v5q1c564_yt7",
+                    "redirectUri": "http://localhost:8085/callback",
+                    "refreshToken": "34_f1w1v4"
+                }
+            ],
+            "properties": {
+                "accessToken": {
+                    "description": "Access token retrieved from authenticating an account with your Reddit Application\n\n* ENV => `ACCESS_TOKEN`\n* ARG => `--accessToken <token>`",
+                    "examples": [
+                        "p75_1c467b2"
+                    ],
+                    "type": "string"
+                },
+                "clientId": {
+                    "description": "Client ID for your Reddit application\n\n* ENV => `CLIENT_ID`\n* ARG => `--clientId <id>`",
+                    "examples": [
+                        "f4b4df1c7b2"
+                    ],
+                    "type": "string"
+                },
+                "clientSecret": {
+                    "description": "Client Secret for your Reddit application\n\n* ENV => `CLIENT_SECRET`\n* ARG => `--clientSecret <id>`",
+                    "examples": [
+                        "34v5q1c56ub"
+                    ],
+                    "type": "string"
+                },
+                "redirectUri": {
+                    "description": "Redirect URI for your Reddit application\n\n**Note:** Only required if:\n\n* You need to authenticate your bot account on first-time setup\n* You want to use the web interface and are not providing `web.credentials.redirectUri` separately\n\n* ENV => `REDIRECT_URI`\n* ARG => `--redirectUri <uri>`",
+                    "examples": [
+                        "http://localhost:8085/callback"
+                    ],
+                    "format": "uri",
+                    "type": "string"
+                },
+                "refreshToken": {
+                    "description": "Refresh token retrieved from authenticating an account with your Reddit Application\n\n* ENV => `REFRESH_TOKEN`\n* ARG => `--refreshToken <token>`",
+                    "examples": [
+                        "34_f1w1v4"
+                    ],
+                    "type": "string"
+                }
+            },
+            "type": "object"
+        },
+        "WebCredentials": {
+            "description": "Separate credentials for the web interface can be provided when also running the api.\n\nAll properties not specified will default to values given in the top-level `credentials` property.\n\nRefer to the [required credentials table](https://github.com/FoxxMD/context-mod/blob/master/docs/operatorConfiguration.md#minimum-required-configuration) to see what is necessary for the web interface.",
+            "examples": [
+                {
+                    "clientId": "f4b4df1_9oiu",
+                    "clientSecret": "34v5q1c564_yt7",
+                    "redirectUri": "http://localhost:8085/callback"
+                }
+            ],
+            "properties": {
+                "clientId": {
+                    "description": "Client ID for your Reddit application",
+                    "examples": [
+                        "f4b4df1_9oiu"
+                    ],
+                    "type": "string"
+                },
+                "clientSecret": {
+                    "description": "Client Secret for your Reddit application",
+                    "examples": [
+                        "34v5q1c564_yt7"
+                    ],
+                    "type": "string"
+                },
+                "redirectUri": {
+                    "description": "Redirect URI for your Reddit application",
+                    "examples": [
+                        "http://localhost:8085/callback"
+                    ],
+                    "format": "uri",
+                    "type": "string"
+                }
+            },
+            "type": "object"
         }
     },
     "description": "Configuration for application-level settings IE for running the bot instance\n\n* To load a JSON configuration **from the command line** use the `-c` cli argument EX: `node src/index.js -c /path/to/JSON/config.json`\n* To load a JSON configuration **using an environmental variable** use `OPERATOR_CONFIG` EX: `OPERATOR_CONFIG=/path/to/JSON/config.json`",
     "properties": {
         "api": {
-            "description": "Settings related to managing heavy API usage.",
             "properties": {
-                "hardLimit": {
-                    "default": 50,
-                    "description": "When `api limit remaining` reaches this number the application will pause all event polling until the api limit is reset.",
-                    "examples": [
-                        50
-                    ],
+                "port": {
                     "type": "number"
                 },
-                "softLimit": {
-                    "default": 250,
-                    "description": "When `api limit remaining` reaches this number the application will attempt to put heavy-usage subreddits in a **slow mode** where activity processed is slowed to one every 1.5 seconds until the api limit is reset.",
-                    "examples": [
-                        250
-                    ],
-                    "type": "number"
+                "secret": {
+                    "type": "string"
                 }
             },
             "type": "object"
@@ -274,46 +364,17 @@
             "type": "object"
         },
         "credentials": {
-            "description": "The credentials required for the bot to interact with Reddit's API\n\n**Note:** Only `clientId` and `clientSecret` are required for initial setup (to use the oauth helper) **but ALL are required to properly run the bot.**",
-            "properties": {
-                "accessToken": {
-                    "description": "Access token retrieved from authenticating an account with your Reddit Application\n\n* ENV => `ACCESS_TOKEN`\n* ARG => `--accessToken <token>`",
-                    "examples": [
-                        "p75_1c467b2"
-                    ],
-                    "type": "string"
-                },
-                "clientId": {
-                    "description": "Client ID for your Reddit application\n\n* ENV => `CLIENT_ID`\n* ARG => `--clientId <id>`",
-                    "examples": [
-                        "f4b4df1c7b2"
-                    ],
-                    "type": "string"
-                },
-                "clientSecret": {
-                    "description": "Client Secret for your Reddit application\n\n* ENV => `CLIENT_SECRET`\n* ARG => `--clientSecret <id>`",
-                    "examples": [
-                        "34v5q1c56ub"
-                    ],
-                    "type": "string"
-                },
-                "redirectUri": {
-                    "description": "Redirect URI for your Reddit application\n\nOnly required if running ContextMod with a web interface (and after using oauth helper)\n\n* ENV => `REDIRECT_URI`\n* ARG => `--redirectUri <uri>`",
-                    "examples": [
-                        "http://localhost:8085"
-                    ],
-                    "format": "uri",
-                    "type": "string"
-                },
-                "refreshToken": {
-                    "description": "Refresh token retrieved from authenticating an account with your Reddit Application\n\n* ENV => `REFRESH_TOKEN`\n* ARG => `--refreshToken <token>`",
-                    "examples": [
-                        "34_f1w1v4"
-                    ],
-                    "type": "string"
+            "$ref": "#/definitions/RedditCredentials",
+            "description": "Credentials required for the bot to interact with Reddit's API\n\nThese credentials will provided to both the API and Web interface unless otherwise specified with the `web.credentials` property\n\nRefer to the [required credentials table](https://github.com/FoxxMD/context-mod/blob/master/docs/operatorConfiguration.md#minimum-required-configuration) to see what is necessary to run the bot.",
+            "examples": [
+                {
+                    "accessToken": "p75_1c467b2",
+                    "clientId": "f4b4df1_9oiu",
+                    "clientSecret": "34v5q1c564_yt7",
+                    "redirectUri": "http://localhost:8085/callback",
+                    "refreshToken": "34_f1w1v4"
                 }
-            },
-            "type": "object"
+            ]
         },
         "logging": {
             "description": "Settings to configure global logging defaults",
@@ -343,6 +404,28 @@
             },
             "type": "object"
         },
+        "nanny": {
+            "description": "Settings related to managing heavy API usage.",
+            "properties": {
+                "hardLimit": {
+                    "default": 50,
+                    "description": "When `api limit remaining` reaches this number the application will pause all event polling until the api limit is reset.",
+                    "examples": [
+                        50
+                    ],
+                    "type": "number"
+                },
+                "softLimit": {
+                    "default": 250,
+                    "description": "When `api limit remaining` reaches this number the application will attempt to put heavy-usage subreddits in a **slow mode** where activity processed is slowed to one every 1.5 seconds until the api limit is reset.",
+                    "examples": [
+                        250
+                    ],
+                    "type": "number"
+                }
+            },
+            "type": "object"
+        },
         "notifications": {
             "$ref": "#/definitions/NotificationConfig",
             "description": "Settings to configure 3rd party notifications for when ContextMod behavior occurs"
@@ -351,7 +434,7 @@
             "description": "Settings related to the user(s) running this ContextMod instance and information on the bot",
             "properties": {
                 "botName": {
-                    "description": "The name to use when identifying the bot. Defaults to name of the authenticated Reddit account IE `u/yourBotAccount`",
+                    "description": "The name to use when identifying the bot. Defaults to name of the authenticated Reddit account IE `u/yourBotAccount`\n\n**Note:** If you plan on running multiple ContextMod instances with the same account then `botName` should be unique for each instance.",
                     "examples": [
                         "u/yourBotAccount"
                     ],
@@ -482,6 +565,23 @@
         "web": {
             "description": "Settings for the web interface",
             "properties": {
+                "clients": {
+                    "items": {
+                        "$ref": "#/definitions/BotConnection"
+                    },
+                    "type": "array"
+                },
+                "credentials": {
+                    "$ref": "#/definitions/WebCredentials",
+                    "description": "Separate credentials for the web interface can be provided when also running the api.\n\nAll properties not specified will default to values given in the top-level `credentials` property.\n\nRefer to the [required credentials table](https://github.com/FoxxMD/context-mod/blob/master/docs/operatorConfiguration.md#minimum-required-configuration) to see what is necessary for the web interface.",
+                    "examples": [
+                        {
+                            "clientId": "f4b4df1_9oiu",
+                            "clientSecret": "34v5q1c564_yt7",
+                            "redirectUri": "http://localhost:8085/callback"
+                        }
+                    ]
+                },
                 "enabled": {
                     "default": true,
                     "description": "Whether the web server interface should be started\n\nIn most cases this does not need to be specified as the application will automatically detect if it is possible to start it --\nuse this to specify \"cli only\" behavior if you encounter errors with port/address or are paranoid\n\n* ENV => `WEB`\n* ARG => `node src/index.js run [interface]` -- interface can be `web` or `cli`",
@@ -505,6 +605,19 @@
                         200
                     ],
                     "type": "number"
+                },
+                "operators": {
+                    "description": "The name, or names, of the Reddit accounts, without prefix, that the operators of this **web interface** uses.\n\n**Note:** This is **not the same** as the top-level `operator` property. This allows specified users to see the status of all `clients` but **not** access to them -- that must still be specified in the `operator.name` property in the configuration of each bot.\n\n\nEX -- User is /u/FoxxMD then `\"name\": [\"FoxxMD\"]`",
+                    "examples": [
+                        [
+                            "FoxxMD",
+                            "AnotherUser"
+                        ]
+                    ],
+                    "items": {
+                        "type": "string"
+                    },
+                    "type": "array"
                 },
                 "port": {
                     "default": 8085,

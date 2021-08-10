@@ -472,6 +472,7 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
         credentials: {
             clientId: ci,
             clientSecret: cs,
+            redirectUri = 'http://localhost:8085/callback',
             ...restCred
         } = {},
         subreddits: {
@@ -494,6 +495,12 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
                 provider: sessionProvider = { store: 'memory' },
             } = {},
             clients,
+            credentials: {
+                clientId: webCI = ci,
+                clientSecret: webSecret = cs,
+                redirectUri: webUri = redirectUri
+            } = {},
+            operators = [],
         } = {},
         api: {
             port: apiPort = 8095,
@@ -558,6 +565,7 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
         credentials: {
             clientId: (ci as string),
             clientSecret: (cs as string),
+            redirectUri,
             ...restCred,
         },
         logging: {
@@ -588,6 +596,12 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
             },
             maxLogs,
             clients: clients === undefined ? [{host: 'localhost:8095', secret: apiSecret}] : clients,
+            credentials: {
+                clientId: webCI as string,
+                clientSecret: webSecret as string,
+                redirectUri: webUri as string,
+            },
+            operators,
         },
         api: {
             port: apiPort,

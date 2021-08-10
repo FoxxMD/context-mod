@@ -14,17 +14,15 @@ activities the Bot runs on.
 
 # Minimum Required Configuration
 
-The minimum required configuration variables to run the bot on subreddits are:
+| property       | Bot Authentication | API And Web        | API Only           | Web Only           |
+|:--------------:|:------------------:|:------------------:|:------------------:|:------------------:|
+| `clientId`     | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
+| `clientSecret` | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
+| `redirectUri`  | :x:                | :heavy_check_mark: | :x:                | :heavy_check_mark: |
+| `refreshToken` | :x:                | :heavy_check_mark: | :heavy_check_mark: | :x:                |
+| `accessToken`  | :x:                | :heavy_check_mark: | :heavy_check_mark: | :x:                |
 
-* clientId
-* clientSecret
-* refreshToken
-* accessToken
-
-However, only **clientId** and **clientSecret** are required to run the **oauth helper** mode in order to generate the last two
-configuration variables.
-
-Refer to the **[Bot Authentication guide](/docs/botAuthentication.md)** to retrieve the above credentials.
+Refer to the **[Bot Authentication guide](/docs/botAuthentication.md)** to retrieve credentials.
 
 # Defining Configuration
 

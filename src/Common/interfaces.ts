@@ -635,12 +635,12 @@ export interface SubmissionState extends ActivityState {
  * */
 export interface CommentState extends ActivityState {
     /**
-    * Is this Comment Author also the Author of the Submission this comment is in?
-    * */
+     * Is this Comment Author also the Author of the Submission this comment is in?
+     * */
     op?: boolean
     /**
-    * A list of SubmissionState attributes to test the Submission this comment is in
-    * */
+     * A list of SubmissionState attributes to test the Submission this comment is in
+     * */
     submissionState?: SubmissionState[]
 }
 
@@ -812,6 +812,101 @@ export interface BotConnection {
 }
 
 /**
+ * Credentials required for the bot to interact with Reddit's API
+ *
+ * These credentials will provided to both the API and Web interface unless otherwise specified with the `web.credentials` property
+ *
+ * Refer to the [required credentials table](https://github.com/FoxxMD/context-mod/blob/master/docs/operatorConfiguration.md#minimum-required-configuration) to see what is necessary to run the bot.
+ *
+ * @examples [{"clientId": "f4b4df1_9oiu", "clientSecret": "34v5q1c564_yt7", "redirectUri": "http://localhost:8085/callback", "refreshToken": "34_f1w1v4", "accessToken": "p75_1c467b2"}]
+ * */
+export interface RedditCredentials {
+    /**
+     * Client ID for your Reddit application
+     *
+     * * ENV => `CLIENT_ID`
+     * * ARG => `--clientId <id>`
+     *
+     * @examples ["f4b4df1c7b2"]
+     * */
+    clientId?: string,
+    /**
+     * Client Secret for your Reddit application
+     *
+     * * ENV => `CLIENT_SECRET`
+     * * ARG => `--clientSecret <id>`
+     *
+     * @examples ["34v5q1c56ub"]
+     * */
+    clientSecret?: string,
+    /**
+     * Redirect URI for your Reddit application
+     *
+     * **Note:** Only required if:
+     *
+     * * You need to authenticate your bot account on first-time setup
+     * * You want to use the web interface and are not providing `web.credentials.redirectUri` separately
+     *
+     * * ENV => `REDIRECT_URI`
+     * * ARG => `--redirectUri <uri>`
+     *
+     * @examples ["http://localhost:8085/callback"]
+     * @format uri
+     * */
+    redirectUri?: string,
+
+    /**
+     * Access token retrieved from authenticating an account with your Reddit Application
+     *
+     * * ENV => `ACCESS_TOKEN`
+     * * ARG => `--accessToken <token>`
+     *
+     * @examples ["p75_1c467b2"]
+     * */
+    accessToken?: string,
+    /**
+     * Refresh token retrieved from authenticating an account with your Reddit Application
+     *
+     * * ENV => `REFRESH_TOKEN`
+     * * ARG => `--refreshToken <token>`
+     *
+     * @examples ["34_f1w1v4"]
+     * */
+    refreshToken?: string
+}
+
+/**
+ * Separate credentials for the web interface can be provided when also running the api.
+ *
+ * All properties not specified will default to values given in the top-level `credentials` property.
+ *
+ * Refer to the [required credentials table](https://github.com/FoxxMD/context-mod/blob/master/docs/operatorConfiguration.md#minimum-required-configuration) to see what is necessary for the web interface.
+ *
+ * @examples [{"clientId": "f4b4df1_9oiu", "clientSecret": "34v5q1c564_yt7", "redirectUri": "http://localhost:8085/callback"}]
+ * */
+export interface WebCredentials {
+    /**
+     * Client ID for your Reddit application
+     *
+     * @examples ["f4b4df1_9oiu"]
+     * */
+    clientId?: string,
+    /**
+     * Client Secret for your Reddit application
+     *
+     * @examples ["34v5q1c564_yt7"]
+     * */
+    clientSecret?: string,
+    /**
+     * Redirect URI for your Reddit application
+     *
+     * @examples ["http://localhost:8085/callback"]
+     * @format uri
+     * */
+    redirectUri?: string,
+}
+
+/**
  * Configuration for application-level settings IE for running the bot instance
  *
  * * To load a JSON configuration **from the command line** use the `-c` cli argument EX: `node src/index.js -c /path/to/JSON/config.json`
@@ -819,8 +914,8 @@ export interface BotConnection {
  * */
 export interface OperatorJsonConfig {
     /**
-    * Settings related to the user(s) running this ContextMod instance and information on the bot
-    * */
+     * Settings related to the user(s) running this ContextMod instance and information on the bot
+     * */
     operator?: {
         /**
          * The name, or names, of the Reddit accounts, without prefix, that the operators of this bot uses.
@@ -849,65 +944,14 @@ export interface OperatorJsonConfig {
         /**
          * The name to use when identifying the bot. Defaults to name of the authenticated Reddit account IE `u/yourBotAccount`
          *
+         * **Note:** If you plan on running multiple ContextMod instances with the same account then `botName` should be unique for each instance.
+         *
          * @examples ["u/yourBotAccount"]
          * */
         botName?: string,
     },
-    /**
-    * The credentials required for the bot to interact with Reddit's API
-    *
-    * **Note:** Only `clientId` and `clientSecret` are required for initial setup (to use the oauth helper) **but ALL are required to properly run the bot.**
-    * */
-    credentials?: {
-        /**
-         * Client ID for your Reddit application
-         *
-         * * ENV => `CLIENT_ID`
-         * * ARG => `--clientId <id>`
-         *
-         * @examples ["f4b4df1c7b2"]
-         * */
-        clientId?: string,
-        /**
-         * Client Secret for your Reddit application
-         *
-         * * ENV => `CLIENT_SECRET`
-         * * ARG => `--clientSecret <id>`
-         *
-         * @examples ["34v5q1c56ub"]
-         * */
-        clientSecret?: string,
-        /**
-        * Redirect URI for your Reddit application
-        *
-        * Only required if running ContextMod with a web interface (and after using oauth helper)
-        *
-        * * ENV => `REDIRECT_URI`
-        * * ARG => `--redirectUri <uri>`
-        *
-        * @examples ["http://localhost:8085"]
-        * @format uri
-        * */
-        redirectUri?: string,
-        /**
-         * Access token retrieved from authenticating an account with your Reddit Application
-         *
-         * * ENV => `ACCESS_TOKEN`
-         * * ARG => `--accessToken <token>`
-         *
-         * @examples ["p75_1c467b2"]
-         * */
-        accessToken?: string,
-        /**
-         * Refresh token retrieved from authenticating an account with your Reddit Application
-         *
-         * * ENV => `REFRESH_TOKEN`
-         * * ARG => `--refreshToken <token>`
-         *
-         * @examples ["34_f1w1v4"]
-         * */
-        refreshToken?: string
-    },
+
+    credentials?: RedditCredentials,
     /**
      * Settings to configure 3rd party notifications for when ContextMod behavior occurs
      * */
@@ -1056,7 +1100,7 @@ export interface OperatorJsonConfig {
          * @default 1
          * @examples [1]
          * */
-      maxWorkers?: number,
+        maxWorkers?: number,
     },
     /**
      * Settings for the web interface
@@ -1122,6 +1166,20 @@ export interface OperatorJsonConfig {
          * */
         maxLogs?: number,
         clients?: BotConnection[]
+
+        credentials?: WebCredentials
+
+        /**
+         * The name, or names, of the Reddit accounts, without prefix, that the operators of this **web interface** uses.
+         *
+         * **Note:** This is **not the same** as the top-level `operator` property. This allows specified users to see the status of all `clients` but **not** access to them -- that must still be specified in the `operator.name` property in the configuration of each bot.
+         *
+         *
+         * EX -- User is /u/FoxxMD then `"name": ["FoxxMD"]`
+         *
+         * @examples [["FoxxMD","AnotherUser"]]
+         * */
+        operators?: string[]
     }
     api?: {
         port?: number,
@@ -1203,19 +1261,24 @@ export interface OperatorJsonConfig {
     }
 }
 
+export interface RequiredOperatorRedditCredentials extends RedditCredentials {
+    clientId: string,
+    clientSecret: string
+}
+
+export interface RequiredWebRedditCredentials extends RedditCredentials {
+    clientId: string,
+    clientSecret: string
+    redirectUri: string
+}
+
 export interface OperatorConfig extends OperatorJsonConfig {
     operator: {
         name: string[]
         display?: string,
         botName?: string,
     },
-    credentials: {
-        clientId: string,
-        clientSecret: string,
-        redirectUri?: string,
-        accessToken?: string,
-        refreshToken?: string
-    },
+    credentials: RequiredOperatorRedditCredentials,
     notifications?: NotificationConfig
     logging: {
         level: LogLevel,
@@ -1237,7 +1300,7 @@ export interface OperatorConfig extends OperatorJsonConfig {
         interval: number,
     },
     queue: {
-      maxWorkers: number,
+        maxWorkers: number,
     },
     web: {
         enabled: boolean,
@@ -1249,6 +1312,8 @@ export interface OperatorConfig extends OperatorJsonConfig {
         logLevel?: LogLevel,
         maxLogs: number,
         clients: BotConnection[]
+        credentials: RequiredWebRedditCredentials
+        operators: string[]
     }
     api: {
         port: number,

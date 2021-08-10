@@ -126,11 +126,6 @@ const availableLevels = ['error', 'warn', 'info', 'verbose', 'debug'];
 
 const webClient = async (options: OperatorConfig) => {
     const {
-        credentials: {
-            clientId,
-            clientSecret,
-            redirectUri
-        },
         operator: {
             name,
             display,
@@ -143,6 +138,11 @@ const webClient = async (options: OperatorConfig) => {
             },
             maxLogs,
             clients,
+            credentials: {
+                clientId,
+                clientSecret,
+                redirectUri
+            },
         },
     } = options;
 
