@@ -3,7 +3,51 @@
 <body class="">
 <script>localStorage.getItem('ms-dark') === 'no' ? document.body.classList.remove('dark') : document.body.classList.add('dark')</script>
 <div class="min-w-screen min-h-screen bg-gray-100 bg-gray-100 dark:bg-gray-800 font-sans">
-    <%- include('partials/authTitle') %>
+    <div class="space-x-4 p-6 md:px-10 md:py-6 leading-6 font-semibold bg-gray-800 text-white">
+        <div class="container mx-auto">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center flex-grow pr-4">
+                    <% if (bots.length === 1) { %>
+                    <div class="px-4 width-full relative">
+                    <span>
+                         <a href="<%= botLink %>"><%= botName %></a>
+                    </span>
+                    </div>
+                        <% } else { %>
+                        <ul class="inline-flex flex-wrap">
+                            <% bots.forEach(function (data) { %>
+                                <li class="my-3 px-3 dark:text-white">
+                                    <span data-bot="<%= data.friendly %>" class="rounded-md py-2 px-3 tabSelectWrapper">
+                                    <a class="tabSelect font-normal pointer hover:font-bold"
+                                       data-bot="<%= data.friendly %>">
+                                        <a href="<%= data.botLink %>"><%= data.botName %></a>
+                                    </a>
+                                    </span>
+                                </li>
+                            <% }) %>
+                        </ul>
+                        <% } %>
+                </div>
+                <div class="flex items-center flex-end text-sm">
+                <span class="inline-block mr-4">
+                    <label style="font-size:2.5px;">
+                        <input class='toggle-checkbox' type='checkbox' id="themeToggle" checked></input>
+                        <div class='toggle-slot'>
+                            <div class='sun-icon-wrapper'>
+                                <div class="iconify sun-icon" data-icon="feather-sun" data-inline="false"></div>
+                            </div>
+                            <div class='toggle-button'></div>
+                            <div class='moon-icon-wrapper'>
+                                <div class="iconify moon-icon" data-icon="feather-moon" data-inline="false"></div>
+                            </div>
+                        </div>
+                    </label>
+                        </span>
+                    <a href="logout">Logout</a>
+                </div>
+            </div>
+        </div>
+    </div>
     <div class="space-x-4 py-1 md:px-10 leading-6 font-semibold bg-gray-500 dark:bg-gray-700 text-white">
         <div class="container mx-auto">
             <ul id="tabs" class="inline-flex flex-wrap">
@@ -234,10 +278,12 @@
                                                 </span>
                                             </label>
                                             <span><%= `${data.runningActivities} Processing / ${data.queuedActivities} Queued` %></span>
+                                                <label>Operated By</label>
+                                                <span><%= operatorDisplay %></span>
                                             <% if (data.name === 'All' && isOperator) { %>
                                                 <label>Operators</label>
                                                 <span><%= operators %></span>
-                                            <% } %>
+                                            <% } else %>
                                         </div>
                                         <% if (data.name !== 'All') { %>
                                             <ul class="list-disc list-inside mt-4">
@@ -647,6 +693,7 @@
             </div>
         </div>
     </div>
+<%- include('partials/footer') %>
 </div>
 <script>
     /*    const appendUser = causedBy => causedBy === 'system' ? '' : ' (user)';

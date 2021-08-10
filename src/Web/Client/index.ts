@@ -157,6 +157,8 @@ const webClient = async (options: OperatorConfig) => {
         },
     } = options;
 
+    const webOps = name.map(x => x.toLowerCase());
+
     stream._write = (chunk, encoding, next) => {
         // remove newline (\n) from end of string since we deal with it with css/html
         const logLine = chunk.toString().slice(0, -1);
@@ -444,9 +446,12 @@ const webClient = async (options: OperatorConfig) => {
         const sort = req.session.sort;
         const level = req.session.level;
 
+        const user = req.user as Express.User;
+
         res.render('status', {
             show: 'All',
             ...resp,
+            bots: webOps.includes(user.name) ? bots : bots.filter(x => intersect(user.subreddits, x.subreddits).length > 0 || x.operators.includes(user.name)),
             botId: bot.friendly,
             botName: bot.botName,
             botLink: bot.botLink,
@@ -501,8 +506,7 @@ const webClient = async (options: OperatorConfig) => {
         res.render('config', {
             config: prettyPrintJson.toHtml(obj, {quoteKeys: true, indent: 2}),
             operatorDisplay:bot.operators.join(', '),
-            botName: bot.botName,
-            botLink: bot.botLink
+            title: `Configuration for ${subreddit}`
         });
     });
 
