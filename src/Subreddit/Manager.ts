@@ -16,7 +16,7 @@ import {
     DEFAULT_POLLING_INTERVAL,
     DEFAULT_POLLING_LIMIT, Invokee,
     ManagerOptions, ManagerStateChangeOption, PAUSED,
-    PollingOptionsStrong, RUNNING, RunState, STOPPED, SYSTEM, USER
+    PollingOptionsStrong, ResourceStats, RUNNING, RunState, STOPPED, SYSTEM, USER
 } from "../Common/interfaces";
 import Submission from "snoowrap/dist/objects/Submission";
 import {activityIsRemoved, itemContentPeek} from "../Utils/SnoowrapUtils";
@@ -58,6 +58,39 @@ export interface RuntimeManagerOptions extends ManagerOptions {
     wikiLocation?: string;
     botName: string;
     maxWorkers: number;
+}
+
+export interface ManagerStats {
+    eventsCheckedTotal: number
+    eventsCheckedSinceStartTotal: number
+    eventsAvg: number
+    checksRunTotal: number
+    checksRunSinceStartTotal: number
+    checksTriggered: number
+    checksTriggeredTotal: number
+    checksTriggeredSinceStart: number
+    checksTriggeredSinceStartTotal: number
+    rulesRunTotal: number
+    rulesRunSinceStartTotal: number
+    rulesCachedTotal: number
+    rulesCachedSinceStartTotal: number
+    rulesTriggeredTotal: number
+    rulesTriggeredSinceStartTotal: number
+    rulesAvg: number
+    actionsRun: number
+    actionsRunTotal: number
+    actionsRunSinceStart: number,
+    actionsRunSinceStartTotal: number
+    cache: {
+        provider: string,
+        currentKeyCount: number,
+        isShared: boolean,
+        totalRequests: number,
+        totalMiss: number,
+        missPercent: string,
+        requestRate: number,
+        types: ResourceStats
+    },
 }
 
 export class Manager {
@@ -131,7 +164,7 @@ export class Manager {
     actionsRun: Map<string, number> = new Map();
     actionsRunSinceStart: Map<string, number> = new Map();
 
-    getStats = async () => {
+    getStats = async (): Promise<ManagerStats> => {
         const data: any = {
             eventsCheckedTotal: this.eventsCheckedTotal,
             eventsCheckedSinceStartTotal: this.eventsCheckedSinceStartTotal,

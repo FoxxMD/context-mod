@@ -74,3 +74,13 @@ a {
 .botStats.hidden {
     display: none;
 }
+
+.sub.offline a {
+    pointer-events: none;
+    text-decoration: none;
+}
+
+.sub.offline .logs a {
+    pointer-events: initial;
+    text-decoration: initial;
+}

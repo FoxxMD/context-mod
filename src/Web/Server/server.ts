@@ -31,6 +31,7 @@ import http from "http";
 import SimpleError from "../../Utils/SimpleError";
 import {booleanMiddle} from "../Common/middleware";
 import pEvent from "p-event";
+import {BotStats, BotStatusResponse} from '../Common/interfaces';
 
 const app = addAsync(express());
 app.use(bodyParser.json());
@@ -189,7 +190,7 @@ const rcbServer = async function (options: OperatorConfig) {
         if (stream) {
             const userStream = new Transform({
                 transform(chunk, encoding, callback) {
-                    const log = chunk.toString();
+                    const log = chunk.toString().slice(0, -1);
                     if (isLogLineMinLevel(log, level as string)) {
                         const subName = parseSubredditLogName(log);
                         if (isOperator || (subName !== undefined && (realManagers.includes(subName) || subName.includes(userName)))) {
@@ -202,12 +203,16 @@ const rcbServer = async function (options: OperatorConfig) {
                     }
                 }
             });
-            try {
-                userStream.on('end', () => {
-                    console.log('user end');
-                });
+            userStream.on('end', () => {
+                console.log('user end');
+            });
 
-                winstonStream.pipe(userStream, {end: false});
+            const currTransport = new winston.transports.Stream({
+                stream: userStream,
+            });
+            logger.add(currTransport);
+            try {
+                //winstonStream.pipe(userStream, {end: false});
                 //logStream.pipe(userStream, {end: false});
 
                 userStream.pipe(res, {end: false});
@@ -217,11 +222,11 @@ const rcbServer = async function (options: OperatorConfig) {
                 res.destroy();
                 return;
             } catch (e) {
-
                 if (e.code !== 'ECONNRESET') {
                     logger.error(e);
                 }
             } finally {
+                logger.remove(currTransport);
                 userStream.end();
                 res.destroy();
             }
@@ -392,7 +397,8 @@ const rcbServer = async function (options: OperatorConfig) {
             Object.keys(curr.stats.cache.types as ResourceStats).forEach((k) => {
                 acc[k].requests += curr.stats.cache.types[k].requests;
                 acc[k].miss += curr.stats.cache.types[k].miss;
-                acc[k].identifierAverageHit += Number.parseFloat(curr.stats.cache.types[k].identifierAverageHit);
+                // @ts-ignore
+                acc[k].identifierAverageHit += (typeof curr.stats.cache.types[k].identifierAverageHit === 'string' ? Number.parseFloat(curr.stats.cache.types[k].identifierAverageHit) : curr.stats.cache.types[k].identifierAverageHit);
                 acc[k].averageTimeBetweenHits += curr.stats.cache.types[k].averageTimeBetweenHits === 'N/A' ? 0 : Number.parseFloat(curr.stats.cache.types[k].averageTimeBetweenHits)
             });
             return acc;
@@ -410,7 +416,7 @@ const rcbServer = async function (options: OperatorConfig) {
         const aManagerWithDefaultResources = bot.subManagers.find(x => x.resources !== undefined && x.resources.cacheSettingsHash === 'default');
         let allManagerData: any = {
             name: 'All',
-            linkName: 'All',
+            status: 'ONLINE',
             indicator: 'green',
             maxWorkers,
             globalMaxWorkers,
@@ -469,10 +475,10 @@ const rcbServer = async function (options: OperatorConfig) {
             allManagerData.stats.cache.requestRate = 0;
         }
 
-        const data = {
-            userName: user,
+        const data: BotStatusResponse = {
             system: {
                 startedAt: bot.startedAt.local().format('MMMM D, YYYY h:mm A Z'),
+                online: true,
                 ...opStats(bot),
             },
             subreddits: [allManagerData, ...subManagerData],
@@ -665,7 +671,7 @@ const rcbServer = async function (options: OperatorConfig) {
     await bot.runManagers();
 };
 
-const opStats = (bot: App) => {
+const opStats = (bot: App): BotStats => {
     const limitReset = dayjs(bot.client.ratelimitExpiration);
     const nextHeartbeat = bot.nextHeartbeat !== undefined ? bot.nextHeartbeat.local().format('MMMM D, YYYY h:mm A Z') : 'N/A';
     const nextHeartbeatHuman = bot.nextHeartbeat !== undefined ? `in ${dayjs.duration(bot.nextHeartbeat.diff(dayjs())).humanize()}` : 'N/A'
@@ -677,7 +683,7 @@ const opStats = (bot: App) => {
         apiAvg: formatNumber(bot.apiRollingAvg),
         nannyMode: bot.nannyMode || 'Off',
         apiDepletion: bot.apiEstDepletion === undefined ? 'Not Calculated' : bot.apiEstDepletion.humanize(),
-        limitReset,
+        limitReset: limitReset.format(),
         limitResetHuman: `in ${dayjs.duration(limitReset.diff(dayjs())).humanize()}`,
     }
 }

@@ -1329,7 +1329,7 @@ interface CacheTypeStat {
     miss: number,
     missPercent?: string,
     identifierRequestCount: Cache
-    identifierAverageHit: number
+    identifierAverageHit: number | string
     requestTimestamps: number[]
     averageTimeBetweenHits: string
 }
