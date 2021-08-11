@@ -12,18 +12,16 @@ export const getLogger = (options: any, name = 'default'): Logger => {
             defaultLabel = 'App',
         } = options || {};
 
-        const consoleTransport = new transports.Console();
+        const consoleTransport = new transports.Console({
+            handleExceptions: true,
+            // @ts-expect-error
+            handleRejections: true,
+        });
 
         const myTransports = [
             consoleTransport,
+            ...additionalTransports,
         ];
-
-        let errorTransports = [consoleTransport];
-
-        for (const a of additionalTransports) {
-            myTransports.push(a);
-            errorTransports.push(a);
-        }
 
         if (path !== undefined && path !== '') {
             const rotateTransport = new winston.transports.DailyRotateFile({
@@ -32,12 +30,12 @@ export const getLogger = (options: any, name = 'default'): Logger => {
                 symlinkName: 'contextBot-current.log',
                 filename: 'contextBot-%DATE%.log',
                 datePattern: 'YYYY-MM-DD',
-                maxSize: '5m'
+                maxSize: '5m',
+                handleExceptions: true,
+                handleRejections: true,
             });
             // @ts-ignore
             myTransports.push(rotateTransport);
-            // @ts-ignore
-            errorTransports.push(rotateTransport);
         }
 
         const loggerOptions = {
@@ -45,8 +43,6 @@ export const getLogger = (options: any, name = 'default'): Logger => {
             format: labelledFormat(defaultLabel),
             transports: myTransports,
             levels: logLevels,
-            exceptionHandlers: errorTransports,
-            rejectionHandlers: errorTransports,
         };
 
         winston.loggers.add(name, loggerOptions);

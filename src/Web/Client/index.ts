@@ -20,7 +20,7 @@ import session, {Session, SessionData} from "express-session";
 import Snoowrap, {Subreddit} from "snoowrap";
 import {getLogger} from "../../Utils/loggerFactory";
 import EventEmitter from "events";
-import {Readable, Writable} from "stream";
+import stream, {Readable, Writable, Transform} from "stream";
 import winston from "winston";
 import tcpUsed from "tcp-port-used";
 import SimpleError from "../../Utils/SimpleError";
@@ -34,9 +34,11 @@ import httpProxy from 'http-proxy';
 import normalizeUrl from 'normalize-url';
 import GotRequest from "got/dist/source/core";
 import {prettyPrintJson} from "pretty-print-json";
+// @ts-ignore
+import DelimiterStream from 'delimiter-stream';
+import {pipeline} from 'stream/promises';
 
 const emitter = new EventEmitter();
-const stream = new Writable()
 
 const app = addAsync(express());
 app.use(bodyParser.json());
@@ -102,16 +104,14 @@ interface ConnectedUserInfo {
     level?: string,
     user?: string,
     botId: string,
-    logStream?: GotRequest
-    opStream?: GotRequest
+    logStream?: Promise<void>
+    logAbort?: AbortController
     statInterval?: any,
 }
 
 interface ConnectUserObj {
     [key: string]: ConnectedUserInfo
 }
-
-const connectedUsers: ConnectUserObj = {};
 
 const createToken = (bot: BotClient, user?: Express.User, ) => {
     const payload = user !== undefined ? {...user, machine: false} : {machine: true};
@@ -147,23 +147,25 @@ const webClient = async (options: OperatorConfig) => {
         },
     } = options;
 
+    const connectedUsers: ConnectUserObj = {};
+
     const webOps = operators.map(x => x.toLowerCase());
 
-    stream._write = (chunk, encoding, next) => {
-        // remove newline (\n) from end of string since we deal with it with css/html
-        const logLine = chunk.toString().slice(0, -1);
-        const now = Date.now();
-        const logEntry: LogEntry = [now, logLine];
+    const winstonStream = new Transform({
+        transform(chunk, encoding, callback) {
+            const logLine = chunk.toString().slice(0, -1);
+            const now = Date.now();
+            const logEntry: LogEntry = [now, logLine];
+            emitter.emit('log', logLine);
+            callback(null,chunk);
+        }
+    });
 
-        emitter.emit('log', logLine);
-        next();
-    }
+    const logger = getLogger({defaultLabel: 'Web', ...options.logging}, 'Web');
 
-    const streamTransport = new winston.transports.Stream({
-        stream,
-    })
-
-    const logger = getLogger({defaultLabel: 'Web', ...options.logging, additionalTransports: [streamTransport]}, 'Web');
+    logger.add(new winston.transports.Stream({
+        stream: winstonStream,
+    }))
 
     if (await tcpUsed.check(port)) {
         throw new SimpleError(`Specified port for web interface (${port}) is in use or not available. Cannot start web server.`);
@@ -306,36 +308,46 @@ const webClient = async (options: OperatorConfig) => {
         
         if(connectedUsers[sessionId] !== undefined) {
 
+            const delim = new DelimiterStream({
+                delimiter: '\r\n',
+            });
+
             const currBot = bots.find(x => x.friendly === connectedUsers[sessionId].botId);
             if(currBot !== undefined) {
-                const l = connectedUsers[sessionId].logStream;
-                if(l !== undefined && !l.destroyed) {
-                    l.destroy();
+                const abortc = connectedUsers[sessionId].logAbort
+                if(abortc !== undefined) {
+                    abortc.abort();
                 }
-                const s = got.stream.get(`${currBot.normalUrl}/logs`, {
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                    },
-                    searchParams: {
-                        limit: sessionData.limit,
-                        sort: sessionData.sort,
-                        level: sessionData.level,
-                        stream: true
-                    }
+                const ac = new AbortController();
+                const options = {
+                    signal: ac.signal,
+                };
+                const s = pipeline(
+                    got.stream.get(`${currBot.normalUrl}/logs`, {
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                        },
+                        searchParams: {
+                            limit: sessionData.limit,
+                            sort: sessionData.sort,
+                            level: sessionData.level,
+                            stream: true
+                        }
+                    }),
+                    delim,
+                    options
+                ) as Promise<void>;
+
+                s.catch((err) => {
+                   if(err.code !== 'ABORT_ERR') {
+                       logger.error(`Error occurred while streaming logs from ${currBot.friendly} -- ${err.message}`);
+                   }
                 });
-                s.on('data', (c) => {
+                delim.on('data', (c: any) => {
                     const chunk = c.toString();
-                    for(const line of chunk.split('\r\n')) {
-                        io.to(sessionId).emit('log', formatLogLineToHtml(line));
-                    }
+                    io.to(sessionId).emit('log', formatLogLineToHtml(chunk));
                 });
-                s.on('destroy', () => {
-                    console.log('destroying');
-                });
-                s.on('error', (e) => {
-                    logger.error(`Error occurred while streaming logs from ${currBot.friendly} -- ${e.message}`);
-                })
-                connectedUsers[sessionId] = {logStream: s, botId: currBot.friendly}
+                connectedUsers[sessionId] = {logStream: s, logAbort: ac, botId: currBot.friendly}
             }
         }
     }
@@ -395,7 +407,7 @@ const webClient = async (options: OperatorConfig) => {
     // botUserRouter.use([ensureAuthenticated, defaultSession, botWithPermissions, createUserToken]);
     // app.use(botUserRouter);
 
-    app.useAsync('/api/*', [ensureAuthenticated, defaultSession, botWithPermissions, createUserToken], (req: express.Request, res: express.Response) => {
+    app.useAsync('/api/', [ensureAuthenticated, defaultSession, botWithPermissions, createUserToken], (req: express.Request, res: express.Response) => {
         req.headers.Authorization = `Bearer ${req.token}`
 
         const bot = req.bot as BotClient;
@@ -490,9 +502,14 @@ const webClient = async (options: OperatorConfig) => {
         });
 
         if(req.isAuthenticated()) {
-            connectedUsers[req.session.id] = {
-                botId: bot.friendly
+            if(connectedUsers[req.session.id] === undefined) {
+                connectedUsers[req.session.id] = {
+                    botId: bot.friendly
+                };
+            } else {
+                connectedUsers[req.session.id].botId = bot.friendly;
             }
+
             if(newBot) {
 
                 const u = req.user;
@@ -577,13 +594,9 @@ const webClient = async (options: OperatorConfig) => {
     io.on('disconnect', (socket) => {
 
         if(connectedUsers[socket.handshake.session.id] !== undefined) {
-            const l = connectedUsers[socket.handshake.session.id].logStream;
-            if(l !== undefined && !l.destroyed) {
-                l.destroy();
-            }
-            const o = connectedUsers[socket.handshake.session.id].opStream;
-            if(o !== undefined && !o.destroyed) {
-                o.destroy();
+            const abortc = connectedUsers[socket.handshake.session.id].logAbort;
+            if(abortc !== undefined) {
+                abortc.abort();
             }
             delete connectedUsers[socket.handshake.session.id];
         }
@@ -599,6 +612,20 @@ const webClient = async (options: OperatorConfig) => {
             await sleep(10000);
         }
     }
+
+    // emitter.on('log', (log) => {
+    //     const emittedSessions = [];
+    //     const subName = parseSubredditLogName(log);
+    //     if (subName !== undefined) {
+    //         for (const [id, info] of connectedUsers) {
+    //             const {subreddits, level = 'verbose', user} = info;
+    //             if (isLogLineMinLevel(log, level) && (subreddits.includes(subName) || subName.includes(user))) {
+    //                 emittedSessions.push(id);
+    //                 io.to(id).emit('log', formatLogLineToHtml(log));
+    //             }
+    //         }
+    //     }
+    // });
 
     const refreshClient = async (client: BotConnection, force = false) => {
         const normalized = normalizeUrl(client.host);
@@ -669,7 +696,7 @@ const webClient = async (options: OperatorConfig) => {
                 logger.verbose(`Updated heartbeat for ${botStat.friendly}`);
             } catch (err) {
                 botStat.error = err.message;
-                logger.error(`Heartbeat response from ${botStat.friendly} was not ok`, err);
+                logger.error(`Heartbeat response from ${botStat.friendly} was not ok: ${err.message}`);
             } finally {
                 if(existingClientIndex !== -1) {
                     bots.splice(existingClientIndex, 1, botStat);

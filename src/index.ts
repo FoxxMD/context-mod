@@ -17,8 +17,8 @@ import {
     operatorConfig
 } from "./Utils/CommandConfig";
 import {App} from "./App";
-import createWebServer from './Web/Server/server';
-import client from './Web/Client';
+import apiServer from './Web/Server/server';
+import clientServer from './Web/Client';
 import createHelperServer from './Web/Server/helper';
 import Submission from "snoowrap/dist/objects/Submission";
 import {COMMENT_URL_ID, parseLinkIdentifier, SUBMISSION_URL_ID} from "./util";
@@ -65,11 +65,10 @@ const program = new Command();
             } = config;
             try {
                 if(mode === 'all' || mode === 'web') {
-                    await client(config);
+                    await clientServer(config);
                 }
                 if(mode === 'all' || mode === 'bot') {
-                    const [server, bot] = createWebServer(config);
-                    await server();
+                    await apiServer(config);
                 }
             } catch (err) {
                 throw err;
