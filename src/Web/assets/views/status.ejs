@@ -739,22 +739,19 @@
             localStorage.setItem('ms-dark', 'no');
         }
     }
-    // if (localStorage.getItem('ms-dark') === 'no') {
-    //     document.querySelector('#light.theme').classList.add('font-bold', 'no-underline', 'pointer-events-none');
-    //     document.body.classList.remove('dark')
-    // } else {
-    //     document.querySelector('#dark.theme').classList.add('font-bold', 'no-underline', 'pointer-events-none');
-    // }
 
     document.querySelectorAll('.logSettingSelect').forEach(el => {
         el.onchange = (e) => {
             action = e.target.dataset.type;
             value = e.target.value;
-            fetch(`/logs/settings/update?${action}=${value}`);
-            document.querySelectorAll(`#${e.target.id}.logSettingSelect option`).forEach(el => {
-                el.classList.remove('font-bold');
+            // this is easier for now
+            fetch(`/logs/settings/update?${action}=${value}`).then(() => {
+                window.location.reload();
             });
-            document.querySelector(`#${e.target.id}.logSettingSelect option[data-value="${e.target.value}"]`).classList.add('font-bold');
+            // document.querySelectorAll(`#${e.target.id}.logSettingSelect option`).forEach(el => {
+            //     el.classList.remove('font-bold');
+            // });
+            // document.querySelector(`#${e.target.id}.logSettingSelect option[data-value="${e.target.value}"]`).classList.add('font-bold');
         }
     });
 

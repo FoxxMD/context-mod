@@ -318,7 +318,7 @@ const webClient = async (options: OperatorConfig) => {
     let server: http.Server,
         io: SocketServer;
 
-    const startLogStream = (sessionData: Session & Partial<SessionData>, token: string) => {
+    const startLogStream = (sessionData: Session & Partial<SessionData>, user: Express.User) => {
         // @ts-ignore
         const sessionId = sessionData.id as string;
         
@@ -334,10 +334,21 @@ const webClient = async (options: OperatorConfig) => {
                 const options = {
                     signal: ac.signal,
                 };
-                const s = pipeline(
-                    got.stream.get(`${currBot.normalUrl}/logs`, {
+
+                const retryFn = (retryCount = 0, err: any = undefined) => {
+                    const delim = new DelimiterStream({
+                        delimiter: '\r\n',
+                    });
+
+                    if(err !== undefined) {
+                        logger.warn(`Log streaming encountered an error, trying to reconnect (retries: ${retryCount}) -- ${err.code !== undefined ? `(${err.code}) ` : ''}${err.message}`, {subreddit: currBot.friendly});
+                    }
+                    const gotStream = got.stream.get(`${currBot.normalUrl}/logs`, {
+                        retry: {
+                            limit: 5,
+                        },
                         headers: {
-                            'Authorization': `Bearer ${token}`,
+                            'Authorization': `Bearer ${createToken(currBot, user)}`,
                         },
                         searchParams: {
                             limit: sessionData.limit,
@@ -345,20 +356,38 @@ const webClient = async (options: OperatorConfig) => {
                             level: sessionData.level,
                             stream: true
                         }
-                    }),
-                    delim,
-                    options
-                ) as Promise<void>;
+                    });
 
-                s.catch((err) => {
-                   if(err.code !== 'ABORT_ERR') {
-                       logger.error(`Error occurred while streaming logs from ${currBot.friendly} -- ${err.message}`);
-                   }
-                });
-                delim.on('data', (c: any) => {
-                    const chunk = c.toString();
-                    io.to(sessionId).emit('log', formatLogLineToHtml(chunk));
-                });
+                    if(err !== undefined) {
+                        gotStream.once('data', () => {
+                            logger.info('Streaming resumed', {subreddit: currBot.friendly});
+                        });
+                    }
+
+                    gotStream.retryCount = retryCount;
+                    const s = pipeline(
+                        gotStream,
+                        delim,
+                        options
+                    ) as Promise<void>;
+
+                    // ECONNRESET
+                    s.catch((err) => {
+                        if(err.code !== 'ABORT_ERR' && err.code !== 'ERR_STREAM_PREMATURE_CLOSE') {
+                            logger.error(`Unexpected error, or too many retries, occurred while streaming logs -- ${err.code !== undefined ? `(${err.code}) ` : ''}${err.message}`, {subreddit: currBot.friendly});
+                        }
+                    });
+
+                    delim.on('data', (c: any) => {
+                        const chunk = c.toString();
+                        io.to(sessionId).emit('log', formatLogLineToHtml(chunk));
+                    });
+
+                    gotStream.once('retry', retryFn);
+                }
+
+                retryFn();
+
                 return ac;
             }
             return undefined;
@@ -557,15 +586,6 @@ const webClient = async (options: OperatorConfig) => {
         }
 
         res.send('OK');
-
-
-
-        if(req.isAuthenticated()) {
-            const connectedUser = connectedUsers[req.session.id];
-            if(connectedUser !== undefined) {
-                startLogStream(req.session, createToken(bots.find(x => x.friendly === connectedUser.botId) as BotClient, req.user));
-            }
-        }
     });
 
     const sockStreams: Map<string, (AbortController | NodeJS.Timeout)[]> = new Map();
@@ -626,7 +646,7 @@ const webClient = async (options: OperatorConfig) => {
                     if(session.authBotId !== undefined) {
                         // streaming logs and stats from client
                         const newStreams: (AbortController | NodeJS.Timeout)[] = [];
-                        const ac = startLogStream(session, createToken(bot, user));
+                        const ac = startLogStream(session, user);
                         if(ac !== undefined) {
                             newStreams.push(ac);
                         }
