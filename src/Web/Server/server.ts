@@ -214,7 +214,7 @@ const rcbServer = async function (options: OperatorConfig) {
             try {
                 //winstonStream.pipe(userStream, {end: false});
                 //logStream.pipe(userStream, {end: false});
-
+                logger.info(`${userName} from ${req.header('host')} => CONNECTED`);
                 userStream.pipe(res, {end: false});
                 await pEvent(req, 'close');
                 console.log('Request closed detected with "close" listener');
@@ -226,6 +226,7 @@ const rcbServer = async function (options: OperatorConfig) {
                     logger.error(e);
                 }
             } finally {
+                logger.info(`${userName} from ${req.header('host')} => DISCONNECTED`);
                 logger.remove(currTransport);
                 userStream.end();
                 res.destroy();
