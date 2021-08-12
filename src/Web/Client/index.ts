@@ -136,6 +136,10 @@ const webClient = async (options: OperatorConfig) => {
             name,
             display,
         },
+        credentials: {
+            refreshToken: configRefreshToken,
+            accessToken: configAccessToken,
+        },
         web: {
             port,
             session: {
@@ -368,7 +372,11 @@ const webClient = async (options: OperatorConfig) => {
         if(req.query.token === token) {
             return next();
         }
-        return res.render('error', {error: 'You are not authorized to access this route.'});
+        let error = 'You are not authorized to access this route.';
+        if(operators.length > 0) {
+            error = `${error} <br/> If you are doing first-time setup with just client id and secret you need to remove the "operator" property in order to access the oauth helper route.`;
+        }
+        return res.render('error', {error});
     }
 
     app.getAsync('/auth/helper', helperAuthed, (req, res) => {
@@ -627,14 +635,9 @@ const webClient = async (options: OperatorConfig) => {
     };
 
     const redirectBotsNotAuthed = async (req: express.Request, res: express.Response, next: Function) => {
-        if(bots.every(x => x.error === 'Bot not authenticated')) {
-            // every bot (probably just default localhost) needs to go through auth for refresh/access token
-            if(operators.length === 0) {
-                return res.redirect('/auth/helper');
-            }
-            if(req.isAuthenticated() && operators.map(x => x.toLowerCase()).some(x => x === req.user.name.toLowerCase())) {
-                return res.redirect('/auth/helper');
-            }
+        if(bots.length === 1 && bots[0].error === 'Missing credentials: refreshToken, accessToken' && configAccessToken === undefined && configRefreshToken === undefined) {
+            // assuming user is doing first-time setup and this is the default localhost bot
+            return res.redirect('/auth/helper');
         }
         next();
     }
@@ -913,7 +916,7 @@ const webClient = async (options: OperatorConfig) => {
                 }
                 botStat.online = true;
                 if(botStat.online) {
-                    botStat.indicator = botStat.running ? 'green' : 'orange';
+                    botStat.indicator = botStat.running ? 'green' : 'yellow';
                 } else {
                     botStat.indicator = 'red';
                 }

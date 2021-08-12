@@ -152,6 +152,7 @@ export class App {
             this.logger.error(`Missing credentials: ${missingCreds.join(', ')}`)
             this.logger.info(`If this is a first-time setup use the 'web' command for a web-based guide to configuring your application`);
             this.logger.info(`Or check the USAGE section of the readme for the correct naming of these arguments/environment variables`);
+            this.error = `Missing credentials: ${missingCreds.join(', ')}`;
             throw new LoggedError(`Missing credentials: ${missingCreds.join(', ')}`);
         }
 
@@ -239,6 +240,7 @@ export class App {
             } else {
                 this.logger.error(err);
             }
+            this.error = `Error occurred while testing Reddit API client: ${err.message}`;
             err.logged = true;
             throw err;
         }

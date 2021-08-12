@@ -104,8 +104,13 @@ const rcbServer = async function (options: OperatorConfig) {
 
     logger.add(streamTransport);
 
+    let error: string;
     // need to return App to main so that we can handle app shutdown on SIGTERM and discriminate between normal shutdown and crash on error
-    bot = new App(options);
+    try {
+        bot = new App(options);
+    } catch (err) {
+        error = err.message;
+    }
 
     if (await tcpUsed.check(port)) {
         throw new SimpleError(`Specified port for API (${port}) is in use or not available. Cannot start API.`);
@@ -124,10 +129,6 @@ const rcbServer = async function (options: OperatorConfig) {
     }
 
     logger.info(`API started => localhost:${port}`);
-
-
-    botSubreddits = bot.subManagers.map(x => x.displayLabel);
-    // TODO potentially prune subLogMap of user keys? shouldn't have happened this early though
 
     const authUserCheck = (userRequired = true) => async (req: express.Request, res: express.Response, next: Function) => {
         if (req.isAuthenticated()) {
@@ -149,14 +150,18 @@ const rcbServer = async function (options: OperatorConfig) {
             return done(null, {machine});
         }
         const isOperator = opNames.includes(name.toLowerCase());
-        const moderatedManagers = bot.subManagers.filter(x => subreddits.includes(x.subreddit.display_name)).map(x => x.displayLabel);
+        const moderatedManagers = bot !== undefined ? bot.subManagers.filter(x => subreddits.includes(x.subreddit.display_name)).map(x => x.displayLabel) : [];
+        let realManagers: string[] = [];
+        if(bot !== undefined) {
+            realManagers = isOperator ? bot.subManagers.map(x => x.displayLabel) : moderatedManagers;
+        }
 
         return done(null, {
             name,
             subreddits,
             isOperator,
             moderatedManagers,
-            realManagers: isOperator ? bot.subManagers.map(x => x.displayLabel) : moderatedManagers
+            realManagers,
         });
     }));
 
@@ -169,14 +174,15 @@ const rcbServer = async function (options: OperatorConfig) {
 
     app.getAsync('/heartbeat', authUserCheck(false), (req: Request, res: Response) => {
         const heartbeatData = {
-            subreddits: bot.subManagers.map(x => x.subreddit.display_name),
+            subreddits: bot !== undefined ? bot.subManagers.map(x => x.subreddit.display_name) : [],
             operators: name,
             operatorDisplay: display,
-            friendly: bot.botName,
-            running: bot.heartBeating,
-            nanny: bot.nannyMode,
-            botName: bot.botName,
-            botLink: bot.botLink,
+            friendly: bot !== undefined ? bot.botName : undefined,
+            running: bot !== undefined ? bot.heartBeating : false,
+            nanny: bot !== undefined ? bot.nannyMode : undefined,
+            botName: bot !== undefined ? bot.botName : undefined,
+            botLink: bot !== undefined ? bot.botLink : undefined,
+            error: bot !== undefined ? bot.error : error,
         };
         return res.json(heartbeatData);
     });
@@ -261,15 +267,13 @@ const rcbServer = async function (options: OperatorConfig) {
             sort = 'descending',
             lastCheck
         } = req.query;
+        if(bot === undefined) {
+            return res.status(500).send('Bot is offline');
+        }
         const {name: userName, realManagers = [], isOperator} = req.user as Express.User;
         const user = userName as string;
         const subreddits = realManagers;
         //const isOperator = opNames.includes(user.toLowerCase())
-
-        if (realManagers.length === 0) {
-            return res.json({});
-            //return res.render('noSubs', {operatorDisplay: display});
-        }
 
         const logs = filterLogBySubreddit(subLogMap, realManagers, {
             level: (level as string),
@@ -668,9 +672,24 @@ const rcbServer = async function (options: OperatorConfig) {
         res.send('OK');
     });
 
-    await bot.testClient();
-    await bot.buildManagers();
-    await bot.runManagers();
+    try {
+        // @ts-ignore
+        if(bot !== undefined) {
+            await bot.testClient();
+            await bot.buildManagers();
+            botSubreddits = bot.subManagers.map(x => x.displayLabel);
+        }
+    } catch (err) {
+        // TODO eventually allow re-creating bot from api request
+        logger.error('Server is still ONLINE but bot cannot recover from this error. The server must be restarted.')
+        if(!err.logged || !(err instanceof LoggedError)) {
+            logger.error(err);
+        }
+    }
+    // @ts-ignore
+    if(bot !== undefined) {
+        await bot.runManagers();
+    }
 };
 
 const opStats = (bot: App): BotStats => {
