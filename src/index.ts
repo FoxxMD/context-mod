@@ -19,11 +19,9 @@ import {
 import {App} from "./App";
 import apiServer from './Web/Server/server';
 import clientServer from './Web/Client';
-import createHelperServer from './Web/Server/helper';
 import Submission from "snoowrap/dist/objects/Submission";
 import {COMMENT_URL_ID, parseLinkIdentifier, SUBMISSION_URL_ID} from "./util";
 import LoggedError from "./Utils/LoggedError";
-import {getLogger} from "./Utils/loggerFactory";
 import {buildOperatorConfigWithDefaults, parseOperatorConfigFromSources} from "./ConfigBuilder";
 
 dayjs.extend(utc);

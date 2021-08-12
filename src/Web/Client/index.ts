@@ -12,7 +12,7 @@ import {
     formatLogLineToHtml,
     intersect, isLogLineMinLevel,
     LogEntry, parseFromJsonOrYamlToObject,
-    parseSubredditLogName,
+    parseSubredditLogName, permissions,
     randomId, sleep
 } from "../../util";
 import {Cache} from "cache-manager";
@@ -38,6 +38,7 @@ import {prettyPrintJson} from "pretty-print-json";
 import DelimiterStream from 'delimiter-stream';
 import {pipeline} from 'stream/promises';
 import {defaultBotStatus} from "../Common/defaults";
+import {booleanMiddle} from "../Common/middleware";
 
 const emitter = new EventEmitter();
 
@@ -259,7 +260,7 @@ const webClient = async (options: OperatorConfig) => {
         if (req.isAuthenticated()) {
             next();
         } else {
-            res.redirect('/login');
+            return res.redirect('/login');
         }
     }
 
@@ -278,17 +279,70 @@ const webClient = async (options: OperatorConfig) => {
         return res.redirect(authUrl);
     });
 
-    app.getAsync(/.*callback$/, (req: express.Request, res: express.Response, next: Function) => {
+    const botCallback = async (req: express.Request, res: express.Response, next: Function) => {
+        const {state, error, code} = req.query as any;
+        if(state.includes('bot')) {
+            if (error !== undefined || state !== req.session.state) {
+                let errContent: string;
+                switch (error) {
+                    case 'access_denied':
+                        errContent = 'You must <b>Allow</b> this application to connect in order to proceed.';
+                        break;
+                    default:
+                        if(error === undefined && state !== req.session.state) {
+                            errContent = 'state value was unexpected';
+                        } else {
+                            errContent = error;
+                        }
+                        break;
+                }
+                return res.render('error', {error: errContent, });
+            }
+            const client = await Snoowrap.fromAuthCode({
+                userAgent: `web:contextBot:web`,
+                // @ts-ignore
+                clientId: req.session.clientId,
+                // @ts-ignore
+                clientSecret: req.session.clientSecret,
+                // @ts-ignore
+                redirectUri: req.session.redir,
+                code: code as string,
+            });
+            // @ts-ignore
+            const user = await client.getMe();
+            let hadToken = false;
+            // @ts-ignore
+            if(req.session.token !== undefined) {
+                // user made successful callback using bypass token
+
+                // @ts-ignore
+                delete req.session.token;
+                // reset token (one-use)
+                token = randomId();
+
+                hadToken = true;
+            }
+            return res.render('callback', {
+                accessToken: client.accessToken,
+                refreshToken: client.refreshToken,
+                hadToken,
+            });
+        } else {
+            next();
+        }
+    }
+
+    app.getAsync(/.*callback$/, botCallback, (req: express.Request, res: express.Response, next: Function) => {
         passport.authenticate('snoowrap', (err, user, info) => {
-            if(err) {
+            if(err !== null) {
                 return res.render('error', {error: err});
             }
-            req.logIn(user, (e) => {
+            return req.logIn(user, (e) => {
                 // don't know why we'd get an error here but ¯\_(ツ)_/¯
                 if(e !== undefined) {
-                    return res.render('err', {error: err});
+                    return res.render('error', {error: err});
                 }
-               return res.redirect('/');
+                return res.redirect('/');
             });
         })(req, res, next);
     });
@@ -299,21 +353,97 @@ const webClient = async (options: OperatorConfig) => {
         req.logout();
         res.send('Bye!');
     });
+
+    let token = randomId();
+    const helperAuthed = async (req: express.Request, res: express.Response, next: Function) => {
+        // allow helper access if no operator is listed
+        if(operators.length === 0) {
+            return next();
+        }
+        // or if there is an operator and current user is operator
+        if(req.isAuthenticated() && req.user.isOperator) {
+            return next();
+        }
+        // or if the bypass token was provided (can only be acquired from an authenticated operator)
+        if(req.query.token === token) {
+            return next();
+        }
+        return res.render('error', {error: 'You are not authorized to access this route.'});
+    }
+
+    app.getAsync('/auth/helper', helperAuthed, (req, res) => {
+        return res.render('helper', {
+            redirectUri,
+            clientId,
+            clientSecret,
+            token: req.isAuthenticated() && req.user.isOperator ? token : undefined
+        });
+    });
+
+    app.getAsync('/auth/init', [helperAuthed, booleanMiddle(['wikiEdit','modmail','modlog'])], async (req: express.Request, res: express.Response) => {
+        const {
+            token,
+            wikiEdit,
+            modlog,
+            modmail,
+            clientId: ci,
+            clientSecret: ce,
+            redirect: redir,
+        } = req.query as any;
+        let permissionsList = permissions;
+
+        // keep track of token use so we can remove it after successful callback
+        if(token !== undefined) {
+            // @ts-ignore
+            req.session.token = token;
+        }
+        if (!wikiEdit) {
+            permissionsList = permissionsList.filter(x => x !== 'wikiedit');
+        }
+        if (!modlog) {
+            permissionsList = permissionsList.filter(x => x !== 'modlog');
+        }
+        if (!modmail) {
+            permissionsList = permissionsList.filter(x => x !== 'modmail');
+        }
+        req.session.state = `bot_${randomId()}`;
+        // @ts-ignore
+        req.session.redir = redir;
+        const cid = ci || clientId;
+        if(cid === undefined || cid === '') {
+            return res.render('error', {error: '"clientId" is required'});
+        }
+        // @ts-ignore
+        req.session.clientId = cid.trim();
+
+        const ced = ce || clientSecret;
+        if(ced === undefined || ced === '') {
+            return res.render('error', {error: '"clientSecret" is required'});
+        }
+        // @ts-ignore
+        req.session.clientSecret = ced.trim();
+
+        if(redir === undefined || redir === '') {
+            return res.render('error', {error: '"redirectUri" is required'});
+        }
+
+        const authUrl = Snoowrap.getAuthUrl({
+            // @ts-ignore
+            clientId: req.session.clientId as string,
+            // @ts-ignore
+            clientSecret: req.session.clientSecret as string,
+            scope: permissionsList,
+            // @ts-ignore
+            redirectUri: redir.trim(),
+            permanent: true,
+            state: req.session.state
+        });
+        return res.redirect(authUrl);
+    });
     //</editor-fold>
 
     const bots: BotClient[] = [];
     let init = false;
-
-    app.useAsync('/*', async (req, res, next) => {
-        if(!init) {
-            for(const c of clients) {
-                await refreshClient(c);
-            }
-            init = true;
-            loopHeartbeat();
-        }
-        next();
-    });
 
     let server: http.Server,
         io: SocketServer;
@@ -485,7 +615,31 @@ const webClient = async (options: OperatorConfig) => {
         next();
     }
 
-    app.getAsync('/', [ensureAuthenticated, defaultSession, defaultBot, botWithPermissions, createUserToken], async (req: express.Request, res: express.Response) => {
+    const initHeartbeat = async (req: express.Request, res: express.Response, next: Function) => {
+        if(!init) {
+            for(const c of clients) {
+                await refreshClient(c);
+            }
+            init = true;
+            loopHeartbeat();
+        }
+        next();
+    };
+
+    const redirectBotsNotAuthed = async (req: express.Request, res: express.Response, next: Function) => {
+        if(bots.every(x => x.error === 'Bot not authenticated')) {
+            // every bot (probably just default localhost) needs to go through auth for refresh/access token
+            if(operators.length === 0) {
+                return res.redirect('/auth/helper');
+            }
+            if(req.isAuthenticated() && operators.map(x => x.toLowerCase()).some(x => x === req.user.name.toLowerCase())) {
+                return res.redirect('/auth/helper');
+            }
+        }
+        next();
+    }
+
+    app.getAsync('/', [initHeartbeat, redirectBotsNotAuthed, ensureAuthenticated, defaultSession, defaultBot, botWithPermissions, createUserToken], async (req: express.Request, res: express.Response) => {
 
         const user = req.user as Express.User;
         const bot = req.bot as BotClient;

@@ -10,34 +10,82 @@
                 <div class="p-6 md:px-10 md:py-6">
                     <div class="text-xl mb-4">Hi! Looks like you're setting up your bot. To get running:</div>
                     <div class="text-lg text-semibold my-3">1. Set your redirect URL</div>
-                    <input id="redirectUri" style="min-width:500px;"
-                           class="text-black placeholder-gray-500 rounded mt-2 mb-3 p-2" value="<%= redirectUri %>">
-                    <div class="my-2">
-                        <input type="checkbox" id="wikiedit" name="wikiedit"
-                               checked>
-                        <label for="wikiedit">Include <span class="font-mono">wikiedit</span> permission for Toolbox
-                            User Notes</label>
-                    </div>
-                    <div class="space-y-3">
-                        <div>This is the URL Reddit will redirect you to once you have authorized an account to be used
-                            with your application.
+                    <div class="ml-5">
+                        <input id="redirectUri" style="min-width:500px;"
+                               class="text-black placeholder-gray-500 rounded mt-2 mb-3 p-2" value="<%= redirectUri %>">
+                        <div class="space-y-3">
+                            <div>This is the URL Reddit will redirect you to once you have authorized an account to be
+                                used
+                                with your application.
+                            </div>
+                            <div>The input field has been pre-filled with either:
+                                <ul class="list-inside list-disc">
+                                    <li>What you provided to the program as an argument/environmental variable or</li>
+                                    <li>The current URL in your browser that would be used -- if you are using a reverse
+                                        proxy this may be different so double check
+                                    </li>
+                                </ul>
+                            </div>
+                            <div>Make sure it matches what is found in the <b>redirect uri</b> for your <a
+                                        target="_blank"
+                                        href="https://www.reddit.com/prefs/apps">application
+                                    on Reddit</a> and <b>it must end with "callback"</b></div>
                         </div>
-                        <div>The input field has been pre-filled with either:
-                            <ul class="list-inside list-disc">
-                                <li>What you provided to the program as an argument/environmental variable or</li>
-                                <li>The current URL in your browser that would be used -- if you are using a reverse
-                                    proxy this may be different so double check
-                                </li>
-                            </ul>
+                    </div>
+                    <div class="text-lg text-semibold my-3">2. Optionally, set <b>Client Id</b> and <b>Client Secret</b>
+                    </div>
+                    <div class="ml-5">
+                        <div class="space-y-2">
+                            Leave these fields blank to use the id/secret you provided the application (if any),
+                            otherwise
+                            fill them in.
                         </div>
-                        <div>Make sure it matches what is found in the <b>redirect uri</b> for your <a target="_blank"
-                                                                                                       href="https://www.reddit.com/prefs/apps">application
-                                on Reddit</a> and <b>it must end with "callback"</b></div>
+                        <input id="clientId" style="min-width:500px;"
+                               class="text-black placeholder-gray-500 rounded mt-2 mb-3 p-2"
+                               placeholder="<%= locals.clientId !== undefined ? 'Use Provided Client Id' : 'Client Id Not Provided' %>">
+                        <input id="clientSecret" style="min-width:500px; display: block;"
+                               class="text-black placeholder-gray-500 rounded mt-2 mb-3 p-2"
+                               placeholder="<%= locals.clientSecret !== undefined ? 'Use Provided Client Secret' : 'Client Secret Not Provided' %>">
                     </div>
-                    <div class="text-lg text-semibold my-3">2. Login to Reddit with the account that will be the bot
+                    <div class="text-lg text-semibold my-3">3. Optionally, include additional permissions</div>
+                    <div class="my-2 ml-5">
+                        <div class="space-y-3">
+                            <span>These are permissions to allow the bot account to  perform these actions, <b>in general.</b></span>
+                            <span>In all cases the subreddits the bot moderates for will <b>also need to give the bot moderator permissions to do these actions</b> -- this is just an extra precaution if you are super paranoid.</span>
+                            <div>
+                                <input type="checkbox" id="wikiedit" name="wikiedit"
+                                       checked>
+                                <label for="wikiedit"><span class="font-mono font-semibold">wikiedit</span> permission used for writing
+                                    Toolbox
+                                    User Notes</label>
+                            </div>
+                            <div>
+                                <input type="checkbox" id="modmail" name="modmail"
+                                       checked>
+                                <label for="modmail"><span class="font-mono font-semibold">modmail</span> permission if
+                                    the bot will be sending messages "as the subreddit"</label>
+                            </div>
+                            <div>
+                                <input type="checkbox" id="modlog" name="modlog"
+                                       checked>
+                                <label for="modlog"><span class="font-mono font-semibold">modlog</span> permission if
+                                    the bot will be reading the moderation log (not currently implemented)</label>
+                            </div>
+                        </div>
                     </div>
-                    Protip: Login to Reddit in an Incognito session, then open this URL in a new tab.
-                    <div class="text-lg text-semibold my-3">3. <a id="doAuth" href="">Authorize your bot account</a>
+                    <div class="text-lg text-semibold my-3">4. Login to Reddit with the account that will be the bot
+                    </div>
+                    <div class="ml-5">
+                        <div class="space-y-3">
+                            <div>Protip: Login to Reddit in an Incognito session, then open this URL in a new tab.</div>
+                            <% if(locals.token !== undefined ) { %>
+                                <div>Use this <b>one-use* URL</b> to access this page without authentication: <span
+                                            id="tokenUrlWrapper"></span></div>
+                                <div>*After successful authentication the token will be discarded</div>
+                            <% } %>
+                        </div>
+                    </div>
+                    <div class="text-lg text-semibold my-3">5. <a id="doAuth" href="">Authorize your bot account</a>
                     </div>
                 </div>
             </div>
@@ -46,13 +94,30 @@
 </div>
 <script>
     if (document.querySelector('#redirectUri').value === '') {
-        document.querySelector('#redirectUri').value = `${document.location.href}callback`;
+        document.querySelector('#redirectUri').value = `${document.location.origin}/callback`;
     }
+
+    <% if(locals.token !== undefined ) { %>
+    document.querySelector('#tokenUrlWrapper').innerHTML = `<a href="${document.location.origin}/auth/helper?token=<%= token %>">${document.location.origin}/auth/helper?token=<%= token %></a>`;
+    <% } %>
 
     document.querySelector('#doAuth').addEventListener('click', e => {
         e.preventDefault()
-        const wikiEdit = document.querySelector('#wikiedit').checked ? 1 : 0;
-        const url = `${document.location.href}auth?redirect=${document.querySelector('#redirectUri').value}&wikiEdit=${wikiEdit}`;
+        const currParams = new URLSearchParams(document.location.search);
+
+        const params = new URLSearchParams();
+        params.append('wikiEdit', document.querySelector('#wikiedit').checked ? 1 : 0);
+        params.append('redirect', document.querySelector('#redirectUri').value);
+        params.append('clientId', document.querySelector('#clientId').value);
+        params.append('clientSecret', document.querySelector('#clientSecret').value);
+        params.append('modmail', document.querySelector('#modmail').checked ? 1 : 0);
+        params.append('modlog', document.querySelector('#modlog').checked ? 1 : 0);
+
+        if(currParams.has('token')) {
+            params.append('token', currParams.get('token'));
+        }
+
+        const url = `${document.location.origin}/auth/init?${params.toString()}`;
         window.location.href = url;
     })
 </script>

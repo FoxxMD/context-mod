@@ -14,10 +14,12 @@
                             <li>Access Token: <b><%= accessToken %></b></li>
                             <li>Refresh Token: <b><%= refreshToken %></b></li>
                         </ul>
-                        <div>Copy these somewhere and then restart the application providing these as either arguments
-                            or environmental variables as described in the <a
-                                    href="https://github.com/FoxxMD/context-mod#usage">usage section.</a>
+                        <div>Copy these somewhere and then restart the application providing these as either arguments, environmental variables, or in a json config as described in the <a
+                                    href="https://github.com/FoxxMD/context-mod/blob/master/docs/operatorConfiguration.md#defining-configuration">configuration guide</a>
                         </div>
+                        <% if(hadToken === true) { %>
+                            <div><b>Note:</b> The one-use token used to access the helper is now INVALID. If needed, you can revisit the helper page to get a new URL.</div>
+                        <% } %>
                     </div>
                 </div>
             </div>
@@ -25,16 +27,5 @@
     </div>
     <%- include('partials/footer') %>
 </div>
-<script>
-    if (document.querySelector('#redirectUri').value === '') {
-        document.querySelector('#redirectUri').value = `${document.location.href}callback`;
-    }
-
-    document.querySelector('#doAuth').addEventListener('click', e => {
-        e.preventDefault()
-        const url = `${document.location.href}auth?redirect=${document.querySelector('#redirectUri').value}`
-        window.location.href = url;
-    })
-</script>
 </body>
 </html>

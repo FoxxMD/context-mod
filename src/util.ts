@@ -770,6 +770,7 @@ export const permissions = [
     'identity',
     'modcontributors',
     'modflair',
+    'modlog',
     'modmail',
     'privatemessages',
     'modposts',
@@ -779,7 +780,7 @@ export const permissions = [
     'report',
     'submit',
     'wikiread',
-    'wikiedit'
+    'wikiedit',
 ];
 
 export const boolToString = (val: boolean): string => {
