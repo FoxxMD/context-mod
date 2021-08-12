@@ -683,7 +683,18 @@ const webClient = async (options: OperatorConfig) => {
             }
         }
 
-        const shownBots = user.isOperator ? bots : bots.filter(x => intersect(user.subreddits, x.subreddits).length > 0 || x.operators.includes(user.name.toLowerCase()));
+        const shownBots = bots.reduce((acc: BotClient[], curr) => {
+            const isBotOperator = curr.operators.map(x => x.toLowerCase()).includes(user.name.toLowerCase());
+            if(user.isOperator) {
+                // @ts-ignore
+                return acc.concat({...curr, canAccessLocation: true, isOperator: isBotOperator});
+            }
+            if(!isBotOperator && intersect(user.subreddits, curr.subreddits).length === 0) {
+                return acc;
+            }
+            // @ts-ignore
+            return acc.concat({...curr, canAccessLocation: isBotOperator, isOperator: isBotOperator});
+        },[]);
 
         res.render('status', {
             show: 'All',

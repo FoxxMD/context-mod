@@ -13,8 +13,10 @@
                                 <span data-bot="<%= data.friendly %>" class="has-tooltip rounded-md py-3 px-3 <%= data.shown ? 'border-2' : 'border'%>">
                                     <span class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black' style="margin-top:3em">
                                         <div class="stats">
+                                            <% if(data.canAccessLocation) { %>
                                             <label>Location</label>
                                             <span><%= data.normalUrl %></span>
+                                                <% } %>
                                             <label>Online</label>
                                             <span><%= data.online %></span>
                                             <label>Running</label>
