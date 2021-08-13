@@ -11,7 +11,7 @@ export const opStats = (bot: App): BotStats => {
         startedAtHuman: `${dayjs.duration(dayjs().diff(bot.startedAt)).humanize()}`,
         nextHeartbeat,
         nextHeartbeatHuman,
-        apiLimit: bot.client.ratelimitRemaining,
+        apiLimit: bot.client !== undefined ? bot.client.ratelimitRemaining : 0,
         apiAvg: formatNumber(bot.apiRollingAvg),
         nannyMode: bot.nannyMode || 'Off',
         apiDepletion: bot.apiEstDepletion === undefined ? 'Not Calculated' : bot.apiEstDepletion.humanize(),

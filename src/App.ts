@@ -35,7 +35,7 @@ const snooLogWrapper = (logger: Logger) => {
 
 export class App {
 
-    client: Snoowrap;
+    client!: Snoowrap;
     subreddits: string[];
     subManagers: Manager[] = [];
     logger: Logger;
@@ -135,7 +135,7 @@ export class App {
 
         this.subreddits = names.map(parseSubredditName);
 
-        const creds = {
+        let creds: any = {
             userAgent: `web:contextBot:dev`,
             clientId,
             clientSecret,
@@ -158,16 +158,23 @@ export class App {
             //throw new LoggedError(`Missing credentials: ${missingCreds.join(', ')}`);
         }
 
-        this.client = proxy === undefined ? new Snoowrap(creds) : new ProxiedSnoowrap({...creds, proxy});
-        this.client.config({
-            warnings: true,
-            maxRetryAttempts: 5,
-            debug,
-            logger: snooLogWrapper(this.logger.child({labels: ['Snoowrap']})),
-            continueAfterRatelimitError: true,
-        });
+        try {
+            this.client = proxy === undefined ? new Snoowrap(creds) : new ProxiedSnoowrap({...creds, proxy});
+            this.client.config({
+                warnings: true,
+                maxRetryAttempts: 5,
+                debug,
+                logger: snooLogWrapper(this.logger.child({labels: ['Snoowrap']})),
+                continueAfterRatelimitError: true,
+            });
 
-        singleton.setClient(this.client);
+            singleton.setClient(this.client);
+        } catch (err) {
+            if(this.error === undefined) {
+                this.error = err.message;
+                this.logger.error(err);
+            }
+        }
 
         const retryHandler = createRetryHandler({maxRequestRetry: 8, maxOtherRetry: 1}, this.logger);
 
