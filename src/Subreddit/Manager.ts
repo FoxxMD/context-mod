@@ -730,29 +730,6 @@ export class Manager {
         }
     }
 
-    async handle(): Promise<void> {
-        if (this.submissionChecks.length === 0 && this.commentChecks.length === 0) {
-            this.logger.warn('No submission or comment checks to run! Bot will not run.');
-            return;
-        }
-
-        try {
-            for (const s of this.streams) {
-                s.startInterval();
-            }
-            this.startedAt = dayjs();
-            this.running = true;
-            this.manuallyStopped = false;
-            this.logger.info('Bot Running');
-
-            await pEvent(this.emitter, 'end');
-        } catch (err) {
-            this.logger.error('Too many request errors occurred or an unhandled error was encountered, manager is stopping');
-        } finally {
-            this.stop();
-        }
-    }
-
     startQueue(causedBy: Invokee = 'system', options?: ManagerStateChangeOption) {
         const {reason, suppressNotification = false} = options || {};
         if(this.queueState.state === RUNNING) {
