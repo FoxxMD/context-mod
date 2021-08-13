@@ -39,6 +39,8 @@ import DelimiterStream from 'delimiter-stream';
 import {pipeline} from 'stream/promises';
 import {defaultBotStatus} from "../Common/defaults";
 import {booleanMiddle} from "../Common/middleware";
+import {BotClient} from "../interfaces";
+import { URL } from "url";
 
 const emitter = new EventEmitter();
 
@@ -78,30 +80,6 @@ declare global {
             moderatedManagers?: string[]
         }
     }
-}
-
-declare module 'express' {
-    interface Request {
-        token?: string,
-        bot?: BotClient,
-    }
-}
-
-interface BotClient extends BotConnection {
-    friendly: string
-    botName: string
-    botLink: string
-    online: boolean
-    indicator: string
-    lastCheck: number
-    error?: string
-    subreddits: string[]
-    operators: string[]
-    operatorDisplay: string
-    nanny?: string
-    running: boolean
-    url: URL,
-    normalUrl: string,
 }
 
 interface ConnectedUserInfo {
