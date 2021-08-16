@@ -98,7 +98,9 @@ export const defaultBotStatus = (subreddits: string[] = []) => {
         subreddits: subs,
         system: {
             startedAt: '-',
-            online: false,
+            running: false,
+            account: '-',
+            name: '-',
             ...botStats,
         }
     };

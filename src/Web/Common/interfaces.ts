@@ -50,7 +50,10 @@ export interface SubredditDataResponse {
 export interface BotStatusResponse {
     system: BotStats & {
         startedAt: string,
-        online: boolean
+        name: string,
+        running: boolean,
+        error?: string,
+        account: string,
     }
     subreddits: SubredditDataResponse[]
 }

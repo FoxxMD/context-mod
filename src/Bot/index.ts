@@ -41,6 +41,7 @@ class Bot {
     nextExpiration: Dayjs = dayjs();
     botName?: string;
     botLink?: string;
+    botAccount?: string;
     maxWorkers: number;
     startedAt: Dayjs = dayjs();
     sharedModqueue: boolean = false;
@@ -258,6 +259,7 @@ class Bot {
         // @ts-ignore
         const user = await this.client.getMe().fetch();
         this.botLink = `https://reddit.com/user/${user.name}`;
+        this.botAccount = `u/${user.name}`;
         this.logger.info(`Reddit API Limit Remaining: ${this.client.ratelimitRemaining}`);
         this.logger.info(`Authenticated Account: u/${user.name}`);
 

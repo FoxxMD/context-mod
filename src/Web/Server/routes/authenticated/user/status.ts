@@ -1,5 +1,13 @@
 import {Request, Response} from 'express';
-import {boolToString, cacheStats, filterLogBySubreddit, formatNumber, LogEntry, pollingInfo} from "../../../../../util";
+import {
+    boolToString,
+    cacheStats,
+    filterLogBySubreddit,
+    formatNumber,
+    intersect,
+    LogEntry,
+    pollingInfo
+} from "../../../../../util";
 import {Manager} from "../../../../../Subreddit/Manager";
 import dayjs from "dayjs";
 import {ResourceStats, RUNNING, STOPPED, SYSTEM} from "../../../../../Common/interfaces";
@@ -7,6 +15,7 @@ import {BotStatusResponse} from "../../../../Common/interfaces";
 import winston from "winston";
 import {opStats} from "../../../../Common/util";
 import {authUserCheck, botRoute} from "../../../middleware";
+import Bot from "../../../../../Bot";
 
 const status = (subLogMap: Map<string, LogEntry[]>) => {
 
@@ -16,6 +25,20 @@ const status = (subLogMap: Map<string, LogEntry[]>) => {
     ];
 
     const response = async (req: Request, res: Response) => {
+        let bots: Bot[] = [];
+        if(req.serverBot !== undefined) {
+            bots = [req.serverBot];
+        } else {
+            bots = (req.user as Express.User).isOperator ? req.botApp.bots : req.botApp.bots.filter(x => intersect(req.user?.subreddits as string[], x.subManagers.map(y => y.subreddit.display_name)));
+        }
+        const resp: BotStatusResponse[] = [];
+        for(const b of bots) {
+            resp.push(await botStatResponse(b, req));
+        }
+        return res.json(resp);
+    }
+
+    const botStatResponse = async (bot: Bot, req: Request) => {
         const {
             //subreddits = [],
             //user: userVal,
@@ -25,11 +48,6 @@ const status = (subLogMap: Map<string, LogEntry[]>) => {
             lastCheck
         } = req.query;
 
-        const bot = req.serverBot;
-
-        if (bot === undefined) {
-            return res.status(500).send('Bot is offline');
-        }
         const {name: userName, realManagers = [], isOperator} = req.user as Express.User;
         const user = userName as string;
         const subreddits = realManagers;
@@ -182,8 +200,8 @@ const status = (subLogMap: Map<string, LogEntry[]>) => {
         const aManagerWithDefaultResources = bot.subManagers.find(x => x.resources !== undefined && x.resources.cacheSettingsHash === 'default');
         let allManagerData: any = {
             name: 'All',
-            status: 'ONLINE',
-            indicator: 'green',
+            status: bot.running ? 'RUNNING' : 'NOT RUNNING',
+            indicator: bot.running ? 'green' : 'grey',
             maxWorkers,
             globalMaxWorkers,
             subMaxWorkers,
@@ -244,13 +262,17 @@ const status = (subLogMap: Map<string, LogEntry[]>) => {
         const data: BotStatusResponse = {
             system: {
                 startedAt: bot.startedAt.local().format('MMMM D, YYYY h:mm A Z'),
-                online: true,
+                running: bot.running,
+                error: bot.error,
+                account: bot.botAccount as string,
+                name: bot.botName as string,
                 ...opStats(bot),
             },
             subreddits: [allManagerData, ...subManagerData],
+
         };
 
-        return res.json(data);
+        return data;
     };
 
     return [...middleware, response];

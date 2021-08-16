@@ -4,18 +4,21 @@ import Bot from "../../Bot";
 export const authUserCheck = (userRequired: boolean = true) => async (req: Request, res: Response, next: Function) => {
     if (req.isAuthenticated()) {
         if (userRequired && req.user.machine) {
-            return res.status(403).json({message: 'Must be authenticated as a user to access this route'});
+            return res.status(403).send('Must be authenticated as a user to access this route');
         }
         return next();
     } else {
-        return res.status(401).json('Must be authenticated to access this route');
+        return res.status(401).send('Must be authenticated to access this route');
     }
 }
 
-export const botRoute = () => async (req: Request, res: Response, next: Function) => {
+export const botRoute = (required = true) => async (req: Request, res: Response, next: Function) => {
     const {bot: botVal} = req.query;
     if (botVal === undefined) {
-        return res.status(400).send("Must specify 'bot' parameter");
+        if(required) {
+            return res.status(400).send("Must specify 'bot' parameter");
+        }
+        return next();
     }
     const botStr = botVal as string;
 
@@ -24,6 +27,7 @@ export const botRoute = () => async (req: Request, res: Response, next: Function
             return res.status(404).send(`Bot named ${botStr} does not exist or you do not have permission to access it.`);
         }
         req.serverBot = req.botApp.bots.find(x => x.botName === botStr) as Bot;
-        next();
+        return next();
     }
+    return next();
 }

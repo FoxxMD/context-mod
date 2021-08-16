@@ -523,7 +523,7 @@ const webClient = async (options: OperatorConfig) => {
         const msg = 'Bot does not exist or you do not have permission to access it';
         const instance = cmInstances.find(x => x.friendly === req.query.instance);
         if (instance === undefined) {
-            return res.render('error', {error: msg});
+            return res.status(404).render('error', {error: msg});
         }
 
         const user = req.user as Express.User;
@@ -531,11 +531,11 @@ const webClient = async (options: OperatorConfig) => {
         const isOperator = instance.operators.includes(user.name);
         const canAccessBot = isOperator || intersect(user.subreddits, instance.subreddits).length === 0;
         if (user.isOperator && !canAccessBot) {
-            return res.render('error', {error: msg});
+            return res.status(404).render('error', {error: msg});
         }
 
         if (req.params.subreddit !== undefined && !isOperator && !user.subreddits.includes(req.params.subreddit)) {
-            return res.render('error', {error: msg});
+            return res.status(404).render('error', {error: msg});
         }
         req.instance = instance;
         req.session.botId = instance.friendly;
@@ -556,12 +556,12 @@ const webClient = async (options: OperatorConfig) => {
         const msg = 'Bot does not exist or you do not have permission to access it';
         const botVal = req.query.bot as string;
         if(botVal === undefined) {
-            return res.render('error', {error: `"bot" param must be defined`});
+            return res.status(400).render('error', {error: `"bot" param must be defined`});
         }
 
         const botInstance = instance.bots.find(x => x.botName === botVal);
         if(botInstance === undefined) {
-            return res.render('error', {error: msg});
+            return res.status(404).render('error', {error: msg});
         }
 
         const user = req.user as Express.User;
@@ -569,11 +569,11 @@ const webClient = async (options: OperatorConfig) => {
         const isOperator = instance.operators.includes(user.name);
         const canAccessBot = isOperator || intersect(user.subreddits, botInstance.subreddits).length === 0;
         if (user.isOperator && !canAccessBot) {
-            return res.render('error', {error: msg});
+            return res.status(404).render('error', {error: msg});
         }
 
         if (req.params.subreddit !== undefined && !isOperator && !user.subreddits.includes(req.params.subreddit)) {
-            return res.render('error', {error: msg});
+            return res.status(404).render('error', {error: msg});
         }
         req.bot = botInstance;
         next();
@@ -697,17 +697,6 @@ const webClient = async (options: OperatorConfig) => {
             })
         }
 
-        if (req.query.sub !== undefined) {
-            const encoded = encodeURI(req.query.sub as string).toLowerCase();
-            // @ts-ignore
-            const shouldShow = resp.subreddits.find(x => x.name.toLowerCase() === encoded);
-            if (shouldShow !== undefined) {
-                resp.show = shouldShow.name;
-            } else {
-                resp.show = 'All';
-            }
-        }
-
         const shownInstances = cmInstances.reduce((acc: CMInstance[], curr) => {
             const isBotOperator = curr.operators.map(x => x.toLowerCase()).includes(user.name.toLowerCase());
             if(user.isOperator) {
@@ -732,11 +721,10 @@ const webClient = async (options: OperatorConfig) => {
         },[]);
 
         res.render('status', {
-            show: 'All',
-            ...resp,
             instances: shownInstances.map(x => ({...x, shown: x.friendly === instance.friendly})),
-            bots: shownBots.map(x => ({...x, shown: req.query.bot === x.botName})),
+            bots: resp.map((x: any) => ({...x, shown: req.query.bot === x.name})),
             botId: (req.instance as CMInstance).friendly,
+            instanceId: (req.instance as CMInstance).friendly,
             isOperator: instance.operators.includes((req.user as Express.User).name),
             operators: instance.operators.join(', '),
             operatorDisplay: instance.operatorDisplay,

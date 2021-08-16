@@ -10,6 +10,7 @@ import passport from 'passport';
 import tcpUsed from 'tcp-port-used';
 
 import {
+    intersect,
     LogEntry,
     parseSubredditLogName
 } from "../../util";
@@ -25,6 +26,8 @@ import {actionRoute, configRoute} from "./routes/authenticated/user";
 import action from "./routes/authenticated/user/action";
 import {authUserCheck, botRoute} from "./middleware";
 import {opStats} from "../Common/util";
+import Bot from "../../Bot";
+import {BotStatusResponse} from "../Common/interfaces";
 
 const server = addAsync(express());
 server.use(bodyParser.json());
@@ -151,8 +154,18 @@ const rcbServer = async function (options: OperatorConfig) {
 
     server.getAsync('/logs', ...logs(subLogMap));
 
-    server.getAsync('/stats', [authUserCheck(), botRoute()], async (req: Request, res: Response) => {
-        return res.json(opStats(req.serverBot));
+    server.getAsync('/stats', [authUserCheck(), botRoute(false)], async (req: Request, res: Response) => {
+        let bots: Bot[] = [];
+        if(req.serverBot !== undefined) {
+            bots = [req.serverBot];
+        } else {
+            bots = (req.user as Express.User).isOperator ? req.botApp.bots : req.botApp.bots.filter(x => intersect(req.user?.subreddits as string[], x.subManagers.map(y => y.subreddit.display_name)));
+        }
+        const resp = [];
+        for(const b of bots) {
+            resp.push({name: b.botName, data: await opStats(b)});
+        }
+        return res.json(resp);
     });
 
     server.getAsync('/status', ...status(subLogMap))
