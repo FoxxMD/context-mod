@@ -2,7 +2,7 @@ import {RuleSet, IRuleSet, RuleSetJson, RuleSetObjectJson} from "../Rule/RuleSet
 import {IRule, isRuleSetResult, Rule, RuleJSONConfig, RuleResult, RuleSetResult} from "../Rule";
 import Action, {ActionConfig, ActionJson} from "../Action";
 import {Logger} from "winston";
-import {Comment, Submission} from "snoowrap";
+import Snoowrap, {Comment, Submission} from "snoowrap";
 import {actionFactory} from "../Action/ActionFactory";
 import {ruleFactory} from "../Rule/RuleFactory";
 import {
@@ -27,7 +27,7 @@ import * as RuleSchema from '../Schema/Rule.json';
 import * as RuleSetSchema from '../Schema/RuleSet.json';
 import * as ActionSchema from '../Schema/Action.json';
 import {ActionObjectJson, RuleJson, RuleObjectJson, ActionJson as ActionTypeJson} from "../Common/types";
-import ResourceManager, {SubredditResources} from "../Subreddit/SubredditResources";
+import {SubredditResources} from "../Subreddit/SubredditResources";
 import {Author, AuthorCriteria, AuthorOptions} from "../Author/Author";
 
 const checkLogName = truncateStringToLength(25);
@@ -48,12 +48,15 @@ export abstract class Check implements ICheck {
     dryRun?: boolean;
     notifyOnTrigger: boolean;
     resources: SubredditResources;
+    client: Snoowrap;
 
     constructor(options: CheckOptions) {
         const {
             enable = true,
             name,
+            resources,
             description,
+            client,
             condition = 'AND',
             rules = [],
             actions = [],
@@ -73,7 +76,8 @@ export abstract class Check implements ICheck {
 
         const ajv = createAjvFactory(this.logger);
 
-        this.resources = ResourceManager.get(subredditName) as SubredditResources;
+        this.resources = resources;
+        this.client = client;
 
         this.name = name;
         this.description = description;
@@ -94,12 +98,12 @@ export abstract class Check implements ICheck {
                 let ruleErrors: any = [];
                 if (valid) {
                     const ruleConfig = r as RuleSetObjectJson;
-                    this.rules.push(new RuleSet({...ruleConfig, logger: this.logger, subredditName}));
+                    this.rules.push(new RuleSet({...ruleConfig, logger: this.logger, subredditName, resources: this.resources, client: this.client}));
                 } else {
                     setErrors = ajv.errors;
                     valid = ajv.validate(RuleSchema, r);
                     if (valid) {
-                        this.rules.push(ruleFactory(r as RuleJSONConfig, this.logger, subredditName));
+                        this.rules.push(ruleFactory(r as RuleJSONConfig, this.logger, subredditName, this.resources, this.client));
                     } else {
                         ruleErrors = ajv.errors;
                         const leastErrorType = setErrors.length < ruleErrors ? 'RuleSet' : 'Rule';
@@ -123,7 +127,7 @@ export abstract class Check implements ICheck {
                     this.actions.push(actionFactory({
                         ...aj,
                         dryRun: this.dryRun || aj.dryRun
-                    }, this.logger, subredditName));
+                    }, this.logger, subredditName, this.resources, this.client));
                     // @ts-ignore
                     a.logger = this.logger;
                 } else {
@@ -331,6 +335,8 @@ export interface CheckOptions extends ICheck {
     logger: Logger
     subredditName: string
     notifyOnTrigger?: boolean
+    resources: SubredditResources
+    client: Snoowrap
 }
 
 export interface CheckJson extends ICheck {

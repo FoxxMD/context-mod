@@ -6,7 +6,7 @@ import winston from "winston";
 import pEvent from "p-event";
 import {getLogger} from "../../../../../Utils/loggerFactory";
 import {booleanMiddle} from "../../../../Common/middleware";
-import {authUserCheck} from "../../../middleware";
+import {authUserCheck, botRoute} from "../../../middleware";
 
 const logs = (subLogMap: Map<string, LogEntry[]>) => {
     const middleware = [

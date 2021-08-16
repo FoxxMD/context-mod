@@ -1,5 +1,5 @@
 import {Request, Response} from 'express';
-import {authUserCheck} from "../../../middleware";
+import {authUserCheck, botRoute} from "../../../middleware";
 import Submission from "snoowrap/dist/objects/Submission";
 import winston from 'winston';
 import {COMMENT_URL_ID, parseLinkIdentifier, SUBMISSION_URL_ID} from "../../../../../util";
@@ -9,7 +9,7 @@ const commentReg = parseLinkIdentifier([COMMENT_URL_ID]);
 const submissionReg = parseLinkIdentifier([SUBMISSION_URL_ID]);
 
 const config = async (req: Request, res: Response) => {
-    const bot = req.botApp;
+    const bot = req.serverBot;
 
     const {subreddit} = req.query as any;
     const {name: userName, realManagers = [], isOperator} = req.user as Express.User;
@@ -25,10 +25,10 @@ const config = async (req: Request, res: Response) => {
     const wiki = await manager.subreddit.getWikiPage(manager.wikiLocation).fetch();
     return res.send(wiki.content_md);
 };
-export const configRoute = [authUserCheck(), config];
+export const configRoute = [authUserCheck(), botRoute(), config];
 
 const action = async (req: Request, res: Response) => {
-    const bot = req.botApp;
+    const bot = req.serverBot;
 
     const {url, dryRun, subreddit} = req.query as any;
     const {name: userName, realManagers = [], isOperator} = req.user as Express.User;
@@ -74,4 +74,4 @@ const action = async (req: Request, res: Response) => {
     res.send('OK');
 };
 
-export const actionRoute = [authUserCheck(), booleanMiddle(['dryRun']), action];
+export const actionRoute = [authUserCheck(), botRoute(), booleanMiddle(['dryRun']), action];

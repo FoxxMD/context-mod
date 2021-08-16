@@ -1,8 +1,8 @@
-import {Comment} from "snoowrap";
+import Snoowrap, {Comment} from "snoowrap";
 import Submission from "snoowrap/dist/objects/Submission";
 import {Logger} from "winston";
 import {findResultByPremise, mergeArr} from "../util";
-import ResourceManager, {SubredditResources} from "../Subreddit/SubredditResources";
+import {SubredditResources} from "../Subreddit/SubredditResources";
 import {ChecksActivityState, TypedActivityStates} from "../Common/interfaces";
 import Author, {AuthorOptions} from "../Author/Author";
 
@@ -12,6 +12,8 @@ export interface RuleOptions {
     itemIs?: TypedActivityStates;
     logger: Logger
     subredditName: string;
+    resources: SubredditResources
+    client: Snoowrap
 }
 
 export interface RulePremise {
@@ -50,6 +52,7 @@ export abstract class Rule implements IRule, Triggerable {
     authorIs: AuthorOptions;
     itemIs: TypedActivityStates;
     resources: SubredditResources;
+    client: Snoowrap;
 
     constructor(options: RuleOptions) {
         const {
@@ -61,9 +64,12 @@ export abstract class Rule implements IRule, Triggerable {
             } = {},
             itemIs = [],
             subredditName,
+            resources,
+            client,
         } = options;
         this.name = name;
-        this.resources = ResourceManager.get(subredditName) as SubredditResources;
+        this.resources = resources;
+        this.client = client;
 
         this.authorIs = {
             exclude: exclude.map(x => new Author(x)),

@@ -2,8 +2,9 @@ import {App} from "../../App";
 import {BotStats} from "./interfaces";
 import dayjs from "dayjs";
 import {formatNumber} from "../../util";
+import Bot from "../../Bot";
 
-export const opStats = (bot: App): BotStats => {
+export const opStats = (bot: Bot): BotStats => {
     const limitReset = dayjs(bot.client.ratelimitExpiration);
     const nextHeartbeat = bot.nextHeartbeat !== undefined ? bot.nextHeartbeat.local().format('MMMM D, YYYY h:mm A Z') : 'N/A';
     const nextHeartbeatHuman = bot.nextHeartbeat !== undefined ? `in ${dayjs.duration(bot.nextHeartbeat.diff(dayjs())).humanize()}` : 'N/A'

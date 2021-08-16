@@ -839,20 +839,6 @@ export interface RedditCredentials {
      * @examples ["34v5q1c56ub"]
      * */
     clientSecret?: string,
-    /**
-     * Redirect URI for your Reddit application
-     *
-     * **Note:** Only required if:
-     *
-     * * You need to authenticate your bot account on first-time setup
-     * * You want to use the web interface and are not providing `web.credentials.redirectUri` separately
-     *
-     * * ENV => `REDIRECT_URI`
-     * * ARG => `--redirectUri <uri>`
-     *
-     * @examples ["http://localhost:8085/callback"]
-     * */
-    redirectUri?: string,
 
     /**
      * Access token retrieved from authenticating an account with your Reddit Application
@@ -899,106 +885,27 @@ export interface WebCredentials {
     /**
      * Redirect URI for your Reddit application
      *
+     * Used for:
+     *
+     * * accessing the web interface for monitoring bots
+     * * authenticating an account to use for a bot instance
+     *
+     * * ENV => `REDIRECT_URI`
+     * * ARG => `--redirectUri <uri>`
+     *
      * @examples ["http://localhost:8085/callback"]
      * */
     redirectUri?: string,
 }
 
-/**
- * Configuration for application-level settings IE for running the bot instance
- *
- * * To load a JSON configuration **from the command line** use the `-c` cli argument EX: `node src/index.js -c /path/to/JSON/config.json`
- * * To load a JSON configuration **using an environmental variable** use `OPERATOR_CONFIG` EX: `OPERATOR_CONFIG=/path/to/JSON/config.json`
- * */
-export interface OperatorJsonConfig {
+export interface BotInstanceJsonConfig {
+    credentials?: RedditCredentials
+    name?: string
     /**
-     * Mode to run ContextMod in
-     *
-     * * `all` (default) - Run the api and the web interface
-     * * `web` - Run web interface only
-     * * `api` - Run the api only
-     *
-     * @default "all"
-     * */
-    mode?: 'bot' | 'web' | 'all',
-    /**
-     * Settings related to the user(s) running this ContextMod instance and information on the bot
-     * */
-    operator?: {
-        /**
-         * The name, or names, of the Reddit accounts, without prefix, that the operators of this bot uses.
-         *
-         * This is used for showing more information in the web interface IE show all logs/subreddits if even not a moderator.
-         *
-         * EX -- User is /u/FoxxMD then `"name": ["FoxxMD"]`
-         *
-         * * ENV => `OPERATOR` (if list, comma-delimited)
-         * * ARG => `--operator <name...>`
-         *
-         * @examples [["FoxxMD","AnotherUser"]]
-         * */
-        name?: string | string[],
-        /**
-         * A **public** name to display to users of the web interface. Use this to help moderators using your bot identify who is the operator in case they need to contact you.
-         *
-         * Leave undefined for no public name to be displayed.
-         *
-         * * ENV => `OPERATOR_DISPLAY`
-         * * ARG => `--operatorDisplay <name>`
-         *
-         * @examples ["Moderators of r/MySubreddit"]
-         * */
-        display?: string,
-        /**
-         * The name to use when identifying the bot. Defaults to name of the authenticated Reddit account IE `u/yourBotAccount`
-         *
-         * **Note:** If you plan on running multiple ContextMod instances with the same account then `botName` should be unique for each instance.
-         *
-         * @examples ["u/yourBotAccount"]
-         * */
-        botName?: string,
-    },
-
-    credentials?: RedditCredentials,
-    /**
-     * Settings to configure 3rd party notifications for when ContextMod behavior occurs
+     * Settings to configure 3rd party notifications for when behavior occurs
      * */
     notifications?: NotificationConfig
-    /**
-     * Settings to configure global logging defaults
-     * */
-    logging?: {
-        /**
-         * The minimum log level to output. The log level set will output logs at its level **and all levels above it:**
-         *
-         *  * `error`
-         *  * `warn`
-         *  * `info`
-         *  * `verbose`
-         *  * `debug`
-         *
-         *  Note: `verbose` will display *a lot* of information on the status/result of run rules/checks/actions etc. which is very useful for testing configurations. Once your bot is stable changing the level to `info` will reduce log noise.
-         *
-         *  * ENV => `LOG_LEVEL`
-         *  * ARG => `--logLevel <level>`
-         *
-         *  @default "verbose"
-         *  @examples ["verbose"]
-         * */
-        level?: LogLevel,
-        /**
-         * The absolute path to a directory where rotating log files should be stored.
-         *
-         * * If not present or `null` no log files will be created
-         * * If `true` logs will be stored at `[working directory]/logs`
-         *
-         * * ENV => `LOG_DIR`
-         * * ARG => `--logDir [dir]`
-         *
-         * @examples ["/var/log/contextmod"]
-         * */
-        path?: string,
-    },
+
     /**
      * Settings to control some [Snoowrap](https://github.com/not-an-aardvark/snoowrap) behavior
      * */
@@ -1027,6 +934,7 @@ export interface OperatorJsonConfig {
          * */
         debug?: boolean,
     }
+
     /**
      * Settings related to bot behavior for subreddits it is managing
      * */
@@ -1041,7 +949,7 @@ export interface OperatorJsonConfig {
          *
          * @examples [["mealtimevideos","programminghumor"]]
          * */
-        names?: string[],
+        names?: string[]
         /**
          * If `true` then all subreddits will run in dry run mode, overriding configurations
          *
@@ -1051,7 +959,7 @@ export interface OperatorJsonConfig {
          * @default false
          * @examples [false]
          * */
-        dryRun?: boolean,
+        dryRun?: boolean
         /**
          * The default relative url to the ContextMod wiki page EX `https://reddit.com/r/subreddit/wiki/<path>`
          *
@@ -1061,7 +969,7 @@ export interface OperatorJsonConfig {
          * @default "botconfig/contextbot"
          * @examples ["botconfig/contextbot"]
          * */
-        wikiConfig?: string,
+        wikiConfig?: string
         /**
          * Interval, in seconds, to perform application heartbeat
          *
@@ -1078,7 +986,8 @@ export interface OperatorJsonConfig {
          * @examples [300]
          * */
         heartbeatInterval?: number,
-    },
+    }
+
     /**
      *  Settings related to default polling configurations for subreddits
      * */
@@ -1109,78 +1018,8 @@ export interface OperatorJsonConfig {
          * @examples [1]
          * */
         maxWorkers?: number,
-    },
-    /**
-     * Settings for the web interface
-     * */
-    web?: {
-        /**
-         * The port for the web interface
-         *
-         * * ENV => `PORT`
-         * * ARG => `--port <number>`
-         *
-         * @default 8085
-         * @examples [8085]
-         * */
-        port?: number,
-        /**
-         * Settings to configure the behavior of user sessions -- the session is what the web interface uses to identify logged in users.
-         * */
-        session?: {
-            /**
-             * The cache provider to use.
-             *
-             * The default should be sufficient for almost all use cases
-             *
-             * @default "memory"
-             * @examples ["memory"]
-             * */
-            provider?: 'memory' | 'redis' | CacheOptions,
-            /**
-             * The secret value used to encrypt session data
-             *
-             * If provider is persistent (redis) specifying a value here will ensure sessions are valid between application restarts
-             *
-             * When not present or `null` a random string is generated on application start
-             *
-             * @examples ["definitelyARandomString"]
-             * */
-            secret?: string,
-        }
-        /**
-         * The default log level to filter to in the web interface
-         *
-         * If not specified or `null` will be same as global `logLevel`
-         * */
-        logLevel?: LogLevel,
-        /**
-         * Maximum number of log statements to keep in memory for each subreddit
-         *
-         * @default 200
-         * @examples [200]
-         * */
-        maxLogs?: number,
-        clients?: BotConnection[]
-
-        credentials?: WebCredentials
-
-        /**
-         * The name, or names, of the Reddit accounts, without prefix, that the operators of this **web interface** uses.
-         *
-         * **Note:** This is **not the same** as the top-level `operator` property. This allows specified users to see the status of all `clients` but **not** access to them -- that must still be specified in the `operator.name` property in the configuration of each bot.
-         *
-         *
-         * EX -- User is /u/FoxxMD then `"name": ["FoxxMD"]`
-         *
-         * @examples [["FoxxMD","AnotherUser"]]
-         * */
-        operators?: string[]
     }
-    api?: {
-        port?: number,
-        secret?: string,
-    }
+
     /**
      * Settings to configure the default caching behavior for each suberddit
      * */
@@ -1257,6 +1096,168 @@ export interface OperatorJsonConfig {
     }
 }
 
+/**
+ * Configuration for application-level settings IE for running the bot instance
+ *
+ * * To load a JSON configuration **from the command line** use the `-c` cli argument EX: `node src/index.js -c /path/to/JSON/config.json`
+ * * To load a JSON configuration **using an environmental variable** use `OPERATOR_CONFIG` EX: `OPERATOR_CONFIG=/path/to/JSON/config.json`
+ * */
+export interface OperatorJsonConfig {
+    /**
+     * Mode to run ContextMod in
+     *
+     * * `all` (default) - Run the api and the web interface
+     * * `web` - Run web interface only
+     * * `api` - Run the api only
+     *
+     * @default "all"
+     * */
+    mode?: 'bot' | 'web' | 'all',
+    /**
+     * Settings related to the user(s) running this ContextMod instance and information on the bot
+     * */
+    operator?: {
+        /**
+         * The name, or names, of the Reddit accounts, without prefix, that the operators of this bot uses.
+         *
+         * This is used for showing more information in the web interface IE show all logs/subreddits if even not a moderator.
+         *
+         * EX -- User is /u/FoxxMD then `"name": ["FoxxMD"]`
+         *
+         * * ENV => `OPERATOR` (if list, comma-delimited)
+         * * ARG => `--operator <name...>`
+         *
+         * @examples [["FoxxMD","AnotherUser"]]
+         * */
+        name?: string | string[],
+        /**
+         * A **public** name to display to users of the web interface. Use this to help moderators using your bot identify who is the operator in case they need to contact you.
+         *
+         * Leave undefined for no public name to be displayed.
+         *
+         * * ENV => `OPERATOR_DISPLAY`
+         * * ARG => `--operatorDisplay <name>`
+         *
+         * @examples ["Moderators of r/MySubreddit"]
+         * */
+        display?: string,
+    },
+    /**
+     * Settings to configure 3rd party notifications for when ContextMod behavior occurs
+     * */
+    notifications?: NotificationConfig
+    /**
+     * Settings to configure global logging defaults
+     * */
+    logging?: {
+        /**
+         * The minimum log level to output. The log level set will output logs at its level **and all levels above it:**
+         *
+         *  * `error`
+         *  * `warn`
+         *  * `info`
+         *  * `verbose`
+         *  * `debug`
+         *
+         *  Note: `verbose` will display *a lot* of information on the status/result of run rules/checks/actions etc. which is very useful for testing configurations. Once your bot is stable changing the level to `info` will reduce log noise.
+         *
+         *  * ENV => `LOG_LEVEL`
+         *  * ARG => `--logLevel <level>`
+         *
+         *  @default "verbose"
+         *  @examples ["verbose"]
+         * */
+        level?: LogLevel,
+        /**
+         * The absolute path to a directory where rotating log files should be stored.
+         *
+         * * If not present or `null` no log files will be created
+         * * If `true` logs will be stored at `[working directory]/logs`
+         *
+         * * ENV => `LOG_DIR`
+         * * ARG => `--logDir [dir]`
+         *
+         * @examples ["/var/log/contextmod"]
+         * */
+        path?: string,
+    },
+
+    bots?: BotInstanceJsonConfig[]
+
+    /**
+     * Settings for the web interface
+     * */
+    web?: {
+        /**
+         * The port for the web interface
+         *
+         * * ENV => `PORT`
+         * * ARG => `--port <number>`
+         *
+         * @default 8085
+         * @examples [8085]
+         * */
+        port?: number,
+        /**
+         * Settings to configure the behavior of user sessions -- the session is what the web interface uses to identify logged in users.
+         * */
+        session?: {
+            /**
+             * The cache provider to use.
+             *
+             * The default should be sufficient for almost all use cases
+             *
+             * @default "memory"
+             * @examples ["memory"]
+             * */
+            provider?: 'memory' | 'redis' | CacheOptions,
+            /**
+             * The secret value used to encrypt session data
+             *
+             * If provider is persistent (redis) specifying a value here will ensure sessions are valid between application restarts
+             *
+             * When not present or `null` a random string is generated on application start
+             *
+             * @examples ["definitelyARandomString"]
+             * */
+            secret?: string,
+        }
+        /**
+         * The default log level to filter to in the web interface
+         *
+         * If not specified or `null` will be same as global `logLevel`
+         * */
+        logLevel?: LogLevel,
+        /**
+         * Maximum number of log statements to keep in memory for each subreddit
+         *
+         * @default 200
+         * @examples [200]
+         * */
+        maxLogs?: number,
+        clients?: BotConnection[]
+
+        credentials?: WebCredentials
+
+        /**
+         * The name, or names, of the Reddit accounts, without prefix, that the operators of this **web interface** uses.
+         *
+         * **Note:** This is **not the same** as the top-level `operator` property. This allows specified users to see the status of all `clients` but **not** access to them -- that must still be specified in the `operator.name` property in the configuration of each bot.
+         *
+         *
+         * EX -- User is /u/FoxxMD then `"name": ["FoxxMD"]`
+         *
+         * @examples [["FoxxMD","AnotherUser"]]
+         * */
+        operators?: string[]
+    }
+    api?: {
+        port?: number,
+        secret?: string,
+        friendly?: string,
+    }
+}
+
 export interface RequiredOperatorRedditCredentials extends RedditCredentials {
     clientId: string,
     clientSecret: string
@@ -1268,19 +1269,8 @@ export interface RequiredWebRedditCredentials extends RedditCredentials {
     redirectUri: string
 }
 
-export interface OperatorConfig extends OperatorJsonConfig {
-    mode: 'all' | 'web' | 'bot',
-    operator: {
-        name: string[]
-        display?: string,
-        botName?: string,
-    },
-    credentials: RequiredOperatorRedditCredentials,
-    notifications?: NotificationConfig
-    logging: {
-        level: LogLevel,
-        path?: string,
-    },
+export interface BotInstanceConfig extends BotInstanceJsonConfig {
+    credentials: RequiredOperatorRedditCredentials
     snoowrap: {
         proxy?: string,
         debug?: boolean,
@@ -1299,6 +1289,24 @@ export interface OperatorConfig extends OperatorJsonConfig {
     queue: {
         maxWorkers: number,
     },
+    caching: StrongCache,
+    nanny: {
+        softLimit: number,
+        hardLimit: number,
+    }
+}
+
+export interface OperatorConfig extends OperatorJsonConfig {
+    mode: 'all' | 'web' | 'bot',
+    operator: {
+        name: string[]
+        display?: string,
+    },
+    notifications?: NotificationConfig
+    logging: {
+        level: LogLevel,
+        path?: string,
+    },
     web: {
         port: number,
         session: {
@@ -1314,12 +1322,9 @@ export interface OperatorConfig extends OperatorJsonConfig {
     api: {
         port: number,
         secret: string,
+        friendly?: string,
     }
-    caching: StrongCache,
-    nanny: {
-        softLimit: number,
-        hardLimit: number,
-    }
+    bots: BotInstanceConfig[]
 }
 
 //export type OperatorConfig = Required<OperatorJsonConfig>;

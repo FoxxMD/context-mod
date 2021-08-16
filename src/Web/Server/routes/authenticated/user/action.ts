@@ -3,11 +3,11 @@ import {RUNNING, USER} from "../../../../../Common/interfaces";
 import Submission from "snoowrap/dist/objects/Submission";
 import LoggedError from "../../../../../Utils/LoggedError";
 import winston from "winston";
-import {authUserCheck} from "../../../middleware";
+import {authUserCheck, botRoute} from "../../../middleware";
 import {booleanMiddle} from "../../../../Common/middleware";
 
 const action = async (req: express.Request, res: express.Response) => {
-    const bot = req.botApp;
+    const bot = req.serverBot;
 
     const {type, action, subreddit, force = false} = req.query as any;
     const {name: userName, realManagers = [], isOperator} = req.user as Express.User;
@@ -92,5 +92,5 @@ const action = async (req: express.Request, res: express.Response) => {
     res.send('OK');
 };
 
-const actionRoute = [authUserCheck(), booleanMiddle(['force']), action];
+const actionRoute = [authUserCheck(), botRoute(), booleanMiddle(['force']), action];
 export default actionRoute;

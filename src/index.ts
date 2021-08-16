@@ -23,6 +23,8 @@ import Submission from "snoowrap/dist/objects/Submission";
 import {COMMENT_URL_ID, parseLinkIdentifier, SUBMISSION_URL_ID} from "./util";
 import LoggedError from "./Utils/LoggedError";
 import {buildOperatorConfigWithDefaults, parseOperatorConfigFromSources} from "./ConfigBuilder";
+import {getLogger} from "./Utils/loggerFactory";
+import Bot from "./Bot";
 
 dayjs.extend(utc);
 dayjs.extend(dduration);
@@ -74,16 +76,17 @@ const program = new Command();
         });
 
         let checkCommand = program
-            .command('check <activityIdentifier> [type]')
+            .command('check <activityIdentifier> [type] [bot]')
             .allowUnknownOption()
             .description('Run check(s) on a specific activity', {
                 activityIdentifier: 'Either a permalink URL or the ID of the Comment or Submission',
                 type: `If activityIdentifier is not a permalink URL then the type of activity ('comment' or 'submission'). May also specify 'submission' type when using a permalink to a comment to get the Submission`,
+                bot: 'Specify the bot to try with using `bot.name` (from config) -- otherwise all bots will be built before the bot to be used can be determined'
             });
         checkCommand = addOptions(checkCommand, getUniversalCLIOptions());
         checkCommand
             .addOption(checks)
-            .action(async (activityIdentifier, type, commandOptions = {}) => {
+            .action(async (activityIdentifier, type, botVal, commandOptions = {}) => {
                 const config = buildOperatorConfigWithDefaults(await parseOperatorConfigFromSources(commandOptions));
                 const {checks = []} = commandOptions;
                 app = new App(config);
@@ -128,37 +131,63 @@ const program = new Command();
                 // @ts-ignore
                 const activity = await a.fetch();
                 const sub = await activity.subreddit.display_name;
-                await app.buildManagers([sub]);
-                if (app.subManagers.length > 0) {
-                    const manager = app.subManagers.find(x => x.subreddit.display_name === sub) as Manager;
-                    await manager.runChecks(type === 'comment' ? 'Comment' : 'Submission', activity, {checkNames: checks});
+                const logger = winston.loggers.get('default');
+                let bots: Bot[] = [];
+                if(botVal !== undefined) {
+                    const bot = app.bots.find(x => x.botName === botVal);
+                    if(bot === undefined) {
+                        logger.error(`No bot named "${botVal} found"`);
+                    } else {
+                        bots = [bot];
+                    }
+                } else  {
+                    bots = app.bots;
+                }
+                for(const b of bots) {
+                    await b.buildManagers([sub]);
+                    if(b.subManagers.length > 0) {
+                       const manager = b.subManagers[0];
+                        await manager.runChecks(type === 'comment' ? 'Comment' : 'Submission', activity, {checkNames: checks});
+                        break;
+                    }
                 }
             });
 
         let unmodCommand = program.command('unmoderated <subreddits...>')
             .description('Run checks on all unmoderated activity in the modqueue', {
-                subreddits: 'The list of subreddits to run on. If not specified will run on all subreddits the account has moderation access to.'
+                subreddits: 'The list of subreddits to run on. If not specified will run on all subreddits the account has moderation access to.',
+                bot: 'Specify the bot to try with using `bot.name` (from config) -- otherwise all bots will be built before the bot to be used can be determined'
             })
             .allowUnknownOption();
         unmodCommand = addOptions(unmodCommand, getUniversalCLIOptions());
         unmodCommand
             .addOption(checks)
-            .action(async (subreddits = [], opts = {}) => {
+            .action(async (subreddits = [], botVal, opts = {}) => {
                 const config = buildOperatorConfigWithDefaults(await parseOperatorConfigFromSources(opts));
                 const {checks = []} = opts;
-                const {subreddits: {names}} = config;
-                app = new App(config);
-
-                await app.buildManagers(names);
-
-                for (const manager of app.subManagers) {
-                    const activities = await manager.subreddit.getUnmoderated();
-                    for (const a of activities.reverse()) {
-                        manager.queue.push({
-                            checkType: a instanceof Submission ? 'Submission' : 'Comment',
-                            activity: a,
-                            options: {checkNames: checks}
-                        });
+                const logger = winston.loggers.get('default');
+                let bots: Bot[] = [];
+                if(botVal !== undefined) {
+                    const bot = app.bots.find(x => x.botName === botVal);
+                    if(bot === undefined) {
+                        logger.error(`No bot named "${botVal} found"`);
+                    } else {
+                        bots = [bot];
+                    }
+                } else  {
+                    bots = app.bots;
+                }
+                for(const b of bots) {
+                    await b.buildManagers(subreddits);
+                    for(const manager of b.subManagers) {
+                        const activities = await manager.subreddit.getUnmoderated();
+                        for (const a of activities.reverse()) {
+                            manager.queue.push({
+                                checkType: a instanceof Submission ? 'Submission' : 'Comment',
+                                activity: a,
+                                options: {checkNames: checks}
+                            });
+                        }
                     }
                 }
             });

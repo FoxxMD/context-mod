@@ -39,7 +39,7 @@ import DelimiterStream from 'delimiter-stream';
 import {pipeline} from 'stream/promises';
 import {defaultBotStatus} from "../Common/defaults";
 import {booleanMiddle} from "../Common/middleware";
-import {BotClient} from "../interfaces";
+import {BotInstance, CMInstance} from "../interfaces";
 import { URL } from "url";
 
 const emitter = new EventEmitter();
@@ -69,18 +69,18 @@ declare module 'express-session' {
     }
 }
 
-declare global {
-    namespace Express {
-        interface User {
-            name: string
-            subreddits: string[]
-            machine?: boolean
-            isOperator?: boolean
-            realManagers?: string[]
-            moderatedManagers?: string[]
-        }
-    }
-}
+// declare global {
+//     namespace Express {
+//         interface User {
+//             name: string
+//             subreddits: string[]
+//             machine?: boolean
+//             isOperator?: boolean
+//             realManagers?: string[]
+//             moderatedManagers?: string[]
+//         }
+//     }
+// }
 
 interface ConnectedUserInfo {
     level?: string,
@@ -95,7 +95,7 @@ interface ConnectUserObj {
     [key: string]: ConnectedUserInfo
 }
 
-const createToken = (bot: BotClient, user?: Express.User, ) => {
+const createToken = (bot: CMInstance, user?: Express.User, ) => {
     const payload = user !== undefined ? {...user, machine: false} : {machine: true};
     return jwt.sign({
         data: payload,
@@ -113,10 +113,6 @@ const webClient = async (options: OperatorConfig) => {
         operator: {
             name,
             display,
-        },
-        credentials: {
-            refreshToken: configRefreshToken,
-            accessToken: configAccessToken,
         },
         web: {
             port,
@@ -310,7 +306,7 @@ const webClient = async (options: OperatorConfig) => {
                 hadToken,
             });
         } else {
-            next();
+            return next();
         }
     }
 
@@ -428,7 +424,7 @@ const webClient = async (options: OperatorConfig) => {
     });
     //</editor-fold>
 
-    const bots: BotClient[] = [];
+    const cmInstances: CMInstance[] = [];
     let init = false;
 
     let server: http.Server,
@@ -444,8 +440,8 @@ const webClient = async (options: OperatorConfig) => {
                 delimiter: '\r\n',
             });
 
-            const currBot = bots.find(x => x.friendly === sessionData.botId);
-            if(currBot !== undefined) {
+            const currInstance = cmInstances.find(x => x.friendly === sessionData.botId);
+            if(currInstance !== undefined) {
                 const ac = new AbortController();
                 const options = {
                     signal: ac.signal,
@@ -457,14 +453,14 @@ const webClient = async (options: OperatorConfig) => {
                     });
 
                     if(err !== undefined) {
-                        logger.warn(`Log streaming encountered an error, trying to reconnect (retries: ${retryCount}) -- ${err.code !== undefined ? `(${err.code}) ` : ''}${err.message}`, {subreddit: currBot.friendly});
+                        logger.warn(`Log streaming encountered an error, trying to reconnect (retries: ${retryCount}) -- ${err.code !== undefined ? `(${err.code}) ` : ''}${err.message}`, {subreddit: currInstance.friendly});
                     }
-                    const gotStream = got.stream.get(`${currBot.normalUrl}/logs`, {
+                    const gotStream = got.stream.get(`${currInstance.normalUrl}/logs`, {
                         retry: {
                             limit: 5,
                         },
                         headers: {
-                            'Authorization': `Bearer ${createToken(currBot, user)}`,
+                            'Authorization': `Bearer ${createToken(currInstance, user)}`,
                         },
                         searchParams: {
                             limit: sessionData.limit,
@@ -476,7 +472,7 @@ const webClient = async (options: OperatorConfig) => {
 
                     if(err !== undefined) {
                         gotStream.once('data', () => {
-                            logger.info('Streaming resumed', {subreddit: currBot.friendly});
+                            logger.info('Streaming resumed', {subreddit: currInstance.friendly});
                         });
                     }
 
@@ -490,7 +486,7 @@ const webClient = async (options: OperatorConfig) => {
                     // ECONNRESET
                     s.catch((err) => {
                         if(err.code !== 'ABORT_ERR' && err.code !== 'ERR_STREAM_PREMATURE_CLOSE') {
-                            logger.error(`Unexpected error, or too many retries, occurred while streaming logs -- ${err.code !== undefined ? `(${err.code}) ` : ''}${err.message}`, {subreddit: currBot.friendly});
+                            logger.error(`Unexpected error, or too many retries, occurred while streaming logs -- ${err.code !== undefined ? `(${err.code}) ` : ''}${err.message}`, {subreddit: currInstance.friendly});
                         }
                     });
 
@@ -520,21 +516,20 @@ const webClient = async (options: OperatorConfig) => {
     }
     logger.info(`Web UI started: http://localhost:${port}`, {label: ['Web']});
 
-
-    const botWithPermissions = async (req: express.Request, res: express.Response, next: Function) => {
+    const instanceWithPermissions = async (req: express.Request, res: express.Response, next: Function) => {
         delete req.session.botId;
         delete req.session.authBotId;
 
         const msg = 'Bot does not exist or you do not have permission to access it';
-        const bot = bots.find(x => x.friendly === req.query.bot);
-        if (bot === undefined) {
+        const instance = cmInstances.find(x => x.friendly === req.query.instance);
+        if (instance === undefined) {
             return res.render('error', {error: msg});
         }
 
         const user = req.user as Express.User;
 
-        const isOperator = bot.operators.includes(user.name);
-        const canAccessBot = isOperator || intersect(user.subreddits, bot.subreddits).length === 0;
+        const isOperator = instance.operators.includes(user.name);
+        const canAccessBot = isOperator || intersect(user.subreddits, instance.subreddits).length === 0;
         if (user.isOperator && !canAccessBot) {
             return res.render('error', {error: msg});
         }
@@ -542,16 +537,50 @@ const webClient = async (options: OperatorConfig) => {
         if (req.params.subreddit !== undefined && !isOperator && !user.subreddits.includes(req.params.subreddit)) {
             return res.render('error', {error: msg});
         }
-        req.bot = bot;
-        req.session.botId = bot.friendly;
+        req.instance = instance;
+        req.session.botId = instance.friendly;
         if(canAccessBot) {
-            req.session.authBotId = bot.friendly;
+            req.session.authBotId = instance.friendly;
         }
+        return next();
+    }
+
+
+    const botWithPermissions = async (req: express.Request, res: express.Response, next: Function) => {
+
+        const instance = req.instance;
+        if(instance === undefined) {
+            return res.status(401).send("Instance must be defined");
+        }
+
+        const msg = 'Bot does not exist or you do not have permission to access it';
+        const botVal = req.query.bot as string;
+        if(botVal === undefined) {
+            return res.render('error', {error: `"bot" param must be defined`});
+        }
+
+        const botInstance = instance.bots.find(x => x.botName === botVal);
+        if(botInstance === undefined) {
+            return res.render('error', {error: msg});
+        }
+
+        const user = req.user as Express.User;
+
+        const isOperator = instance.operators.includes(user.name);
+        const canAccessBot = isOperator || intersect(user.subreddits, botInstance.subreddits).length === 0;
+        if (user.isOperator && !canAccessBot) {
+            return res.render('error', {error: msg});
+        }
+
+        if (req.params.subreddit !== undefined && !isOperator && !user.subreddits.includes(req.params.subreddit)) {
+            return res.render('error', {error: msg});
+        }
+        req.bot = botInstance;
         next();
     }
 
     const createUserToken = async (req: express.Request, res: express.Response, next: Function) => {
-        req.token = createToken(req.bot as BotClient, req.user);
+        req.token = createToken(req.instance as CMInstance, req.user);
         next();
     }
 
@@ -575,24 +604,38 @@ const webClient = async (options: OperatorConfig) => {
     // botUserRouter.use([ensureAuthenticated, defaultSession, botWithPermissions, createUserToken]);
     // app.use(botUserRouter);
 
-    app.useAsync('/api/', [ensureAuthenticated, defaultSession, botWithPermissions, createUserToken], (req: express.Request, res: express.Response) => {
+    app.useAsync('/api/', [ensureAuthenticated, defaultSession, instanceWithPermissions, botWithPermissions, createUserToken], (req: express.Request, res: express.Response) => {
         req.headers.Authorization = `Bearer ${req.token}`
 
-        const bot = req.bot as BotClient;
+        const instance = req.instance as CMInstance;
         return proxy.web(req, res, {
             target: {
-                protocol: bot.url.protocol,
-                host: bot.url.hostname,
-                port: bot.url.port,
+                protocol: instance.url.protocol,
+                host: instance.url.hostname,
+                port: instance.url.port,
             },
             prependPath: false,
         });
     });
 
+    const defaultInstance = async (req: express.Request, res: express.Response, next: Function) => {
+        if(req.query.instance === undefined) {
+            if(cmInstances.length > 0) {
+                return res.redirect(`/?instance=${cmInstances[0].friendly}`);
+            } else {
+                // TODO better noSubs page
+                return res.render('noSubs');
+            }
+        }
+        const instance = cmInstances.find(x => x.friendly === req.query.instance);
+        req.instance = instance;
+        next();
+    }
     const defaultBot = async (req: express.Request, res: express.Response, next: Function) => {
         if(req.query.bot === undefined) {
-            if(bots.length > 0) {
-                return res.redirect(`/?bot=${bots[0].friendly}`);
+            const instance = req.instance as CMInstance;
+            if(instance.bots.length > 0) {
+                return res.redirect(`/?instance=${req.query.instance}&bot=${instance.bots[0].botName}`);
             } else {
                 // TODO better noSubs page
                 return res.render('noSubs');
@@ -613,24 +656,24 @@ const webClient = async (options: OperatorConfig) => {
     };
 
     const redirectBotsNotAuthed = async (req: express.Request, res: express.Response, next: Function) => {
-        if(bots.length === 1 && bots[0].error === 'Missing credentials: refreshToken, accessToken' && configAccessToken === undefined && configRefreshToken === undefined) {
+        if(cmInstances.length === 1 && cmInstances[0].error === 'Missing credentials: refreshToken, accessToken') {
             // assuming user is doing first-time setup and this is the default localhost bot
             return res.redirect('/auth/helper');
         }
         next();
     }
 
-    app.getAsync('/', [initHeartbeat, redirectBotsNotAuthed, ensureAuthenticated, defaultSession, defaultBot, botWithPermissions, createUserToken], async (req: express.Request, res: express.Response) => {
+    app.getAsync('/', [initHeartbeat, redirectBotsNotAuthed, ensureAuthenticated, defaultSession, defaultInstance, defaultBot, instanceWithPermissions, botWithPermissions, createUserToken], async (req: express.Request, res: express.Response) => {
 
         const user = req.user as Express.User;
-        const bot = req.bot as BotClient;
+        const instance = req.instance as CMInstance;
 
         const limit = req.session.limit;
         const sort = req.session.sort;
         const level = req.session.level;
         let resp;
         try {
-            resp = await got.get(`${bot.normalUrl}/status`, {
+            resp = await got.get(`${instance.normalUrl}/status`, {
                 headers: {
                     'Authorization': `Bearer ${req.token}`,
                 },
@@ -638,16 +681,17 @@ const webClient = async (options: OperatorConfig) => {
                     limit,
                     sort,
                     level,
+                    bot: req.query.bot as string,
                 },
             }).json() as any;
 
         } catch(err) {
             logger.error(`Error occurred while retrieving bot information. Will update heartbeat -- ${err.message}`);
-            refreshClient(clients.find(x => normalizeUrl(x.host) === bot.normalUrl) as BotConnection);
-            resp = defaultBotStatus(intersect(user.subreddits, bot.subreddits));
+            refreshClient(clients.find(x => normalizeUrl(x.host) === instance.normalUrl) as BotConnection);
+            resp = defaultBotStatus(intersect(user.subreddits, instance.subreddits));
             resp.subreddits = resp.subreddits.map(x => {
                 if(x.name === 'All') {
-                    x.logs = (botLogMap.get(bot.friendly) || []).map(x => formatLogLineToHtml(x[1]));
+                    x.logs = (botLogMap.get(instance.friendly) || []).map(x => formatLogLineToHtml(x[1]));
                 }
                 return x;
             })
@@ -664,7 +708,7 @@ const webClient = async (options: OperatorConfig) => {
             }
         }
 
-        const shownBots = bots.reduce((acc: BotClient[], curr) => {
+        const shownInstances = cmInstances.reduce((acc: CMInstance[], curr) => {
             const isBotOperator = curr.operators.map(x => x.toLowerCase()).includes(user.name.toLowerCase());
             if(user.isOperator) {
                 // @ts-ignore
@@ -674,19 +718,28 @@ const webClient = async (options: OperatorConfig) => {
                 return acc;
             }
             // @ts-ignore
-            return acc.concat({...curr, canAccessLocation: isBotOperator, isOperator: isBotOperator});
+            return acc.concat({...curr, canAccessLocation: isBotOperator, isOperator: isBotOperator, botId: curr.friendly});
+        },[]);
+
+        const instanceOperator = instance.operators.includes((req.user as Express.User).name);
+
+        const shownBots = instance.bots.reduce((acc: BotInstance[], curr) => {
+            if(!instanceOperator && intersect(user.subreddits, curr.subreddits).length === 0) {
+                return acc;
+            }
+            // @ts-ignore
+            return acc.concat({...curr, isOperator: instanceOperator});
         },[]);
 
         res.render('status', {
             show: 'All',
             ...resp,
-            bots: shownBots.map(x => ({...x, shown: x.friendly === bot.friendly})),
-            botId: bot.friendly,
-            botName: bot.botName,
-            botLink: bot.botLink,
-            isOperator: bot.operators.includes((req.user as Express.User).name),
-            operators: bot.operators.join(', '),
-            operatorDisplay: bot.operatorDisplay,
+            instances: shownInstances.map(x => ({...x, shown: x.friendly === instance.friendly})),
+            bots: shownBots.map(x => ({...x, shown: req.query.bot === x.botName})),
+            botId: (req.instance as CMInstance).friendly,
+            isOperator: instance.operators.includes((req.user as Express.User).name),
+            operators: instance.operators.join(', '),
+            operatorDisplay: instance.operatorDisplay,
             logSettings: {
                 limitSelect: [10, 20, 50, 100, 200].map(x => `<option ${limit === x ? 'selected' : ''} class="capitalize ${limit === x ? 'font-bold' : ''}" data-value="${x}">${x}</option>`).join(' | '),
                 sortSelect: ['ascending', 'descending'].map(x => `<option ${sort === x ? 'selected' : ''} class="capitalize ${sort === x ? 'font-bold' : ''}" data-value="${x}">${x}</option>`).join(' '),
@@ -695,19 +748,20 @@ const webClient = async (options: OperatorConfig) => {
         });
     });
 
-    app.getAsync('/config', [ensureAuthenticated, defaultSession, botWithPermissions, createUserToken], async (req: express.Request, res: express.Response) => {
+    app.getAsync('/config', [ensureAuthenticated, defaultSession, instanceWithPermissions, botWithPermissions, createUserToken], async (req: express.Request, res: express.Response) => {
         const {subreddit} = req.query as any;
-        const resp = await got.get(`${(req.bot as BotClient).normalUrl}/config`, {
+        const resp = await got.get(`${(req.instance as CMInstance).normalUrl}/config`, {
             headers: {
                 'Authorization': `Bearer ${req.token}`,
             },
             searchParams: {
-                subreddit
+                subreddit,
+                bot: req.bot?.botName
             }
         }).text();
 
         const [obj, jsonErr, yamlErr] = parseFromJsonOrYamlToObject(resp);
-        const bot = req.bot as BotClient;
+        const bot = req.instance as CMInstance;
         res.render('config', {
             config: prettyPrintJson.toHtml(obj, {quoteKeys: true, indent: 2}),
             operatorDisplay:bot.operators.join(', '),
@@ -776,7 +830,7 @@ const webClient = async (options: OperatorConfig) => {
             socketListeners.set(socket.id, [...(socketListeners.get(socket.id) || []), webLogListener]);
 
             if(session.botId !== undefined) {
-                const bot = bots.find(x => x.friendly === session.botId);
+                const bot = cmInstances.find(x => x.friendly === session.botId);
                 if(bot !== undefined) {
                     // web log listener for bot specifically
                     const botWebLogListener = (log: string) => {
@@ -834,8 +888,8 @@ const webClient = async (options: OperatorConfig) => {
 
     const refreshClient = async (client: BotConnection, force = false) => {
         const normalized = normalizeUrl(client.host);
-        const existingClientIndex = bots.findIndex(x => x.normalUrl === normalized);
-        const existingClient = existingClientIndex === -1 ? undefined : bots[existingClientIndex];
+        const existingClientIndex = cmInstances.findIndex(x => x.normalUrl === normalized);
+        const existingClient = existingClientIndex === -1 ? undefined : cmInstances[existingClientIndex];
 
         let shouldCheck = false;
         if(!existingClient) {
@@ -844,7 +898,7 @@ const webClient = async (options: OperatorConfig) => {
             shouldCheck = true;
         } else  {
             const lastCheck = dayjs().diff(dayjs.unix(existingClient.lastCheck), 's');
-            if((!existingClient.online || !existingClient.running)) {
+            if(!existingClient.online) {
                 if(lastCheck > 15) {
                     shouldCheck = true;
                 }
@@ -864,49 +918,46 @@ const webClient = async (options: OperatorConfig) => {
             //let base = `${c.host}${c.port !== undefined ? `:${c.port}` : ''}`;
             const normalized = normalizeUrl(client.host);
             const url = new URL(normalized);
-            let botStat: BotClient = {
+            let botStat: CMInstance = {
                 ...client,
-                indicator: 'gray',
                 subreddits: [] as string[],
                 operators: [] as string[],
                 operatorDisplay: '',
                 online: false,
-                running: false,
                 friendly: url.host,
-                botName: url.host,
-                botLink: normalized,
                 lastCheck: dayjs().unix(),
                 normalUrl: normalized,
                 url,
+                bots: [],
             };
             try {
                 const resp = await got.get(`${normalized}/heartbeat`, {
                     headers: {
                         'Authorization': `Bearer ${machineToken}`,
                     }
-                }).json() as BotClient;
+                }).json() as CMInstance;
 
                 botStat = {...botStat, ...resp, online: true};
-                const sameNameIndex = bots.findIndex(x => x.friendly === botStat.friendly);
+                const sameNameIndex = cmInstances.findIndex(x => x.friendly === botStat.friendly);
                 if(sameNameIndex > -1 && sameNameIndex !== existingClientIndex) {
                     logger.warn(`Client returned a friendly name that is not unique (${botStat.friendly}), will fallback to host as friendly (${botStat.normalUrl})`);
                     botStat.friendly = botStat.normalUrl;
                 }
                 botStat.online = true;
-                if(botStat.online) {
-                    botStat.indicator = botStat.running ? 'green' : 'yellow';
-                } else {
-                    botStat.indicator = 'red';
-                }
+                // if(botStat.online) {
+                //     botStat.indicator = botStat.running ? 'green' : 'yellow';
+                // } else {
+                //     botStat.indicator = 'red';
+                // }
                 logger.verbose(`Heartbeat detected`, {subreddit: botStat.friendly});
             } catch (err) {
                 botStat.error = err.message;
                 logger.error(`Heartbeat response from ${botStat.friendly} was not ok: ${err.message}`, {subreddit: botStat.friendly});
             } finally {
                 if(existingClientIndex !== -1) {
-                    bots.splice(existingClientIndex, 1, botStat);
+                    cmInstances.splice(existingClientIndex, 1, botStat);
                 } else {
-                    bots.push(botStat);
+                    cmInstances.push(botStat);
                 }
             }
         }

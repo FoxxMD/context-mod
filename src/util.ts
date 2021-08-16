@@ -76,18 +76,19 @@ export const FAIL = '✘';
 export const truncateStringToLength = (length: number, truncStr = '...') => (str: string) => str.length > length ? `${str.slice(0, length - truncStr.length - 1)}${truncStr}` : str;
 
 export const defaultFormat = (defaultLabel = 'App') => printf(({
-                                         level,
-                                         message,
-                                         labels = [defaultLabel],
-                                         subreddit,
-                                         leaf,
-                                         itemId,
-                                         timestamp,
-                                        // @ts-ignore
-                                         [SPLAT]: splatObj,
-                                         stack,
-                                         ...rest
-                                     }) => {
+                                                                   level,
+                                                                   message,
+                                                                   labels = [defaultLabel],
+                                                                   subreddit,
+                                                                   bot,
+                                                                   leaf,
+                                                                   itemId,
+                                                                   timestamp,
+                                                                   // @ts-ignore
+                                                                   [SPLAT]: splatObj,
+                                                                   stack,
+                                                                   ...rest
+                                                               }) => {
     let stringifyValue = splatObj !== undefined ? jsonStringify(splatObj) : '';
     let msg = message;
     let stackMsg = '';
@@ -99,7 +100,7 @@ export const defaultFormat = (defaultLabel = 'App') => printf(({
             .map((x: string) => x.replace(CWD, 'CWD')) // replace file location up to cwd for user privacy
             .join('\n'); // rejoin with newline to preserve formatting
         stackMsg = `\n${cleanedStack}`;
-        if(msg === undefined || msg === null || typeof message === 'object') {
+        if (msg === undefined || msg === null || typeof message === 'object') {
             msg = stackTop;
         } else {
             stackMsg = `\n${stackTop}${stackMsg}`
@@ -112,7 +113,7 @@ export const defaultFormat = (defaultLabel = 'App') => printf(({
     }
     const labelContent = `${nodes.map((x: string) => `[${x}]`).join(' ')}`;
 
-    return `${timestamp} ${level.padEnd(7)}: ${subreddit !== undefined ? `{${subreddit}} ` : ''}${labelContent} ${msg}${stringifyValue !== '' ? ` ${stringifyValue}` : ''}${stackMsg}`;
+    return `${timestamp} ${level.padEnd(7)}: ${bot !== undefined ? `<${bot}> ` : ''}${subreddit !== undefined ? `{${subreddit}} ` : ''}${labelContent} ${msg}${stringifyValue !== '' ? ` ${stringifyValue}` : ''}${stackMsg}`;
 });
 
 
@@ -942,4 +943,13 @@ export const intersect = (a: Array<any>, b: Array<any>) => {
     const setB = new Set(b);
     const intersection = new Set([...setA].filter(x => setB.has(x)));
     return Array.from(intersection);
+}
+
+export const snooLogWrapper = (logger: Logger) => {
+    return {
+        warn: (...args: any[]) => logger.warn(args.slice(0, 2).join(' '), [args.slice(2)]),
+        debug: (...args: any[]) => logger.debug(args.slice(0, 2).join(' '), [args.slice(2)]),
+        info: (...args: any[]) => logger.info(args.slice(0, 2).join(' '), [args.slice(2)]),
+        trace: (...args: any[]) => logger.debug(args.slice(0, 2).join(' '), [args.slice(2)]),
+    }
 }

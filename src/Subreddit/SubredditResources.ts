@@ -5,7 +5,7 @@ import {
     activityIsRemoved,
     AuthorActivitiesOptions,
     AuthorTypedActivitiesOptions, BOT_LINK,
-    getAuthorActivities, singleton,
+    getAuthorActivities,
     testAuthorCriteria
 } from "../Utils/SnoowrapUtils";
 import Subreddit from 'snoowrap/dist/objects/Subreddit';
@@ -21,6 +21,7 @@ import {
 } from "../util";
 import LoggedError from "../Utils/LoggedError";
 import {
+    BotInstanceConfig,
     CacheOptions, CommentState,
     Footer, OperatorConfig, ResourceStats, SubmissionState,
     SubredditCacheConfig, TTLConfig, TypedActivityStates
@@ -40,6 +41,7 @@ export interface SubredditResourceConfig extends Footer {
     caching?: SubredditCacheConfig,
     subreddit: Subreddit,
     logger: Logger;
+    client: Snoowrap
 }
 
 interface SubredditResourceOptions extends Footer {
@@ -49,6 +51,7 @@ interface SubredditResourceOptions extends Footer {
     cacheSettingsHash: string
     subreddit: Subreddit,
     logger: Logger;
+    client: Snoowrap;
 }
 
 export interface SubredditResourceSetOptions extends SubredditCacheConfig, Footer {
@@ -67,6 +70,7 @@ export class SubredditResources {
     userNotes: UserNotes;
     footer: false | string = DEFAULT_FOOTER;
     subreddit: Subreddit
+    client: Snoowrap
     cache: Cache
     cacheType: string
     cacheSettingsHash?: string;
@@ -87,10 +91,12 @@ export class SubredditResources {
             cache,
             cacheType,
             cacheSettingsHash,
+            client,
         } = options || {};
 
         this.cacheSettingsHash = cacheSettingsHash;
         this.cache = cache;
+        this.client = client;
         this.cacheType = cacheType;
         this.authorTTL = authorTTL;
         this.wikiTTL = wikiTTL;
@@ -314,9 +320,7 @@ export class SubredditResources {
             if (wikiContext.subreddit === undefined || wikiContext.subreddit.toLowerCase() === subreddit.display_name) {
                 sub = subreddit;
             } else {
-                // @ts-ignore
-                const client = singleton.getClient();
-                sub = client.getSubreddit(wikiContext.subreddit);
+                sub = this.client.getSubreddit(wikiContext.subreddit);
             }
             try {
                 // @ts-ignore
@@ -381,10 +385,8 @@ export class SubredditResources {
             let states = s;
             // optimize for submission only checks on comment item
             if (item instanceof Comment && states.length === 1 && Object.keys(states[0]).length === 1 && (states[0] as CommentState).submissionState !== undefined) {
-                // get submission
-                const client = singleton.getClient();
                 // @ts-ignore
-                const subProxy = await client.getSubmission(await i.link_id);
+                const subProxy = await this.client.getSubmission(await i.link_id);
                 // @ts-ignore
                 item = await this.getActivity(subProxy);
                 states = (states[0] as CommentState).submissionState as SubmissionState[];
@@ -434,9 +436,8 @@ export class SubredditResources {
                                     continue;
                                 }
                                 // get submission
-                                const client = singleton.getClient();
                                 // @ts-ignore
-                                const subProxy = await client.getSubmission(await item.link_id);
+                                const subProxy = await this.client.getSubmission(await item.link_id);
                                 // @ts-ignore
                                 const sub = await this.getActivity(subProxy);
                                 // @ts-ignore
@@ -559,18 +560,18 @@ export class SubredditResources {
     }
 }
 
-class SubredditResourcesManager {
+export class BotResourcesManager {
     resources: Map<string, SubredditResources> = new Map();
     authorTTL: number = 10000;
     enabled: boolean = true;
     modStreams: Map<string, SPoll<Snoowrap.Submission | Snoowrap.Comment>> = new Map();
-    defaultCache!: Cache;
+    defaultCache: Cache;
     cacheType: string = 'none';
-    cacheHash!: string;
-    ttlDefaults!: Required<TTLConfig>;
+    cacheHash: string;
+    ttlDefaults: Required<TTLConfig>;
     pruneInterval: any;
 
-    setDefaultsFromConfig(config: OperatorConfig) {
+    constructor(config: BotInstanceConfig) {
         const {
             caching: {
                 authorTTL,
@@ -584,16 +585,14 @@ class SubredditResourcesManager {
             caching,
         } = config;
         this.cacheHash = objectHash.sha1(caching);
-        this.setTTLDefaults({authorTTL, userNotesTTL, wikiTTL, commentTTL, submissionTTL, filterCriteriaTTL});
-        this.setDefaultCache(provider);
-    }
+        this.ttlDefaults = {authorTTL, userNotesTTL, wikiTTL, commentTTL, submissionTTL, filterCriteriaTTL};
 
-    setDefaultCache(options: CacheOptions) {
+        const options = provider;
         this.cacheType = options.store;
         this.defaultCache = createCacheManager(options);
-        if(this.cacheType === 'memory') {
+        if (this.cacheType === 'memory') {
             const min = Math.min(...([this.ttlDefaults.wikiTTL, this.ttlDefaults.authorTTL, this.ttlDefaults.userNotesTTL].filter(x => x !== 0)));
-            if(min > 0) {
+            if (min > 0) {
                 // set default prune interval
                 this.pruneInterval = setInterval(() => {
                     // @ts-ignore
@@ -602,13 +601,9 @@ class SubredditResourcesManager {
                     const logger = winston.loggers.get('default');
                     logger.debug('Pruned Shared Cache');
                     // prune interval should be twice the smallest TTL
-                },min * 1000 * 2)
+                }, min * 1000 * 2)
             }
         }
-    }
-
-    setTTLDefaults(def: Required<TTLConfig>) {
-        this.ttlDefaults = def;
     }
 
     get(subName: string): SubredditResources | undefined {
@@ -674,7 +669,3 @@ class SubredditResourcesManager {
         return resource;
     }
 }
-
-const manager = new SubredditResourcesManager();
-
-export default manager;

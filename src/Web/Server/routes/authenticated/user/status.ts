@@ -6,12 +6,13 @@ import {ResourceStats, RUNNING, STOPPED, SYSTEM} from "../../../../../Common/int
 import {BotStatusResponse} from "../../../../Common/interfaces";
 import winston from "winston";
 import {opStats} from "../../../../Common/util";
-import {authUserCheck} from "../../../middleware";
+import {authUserCheck, botRoute} from "../../../middleware";
 
 const status = (subLogMap: Map<string, LogEntry[]>) => {
 
     const middleware = [
-        authUserCheck()
+        authUserCheck(),
+        botRoute(),
     ];
 
     const response = async (req: Request, res: Response) => {
@@ -24,7 +25,7 @@ const status = (subLogMap: Map<string, LogEntry[]>) => {
             lastCheck
         } = req.query;
 
-        const bot = req.botApp;
+        const bot = req.serverBot;
 
         if (bot === undefined) {
             return res.status(500).send('Bot is offline');
