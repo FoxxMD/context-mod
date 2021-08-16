@@ -929,58 +929,94 @@
 <script src="https://cdn.socket.io/4.1.2/socket.io.min.js" integrity="sha384-toS6mmwu70G0fw54EGlWWeA4z3dyJ+dlXBtSURSKN4vyRFOcxd3Bzjj/AoOwY+Rg" crossorigin="anonymous"></script>
 <script>
     const SUBREDDIT_NAME_LOG_REGEX = /{(.+?)}/;
-    const parseSubredditLogName = (val) => {
-        const matches = val.match(SUBREDDIT_NAME_LOG_REGEX);
-        if (matches === null) {
-            return undefined;
+    const BOT_NAME_LOG_REGEX = /~(.+?)~/;
+    const parseALogName = (reg) => {
+        return (val) => {
+            const matches = val.match(reg);
+            if (matches === null) {
+                return undefined;
+            }
+            return matches[1];
         }
-        return matches[1];
     }
+    const parseSubredditLogName = parseALogName(SUBREDDIT_NAME_LOG_REGEX);
+    const parseBotLogName = parseALogName(BOT_NAME_LOG_REGEX);
 
     let socket = io({
         reconnectionAttempts: 5, // bail after 5 attempts
     });
 
-    const newBufferedLogs = () => new Map([["All", []]])
+    // get all bots
+    let bots = [];
+    document.querySelectorAll(`[data-bot].sub`).forEach((el) => {
+        bots.push(el.dataset.bot);
+    })
+    const newBufferedLogs = () => new Map([["All", []]]);
+    const newBufferedBot = () => new Map([["All", []], ...bots.map(x => ([x, newBufferedLogs()]))]);
+
 
     let bufferedLogs = newBufferedLogs();
+    let bufferedBot = newBufferedBot();
     let lastFlush;
     let bufferTimeout;
 
     socket.on("connect", () => {
         document.body.classList.add('connected')
         socket.on("log", data => {
-            bufferedLogs.set('All', bufferedLogs.get('All').concat(data));
-            const sub = parseSubredditLogName(data);
-            if (sub !== undefined) {
-                bufferedLogs.set(sub, (bufferedLogs.get(sub) || []).concat(data));
+            bufferedBot.set('All', bufferedBot.get('All').concat(data));
+
+            const bot = parseBotLogName(data);
+            if(bot !== undefined) {
+                const buffBot = bufferedBot.get(bot) || newBufferedLogs();
+                buffBot.set('All', buffBot.get('All').concat(data));
+                const sub = parseSubredditLogName(data);
+                if (sub !== undefined) {
+                    buffBot.set(sub, (buffBot.get(sub) || []).concat(data));
+                }
+                bufferedBot.set(bot, buffBot);
+            } else {
+                bufferedBot.forEach((logs, botName) => {
+                    if(botName === 'All') {
+                        return;
+                    }
+                    logs.set('All', logs.get('All').concat(data));
+                    bufferedBot.set(botName, logs);
+                });
             }
 
+
             const flushLogs = () => {
-                bufferedLogs.forEach((logs, subKey) => {
-                    // check sub exists -- may be a web log
-                    if(null !== document.querySelector(`[data-subreddit="${subKey}"].sub`)) {
-                        const limit = Number.parseInt(document.querySelector(`[data-subreddit="${subKey}"] [data-type="limit"]`).value);
-                        const logContainer = document.querySelector(`[data-subreddit="${subKey}"].logs`);
-                        let existingLogs;
-                        if(window.sort === 'desc') {
-                            logs.forEach((l) => {
-                                logContainer.insertAdjacentHTML('afterbegin', l);
-                            })
-                            existingLogs = Array.from(document.querySelectorAll(`[data-subreddit="${subKey}"].logs .logLine`));
-                            logContainer.replaceChildren(...existingLogs.slice(0, limit));
-                        } else {
-                            logs.forEach((l) => {
-                                logContainer.insertAdjacentHTML('beforeend', l);
-                                existingLogs = Array.from(document.querySelectorAll(`[data-subreddit="${subKey}"].logs .logLine`));
-                                const overLimit = limit - existingLogs.length;
-                                logContainer.replaceChildren(...existingLogs.slice(overLimit -1, limit));
-                            })
-                        }
+                bufferedBot.forEach((subLogs, botName) => {
+                    if(botName === 'All') {
+                        return;
                     }
+                    subLogs.forEach((logs, subKey) => {
+                        // check sub exists -- may be a web log
+                        const el = document.querySelector(`[data-subreddit="${subKey}"][data-bot="${botName}"].sub`);
+                        if(null !== el) {
+                            const limit = Number.parseInt(document.querySelector(`[data-subreddit="${subKey}"] [data-type="limit"]`).value);
+                            const logContainer = el.querySelector(`.logs`);
+                            let existingLogs;
+                            if(window.sort === 'desc') {
+                                logs.forEach((l) => {
+                                    logContainer.insertAdjacentHTML('afterbegin', l);
+                                })
+                                existingLogs = Array.from(el.querySelectorAll(`.logs .logLine`));
+                                logContainer.replaceChildren(...existingLogs.slice(0, limit));
+                            } else {
+                                logs.forEach((l) => {
+                                    logContainer.insertAdjacentHTML('beforeend', l);
+                                    existingLogs = Array.from(el.querySelectorAll(`.logs .logLine`));
+                                    const overLimit = limit - existingLogs.length;
+                                    logContainer.replaceChildren(...existingLogs.slice(overLimit -1, limit));
+                                })
+                            }
+                        }
+                    });
                 });
                 lastFlush = Date.now();
-                bufferedLogs = newBufferedLogs();
+                bufferedBot = newBufferedBot();
+                //bufferedLogs = newBufferedLogs();
                 //console.log('Flushed Logs');
             }
 
