@@ -8,6 +8,7 @@ import {getLogger} from "../../../../../Utils/loggerFactory";
 import {booleanMiddle} from "../../../../Common/middleware";
 import {authUserCheck, botRoute} from "../../../middleware";
 
+// TODO update logs api
 const logs = (subLogMap: Map<string, LogEntry[]>) => {
     const middleware = [
         authUserCheck(),

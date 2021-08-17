@@ -11,7 +11,7 @@ import tcpUsed from 'tcp-port-used';
 
 import {
     intersect,
-    LogEntry,
+    LogEntry, parseBotLogName,
     parseSubredditLogName
 } from "../../util";
 import {getLogger} from "../../Utils/loggerFactory";
@@ -45,6 +45,10 @@ declare module 'express-session' {
 }
 
 const subLogMap: Map<string, LogEntry[]> = new Map();
+const systemLogs: LogEntry[] = [];
+const botLogMap: Map<string, Map<string, LogEntry[]>> = new Map();
+
+const botSubreddits: Map<string, string[]> = new Map();
 
 const rcbServer = async function (options: OperatorConfig) {
 
@@ -62,7 +66,7 @@ const rcbServer = async function (options: OperatorConfig) {
 
     const opNames = name.map(x => x.toLowerCase());
     let app: App;
-    let botSubreddits: string[] = [];
+    //const botSubreddits: Map<string, string[]> = new Map();
 
     const winstonStream = new Transform({
         transform(chunk, encoding, callback) {
@@ -71,15 +75,35 @@ const rcbServer = async function (options: OperatorConfig) {
             const now = Date.now();
             const logEntry: LogEntry = [now, logLine];
 
-            const subName = parseSubredditLogName(logLine);
-            if (subName !== undefined && (botSubreddits.length === 0 || botSubreddits.includes(subName))) {
-                const subLogs = subLogMap.get(subName) || [];
-                subLogs.unshift(logEntry);
-                subLogMap.set(subName, subLogs.slice(0, 200 + 1));
+            const botName = parseBotLogName(logLine);
+            if(botName === undefined) {
+                systemLogs.unshift(logEntry);
+                systemLogs.slice(0, 201);
             } else {
-                const appLogs = subLogMap.get('app') || [];
-                appLogs.unshift(logEntry);
-                subLogMap.set('app', appLogs.slice(0, 200 + 1));
+                const botLog = botLogMap.get(botName) || new Map();
+
+                const subName = parseSubredditLogName(logLine);
+
+                if(subName === undefined) {
+                    const appLogs = botLog.get('app') || [];
+                    appLogs.unshift(logEntry);
+                    botLog.set('app', appLogs.slice(0, 200 + 1));
+                } else {
+                    let botSubs = botSubreddits.get(botName) || [];
+                    if(botSubs.length === 0 && app !== undefined) {
+                        const b = app.bots.find(x => x.botName === botName);
+                        if(b !== undefined) {
+                            botSubs = b.subManagers.map(x => x.displayLabel);
+                            botSubreddits.set(botName, botSubs);
+                        }
+                    }
+                    if(botSubs.length === 0 || botSubs.includes(subName)) {
+                        const subLogs = botLog.get(subName) || [];
+                        subLogs.unshift(logEntry);
+                        botLog.set(subName, subLogs.slice(0, 200 + 1));
+                    }
+                }
+                botLogMap.set(botName, botLog);
             }
             callback(null, logLine);
         }
@@ -168,7 +192,7 @@ const rcbServer = async function (options: OperatorConfig) {
         return res.json(resp);
     });
 
-    server.getAsync('/status', ...status(subLogMap))
+    server.getAsync('/status', ...status(botLogMap, systemLogs))
 
     server.getAsync('/config', ...configRoute);
 

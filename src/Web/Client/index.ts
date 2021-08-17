@@ -700,11 +700,11 @@ const webClient = async (options: OperatorConfig) => {
             logger.error(`Error occurred while retrieving bot information. Will update heartbeat -- ${err.message}`, {instance: instance.friendly});
             refreshClient(clients.find(x => normalizeUrl(x.host) === instance.normalUrl) as BotConnection);
             return res.render('offline', {
-                instances: shownInstances.map(x => ({...x, shown: x.friendly === instance.friendly})),
+                instances: shownInstances,
                 instanceId: (req.instance as CMInstance).friendly,
                 isOperator: instance.operators.includes((req.user as Express.User).name),
                 // @ts-ignore
-                logs: filterLogBySubreddit(instanceLogMap, [instance.friendly], {limit, sort, level}).get(instance.friendly),
+                logs: filterLogBySubreddit(instanceLogMap, [instance.friendly], {limit, sort, level, allLogName: 'web', allLogsParser: parseInstanceLogName }).get(instance.friendly),
                 logSettings: {
                     limitSelect: [10, 20, 50, 100, 200].map(x => `<option ${limit === x ? 'selected' : ''} class="capitalize ${limit === x ? 'font-bold' : ''}" data-value="${x}">${x}</option>`).join(' | '),
                     sortSelect: ['ascending', 'descending'].map(x => `<option ${sort === x ? 'selected' : ''} class="capitalize ${sort === x ? 'font-bold' : ''}" data-value="${x}">${x}</option>`).join(' '),
@@ -731,8 +731,8 @@ const webClient = async (options: OperatorConfig) => {
         // },[]);
 
         res.render('status', {
-            instances: shownInstances.map(x => ({...x, shown: x.friendly === instance.friendly})),
-            bots: resp.map((x: any) => ({...x, shown: req.query.bot === x.name})),
+            instances: shownInstances,
+            bots: resp.bots,
             botId: (req.instance as CMInstance).friendly,
             instanceId: (req.instance as CMInstance).friendly,
             isOperator: instance.operators.includes((req.user as Express.User).name),

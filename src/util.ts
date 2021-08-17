@@ -698,37 +698,44 @@ export interface LogOptions {
     sort: 'ascending' | 'descending',
     operator?: boolean,
     user?: string,
+    allLogsParser?: Function
+    allLogName?: string
 }
 
-export const filterLogBySubreddit = (logs: Map<string, LogEntry[]>, subreddits: string[] = [], options: LogOptions): Map<string, string[]> => {
+export const filterLogBySubreddit = (logs: Map<string, LogEntry[]>, validLogCategories: string[] = [], options: LogOptions): Map<string, string[]> => {
     const {
         limit,
         level,
         sort,
         operator = false,
-        user
+        user,
+        allLogsParser = parseSubredditLogName,
+        allLogName = 'app'
     } = options;
 
-    // get map of valid subreddits
+    // get map of valid logs categories
     const validSubMap: Map<string, LogEntry[]> = new Map();
     for(const [k, v] of logs) {
-        if(subreddits.includes(k)) {
+        if(validLogCategories.includes(k)) {
             validSubMap.set(k, v);
         }
     }
 
     // derive 'all'
-    let allLogs = (logs.get('app') || []);
+    let allLogs = (logs.get(allLogName) || []);
     if(!operator) {
+        // if user is not an operator then we want to filter allLogs to only logs that include categories they can access
         if(user === undefined) {
             allLogs = [];
         } else {
             allLogs.filter(([time, l]) => {
-                const sub = parseSubredditLogName(l);
+                const sub = allLogsParser(l);
                 return sub !== undefined && sub.includes(user);
             });
         }
     }
+    // then append all other logs to all logs
+    // -- this is fine because we sort and truncate all logs just below this anyway
     allLogs = Array.from(validSubMap.values()).reduce((acc, logs) => {
         return acc.concat(logs);
     },allLogs);

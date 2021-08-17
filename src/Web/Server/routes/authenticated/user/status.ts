@@ -17,7 +17,7 @@ import {opStats} from "../../../../Common/util";
 import {authUserCheck, botRoute} from "../../../middleware";
 import Bot from "../../../../../Bot";
 
-const status = (subLogMap: Map<string, LogEntry[]>) => {
+const status = (botLogMap: Map<string, Map<string, LogEntry[]>>, systemLogs: LogEntry[]) => {
 
     const middleware = [
         authUserCheck(),
@@ -26,16 +26,31 @@ const status = (subLogMap: Map<string, LogEntry[]>) => {
 
     const response = async (req: Request, res: Response) => {
         let bots: Bot[] = [];
+        const {
+            limit = 200,
+            level = 'verbose',
+            sort = 'descending',
+        } = req.query;
+
         if(req.serverBot !== undefined) {
             bots = [req.serverBot];
         } else {
             bots = (req.user as Express.User).isOperator ? req.botApp.bots : req.botApp.bots.filter(x => intersect(req.user?.subreddits as string[], x.subManagers.map(y => y.subreddit.display_name)));
         }
-        const resp: BotStatusResponse[] = [];
+        const botResponses: BotStatusResponse[] = [];
         for(const b of bots) {
-            resp.push(await botStatResponse(b, req));
+            botResponses.push(await botStatResponse(b, req));
         }
-        return res.json(resp);
+        const system: any = {};
+        if((req.user as Express.User).isOperator) {
+            // @ts-ignore
+            system.logs = filterLogBySubreddit(new Map([['app', systemLogs]]), [], {level, sort, limit, operator: true}).get('app');
+        }
+        const response = {
+            bots: botResponses,
+            system: system,
+        };
+        return res.json(response);
     }
 
     const botStatResponse = async (bot: Bot, req: Request) => {
@@ -53,7 +68,7 @@ const status = (subLogMap: Map<string, LogEntry[]>) => {
         const subreddits = realManagers;
         //const isOperator = opNames.includes(user.toLowerCase())
 
-        const logs = filterLogBySubreddit(subLogMap, realManagers, {
+        const logs = filterLogBySubreddit(botLogMap.get(bot.botName as string) || new Map(), realManagers, {
             level: (level as string),
             operator: isOperator,
             user,
