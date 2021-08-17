@@ -14,12 +14,15 @@
                             <li>Access Token: <b><%= accessToken %></b></li>
                             <li>Refresh Token: <b><%= refreshToken %></b></li>
                         </ul>
-                        <div>Copy these somewhere and then restart the application providing these as either arguments, environmental variables, or in a json config as described in the <a
+                        <% if(locals.addResult !== undefined) { %>
+                            <div>Result of trying to add bot automatically: <%= addResult %></div>
+                        <% } else { %>
+                            <div>Bot was not automatically added to an instance and will need to manually appended to configuration...</div>
+                        <% } %>
+                        <div>If you are a <b>Moderator</b> then copy the above <b>Tokens</b> and pass them on to the Operator of this ContextMod instance.</div>
+                        <div>If you are an <b>Operator</b> copy these somewhere and then restart the application providing these as either arguments, environmental variables, or in a json config as described in the <a
                                     href="https://github.com/FoxxMD/context-mod/blob/master/docs/operatorConfiguration.md#defining-configuration">configuration guide</a>
                         </div>
-                        <% if(hadToken === true) { %>
-                            <div><b>Note:</b> The one-use token used to access the helper is now INVALID. If needed, you can revisit the helper page to get a new URL.</div>
-                        <% } %>
                     </div>
                 </div>
             </div>

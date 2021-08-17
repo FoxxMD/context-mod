@@ -95,7 +95,7 @@ interface ConnectUserObj {
     [key: string]: ConnectedUserInfo
 }
 
-const createToken = (bot: CMInstance, user?: Express.User, ) => {
+const createToken = (bot: CMInstance, user?: Express.User | any, ) => {
     const payload = user !== undefined ? {...user, machine: false} : {machine: true};
     return jwt.sign({
         data: payload,
@@ -274,37 +274,46 @@ const webClient = async (options: OperatorConfig) => {
                         }
                         break;
                 }
-                return res.render('error', {error: errContent, });
+                return res.render('error', {error: errContent});
             }
+            // @ts-ignore
+            const invite = invites.get(req.session.inviteId) as inviteData;
             const client = await Snoowrap.fromAuthCode({
                 userAgent: `web:contextBot:web`,
-                // @ts-ignore
-                clientId: req.session.clientId,
-                // @ts-ignore
-                clientSecret: req.session.clientSecret,
-                // @ts-ignore
-                redirectUri: req.session.redir,
+                clientId: invite.clientId,
+                clientSecret: invite.clientSecret,
+                redirectUri: invite.redirectUri,
                 code: code as string,
             });
             // @ts-ignore
             const user = await client.getMe();
-            let hadToken = false;
             // @ts-ignore
-            if(req.session.token !== undefined) {
-                // user made successful callback using bypass token
-
-                // @ts-ignore
-                delete req.session.token;
-                // reset token (one-use)
-                token = randomId();
-
-                hadToken = true;
-            }
-            return res.render('callback', {
+            invites.delete(req.session.inviteId);
+            let data: any = {
                 accessToken: client.accessToken,
                 refreshToken: client.refreshToken,
-                hadToken,
-            });
+            };
+            if(invite.instance !== undefined) {
+                const bot = cmInstances.find(x => x.friendly === invite.instance);
+                if(bot !== undefined) {
+                    const botPayload: any = {
+                        accessToken: client.accessToken,
+                        refreshToken: client.refreshToken,
+                        clientId: invite.clientId,
+                        clientSecret: invite.clientSecret,
+                    };
+                    if(invite.subreddit !== undefined) {
+                        botPayload.subreddits = [invite.subreddit];
+                    }
+                    const botAddResult: any = await addBot(bot, {name: invite.creator}, botPayload);
+                    let msg = botAddResult.success ? 'Bot successfully added to running instance' : 'An error occurred while adding the bot to the instance';
+                    if(botAddResult.success) {
+                        msg = `${msg}. ${botAddResult.stored === false ? 'Additionally, the bot was not stored in config so the operator will need to add it manually to persist after a restart.' : ''}`;
+                    }
+                    data.addResult = msg;
+                }
+            }
+            return res.render('callback', data);
         } else {
             return next();
         }
@@ -333,24 +342,35 @@ const webClient = async (options: OperatorConfig) => {
     });
 
     let token = randomId();
+    interface inviteData {
+        permissions: string[],
+        subreddit?: string,
+        instance?: string,
+        clientId: string
+        clientSecret: string
+        redirectUri: string
+        creator: string
+    }
+    const invites: Map<string, inviteData> = new Map();
+
     const helperAuthed = async (req: express.Request, res: express.Response, next: Function) => {
-        // allow helper access if no operator is listed
+
+        if(!req.isAuthenticated()) {
+            return res.render('error', {error: 'You must be logged in to access this route.'});
+        }
         if(operators.length === 0) {
-            return next();
+            return res.render('error', {error: '<div>You must be authenticated <b>and an Operator</b> to access this route but there are <b>no Operators specified in configuration.</b></div>' +
+                    '<div>Refer to the <a href="https://github.com/FoxxMD/context-mod/blob/master/docs/operatorConfiguration.md">Operator Configuration Guide</a> to do this.</div>' +
+                    '<div>TLDR:' +
+                    '<div>Environment Variable: <span class="font-mono">OPERATOR=YourRedditUsername</span></div> ' +
+                    '<div>or as an argument: <span class="font-mono">--operator YourRedditUsername</span></div>'});
         }
         // or if there is an operator and current user is operator
-        if(req.isAuthenticated() && req.user.isOperator) {
+        if(req.user.isOperator) {
             return next();
+        } else {
+            return res.render('error', {error: 'You must be an <b>Operator</b> to access this route.'});
         }
-        // or if the bypass token was provided (can only be acquired from an authenticated operator)
-        if(req.query.token === token) {
-            return next();
-        }
-        let error = 'You are not authorized to access this route.';
-        if(operators.length > 0) {
-            error = `${error} <br/> If you are doing first-time setup with just client id and secret you need to remove the "operator" property in order to access the oauth helper route.`;
-        }
-        return res.render('error', {error});
     }
 
     app.getAsync('/auth/helper', helperAuthed, (req, res) => {
@@ -362,66 +382,95 @@ const webClient = async (options: OperatorConfig) => {
         });
     });
 
-    app.getAsync('/auth/init', [helperAuthed, booleanMiddle(['wikiEdit','modmail','modlog'])], async (req: express.Request, res: express.Response) => {
+    app.getAsync('/auth/invite', (req, res) => {
+        const {invite: inviteId} = req.query;
+
+        if(inviteId === undefined) {
+            return res.render('error', {error: '`invite` param is missing from URL'});
+        }
+        const invite = invites.get(inviteId as string);
+        if(invite === undefined) {
+            return res.render('error', {error: 'Invite with the given id does not exist'});
+        }
+
+        return res.render('invite', {
+            permissions: JSON.stringify(invite.permissions || []),
+            invite: inviteId,
+        });
+    });
+
+    app.postAsync('/auth/create', helperAuthed, async (req: express.Request, res: express.Response) => {
         const {
-            token,
-            wikiEdit,
-            modlog,
-            modmail,
+            permissions,
             clientId: ci,
             clientSecret: ce,
             redirect: redir,
-        } = req.query as any;
-        let permissionsList = permissions;
+            instance,
+            subreddit,
+        } = req.body as any;
 
-        // keep track of token use so we can remove it after successful callback
-        if(token !== undefined) {
-            // @ts-ignore
-            req.session.token = token;
-        }
-        if (!wikiEdit) {
-            permissionsList = permissionsList.filter(x => x !== 'wikiedit');
-        }
-        if (!modlog) {
-            permissionsList = permissionsList.filter(x => x !== 'modlog');
-        }
-        if (!modmail) {
-            permissionsList = permissionsList.filter(x => x !== 'modmail');
-        }
-        req.session.state = `bot_${randomId()}`;
-        // @ts-ignore
-        req.session.redir = redir;
         const cid = ci || clientId;
-        if(cid === undefined || cid === '') {
-            return res.render('error', {error: '"clientId" is required'});
+        if(cid === undefined || cid.trim() === '') {
+            return res.status(400).send('clientId is required');
         }
-        // @ts-ignore
-        req.session.clientId = cid.trim();
 
         const ced = ce || clientSecret;
-        if(ced === undefined || ced === '') {
-            return res.render('error', {error: '"clientSecret" is required'});
+        if(ced === undefined || ced.trim() === '') {
+            return res.status(400).send('clientSecret is required');
         }
-        // @ts-ignore
-        req.session.clientSecret = ced.trim();
 
-        if(redir === undefined || redir === '') {
-            return res.render('error', {error: '"redirectUri" is required'});
+        if(redir === undefined || redir.trim() === '') {
+            return res.status(400).send('redirectUrl is required');
         }
+
+        const inviteId = randomId();
+        invites.set(inviteId, {
+            permissions,
+            clientId: (ci || clientId).trim(),
+            clientSecret: (ce || clientSecret).trim(),
+            redirectUri: redir.trim(),
+            instance,
+            subreddit,
+            creator: (req.user as Express.User).name,
+        });
+        return res.send(inviteId);
+    });
+
+    app.getAsync('/auth/init', async (req: express.Request, res: express.Response) => {
+        const {invite: inviteId} = req.query;
+        if(inviteId === undefined) {
+            return res.render('error', {error: '`invite` param is missing from URL'});
+        }
+        const invite = invites.get(inviteId as string);
+        if(invite === undefined) {
+            return res.render('error', {error: 'Invite with the given id does not exist'});
+        }
+
+        req.session.state = `bot_${randomId()}`;
+        // @ts-ignore
+        req.session.inviteId = inviteId;
+
+        const scope = Object.entries(invite.permissions).reduce((acc: string[], curr) => {
+            const [k, v] = curr as unknown as [string, boolean];
+            if(v) {
+                return acc.concat(k);
+            }
+            return acc;
+        },[]);
 
         const authUrl = Snoowrap.getAuthUrl({
+            clientId: invite.clientId,
             // @ts-ignore
-            clientId: req.session.clientId as string,
+            clientSecret: invite.clientSecret,
+            scope,
             // @ts-ignore
-            clientSecret: req.session.clientSecret as string,
-            scope: permissionsList,
-            // @ts-ignore
-            redirectUri: redir.trim(),
+            redirectUri: invite.redirectUri.trim(),
             permanent: true,
             state: req.session.state
         });
         return res.redirect(authUrl);
     });
+
     //</editor-fold>
 
     const cmInstances: CMInstance[] = [];
@@ -882,6 +931,21 @@ const webClient = async (options: OperatorConfig) => {
             }
             // sleep for 10 seconds then do heartbeat check again
             await sleep(10000);
+        }
+    }
+
+    const addBot = async (bot: CMInstance, userPayload: any, botPayload: any) => {
+        try {
+            const token = createToken(bot, userPayload);
+            const resp = await got.post(`${bot.normalUrl}/bot`, {
+                body: botPayload,
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                }
+            }).json() as object;
+            return {success: true, ...resp};
+        } catch (err) {
+            return {success: false, error: err.message};
         }
     }
 

@@ -779,10 +779,9 @@ export const totalFromMapStats = (val: Map<any, number>): number => {
 }
 
 export const permissions = [
-    'edit',
-    'flair',
-    'history',
     'identity',
+    'history',
+    'read',
     'modcontributors',
     'modflair',
     'modlog',
@@ -791,7 +790,6 @@ export const permissions = [
     'modposts',
     'modself',
     'mysubreddits',
-    'read',
     'report',
     'submit',
     'wikiread',

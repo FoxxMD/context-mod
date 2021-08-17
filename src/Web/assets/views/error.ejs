@@ -11,7 +11,7 @@
                     <div class="text-xl mb-4">Oops 😬</div>
                     <div class="space-y-3">
                         <div>Something went wrong while processing that last request:</div>
-                        <div><%- error %></div>
+                        <div class="space-y-3"><%- error %></div>
                         <% if(locals.operatorDisplay !== undefined && locals.operatorDisplay !== 'Anonymous') { %>
                         <div>Operated By: <%= operatorDisplay %></div>
                         <% } %>

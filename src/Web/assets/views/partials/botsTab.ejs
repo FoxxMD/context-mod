@@ -15,6 +15,15 @@
                         </span>
                 </li>
             <% }) %>
+            <% if(locals.isOperator === true && locals.instanceId !== undefined) { %>
+                    <li class="my-3 px-3 dark:text-white">
+                        <span class="rounded-md py-2 px-3 border">
+                        <a class="font-normal pointer hover:font-bold" href="/auth/helper">
+                            Add Bot +
+                        </a>
+                        </span>
+                    </li>
+            <% } %>
         </ul>
         <% } %>
     </div>
