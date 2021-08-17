@@ -11,7 +11,7 @@ import {
     createCacheManager, filterLogBySubreddit,
     formatLogLineToHtml,
     intersect, isLogLineMinLevel,
-    LogEntry, parseFromJsonOrYamlToObject,
+    LogEntry, parseFromJsonOrYamlToObject, parseInstanceLogName,
     parseSubredditLogName, permissions,
     randomId, sleep
 } from "../../util";
@@ -453,7 +453,7 @@ const webClient = async (options: OperatorConfig) => {
                     });
 
                     if(err !== undefined) {
-                        logger.warn(`Log streaming encountered an error, trying to reconnect (retries: ${retryCount}) -- ${err.code !== undefined ? `(${err.code}) ` : ''}${err.message}`, {subreddit: currInstance.friendly});
+                        logger.warn(`Log streaming encountered an error, trying to reconnect (retries: ${retryCount}) -- ${err.code !== undefined ? `(${err.code}) ` : ''}${err.message}`, {instance: currInstance.friendly});
                     }
                     const gotStream = got.stream.get(`${currInstance.normalUrl}/logs`, {
                         retry: {
@@ -486,7 +486,7 @@ const webClient = async (options: OperatorConfig) => {
                     // ECONNRESET
                     s.catch((err) => {
                         if(err.code !== 'ABORT_ERR' && err.code !== 'ERR_STREAM_PREMATURE_CLOSE') {
-                            logger.error(`Unexpected error, or too many retries, occurred while streaming logs -- ${err.code !== undefined ? `(${err.code}) ` : ''}${err.message}`, {subreddit: currInstance.friendly});
+                            logger.error(`Unexpected error, or too many retries, occurred while streaming logs -- ${err.code !== undefined ? `(${err.code}) ` : ''}${err.message}`, {instance: currInstance.friendly});
                         }
                     });
 
@@ -668,6 +668,20 @@ const webClient = async (options: OperatorConfig) => {
         const limit = req.session.limit;
         const sort = req.session.sort;
         const level = req.session.level;
+
+        const shownInstances = cmInstances.reduce((acc: CMInstance[], curr) => {
+            const isBotOperator = curr.operators.map(x => x.toLowerCase()).includes(user.name.toLowerCase());
+            if(user.isOperator) {
+                // @ts-ignore
+                return acc.concat({...curr, canAccessLocation: true, isOperator: isBotOperator});
+            }
+            if(!isBotOperator && intersect(user.subreddits, curr.subreddits).length === 0) {
+                return acc;
+            }
+            // @ts-ignore
+            return acc.concat({...curr, canAccessLocation: isBotOperator, isOperator: isBotOperator, botId: curr.friendly});
+        },[]);
+
         let resp;
         try {
             resp = await got.get(`${instance.normalUrl}/status`, {
@@ -685,37 +699,35 @@ const webClient = async (options: OperatorConfig) => {
         } catch(err) {
             logger.error(`Error occurred while retrieving bot information. Will update heartbeat -- ${err.message}`);
             refreshClient(clients.find(x => normalizeUrl(x.host) === instance.normalUrl) as BotConnection);
-            resp = defaultBotStatus(intersect(user.subreddits, instance.subreddits));
-            resp.subreddits = resp.subreddits.map(x => {
-                if(x.name === 'All') {
-                    x.logs = (botLogMap.get(instance.friendly) || []).map(x => formatLogLineToHtml(x[1]));
-                }
-                return x;
+            return res.render('offline', {
+                instances: shownInstances.map(x => ({...x, shown: x.friendly === instance.friendly})),
+                instanceId: (req.instance as CMInstance).friendly,
+                isOperator: instance.operators.includes((req.user as Express.User).name),
+                logs: [],
+                logSettings: {
+                    limitSelect: [10, 20, 50, 100, 200].map(x => `<option ${limit === x ? 'selected' : ''} class="capitalize ${limit === x ? 'font-bold' : ''}" data-value="${x}">${x}</option>`).join(' | '),
+                    sortSelect: ['ascending', 'descending'].map(x => `<option ${sort === x ? 'selected' : ''} class="capitalize ${sort === x ? 'font-bold' : ''}" data-value="${x}">${x}</option>`).join(' '),
+                    levelSelect: availableLevels.map(x => `<option ${level === x ? 'selected' : ''} class="capitalize log-${x} ${level === x ? `font-bold` : ''}" data-value="${x}">${x}</option>`).join(' '),
+                },
             })
+            // resp = defaultBotStatus(intersect(user.subreddits, instance.subreddits));
+            // resp.subreddits = resp.subreddits.map(x => {
+            //     if(x.name === 'All') {
+            //         x.logs = (botLogMap.get(instance.friendly) || []).map(x => formatLogLineToHtml(x[1]));
+            //     }
+            //     return x;
+            // })
         }
 
-        const shownInstances = cmInstances.reduce((acc: CMInstance[], curr) => {
-            const isBotOperator = curr.operators.map(x => x.toLowerCase()).includes(user.name.toLowerCase());
-            if(user.isOperator) {
-                // @ts-ignore
-                return acc.concat({...curr, canAccessLocation: true, isOperator: isBotOperator});
-            }
-            if(!isBotOperator && intersect(user.subreddits, curr.subreddits).length === 0) {
-                return acc;
-            }
-            // @ts-ignore
-            return acc.concat({...curr, canAccessLocation: isBotOperator, isOperator: isBotOperator, botId: curr.friendly});
-        },[]);
+        //const instanceOperator = instance.operators.includes((req.user as Express.User).name);
 
-        const instanceOperator = instance.operators.includes((req.user as Express.User).name);
-
-        const shownBots = instance.bots.reduce((acc: BotInstance[], curr) => {
-            if(!instanceOperator && intersect(user.subreddits, curr.subreddits).length === 0) {
-                return acc;
-            }
-            // @ts-ignore
-            return acc.concat({...curr, isOperator: instanceOperator});
-        },[]);
+        // const shownBots = instance.bots.reduce((acc: BotInstance[], curr) => {
+        //     if(!instanceOperator && intersect(user.subreddits, curr.subreddits).length === 0) {
+        //         return acc;
+        //     }
+        //     // @ts-ignore
+        //     return acc.concat({...curr, isOperator: instanceOperator});
+        // },[]);
 
         res.render('status', {
             instances: shownInstances.map(x => ({...x, shown: x.friendly === instance.friendly})),
@@ -820,7 +832,8 @@ const webClient = async (options: OperatorConfig) => {
                     // web log listener for bot specifically
                     const botWebLogListener = (log: string) => {
                         const subName = parseSubredditLogName(log);
-                        if(subName !== undefined && isLogLineMinLevel(log, session.level as string) && (session.botId?.toLowerCase() === subName.toLowerCase() || subName.toLowerCase().includes(user.name.toLowerCase()))) {
+                        const instanceName = parseInstanceLogName(log);
+                        if((subName !== undefined || instanceName !== undefined) && isLogLineMinLevel(log, session.level as string) && (session.botId?.toLowerCase() === instanceName || (subName !== undefined && subName.toLowerCase().includes(user.name.toLowerCase())))) {
                             io.to(session.id).emit('log', formatLogLineToHtml(log));
                         }
                     }
@@ -844,7 +857,7 @@ const webClient = async (options: OperatorConfig) => {
                                 }).json() as object;
                                 io.to(session.id).emit('opStats', resp);
                             } catch (err) {
-                                logger.error(`Could not retrieve stats ${err.message}`, {subreddit: bot.friendly});
+                                logger.error(`Could not retrieve stats ${err.message}`, {instance: bot.friendly});
                                 clearInterval(interval);
                             }
                         }, 5000);
@@ -934,10 +947,10 @@ const webClient = async (options: OperatorConfig) => {
                 // } else {
                 //     botStat.indicator = 'red';
                 // }
-                logger.verbose(`Heartbeat detected`, {subreddit: botStat.friendly});
+                logger.verbose(`Heartbeat detected`, {instance: botStat.friendly});
             } catch (err) {
                 botStat.error = err.message;
-                logger.error(`Heartbeat response from ${botStat.friendly} was not ok: ${err.message}`, {subreddit: botStat.friendly});
+                logger.error(`Heartbeat response from ${botStat.friendly} was not ok: ${err.message}`, {instance: botStat.friendly});
             } finally {
                 if(existingClientIndex !== -1) {
                     cmInstances.splice(existingClientIndex, 1, botStat);

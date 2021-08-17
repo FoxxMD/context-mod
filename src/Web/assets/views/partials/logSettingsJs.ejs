@@ -1,0 +1,10 @@
+<script>
+document.querySelectorAll('.logSettingSelect').forEach(el => {
+    el.onchange = (e) => {
+        // this is easier for now
+        fetch(`/logs/settings/update?${e.target.dataset.type}=${e.target.value}`).then(() => {
+            window.location.reload();
+        });
+    }
+});
+</script>

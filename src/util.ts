@@ -81,6 +81,7 @@ export const defaultFormat = (defaultLabel = 'App') => printf(({
                                                                    labels = [defaultLabel],
                                                                    subreddit,
                                                                    bot,
+                                                                   instance,
                                                                    leaf,
                                                                    itemId,
                                                                    timestamp,
@@ -113,7 +114,7 @@ export const defaultFormat = (defaultLabel = 'App') => printf(({
     }
     const labelContent = `${nodes.map((x: string) => `[${x}]`).join(' ')}`;
 
-    return `${timestamp} ${level.padEnd(7)}: ${bot !== undefined ? `~${bot}~ ` : ''}${subreddit !== undefined ? `{${subreddit}} ` : ''}${labelContent} ${msg}${stringifyValue !== '' ? ` ${stringifyValue}` : ''}${stackMsg}`;
+    return `${timestamp} ${level.padEnd(7)}: ${instance !== undefined ? `|${instance}| ` : ''}${bot !== undefined ? `~${bot}~ ` : ''}${subreddit !== undefined ? `{${subreddit}} ` : ''}${labelContent} ${msg}${stringifyValue !== '' ? ` ${stringifyValue}` : ''}${stackMsg}`;
 });
 
 
@@ -647,14 +648,20 @@ export const parseLabels = (log: string): string[] => {
     return Array.from(log.matchAll(LABELS_REGEX), m => m[0]).map(x => x.substring(1, x.length - 1));
 }
 
-const SUBREDDIT_NAME_LOG_REGEX: RegExp = /{(.+?)}/;
-export const parseSubredditLogName = (val:string): string | undefined => {
-    const matches = val.match(SUBREDDIT_NAME_LOG_REGEX);
+export const parseALogName = (reg: RegExp) => (val: string): string | undefined => {
+    const matches = val.match(reg);
     if (matches === null) {
         return undefined;
     }
     return matches[1] as string;
 }
+
+const SUBREDDIT_NAME_LOG_REGEX: RegExp = /{(.+?)}/;
+export const parseSubredditLogName = parseALogName(SUBREDDIT_NAME_LOG_REGEX);
+const BOT_NAME_LOG_REGEX: RegExp = /~(.+?)~/;
+export const parseBotLogName = parseALogName(BOT_NAME_LOG_REGEX);
+const INSTANCE_NAME_LOG_REGEX: RegExp = /\|(.+?)\|/;
+export const parseInstanceLogName = parseALogName(INSTANCE_NAME_LOG_REGEX);
 
 export const LOG_LEVEL_REGEX: RegExp = /\s*(debug|warn|info|error|verbose)\s*:/i
 export const isLogLineMinLevel = (line: string, minLevelText: string): boolean => {
