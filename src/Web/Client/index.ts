@@ -106,7 +106,7 @@ const createToken = (bot: CMInstance, user?: Express.User, ) => {
 
 const availableLevels = ['error', 'warn', 'info', 'verbose', 'debug'];
 
-const botLogMap: Map<string, LogEntry[]> = new Map();
+const instanceLogMap: Map<string, LogEntry[]> = new Map();
 
 const webClient = async (options: OperatorConfig) => {
     const {
@@ -140,15 +140,15 @@ const webClient = async (options: OperatorConfig) => {
             const logLine = chunk.toString().slice(0, -1);
             const now = Date.now();
             const logEntry: LogEntry = [now, logLine];
-            const subName = parseSubredditLogName(logLine);
-            if (subName !== undefined) {
-                const subLogs = botLogMap.get(subName) || [];
+            const instanceLogName = parseInstanceLogName(logLine);
+            if (instanceLogName !== undefined) {
+                const subLogs = instanceLogMap.get(instanceLogName) || [];
                 subLogs.unshift(logEntry);
-                botLogMap.set(subName, subLogs.slice(0, 200 + 1));
+                instanceLogMap.set(instanceLogName, subLogs.slice(0, 200 + 1));
             } else {
-                const appLogs = botLogMap.get('web') || [];
+                const appLogs = instanceLogMap.get('web') || [];
                 appLogs.unshift(logEntry);
-                botLogMap.set('web', appLogs.slice(0, 200 + 1));
+                instanceLogMap.set('web', appLogs.slice(0, 200 + 1));
             }
             emitter.emit('log', logLine);
             callback(null,chunk);
@@ -697,13 +697,14 @@ const webClient = async (options: OperatorConfig) => {
             }).json() as any;
 
         } catch(err) {
-            logger.error(`Error occurred while retrieving bot information. Will update heartbeat -- ${err.message}`);
+            logger.error(`Error occurred while retrieving bot information. Will update heartbeat -- ${err.message}`, {instance: instance.friendly});
             refreshClient(clients.find(x => normalizeUrl(x.host) === instance.normalUrl) as BotConnection);
             return res.render('offline', {
                 instances: shownInstances.map(x => ({...x, shown: x.friendly === instance.friendly})),
                 instanceId: (req.instance as CMInstance).friendly,
                 isOperator: instance.operators.includes((req.user as Express.User).name),
-                logs: [],
+                // @ts-ignore
+                logs: filterLogBySubreddit(instanceLogMap, [instance.friendly], {limit, sort, level}).get(instance.friendly),
                 logSettings: {
                     limitSelect: [10, 20, 50, 100, 200].map(x => `<option ${limit === x ? 'selected' : ''} class="capitalize ${limit === x ? 'font-bold' : ''}" data-value="${x}">${x}</option>`).join(' | '),
                     sortSelect: ['ascending', 'descending'].map(x => `<option ${sort === x ? 'selected' : ''} class="capitalize ${sort === x ? 'font-bold' : ''}" data-value="${x}">${x}</option>`).join(' '),
