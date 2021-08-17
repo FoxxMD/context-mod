@@ -28,6 +28,7 @@ import {authUserCheck, botRoute} from "./middleware";
 import {opStats} from "../Common/util";
 import Bot from "../../Bot";
 import {BotStatusResponse} from "../Common/interfaces";
+import addBot from "./routes/authenticated/user/addBot";
 
 const server = addAsync(express());
 server.use(bodyParser.json());
@@ -199,6 +200,8 @@ const rcbServer = async function (options: OperatorConfig) {
     server.getAsync('/action', ...action);
 
     server.getAsync('/check', ...actionRoute);
+
+    server.getAsync('/addBot', ...addBot());
 
     const initBot = async (causedBy: Invokee = 'system') => {
         if(app !== undefined) {

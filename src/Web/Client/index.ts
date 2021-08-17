@@ -297,13 +297,15 @@ const webClient = async (options: OperatorConfig) => {
                 const bot = cmInstances.find(x => x.friendly === invite.instance);
                 if(bot !== undefined) {
                     const botPayload: any = {
-                        accessToken: client.accessToken,
-                        refreshToken: client.refreshToken,
-                        clientId: invite.clientId,
-                        clientSecret: invite.clientSecret,
+                        credentials: {
+                            accessToken: client.accessToken,
+                            refreshToken: client.refreshToken,
+                            clientId: invite.clientId,
+                            clientSecret: invite.clientSecret,
+                        }
                     };
                     if(invite.subreddit !== undefined) {
-                        botPayload.subreddits = [invite.subreddit];
+                        botPayload.subreddits =  {names: [invite.subreddit]};
                     }
                     const botAddResult: any = await addBot(bot, {name: invite.creator}, botPayload);
                     let msg = botAddResult.success ? 'Bot successfully added to running instance' : 'An error occurred while adding the bot to the instance';
