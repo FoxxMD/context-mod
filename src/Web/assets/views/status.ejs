@@ -26,10 +26,10 @@
                                         </div>
                                     </span>
                                     <span>
-                                        <a class="tabSelect hover:font-bold <%= data.shown ? 'pointer-events-none no-underline font-bold' : 'font-normal pointer'%>" href="/?bot=<%= data.friendly %>">
+                                        <a class="tabSelect hover:font-bold <%= data.shown ? 'pointer-events-none no-underline font-bold' : 'font-normal pointer'%>" href="/?instance=<%= data.friendly %>">
                                         <%= data.friendly %>
                                         </a>
-                                        <span class="inline-block mb-0.5 ml-0.5 w-2 h-2 bg-<%= data.online ? 'green' : 'grey' %>-400 rounded-full"></span>
+                                        <span class="inline-block mb-0.5 ml-0.5 w-2 h-2 bg-<%= data.online ? 'green' : 'gray' %>-400 rounded-full"></span>
                                     </span>
                                 </span>
                             </li>
@@ -837,7 +837,7 @@
         el.addEventListener('click', e => {
             const bot = e.target.dataset.bot;
             e.preventDefault();
-            document.querySelectorAll('[data-subreddit].tabSelect').forEach(el => {
+            document.querySelectorAll('.tabSelect').forEach(el => {
                 el.classList.remove('font-bold', 'no-underline', 'pointer-events-none');
             });
             document.querySelectorAll('[data-subreddit].sub').forEach(el => {
@@ -845,13 +845,20 @@
             });
             e.target.classList.add('font-bold', 'no-underline', 'pointer-events-none');
             const firstSub = document.querySelectorAll(`[data-bot="${bot}"].sub`)[0];
-            firstSub.classList.add('active')
+            firstSub.classList.add('active');
+
+            const firstSubTab = document.querySelector(`ul[data-bot="${bot}"] [data-subreddit="${firstSub.dataset.subreddit}"].tabSelect`);
+            firstSubTab.classList.add('font-bold', 'no-underline', 'pointer-events-none');
+            const firstSubWrapper = firstSubTab.closest('.tabSelectWrapper');
             //document.querySelector(`[data-subreddit="${subreddit}"][data-bot="${bot}"].sub`).classList.add('active');
 
-            document.querySelectorAll('[data-bot].tabSelectWrapper').forEach(el => {
+            document.querySelectorAll('.tabSelectWrapper').forEach(el => {
                 el.classList.remove('border-2');
                 el.classList.add('border');
             })
+
+            firstSubWrapper.classList.remove('border');
+            firstSubWrapper.classList.add('border-2');
 
             document.querySelectorAll('[data-bot].subreddit.nestedTabs').forEach(el => {
                 el.classList.remove('active');
@@ -886,7 +893,7 @@
             e.target.classList.add('font-bold', 'no-underline', 'pointer-events-none');
             document.querySelector(`[data-subreddit="${subreddit}"][data-bot="${bot}"].sub`).classList.add('active');
 
-            document.querySelectorAll('.tabSelectWrapper').forEach(el => {
+            document.querySelectorAll('[data-subreddit].tabSelectWrapper').forEach(el => {
                 el.classList.remove('border-2');
                 el.classList.add('border');
             })

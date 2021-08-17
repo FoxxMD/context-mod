@@ -21,7 +21,7 @@ const status = (subLogMap: Map<string, LogEntry[]>) => {
 
     const middleware = [
         authUserCheck(),
-        botRoute(),
+        //botRoute(),
     ];
 
     const response = async (req: Request, res: Response) => {
@@ -65,6 +65,9 @@ const status = (subLogMap: Map<string, LogEntry[]>) => {
         const subManagerData = [];
         for (const s of subreddits) {
             const m = bot.subManagers.find(x => x.displayLabel === s) as Manager;
+            if(m === undefined) {
+                continue;
+            }
             const sd = {
                 name: s,
                 //linkName: s.replace(/\W/g, ''),

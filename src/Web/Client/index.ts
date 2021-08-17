@@ -636,9 +636,6 @@ const webClient = async (options: OperatorConfig) => {
             const instance = req.instance as CMInstance;
             if(instance.bots.length > 0) {
                 return res.redirect(`/?instance=${req.query.instance}&bot=${instance.bots[0].botName}`);
-            } else {
-                // TODO better noSubs page
-                return res.render('noSubs');
             }
         }
         next();
@@ -663,7 +660,7 @@ const webClient = async (options: OperatorConfig) => {
         next();
     }
 
-    app.getAsync('/', [initHeartbeat, redirectBotsNotAuthed, ensureAuthenticated, defaultSession, defaultInstance, defaultBot, instanceWithPermissions, botWithPermissions, createUserToken], async (req: express.Request, res: express.Response) => {
+    app.getAsync('/', [initHeartbeat, redirectBotsNotAuthed, ensureAuthenticated, defaultSession, defaultInstance, defaultBot, instanceWithPermissions, createUserToken], async (req: express.Request, res: express.Response) => {
 
         const user = req.user as Express.User;
         const instance = req.instance as CMInstance;
@@ -681,7 +678,7 @@ const webClient = async (options: OperatorConfig) => {
                     limit,
                     sort,
                     level,
-                    bot: req.query.bot as string,
+                    //bot: req.query.bot as string,
                 },
             }).json() as any;
 
