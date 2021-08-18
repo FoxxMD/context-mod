@@ -1,5 +1,6 @@
 import {Duration} from "dayjs/plugin/duration";
 import {Cache} from 'cache-manager';
+import {MESSAGE} from 'triple-beam';
 import Poll from "snoostorm/out/util/Poll";
 import Snoowrap from "snoowrap";
 
@@ -1341,4 +1342,15 @@ interface CacheTypeStat {
 
 export interface ResourceStats {
     [key: string]: CacheTypeStat;
+}
+
+export interface LogInfo {
+    message: string
+    [MESSAGE]: string,
+    level: string
+    timestamp: string
+    subreddit?: string
+    instance?: string
+    labels?: string[]
+    bot?: string
 }

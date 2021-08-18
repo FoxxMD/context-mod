@@ -131,7 +131,7 @@ const program = new Command();
                 // @ts-ignore
                 const activity = await a.fetch();
                 const sub = await activity.subreddit.display_name;
-                const logger = winston.loggers.get('default');
+                const logger = winston.loggers.get('app');
                 let bots: Bot[] = [];
                 if(botVal !== undefined) {
                     const bot = app.bots.find(x => x.botName === botVal);
@@ -165,7 +165,7 @@ const program = new Command();
             .action(async (subreddits = [], botVal, opts = {}) => {
                 const config = buildOperatorConfigWithDefaults(await parseOperatorConfigFromSources(opts));
                 const {checks = []} = opts;
-                const logger = winston.loggers.get('default');
+                const logger = winston.loggers.get('app');
                 let bots: Bot[] = [];
                 if(botVal !== undefined) {
                     const bot = app.bots.find(x => x.botName === botVal);
@@ -196,7 +196,7 @@ const program = new Command();
 
     } catch (err) {
         if (!err.logged && !(err instanceof LoggedError)) {
-            const logger = winston.loggers.get('default');
+            const logger = winston.loggers.get('app');
             if (err.name === 'StatusCodeError' && err.response !== undefined) {
                 const authHeader = err.response.headers['www-authenticate'];
                 if (authHeader !== undefined && authHeader.includes('insufficient_scope')) {

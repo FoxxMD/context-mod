@@ -12,7 +12,7 @@ import {inflateSync, deflateSync} from "zlib";
 import {
     ActivityWindowCriteria, CacheOptions, CacheProvider,
     DurationComparison,
-    GenericComparison, NamedGroup,
+    GenericComparison, LogInfo, NamedGroup,
     PollingOptionsStrong, RegExResult, ResourceStats,
     StringOperator
 } from "./Common/interfaces";
@@ -25,7 +25,9 @@ import {cacheOptDefaults} from "./Common/defaults";
 import cacheManager, {Cache} from "cache-manager";
 import redisStore from "cache-manager-redis-store";
 import crypto from "crypto";
+import Autolinker from 'autolinker';
 import {create as createMemoryStore} from './Utils/memoryStore';
+import {MESSAGE} from "triple-beam";
 
 const {format} = winston;
 const {combine, printf, timestamp, label, splat, errors} = format;
@@ -658,40 +660,57 @@ export const parseALogName = (reg: RegExp) => (val: string): string | undefined 
 
 const SUBREDDIT_NAME_LOG_REGEX: RegExp = /{(.+?)}/;
 export const parseSubredditLogName = parseALogName(SUBREDDIT_NAME_LOG_REGEX);
+export const parseSubredditLogInfoName = (logInfo: LogInfo) => logInfo.subreddit;
 const BOT_NAME_LOG_REGEX: RegExp = /~(.+?)~/;
 export const parseBotLogName = parseALogName(BOT_NAME_LOG_REGEX);
 const INSTANCE_NAME_LOG_REGEX: RegExp = /\|(.+?)\|/;
 export const parseInstanceLogName = parseALogName(INSTANCE_NAME_LOG_REGEX);
+export const parseInstanceLogInfoName = (logInfo: LogInfo) => logInfo.instance;
 
 export const LOG_LEVEL_REGEX: RegExp = /\s*(debug|warn|info|error|verbose)\s*:/i
-export const isLogLineMinLevel = (line: string, minLevelText: string): boolean => {
-    const lineLevelMatch = line.match(LOG_LEVEL_REGEX);
-    if (lineLevelMatch === null) {
-        return false;
-    }
-
+export const isLogLineMinLevel = (log: string | LogInfo, minLevelText: string): boolean => {
     // @ts-ignore
     const minLevel = logLevels[minLevelText];
-    // @ts-ignore
-    const level = logLevels[lineLevelMatch[1] as string];
+    let level: number;
+
+    if(typeof log === 'string') {
+        const lineLevelMatch =  log.match(LOG_LEVEL_REGEX)
+        if (lineLevelMatch === null) {
+            return false;
+        }
+        // @ts-ignore
+         level = logLevels[lineLevelMatch[1]];
+    } else {
+        const lineLevelMatch = log.level;
+        // @ts-ignore
+        level = logLevels[lineLevelMatch];
+    }
     return level <= minLevel;
 }
 
 // https://regexr.com/3e6m0
 const HYPERLINK_REGEX: RegExp = /(http(s)?:\/\/.)?(www\.)?[-a-zA-Z0-9@:%._\+~#=]{2,256}\.[a-z]{2,6}\b([-a-zA-Z0-9@:%_\+.~#?&//=]*)/;
-export const formatLogLineToHtml = (val: string) => {
-    const logContent = val
+export const formatLogLineToHtml = (log: string | LogInfo) => {
+    const val = typeof log === 'string' ? log : log[MESSAGE];
+    const logContent = Autolinker.link(val, {
+        email: false,
+        phone: false,
+        mention: false,
+        hashtag: false,
+        stripPrefix: false,
+        sanitizeHtml: true,
+    })
         .replace(/(\s*debug\s*):/i, '<span class="debug text-pink-400">$1</span>:')
         .replace(/(\s*warn\s*):/i, '<span class="warn text-yellow-400">$1</span>:')
         .replace(/(\s*info\s*):/i, '<span class="info text-blue-300">$1</span>:')
         .replace(/(\s*error\s*):/i, '<span class="error text-red-400">$1</span>:')
         .replace(/(\s*verbose\s*):/i, '<span class="error text-purple-400">$1</span>:')
-        .replaceAll('\n', '<br />')
-        .replace(HYPERLINK_REGEX, '<a target="_blank" href="$&">$&</a>');
+        .replaceAll('\n', '<br />');
+        //.replace(HYPERLINK_REGEX, '<a target="_blank" href="$&">$&</a>');
     return `<div class="logLine">${logContent}</div>`
 }
 
-export type LogEntry = [number, string];
+export type LogEntry = [number, LogInfo];
 export interface LogOptions {
     limit: number,
     level: string,
@@ -709,7 +728,7 @@ export const filterLogBySubreddit = (logs: Map<string, LogEntry[]>, validLogCate
         sort,
         operator = false,
         user,
-        allLogsParser = parseSubredditLogName,
+        allLogsParser = parseSubredditLogInfoName,
         allLogName = 'app'
     } = options;
 

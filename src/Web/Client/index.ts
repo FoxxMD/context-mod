@@ -6,12 +6,12 @@ import cookieParser from 'cookie-parser';
 import CacheManagerStore from 'express-session-cache-manager'
 import passport from 'passport';
 import {Strategy as CustomStrategy} from 'passport-custom';
-import {OperatorConfig, BotConnection} from "../../Common/interfaces";
+import {OperatorConfig, BotConnection, LogInfo} from "../../Common/interfaces";
 import {
     createCacheManager, filterLogBySubreddit,
     formatLogLineToHtml,
     intersect, isLogLineMinLevel,
-    LogEntry, parseFromJsonOrYamlToObject, parseInstanceLogName,
+    LogEntry, parseFromJsonOrYamlToObject, parseInstanceLogInfoName, parseInstanceLogName,
     parseSubredditLogName, permissions,
     randomId, sleep
 } from "../../util";
@@ -41,6 +41,7 @@ import {defaultBotStatus} from "../Common/defaults";
 import {booleanMiddle} from "../Common/middleware";
 import {BotInstance, CMInstance} from "../interfaces";
 import { URL } from "url";
+import {MESSAGE} from "triple-beam";
 
 const emitter = new EventEmitter();
 
@@ -135,31 +136,22 @@ const webClient = async (options: OperatorConfig) => {
 
     const webOps = operators.map(x => x.toLowerCase());
 
-    const winstonStream = new Transform({
-        transform(chunk, encoding, callback) {
-            const logLine = chunk.toString().slice(0, -1);
-            const now = Date.now();
-            const logEntry: LogEntry = [now, logLine];
-            const instanceLogName = parseInstanceLogName(logLine);
-            if (instanceLogName !== undefined) {
-                const subLogs = instanceLogMap.get(instanceLogName) || [];
-                subLogs.unshift(logEntry);
-                instanceLogMap.set(instanceLogName, subLogs.slice(0, 200 + 1));
-            } else {
-                const appLogs = instanceLogMap.get('web') || [];
-                appLogs.unshift(logEntry);
-                instanceLogMap.set('web', appLogs.slice(0, 200 + 1));
-            }
-            emitter.emit('log', logLine);
-            callback(null,chunk);
-        }
-    });
-
     const logger = getLogger({defaultLabel: 'Web', ...options.logging}, 'Web');
 
-    logger.add(new winston.transports.Stream({
-        stream: winstonStream,
-    }))
+    logger.stream().on('log', (log: LogInfo) => {
+        const logEntry: LogEntry = [dayjs(log.timestamp).unix(), log];
+        const {instance: instanceLogName} = log;
+        if (instanceLogName !== undefined) {
+            const subLogs = instanceLogMap.get(instanceLogName) || [];
+            subLogs.unshift(logEntry);
+            instanceLogMap.set(instanceLogName, subLogs.slice(0, 200 + 1));
+        } else {
+            const appLogs = instanceLogMap.get('web') || [];
+            appLogs.unshift(logEntry);
+            instanceLogMap.set('web', appLogs.slice(0, 200 + 1));
+        }
+        emitter.emit('log', log[MESSAGE]);
+    });
 
     if (await tcpUsed.check(port)) {
         throw new SimpleError(`Specified port for web interface (${port}) is in use or not available. Cannot start web server.`);
@@ -755,7 +747,7 @@ const webClient = async (options: OperatorConfig) => {
                 instanceId: (req.instance as CMInstance).friendly,
                 isOperator: instance.operators.includes((req.user as Express.User).name),
                 // @ts-ignore
-                logs: filterLogBySubreddit(instanceLogMap, [instance.friendly], {limit, sort, level, allLogName: 'web', allLogsParser: parseInstanceLogName }).get(instance.friendly),
+                logs: filterLogBySubreddit(instanceLogMap, [instance.friendly], {limit, sort, level, allLogName: 'web', allLogsParser: parseInstanceLogInfoName }).get(instance.friendly),
                 logSettings: {
                     limitSelect: [10, 20, 50, 100, 200].map(x => `<option ${limit === x ? 'selected' : ''} class="capitalize ${limit === x ? 'font-bold' : ''}" data-value="${x}">${x}</option>`).join(' | '),
                     sortSelect: ['ascending', 'descending'].map(x => `<option ${sort === x ? 'selected' : ''} class="capitalize ${sort === x ? 'font-bold' : ''}" data-value="${x}">${x}</option>`).join(' '),

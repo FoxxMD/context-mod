@@ -21,7 +21,7 @@ const action = async (req: express.Request, res: express.Response) => {
     for (const s of subreddits) {
         const manager = bot.subManagers.find(x => x.displayLabel === s);
         if (manager === undefined) {
-            winston.loggers.get('default').warn(`Manager for ${s} does not exist`, {subreddit: `/u/${userName}`});
+            winston.loggers.get('app').warn(`Manager for ${s} does not exist`, {subreddit: `/u/${userName}`});
             continue;
         }
         const mLogger = manager.logger;

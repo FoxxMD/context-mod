@@ -17,7 +17,7 @@ import {opStats} from "../../../../Common/util";
 import {authUserCheck, botRoute} from "../../../middleware";
 import Bot from "../../../../../Bot";
 
-const status = (botLogMap: Map<string, Map<string, LogEntry[]>>, systemLogs: LogEntry[]) => {
+const status = () => {
 
     const middleware = [
         authUserCheck(),
@@ -32,6 +32,12 @@ const status = (botLogMap: Map<string, Map<string, LogEntry[]>>, systemLogs: Log
             sort = 'descending',
         } = req.query;
 
+        // @ts-ignore
+        const botLogMap = req.botLogs as Map<string, Map<string, LogEntry[]>>;
+        // @ts-ignore
+        const systemLogs = req.systemLogs as LogEntry[];
+
+
         if(req.serverBot !== undefined) {
             bots = [req.serverBot];
         } else {
@@ -39,7 +45,7 @@ const status = (botLogMap: Map<string, Map<string, LogEntry[]>>, systemLogs: Log
         }
         const botResponses: BotStatusResponse[] = [];
         for(const b of bots) {
-            botResponses.push(await botStatResponse(b, req));
+            botResponses.push(await botStatResponse(b, req, botLogMap));
         }
         const system: any = {};
         if((req.user as Express.User).isOperator) {
@@ -53,7 +59,7 @@ const status = (botLogMap: Map<string, Map<string, LogEntry[]>>, systemLogs: Log
         return res.json(response);
     }
 
-    const botStatResponse = async (bot: Bot, req: Request) => {
+    const botStatResponse = async (bot: Bot, req: Request, botLogMap: Map<string, Map<string, LogEntry[]>>) => {
         const {
             //subreddits = [],
             //user: userVal,
@@ -250,7 +256,7 @@ const status = (botLogMap: Map<string, Map<string, LogEntry[]>>, systemLogs: Log
         };
         if (allManagerData.logs === undefined) {
             // this should happen but saw an edge case where potentially did
-            winston.loggers.get('default').warn(`Logs for 'all' were undefined found but should always have a default empty value`);
+            winston.loggers.get('app').warn(`Logs for 'all' were undefined found but should always have a default empty value`);
         }
         // if(isOperator) {
         allManagerData.startedAt = bot.startedAt.local().format('MMMM D, YYYY h:mm A Z');

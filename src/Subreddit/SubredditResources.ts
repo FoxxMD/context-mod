@@ -104,7 +104,7 @@ export class SubredditResources {
         this.subreddit = subreddit;
         this.name = name;
         if (logger === undefined) {
-            const alogger = winston.loggers.get('default')
+            const alogger = winston.loggers.get('app')
             this.logger = alogger.child({labels: [this.name, 'Resource Cache']}, mergeArr);
         } else {
             this.logger = logger.child({labels: ['Resource Cache']}, mergeArr);
@@ -422,7 +422,7 @@ export class SubredditResources {
             return true;
         }
 
-        const log = logger.child({leaf: 'Item Check'});
+        const log = logger.child({leaf: 'Item Check'}, mergeArr);
 
         for (const crit of stateCriteria) {
             const pass = await (async () => {
@@ -598,7 +598,7 @@ export class BotResourcesManager {
                     // @ts-ignore
                     this.defaultCache?.store.prune();
                     // kinda hacky but whatever
-                    const logger = winston.loggers.get('default');
+                    const logger = winston.loggers.get('app');
                     logger.debug('Pruned Shared Cache');
                     // prune interval should be twice the smallest TTL
                 }, min * 1000 * 2)

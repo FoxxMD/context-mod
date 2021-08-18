@@ -48,7 +48,7 @@ const action = async (req: Request, res: Response) => {
     }
 
     if (a === undefined) {
-        winston.loggers.get('default').error('Could not parse Comment or Submission ID from given URL', {subreddit: `/u/${userName}`});
+        winston.loggers.get('app').error('Could not parse Comment or Submission ID from given URL', {subreddit: `/u/${userName}`});
         return res.send('OK');
     } else {
         // @ts-ignore
@@ -62,7 +62,7 @@ const action = async (req: Request, res: Response) => {
             if (subreddit === 'All') {
                 msg = `${msg} If you want to test an Activity against a Subreddit\'s config it does not belong to then switch to that Subreddit's tab first.`
             }
-            winston.loggers.get('default').error(msg, {subreddit: `/u/${userName}`});
+            winston.loggers.get('app').error(msg, {subreddit: `/u/${userName}`});
             return res.send('OK');
         }
 

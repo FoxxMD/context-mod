@@ -20,7 +20,7 @@ const logs = (subLogMap: Map<string, LogEntry[]>) => {
 
     const response = async (req: Request, res: Response) => {
 
-        const logger = winston.loggers.get('default');
+        const logger = winston.loggers.get('app');
 
         const {name: userName, realManagers = [], isOperator} = req.user as Express.User;
         const {level = 'verbose', stream, limit = 200, sort = 'descending'} = req.query;

@@ -165,7 +165,7 @@ class Bot {
                 warnings: true,
                 maxRetryAttempts: 5,
                 debug,
-                logger: snooLogWrapper(this.logger.child({labels: ['Snoowrap']})),
+                logger: snooLogWrapper(this.logger.child({labels: ['Snoowrap']}, mergeArr)),
                 continueAfterRatelimitError: true,
             });
         } catch (err) {

@@ -4,6 +4,7 @@ import {RuleResult} from "../Rule";
 import {SubredditResources} from "../Subreddit/SubredditResources";
 import {ChecksActivityState, TypedActivityStates} from "../Common/interfaces";
 import Author, {AuthorOptions} from "../Author/Author";
+import {mergeArr} from "../util";
 
 export abstract class Action {
     name?: string;
@@ -36,7 +37,7 @@ export abstract class Action {
         this.enabled = enable;
         this.resources = resources;
         this.client = client;
-        this.logger = logger.child({labels: [`Action ${this.getActionUniqueName()}`]});
+        this.logger = logger.child({labels: [`Action ${this.getActionUniqueName()}`]}, mergeArr);
 
         this.authorIs = {
             exclude: exclude.map(x => new Author(x)),

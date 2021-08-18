@@ -16,7 +16,7 @@ import {
 } from "../../util";
 import {getLogger} from "../../Utils/loggerFactory";
 import LoggedError from "../../Utils/LoggedError";
-import {Invokee, OperatorConfig} from "../../Common/interfaces";
+import {Invokee, LogInfo, OperatorConfig} from "../../Common/interfaces";
 import http from "http";
 import SimpleError from "../../Utils/SimpleError";
 import {heartbeat} from "./routes/authenticated/applicationRoutes";
@@ -29,6 +29,9 @@ import {opStats} from "../Common/util";
 import Bot from "../../Bot";
 import {BotStatusResponse} from "../Common/interfaces";
 import addBot from "./routes/authenticated/user/addBot";
+import DuplexTransport from "../../Utils/DuplexTransport";
+import dayjs from "dayjs";
+import {MESSAGE} from "triple-beam";
 
 const server = addAsync(express());
 server.use(bodyParser.json());
@@ -67,56 +70,42 @@ const rcbServer = async function (options: OperatorConfig) {
 
     const opNames = name.map(x => x.toLowerCase());
     let app: App;
-    //const botSubreddits: Map<string, string[]> = new Map();
-
-    const winstonStream = new Transform({
-        transform(chunk, encoding, callback) {
-            // remove newline (\n) from end of string since we deal with it with css/html
-            const logLine = chunk.toString().slice(0, -1);
-            const now = Date.now();
-            const logEntry: LogEntry = [now, logLine];
-
-            const botName = parseBotLogName(logLine);
-            if(botName === undefined) {
-                systemLogs.unshift(logEntry);
-                systemLogs.slice(0, 201);
-            } else {
-                const botLog = botLogMap.get(botName) || new Map();
-
-                const subName = parseSubredditLogName(logLine);
-
-                if(subName === undefined) {
-                    const appLogs = botLog.get('app') || [];
-                    appLogs.unshift(logEntry);
-                    botLog.set('app', appLogs.slice(0, 200 + 1));
-                } else {
-                    let botSubs = botSubreddits.get(botName) || [];
-                    if(botSubs.length === 0 && app !== undefined) {
-                        const b = app.bots.find(x => x.botName === botName);
-                        if(b !== undefined) {
-                            botSubs = b.subManagers.map(x => x.displayLabel);
-                            botSubreddits.set(botName, botSubs);
-                        }
-                    }
-                    if(botSubs.length === 0 || botSubs.includes(subName)) {
-                        const subLogs = botLog.get(subName) || [];
-                        subLogs.unshift(logEntry);
-                        botLog.set(subName, subLogs.slice(0, 200 + 1));
-                    }
-                }
-                botLogMap.set(botName, botLog);
-            }
-            callback(null, logLine);
-        }
-    });
-
-    const streamTransport = new winston.transports.Stream({
-        stream: winstonStream,
-    });
 
     const logger = getLogger({...options.logging});
 
-    logger.add(streamTransport);
+    logger.stream().on('log', (log: LogInfo) => {
+        const logEntry: LogEntry = [dayjs(log.timestamp).unix(), log];
+
+        const {bot: botName, subreddit: subName} = log;
+
+        if(botName === undefined) {
+            systemLogs.unshift(logEntry);
+            systemLogs.slice(0, 201);
+        } else {
+            const botLog = botLogMap.get(botName) || new Map();
+
+            if(subName === undefined) {
+                const appLogs = botLog.get('app') || [];
+                appLogs.unshift(logEntry);
+                botLog.set('app', appLogs.slice(0, 200 + 1));
+            } else {
+                let botSubs = botSubreddits.get(botName) || [];
+                if(botSubs.length === 0 && app !== undefined) {
+                    const b = app.bots.find(x => x.botName === botName);
+                    if(b !== undefined) {
+                        botSubs = b.subManagers.map(x => x.displayLabel);
+                        botSubreddits.set(botName, botSubs);
+                    }
+                }
+                if(botSubs.length === 0 || botSubs.includes(subName)) {
+                    const subLogs = botLog.get(subName) || [];
+                    subLogs.unshift(logEntry);
+                    botLog.set(subName, subLogs.slice(0, 200 + 1));
+                }
+            }
+            botLogMap.set(botName, botLog);
+        }
+    })
 
     if (await tcpUsed.check(port)) {
         throw new SimpleError(`Specified port for API (${port}) is in use or not available. Cannot start API.`);
@@ -192,8 +181,14 @@ const rcbServer = async function (options: OperatorConfig) {
         }
         return res.json(resp);
     });
-
-    server.getAsync('/status', ...status(botLogMap, systemLogs))
+    const passLogs = async (req: Request, res: Response, next: Function) => {
+        // @ts-ignore
+        req.botLogs = botLogMap;
+        // @ts-ignore
+        req.systemLogs = systemLogs;
+        next();
+    }
+    server.getAsync('/status', passLogs, ...status())
 
     server.getAsync('/config', ...configRoute);
 

@@ -1,9 +1,10 @@
 import {labelledFormat, logLevels} from "../util";
 import winston, {Logger} from "winston";
+import DuplexTransport from "./DuplexTransport";
 
 const {transports} = winston;
 
-export const getLogger = (options: any, name = 'default'): Logger => {
+export const getLogger = (options: any, name = 'app'): Logger => {
     if(!winston.loggers.has(name)) {
         const {
             path,
@@ -20,6 +21,19 @@ export const getLogger = (options: any, name = 'default'): Logger => {
 
         const myTransports = [
             consoleTransport,
+            new DuplexTransport({
+                stream: {
+                    transform(chunk,e, cb) {
+                        cb(null, chunk);
+                    },
+                    objectMode: true,
+                },
+                name: 'duplex',
+                dump: false,
+                handleExceptions: true,
+                // @ts-expect-error
+                handleRejections: true,
+            }),
             ...additionalTransports,
         ];
 

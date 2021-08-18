@@ -28,6 +28,7 @@
     "@awaitjs/express": "^0.8.0",
     "ajv": "^7.2.4",
     "async": "^3.2.0",
+    "autolinker": "^3.14.3",
     "body-parser": "^1.19.0",
     "cache-manager": "^3.4.4",
     "cache-manager-redis-store": "^2.0.0",
@@ -67,10 +68,12 @@
     "snoowrap": "^1.23.0",
     "socket.io": "^4.1.3",
     "tcp-port-used": "^1.0.2",
+    "triple-beam": "^1.3.0",
     "typescript": "^4.3.4",
     "webhook-discord": "^3.7.7",
     "winston": "FoxxMD/winston#fbab8de969ecee578981c77846156c7f43b5f01e",
     "winston-daily-rotate-file": "^4.5.5",
+    "winston-transport": "^4.4.0",
     "zlib": "^1.0.5"
   },
   "devDependencies": {
@@ -96,6 +99,7 @@
     "@types/passport": "^1.0.7",
     "@types/passport-jwt": "^3.0.6",
     "@types/tcp-port-used": "^1.0.0",
+    "@types/triple-beam": "^1.3.2",
     "ts-auto-guard": "*",
     "ts-json-schema-generator": "^0.93.0",
     "typescript-json-schema": "^0.50.1"
