@@ -6,7 +6,7 @@ import cookieParser from 'cookie-parser';
 import CacheManagerStore from 'express-session-cache-manager'
 import passport from 'passport';
 import {Strategy as CustomStrategy} from 'passport-custom';
-import {OperatorConfig, BotConnection, LogInfo} from "../../Common/interfaces";
+import {OperatorConfig, BotConnection, LogInfo, StreamedLogInfo} from "../../Common/interfaces";
 import {
     createCacheManager, filterLogBySubreddit,
     formatLogLineToHtml,
@@ -534,8 +534,7 @@ const webClient = async (options: OperatorConfig) => {
                     });
 
                     delim.on('data', (c: any) => {
-                        const chunk = c.toString();
-                        io.to(sessionId).emit('log', formatLogLineToHtml(chunk));
+                        io.to(sessionId).emit('log', formatLogLineToHtml(c.toString()));
                     });
 
                     gotStream.once('retry', retryFn);
