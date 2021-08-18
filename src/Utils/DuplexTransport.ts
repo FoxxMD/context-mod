@@ -38,23 +38,27 @@ class DuplexTransport extends StreamTransport {
         }
     }
 
-    stream(options = {}) {
-        this.duplex.on('data', (chunk) => {
-            try {
-                if (this.duplex.writableObjectMode) {
-                    this.duplex.emit('log', {...chunk, name: this.name});
-                } else {
-                    const msg = chunk.toString();
-                    this.duplex.emit('log', {
-                        message: msg,
-                        name: this.name,
-                        [Symbol.for('message')]: msg,
-                    });
-                }
-            } catch (e) {
-                this.duplex.emit('error', e);
+    onStream(chunk: any) {
+        try {
+            if (this.duplex.writableObjectMode) {
+                this.duplex.emit('log', {...chunk, name: this.name});
+            } else {
+                const msg = chunk.toString();
+                this.duplex.emit('log', {
+                    message: msg,
+                    name: this.name,
+                    [Symbol.for('message')]: msg,
+                });
             }
-        });
+        } catch (e) {
+            this.duplex.emit('error', e);
+        }
+    }
+
+    stream(options = {}) {
+        if(!this.duplex.listeners('data').some(x => this.onStream)) {
+            this.duplex.on('data', this.onStream.bind(this));
+        }
         return this.duplex;
     }
 }
