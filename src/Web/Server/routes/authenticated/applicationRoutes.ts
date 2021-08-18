@@ -13,6 +13,9 @@ interface OperatorData {
 
 export const heartbeat = (opData: OperatorData) => {
     const response = async (req: Request, res: Response) => {
+        if(req.botApp === undefined) {
+            return res.status(500).send('Application is initializing, try again in a few seconds');
+        }
         const heartbeatData = {
             subreddits: req.botApp.bots.map(y => y.subManagers.map(x => x.subreddit.display_name)).flat(),
             bots: req.botApp.bots.map(x => ({botName: x.botName, subreddits: x.subManagers.map(y => y.displayLabel), running: x.running})),
