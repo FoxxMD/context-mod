@@ -271,7 +271,7 @@ export const parseDefaultBotInstanceFromArgs = (args: any): BotInstanceJsonConfi
         caching,
     } = args || {};
 
-    return {
+    const data = {
         credentials: {
             clientId,
             clientSecret,
@@ -300,6 +300,7 @@ export const parseDefaultBotInstanceFromArgs = (args: any): BotInstanceJsonConfi
             hardLimit
         }
     }
+    return removeUndefinedKeys(data) as BotInstanceJsonConfig;
 }
 
 export const parseOpConfigFromArgs = (args: any): OperatorJsonConfig => {
@@ -366,7 +367,7 @@ const parseListFromEnv = (val: string|undefined) => {
 }
 
 export const parseDefaultBotInstanceFromEnv = (): BotInstanceJsonConfig => {
-    return {
+    const data = {
         credentials: {
             clientId: process.env.CLIENT_ID,
             clientSecret: process.env.CLIENT_SECRET,
@@ -397,7 +398,8 @@ export const parseDefaultBotInstanceFromEnv = (): BotInstanceJsonConfig => {
             softLimit: process.env.SOFT_LIMIT !== undefined ? parseInt(process.env.SOFT_LIMIT) : undefined,
             hardLimit: process.env.HARD_LIMIT !== undefined ? parseInt(process.env.HARD_LIMIT) : undefined
         },
-    }
+    };
+    return removeUndefinedKeys(data) as BotInstanceJsonConfig;
 }
 
 export const parseOpConfigFromEnv = (): OperatorJsonConfig => {

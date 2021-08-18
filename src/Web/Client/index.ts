@@ -6,7 +6,7 @@ import cookieParser from 'cookie-parser';
 import CacheManagerStore from 'express-session-cache-manager'
 import passport from 'passport';
 import {Strategy as CustomStrategy} from 'passport-custom';
-import {OperatorConfig, BotConnection, LogInfo, StreamedLogInfo} from "../../Common/interfaces";
+import {OperatorConfig, BotConnection, LogInfo} from "../../Common/interfaces";
 import {
     createCacheManager, filterLogBySubreddit,
     formatLogLineToHtml,
