@@ -411,6 +411,7 @@ const webClient = async (options: OperatorConfig) => {
             redirect: redir,
             instance,
             subreddit,
+            code,
         } = req.body as any;
 
         const cid = ci || clientId;
@@ -427,7 +428,7 @@ const webClient = async (options: OperatorConfig) => {
             return res.status(400).send('redirectUrl is required');
         }
 
-        const inviteId = randomId();
+        const inviteId = code || randomId();
         invites.set(inviteId, {
             permissions,
             clientId: (ci || clientId).trim(),
@@ -581,8 +582,8 @@ const webClient = async (options: OperatorConfig) => {
         const user = req.user as Express.User;
 
         const isOperator = instance.operators.includes(user.name);
-        const canAccessBot = isOperator || intersect(user.subreddits, instance.subreddits).length === 0;
-        if (user.isOperator && !canAccessBot) {
+        const canAccessBot = isOperator || intersect(user.subreddits, instance.subreddits).length > 0;
+        if (!user.isOperator && !canAccessBot) {
             return res.status(404).render('error', {error: msg});
         }
 
