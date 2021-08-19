@@ -1,6 +1,6 @@
 import {labelledFormat, logLevels} from "../util";
 import winston, {Logger} from "winston";
-import DuplexTransport from "./DuplexTransport";
+import {DuplexTransport} from "winston-duplex";
 
 const {transports} = winston;
 

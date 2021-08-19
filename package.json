@@ -74,6 +74,7 @@
     "webhook-discord": "^3.7.7",
     "winston": "FoxxMD/winston#fbab8de969ecee578981c77846156c7f43b5f01e",
     "winston-daily-rotate-file": "^4.5.5",
+    "winston-duplex": "^0.1.1",
     "winston-transport": "^4.4.0",
     "zlib": "^1.0.5"
   },

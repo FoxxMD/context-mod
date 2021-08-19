@@ -27,11 +27,8 @@ import action from "./routes/authenticated/user/action";
 import {authUserCheck, botRoute} from "./middleware";
 import {opStats} from "../Common/util";
 import Bot from "../../Bot";
-import {BotStatusResponse} from "../Common/interfaces";
 import addBot from "./routes/authenticated/user/addBot";
-import DuplexTransport from "../../Utils/DuplexTransport";
 import dayjs from "dayjs";
-import {MESSAGE} from "triple-beam";
 
 const server = addAsync(express());
 server.use(bodyParser.json());
