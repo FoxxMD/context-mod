@@ -139,7 +139,10 @@
                                 var model = monaco.editor.createModel(data, "json", modelUri);
                                 var editor = monaco.editor.create(document.getElementById('editor'), {
                                     model,
-                                    theme: 'vs-dark'
+                                    theme: 'vs-dark',
+                                    minimap: {
+                                        enabled: false
+                                    }
                                 });
                                 editor;
                             })
@@ -149,7 +152,10 @@
                     var model = monaco.editor.createModel(preamble.join('\r\n'), "json", modelUri);
                     var editor = monaco.editor.create(document.getElementById('editor'), {
                         model,
-                        theme: 'vs-dark'
+                        theme: 'vs-dark',
+                        minimap: {
+                            enabled: false
+                        }
                     });
                     editor;
                 }
