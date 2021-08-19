@@ -620,8 +620,8 @@ const webClient = async (options: OperatorConfig) => {
         const user = req.user as Express.User;
 
         const isOperator = instance.operators.includes(user.name);
-        const canAccessBot = isOperator || intersect(user.subreddits, botInstance.subreddits).length === 0;
-        if (user.isOperator && !canAccessBot) {
+        const canAccessBot = isOperator || intersect(user.subreddits, botInstance.subreddits).length > 0;
+        if (!user.isOperator && !canAccessBot) {
             return res.status(404).render('error', {error: msg});
         }
 
@@ -673,24 +673,26 @@ const webClient = async (options: OperatorConfig) => {
 
     const defaultInstance = async (req: express.Request, res: express.Response, next: Function) => {
         if(req.query.instance === undefined) {
-            if(cmInstances.length > 0) {
-                return res.redirect(`/?instance=${cmInstances[0].friendly}`);
-            } else {
-                // TODO better noSubs page
-                return res.render('noSubs');
+            if(cmInstances.length === 0) {
+                return res.render('error', {error: 'There are no ContextMod instances defined for this web client!'});
             }
+            const user = req.user as Express.User;
+
+            const accessibleInstance = cmInstances.find(x => {
+                if(x.operators.includes(user.name)) {
+                    return true;
+                }
+                return intersect(user.subreddits, x.subreddits).length > 0;
+            });
+
+            if(accessibleInstance === undefined) {
+                return res.render('noAccess');
+            }
+
+            return res.redirect(`/?instance=${accessibleInstance.friendly}`);
         }
         const instance = cmInstances.find(x => x.friendly === req.query.instance);
         req.instance = instance;
-        next();
-    }
-    const defaultBot = async (req: express.Request, res: express.Response, next: Function) => {
-        if(req.query.bot === undefined) {
-            const instance = req.instance as CMInstance;
-            if(instance.bots.length > 0) {
-                return res.redirect(`/?instance=${req.query.instance}&bot=${instance.bots[0].botName}`);
-            }
-        }
         next();
     }
 
@@ -713,7 +715,7 @@ const webClient = async (options: OperatorConfig) => {
         next();
     }
 
-    app.getAsync('/', [initHeartbeat, redirectBotsNotAuthed, ensureAuthenticated, defaultSession, defaultInstance, defaultBot, instanceWithPermissions, createUserToken], async (req: express.Request, res: express.Response) => {
+    app.getAsync('/', [initHeartbeat, redirectBotsNotAuthed, ensureAuthenticated, defaultSession, defaultInstance, instanceWithPermissions, createUserToken], async (req: express.Request, res: express.Response) => {
 
         const user = req.user as Express.User;
         const instance = req.instance as CMInstance;

@@ -740,7 +740,17 @@
 
     var searchParams = new URLSearchParams(window.location.search);
     const shownSub = searchParams.get('sub') || 'All'
-    const shownBot = searchParams.get('bot');
+    let shownBot = searchParams.get('bot');
+    if(shownBot === null) {
+        // show the first bot listed if none is specified
+        const firstBot = document.querySelector('.tabSelectWrapper[data-bot]');
+        if(firstBot !== null) {
+            shownBot = firstBot.dataset.bot;
+            searchParams.set('bot', shownBot);
+            var newRelativePathQuery = window.location.pathname + '?' + searchParams.toString();
+            history.pushState(null, '', newRelativePathQuery);
+        }
+    }
 
     document.querySelector(`[data-bot="${shownBot}"].tabSelect`).classList.add('font-bold', 'no-underline', 'pointer-events-none');
     document.querySelector(`ul[data-bot="${shownBot}"] [data-subreddit="${shownSub}"].tabSelect`).classList.add('font-bold', 'no-underline', 'pointer-events-none');
