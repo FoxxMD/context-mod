@@ -39,6 +39,7 @@
                         </ul>
                         <div>When done editing hit Ctrl+A (Command+A on macOS) to select all text, then copy + paste back into your wiki/file</div>
                     </span>
+                    <span id="schemaType"></span> |
                     <span class="cursor-help">
                             How To Use
                         <span>
@@ -54,6 +55,7 @@
                         </span>
                     </span>
                 </span>
+                | <a id="schemaOpen" href="">Open With Operator Schema</a>
                 <div id="error" class="font-semibold"></div>
             </div>
             <div style="min-height: 80vh" id="editor"></div>
@@ -106,10 +108,15 @@
         schemaType = 'OperatorConfig.json';
         preamble.push('// automatic validation of your OPERATOR configuration');
         document.querySelector('#schemaTypeList').innerHTML = 'automatic validation of your OPERATOR configuration (yellow squiggly)';
+        document.querySelector('#schemaType').innerHTML = 'Operator Configuration';
+        document.querySelector('#schemaOpen').href = '/config?schema=subreddit';
+        document.querySelector('#schemaOpen').innerHTML = 'Open with Subreddit Schema';
     } else {
         schemaType = 'App.json';
         preamble.push('// automatic validation of your SUBREDDIT configuration');
         document.querySelector('#schemaTypeList').innerHTML = 'automatic validation of your SUBREDDIT configuration (yellow squiggly)'
+        document.querySelector('#schemaType').innerHTML = 'Subreddit Configuration';
+        document.querySelector('#schemaOpen').href = '/config?schema=operator';
     }
 
     const schemaUri = `${document.location.origin}/schemas/${schemaType}`;
