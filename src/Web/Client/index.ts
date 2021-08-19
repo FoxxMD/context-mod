@@ -52,6 +52,8 @@ app.use(bodyParser.urlencoded({extended: false}));
 app.set('views', `${__dirname}/../assets/views`);
 app.set('view engine', 'ejs');
 app.use('/public', express.static(`${__dirname}/../assets/public`));
+app.use('/monaco', express.static(`${__dirname}/../../../node_modules/monaco-editor/`));
+app.use('/schemas', express.static(`${__dirname}/../../Schema/`));
 
 const proxy = httpProxy.createProxyServer({
     ws: true,
@@ -231,6 +233,14 @@ const webClient = async (options: OperatorConfig) => {
             next();
         } else {
             return res.redirect('/login');
+        }
+    }
+
+    const ensureAuthenticatedApi = async (req: express.Request, res: express.Response, next: Function) => {
+        if (req.isAuthenticated()) {
+            next();
+        } else {
+            return res.status(401).send('You must be logged in to access this route');
         }
     }
 
@@ -788,7 +798,13 @@ const webClient = async (options: OperatorConfig) => {
         });
     });
 
-    app.getAsync('/config', [ensureAuthenticated, defaultSession, instanceWithPermissions, botWithPermissions, createUserToken], async (req: express.Request, res: express.Response) => {
+    app.getAsync('/config', async (req: express.Request, res: express.Response) => {
+        res.render('config', {
+            title: `Configuration Editor`
+        });
+    });
+
+    app.getAsync('/config/content', [ensureAuthenticatedApi, defaultSession, instanceWithPermissions, botWithPermissions, createUserToken], async (req: express.Request, res: express.Response) => {
         const {subreddit} = req.query as any;
         const resp = await got.get(`${(req.instance as CMInstance).normalUrl}/config`, {
             headers: {
@@ -800,13 +816,7 @@ const webClient = async (options: OperatorConfig) => {
             }
         }).text();
 
-        const [obj, jsonErr, yamlErr] = parseFromJsonOrYamlToObject(resp);
-        const bot = req.instance as CMInstance;
-        res.render('config', {
-            config: prettyPrintJson.toHtml(obj, {quoteKeys: true, indent: 2}),
-            operatorDisplay:bot.operators.join(', '),
-            title: `Configuration for ${subreddit}`
-        });
+        return res.send(resp);
     });
 
     app.getAsync('/logs/settings/update',[ensureAuthenticated], async (req: express.Request, res: express.Response) => {

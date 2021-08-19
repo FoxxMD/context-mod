@@ -9,9 +9,7 @@
     <script src="https://code.iconify.design/1/1.0.4/iconify.min.js"></script>
     <link rel="stylesheet" href="/public/themeToggle.css">
     <link rel="stylesheet" href="/public/app.css">
-    <link rel="stylesheet" href="/public/json.css">
     <title><%= title %></title>
-    <!--<title><%# `CM for /u/${botName}`%></title>-->
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width,initial-scale=1.0">
@@ -23,12 +21,42 @@
     <%- include('partials/title') %>
     <div class="container mx-auto">
         <div class="grid">
-            <div class="bg-white dark:bg-gray-700 dark:text-white">
-                <div class="p-6 md:px-10 md:py-6 space-y-3">
-                    <div>Note: Comments have been removed</div>
-                    <pre style="user-select: text;"><%- config %></pre>
-                </div>
+            <div class="dark:text-white mb-3 pl-2">
+                <span class="has-tooltip">
+                    <span style="z-index:999; margin-top: 30px;" class='tooltip rounded shadow-lg p-3 bg-gray-100 text-black space-y-2'>
+                       <div>Copy + paste your configuration here to get:</div>
+                        <ul class="list-inside list-disc">
+                            <li>
+                                formatting (right click for menu)
+                            </li>
+                            <li>
+                                JSON syntax assist (red squiggly, hover for info)
+                            </li>
+                            <li>
+                                annotated properties (hover for info)
+                            </li>
+                            <li id="schemaTypeList"></li>
+                        </ul>
+                        <div>When done editing hit Ctrl+A (Command+A on macOS) to select all text, then copy + paste back into your wiki/file</div>
+                    </span>
+                    <span class="cursor-help">
+                            How To Use
+                        <span>
+                            <svg xmlns="http://www.w3.org/2000/svg"
+                                 class="h-4 w-4 inline-block cursor-help"
+                                 fill="none"
+                                 viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round"
+                                      stroke-linejoin="round"
+                                      stroke-width="2"
+                                      d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                        </span>
+                    </span>
+                </span>
+                <div id="error" class="font-semibold"></div>
             </div>
+            <div style="min-height: 80vh" id="editor"></div>
         </div>
     </div>
     <%- include('partials/footer') %>
@@ -61,6 +89,73 @@
             localStorage.setItem('ms-dark', 'no');
         }
     }
+</script>
+<script src="/monaco/dev/vs/loader.js"></script>
+<script>
+    require.config({ paths: { vs: 'monaco/dev/vs' } });
+
+    const preamble = [
+        '// Copy + paste your configuration here to get',
+        '// formatting, JSON syntax, annotated properties and'
+    ];
+
+    var searchParams = new URLSearchParams(window.location.search);
+
+    let schemaType;
+    if(searchParams.get('schema') === 'operator') {
+        schemaType = 'OperatorConfig.json';
+        preamble.push('// automatic validation of your OPERATOR configuration');
+        document.querySelector('#schemaTypeList').innerHTML = 'automatic validation of your OPERATOR configuration (yellow squiggly)';
+    } else {
+        schemaType = 'App.json';
+        preamble.push('// automatic validation of your SUBREDDIT configuration');
+        document.querySelector('#schemaTypeList').innerHTML = 'automatic validation of your SUBREDDIT configuration (yellow squiggly)'
+    }
+
+    const schemaUri = `${document.location.origin}/schemas/${schemaType}`;
+
+    require(['vs/editor/editor.main'], function () {
+        const modelUri = monaco.Uri.parse("a://b/foo.json");
+        fetch(schemaUri).then((res) => {
+            res.json().then((schemaData) => {
+                monaco.languages.json.jsonDefaults.setDiagnosticsOptions({
+                    validate: true,
+                    allowComments: true,
+                    trailingCommas: "ignore",
+                    schemas: [{
+                        uri: schemaUri,
+                        fileMatch: [modelUri.toString()],
+                        schema: schemaData
+                    }]
+                });
+                if(searchParams.get('subreddit') !== null) {
+                    fetch(`${document.location.origin}/config/content${document.location.search}`).then((resp) => {
+                        if(!resp.ok) {
+                            resp.text().then(data => {
+                                document.querySelector('#error').innerHTML = `Error occurred while fetching configuration => ${data}`
+                            });
+                        } else {
+                            resp.text().then(data => {
+                                var model = monaco.editor.createModel(data, "json", modelUri);
+                                var editor = monaco.editor.create(document.getElementById('editor'), {
+                                    model,
+                                    theme: 'vs-dark'
+                                });
+                                editor;
+                            })
+                        }
+                    })
+                } else {
+                    var model = monaco.editor.createModel(preamble.join('\r\n'), "json", modelUri);
+                    var editor = monaco.editor.create(document.getElementById('editor'), {
+                        model,
+                        theme: 'vs-dark'
+                    });
+                    editor;
+                }
+            })
+        })
+    });
 </script>
 </body>
 </html>
