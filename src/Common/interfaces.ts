@@ -1123,12 +1123,12 @@ export interface OperatorJsonConfig {
      * Mode to run ContextMod in
      *
      * * `all` (default) - Run the api and the web interface
-     * * `web` - Run web interface only
-     * * `api` - Run the api only
+     * * `client` - Run web interface only
+     * * `server` - Run the api/bots only
      *
      * @default "all"
      * */
-    mode?: 'bot' | 'web' | 'all',
+    mode?: 'server' | 'client' | 'all',
     /**
      * Settings related to the user(s) running this ContextMod instance and information on the bot
      * */
@@ -1314,7 +1314,7 @@ export interface BotInstanceConfig extends BotInstanceJsonConfig {
 }
 
 export interface OperatorConfig extends OperatorJsonConfig {
-    mode: 'all' | 'web' | 'bot',
+    mode: 'all' | 'server' | 'client',
     operator: {
         name: string[]
         display?: string,

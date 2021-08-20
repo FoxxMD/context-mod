@@ -546,11 +546,11 @@
         },
         "mode": {
             "default": "all",
-            "description": "Mode to run ContextMod in\n\n* `all` (default) - Run the api and the web interface\n* `web` - Run web interface only\n* `api` - Run the api only",
+            "description": "Mode to run ContextMod in\n\n* `all` (default) - Run the api and the web interface\n* `client` - Run web interface only\n* `server` - Run the api/bots only",
             "enum": [
                 "all",
-                "bot",
-                "web"
+                "client",
+                "server"
             ],
             "type": "string"
         },

@@ -54,7 +54,7 @@ const program = new Command();
 
         let runCommand = program
             .command('run')
-            .addArgument(new Argument('[interface]', 'Which interface to start the bot with').choices(['web', 'bot', 'all']).default(undefined, 'process.env.MODE || all'))
+            .addArgument(new Argument('[interface]', 'Which interface to start the bot with').choices(['client', 'server', 'all']).default(undefined, 'process.env.MODE || all'))
             .description('Monitor new activities from configured subreddits.')
             .allowUnknownOption();
         runCommand = addOptions(runCommand, getUniversalWebOptions());
@@ -64,10 +64,10 @@ const program = new Command();
                 mode,
             } = config;
             try {
-                if(mode === 'all' || mode === 'web') {
+                if(mode === 'all' || mode === 'client') {
                     await clientServer(config);
                 }
-                if(mode === 'all' || mode === 'bot') {
+                if(mode === 'all' || mode === 'server') {
                     await apiServer(config);
                 }
             } catch (err) {

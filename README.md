@@ -15,7 +15,10 @@ An example of the above that Context Bot can do now:
 
 Some feature highlights:
 * Simple rule-action behavior can be combined to create any level of complexity in behavior
-* One instance can manage all moderated subreddits for the authenticated account
+* Server/client architecture
+  * Default/no configuration runs "All In One" behavior
+  * Additional configuration allows web interface to connect to multiple servers
+  * Each server instance can run multiple reddit accounts as bots
 * **Per-subreddit configuration** is handled by JSON stored in the subreddit wiki
 * Any text-based actions (comment, submission, message, usernotes, ban, etc...) can be configured via a wiki page or raw text in JSON and support [mustache](https://mustache.github.io) [templating](/docs/actionTemplating.md)
 * History-based rules support multiple "valid window" types -- [ISO 8601 Durations](https://en.wikipedia.org/wiki/ISO_8601#Durations), [Day.js Durations](https://day.js.org/docs/en/durations/creating), and submission/comment count limits.
@@ -27,7 +30,7 @@ Some feature highlights:
 * Support for [Toolbox User Notes](https://www.reddit.com/r/toolbox/wiki/docs/usernotes) as criteria or Actions (writing notes)
 * Docker container support
 * Event notification via Discord
-* **Web interface** for monitoring and administration
+* **Web interface** for monitoring, administration, and oauth bot authentication
 
 # Table of Contents
 
@@ -88,7 +91,6 @@ Context Bot's configuration can be written in JSON, [JSON5](https://json5.org/) 
 [**Check the full docs for in-depth explanations of all concepts and examples**](/docs)
 
 ## Web UI and Screenshots
-
 
 ### Dashboard
 

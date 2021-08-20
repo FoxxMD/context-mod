@@ -404,7 +404,7 @@ export const parseDefaultBotInstanceFromEnv = (): BotInstanceJsonConfig => {
 
 export const parseOpConfigFromEnv = (): OperatorJsonConfig => {
     const data = {
-        mode: process.env.MODE !== undefined ? process.env.MODE as ('all' | 'bot' | 'web') : undefined,
+        mode: process.env.MODE !== undefined ? process.env.MODE as ('all' | 'server' | 'client') : undefined,
             operator: {
             name: parseListFromEnv(process.env.OPERATOR),
             display: process.env.OPERATOR_DISPLAY
