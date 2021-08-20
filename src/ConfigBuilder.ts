@@ -564,6 +564,7 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
            } = {},
            subreddits: {
                names = [],
+               exclude = [],
                wikiConfig = 'botconfig/contextbot',
                dryRun,
                heartbeatInterval = 300,
@@ -610,6 +611,7 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
         snoowrap,
         subreddits: {
             names,
+            exclude,
             wikiConfig,
             heartbeatInterval,
             dryRun,

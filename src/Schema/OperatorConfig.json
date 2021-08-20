@@ -17,6 +17,7 @@
             "type": "object"
         },
         "BotInstanceJsonConfig": {
+            "description": "The configuration for an **individual reddit account** ContextMod will run as a bot",
             "properties": {
                 "caching": {
                     "description": "Settings to configure the default caching behavior for each suberddit",
@@ -189,6 +190,19 @@
                                 false
                             ],
                             "type": "boolean"
+                        },
+                        "exclude": {
+                            "description": "Names of subreddits the bot should NOT run, based on what subreddits it moderates\n\nThis setting is ignored if `names` is specified",
+                            "examples": [
+                                [
+                                    "mealtimevideos",
+                                    "programminghumor"
+                                ]
+                            ],
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
                         },
                         "heartbeatInterval": {
                             "default": 300,

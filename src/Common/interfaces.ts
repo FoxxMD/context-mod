@@ -899,8 +899,14 @@ export interface WebCredentials {
     redirectUri?: string,
 }
 
+/**
+ * The configuration for an **individual reddit account** ContextMod will run as a bot
+ * */
 export interface BotInstanceJsonConfig {
     credentials?: RedditCredentials
+    /*
+    * The name to display for the bot. If not specified will use the name of the reddit account IE `u/TheBotName`
+    * */
     name?: string
     /**
      * Settings to configure 3rd party notifications for when behavior occurs
@@ -951,6 +957,15 @@ export interface BotInstanceJsonConfig {
          * @examples [["mealtimevideos","programminghumor"]]
          * */
         names?: string[]
+
+        /**
+         * Names of subreddits the bot should NOT run, based on what subreddits it moderates
+         *
+         * This setting is ignored if `names` is specified
+         *
+         * @examples [["mealtimevideos","programminghumor"]]
+         * */
+        exclude?: string[]
         /**
          * If `true` then all subreddits will run in dry run mode, overriding configurations
          *
@@ -1278,6 +1293,7 @@ export interface BotInstanceConfig extends BotInstanceJsonConfig {
     }
     subreddits: {
         names?: string[],
+        exclude?: string[],
         dryRun?: boolean,
         wikiConfig: string,
         heartbeatInterval: number,

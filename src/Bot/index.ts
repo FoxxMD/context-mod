@@ -30,6 +30,7 @@ class Bot {
     dryRun?: true | undefined;
     running: boolean = false;
     subreddits: string[];
+    excludeSubreddits: string[];
     subManagers: Manager[] = [];
     heartbeatInterval: number;
     nextHeartbeat?: Dayjs;
@@ -70,6 +71,7 @@ class Bot {
             name,
             subreddits: {
                 names = [],
+                exclude = [],
                 wikiConfig,
                 dryRun,
                 heartbeatInterval,
@@ -135,6 +137,7 @@ class Bot {
         }
 
         this.subreddits = names.map(parseSubredditName);
+        this.excludeSubreddits = exclude.map(parseSubredditName);
 
         let creds: any = {
             get userAgent() { return getUserName() },
@@ -276,6 +279,7 @@ class Bot {
         this.logger.info(`u/${user.name} is a moderator of these subreddits: ${availSubs.map(x => x.display_name_prefixed).join(', ')}`);
 
         let subsToRun: Subreddit[] = [];
+        debugger;
         const subsToUse = subreddits.length > 0 ? subreddits.map(parseSubredditName) : this.subreddits;
         if (subsToUse.length > 0) {
             this.logger.info(`Operator-defined subreddit constraints detected (CLI argument or environmental variable), will try to run on: ${subsToUse.join(', ')}`);
@@ -290,9 +294,14 @@ class Bot {
                 }
             }
         } else {
-            // otherwise assume all moddable subs from client should be run on
-            this.logger.info('No user-defined subreddit constraints detected, will try to run on all');
-            subsToRun = availSubs;
+            if(this.excludeSubreddits.length > 0) {
+                this.logger.info(`Will run on all moderated subreddits but user-defined excluded: ${this.excludeSubreddits.join(', ')}`);
+                const normalExcludes = this.excludeSubreddits.map(x => x.toLowerCase());
+                subsToRun = availSubs.filter(x => !normalExcludes.includes(x.display_name.toLowerCase()));
+            } else {
+                this.logger.info('No user-defined subreddit constraints detected, will run on all moderated subreddits');
+                subsToRun = availSubs;
+            }
         }
 
         let subSchedule: Manager[] = [];
