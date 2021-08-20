@@ -169,7 +169,7 @@ export class HistoryRule extends Rule {
             const firstActivity = activities[0];
             const lastActivity = activities[activities.length - 1];
 
-            const activityTotalWindow = dayjs.duration(dayjs(firstActivity.created_utc * 1000).diff(dayjs(lastActivity.created_utc * 1000)));
+            const activityTotalWindow = activities.length === 0 ? dayjs.duration(0, 's') : dayjs.duration(dayjs(firstActivity.created_utc * 1000).diff(dayjs(lastActivity.created_utc * 1000)));
 
             criteriaResults.push({
                 criteria,
@@ -244,7 +244,7 @@ export class HistoryRule extends Rule {
             submissionPercent: formatNumber((submissionTotal/activityTotal)*100),
             opPercent: formatNumber((opTotal/commentTotal)*100),
             criteria,
-            window: typeof window === 'number' ? `${activityTotal} Items` : activityTotalWindow.humanize(true),
+            window: typeof window === 'number' || activityTotal === 0 ? `${activityTotal} Items` : activityTotalWindow.humanize(true),
             triggered,
             submissionTrigger,
             commentTrigger,
