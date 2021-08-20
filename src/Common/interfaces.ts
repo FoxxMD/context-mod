@@ -807,8 +807,19 @@ export interface ManagerStateChangeOption {
     suppressNotification?: boolean
 }
 
+/**
+ * Configuration required to connect to a CM Server
+ * */
 export interface BotConnection {
+    /**
+     * The hostname and port the CM Server is listening on EX `localhost:8085`
+     * */
     host: string
+    /**
+     * The **shared secret** used to sign API calls from the Client to the Server.
+     *
+     * This value should be the same as what is specified in the target CM's `api.secret` configuration
+     * */
     secret: string
 }
 
@@ -864,7 +875,7 @@ export interface RedditCredentials {
 /**
  * Separate credentials for the web interface can be provided when also running the api.
  *
- * All properties not specified will default to values given in the top-level `credentials` property.
+ * All properties not specified will default to values given in ENV/ARG credential properties
  *
  * Refer to the [required credentials table](https://github.com/FoxxMD/context-mod/blob/master/docs/operatorConfiguration.md#minimum-required-configuration) to see what is necessary for the web interface.
  *
@@ -900,7 +911,12 @@ export interface WebCredentials {
 }
 
 /**
- * The configuration for an **individual reddit account** ContextMod will run as a bot
+ * The configuration for an **individual reddit account** ContextMod will run as a bot.
+ *
+ * Multiple bot configs may be specified (one per reddit account).
+ *
+ * **NOTE:** If `bots` is not specified in a `FILE` then a default `bot` is generated using `ENV/ARG` values IE `CLIENT_ID`, etc...but if `bots` IS specified the default is not generated.
+ *
  * */
 export interface BotInstanceJsonConfig {
     credentials?: RedditCredentials
@@ -1251,6 +1267,13 @@ export interface OperatorJsonConfig {
          * @examples [200]
          * */
         maxLogs?: number,
+        /**
+         * A list of CM Servers this Client should connect to.
+         *
+         * If not specified a default `BotConnection` for this instance is generated
+         *
+         * @examples [[{"host": "localhost:8095", "secret": "aRandomString"}]]
+         * */
         clients?: BotConnection[]
 
         credentials?: WebCredentials
@@ -1267,9 +1290,26 @@ export interface OperatorJsonConfig {
          * */
         operators?: string[]
     }
+    /**
+     * Configuration for the **Server** application. See [Architecture Documentation](https://github.com/FoxxMD/context-mod/blob/master/docs/serverClientArchitecture.md) for more info
+     * */
     api?: {
+        /**
+         * The port the server listens on for API requests
+         *
+         * @default 8095
+         * @examples [8095]
+         * */
         port?: number,
+        /**
+         * The **shared secret** used to verify API requests come from an authenticated client.
+         *
+         * Use this same value for the `secret` value in a `BotConnection` object to connect to this Server
+         * */
         secret?: string,
+        /**
+         * A friendly name for this server. This will override `friendly` in `BotConnection` if specified.
+         * */
         friendly?: string,
     }
 }
