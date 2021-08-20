@@ -279,7 +279,6 @@ class Bot {
         this.logger.info(`u/${user.name} is a moderator of these subreddits: ${availSubs.map(x => x.display_name_prefixed).join(', ')}`);
 
         let subsToRun: Subreddit[] = [];
-        debugger;
         const subsToUse = subreddits.length > 0 ? subreddits.map(parseSubredditName) : this.subreddits;
         if (subsToUse.length > 0) {
             this.logger.info(`Operator-defined subreddit constraints detected (CLI argument or environmental variable), will try to run on: ${subsToUse.join(', ')}`);
