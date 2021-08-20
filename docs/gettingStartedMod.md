@@ -4,7 +4,9 @@ This getting started guide is for **reddit moderators** -- that is, someone who 
 # Table of Contents
 
 * [Prior Knowledge](#prior-knowledge)
-* [Mod the Bot](#mod-the-bot)
+* [Choose A Bot](#choose-a-bot)
+  * [Use The Operator's Bot](#use-the-operators-bot)
+  * [Bring Your Own Bot (BYOB)](#bring-your-own-bot-byob)
 * [Creating Configuration](#configuring-the-bot)
 * [Monitor the Bot](#monitor-the-bot)
 
@@ -15,9 +17,26 @@ Before continuing with this guide you should first make sure you understand how 
 * [How It Works](/docs#how-it-works)
 * [Core Concepts](/docs#concepts)
 
-# Mod The Bot
+# Choose A Bot
 
-First ensure that you are in communication with the **operator** for this bot. The bot **will not automatically accept a moderator invitation,** it must be manually done by the bot operator. This is an intentional barrier to ensure moderators and the operator are familiar with their respective needs and have some form of trust.
+First determine what bot (reddit account) you want to run ContextMod with. (You may have already discussed this with your operator)
+
+## Use the Operator's Bot
+
+If the Operator has communicated that **you should add a bot they control as a moderator** to your subreddit this is the option you will use.
+
+**Pros:**
+
+* Do not have to create and keep track of another reddit account
+* Easiest option in terms of setup for both moderators and operator
+
+**Cons:**
+
+* Shared api quota among other moderated subreddits (not great for high-volume subreddits)
+
+___
+
+Ensure that you are in communication with the **operator** for this bot. The bot **will not automatically accept a moderator invitation,** it must be manually done by the bot operator. This is an intentional barrier to ensure moderators and the operator are familiar with their respective needs and have some form of trust.
 
 Now invite the bot to moderate your subreddit. The bot should have at least these permissions:
 
@@ -26,6 +45,30 @@ Now invite the bot to moderate your subreddit. The bot should have at least thes
 * Manage Flair
 
 Additionally, the bot must have the **Manage Wiki Pages** permission if you plan to use [Toolbox User Notes](https://www.reddit.com/r/toolbox/wiki/docs/usernotes). If you are not planning on using this feature and do not want the bot to have this permission then you **must** ensure the bot has visibility to the configuration wiki page (detailed below).
+
+## Bring Your Own Bot (BYOB)
+
+If the operator has communicated that **they want to use a bot you control** this is the option you will use.
+
+**Pros:**
+
+* **Dedicated API quota**
+  * This is basically a requirement if your subreddit has high-volume activity and you plan on running checks on comments
+* More security guarantees since you control the account 
+  * **Note:** authenticating an account does NOT give the operator access to view or change the email/password for the account
+* Established history in your subreddit
+
+**Cons:**
+
+* More setup required for both moderators and operators
+
+___
+
+The **operator** will send you an **invite link** that you will use to authenticate your bot with the operator's application. Example link: `https://operatorsUrl.com/auth/invite?invite=4kf9n3o03ncd4nd`
+
+Review the information shown on the invite link webpage and then follow the directions shown to authorize your bot for the operator.
+
+**Note:** There is information display **after** authentication that you will need to communicate to your operator -- **Refresh** and **Access** token values. Make sure you save these somewhere as the invite link is **one-use only.**
 
 # Configuring the Bot
 

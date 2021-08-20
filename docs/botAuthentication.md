@@ -12,6 +12,7 @@ At the end of this process you will have this info:
 * clientSecret
 * refreshToken
 * accessToken
+* redirectUri
 
 **Note:** If you already have this information you can skip this guide **but make sure your redirect uri is correct if you plan on using the web interface.**
 
@@ -28,11 +29,11 @@ At the end of this process you will have this info:
 Visit [your reddit preferences](https://www.reddit.com/prefs/apps) and at the bottom of the page go through the **create an(other) app** process.
 * Give it a **name**
 * Choose **web app**
-* If you know what you will use for **redirect uri** go ahead and use it, otherwise use **http://localhost:8085** for now
+* If you know what you will use for **redirect uri** go ahead and use it, otherwise use **http://localhost:8085/callback**
 
 Click **create app**.
 
-Then write down your **Client ID, Client Secret, and redirect uri** somewhere (or keep this webpage open)
+Then write down your **Client ID, Client Secret, and Redirect Uri** somewhere (or keep this webpage open)
 
 # Authenticate Your Bot Account
 
@@ -42,18 +43,31 @@ There are **two ways** you can authenticate your bot account. It is recommended 
 
 This method will use CM's built in oauth flow. It is recommended because it will ensure your bot is authenticated with the correct oauth permissions.
 
-### Start CM with Client ID/Secret
+### Start CM with Client ID/Secret and Operator
 
-Start the application while providing the **Client ID** and **Client Secret** you received. Refer to the [operator config guide](/docs/operatorConfiguration.md) if you need help with this.
+Start the application and provide these to your configuration:
+
+* **Client ID** 
+* **Client Secret** 
+* **Redirect URI**
+* **Operator** 
+
+It is important you define **Operator** because the auth route is **protected.** You must login to the application in order to access the route.
+
+Refer to the [operator config guide](/docs/operatorConfiguration.md) if you need help with this.
 
 Examples:
 
-* CLI - `node src/index.js --clientId=myId --clientSecret=mySecret`
-* Docker - `docker run -e "CLIENT_ID=myId" -e "CLIENT_SECRET=mySecret" foxxmd/context-mod`
+* CLI - `node src/index.js --clientId=myId --clientSecret=mySecret --redirectUri="http://localhost:8085/callback" --operator=FoxxMD`
+* Docker - `docker run -e "CLIENT_ID=myId" -e "CLIENT_SECRET=mySecret" -e "OPERATOR=FoxxMD" -e "REDIRECT_URI=http://localhost:8085/callback" foxxmd/context-mod`
 
-Then open the CM web interface (default is [http://localhost:8085](http://localhost:8085))
+### Create An Auth Invite
 
-Follow the directions in the helper to finish authenticating your bot and get your credentials (Access Token and Refresh Token)
+Then open the CM web interface (default is [http://localhost:8085](http://localhost:8085)) and login.
+
+After logging in you should be automatically redirected the auth page. If you are not then visit [http://localhost:8085/auth/helper](http://localhost:8085/auth/helper))
+
+Follow the directions in the helper to create an **auth invite link.** Open this link and then follow the directions to authenticate your bot. At the end of the process you will receive an **Access Token** and **Refresh Token**
 
 ## Aardvark OAuth Helper
 
@@ -88,6 +102,7 @@ At the end of the last step you chose you should now have this information saved
 * clientSecret
 * refreshToken
 * accessToken
+* redirectUri
 
 This is all the information you need to run your bot with CM.
 
