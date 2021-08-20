@@ -17,13 +17,14 @@ import {
     operatorConfig
 } from "./Utils/CommandConfig";
 import {App} from "./App";
-import createWebServer from './Server/server';
-import createHelperServer from './Server/helper';
+import apiServer from './Web/Server/server';
+import clientServer from './Web/Client';
 import Submission from "snoowrap/dist/objects/Submission";
 import {COMMENT_URL_ID, parseLinkIdentifier, SUBMISSION_URL_ID} from "./util";
 import LoggedError from "./Utils/LoggedError";
-import {getLogger} from "./Utils/loggerFactory";
 import {buildOperatorConfigWithDefaults, parseOperatorConfigFromSources} from "./ConfigBuilder";
+import {getLogger} from "./Utils/loggerFactory";
+import Bot from "./Bot";
 
 dayjs.extend(utc);
 dayjs.extend(dduration);
@@ -42,57 +43,32 @@ const program = new Command();
 
 (async function () {
     let app: App;
-    let errorReason: string | undefined;
-    process.on('SIGTERM', async () => {
-        if(app !== undefined) {
-            await app.onTerminate(errorReason);
-        }
-        process.exit(errorReason === undefined ? 0 : 1);
-    });
+    // let errorReason: string | undefined;
+    // process.on('SIGTERM', async () => {
+    //     if(app !== undefined) {
+    //         await app.onTerminate(errorReason);
+    //     }
+    //     process.exit(errorReason === undefined ? 0 : 1);
+    // });
     try {
 
         let runCommand = program
             .command('run')
-            .addArgument(new Argument('[interface]', 'Which interface to start the bot with').choices(['web', 'cli']).default(undefined, 'process.env.WEB || true'))
+            .addArgument(new Argument('[interface]', 'Which interface to start the bot with').choices(['client', 'server', 'all']).default(undefined, 'process.env.MODE || all'))
             .description('Monitor new activities from configured subreddits.')
             .allowUnknownOption();
         runCommand = addOptions(runCommand, getUniversalWebOptions());
         runCommand.action(async (interfaceVal, opts) => {
-            const config = buildOperatorConfigWithDefaults(await parseOperatorConfigFromSources({...opts, web: interfaceVal !== undefined ? interfaceVal === 'web': undefined}));
+            const config = buildOperatorConfigWithDefaults(await parseOperatorConfigFromSources({...opts, mode: interfaceVal}));
             const {
-                credentials: {
-                    redirectUri,
-                    clientId,
-                    clientSecret,
-                    accessToken,
-                    refreshToken,
-                },
-                web: {
-                    enabled: web,
-                },
-                logging,
+                mode,
             } = config;
-            const logger = getLogger(logging, 'init');
-            const hasClient = clientId !== undefined && clientSecret !== undefined;
-            const hasNoTokens = accessToken === undefined && refreshToken === undefined;
             try {
-                if (web) {
-                    if (hasClient && hasNoTokens) {
-                        // run web helper
-                        const server = createHelperServer(config);
-                        await server;
-                    } else {
-                        if (redirectUri === undefined) {
-                            logger.warn(`No 'redirectUri' found in arg/env. Bot will still run but web interface will not be accessible.`);
-                        }
-                        const [server, bot] = createWebServer(config);
-                        app = bot;
-                        await server();
-                    }
-                } else {
-                    app = new App(config);
-                    await app.buildManagers();
-                    await app.runManagers();
+                if(mode === 'all' || mode === 'client') {
+                    await clientServer(config);
+                }
+                if(mode === 'all' || mode === 'server') {
+                    await apiServer(config);
                 }
             } catch (err) {
                 throw err;
@@ -100,16 +76,17 @@ const program = new Command();
         });
 
         let checkCommand = program
-            .command('check <activityIdentifier> [type]')
+            .command('check <activityIdentifier> [type] [bot]')
             .allowUnknownOption()
             .description('Run check(s) on a specific activity', {
                 activityIdentifier: 'Either a permalink URL or the ID of the Comment or Submission',
                 type: `If activityIdentifier is not a permalink URL then the type of activity ('comment' or 'submission'). May also specify 'submission' type when using a permalink to a comment to get the Submission`,
+                bot: 'Specify the bot to try with using `bot.name` (from config) -- otherwise all bots will be built before the bot to be used can be determined'
             });
         checkCommand = addOptions(checkCommand, getUniversalCLIOptions());
         checkCommand
             .addOption(checks)
-            .action(async (activityIdentifier, type, commandOptions = {}) => {
+            .action(async (activityIdentifier, type, botVal, commandOptions = {}) => {
                 const config = buildOperatorConfigWithDefaults(await parseOperatorConfigFromSources(commandOptions));
                 const {checks = []} = commandOptions;
                 app = new App(config);
@@ -154,37 +131,63 @@ const program = new Command();
                 // @ts-ignore
                 const activity = await a.fetch();
                 const sub = await activity.subreddit.display_name;
-                await app.buildManagers([sub]);
-                if (app.subManagers.length > 0) {
-                    const manager = app.subManagers.find(x => x.subreddit.display_name === sub) as Manager;
-                    await manager.runChecks(type === 'comment' ? 'Comment' : 'Submission', activity, {checkNames: checks});
+                const logger = winston.loggers.get('app');
+                let bots: Bot[] = [];
+                if(botVal !== undefined) {
+                    const bot = app.bots.find(x => x.botName === botVal);
+                    if(bot === undefined) {
+                        logger.error(`No bot named "${botVal} found"`);
+                    } else {
+                        bots = [bot];
+                    }
+                } else  {
+                    bots = app.bots;
+                }
+                for(const b of bots) {
+                    await b.buildManagers([sub]);
+                    if(b.subManagers.length > 0) {
+                       const manager = b.subManagers[0];
+                        await manager.runChecks(type === 'comment' ? 'Comment' : 'Submission', activity, {checkNames: checks});
+                        break;
+                    }
                 }
             });
 
         let unmodCommand = program.command('unmoderated <subreddits...>')
             .description('Run checks on all unmoderated activity in the modqueue', {
-                subreddits: 'The list of subreddits to run on. If not specified will run on all subreddits the account has moderation access to.'
+                subreddits: 'The list of subreddits to run on. If not specified will run on all subreddits the account has moderation access to.',
+                bot: 'Specify the bot to try with using `bot.name` (from config) -- otherwise all bots will be built before the bot to be used can be determined'
             })
             .allowUnknownOption();
         unmodCommand = addOptions(unmodCommand, getUniversalCLIOptions());
         unmodCommand
             .addOption(checks)
-            .action(async (subreddits = [], opts = {}) => {
+            .action(async (subreddits = [], botVal, opts = {}) => {
                 const config = buildOperatorConfigWithDefaults(await parseOperatorConfigFromSources(opts));
                 const {checks = []} = opts;
-                const {subreddits: {names}} = config;
-                app = new App(config);
-
-                await app.buildManagers(names);
-
-                for (const manager of app.subManagers) {
-                    const activities = await manager.subreddit.getUnmoderated();
-                    for (const a of activities.reverse()) {
-                        manager.queue.push({
-                            checkType: a instanceof Submission ? 'Submission' : 'Comment',
-                            activity: a,
-                            options: {checkNames: checks}
-                        });
+                const logger = winston.loggers.get('app');
+                let bots: Bot[] = [];
+                if(botVal !== undefined) {
+                    const bot = app.bots.find(x => x.botName === botVal);
+                    if(bot === undefined) {
+                        logger.error(`No bot named "${botVal} found"`);
+                    } else {
+                        bots = [bot];
+                    }
+                } else  {
+                    bots = app.bots;
+                }
+                for(const b of bots) {
+                    await b.buildManagers(subreddits);
+                    for(const manager of b.subManagers) {
+                        const activities = await manager.subreddit.getUnmoderated();
+                        for (const a of activities.reverse()) {
+                            manager.queue.push({
+                                checkType: a instanceof Submission ? 'Submission' : 'Comment',
+                                activity: a,
+                                options: {checkNames: checks}
+                            });
+                        }
                     }
                 }
             });
@@ -193,16 +196,15 @@ const program = new Command();
 
     } catch (err) {
         if (!err.logged && !(err instanceof LoggedError)) {
-            const logger = winston.loggers.get('default');
+            const logger = winston.loggers.get('app');
             if (err.name === 'StatusCodeError' && err.response !== undefined) {
                 const authHeader = err.response.headers['www-authenticate'];
                 if (authHeader !== undefined && authHeader.includes('insufficient_scope')) {
                     logger.error('Reddit responded with a 403 insufficient_scope, did you choose the correct scopes?');
                 }
             }
-            console.log(err);
+            logger.error(err);
         }
-        errorReason = `Application crashed due to an uncaught error: ${err.message}`;
         process.kill(process.pid, 'SIGTERM');
     }
 }());

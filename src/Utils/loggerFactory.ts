@@ -1,28 +1,41 @@
 import {labelledFormat, logLevels} from "../util";
 import winston, {Logger} from "winston";
+import {DuplexTransport} from "winston-duplex";
 
 const {transports} = winston;
 
-export const getLogger = (options: any, name = 'default'): Logger => {
+export const getLogger = (options: any, name = 'app'): Logger => {
     if(!winston.loggers.has(name)) {
         const {
             path,
             level,
             additionalTransports = [],
+            defaultLabel = 'App',
         } = options || {};
 
-        const consoleTransport = new transports.Console();
+        const consoleTransport = new transports.Console({
+            handleExceptions: true,
+            // @ts-expect-error
+            handleRejections: true,
+        });
 
         const myTransports = [
             consoleTransport,
+            new DuplexTransport({
+                stream: {
+                    transform(chunk,e, cb) {
+                        cb(null, chunk);
+                    },
+                    objectMode: true,
+                },
+                name: 'duplex',
+                dump: false,
+                handleExceptions: true,
+                // @ts-expect-error
+                handleRejections: true,
+            }),
+            ...additionalTransports,
         ];
-
-        let errorTransports = [consoleTransport];
-
-        for (const a of additionalTransports) {
-            myTransports.push(a);
-            errorTransports.push(a);
-        }
 
         if (path !== undefined && path !== '') {
             const rotateTransport = new winston.transports.DailyRotateFile({
@@ -31,21 +44,19 @@ export const getLogger = (options: any, name = 'default'): Logger => {
                 symlinkName: 'contextBot-current.log',
                 filename: 'contextBot-%DATE%.log',
                 datePattern: 'YYYY-MM-DD',
-                maxSize: '5m'
+                maxSize: '5m',
+                handleExceptions: true,
+                handleRejections: true,
             });
             // @ts-ignore
             myTransports.push(rotateTransport);
-            // @ts-ignore
-            errorTransports.push(rotateTransport);
         }
 
         const loggerOptions = {
             level: level || 'info',
-            format: labelledFormat(),
+            format: labelledFormat(defaultLabel),
             transports: myTransports,
             levels: logLevels,
-            exceptionHandlers: errorTransports,
-            rejectionHandlers: errorTransports,
         };
 
         winston.loggers.add(name, loggerOptions);

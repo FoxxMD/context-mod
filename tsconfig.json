@@ -3,6 +3,7 @@
   "compilerOptions": {
     "sourceMap": true,
     "resolveJsonModule": true,
+    "typeRoots": ["./src/Web/types"]
   },
 //  "compilerOptions": {
 //    "module": "es6",

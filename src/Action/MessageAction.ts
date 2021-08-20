@@ -1,7 +1,7 @@
 import Action, {ActionJson, ActionOptions} from "./index";
 import {Comment, ComposeMessageParams} from "snoowrap";
 import Submission from "snoowrap/dist/objects/Submission";
-import {renderContent, singleton} from "../Utils/SnoowrapUtils";
+import {renderContent} from "../Utils/SnoowrapUtils";
 import {Footer, RequiredRichContent, RichContent} from "../Common/interfaces";
 import {RuleResult} from "../Rule";
 import {boolToString} from "../util";
@@ -45,8 +45,6 @@ export class MessageAction extends Action {
         // @ts-ignore
         const author = await item.author.fetch() as RedditUser;
 
-        const client = singleton.getClient();
-
         const msgOpts: ComposeMessageParams = {
             to: author,
             text: renderedContent,
@@ -64,7 +62,7 @@ export class MessageAction extends Action {
         this.logger.verbose(`Message Preview => \r\n ${msgPreview}`);
 
         if (!dryRun) {
-            await client.composeMessage(msgOpts);
+            await this.client.composeMessage(msgOpts);
         }
     }
 }

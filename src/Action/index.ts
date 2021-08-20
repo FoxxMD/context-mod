@@ -1,14 +1,16 @@
-import {Comment, Submission} from "snoowrap";
+import Snoowrap, {Comment, Submission} from "snoowrap";
 import {Logger} from "winston";
 import {RuleResult} from "../Rule";
-import ResourceManager, {SubredditResources} from "../Subreddit/SubredditResources";
+import {SubredditResources} from "../Subreddit/SubredditResources";
 import {ChecksActivityState, TypedActivityStates} from "../Common/interfaces";
 import Author, {AuthorOptions} from "../Author/Author";
+import {mergeArr} from "../util";
 
 export abstract class Action {
     name?: string;
     logger: Logger;
     resources: SubredditResources;
+    client: Snoowrap
     authorIs: AuthorOptions;
     itemIs: TypedActivityStates;
     dryRun: boolean;
@@ -18,6 +20,8 @@ export abstract class Action {
         const {
             enable = true,
             name = this.getKind(),
+            resources,
+            client,
             logger,
             subredditName,
             dryRun = false,
@@ -31,8 +35,9 @@ export abstract class Action {
         this.name = name;
         this.dryRun = dryRun;
         this.enabled = enable;
-        this.resources = ResourceManager.get(subredditName) as SubredditResources;
-        this.logger = logger.child({labels: [`Action ${this.getActionUniqueName()}`]});
+        this.resources = resources;
+        this.client = client;
+        this.logger = logger.child({labels: [`Action ${this.getActionUniqueName()}`]}, mergeArr);
 
         this.authorIs = {
             exclude: exclude.map(x => new Author(x)),
@@ -94,6 +99,8 @@ export abstract class Action {
 export interface ActionOptions extends ActionConfig {
     logger: Logger;
     subredditName: string;
+    resources: SubredditResources
+    client: Snoowrap
 }
 
 export interface ActionConfig extends ChecksActivityState {

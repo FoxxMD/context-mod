@@ -16,12 +16,13 @@ import {
     DEFAULT_POLLING_INTERVAL,
     DEFAULT_POLLING_LIMIT, Invokee,
     ManagerOptions, ManagerStateChangeOption, PAUSED,
-    PollingOptionsStrong, RUNNING, RunState, STOPPED, SYSTEM, USER
+    PollingOptionsStrong, ResourceStats, RUNNING, RunState, STOPPED, SYSTEM, USER
 } from "../Common/interfaces";
 import Submission from "snoowrap/dist/objects/Submission";
 import {activityIsRemoved, itemContentPeek} from "../Utils/SnoowrapUtils";
 import LoggedError from "../Utils/LoggedError";
-import ResourceManager, {
+import {
+    BotResourcesManager,
     SubredditResourceConfig,
     SubredditResources,
     SubredditResourceSetOptions
@@ -60,6 +61,39 @@ export interface RuntimeManagerOptions extends ManagerOptions {
     maxWorkers: number;
 }
 
+export interface ManagerStats {
+    eventsCheckedTotal: number
+    eventsCheckedSinceStartTotal: number
+    eventsAvg: number
+    checksRunTotal: number
+    checksRunSinceStartTotal: number
+    checksTriggered: number
+    checksTriggeredTotal: number
+    checksTriggeredSinceStart: number
+    checksTriggeredSinceStartTotal: number
+    rulesRunTotal: number
+    rulesRunSinceStartTotal: number
+    rulesCachedTotal: number
+    rulesCachedSinceStartTotal: number
+    rulesTriggeredTotal: number
+    rulesTriggeredSinceStartTotal: number
+    rulesAvg: number
+    actionsRun: number
+    actionsRunTotal: number
+    actionsRunSinceStart: number,
+    actionsRunSinceStartTotal: number
+    cache: {
+        provider: string,
+        currentKeyCount: number,
+        isShared: boolean,
+        totalRequests: number,
+        totalMiss: number,
+        missPercent: string,
+        requestRate: number,
+        types: ResourceStats
+    },
+}
+
 export class Manager {
     subreddit: Subreddit;
     client: Snoowrap;
@@ -79,6 +113,7 @@ export class Manager {
     modStreamCallbacks: Map<string, any> = new Map();
     dryRun?: boolean;
     sharedModqueue: boolean;
+    cacheManager: BotResourcesManager;
     globalDryRun?: boolean;
     emitter: EventEmitter = new EventEmitter();
     queue: QueueObject<CheckTask>;
@@ -131,7 +166,7 @@ export class Manager {
     actionsRun: Map<string, number> = new Map();
     actionsRunSinceStart: Map<string, number> = new Map();
 
-    getStats = async () => {
+    getStats = async (): Promise<ManagerStats> => {
         const data: any = {
             eventsCheckedTotal: this.eventsCheckedTotal,
             eventsCheckedSinceStartTotal: this.eventsCheckedSinceStartTotal,
@@ -184,7 +219,7 @@ export class Manager {
         return this.displayLabel;
     }
 
-    constructor(sub: Subreddit, client: Snoowrap, logger: Logger, opts: RuntimeManagerOptions = {botName: 'ContextMod', maxWorkers: 1}) {
+    constructor(sub: Subreddit, client: Snoowrap, logger: Logger, cacheManager: BotResourcesManager, opts: RuntimeManagerOptions = {botName: 'ContextMod', maxWorkers: 1}) {
         const {dryRun, sharedModqueue = false, wikiLocation = 'botconfig/contextbot', botName, maxWorkers} = opts;
         this.displayLabel = opts.nickname || `${sub.display_name_prefixed}`;
         const getLabels = this.getCurrentLabels;
@@ -207,6 +242,7 @@ export class Manager {
         this.botName = botName;
         this.globalMaxWorkers = maxWorkers;
         this.notificationManager = new NotificationManager(this.logger, this.subreddit, this.displayLabel, botName);
+        this.cacheManager = cacheManager;
 
         this.queue = this.generateQueue(this.getMaxWorkers(this.globalMaxWorkers));
         this.queue.pause();
@@ -342,9 +378,10 @@ export class Manager {
                 footer,
                 logger: this.logger,
                 subreddit: this.subreddit,
-                caching
+                caching,
+                client: this.client,
             };
-            this.resources = ResourceManager.set(this.subreddit.display_name, resourceConfig);
+            this.resources = this.cacheManager.set(this.subreddit.display_name, resourceConfig);
             this.resources.setLogger(this.logger);
 
             this.logger.info('Subreddit-specific options updated');
@@ -358,7 +395,9 @@ export class Manager {
                     ...jCheck,
                     dryRun: this.dryRun || jCheck.dryRun,
                     logger: this.logger,
-                    subredditName: this.subreddit.display_name
+                    subredditName: this.subreddit.display_name,
+                    resources: this.resources,
+                    client: this.client,
                 };
                 if (jCheck.kind === 'comment') {
                     commentChecks.push(new CommentCheck(checkConfig));
@@ -604,7 +643,7 @@ export class Manager {
                     if (limit === DEFAULT_POLLING_LIMIT && interval === DEFAULT_POLLING_INTERVAL && this.sharedModqueue) {
                         modStreamType = 'unmoderated';
                         // use default mod stream from resources
-                        stream = ResourceManager.modStreams.get('unmoderated') as SPoll<Snoowrap.Submission | Snoowrap.Comment>;
+                        stream = this.cacheManager.modStreams.get('unmoderated') as SPoll<Snoowrap.Submission | Snoowrap.Comment>;
                     } else {
                         stream = new UnmoderatedStream(this.client, {
                             subreddit: this.subreddit.display_name,
@@ -617,7 +656,7 @@ export class Manager {
                     if (limit === DEFAULT_POLLING_LIMIT && interval === DEFAULT_POLLING_INTERVAL) {
                         modStreamType = 'modqueue';
                         // use default mod stream from resources
-                        stream = ResourceManager.modStreams.get('modqueue') as SPoll<Snoowrap.Submission | Snoowrap.Comment>;
+                        stream = this.cacheManager.modStreams.get('modqueue') as SPoll<Snoowrap.Submission | Snoowrap.Comment>;
                     } else {
                         stream = new ModQueueStream(this.client, {
                             subreddit: this.subreddit.display_name,
@@ -694,29 +733,6 @@ export class Manager {
                 });
                 this.streams.push(stream);
             }
-        }
-    }
-
-    async handle(): Promise<void> {
-        if (this.submissionChecks.length === 0 && this.commentChecks.length === 0) {
-            this.logger.warn('No submission or comment checks to run! Bot will not run.');
-            return;
-        }
-
-        try {
-            for (const s of this.streams) {
-                s.startInterval();
-            }
-            this.startedAt = dayjs();
-            this.running = true;
-            this.manuallyStopped = false;
-            this.logger.info('Bot Running');
-
-            await pEvent(this.emitter, 'end');
-        } catch (err) {
-            this.logger.error('Too many request errors occurred or an unhandled error was encountered, manager is stopping');
-        } finally {
-            this.stop();
         }
     }
 
@@ -876,7 +892,7 @@ export class Manager {
             }
             this.streams = [];
             for (const [k, v] of this.modStreamCallbacks) {
-                const stream = ResourceManager.modStreams.get(k) as Poll<Snoowrap.Submission | Snoowrap.Comment>;
+                const stream = this.cacheManager.modStreams.get(k) as Poll<Snoowrap.Submission | Snoowrap.Comment>;
                 stream.removeListener('item', v);
             }
             this.startedAt = undefined;

@@ -24,6 +24,13 @@ a {
     display: inherit;
 }
 
+.nestedTabs {
+    display: none;
+}
+.nestedTabs.active {
+    display: inline-flex;
+}
+
 /*https://stackoverflow.com/a/48386400/1469797*/
 .stats {
     display: grid;
@@ -73,4 +80,14 @@ a {
 
 .botStats.hidden {
     display: none;
+}
+
+.sub.offline a {
+    pointer-events: none;
+    text-decoration: none;
+}
+
+.sub.offline .logs a {
+    pointer-events: initial;
+    text-decoration: initial;
 }

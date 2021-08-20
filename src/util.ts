@@ -12,7 +12,7 @@ import {inflateSync, deflateSync} from "zlib";
 import {
     ActivityWindowCriteria, CacheOptions, CacheProvider,
     DurationComparison,
-    GenericComparison, NamedGroup,
+    GenericComparison, LogInfo, NamedGroup,
     PollingOptionsStrong, RegExResult, ResourceStats,
     StringOperator
 } from "./Common/interfaces";
@@ -25,7 +25,9 @@ import {cacheOptDefaults} from "./Common/defaults";
 import cacheManager, {Cache} from "cache-manager";
 import redisStore from "cache-manager-redis-store";
 import crypto from "crypto";
+import Autolinker from 'autolinker';
 import {create as createMemoryStore} from './Utils/memoryStore';
+import {MESSAGE} from "triple-beam";
 
 const {format} = winston;
 const {combine, printf, timestamp, label, splat, errors} = format;
@@ -75,19 +77,21 @@ export const FAIL = '✘';
 
 export const truncateStringToLength = (length: number, truncStr = '...') => (str: string) => str.length > length ? `${str.slice(0, length - truncStr.length - 1)}${truncStr}` : str;
 
-export const defaultFormat = printf(({
-                                         level,
-                                         message,
-                                         labels = ['App'],
-                                         subreddit,
-                                         leaf,
-                                         itemId,
-                                         timestamp,
-                                        // @ts-ignore
-                                         [SPLAT]: splatObj,
-                                         stack,
-                                         ...rest
-                                     }) => {
+export const defaultFormat = (defaultLabel = 'App') => printf(({
+                                                                   level,
+                                                                   message,
+                                                                   labels = [defaultLabel],
+                                                                   subreddit,
+                                                                   bot,
+                                                                   instance,
+                                                                   leaf,
+                                                                   itemId,
+                                                                   timestamp,
+                                                                   // @ts-ignore
+                                                                   [SPLAT]: splatObj,
+                                                                   stack,
+                                                                   ...rest
+                                                               }) => {
     let stringifyValue = splatObj !== undefined ? jsonStringify(splatObj) : '';
     let msg = message;
     let stackMsg = '';
@@ -99,7 +103,7 @@ export const defaultFormat = printf(({
             .map((x: string) => x.replace(CWD, 'CWD')) // replace file location up to cwd for user privacy
             .join('\n'); // rejoin with newline to preserve formatting
         stackMsg = `\n${cleanedStack}`;
-        if(msg === undefined || msg === null || typeof message === 'object') {
+        if (msg === undefined || msg === null || typeof message === 'object') {
             msg = stackTop;
         } else {
             stackMsg = `\n${stackTop}${stackMsg}`
@@ -112,23 +116,23 @@ export const defaultFormat = printf(({
     }
     const labelContent = `${nodes.map((x: string) => `[${x}]`).join(' ')}`;
 
-    return `${timestamp} ${level.padEnd(7)}: ${subreddit !== undefined ? `{${subreddit}} ` : ''}${labelContent} ${msg}${stringifyValue !== '' ? ` ${stringifyValue}` : ''}${stackMsg}`;
+    return `${timestamp} ${level.padEnd(7)}: ${instance !== undefined ? `|${instance}| ` : ''}${bot !== undefined ? `~${bot}~ ` : ''}${subreddit !== undefined ? `{${subreddit}} ` : ''}${labelContent} ${msg}${stringifyValue !== '' ? ` ${stringifyValue}` : ''}${stackMsg}`;
 });
 
 
 export const labelledFormat = (labelName = 'App') => {
-    const l = label({label: labelName, message: false});
+    //const l = label({label: labelName, message: false});
     return combine(
         timestamp(
             {
                 format: () => dayjs().local().format(),
             }
         ),
-        l,
+      // l,
         s,
         errorAwareFormat,
         //errorsFormat,
-        defaultFormat,
+        defaultFormat(labelName),
     );
 }
 
@@ -646,81 +650,111 @@ export const parseLabels = (log: string): string[] => {
     return Array.from(log.matchAll(LABELS_REGEX), m => m[0]).map(x => x.substring(1, x.length - 1));
 }
 
-const SUBREDDIT_NAME_LOG_REGEX: RegExp = /{(.+?)}/;
-export const parseSubredditLogName = (val:string): string | undefined => {
-    const matches = val.match(SUBREDDIT_NAME_LOG_REGEX);
+export const parseALogName = (reg: RegExp) => (val: string): string | undefined => {
+    const matches = val.match(reg);
     if (matches === null) {
         return undefined;
     }
     return matches[1] as string;
 }
 
-export const LOG_LEVEL_REGEX: RegExp = /\s*(debug|warn|info|error|verbose)\s*:/i
-export const isLogLineMinLevel = (line: string, minLevelText: string): boolean => {
-    const lineLevelMatch = line.match(LOG_LEVEL_REGEX);
-    if (lineLevelMatch === null) {
-        return false;
-    }
+const SUBREDDIT_NAME_LOG_REGEX: RegExp = /{(.+?)}/;
+export const parseSubredditLogName = parseALogName(SUBREDDIT_NAME_LOG_REGEX);
+export const parseSubredditLogInfoName = (logInfo: LogInfo) => logInfo.subreddit;
+const BOT_NAME_LOG_REGEX: RegExp = /~(.+?)~/;
+export const parseBotLogName = parseALogName(BOT_NAME_LOG_REGEX);
+const INSTANCE_NAME_LOG_REGEX: RegExp = /\|(.+?)\|/;
+export const parseInstanceLogName = parseALogName(INSTANCE_NAME_LOG_REGEX);
+export const parseInstanceLogInfoName = (logInfo: LogInfo) => logInfo.instance;
 
+export const LOG_LEVEL_REGEX: RegExp = /\s*(debug|warn|info|error|verbose)\s*:/i
+export const isLogLineMinLevel = (log: string | LogInfo, minLevelText: string): boolean => {
     // @ts-ignore
     const minLevel = logLevels[minLevelText];
-    // @ts-ignore
-    const level = logLevels[lineLevelMatch[1] as string];
+    let level: number;
+
+    if(typeof log === 'string') {
+        const lineLevelMatch =  log.match(LOG_LEVEL_REGEX)
+        if (lineLevelMatch === null) {
+            return false;
+        }
+        // @ts-ignore
+         level = logLevels[lineLevelMatch[1]];
+    } else {
+        const lineLevelMatch = log.level;
+        // @ts-ignore
+        level = logLevels[lineLevelMatch];
+    }
     return level <= minLevel;
 }
 
 // https://regexr.com/3e6m0
 const HYPERLINK_REGEX: RegExp = /(http(s)?:\/\/.)?(www\.)?[-a-zA-Z0-9@:%._\+~#=]{2,256}\.[a-z]{2,6}\b([-a-zA-Z0-9@:%_\+.~#?&//=]*)/;
-export const formatLogLineToHtml = (val: string) => {
-    const logContent = val
+export const formatLogLineToHtml = (log: string | LogInfo) => {
+    const val = typeof log === 'string' ? log : log[MESSAGE];
+    const logContent = Autolinker.link(val, {
+        email: false,
+        phone: false,
+        mention: false,
+        hashtag: false,
+        stripPrefix: false,
+        sanitizeHtml: true,
+    })
         .replace(/(\s*debug\s*):/i, '<span class="debug text-pink-400">$1</span>:')
         .replace(/(\s*warn\s*):/i, '<span class="warn text-yellow-400">$1</span>:')
         .replace(/(\s*info\s*):/i, '<span class="info text-blue-300">$1</span>:')
         .replace(/(\s*error\s*):/i, '<span class="error text-red-400">$1</span>:')
         .replace(/(\s*verbose\s*):/i, '<span class="error text-purple-400">$1</span>:')
-        .replaceAll('\n', '<br />')
-        .replace(HYPERLINK_REGEX, '<a target="_blank" href="$&">$&</a>');
+        .replaceAll('\n', '<br />');
+        //.replace(HYPERLINK_REGEX, '<a target="_blank" href="$&">$&</a>');
     return `<div class="logLine">${logContent}</div>`
 }
 
-export type LogEntry = [number, string];
+export type LogEntry = [number, LogInfo];
 export interface LogOptions {
     limit: number,
     level: string,
     sort: 'ascending' | 'descending',
     operator?: boolean,
     user?: string,
+    allLogsParser?: Function
+    allLogName?: string
 }
 
-export const filterLogBySubreddit = (logs: Map<string, LogEntry[]>, subreddits: string[] = [], options: LogOptions): Map<string, string[]> => {
+export const filterLogBySubreddit = (logs: Map<string, LogEntry[]>, validLogCategories: string[] = [], options: LogOptions): Map<string, string[]> => {
     const {
         limit,
         level,
         sort,
         operator = false,
-        user
+        user,
+        allLogsParser = parseSubredditLogInfoName,
+        allLogName = 'app'
     } = options;
 
-    // get map of valid subreddits
+    // get map of valid logs categories
     const validSubMap: Map<string, LogEntry[]> = new Map();
     for(const [k, v] of logs) {
-        if(subreddits.includes(k)) {
+        if(validLogCategories.includes(k)) {
             validSubMap.set(k, v);
         }
     }
 
     // derive 'all'
-    let allLogs = (logs.get('app') || []);
+    let allLogs = (logs.get(allLogName) || []);
     if(!operator) {
+        // if user is not an operator then we want to filter allLogs to only logs that include categories they can access
         if(user === undefined) {
             allLogs = [];
         } else {
             allLogs.filter(([time, l]) => {
-                const sub = parseSubredditLogName(l);
+                const sub = allLogsParser(l);
                 return sub !== undefined && sub.includes(user);
             });
         }
     }
+    // then append all other logs to all logs
+    // -- this is fine because we sort and truncate all logs just below this anyway
     allLogs = Array.from(validSubMap.values()).reduce((acc, logs) => {
         return acc.concat(logs);
     },allLogs);
@@ -764,22 +798,21 @@ export const totalFromMapStats = (val: Map<any, number>): number => {
 }
 
 export const permissions = [
-    'edit',
-    'flair',
-    'history',
     'identity',
+    'history',
+    'read',
     'modcontributors',
     'modflair',
+    'modlog',
     'modmail',
     'privatemessages',
     'modposts',
     'modself',
     'mysubreddits',
-    'read',
     'report',
     'submit',
     'wikiread',
-    'wikiedit'
+    'wikiedit',
 ];
 
 export const boolToString = (val: boolean): string => {
@@ -935,3 +968,19 @@ export const createCacheManager = (options: CacheOptions): Cache => {
 }
 
 export const randomId = () => crypto.randomBytes(20).toString('hex');
+
+export const intersect = (a: Array<any>, b: Array<any>) => {
+    const setA = new Set(a);
+    const setB = new Set(b);
+    const intersection = new Set([...setA].filter(x => setB.has(x)));
+    return Array.from(intersection);
+}
+
+export const snooLogWrapper = (logger: Logger) => {
+    return {
+        warn: (...args: any[]) => logger.warn(args.slice(0, 2).join(' '), [args.slice(2)]),
+        debug: (...args: any[]) => logger.debug(args.slice(0, 2).join(' '), [args.slice(2)]),
+        info: (...args: any[]) => logger.info(args.slice(0, 2).join(' '), [args.slice(2)]),
+        trace: (...args: any[]) => logger.debug(args.slice(0, 2).join(' '), [args.slice(2)]),
+    }
+}

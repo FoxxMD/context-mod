@@ -15,7 +15,10 @@ An example of the above that Context Bot can do now:
 
 Some feature highlights:
 * Simple rule-action behavior can be combined to create any level of complexity in behavior
-* One instance can manage all moderated subreddits for the authenticated account
+* Server/client architecture
+  * Default/no configuration runs "All In One" behavior
+  * Additional configuration allows web interface to connect to multiple servers
+  * Each server instance can run multiple reddit accounts as bots
 * **Per-subreddit configuration** is handled by JSON stored in the subreddit wiki
 * Any text-based actions (comment, submission, message, usernotes, ban, etc...) can be configured via a wiki page or raw text in JSON and support [mustache](https://mustache.github.io) [templating](/docs/actionTemplating.md)
 * History-based rules support multiple "valid window" types -- [ISO 8601 Durations](https://en.wikipedia.org/wiki/ISO_8601#Durations), [Day.js Durations](https://day.js.org/docs/en/durations/creating), and submission/comment count limits.
@@ -27,7 +30,7 @@ Some feature highlights:
 * Support for [Toolbox User Notes](https://www.reddit.com/r/toolbox/wiki/docs/usernotes) as criteria or Actions (writing notes)
 * Docker container support
 * Event notification via Discord
-* **Web interface** for monitoring and administration
+* **Web interface** for monitoring, administration, and oauth bot authentication
 
 # Table of Contents
 
@@ -89,9 +92,12 @@ Context Bot's configuration can be written in JSON, [JSON5](https://json5.org/) 
 
 ## Web UI and Screenshots
 
-RCB comes equipped with a web interface designed for use by both moderators and bot operators. Some feature highlights:
+### Dashboard
+
+CM comes equipped with a dashboard designed for use by both moderators and bot operators.
 
 * Authentication via Reddit OAuth -- only accessible if you are the bot operator or a moderator of a subreddit the bot moderates
+* Connect to multiple ContextMod instances (specified in configuration)
 * Monitor API usage/rates
 * Monitoring and administration **per subreddit:**
   * Start/stop/pause various bot components
@@ -102,9 +108,30 @@ RCB comes equipped with a web interface designed for use by both moderators and 
 
 ![Subreddit View](docs/screenshots/subredditStatus.jpg)
 
-Additionally, a helper webpage is available to help initial setup of your bot with reddit's oauth authentication. [Learn more about using the oauth helper.](docs/botAuthentication.md#cm-oauth-helper-recommended)
+### Bot Setup/Authentication
+
+A bot oauth helper allows operators to define oauth credentials/permissions and then generate unique, one-time invite links that allow moderators to authenticate their own bots without operator assistance. [Learn more about using the oauth helper.](docs/botAuthentication.md#cm-oauth-helper-recommended)
+
+Operator view/invite link generation:
 
 ![Oauth View](docs/screenshots/oauth.jpg)
+
+Moderator view/invite and authorization:
+
+![Invite View](docs/screenshots/oauth-invite.jpg)
+
+### Configuration Editor
+
+A built-in editor using [monaco-editor](https://microsoft.github.io/monaco-editor/) makes editing configurations easy:
+
+* Automatic JSON syntax validation and formatting
+* Automatic Schema (subreddit or operator) validation
+* All properties are annotated via hover popups
+* Unauthenticated view via `yourdomain.com/config`
+* Authenticated view loads subreddit configurations by simple link found on the subreddit dashboard
+* Switch schemas to edit either subreddit or operator configurations
+
+![Configuration View](docs/screenshots/editor.jpg)
 
 ## License
 

@@ -636,24 +636,3 @@ export const activityIsDeleted = (item: Submission | Comment): boolean => {
     }
     return item.author.name === '[deleted]'
 }
-
-class ClientSingleton {
-    client!: Snoowrap;
-
-    constructor(client?: Snoowrap) {
-        if (client !== undefined) {
-            this.client = client;
-        }
-    }
-
-    setClient(client: Snoowrap) {
-        this.client = client;
-    }
-
-    getClient(): Snoowrap {
-        return this.client;
-    }
-}
-
-// quick little hack to get access to the client without having to pass it all the way down the chain
-export const singleton = new ClientSingleton();

@@ -25,7 +25,13 @@ import {
     OperatorConfig,
     PollingOptions,
     PollingOptionsStrong,
-    PollOn, StrongCache, CacheProvider, CacheOptions
+    PollOn,
+    StrongCache,
+    CacheProvider,
+    CacheOptions,
+    BotInstanceJsonConfig,
+    BotInstanceConfig,
+    RequiredWebRedditCredentials
 } from "./Common/interfaces";
 import {isRuleSetJSON, RuleSetJson, RuleSetObjectJson} from "./Rule/RuleSet";
 import deepEqual from "fast-deep-equal";
@@ -246,65 +252,41 @@ export const insertNamedActions = (actions: Array<ActionJson>, namedActions: Map
     return strongActions;
 }
 
-export const parseOpConfigFromArgs = (args: any): OperatorJsonConfig => {
+export const parseDefaultBotInstanceFromArgs = (args: any): BotInstanceJsonConfig => {
     const {
         subreddits,
         clientId,
         clientSecret,
         accessToken,
         refreshToken,
-        redirectUri,
         wikiConfig,
         dryRun,
-        heartbeat,
         softLimit,
+        heartbeat,
         hardLimit,
         authorTTL,
-        operator,
-        operatorDisplay,
         snooProxy,
         snooDebug,
         sharedMod,
-        logLevel,
-        logDir,
-        port,
-        sessionSecret,
         caching,
-        web
     } = args || {};
 
     const data = {
-        operator: {
-            name: operator,
-            display: operatorDisplay
-        },
         credentials: {
             clientId,
             clientSecret,
             accessToken,
             refreshToken,
-            redirectUri,
-        },
-        subreddits: {
-            names: subreddits,
-            wikiConfig,
-            heartbeatInterval: heartbeat,
-            dryRun
-        },
-        logging: {
-            level: logLevel,
-            path: logDir === true ? `${process.cwd()}/logs` : undefined,
         },
         snoowrap: {
             proxy: snooProxy,
             debug: snooDebug,
         },
-        web: {
-            enabled: web,
-            port,
-            session: {
-                secret: sessionSecret
-            }
+        subreddits: {
+            names: subreddits,
+            wikiConfig,
+            dryRun,
+            heartbeatInterval: heartbeat,
         },
         polling: {
             sharedMod,
@@ -313,9 +295,50 @@ export const parseOpConfigFromArgs = (args: any): OperatorJsonConfig => {
             provider: caching,
             authorTTL
         },
-        api: {
+        nanny: {
             softLimit,
             hardLimit
+        }
+    }
+    return removeUndefinedKeys(data) as BotInstanceJsonConfig;
+}
+
+export const parseOpConfigFromArgs = (args: any): OperatorJsonConfig => {
+    const {
+        clientId,
+        clientSecret,
+        redirectUri,
+        operator,
+        operatorDisplay,
+        logLevel,
+        logDir,
+        port,
+        sessionSecret,
+        web,
+        mode,
+    } = args || {};
+
+    const data = {
+        mode,
+        operator: {
+            name: operator,
+            display: operatorDisplay
+        },
+        logging: {
+            level: logLevel,
+            path: logDir === true ? `${process.cwd()}/logs` : undefined,
+        },
+        web: {
+            enabled: web,
+            port,
+            session: {
+                secret: sessionSecret
+            },
+            credentials: {
+                clientId,
+                clientSecret,
+                redirectUri,
+            }
         }
     }
 
@@ -343,54 +366,65 @@ const parseListFromEnv = (val: string|undefined) => {
     return listVals;
 }
 
-export const parseOpConfigFromEnv = (): OperatorJsonConfig => {
+export const parseDefaultBotInstanceFromEnv = (): BotInstanceJsonConfig => {
     const data = {
-        operator: {
-            name: parseListFromEnv(process.env.OPERATOR),
-            display: process.env.OPERATOR_DISPLAY
-        },
         credentials: {
             clientId: process.env.CLIENT_ID,
             clientSecret: process.env.CLIENT_SECRET,
             accessToken: process.env.ACCESS_TOKEN,
             refreshToken: process.env.REFRESH_TOKEN,
-            redirectUri: process.env.REDIRECT_URI,
         },
         subreddits: {
             names: parseListFromEnv(process.env.SUBREDDITS),
             wikiConfig: process.env.WIKI_CONFIG,
-            heartbeatInterval: process.env.HEARTBEAT !== undefined ? parseInt(process.env.HEARTBEAT) : undefined,
             dryRun: parseBool(process.env.DRYRUN, undefined),
-        },
-        logging: {
-            // @ts-ignore
-            level: process.env.LOG_LEVEL,
-            path: process.env.LOG_DIR === 'true' ? `${process.cwd()}/logs` : undefined,
+            heartbeatInterval: process.env.HEARTBEAT !== undefined ? parseInt(process.env.HEARTBEAT) : undefined,
         },
         snoowrap: {
             proxy: process.env.PROXY,
             debug: parseBool(process.env.SNOO_DEBUG, undefined),
-        },
-        web: {
-            enabled: process.env.WEB !== undefined ? parseBool(process.env.WEB) : undefined,
-            port: process.env.PORT !== undefined ? parseInt(process.env.PORT) : undefined,
-            session: {
-                provider: process.env.SESSION_PROVIDER,
-                secret: process.env.SESSION_SECRET
-            }
         },
         polling: {
             sharedMod: parseBool(process.env.SHARE_MOD),
         },
         caching: {
             provider: {
+                // @ts-ignore
                 store: process.env.CACHING as (CacheProvider | undefined)
             },
             authorTTL: process.env.AUTHOR_TTL !== undefined ? parseInt(process.env.AUTHOR_TTL) : undefined
         },
-        api: {
+        nanny: {
             softLimit: process.env.SOFT_LIMIT !== undefined ? parseInt(process.env.SOFT_LIMIT) : undefined,
             hardLimit: process.env.HARD_LIMIT !== undefined ? parseInt(process.env.HARD_LIMIT) : undefined
+        },
+    };
+    return removeUndefinedKeys(data) as BotInstanceJsonConfig;
+}
+
+export const parseOpConfigFromEnv = (): OperatorJsonConfig => {
+    const data = {
+        mode: process.env.MODE !== undefined ? process.env.MODE as ('all' | 'server' | 'client') : undefined,
+            operator: {
+            name: parseListFromEnv(process.env.OPERATOR),
+            display: process.env.OPERATOR_DISPLAY
+        },
+        logging: {
+            // @ts-ignore
+            level: process.env.LOG_LEVEL,
+            path: process.env.LOG_DIR === 'true' ? `${process.cwd()}/logs` : undefined,
+        },
+        web: {
+            port: process.env.PORT !== undefined ? parseInt(process.env.PORT) : undefined,
+            session: {
+                provider: process.env.SESSION_PROVIDER,
+                secret: process.env.SESSION_SECRET
+            },
+            credentials: {
+                clientId: process.env.CLIENT_ID,
+                clientSecret: process.env.CLIENT_SECRET,
+                redirectUri: process.env.REDIRECT_URI,
+            },
         }
     }
 
@@ -452,62 +486,91 @@ export const parseOperatorConfigFromSources = async (args: any): Promise<Operato
             throw err;
         }
     }
-    const configFromArgs = parseOpConfigFromArgs(args);
-    const configFromEnv = parseOpConfigFromEnv();
+    const opConfigFromArgs = parseOpConfigFromArgs(args);
+    const opConfigFromEnv = parseOpConfigFromEnv();
 
-    const mergedConfig = merge.all([configFromEnv, configFromFile, configFromArgs], {
+    const defaultBotInstanceFromArgs = parseDefaultBotInstanceFromArgs(args);
+    const defaultBotInstanceFromEnv = parseDefaultBotInstanceFromEnv();
+    const {bots: botInstancesFromFile = [], ...restConfigFile} = configFromFile;
+
+    const defaultBotInstance = merge.all([defaultBotInstanceFromEnv, defaultBotInstanceFromArgs], {
         arrayMerge: overwriteMerge,
     });
 
-    return removeUndefinedKeys(mergedConfig) as OperatorJsonConfig;
+    let botInstances = [];
+    if(botInstancesFromFile.length === 0) {
+        botInstances = [defaultBotInstance];
+    } else {
+        botInstances = botInstancesFromFile.map(x => merge.all([defaultBotInstance, x], {arrayMerge: overwriteMerge}));
+    }
+
+    const mergedConfig = merge.all([opConfigFromEnv, restConfigFile, opConfigFromArgs], {
+        arrayMerge: overwriteMerge,
+    });
+
+    return removeUndefinedKeys({...mergedConfig, bots: botInstances}) as OperatorJsonConfig;
 }
 
 export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): OperatorConfig => {
     const {
+        mode = 'all',
         operator: {
             name = [],
             display = 'Anonymous',
-            botName,
-        } = {},
-        credentials: {
-            clientId: ci,
-            clientSecret: cs,
-            ...restCred
-        } = {},
-        subreddits: {
-            names = [],
-            wikiConfig = 'botconfig/contextbot',
-            heartbeatInterval = 300,
-            dryRun
         } = {},
         logging: {
             level = 'verbose',
             path,
         } = {},
-        snoowrap = {},
         web: {
-            enabled = true,
             port = 8085,
             maxLogs = 200,
             session: {
                 secret = randomId(),
                 provider: sessionProvider = { store: 'memory' },
-            } = {}
+            } = {},
+            clients,
+            credentials: webCredentials,
+            operators,
         } = {},
-        polling: {
-            sharedMod = false,
-            limit = 100,
-            interval = 30,
-        } = {},
-        queue: {
-            maxWorkers = 1,
-        } = {},
-        caching,
         api: {
-            softLimit = 250,
-            hardLimit = 50
+            port: apiPort = 8095,
+            secret: apiSecret = randomId(),
+            friendly,
         } = {},
+        bots = [],
     } = data;
+
+    let hydratedBots: BotInstanceConfig[]  = bots.map(x => {
+       const {
+           polling: {
+               sharedMod = false,
+               limit = 100,
+               interval = 30,
+           } = {},
+           queue: {
+               maxWorkers = 1,
+           } = {},
+           caching,
+           nanny: {
+               softLimit = 250,
+               hardLimit = 50
+           } = {},
+           snoowrap = {},
+           credentials: {
+               clientId: ci,
+               clientSecret: cs,
+               ...restCred
+           } = {},
+           subreddits: {
+               names = [],
+               exclude = [],
+               wikiConfig = 'botconfig/contextbot',
+               dryRun,
+               heartbeatInterval = 300,
+           } = {},
+       } = x;
+
 
     let cache: StrongCache;
 
@@ -544,30 +607,49 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
         }
     }
 
-    const config: OperatorConfig = {
-        operator: {
-            name: typeof name === 'string' ? [name] : name,
-            display,
-            botName,
+    return {
+        snoowrap,
+        subreddits: {
+            names,
+            exclude,
+            wikiConfig,
+            heartbeatInterval,
+            dryRun,
         },
         credentials: {
             clientId: (ci as string),
             clientSecret: (cs as string),
             ...restCred,
         },
+        caching: cache,
+        polling: {
+            sharedMod,
+            limit,
+            interval,
+        },
+        queue: {
+            maxWorkers,
+        },
+        nanny: {
+            softLimit,
+            hardLimit
+        }
+    }
+
+    });
+    const defaultOperators = typeof name === 'string' ? [name] : name;
+
+    const config: OperatorConfig = {
+        mode,
+        operator: {
+            name: defaultOperators,
+            display,
+        },
         logging: {
             level,
             path
         },
-        snoowrap,
-        subreddits: {
-            names,
-            wikiConfig,
-            heartbeatInterval,
-            dryRun,
-        },
         web: {
-            enabled,
             port,
             session: {
                 secret,
@@ -582,20 +664,16 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
                 },
             },
             maxLogs,
-        },
-        caching: cache,
-        polling: {
-            sharedMod,
-            limit,
-            interval,
-        },
-        queue: {
-          maxWorkers,
+            clients: clients === undefined ? [{host: 'localhost:8095', secret: apiSecret}] : clients,
+            credentials: webCredentials as RequiredWebRedditCredentials,
+            operators: operators || defaultOperators,
         },
         api: {
-            softLimit,
-            hardLimit
-        }
+            port: apiPort,
+            secret: apiSecret,
+            friendly
+        },
+        bots: hydratedBots,
     };
 
     return config;

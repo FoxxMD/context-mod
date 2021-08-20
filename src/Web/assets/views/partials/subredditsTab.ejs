@@ -1,0 +1,23 @@
+<div class="space-x-4 pt-2 md:px-5 leading-6 font-semibold bg-gray-white dark:bg-gray-500 text-white">
+    <div class="container mx-auto">
+        <% if(locals.bots !== undefined) { %>
+        <% bots.forEach(function (botData){ %>
+            <ul data-bot="<%= botData.system.name %>" class="inline-flex flex-wrap subreddit nestedTabs">
+                <% botData.subreddits.forEach(function (data){ %>
+                    <li class="my-3 pr-3 dark:text-white">
+                        <span data-subreddit="<%= data.name %>" class="rounded-md py-2 px-3 tabSelectWrapper">
+                        <a class="tabSelect font-normal pointer hover:font-bold"
+                           data-subreddit="<%= data.name %>">
+                            <%= data.name === 'All' ? 'All Subreddits' : data.name %>
+                        </a>
+                            <% if ((data.name === 'All' && isOperator) || data.name !== 'All') { %>
+                                <span class="inline-block mb-0.5 ml-0.5 w-2 h-2 bg-<%= data.indicator %>-400 rounded-full"></span>
+                            <% } %>
+                        </span>
+                    </li>
+                <% }) %>
+            </ul>
+        <% }) %>
+        <% } %>
+    </div>
+</div>

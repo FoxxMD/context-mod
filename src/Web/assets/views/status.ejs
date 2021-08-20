@@ -3,36 +3,16 @@
 <body class="">
 <script>localStorage.getItem('ms-dark') === 'no' ? document.body.classList.remove('dark') : document.body.classList.add('dark')</script>
 <div class="min-w-screen min-h-screen bg-gray-100 bg-gray-100 dark:bg-gray-800 font-sans">
-    <%- include('partials/authTitle') %>
-    <div class="space-x-4 py-1 md:px-10 leading-6 font-semibold bg-gray-500 dark:bg-gray-700 text-white">
-        <div class="container mx-auto">
-            <ul id="tabs" class="inline-flex flex-wrap">
-                <% subreddits.forEach(function (data){ %>
-                    <li class="my-3 px-3 dark:text-white">
-                        <span data-subreddit="<%= data.name %>" class="rounded-md py-2 px-3 tabSelectWrapper">
-                        <a class="tabSelect font-normal pointer hover:font-bold"
-                           data-subreddit="<%= data.name %>">
-                            <%= data.name %>
-                        </a>
-                            <% if ((data.name === 'All' && isOperator) || data.name !== 'All') { %>
-                                <span class="inline-block mb-0.5 ml-0.5 w-2 h-2 bg-<%= data.indicator %>-400 rounded-full"></span>
-                            <% } %>
-                        </span>
-                    </li>
-                <% }) %>
-            </ul>
-        </div>
-    </div>
+    <%- include('partials/header') %>
+    <%- include('partials/botsTab') %>
     <div class="container mx-auto">
+        <%- include('partials/subredditsTab') %>
         <div class="grid">
             <div class="bg-white dark:bg-gray-500 dark:text-white">
-                <div class="pb-6 pt-3 md:px-7">
-                    <!--                    <div class="flex items-center justify-around">-->
-                    <!--                        -->
-
-                    <!--                    </div>-->
-                    <% subreddits.forEach(function (data){ %>
-                        <div class="sub" data-subreddit="<%= data.name %>">
+                <div class="pb-6 md:px-7">
+                    <% bots.forEach(function (bot){ %>
+                        <% bot.subreddits.forEach(function (data){ %>
+                        <div class="sub <%= bot.system.running ? '' : 'offline' %>" data-subreddit="<%= data.name %>" data-bot="<%= bot.system.name %>">
                             <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-3 gap-5">
                                 <div class="bg-white shadow-md rounded my-3 dark:bg-gray-500 dark:text-white">
                                     <div class="space-x-4 px-4 p-2 leading-2 font-semibold bg-gray-300 dark:bg-gray-700 dark:text-white">
@@ -181,13 +161,17 @@
                                                 <span><%= data.delayBy %></span>
                                             <% } %>
                                             <% if (data.name === 'All') { %>
+                                                    <label>Status</label>
+                                                    <span class="font-semibold"><%= bot.system.running ? 'ONLINE' : 'OFFLINE' %></span>
+                                                    <label>Account</label>
+                                                    <span><a href="https://reddit.com/<%= bot.system.account %>"><%= bot.system.account %></a></span>
                                                 <label>Uptime</label>
                                                 <span class="has-tooltip">
                                                     <span class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2'>
-                                                        <%= system.startedAt %>
+                                                        <%= bot.system.startedAt %>
                                                     </span>
                                                     <span>
-                                                        <span id="startedAtHuman"><%= system.startedAtHuman %></span>
+                                                        <span id="startedAtHuman"><%= bot.system.startedAtHuman %></span>
                                                     </span>
                                                 </span>
                                                 <label>Heartbeat Interval</label>
@@ -234,10 +218,12 @@
                                                 </span>
                                             </label>
                                             <span><%= `${data.runningActivities} Processing / ${data.queuedActivities} Queued` %></span>
+                                                <label>Operated By</label>
+                                                <span><%= operatorDisplay %></span>
                                             <% if (data.name === 'All' && isOperator) { %>
                                                 <label>Operators</label>
                                                 <span><%= operators %></span>
-                                            <% } %>
+                                            <% } else %>
                                         </div>
                                         <% if (data.name !== 'All') { %>
                                             <ul class="list-disc list-inside mt-4">
@@ -324,7 +310,7 @@
                                                 <span>
                                                     <a style="display: inline"
                                                        href="<%= data.wikiHref %>"><%= data.wikiLocation %></a> | <a style="display: inline" target="_blank"
-                                                                                                                     href="/config?subreddit=<%= data.name %>">View</a>
+                                                                                                                     href="/config?instance=<%= instanceId %>&bot=<%= bot.system.name %>&subreddit=<%= data.name %>">View</a>
                                                 </span>
                                             </div>
                                         </div>
@@ -593,51 +579,16 @@
                                     </span>
                                     <a class="runCheck" data-subreddit="<%= data.name %>" href="">Run</a>
                                 </div>
-                                <div class="flex items-center flex-end space-x-2">
-                                <span>
-                                    <label for="level-select">Level: </label>
-                                    <select class="logSettingSelect rounded capitalize text-black" data-type="level"
-                                            id="levels-select">
-                                        <%- logSettings.levelSelect %>
-                                    </select>
-                                </span>
-                                    <span>
-                                    <label for="sort-select">Sort: </label>
-                                    <select class="logSettingSelect rounded capitalize text-black" data-type="sort"
-                                            id="sort-select">
-                                        <%- logSettings.sortSelect %>
-                                    </select>
-                                </span>
-                                    <span>
-                                    <label for="limit-select">Limit: </label>
-                                    <select class="logSettingSelect rounded capitalize text-black" data-type="limit"
-                                            id="limit-select">
-                                        <%- logSettings.limitSelect %>
-                                    </select>
-                                </span>
-                                </div>
+                                <%- include('partials/logSettings') %>
                             </div>
-                            <svg class="loading" version="1.1" id="L9" xmlns="http://www.w3.org/2000/svg"
-                                 xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
-                                 viewBox="0 0 100 100" xml:space="preserve">
-                                    <path
-                                            d="M73,50c0-12.7-10.3-23-23-23S27,37.3,27,50 M30.9,50c0-10.5,8.5-19.1,19.1-19.1S69.1,39.5,69.1,50">
-                                        <animateTransform
-                                                attributeName="transform"
-                                                attributeType="XML"
-                                                type="rotate"
-                                                dur="1s"
-                                                from="0 50 50"
-                                                to="360 50 50"
-                                                repeatCount="indefinite"/>
-                                    </path>
-                                </svg>
+                            <%- include('partials/loadingIcon') %>
                             <div data-subreddit="<%= data.name %>" class="logs font-mono text-sm">
                                 <% data.logs.forEach(function (logEntry){ %>
                                     <%- logEntry %>
                                 <% }) %>
                             </div>
                         </div>
+                    <% }) %>
                     <% }) %>
                 </div>
                 <!--<div class="w-full flex-auto flex min-h-0 overflow-auto">
@@ -647,69 +598,25 @@
             </div>
         </div>
     </div>
+<%- include('partials/footer') %>
 </div>
+<%- include('partials/instanceTabJs') %>
+<%- include('partials/themeJs') %>
+<%- include('partials/logSettingsJs') %>
 <script>
-    /*    const appendUser = causedBy => causedBy === 'system' ? '' : ' (user)';
-        const initialData =
-        const updateOverview = (sub, data) => {
-
-        }*/
     window.sort = 'desc';
-    document.querySelectorAll('.theme').forEach(el => {
-        el.addEventListener('click', e => {
-            e.preventDefault();
-            if (e.target.id === 'dark') {
-                document.body.classList.add('dark');
-                localStorage.setItem('ms-dark', 'yes');
-            } else {
-                document.body.classList.remove('dark');
-                localStorage.setItem('ms-dark', 'no');
-            }
-            document.querySelectorAll('.theme').forEach(el => {
-                el.classList.remove('font-bold', 'no-underline', 'pointer-events-none');
-            });
-            e.target.classList.add('font-bold', 'no-underline', 'pointer-events-none');
-        })
-    })
-
-    document.querySelector("#themeToggle").checked = localStorage.getItem('ms-dark') !== 'no';
-    document.querySelector("#themeToggle").onchange = (e) => {
-        if (e.target.checked === true) {
-            document.body.classList.add('dark');
-            localStorage.setItem('ms-dark', 'yes');
-        } else {
-            document.body.classList.remove('dark');
-            localStorage.setItem('ms-dark', 'no');
-        }
-    }
-    // if (localStorage.getItem('ms-dark') === 'no') {
-    //     document.querySelector('#light.theme').classList.add('font-bold', 'no-underline', 'pointer-events-none');
-    //     document.body.classList.remove('dark')
-    // } else {
-    //     document.querySelector('#dark.theme').classList.add('font-bold', 'no-underline', 'pointer-events-none');
-    // }
-
-    document.querySelectorAll('.logSettingSelect').forEach(el => {
-        el.onchange = (e) => {
-            action = e.target.dataset.type;
-            value = e.target.value;
-            fetch(`logs/settings/update?${action}=${value}`);
-            document.querySelectorAll(`#${e.target.id}.logSettingSelect option`).forEach(el => {
-                el.classList.remove('font-bold');
-            });
-            document.querySelector(`#${e.target.id}.logSettingSelect option[data-value="${e.target.value}"]`).classList.add('font-bold');
-        }
-    });
 
     document.querySelectorAll('.action').forEach(el => {
         el.addEventListener('click', e => {
-            e.preventDefault()
+            e.preventDefault();
+            const subSection = e.target.closest('div.sub');
             action = e.target.dataset.action;
-            subreddit = e.target.dataset.subreddit;
+            subreddit = subSection.dataset.subreddit;
+            bot = subSection.dataset.bot;
             type = e.target.dataset.type;
             force = e.target.dataset.force === 'true';
 
-            fetch(`action?action=${action}&subreddit=${subreddit}&force=${force}&type=${type}`);
+            fetch(`/api/action?instance=<%= instanceId %>&bot=${bot}&action=${action}&subreddit=${subreddit}&force=${force}&type=${type}`);
         });
     })
 
@@ -720,11 +627,12 @@
             const urlInput = document.querySelector(`[data-subreddit="${subreddit}"].checkUrl`);
             const dryRunCheck = document.querySelector(`[data-subreddit="${subreddit}"].dryrunCheck`);
 
-
+            const subSection = e.target.closest('div.sub');
+            bot = subSection.dataset.bot;
             const url = urlInput.value;
             const dryRun = dryRunCheck.checked ? 1 : 0;
 
-            const fetchUrl = `check?url=${url}&dryRun=${dryRun}&subreddit=${subreddit}`;
+            const fetchUrl = `/api/check?instanceId=<%= instanceId %>%bot=${bot}&url=${url}&dryRun=${dryRun}&subreddit=${subreddit}`;
             fetch(fetchUrl);
 
             urlInput.value = '';
@@ -751,8 +659,56 @@
         });
     })
 
+    document.querySelectorAll('[data-bot].tabSelect').forEach(el => {
+        el.addEventListener('click', e => {
+            const bot = e.target.dataset.bot;
+            e.preventDefault();
+            document.querySelectorAll('.tabSelect').forEach(el => {
+                el.classList.remove('font-bold', 'no-underline', 'pointer-events-none');
+            });
+            document.querySelectorAll('[data-subreddit].sub').forEach(el => {
+                el.classList.remove('active');
+            });
+            e.target.classList.add('font-bold', 'no-underline', 'pointer-events-none');
+            const firstSub = document.querySelectorAll(`[data-bot="${bot}"].sub`)[0];
+            firstSub.classList.add('active');
+
+            const firstSubTab = document.querySelector(`ul[data-bot="${bot}"] [data-subreddit="${firstSub.dataset.subreddit}"].tabSelect`);
+            firstSubTab.classList.add('font-bold', 'no-underline', 'pointer-events-none');
+            const firstSubWrapper = firstSubTab.closest('.tabSelectWrapper');
+            //document.querySelector(`[data-subreddit="${subreddit}"][data-bot="${bot}"].sub`).classList.add('active');
+
+            document.querySelectorAll('.tabSelectWrapper').forEach(el => {
+                el.classList.remove('border-2');
+                el.classList.add('border');
+            })
+
+            firstSubWrapper.classList.remove('border');
+            firstSubWrapper.classList.add('border-2');
+
+            document.querySelectorAll('[data-bot].subreddit.nestedTabs').forEach(el => {
+                el.classList.remove('active');
+            })
+            document.querySelector(`[data-bot="${bot}"].subreddit.nestedTabs`).classList.add('active');
+
+            const wrapper = e.target.closest('.tabSelectWrapper');//document.querySelector(`[data-subreddit="${subreddit}"].tabSelectWrapper`);
+            wrapper.classList.remove('border');
+            wrapper.classList.add('border-2');
+
+            if ('URLSearchParams' in window) {
+                var searchParams = new URLSearchParams(window.location.search)
+                searchParams.set("bot", bot);
+                searchParams.set("sub", firstSub.dataset.subreddit);
+                var newRelativePathQuery = window.location.pathname + '?' + searchParams.toString();
+                history.pushState(null, '', newRelativePathQuery);
+            }
+        });
+    });
+
     document.querySelectorAll('[data-subreddit].tabSelect').forEach(el => {
         el.addEventListener('click', e => {
+            const bot = e.target.closest('ul').dataset.bot;
+            const subreddit = e.target.dataset.subreddit;
             e.preventDefault();
             document.querySelectorAll('[data-subreddit].tabSelect').forEach(el => {
                 el.classList.remove('font-bold', 'no-underline', 'pointer-events-none');
@@ -761,14 +717,14 @@
                 el.classList.remove('active');
             });
             e.target.classList.add('font-bold', 'no-underline', 'pointer-events-none');
-            document.querySelector(`[data-subreddit="${e.target.dataset.subreddit}"].sub`).classList.add('active');
+            document.querySelector(`[data-subreddit="${subreddit}"][data-bot="${bot}"].sub`).classList.add('active');
 
-            document.querySelectorAll('.tabSelectWrapper').forEach(el => {
+            document.querySelectorAll('[data-subreddit].tabSelectWrapper').forEach(el => {
                 el.classList.remove('border-2');
                 el.classList.add('border');
             })
 
-            const wrapper = document.querySelector(`[data-subreddit="${e.target.dataset.subreddit}"].tabSelectWrapper`);
+            const wrapper = e.target.closest('.tabSelectWrapper');//document.querySelector(`[data-subreddit="${subreddit}"].tabSelectWrapper`);
             wrapper.classList.remove('border');
             wrapper.classList.add('border-2');
 
@@ -779,72 +735,131 @@
                 history.pushState(null, '', newRelativePathQuery);
             }
         });
-    })
-    document.querySelector('[data-subreddit="<%= show %>"].tabSelect').classList.add('font-bold', 'no-underline', 'pointer-events-none');
+    });
+
+
+    var searchParams = new URLSearchParams(window.location.search);
+    const shownSub = searchParams.get('sub') || 'All'
+    let shownBot = searchParams.get('bot');
+    if(shownBot === null) {
+        // show the first bot listed if none is specified
+        const firstBot = document.querySelector('.tabSelectWrapper[data-bot]');
+        if(firstBot !== null) {
+            shownBot = firstBot.dataset.bot;
+            searchParams.set('bot', shownBot);
+            var newRelativePathQuery = window.location.pathname + '?' + searchParams.toString();
+            history.pushState(null, '', newRelativePathQuery);
+        }
+    }
+
+    document.querySelector(`[data-bot="${shownBot}"].tabSelect`).classList.add('font-bold', 'no-underline', 'pointer-events-none');
+    document.querySelector(`ul[data-bot="${shownBot}"] [data-subreddit="${shownSub}"].tabSelect`).classList.add('font-bold', 'no-underline', 'pointer-events-none');
     document.querySelectorAll('.tabSelectWrapper').forEach(el => el.classList.add('border'));
-    document.querySelector('[data-subreddit="<%= show %>"].sub').classList.add('active')
-    const wrapper = document.querySelector(`[data-subreddit="<%= show %>"].tabSelectWrapper`);
+    document.querySelector(`[data-bot="${shownBot}"][data-subreddit="${shownSub}"].sub`).classList.add('active');
+    const subWrapper = document.querySelector(`ul[data-bot="${shownBot}"] [data-subreddit="${shownSub}"].tabSelectWrapper`);
+    subWrapper.classList.remove('border');
+    subWrapper.classList.add('border-2');
+    const wrapper = document.querySelector(`[data-bot="${shownBot}"].tabSelectWrapper`);
     wrapper.classList.remove('border');
     wrapper.classList.add('border-2');
+
+    document.querySelector(`[data-bot="${shownBot}"].subreddit.nestedTabs`).classList.add('active');
 
     document.querySelectorAll('.stats.reloadStats').forEach(el => el.classList.add('hidden'));
     document.querySelectorAll('.allStatsToggle').forEach(el => el.classList.add('font-bold', 'no-underline', 'pointer-events-none'));
 </script>
 
-<script src="https://cdn.socket.io/3.1.3/socket.io.min.js"
-        integrity="sha384-cPwlPLvBTa3sKAgddT6krw0cJat7egBga3DJepJyrLl4Q9/5WLra3rrnMcyTyOnh"
-        crossorigin="anonymous"></script>
+<script src="https://cdn.socket.io/4.1.2/socket.io.min.js" integrity="sha384-toS6mmwu70G0fw54EGlWWeA4z3dyJ+dlXBtSURSKN4vyRFOcxd3Bzjj/AoOwY+Rg" crossorigin="anonymous"></script>
 <script>
     const SUBREDDIT_NAME_LOG_REGEX = /{(.+?)}/;
-    const parseSubredditLogName = (val) => {
-        const matches = val.match(SUBREDDIT_NAME_LOG_REGEX);
-        if (matches === null) {
-            return undefined;
+    const BOT_NAME_LOG_REGEX = /~(.+?)~/;
+    const parseALogName = (reg) => {
+        return (val) => {
+            const matches = val.match(reg);
+            if (matches === null) {
+                return undefined;
+            }
+            return matches[1];
         }
-        return matches[1];
     }
+    const parseSubredditLogName = parseALogName(SUBREDDIT_NAME_LOG_REGEX);
+    const parseBotLogName = parseALogName(BOT_NAME_LOG_REGEX);
 
     let socket = io({
         reconnectionAttempts: 5, // bail after 5 attempts
     });
 
-    const newBufferedLogs = () => new Map([["All", []]])
+    // get all bots
+    let bots = [];
+    document.querySelectorAll(`[data-bot].sub`).forEach((el) => {
+        bots.push(el.dataset.bot);
+    })
+    const newBufferedLogs = () => new Map([["All", []]]);
+    const newBufferedBot = () => new Map([["All", []], ...bots.map(x => ([x, newBufferedLogs()]))]);
+
 
     let bufferedLogs = newBufferedLogs();
+    let bufferedBot = newBufferedBot();
     let lastFlush;
     let bufferTimeout;
 
     socket.on("connect", () => {
         document.body.classList.add('connected')
         socket.on("log", data => {
-            bufferedLogs.set('All', bufferedLogs.get('All').concat(data));
-            const sub = parseSubredditLogName(data);
-            if (sub !== undefined) {
-                bufferedLogs.set(sub, (bufferedLogs.get(sub) || []).concat(data));
+            bufferedBot.set('All', bufferedBot.get('All').concat(data));
+
+            const bot = parseBotLogName(data);
+            if(bot !== undefined) {
+                const buffBot = bufferedBot.get(bot) || newBufferedLogs();
+                buffBot.set('All', buffBot.get('All').concat(data));
+                const sub = parseSubredditLogName(data);
+                if (sub !== undefined) {
+                    buffBot.set(sub, (buffBot.get(sub) || []).concat(data));
+                }
+                bufferedBot.set(bot, buffBot);
+            } else {
+                bufferedBot.forEach((logs, botName) => {
+                    if(botName === 'All') {
+                        return;
+                    }
+                    logs.set('All', logs.get('All').concat(data));
+                    bufferedBot.set(botName, logs);
+                });
             }
 
+
             const flushLogs = () => {
-                bufferedLogs.forEach((logs, subKey) => {
-                    const limit = Number.parseInt(document.querySelector(`[data-subreddit="${subKey}"] [data-type="limit"]`).value);
-                    const logContainer = document.querySelector(`[data-subreddit="${subKey}"].logs`);
-                    let existingLogs;
-                    if(window.sort === 'desc') {
-                        logs.forEach((l) => {
-                            logContainer.insertAdjacentHTML('afterbegin', l);
-                        })
-                        existingLogs = Array.from(document.querySelectorAll(`[data-subreddit="${subKey}"].logs .logLine`));
-                        logContainer.replaceChildren(...existingLogs.slice(0, limit));
-                    } else {
-                        logs.forEach((l) => {
-                            logContainer.insertAdjacentHTML('beforeend', l);
-                            existingLogs = Array.from(document.querySelectorAll(`[data-subreddit="${subKey}"].logs .logLine`));
-                            const overLimit = limit - existingLogs.length;
-                            logContainer.replaceChildren(...existingLogs.slice(overLimit -1, limit));
-                        })
+                bufferedBot.forEach((subLogs, botName) => {
+                    if(botName === 'All') {
+                        return;
                     }
+                    subLogs.forEach((logs, subKey) => {
+                        // check sub exists -- may be a web log
+                        const el = document.querySelector(`[data-subreddit="${subKey}"][data-bot="${botName}"].sub`);
+                        if(null !== el) {
+                            const limit = Number.parseInt(document.querySelector(`[data-subreddit="${subKey}"] [data-type="limit"]`).value);
+                            const logContainer = el.querySelector(`.logs`);
+                            let existingLogs;
+                            if(window.sort === 'desc') {
+                                logs.forEach((l) => {
+                                    logContainer.insertAdjacentHTML('afterbegin', l);
+                                })
+                                existingLogs = Array.from(el.querySelectorAll(`.logs .logLine`));
+                                logContainer.replaceChildren(...existingLogs.slice(0, limit));
+                            } else {
+                                logs.forEach((l) => {
+                                    logContainer.insertAdjacentHTML('beforeend', l);
+                                    existingLogs = Array.from(el.querySelectorAll(`.logs .logLine`));
+                                    const overLimit = limit - existingLogs.length;
+                                    logContainer.replaceChildren(...existingLogs.slice(overLimit -1, limit));
+                                })
+                            }
+                        }
+                    });
                 });
                 lastFlush = Date.now();
-                bufferedLogs = newBufferedLogs();
+                bufferedBot = newBufferedBot();
+                //bufferedLogs = newBufferedLogs();
                 //console.log('Flushed Logs');
             }
 
@@ -859,16 +874,23 @@
                 bufferTimeout = setTimeout(() => {flushLogs();}, 1000);
             }
         });
+        socket.on("webLog", data => {
+           console.log(data);
+        });
         socket.on("logClear", data => {
             data.forEach((obj) => {
                 const n = obj.name === 'all' ? 'All' : obj.name;
                 document.querySelector(`[data-subreddit="${n}"].logs`).innerHTML = obj.logs;
             })
         });
-        socket.on('opStats', (data) => {
-            for (const [k, v] of Object.entries(data)) {
-                document.querySelector(`#${k}`).innerHTML = v;
+        socket.on('opStats', (resp) => {
+            for(const b of resp) {
+                const {name, data} = b;
+                for (const [k, v] of Object.entries(data)) {
+                    document.querySelector(`[data-bot="${name}"].sub #${k}`).innerHTML = v;
+                }
             }
+
         });
     });
 

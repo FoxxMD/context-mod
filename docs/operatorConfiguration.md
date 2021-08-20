@@ -14,17 +14,15 @@ activities the Bot runs on.
 
 # Minimum Required Configuration
 
-The minimum required configuration variables to run the bot on subreddits are:
+| property       | Server And Web     | Server Only        | Web/Bot-Auth Only  |
+|:--------------:|:------------------:|:------------------:|:------------------:|
+| `clientId`     | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
+| `clientSecret` | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
+| `redirectUri`  | :heavy_check_mark: | :x:                | :heavy_check_mark: |
+| `refreshToken` | :heavy_check_mark: | :heavy_check_mark: | :x:                |
+| `accessToken`  | :heavy_check_mark: | :heavy_check_mark: | :x:                |
 
-* clientId
-* clientSecret
-* refreshToken
-* accessToken
-
-However, only **clientId** and **clientSecret** are required to run the **oauth helper** mode in order to generate the last two
-configuration variables.
-
-Refer to the **[Bot Authentication guide](/docs/botAuthentication.md)** to retrieve the above credentials.
+Refer to the **[Bot Authentication guide](/docs/botAuthentication.md)** to retrieve credentials.
 
 # Defining Configuration
 
@@ -47,6 +45,17 @@ noted with the same symbol as above. The value shown is the default.
 * To load a JSON configuration (for **FILE**) **using an environmental variable** use `OPERATOR_CONFIG` EX: `OPERATOR_CONFIG=/path/to/JSON/config.json`
 
 [**See the Operator Config Schema here**](https://json-schema.app/view/%23?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Fcontext-mod%2Fmaster%2Fsrc%2FSchema%2FOperatorConfig.json)
+
+## Defining Multiple Bots or CM Instances
+
+One ContextMod instance can
+
+* Run multiple bots (multiple reddit accounts -- each as a bot)
+* Connect to many other, independent, ContextMod instances
+
+However, the default configuration (using **ENV/ARG**) assumes your intention is to run one bot (one reddit account) on one CM instance without these additional features. This is to make this mode of operation easier for users with this intention.
+
+To take advantage of this additional features you **must** use a **FILE** configuration. Learn about how this works and how to configure this scenario in the [Architecture Documentation.](/docs/serverClientArchitecture.md)
 
 ## CLI Usage
 
@@ -112,14 +121,18 @@ Below are examples of the minimum required config to run the application using a
 Using **FILE**
 <details>
 
-```json
+```json5
 {
-  "credentials": {
-    "clientId": "f4b4df1c7b2",
-    "clientSecret": "34v5q1c56ub",
-    "refreshToken": "34_f1w1v4",
-    "accessToken": "p75_1c467b2"
-  }
+  "bots": [
+    {
+      "credentials": {
+        "clientId": "f4b4df1c7b2",
+        "clientSecret": "34v5q1c56ub",
+        "refreshToken": "34_f1w1v4",
+        "accessToken": "p75_1c467b2"
+      }
+    }
+  ]
 }
 ```
 
@@ -157,10 +170,8 @@ An example of using multiple configuration levels together IE all are provided t
 
 ```json
 {
-  "credentials": {
-    "clientId": "f4b4df1c7b2",
-    "refreshToken": "34_f1w1v4",
-    "accessToken": "p75_1c467b2"
+  "logging": {
+    "level": "debug"
   }
 }
 ```
@@ -173,9 +184,10 @@ An example of using multiple configuration levels together IE all are provided t
 
 ```
 CLIENT_SECRET=34v5q1c56ub
+REFRESH_TOKEN=34_f1w1v4
+ACCESS_TOKEN=p75_1c467b2
 SUBREDDITS=sub1,sub2,sub3
 PORT=9008
-LOG_LEVEL=DEBUG
 ```
 
 </details>
@@ -185,7 +197,7 @@ LOG_LEVEL=DEBUG
 <details>
 
 ```
-node src/index.js run --subreddits=sub1
+node src/index.js run --subreddits=sub1 --clientId=34v5q1c56ub
 ```
 
 </details>
@@ -201,6 +213,52 @@ subreddits: sub1
 port: 9008
 log level: debug
 ```
+
+## Configuring Client for Many Instances
+
+See the [Architecture Docs](/docs/serverClientArchitecture.md) for more information.
+
+<details>
+
+```json5
+{
+  "bots": [
+    {
+      "credentials": {
+        "clientId": "f4b4df1c7b2",
+        "clientSecret": "34v5q1c56ub",
+        "refreshToken": "34_f1w1v4",
+        "accessToken": "p75_1c467b2"
+      }
+    }
+  ],
+  "web": {
+    "credentials": {
+      "clientId": "f4b4df1c7b2",
+      "clientSecret": "34v5q1c56ub",
+      "redirectUri": "http://localhost:8085/callback"
+    },
+    "clients": [
+      // server application running on this same CM instance
+      {
+        "host": "localhost:8095",
+        "secret": "localSecret"
+      },
+      // a server application running somewhere else
+      {
+        // api endpoint and port
+        "host": "mySecondContextMod.com:8095",
+        "secret": "anotherSecret"
+      }
+    ]
+  },
+  "api": {
+    "secret": "localSecret",
+  }
+}
+```
+
+</details>
 
 # Cache Configuration
 

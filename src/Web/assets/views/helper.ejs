@@ -1,0 +1,231 @@
+<html>
+<%- include('partials/head', {title: 'CM OAuth Helper'}) %>
+<body class="">
+<script>localStorage.getItem('ms-dark') === 'no' ? document.body.classList.remove('dark') : document.body.classList.add('dark')</script>
+<div class="min-w-screen min-h-screen bg-gray-100 bg-gray-100 dark:bg-gray-800 font-sans">
+    <%- include('partials/title', {title: ' OAuth Helper'}) %>
+    <div class="container mx-auto">
+        <div class="grid">
+            <div class="bg-white dark:bg-gray-500 dark:text-white">
+                <div class="p-6 md:px-10 md:py-6">
+                    <div class="text-xl mb-4">Hi! Looks like you're setting up your bot. To get running:</div>
+                    <div class="text-lg text-semibold my-3">1. Set your redirect URL</div>
+                    <div class="ml-5">
+                        <input id="redirectUri" style="min-width:500px;"
+                               class="text-black placeholder-gray-500 rounded mt-2 mb-3 p-2" value="<%= redirectUri %>">
+                        <div class="space-y-3">
+                            <div>This is the URL Reddit will redirect you to once you have authorized an account to be
+                                used
+                                with your application.
+                            </div>
+                            <div>The input field has been pre-filled with either:
+                                <ul class="list-inside list-disc">
+                                    <li>What you provided to the program as an argument/environmental variable or</li>
+                                    <li>The current URL in your browser that would be used -- if you are using a reverse
+                                        proxy this may be different so double check
+                                    </li>
+                                </ul>
+                            </div>
+                            <div>Make sure it matches what is found in the <b>redirect uri</b> for your <a
+                                        target="_blank"
+                                        href="https://www.reddit.com/prefs/apps">application
+                                    on Reddit</a> and <b>it must end with "callback"</b></div>
+                        </div>
+                    </div>
+                    <div class="text-lg text-semibold my-3">2. Optionally, set <b>Client Id</b> and <b>Client Secret</b>
+                    </div>
+                    <div class="ml-5">
+                        <div class="space-y-2">
+                            Leave these fields blank to use the id/secret you provided the application (if any),
+                            otherwise
+                            fill them in.
+                        </div>
+                        <input id="clientId" style="min-width:500px;"
+                               class="text-black placeholder-gray-500 rounded mt-2 mb-3 p-2"
+                               placeholder="<%= locals.clientId !== undefined ? 'Use Provided Client Id' : 'Client Id Not Provided' %>">
+                        <input id="clientSecret" style="min-width:500px; display: block;"
+                               class="text-black placeholder-gray-500 rounded mt-2 mb-3 p-2"
+                               placeholder="<%= locals.clientSecret !== undefined ? 'Use Provided Client Secret' : 'Client Secret Not Provided' %>">
+                    </div>
+                    <div class="text-lg text-semibold my-3">3. Select permissions</div>
+                    <div class="my-2 ml-5">
+                        <div class="space-y-3">
+                            <div>These are permissions to allow the bot account to perform these actions, <b>in
+                                    general.</b></div>
+                            <div>In all cases the subreddits the bot moderates for will <b>also need to give the bot
+                                    moderator permissions to do these actions</b> -- this is just an extra precaution if
+                                you are super paranoid.
+                            </div>
+                            <div><b>Note:</b> None of the permissions the bot receive allow it to view/edit the email or
+                                password for the account
+                            </div>
+                        </div>
+                        <div class="mt-1">
+                            <div class="my-3">
+                                <h3 class="font-semibold">Required</h3>
+                                <div>The following permissions are required for the bot to do <i>anything.</i></div>
+                            </div>
+                            <div>
+                                <input class="permissionToggle" type="checkbox" id="identity" name="identity"
+                                       checked disabled>
+                                <label for="identity"><span class="font-mono font-semibold">identity</span> required for
+                                    the bot to know who it is</label>
+                            </div>
+                            <div>
+                                <input class="permissionToggle" type="checkbox" id="mysubreddits" name="mysubreddits"
+                                       checked disabled>
+                                <label for="mysubreddits"><span class="font-mono font-semibold">mysubreddits</span>
+                                    required for the bot to find out what subreddits it moderates</label>
+                            </div>
+                            <div>
+                                <input class="permissionToggle" type="checkbox" id="read" name="read"
+                                       checked disabled>
+                                <label for="read"><span class="font-mono font-semibold">read</span> required for the bot
+                                    to be able to access other's activities</label>
+                            </div>
+                            <div>
+                                <input class="permissionToggle" type="checkbox" id="history" name="history"
+                                       checked disabled>
+                                <label for="history"><span class="font-mono font-semibold">history</span> required for
+                                    the bot to be able to access other user's history</label>
+                            </div>
+                            <div>
+                                <input class="permissionToggle" type="checkbox" id="wikiread" name="wikiread"
+                                       checked disabled>
+                                <label for="wikiread"><span class="font-mono font-semibold">wikiread</span> required for
+                                    the bot to read configurations in the subreddits it moderates</label>
+                            </div>
+                            <div class="my-3">
+                                <h3 class="font-semibold">Recommended</h3>
+                                <div class="mb-1">The following permissions cover what is necessary for the bot to
+                                    perform moderation actions
+                                </div>
+                            </div>
+                            <div>
+                                <input class="permissionToggle" type="checkbox" id="privatemessages"
+                                       name="privatemessages"
+                                       checked>
+                                <label for="privatemessages"><span
+                                            class="font-mono font-semibold">privatemessages</span> for the bot to send
+                                    messages as itself</label>
+                            </div>
+                            <div>
+                                <input class="permissionToggle" type="checkbox" id="modmail" name="modmail"
+                                       checked>
+                                <label for="modmail"><span class="font-mono font-semibold">modmail</span> for the bot to
+                                    send messages as a subreddit</label>
+                            </div>
+                            <div>
+                                <input class="permissionToggle" type="checkbox" id="modflair" name="modflair"
+                                       checked>
+                                <label for="modflair"><span class="font-mono font-semibold">modflair</span> for the bot
+                                    to flair users and submissions in the subreddits it moderates</label>
+                            </div>
+                            <div>
+                                <input class="permissionToggle" type="checkbox" id="modcontributors"
+                                       name="modcontributors"
+                                       checked>
+                                <label for="modcontributors"><span
+                                            class="font-mono font-semibold">modcontributors</span> for the bot to
+                                    ban/mute users in the subreddits it moderates</label>
+                            </div>
+                            <div>
+                                <input class="permissionToggle" type="checkbox" id="modposts" name="modposts"
+                                       checked>
+                                <label for="modposts"><span class="font-mono font-semibold">modposts</span> for the bot
+                                    to approve/remove/nsfw/distinguish/etc. submissions/comments in the subreddits it
+                                    moderates</label>
+                            </div>
+                            <div>
+                                <input class="permissionToggle" type="checkbox" id="report" name="report"
+                                       checked>
+                                <label for="report"><span class="font-mono font-semibold">report</span> for the bot to
+                                    be able to report submissions/comments</label>
+                            </div>
+                            <div>
+                                <input class="permissionToggle" type="checkbox" id="submit" name="submit"
+                                       checked>
+                                <label for="submit"><span class="font-mono font-semibold">submit</span> for the bot to
+                                    reply to submissions/comments</label>
+                            </div>
+                            <div class="my-3">
+                                <h3 class="font-semibold">Optional</h3>
+                                <div>The following permissions cover additional functionality ContextMod can use or may
+                                    in the use future
+                                </div>
+                            </div>
+                            <div>
+                                <input class="permissionToggle" type="checkbox" id="wikiedit" name="wikiedit">
+                                <label for="wikiedit"><span class="font-mono font-semibold">wikiedit</span> for the bot
+                                    to be able to create/edit
+                                    Toolbox
+                                    User Notes</label>
+                            </div>
+                            <div>
+                                <input class="permissionToggle" type="checkbox" id="modlog" name="modlog">
+                                <label for="modlog"><span class="font-mono font-semibold">modlog</span> for the bot to
+                                    able to read the moderation log (not currently implemented)</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="text-lg text-semibold my-3">4. <a id="doAuth" href="">Create Authorization Invite</a>
+                    </div>
+                    <div class="ml-5 mb-4">
+                        <input id="inviteCode" style="min-width:500px;"
+                               class="text-black placeholder-gray-500 rounded mt-2 mb-3 p-2" placeholder="Invite code value to use. Leave blank to generate a random one."/>
+                        <div class="space-y-3">
+                            <div>A unique link will be generated that you (or someone) will use to authorize a Reddit account with this application.</div>
+                            <div id="inviteLink"></div>
+                            <div id="errorWrapper" class="font-semibold hidden">Error: <span id="error"></span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+    if (document.querySelector('#redirectUri').value === '') {
+        document.querySelector('#redirectUri').value = `${document.location.origin}/callback`;
+    }
+
+    document.querySelector('#doAuth').addEventListener('click', e => {
+        e.preventDefault()
+        const permissions = {};
+
+        document.querySelectorAll('.permissionToggle').forEach((el) => {
+            permissions[el.id] = el.checked;
+        });
+        fetch(`${document.location.origin}/auth/create`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                redirect: document.querySelector('#redirectUri').value,
+                clientId: document.querySelector('#clientId').value,
+                clientSecret: document.querySelector('#clientSecret').value,
+                code: document.querySelector("#inviteCode").value === '' ? undefined : document.querySelector("#inviteCode").value,
+                permissions,
+            })
+        }).then((resp) => {
+            if(!resp.ok) {
+                document.querySelector("#errorWrapper").classList.remove('hidden');
+                resp.text().then(t => {
+                    document.querySelector("#error").innerHTML = t;
+                });
+            } else {
+                document.querySelector("#errorWrapper").classList.add('hidden');
+                document.querySelector("#inviteCode").value = '';
+                resp.text().then(t => {
+                    document.querySelector("#inviteLink").innerHTML = `Invite Link: <a class="font-semibold" href="${document.location.origin}/auth/invite?invite=${t}">${document.location.origin}/auth/invite?invite=${t}</a>`;
+                });
+            }
+        });
+
+        //const url = `${document.location.origin}/auth/init?${params.toString()}`;
+        //window.location.href = url;
+    })
+</script>
+</body>
+</html>

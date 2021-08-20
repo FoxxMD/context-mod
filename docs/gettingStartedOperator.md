@@ -52,7 +52,7 @@ tsc -p .
 
 # Bot Authentication
 
-Next you need to create your bot and authenticate it with Reddit. Follow the [bot authentication guide](/docs/botAuthentication.md) to complete this step.
+Next you need to create a bot and authenticate it with Reddit. Follow the [bot authentication guide](/docs/botAuthentication.md) to complete this step.
 
 # Instance Configuration
 

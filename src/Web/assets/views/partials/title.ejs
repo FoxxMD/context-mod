@@ -2,11 +2,12 @@
     <div class="container mx-auto">
         <div class="flex items-center justify-between">
             <div class="flex items-center flex-grow pr-4">
-                <div class="px-4 width-full relative">
-                    <span>
-                        <a href="https://github.com/FoxxMD/context-mod">ContextMod</a> for <a href="<%= botLink %>"><%= botName %></a>
-                    </span>
-                    <span class="inline-block -mb-3 ml-2">
+                <% if(locals.title !== undefined) { %>
+                    <%= title %>
+                <% } %>
+            </div>
+            <div class="flex items-center flex-end text-sm">
+                <span class="inline-block mr-4">
                     <label style="font-size:2.5px;">
                         <input class='toggle-checkbox' type='checkbox' id="themeToggle" checked></input>
                         <div class='toggle-slot'>
@@ -20,12 +21,6 @@
                         </div>
                     </label>
                         </span>
-                    <div class="text-small absolute pl-4">
-                        Operated by <%= operatorDisplay %>
-                    </div>
-                </div>
-            </div>
-            <div class="flex items-center flex-end text-sm">
                 <a href="logout">Logout</a>
             </div>
         </div>

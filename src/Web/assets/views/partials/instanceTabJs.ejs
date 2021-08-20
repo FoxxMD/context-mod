@@ -1,0 +1,16 @@
+<script>
+    const instanceSearchParams = new URLSearchParams(window.location.search);
+
+    const instance = instanceSearchParams.get('instance');
+
+    document.querySelectorAll(`[data-instance].instanceSelectWrapper`).forEach((el) => {
+        if(el.dataset.instance === instance) {
+            el.classList.add('border-2');
+            el.querySelector('a.instanceSelect').classList.add('pointer-events-none','no-underline','font-bold');
+        } else {
+            el.classList.add('border');
+            el.querySelector('a.instanceSelect').classList.add('font-normal','pointer');
+        }
+
+    });
+</script>
