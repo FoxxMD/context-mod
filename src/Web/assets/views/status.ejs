@@ -632,7 +632,7 @@
             const url = urlInput.value;
             const dryRun = dryRunCheck.checked ? 1 : 0;
 
-            const fetchUrl = `/api/check?instanceId=<%= instanceId %>%bot=${bot}&url=${url}&dryRun=${dryRun}&subreddit=${subreddit}`;
+            const fetchUrl = `/api/check?instance=<%= instanceId %>&bot=${bot}&url=${url}&dryRun=${dryRun}&subreddit=${subreddit}`;
             fetch(fetchUrl);
 
             urlInput.value = '';
