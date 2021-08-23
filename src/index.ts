@@ -20,7 +20,7 @@ import {App} from "./App";
 import apiServer from './Web/Server/server';
 import clientServer from './Web/Client';
 import Submission from "snoowrap/dist/objects/Submission";
-import {COMMENT_URL_ID, parseLinkIdentifier, SUBMISSION_URL_ID} from "./util";
+import {COMMENT_URL_ID, isScopeError, parseLinkIdentifier, SUBMISSION_URL_ID} from "./util";
 import LoggedError from "./Utils/LoggedError";
 import {buildOperatorConfigWithDefaults, parseOperatorConfigFromSources} from "./ConfigBuilder";
 import {getLogger} from "./Utils/loggerFactory";
@@ -197,11 +197,8 @@ const program = new Command();
     } catch (err) {
         if (!err.logged && !(err instanceof LoggedError)) {
             const logger = winston.loggers.get('app');
-            if (err.name === 'StatusCodeError' && err.response !== undefined) {
-                const authHeader = err.response.headers['www-authenticate'];
-                if (authHeader !== undefined && authHeader.includes('insufficient_scope')) {
-                    logger.error('Reddit responded with a 403 insufficient_scope, did you choose the correct scopes?');
-                }
+            if(isScopeError(err)) {
+                logger.error('Reddit responded with a 403 insufficient_scope which means the bot is lacking necessary OAUTH scopes to perform general actions.');
             }
             logger.error(err);
         }

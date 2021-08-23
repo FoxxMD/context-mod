@@ -1,6 +1,13 @@
 import dayjs, {Dayjs} from "dayjs";
 import {Comment, RedditUser, WikiPage} from "snoowrap";
-import {COMMENT_URL_ID, deflateUserNotes, inflateUserNotes, parseLinkIdentifier, SUBMISSION_URL_ID} from "../util";
+import {
+    COMMENT_URL_ID,
+    deflateUserNotes,
+    inflateUserNotes,
+    isScopeError,
+    parseLinkIdentifier,
+    SUBMISSION_URL_ID
+} from "../util";
 import Subreddit from "snoowrap/dist/objects/Subreddit";
 import {Logger} from "winston";
 import LoggedError from "../Utils/LoggedError";
@@ -227,7 +234,13 @@ export class UserNotes {
 
             return payload as RawUserNotesPayload;
         } catch (err) {
-            const msg = `Could not edit usernotes. Make sure at least one moderator has used toolbox and usernotes before and that this account has editing permissions`;
+            let msg = 'Could not edit usernotes.';
+            // Make sure at least one moderator has used toolbox and usernotes before and that this account has editing permissions`;
+            if(isScopeError(err)) {
+                msg = `${msg} The bot account had insufficient OAUTH scope to perform this action. You must re-authenticate the bot and ensure it has has 'wikiedit' permissions.`
+            } else {
+                msg = `${msg} Make sure at least one moderator has used toolbox, created a usernote, and that this account has editing permissions for the wiki page.`;
+            }
             this.logger.error(msg, err);
             throw new LoggedError(msg);
         }

@@ -984,3 +984,11 @@ export const snooLogWrapper = (logger: Logger) => {
         trace: (...args: any[]) => logger.debug(args.slice(0, 2).join(' '), [args.slice(2)]),
     }
 }
+
+export const isScopeError = (err: any): boolean => {
+    if(typeof err === 'object' && err.name === 'StatusCodeError' && err.response !== undefined) {
+        const authHeader = err.response.headers['www-authenticate'];
+        return authHeader !== undefined && authHeader.includes('insufficient_scope');
+    }
+    return false;
+}
