@@ -237,7 +237,7 @@ export class UserNotes {
             let msg = 'Could not edit usernotes.';
             // Make sure at least one moderator has used toolbox and usernotes before and that this account has editing permissions`;
             if(isScopeError(err)) {
-                msg = `${msg} The bot account had insufficient OAUTH scope to perform this action. You must re-authenticate the bot and ensure it has has 'wikiedit' permissions.`
+                msg = `${msg} The bot account did not have sufficient OAUTH scope to perform this action. You must re-authenticate the bot and ensure it has has 'wikiedit' permissions.`
             } else {
                 msg = `${msg} Make sure at least one moderator has used toolbox, created a usernote, and that this account has editing permissions for the wiki page.`;
             }
