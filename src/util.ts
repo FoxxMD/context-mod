@@ -855,12 +855,19 @@ export const parseRegex = (r: string | RegExp, val: string, flags?: string): Reg
     }
 }
 
-export async function readJson(path: string, opts: any) {
+export async function readConfigFile(path: string, opts: any) {
     const {log, throwOnNotFound = true} = opts;
     try {
         await promises.access(path, constants.R_OK);
         const data = await promises.readFile(path);
-        return JSON.parse(data as unknown as string);
+        const [configObj, jsonErr, yamlErr] = parseFromJsonOrYamlToObject(data as unknown as string);
+        if(configObj !== undefined) {
+            return configObj as object;
+        }
+        log.error(`Could not parse wiki page contents as JSON or YAML:`);
+        log.error(jsonErr);
+        log.error(yamlErr);
+        throw new SimpleError('Could not parse wiki page contents as JSON or YAML');
     } catch (e) {
         const {code} = e;
         if (code === 'ENOENT') {

@@ -6,7 +6,7 @@ import {
     normalizeName,
     overwriteMerge,
     parseBool, randomId,
-    readJson,
+    readConfigFile,
     removeUndefinedKeys
 } from "./util";
 import {CommentCheck} from "./Check/CommentCheck";
@@ -473,7 +473,7 @@ export const parseOperatorConfigFromSources = async (args: any): Promise<Operato
     if (operatorConfig !== undefined) {
         let rawConfig;
         try {
-            rawConfig = await readJson(operatorConfig, {log: initLogger});
+            rawConfig = await readConfigFile(operatorConfig, {log: initLogger}) as object;
         } catch (err) {
             initLogger.error('Cannot continue app startup because operator config file was not parseable.');
             err.logged = true;
