@@ -2,7 +2,7 @@ import Action, {ActionJson, ActionOptions} from "./index";
 import {Comment} from "snoowrap";
 import Submission from "snoowrap/dist/objects/Submission";
 import {renderContent} from "../Utils/SnoowrapUtils";
-import {Footer, RequiredRichContent, RichContent} from "../Common/interfaces";
+import {ActionProcessResult, Footer, RequiredRichContent, RichContent} from "../Common/interfaces";
 import {RuleResult} from "../Rule";
 
 export class CommentAction extends Action {
@@ -32,7 +32,7 @@ export class CommentAction extends Action {
         return 'Comment';
     }
 
-    async process(item: Comment | Submission, ruleResults: RuleResult[], runtimeDryrun?: boolean): Promise<void> {
+    async process(item: Comment | Submission, ruleResults: RuleResult[], runtimeDryrun?: boolean): Promise<ActionProcessResult> {
         const dryRun = runtimeDryrun || this.dryRun;
         const content = await this.resources.getContent(this.content, item.subreddit);
         const body = await renderContent(content, item, ruleResults, this.resources.userNotes);
@@ -44,7 +44,11 @@ export class CommentAction extends Action {
 
         if(item.archived) {
             this.logger.warn('Cannot comment because Item is archived');
-            return;
+            return {
+                dryRun,
+                success: false,
+                result: 'Cannot comment because Item is archived'
+            };
         }
         let reply: Comment;
         if(!dryRun) {
@@ -62,6 +66,10 @@ export class CommentAction extends Action {
             // @ts-ignore
             await reply.distinguish({sticky: this.sticky});
         }
+        return {
+            dryRun,
+            success: true,
+        };
     }
 }
 

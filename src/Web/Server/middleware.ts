@@ -31,3 +31,22 @@ export const botRoute = (required = true) => async (req: Request, res: Response,
     }
     return next();
 }
+
+export const subredditRoute = (required = true) => async (req: Request, res: Response, next: Function) => {
+
+    const bot = req.serverBot;
+
+    const {subreddit} = req.query as any;
+    const {name: userName, realManagers = [], isOperator} = req.user as Express.User;
+    if (!isOperator && !realManagers.includes(subreddit)) {
+        return res.status(400).send('Cannot access route for subreddit you do not manage or is not run by the bot')
+    }
+    const manager = bot.subManagers.find(x => x.displayLabel === subreddit);
+    if (manager === undefined) {
+        return res.status(400).send('Cannot access route for subreddit you do not manage or is not run by the bot')
+    }
+
+    req.manager = manager;
+
+    next();
+}

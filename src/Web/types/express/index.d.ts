@@ -1,6 +1,7 @@
 import {App} from "../../../App";
 import Bot from "../../../Bot";
 import {BotInstance, CMInstance} from "../../interfaces";
+import {Manager} from "../../../Subreddit/Manager";
 
 declare global {
     declare namespace Express {
@@ -10,6 +11,7 @@ declare global {
             instance?: CMInstance,
             bot?: BotInstance,
             serverBot: Bot,
+            manager?: Manager,
         }
         interface User {
             name: string

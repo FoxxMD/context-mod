@@ -13,7 +13,7 @@ import {
     intersect, isLogLineMinLevel,
     LogEntry, parseFromJsonOrYamlToObject, parseInstanceLogInfoName, parseInstanceLogName,
     parseSubredditLogName, permissions,
-    randomId, sleep
+    randomId, sleep, triggeredIndicator
 } from "../../util";
 import {Cache} from "cache-manager";
 import session, {Session, SessionData} from "express-session";
@@ -42,6 +42,7 @@ import {booleanMiddle} from "../Common/middleware";
 import {BotInstance, CMInstance} from "../interfaces";
 import { URL } from "url";
 import {MESSAGE} from "triple-beam";
+import Autolinker from "autolinker";
 
 const emitter = new EventEmitter();
 
@@ -820,6 +821,73 @@ const webClient = async (options: OperatorConfig) => {
         }).text();
 
         return res.send(resp);
+    });
+
+    app.getAsync('/events', [ensureAuthenticatedApi, defaultSession, instanceWithPermissions, botWithPermissions, createUserToken], async (req: express.Request, res: express.Response) => {
+        const {subreddit} = req.query as any;
+        const resp = await got.get(`${(req.instance as CMInstance).normalUrl}/events`, {
+            headers: {
+                'Authorization': `Bearer ${req.token}`,
+            },
+            searchParams: {
+                subreddit,
+                bot: req.bot?.botName
+            }
+        }).json() as [any];
+
+        return res.render('events', {
+            data: resp.map((x) => {
+                const {timestamp, activity: {peek, link}, ruleResults = [], actionResults = [], ...rest} = x;
+                const time = dayjs(timestamp).toISOString();
+                const formattedPeek = Autolinker.link(peek, {
+                    email: false,
+                    phone: false,
+                    mention: false,
+                    hashtag: false,
+                    stripPrefix: false,
+                    sanitizeHtml: true,
+                });
+                const formattedRuleResults = ruleResults.map((y: any) => {
+                    const {triggered, result, ...restY} = y;
+                    let t = 'Not Triggered';
+                    if(triggered === null) {
+                        t = 'Skipped';
+                    } else if(triggered === true) {
+                        t = 'Triggered';
+                    }
+                    return {
+                        ...restY,
+                        triggered: t,
+                        result: result || '-'
+                    };
+                });
+                const formattedActionResults = actionResults.map((y: any) => {
+                   const {run, runReason, success, result, dryRun, ...restA} = y;
+                   let res = '';
+                   if(!run) {
+                       res = `Not Run - ${runReason === undefined ? '(No Reason)' : runReason}`;
+                   } else {
+                       res = `Success: ${triggeredIndicator(success)}${result !== undefined ? ` - ${result}` : ''}`;
+                   }
+                   return {
+                       ...restA,
+                       dryRun: dryRun ? ' (DRYRUN)' : '',
+                       result: res
+                   };
+                });
+                return {
+                    ...rest,
+                    timestamp: time,
+                    activity: {
+                        link,
+                        peek: formattedPeek,
+                    },
+                    ruleResults: formattedRuleResults,
+                    actionResults: formattedActionResults
+                }
+            }),
+            title: `${subreddit} Actioned Events`
+        });
     });
 
     app.getAsync('/logs/settings/update',[ensureAuthenticated], async (req: express.Request, res: express.Response) => {

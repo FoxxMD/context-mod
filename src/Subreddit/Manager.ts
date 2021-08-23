@@ -6,13 +6,15 @@ import {
     cacheStats,
     createRetryHandler,
     determineNewResults, formatNumber,
-    mergeArr, parseFromJsonOrYamlToObject, pollingInfo, sleep, totalFromMapStats,
+    mergeArr, parseFromJsonOrYamlToObject, pollingInfo, resultsSummary, sleep, totalFromMapStats,
 } from "../util";
 import {Poll} from "snoostorm";
 import pEvent from "p-event";
 import {RuleResult} from "../Rule";
 import {ConfigBuilder, buildPollingOptions} from "../ConfigBuilder";
 import {
+    ActionedEvent,
+    ActionResult,
     DEFAULT_POLLING_INTERVAL,
     DEFAULT_POLLING_LIMIT, Invokee,
     ManagerOptions, ManagerStateChangeOption, PAUSED,
@@ -36,6 +38,7 @@ import {queue, QueueObject} from 'async';
 import {JSONConfig} from "../JsonConfig";
 import {CheckStructuredJson} from "../Check";
 import NotificationManager from "../Notification/NotificationManager";
+import action from "../Web/Server/routes/authenticated/user/action";
 
 export interface RunningState {
     state: RunState,
@@ -82,6 +85,7 @@ export interface ManagerStats {
     actionsRunTotal: number
     actionsRunSinceStart: number,
     actionsRunSinceStartTotal: number
+    actionedEvents: number
     cache: {
         provider: string,
         currentKeyCount: number,
@@ -165,6 +169,7 @@ export class Manager {
     rulesUniqueRollingAvg: number = 0;
     actionsRun: Map<string, number> = new Map();
     actionsRunSinceStart: Map<string, number> = new Map();
+    actionedEvents: ActionedEvent[] = [];
 
     getStats = async (): Promise<ManagerStats> => {
         const data: any = {
@@ -188,6 +193,7 @@ export class Manager {
             actionsRunTotal: totalFromMapStats(this.actionsRun),
             actionsRunSinceStart: this.actionsRunSinceStart,
             actionsRunSinceStartTotal: totalFromMapStats(this.actionsRunSinceStart),
+            actionedEvents: this.actionedEvents.length,
             cache: {
                 provider: 'none',
                 currentKeyCount: 0,
@@ -540,10 +546,22 @@ export class Manager {
         let checksRun = 0;
         let actionsRun = 0;
         let totalRulesRun = 0;
-        let runActions: Action[] = [];
+        let runActions: ActionResult[] = [];
+        let actionedEvent: ActionedEvent = {
+            activity: {
+                peek: ePeek,
+                link: item.permalink
+            },
+            author: item.author.name,
+            timestamp: Date.now(),
+            check: '',
+            ruleSummary: '',
+            ruleResults: [],
+            actionResults: [],
+        }
+        let triggered = false;
 
         try {
-            let triggered = false;
             for (const check of checks) {
                 if (checkNames.length > 0 && !checkNames.map(x => x.toLowerCase()).some(x => x === check.name.toLowerCase())) {
                     this.logger.warn(`Check ${check.name} not in array of requested checks to run, skipping...`);
@@ -570,13 +588,16 @@ export class Manager {
                 }
 
                 if (triggered) {
+                    actionedEvent.check = check.name;
+                    actionedEvent.ruleResults = currentResults;
+                    actionedEvent.ruleSummary = resultsSummary(currentResults, check.condition);
                     this.checksTriggered.set(check.name, (this.checksTriggered.get(check.name) || 0) + 1);
                     this.checksTriggeredSinceStart.set(check.name, (this.checksTriggeredSinceStart.get(check.name) || 0) + 1);
                     runActions = await check.runActions(item, currentResults.filter(x => x.triggered), dryRun);
                     actionsRun = runActions.length;
 
                     if(check.notifyOnTrigger) {
-                        const ar = runActions.map(x => x.getActionUniqueName()).join(', ');
+                        const ar = runActions.map(x => x.name).join(', ');
                         this.notificationManager.handle('eventActioned', 'Check Triggered', `Check "${check.name}" was triggered on Event: \n\n ${ePeek} \n\n with the following actions run: ${ar}`);
                     }
                     break;
@@ -606,9 +627,15 @@ export class Manager {
                 this.rulesTriggeredSinceStartTotal += triggeredRulesTotal;
 
                 for (const a of runActions) {
-                    const name = a.getActionUniqueName();
+                    const name = a.name;
                     this.actionsRun.set(name, (this.actionsRun.get(name) || 0) + 1);
-                    this.actionsRunSinceStart.set(name, (this.actionsRunSinceStart.get(name) || 0) + 1)
+                    this.actionsRunSinceStart.set(name, (this.actionsRunSinceStart.get(name) || 0) + 1);
+                }
+                actionedEvent.actionResults = runActions;
+                if(triggered) {
+                    this.actionedEvents.unshift(actionedEvent);
+                    // save last 25 triggered events
+                    this.actionedEvents = this.actionedEvents.slice(0, 25);
                 }
 
                 this.logger.verbose(`Run Stats:        Checks ${checksRun} | Rules => Total: ${totalRulesRun} Unique: ${allRuleResults.length} Cached: ${totalRulesRun - allRuleResults.length} Rolling Avg: ~${formatNumber(this.rulesUniqueRollingAvg)}/s | Actions ${actionsRun}`);

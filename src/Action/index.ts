@@ -2,9 +2,10 @@ import Snoowrap, {Comment, Submission} from "snoowrap";
 import {Logger} from "winston";
 import {RuleResult} from "../Rule";
 import {SubredditResources} from "../Subreddit/SubredditResources";
-import {ChecksActivityState, TypedActivityStates} from "../Common/interfaces";
+import {ActionProcessResult, ActionResult, ChecksActivityState, TypedActivityStates} from "../Common/interfaces";
 import Author, {AuthorOptions} from "../Author/Author";
 import {mergeArr} from "../util";
+import LoggedError from "../Utils/LoggedError";
 
 export abstract class Action {
     name?: string;
@@ -53,47 +54,61 @@ export abstract class Action {
         return this.name === this.getKind() ? this.getKind() : `${this.getKind()} - ${this.name}`;
     }
 
-    async handle(item: Comment | Submission, ruleResults: RuleResult[], runtimeDryrun?: boolean): Promise<void> {
+    async handle(item: Comment | Submission, ruleResults: RuleResult[], runtimeDryrun?: boolean): Promise<ActionResult> {
         const dryRun = runtimeDryrun || this.dryRun;
-        let actionRun = false;
-        const itemPass = await this.resources.testItemCriteria(item, this.itemIs);
-        if (!itemPass) {
-            this.logger.verbose(`Activity did not pass 'itemIs' test, Action not run`);
-            return;
-        }
-        const authorRun = async () => {
+
+        let actRes: ActionResult = {
+            kind: this.getKind(),
+            name: this.getActionUniqueName(),
+            run: false,
+            dryRun,
+            success: false,
+        };
+        try {
+            const itemPass = await this.resources.testItemCriteria(item, this.itemIs);
+            if (!itemPass) {
+                this.logger.verbose(`Activity did not pass 'itemIs' test, Action not run`);
+                actRes.runReason = `Activity did not pass 'itemIs' test, Action not run`;
+                return actRes;
+            }
             if (this.authorIs.include !== undefined && this.authorIs.include.length > 0) {
                 for (const auth of this.authorIs.include) {
                     if (await this.resources.testAuthorCriteria(item, auth)) {
-                        await this.process(item, ruleResults, runtimeDryrun);
-                        return true;
+                        actRes.run = true;
+                        const results = await this.process(item, ruleResults, runtimeDryrun);
+                        return {...actRes, ...results};
                     }
                 }
                 this.logger.verbose('Inclusive author criteria not matched, Action not run');
-                return false;
-            }
-            if (!actionRun && this.authorIs.exclude !== undefined && this.authorIs.exclude.length > 0) {
+                actRes.runReason = 'Inclusive author criteria not matched';
+                return actRes;
+            } else if (this.authorIs.exclude !== undefined && this.authorIs.exclude.length > 0) {
                 for (const auth of this.authorIs.exclude) {
                     if (await this.resources.testAuthorCriteria(item, auth, false)) {
-                        await this.process(item, ruleResults, runtimeDryrun);
-                        return true;
+                        actRes.run = true;
+                        const results = await this.process(item, ruleResults, runtimeDryrun);
+                        return {...actRes, ...results};
                     }
                 }
                 this.logger.verbose('Exclusive author criteria not matched, Action not run');
-                return false;
+                actRes.runReason = 'Exclusive author criteria not matched';
+                return actRes;
             }
-            return null;
+
+            actRes.run = true;
+            const results = await this.process(item, ruleResults, runtimeDryrun);
+            return {...actRes, ...results};
+        } catch (err) {
+            if(!(err instanceof LoggedError)) {
+                this.logger.error(`Encountered error while running`, err);
+            }
+            actRes.success = false;
+            actRes.result = err.message;
+            return actRes;
         }
-        const authorRunResults = await authorRun();
-        if (null === authorRunResults) {
-            await this.process(item, ruleResults, runtimeDryrun);
-        } else if (!authorRunResults) {
-            return;
-        }
-        this.logger.verbose(`${dryRun ? 'DRYRUN - ' : ''}Done`);
     }
 
-    abstract process(item: Comment | Submission, ruleResults: RuleResult[], runtimeDryun?: boolean): Promise<void>;
+    abstract process(item: Comment | Submission, ruleResults: RuleResult[], runtimeDryun?: boolean): Promise<ActionProcessResult>;
 }
 
 export interface ActionOptions extends ActionConfig {

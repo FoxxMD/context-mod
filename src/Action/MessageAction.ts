@@ -2,7 +2,7 @@ import Action, {ActionJson, ActionOptions} from "./index";
 import {Comment, ComposeMessageParams} from "snoowrap";
 import Submission from "snoowrap/dist/objects/Submission";
 import {renderContent} from "../Utils/SnoowrapUtils";
-import {Footer, RequiredRichContent, RichContent} from "../Common/interfaces";
+import {ActionProcessResult, Footer, RequiredRichContent, RichContent} from "../Common/interfaces";
 import {RuleResult} from "../Rule";
 import {boolToString} from "../util";
 
@@ -34,7 +34,7 @@ export class MessageAction extends Action {
         return 'Message';
     }
 
-    async process(item: Comment | Submission, ruleResults: RuleResult[], runtimeDryrun?: boolean): Promise<void> {
+    async process(item: Comment | Submission, ruleResults: RuleResult[], runtimeDryrun?: boolean): Promise<ActionProcessResult> {
         const dryRun = runtimeDryrun || this.dryRun;
         const content = await this.resources.getContent(this.content);
         const body = await renderContent(content, item, ruleResults, this.resources.userNotes);
@@ -63,6 +63,10 @@ export class MessageAction extends Action {
 
         if (!dryRun) {
             await this.client.composeMessage(msgOpts);
+        }
+        return {
+            dryRun,
+            success: true,
         }
     }
 }

@@ -1,31 +1,31 @@
 import {Request, Response} from 'express';
-import {authUserCheck, botRoute} from "../../../middleware";
+import {authUserCheck, botRoute, subredditRoute} from "../../../middleware";
 import Submission from "snoowrap/dist/objects/Submission";
 import winston from 'winston';
 import {COMMENT_URL_ID, parseLinkIdentifier, SUBMISSION_URL_ID} from "../../../../../util";
 import {booleanMiddle} from "../../../../Common/middleware";
+import {Manager} from "../../../../../Subreddit/Manager";
 
 const commentReg = parseLinkIdentifier([COMMENT_URL_ID]);
 const submissionReg = parseLinkIdentifier([SUBMISSION_URL_ID]);
 
 const config = async (req: Request, res: Response) => {
-    const bot = req.serverBot;
 
-    const {subreddit} = req.query as any;
-    const {name: userName, realManagers = [], isOperator} = req.user as Express.User;
-    if (!isOperator && !realManagers.includes(subreddit)) {
-        return res.status(400).send('Cannot retrieve config for subreddit you do not manage or is not run by the bot')
-    }
-    const manager = bot.subManagers.find(x => x.displayLabel === subreddit);
-    if (manager === undefined) {
-        return res.status(400).send('Cannot retrieve config for subreddit you do not manage or is not run by the bot')
-    }
+    const manager = req.manager as Manager;
 
     // @ts-ignore
     const wiki = await manager.subreddit.getWikiPage(manager.wikiLocation).fetch();
     return res.send(wiki.content_md);
 };
-export const configRoute = [authUserCheck(), botRoute(), config];
+export const configRoute = [authUserCheck(), botRoute(), subredditRoute(), config];
+
+const actionedEvents = async (req: Request, res: Response) => {
+
+    const manager = req.manager as Manager;
+
+    return res.json(manager.actionedEvents);
+};
+export const actionedEventsRoute = [authUserCheck(), botRoute(), subredditRoute(), actionedEvents];
 
 const action = async (req: Request, res: Response) => {
     const bot = req.serverBot;

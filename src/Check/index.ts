@@ -16,6 +16,7 @@ import {
     truncateStringToLength
 } from "../util";
 import {
+    ActionResult,
     ChecksActivityState,
     CommentState,
     JoinCondition,
@@ -264,23 +265,27 @@ export abstract class Check implements ICheck {
         }
     }
 
-    async runActions(item: Submission | Comment, ruleResults: RuleResult[], runtimeDryrun?: boolean): Promise<Action[]> {
+    async runActions(item: Submission | Comment, ruleResults: RuleResult[], runtimeDryrun?: boolean): Promise<ActionResult[]> {
         const dr = runtimeDryrun || this.dryRun;
         this.logger.debug(`${dr ? 'DRYRUN - ' : ''}Running Actions`);
-        const runActions: Action[] = [];
+        const runActions: ActionResult[] = [];
         for (const a of this.actions) {
             if(!a.enabled) {
+                runActions.push({
+                    kind: a.getKind(),
+                    name: a.getActionUniqueName(),
+                    run: false,
+                    success: false,
+                    runReason: 'Not enabled',
+                    dryRun: (a.dryRun || dr) || false,
+                });
                 this.logger.info(`Action ${a.getActionUniqueName()} not run because it is not enabled.`);
                 continue;
             }
-            try {
-                await a.handle(item, ruleResults, runtimeDryrun);
-                runActions.push(a);
-            } catch (err) {
-                this.logger.error(`Action ${a.getActionUniqueName()} encountered an error while running`, err);
-            }
+            const res = await a.handle(item, ruleResults, runtimeDryrun);
+            runActions.push(res);
         }
-        this.logger.info(`${dr ? 'DRYRUN - ' : ''}Ran Actions: ${runActions.map(x => x.getActionUniqueName()).join(' | ')}`);
+        this.logger.info(`${dr ? 'DRYRUN - ' : ''}Ran Actions: ${runActions.map(x => x.name).join(' | ')}`);
         return runActions;
     }
 }

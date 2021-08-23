@@ -22,7 +22,7 @@ import SimpleError from "../../Utils/SimpleError";
 import {heartbeat} from "./routes/authenticated/applicationRoutes";
 import logs from "./routes/authenticated/user/logs";
 import status from './routes/authenticated/user/status';
-import {actionRoute, configRoute} from "./routes/authenticated/user";
+import {actionedEventsRoute, actionRoute, configRoute} from "./routes/authenticated/user";
 import action from "./routes/authenticated/user/action";
 import {authUserCheck, botRoute} from "./middleware";
 import {opStats} from "../Common/util";
@@ -188,6 +188,8 @@ const rcbServer = async function (options: OperatorConfig) {
     server.getAsync('/status', passLogs, ...status())
 
     server.getAsync('/config', ...configRoute);
+
+    server.getAsync('/events', ...actionedEventsRoute);
 
     server.getAsync('/action', ...action);
 

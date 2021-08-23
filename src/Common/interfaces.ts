@@ -3,6 +3,7 @@ import {Cache} from 'cache-manager';
 import {MESSAGE} from 'triple-beam';
 import Poll from "snoostorm/out/util/Poll";
 import Snoowrap from "snoowrap";
+import {RuleResult} from "../Rule";
 
 /**
  * An ISO 8601 Duration
@@ -1409,4 +1410,33 @@ export interface LogInfo {
     instance?: string
     labels?: string[]
     bot?: string
+}
+
+export interface ActionResult {
+    kind: string,
+    name: string,
+    run: boolean,
+    runReason?: string,
+    dryRun: boolean,
+    success: boolean,
+    result?: string,
+}
+
+export interface ActionProcessResult {
+    success: boolean,
+    dryRun: boolean,
+    result?: string
+}
+
+export interface ActionedEvent {
+    activity: {
+        peek: string
+        link: string
+    }
+    author: string
+    timestamp: number
+    check: string
+    ruleSummary: string,
+    ruleResults: RuleResult[]
+    actionResults: ActionResult[]
 }
