@@ -337,20 +337,17 @@
                                                         <label>Events</label>
                                                         <span>
                                                             <%= data.stats.eventsCheckedSinceStartTotal === undefined ? '-' : data.stats.eventsCheckedSinceStartTotal %>
-                                                            <span class="has-tooltip">
-                                                                <span style="margin-top:-60px"  class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black'>
-                                                                    The number of events of events that had actions taken on them. Click to open a new window detailing the last 25.
-                                                                </span>
-                                                                <span>(<a target="_blank" href="/events?instance=<%= instanceId %>&bot=<%= bot.system.name %>&subreddit=<%= data.name %>" class="underline" style="text-decoration-style: dotted"><%= data.stats.actionedEvents %></a>)
-                                                            </span>
-                                                        </span>
                                                         </span>
                                                         <label>Checks</label>
                                                         <span class="has-tooltip">
                                                         <span class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2'>
                                                             <span><%= data.stats.checksTriggeredSinceStartTotal %></span> Triggered / <span><%= data.stats.checksRunSinceStartTotal %></span> Run
                                                         </span>
-                                                        <span><%= data.stats.checksTriggeredSinceStartTotal %></span> T / <span><%= data.stats.checksRunSinceStartTotal %></span> R
+                                                        <% if (data.name !== 'All') { %>
+                                                            <a target="_blank" href="/events?instance=<%= instanceId %>&bot=<%= bot.system.name %>&subreddit=<%= data.name %>" class="underline" style="text-decoration-style: dotted"><%= data.stats.checksTriggeredSinceStartTotal %> T</a>
+                                                        <% } else { %>
+                                                                <%= data.stats.checksTriggeredSinceStartTotal %> T
+                                                        <% } %>/ <span><%= data.stats.checksRunSinceStartTotal %></span> R
                                                     </span>
 
                                                         <label>Rules</label>
@@ -370,20 +367,17 @@
                                                     <label>Events</label>
                                                     <span>
                                                         <%= data.stats.eventsCheckedTotal %>
-                                                        <span class="has-tooltip">
-                                                                <span style="margin-top:-60px" class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black'>
-                                                                    The number of events of events that had actions taken on them. Click to open a new window detailing the last 25.
-                                                                </span>
-                                                                <span>(<a target="_blank" href="/events?instance=<%= instanceId %>&bot=<%= bot.system.name %>&subreddit=<%= data.name %>" class="underline" style="text-decoration-style: dotted"><%= data.stats.actionedEvents %></a>)
-                                                            </span>
-                                                        </span>
                                                     </span>
                                                     <label>Checks</label>
                                                     <span class="has-tooltip">
                                                         <span class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2'>
                                                             <span><%= data.stats.checksTriggeredTotal %></span> Triggered / <span><%= data.stats.checksRunTotal %></span> Run
                                                         </span>
-                                                        <span class="cursor-help"><span><%= data.stats.checksTriggeredTotal %></span> T / <span><%= data.stats.checksRunTotal %></span> R</span>
+                                                        <% if (data.name !== 'All') { %>
+                                                            <a target="_blank" href="/events?instance=<%= instanceId %>&bot=<%= bot.system.name %>&subreddit=<%= data.name %>" class="underline" style="text-decoration-style: dotted"><%= data.stats.checksTriggeredTotal %> T</a>
+                                                        <% } else { %>
+                                                            <%= data.stats.checksTriggeredTotal %> T
+                                                        <% } %>/ <span><%= data.stats.checksRunTotal %></span> R</span>
                                                     </span>
 
                                                     <label>Rules</label>
