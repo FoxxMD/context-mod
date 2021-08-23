@@ -838,7 +838,7 @@ const webClient = async (options: OperatorConfig) => {
         return res.render('events', {
             data: resp.map((x) => {
                 const {timestamp, activity: {peek, link}, ruleResults = [], actionResults = [], ...rest} = x;
-                const time = dayjs(timestamp).toISOString();
+                const time = dayjs(timestamp).local().format();
                 const formattedPeek = Autolinker.link(peek, {
                     email: false,
                     phone: false,
