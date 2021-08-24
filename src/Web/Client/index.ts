@@ -143,8 +143,6 @@ const webClient = async (options: OperatorConfig) => {
         },
     } = options;
 
-    const connectedUsers: ConnectUserObj = {};
-
     const webOps = operators.map(x => x.toLowerCase());
 
     const logger = getLogger({defaultLabel: 'Web', ...options.logging}, 'Web');
@@ -172,7 +170,11 @@ const webClient = async (options: OperatorConfig) => {
         logger.warn(`Cannot use 'none' for web caching or else no one can use the interface...falling back to 'memory'`);
         caching.store = 'memory';
     }
+    //const webCachePrefix = buildCachePrefix([prefix, 'web']);
     const webCache = createCacheManager({...caching, prefix: buildCachePrefix([prefix, 'web'])}) as Cache;
+
+    //const previousSessions = await webCache.get
+    const connectedUsers: ConnectUserObj = {};
 
     //<editor-fold desc=Session and Auth>
     /*
@@ -651,9 +653,9 @@ const webClient = async (options: OperatorConfig) => {
             req.session.level = 'verbose';
             req.session.sort = 'descending';
             req.session.save();
-            // @ts-ignore
-            connectedUsers[req.session.id] = {};
         }
+        // @ts-ignore
+        connectedUsers[req.session.id] = {};
         next();
     }
 
