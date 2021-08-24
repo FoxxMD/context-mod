@@ -532,9 +532,13 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
         web: {
             port = 8085,
             maxLogs = 200,
+            caching: webCaching = {},
             session: {
                 secret = randomId(),
-                provider: sessionProvider = { store: 'memory' },
+                maxAge: sessionMaxAge = 86400,
+            } = {},
+            invites: {
+                maxAge: inviteMaxAge = 0,
             } = {},
             clients,
             credentials: webCredentials,
@@ -646,37 +650,37 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
     });
 
     let cache: StrongCache;
+    let defaultProvider: CacheOptions;
 
     if(caching === undefined) {
+        defaultProvider =  {
+            store: 'memory',
+            ...cacheOptDefaults
+        };
         cache = {
             ...cacheTTLDefaults,
-            provider: {
-                store: 'memory',
-                ...cacheOptDefaults
-            }
+            provider: defaultProvider
         };
+
     } else {
         const {provider, ...restConfig} = caching;
-        if (typeof provider === 'string') {
-            cache = {
-                ...cacheTTLDefaults,
-                ...restConfig,
-                provider: {
-                    store: provider as CacheProvider,
-                    ...cacheOptDefaults
-                }
-            }
+        if(typeof provider === 'string') {
+            defaultProvider = {
+                store: provider as CacheProvider,
+                ...cacheOptDefaults
+            };
         } else {
             const {ttl = 60, max = 500, store = 'memory', ...rest} = provider || {};
-            cache = {
-                ...cacheTTLDefaults,
-                ...restConfig,
-                provider: {
-                    store,
-                    ...cacheOptDefaults,
-                    ...rest,
-                },
-            }
+            defaultProvider = {
+                store,
+                ...cacheOptDefaults,
+                ...rest,
+            };
+        }
+        cache = {
+            ...cacheTTLDefaults,
+            ...restConfig,
+            provider: defaultProvider,
         }
     }
 
@@ -695,17 +699,16 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
         caching: cache,
         web: {
             port,
+            caching: {
+                ...defaultProvider,
+                ...webCaching
+            },
+            invites: {
+                maxAge: inviteMaxAge,
+            },
             session: {
                 secret,
-                provider: typeof sessionProvider === 'string' ? {
-                    ...buildCacheOptionsFromProvider({
-                        ttl: 86400000,
-                        store: sessionProvider,
-                    })
-                } : {
-                    ...buildCacheOptionsFromProvider(sessionProvider),
-                    ttl: 86400000,
-                },
+                maxAge: sessionMaxAge,
             },
             maxLogs,
             clients: clients === undefined ? [{host: 'localhost:8095', secret: apiSecret}] : clients,

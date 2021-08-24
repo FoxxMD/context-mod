@@ -1031,3 +1031,7 @@ export const getActivityAuthorName = (author: any): string => {
     }
     return author.name;
 }
+
+export const buildCachePrefix = (parts: any[]): string => {
+    return parts.filter(x => typeof x === 'string' && x !== '').map(x => x.trim()).map(x => x.split(':')).flat().join(':')
+}

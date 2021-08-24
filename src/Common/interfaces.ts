@@ -1293,29 +1293,51 @@ export interface OperatorJsonConfig {
          * @examples [8085]
          * */
         port?: number,
+
+        /**
+         * Caching provider to use for session and invite data
+         *
+         * If none is provided the top-level caching provider is used
+         * */
+        caching?: 'memory' | 'redis' | CacheOptions
         /**
          * Settings to configure the behavior of user sessions -- the session is what the web interface uses to identify logged in users.
          * */
         session?: {
             /**
-             * The cache provider to use.
+             * Number of seconds a session should be valid for.
              *
-             * The default should be sufficient for almost all use cases
+             * Default is 1 day
              *
-             * @default "memory"
-             * @examples ["memory"]
+             * @default 86400
+             * @examples [86400]
              * */
-            provider?: 'memory' | 'redis' | CacheOptions,
+            maxAge: number
             /**
              * The secret value used to encrypt session data
              *
-             * If provider is persistent (redis) specifying a value here will ensure sessions are valid between application restarts
+             * If provider is persistent (`redis`) specifying a value here will ensure sessions are valid between application restarts
              *
              * When not present or `null` a random string is generated on application start
              *
              * @examples ["definitelyARandomString"]
              * */
             secret?: string,
+        }
+
+        /**
+         * Settings related to oauth flow invites
+         * */
+        invites?: {
+            /**
+            * Number of seconds an invite should be valid for
+             *
+             * If `0` or not specified (default) invites do not expire
+            *
+            * @default 0
+            * @examples [0]
+            * */
+            maxAge: number
         }
         /**
          * The default log level to filter to in the web interface
@@ -1430,10 +1452,14 @@ export interface OperatorConfig extends OperatorJsonConfig {
     caching: StrongCache,
     web: {
         port: number,
+        caching: CacheOptions,
         session: {
-            provider: CacheOptions,
+            maxAge: number,
             secret: string,
-        }
+        },
+        invites: {
+          maxAge: number
+        },
         logLevel?: LogLevel,
         maxLogs: number,
         clients: BotConnection[]

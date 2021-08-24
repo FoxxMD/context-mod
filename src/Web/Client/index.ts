@@ -8,6 +8,7 @@ import passport from 'passport';
 import {Strategy as CustomStrategy} from 'passport-custom';
 import {OperatorConfig, BotConnection, LogInfo} from "../../Common/interfaces";
 import {
+    buildCachePrefix,
     createCacheManager, filterLogBySubreddit,
     formatLogLineToHtml,
     intersect, isLogLineMinLevel,
@@ -120,9 +121,16 @@ const webClient = async (options: OperatorConfig) => {
         },
         web: {
             port,
+            caching,
+            caching: {
+                prefix
+            },
+            invites: {
+              maxAge: invitesMaxAge,
+            },
             session: {
-                provider,
                 secret,
+                maxAge: sessionMaxAge,
             },
             maxLogs,
             clients,
@@ -160,11 +168,11 @@ const webClient = async (options: OperatorConfig) => {
         throw new SimpleError(`Specified port for web interface (${port}) is in use or not available. Cannot start web server.`);
     }
 
-    if (provider.store === 'none') {
-        logger.warn(`Cannot use 'none' for session store or else no one can use the interface...falling back to 'memory'`);
-        provider.store = 'memory';
+    if (caching.store === 'none') {
+        logger.warn(`Cannot use 'none' for web caching or else no one can use the interface...falling back to 'memory'`);
+        caching.store = 'memory';
     }
-    //const webCache = createCacheManager(provider) as Cache;
+    const webCache = createCacheManager({...caching, prefix: buildCachePrefix([prefix, 'web'])}) as Cache;
 
     //<editor-fold desc=Session and Auth>
     /*
@@ -218,9 +226,9 @@ const webClient = async (options: OperatorConfig) => {
 
     const sessionObj = session({
         cookie: {
-            maxAge: provider.ttl,
+            maxAge: sessionMaxAge * 1000,
         },
-        store: new CacheManagerStore(createCacheManager(provider) as Cache),
+        store: new CacheManagerStore(webCache, {prefix: 'sess:'}),
         resave: false,
         saveUninitialized: false,
         secret,
@@ -280,7 +288,7 @@ const webClient = async (options: OperatorConfig) => {
                 return res.render('error', {error: errContent});
             }
             // @ts-ignore
-            const invite = invites.get(req.session.inviteId) as inviteData;
+            const invite = await webCache.get(`invite:${req.session.inviteId}`) as InviteData;
             const client = await Snoowrap.fromAuthCode({
                 userAgent: `web:contextBot:web`,
                 clientId: invite.clientId,
@@ -291,7 +299,7 @@ const webClient = async (options: OperatorConfig) => {
             // @ts-ignore
             const user = await client.getMe();
             // @ts-ignore
-            invites.delete(req.session.inviteId);
+            await webCache.del(`invite:${req.session.inviteId}`);
             let data: any = {
                 accessToken: client.accessToken,
                 refreshToken: client.refreshToken,
@@ -347,7 +355,7 @@ const webClient = async (options: OperatorConfig) => {
     });
 
     let token = randomId();
-    interface inviteData {
+    interface InviteData {
         permissions: string[],
         subreddit?: string,
         instance?: string,
@@ -356,7 +364,6 @@ const webClient = async (options: OperatorConfig) => {
         redirectUri: string
         creator: string
     }
-    const invites: Map<string, inviteData> = new Map();
 
     const helperAuthed = async (req: express.Request, res: express.Response, next: Function) => {
 
@@ -387,14 +394,14 @@ const webClient = async (options: OperatorConfig) => {
         });
     });
 
-    app.getAsync('/auth/invite', (req, res) => {
+    app.getAsync('/auth/invite', async (req, res) => {
         const {invite: inviteId} = req.query;
 
         if(inviteId === undefined) {
             return res.render('error', {error: '`invite` param is missing from URL'});
         }
-        const invite = invites.get(inviteId as string);
-        if(invite === undefined) {
+        const invite = await webCache.get(`invite:${inviteId}`) as InviteData | undefined | null;
+        if(invite === undefined || invite === null) {
             return res.render('error', {error: 'Invite with the given id does not exist'});
         }
 
@@ -430,7 +437,7 @@ const webClient = async (options: OperatorConfig) => {
         }
 
         const inviteId = code || randomId();
-        invites.set(inviteId, {
+        await webCache.set(`invite:${inviteId}`, {
             permissions,
             clientId: (ci || clientId).trim(),
             clientSecret: (ce || clientSecret).trim(),
@@ -438,7 +445,7 @@ const webClient = async (options: OperatorConfig) => {
             instance,
             subreddit,
             creator: (req.user as Express.User).name,
-        });
+        }, {ttl: invitesMaxAge * 1000});
         return res.send(inviteId);
     });
 
@@ -447,8 +454,8 @@ const webClient = async (options: OperatorConfig) => {
         if(inviteId === undefined) {
             return res.render('error', {error: '`invite` param is missing from URL'});
         }
-        const invite = invites.get(inviteId as string);
-        if(invite === undefined) {
+        const invite = await webCache.get(`invite:${inviteId}`) as InviteData | undefined | null;
+        if(invite === undefined || invite === null) {
             return res.render('error', {error: 'Invite with the given id does not exist'});
         }
 
