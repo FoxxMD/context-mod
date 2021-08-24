@@ -24,7 +24,7 @@ import {
     BotInstanceConfig,
     CacheOptions, CommentState,
     Footer, OperatorConfig, ResourceStats, SubmissionState,
-    SubredditCacheConfig, TTLConfig, TypedActivityStates
+    SubredditCacheConfig, TTLConfig, TypedActivityStates, UserResultCache
 } from "../Common/interfaces";
 import UserNotes from "./UserNotes";
 import Mustache from "mustache";
@@ -514,7 +514,7 @@ export class SubredditResources {
         return false
     }
 
-    async getCommentCheckCacheResult(item: Comment, checkConfig: object): Promise<boolean | undefined> {
+    async getCommentCheckCacheResult(item: Comment, checkConfig: object): Promise<UserResultCache | undefined> {
         const criteria = {
             author: item.author.name,
             submission: item.link_id,
@@ -522,7 +522,7 @@ export class SubredditResources {
         }
         const hash = objectHash.sha1(criteria);
         this.stats.cache.commentCheck.requests++;
-        const result = await this.cache.get(hash) as boolean | undefined;
+        const result = await this.cache.get(hash) as UserResultCache | undefined;
         if(result === undefined) {
             this.stats.cache.commentCheck.miss++;
         }
@@ -530,7 +530,7 @@ export class SubredditResources {
         return result;
     }
 
-    async setCommentCheckCacheResult(item: Comment, checkConfig: object, result: boolean, ttl: number) {
+    async setCommentCheckCacheResult(item: Comment, checkConfig: object, result: UserResultCache, ttl: number) {
         const criteria = {
             author: item.author.name,
             submission: item.link_id,
@@ -542,7 +542,7 @@ export class SubredditResources {
             this.logger.debug(`Check result already cached for User ${item.author.name} on Submission ${item.link_id}`);
         } else {
             await this.cache.set(hash, result, { ttl });
-            this.logger.debug(`Cached check result '${result}' for User ${item.author.name} on Submission ${item.link_id} for ${ttl} seconds`);
+            this.logger.debug(`Cached check result '${result.result}' for User ${item.author.name} on Submission ${item.link_id} for ${ttl} seconds`);
         }
     }
 

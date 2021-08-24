@@ -6,7 +6,7 @@ import {
     cacheStats,
     createRetryHandler,
     determineNewResults, formatNumber,
-    mergeArr, parseFromJsonOrYamlToObject, pollingInfo, resultsSummary, sleep, totalFromMapStats,
+    mergeArr, parseFromJsonOrYamlToObject, pollingInfo, resultsSummary, sleep, totalFromMapStats, triggeredIndicator,
 } from "../util";
 import {Poll} from "snoostorm";
 import pEvent from "p-event";
@@ -573,14 +573,22 @@ export class Manager {
                 }
                 checksRun++;
                 triggered = false;
+                let isFromCache = false;
                 let currentResults: RuleResult[] = [];
                 try {
-                    const [checkTriggered, checkResults] = await check.runRules(item, allRuleResults);
-                    await check.setCacheResult(item, checkTriggered);
+                    const [checkTriggered, checkResults, fromCache = false] = await check.runRules(item, allRuleResults);
+                    isFromCache = fromCache;
+                    if(!fromCache) {
+                        await check.setCacheResult(item, {result: checkTriggered, ruleResults: checkResults});
+                    }
                     currentResults = checkResults;
                     totalRulesRun += checkResults.length;
                     allRuleResults = allRuleResults.concat(determineNewResults(allRuleResults, checkResults));
                     triggered = checkTriggered;
+                    if(triggered && fromCache && !check.cacheUserResult.runActions) {
+                        this.logger.info('Check was triggered but cache result options specified NOT to run actions...counting as check NOT triggered');
+                        triggered = false;
+                    }
                 } catch (e) {
                     if (e.logged !== true) {
                         this.logger.warn(`Running rules for Check ${check.name} failed due to uncaught exception`, e);
@@ -590,7 +598,11 @@ export class Manager {
                 if (triggered) {
                     actionedEvent.check = check.name;
                     actionedEvent.ruleResults = currentResults;
-                    actionedEvent.ruleSummary = resultsSummary(currentResults, check.condition);
+                    if(isFromCache) {
+                        actionedEvent.ruleSummary = `Check result was found in cache: ${triggeredIndicator(true)}`;
+                    } else {
+                        actionedEvent.ruleSummary = resultsSummary(currentResults, check.condition);
+                    }
                     this.checksTriggered.set(check.name, (this.checksTriggered.get(check.name) || 0) + 1);
                     this.checksTriggeredSinceStart.set(check.name, (this.checksTriggeredSinceStart.get(check.name) || 0) + 1);
                     runActions = await check.runActions(item, currentResults.filter(x => x.triggered), dryRun);

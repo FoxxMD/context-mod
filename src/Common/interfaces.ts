@@ -1440,3 +1440,8 @@ export interface ActionedEvent {
     ruleResults: RuleResult[]
     actionResults: ActionResult[]
 }
+
+export interface UserResultCache {
+    result: boolean,
+    ruleResults: RuleResult[]
+}
