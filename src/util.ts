@@ -1033,5 +1033,9 @@ export const getActivityAuthorName = (author: any): string => {
 }
 
 export const buildCachePrefix = (parts: any[]): string => {
-    return parts.filter(x => typeof x === 'string' && x !== '').map(x => x.trim()).map(x => x.split(':')).flat().join(':')
+    const prefix = parts.filter(x => typeof x === 'string' && x !== '').map(x => x.trim()).map(x => x.split(':')).flat().filter(x => x !== '').join(':')
+    if(prefix !== '') {
+        return `${prefix}:`;
+    }
+    return prefix;
 }

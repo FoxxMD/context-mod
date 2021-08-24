@@ -13,7 +13,7 @@ import winston, {Logger} from "winston";
 import fetch from 'node-fetch';
 import {
     asSubmission,
-    buildCacheOptionsFromProvider,
+    buildCacheOptionsFromProvider, buildCachePrefix,
     cacheStats, createCacheManager,
     formatNumber, getActivityAuthorName,
     mergeArr,
@@ -605,19 +605,6 @@ export class BotResourcesManager {
 
         const options = provider;
         this.cacheType = options.store;
-        if(this.cacheType === 'redis') {
-            // need to make sure there is a key prefix
-            if(options.prefix === undefined) {
-                // name is way more friendly but...
-                if(name !== undefined) {
-                    options.prefix = `${name}:`;
-                } else {
-                    // if no name given use credentials hash since that is most likely unique among all configured bots
-                    // and if it isn't then operator is running the same bot twice in which case a shared namespace isn't too bad since its technically running the same subreddits anyway
-                    options.prefix = `${objectHash.sha1(credentials)}:`
-                }
-            }
-        }
         this.defaultCache = createCacheManager(options);
         if (this.cacheType === 'memory') {
             const min = Math.min(...([this.ttlDefaults.wikiTTL, this.ttlDefaults.authorTTL, this.ttlDefaults.userNotesTTL].filter(x => x !== 0)));
@@ -667,10 +654,7 @@ export class BotResourcesManager {
             // only need to create private if there settings are actually different than the default
             if(hash !== this.cacheHash) {
                 const {provider: trueProvider, ...trueRest} = cacheConfig;
-                if(trueProvider.store === 'redis') {
-                    // add subreddit name to prefix
-                    trueProvider.prefix = `${(trueProvider.prefix || '')}${subName}:`;
-                }
+                trueProvider.prefix = trueProvider.prefix === this.defaultCacheConfig.provider.prefix ? buildCachePrefix([trueProvider.prefix, subName]) : trueProvider.prefix;
                 opts = {
                     cache: createCacheManager(trueProvider),
                     cacheType: trueProvider.store,

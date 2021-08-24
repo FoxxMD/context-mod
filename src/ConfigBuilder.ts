@@ -1,6 +1,6 @@
 import {Logger} from "winston";
 import {
-    buildCacheOptionsFromProvider,
+    buildCacheOptionsFromProvider, buildCachePrefix,
     createAjvFactory,
     mergeArr,
     normalizeName,
@@ -43,6 +43,7 @@ import {operatorConfig} from "./Utils/CommandConfig";
 import merge from 'deepmerge';
 import * as process from "process";
 import {cacheOptDefaults, cacheTTLDefaults} from "./Common/defaults";
+import objectHash from "object-hash";
 
 export interface ConfigBuilderOptions {
     logger: Logger,
@@ -528,7 +529,7 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
             level = 'verbose',
             path,
         } = {},
-        caching,
+        caching: opCache,
         web: {
             port = 8085,
             maxLogs = 200,
@@ -552,8 +553,44 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
         bots = [],
     } = data;
 
+    let cache: StrongCache;
+    let defaultProvider: CacheOptions;
+
+    if(opCache === undefined) {
+        defaultProvider =  {
+            store: 'memory',
+            ...cacheOptDefaults
+        };
+        cache = {
+            ...cacheTTLDefaults,
+            provider: defaultProvider
+        };
+
+    } else {
+        const {provider, ...restConfig} = opCache;
+        if(typeof provider === 'string') {
+            defaultProvider = {
+                store: provider as CacheProvider,
+                ...cacheOptDefaults
+            };
+        } else {
+            const {ttl = 60, max = 500, store = 'memory', ...rest} = provider || {};
+            defaultProvider = {
+                store,
+                ...cacheOptDefaults,
+                ...rest,
+            };
+        }
+        cache = {
+            ...cacheTTLDefaults,
+            ...restConfig,
+            provider: defaultProvider,
+        }
+    }
+
     let hydratedBots: BotInstanceConfig[]  = bots.map(x => {
        const {
+           name: botName,
            polling: {
                sharedMod = false,
                limit = 100,
@@ -583,10 +620,10 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
        } = x;
 
 
-    let cache: StrongCache;
+    let botCache: StrongCache;
 
     if(caching === undefined) {
-        cache = {
+        botCache = {
             ...cacheTTLDefaults,
             provider: {
                 store: 'memory',
@@ -596,7 +633,7 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
     } else {
         const {provider, ...restConfig} = caching;
         if (typeof provider === 'string') {
-            cache = {
+            botCache = {
                 ...cacheTTLDefaults,
                 ...restConfig,
                 provider: {
@@ -606,7 +643,7 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
             }
         } else {
             const {ttl = 60, max = 500, store = 'memory', ...rest} = provider || {};
-            cache = {
+            botCache = {
                 ...cacheTTLDefaults,
                 ...restConfig,
                 provider: {
@@ -618,7 +655,18 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
         }
     }
 
+    const botCreds =  {
+            clientId: (ci as string),
+                clientSecret: (cs as string),
+        ...restCred,
+        };
+        if (botCache.provider.prefix === undefined || botCache.provider.prefix === defaultProvider.prefix) {
+            // need to provide unique prefix to bot
+            botCache.provider.prefix = buildCachePrefix([botCache.provider.prefix, 'bot', (botName || objectHash.sha1(botCreds))]);
+        }
+
     return {
+        name: botName,
         snoowrap,
         subreddits: {
             names,
@@ -627,12 +675,8 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
             heartbeatInterval,
             dryRun,
         },
-        credentials: {
-            clientId: (ci as string),
-            clientSecret: (cs as string),
-            ...restCred,
-        },
-        caching: cache,
+        credentials: botCreds,
+        caching: botCache,
         polling: {
             sharedMod,
             limit,
@@ -648,41 +692,6 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
     }
 
     });
-
-    let cache: StrongCache;
-    let defaultProvider: CacheOptions;
-
-    if(caching === undefined) {
-        defaultProvider =  {
-            store: 'memory',
-            ...cacheOptDefaults
-        };
-        cache = {
-            ...cacheTTLDefaults,
-            provider: defaultProvider
-        };
-
-    } else {
-        const {provider, ...restConfig} = caching;
-        if(typeof provider === 'string') {
-            defaultProvider = {
-                store: provider as CacheProvider,
-                ...cacheOptDefaults
-            };
-        } else {
-            const {ttl = 60, max = 500, store = 'memory', ...rest} = provider || {};
-            defaultProvider = {
-                store,
-                ...cacheOptDefaults,
-                ...rest,
-            };
-        }
-        cache = {
-            ...cacheTTLDefaults,
-            ...restConfig,
-            provider: defaultProvider,
-        }
-    }
 
     const defaultOperators = typeof name === 'string' ? [name] : name;
 
