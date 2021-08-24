@@ -53,6 +53,7 @@ interface SubredditResourceOptions extends Footer {
     subreddit: Subreddit,
     logger: Logger;
     client: Snoowrap;
+    prefix? :string;
 }
 
 export interface SubredditResourceSetOptions extends SubredditCacheConfig, Footer {
@@ -76,6 +77,7 @@ export class SubredditResources {
     cacheType: string
     cacheSettingsHash?: string;
     pruneInterval?: any;
+    prefix?: string
 
     stats: { cache: ResourceStats };
 
@@ -90,6 +92,7 @@ export class SubredditResources {
                 filterCriteriaTTL,
             },
             cache,
+            prefix,
             cacheType,
             cacheSettingsHash,
             client,
@@ -97,6 +100,7 @@ export class SubredditResources {
 
         this.cacheSettingsHash = cacheSettingsHash;
         this.cache = cache;
+        this.prefix = prefix;
         this.client = client;
         this.cacheType = cacheType;
         this.authorTTL = authorTTL;
@@ -138,6 +142,9 @@ export class SubredditResources {
 
     async getCacheKeyCount() {
         if (this.cache.store.keys !== undefined) {
+            if(this.cacheType === 'redis') {
+                return (await this.cache.store.keys(`${this.prefix}*`)).length;
+            }
             return (await this.cache.store.keys()).length;
         }
         return 0;
@@ -594,6 +601,7 @@ export class BotResourcesManager {
             credentials,
             caching,
         } = config;
+        caching.provider.prefix = buildCachePrefix([caching.provider.prefix, 'SHARED']);
         this.cacheHash = objectHash.sha1(caching);
         this.defaultCacheConfig = caching;
         this.ttlDefaults = {authorTTL, userNotesTTL, wikiTTL, commentTTL, submissionTTL, filterCriteriaTTL};
@@ -633,6 +641,7 @@ export class BotResourcesManager {
             cacheType: this.cacheType,
             cacheSettingsHash: hash,
             ttl: this.ttlDefaults,
+            prefix: this.defaultCacheConfig.provider.prefix,
             ...init,
         };
 
@@ -649,11 +658,14 @@ export class BotResourcesManager {
             // only need to create private if there settings are actually different than the default
             if(hash !== this.cacheHash) {
                 const {provider: trueProvider, ...trueRest} = cacheConfig;
-                trueProvider.prefix = trueProvider.prefix === this.defaultCacheConfig.provider.prefix ? buildCachePrefix([trueProvider.prefix, subName]) : trueProvider.prefix;
+                const defaultPrefix = trueProvider.prefix;
+                const subPrefix = defaultPrefix === this.defaultCacheConfig.provider.prefix ? buildCachePrefix([(defaultPrefix !== undefined ? defaultPrefix.replace('SHARED', '') : defaultPrefix), subName]) : trueProvider.prefix;
+                trueProvider.prefix = subPrefix;
                 opts = {
                     cache: createCacheManager(trueProvider),
                     cacheType: trueProvider.store,
                     cacheSettingsHash: hash,
+                    prefix: subPrefix,
                     ...init,
                     ...trueRest,
                 };
