@@ -291,10 +291,6 @@ export const parseDefaultBotInstanceFromArgs = (args: any): BotInstanceJsonConfi
         polling: {
             sharedMod,
         },
-        caching: {
-            provider: caching,
-            authorTTL
-        },
         nanny: {
             softLimit,
             hardLimit
@@ -316,6 +312,8 @@ export const parseOpConfigFromArgs = (args: any): OperatorJsonConfig => {
         sessionSecret,
         web,
         mode,
+        caching,
+        authorTTL,
     } = args || {};
 
     const data = {
@@ -327,6 +325,10 @@ export const parseOpConfigFromArgs = (args: any): OperatorJsonConfig => {
         logging: {
             level: logLevel,
             path: logDir === true ? `${process.cwd()}/logs` : undefined,
+        },
+        caching: {
+            provider: caching,
+            authorTTL
         },
         web: {
             enabled: web,
@@ -387,13 +389,6 @@ export const parseDefaultBotInstanceFromEnv = (): BotInstanceJsonConfig => {
         polling: {
             sharedMod: parseBool(process.env.SHARE_MOD),
         },
-        caching: {
-            provider: {
-                // @ts-ignore
-                store: process.env.CACHING as (CacheProvider | undefined)
-            },
-            authorTTL: process.env.AUTHOR_TTL !== undefined ? parseInt(process.env.AUTHOR_TTL) : undefined
-        },
         nanny: {
             softLimit: process.env.SOFT_LIMIT !== undefined ? parseInt(process.env.SOFT_LIMIT) : undefined,
             hardLimit: process.env.HARD_LIMIT !== undefined ? parseInt(process.env.HARD_LIMIT) : undefined
@@ -413,6 +408,13 @@ export const parseOpConfigFromEnv = (): OperatorJsonConfig => {
             // @ts-ignore
             level: process.env.LOG_LEVEL,
             path: process.env.LOG_DIR === 'true' ? `${process.cwd()}/logs` : undefined,
+        },
+        caching: {
+            provider: {
+                // @ts-ignore
+                store: process.env.CACHING as (CacheProvider | undefined)
+            },
+            authorTTL: process.env.AUTHOR_TTL !== undefined ? parseInt(process.env.AUTHOR_TTL) : undefined
         },
         web: {
             port: process.env.PORT !== undefined ? parseInt(process.env.PORT) : undefined,
@@ -493,9 +495,17 @@ export const parseOperatorConfigFromSources = async (args: any): Promise<Operato
     const defaultBotInstanceFromEnv = parseDefaultBotInstanceFromEnv();
     const {bots: botInstancesFromFile = [], ...restConfigFile} = configFromFile;
 
-    const defaultBotInstance = merge.all([defaultBotInstanceFromEnv, defaultBotInstanceFromArgs], {
+    const mergedConfig = merge.all([opConfigFromEnv, restConfigFile, opConfigFromArgs], {
         arrayMerge: overwriteMerge,
     });
+
+    const defaultBotInstance = merge.all([defaultBotInstanceFromEnv, defaultBotInstanceFromArgs], {
+        arrayMerge: overwriteMerge,
+    }) as BotInstanceJsonConfig;
+
+    if(configFromFile.caching !== undefined) {
+        defaultBotInstance.caching = configFromFile.caching;
+    }
 
     let botInstances = [];
     if(botInstancesFromFile.length === 0) {
@@ -503,10 +513,6 @@ export const parseOperatorConfigFromSources = async (args: any): Promise<Operato
     } else {
         botInstances = botInstancesFromFile.map(x => merge.all([defaultBotInstance, x], {arrayMerge: overwriteMerge}));
     }
-
-    const mergedConfig = merge.all([opConfigFromEnv, restConfigFile, opConfigFromArgs], {
-        arrayMerge: overwriteMerge,
-    });
 
     return removeUndefinedKeys({...mergedConfig, bots: botInstances}) as OperatorJsonConfig;
 }
@@ -522,6 +528,7 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
             level = 'verbose',
             path,
         } = {},
+        caching,
         web: {
             port = 8085,
             maxLogs = 200,
@@ -637,6 +644,42 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
     }
 
     });
+
+    let cache: StrongCache;
+
+    if(caching === undefined) {
+        cache = {
+            ...cacheTTLDefaults,
+            provider: {
+                store: 'memory',
+                ...cacheOptDefaults
+            }
+        };
+    } else {
+        const {provider, ...restConfig} = caching;
+        if (typeof provider === 'string') {
+            cache = {
+                ...cacheTTLDefaults,
+                ...restConfig,
+                provider: {
+                    store: provider as CacheProvider,
+                    ...cacheOptDefaults
+                }
+            }
+        } else {
+            const {ttl = 60, max = 500, store = 'memory', ...rest} = provider || {};
+            cache = {
+                ...cacheTTLDefaults,
+                ...restConfig,
+                provider: {
+                    store,
+                    ...cacheOptDefaults,
+                    ...rest,
+                },
+            }
+        }
+    }
+
     const defaultOperators = typeof name === 'string' ? [name] : name;
 
     const config: OperatorConfig = {
@@ -649,6 +692,7 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
             level,
             path
         },
+        caching: cache,
         web: {
             port,
             session: {

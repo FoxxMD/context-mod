@@ -824,7 +824,7 @@ export const isRedditMedia = (act: Submission): boolean => {
 }
 
 export const isExternalUrlSubmission = (act: Comment | Submission): boolean => {
-    return act instanceof Submission && !act.is_self && !isRedditMedia(act);
+    return asSubmission(act) && !act.is_self && !isRedditMedia(act);
 }
 
 export const parseRegex = (r: string | RegExp, val: string, flags?: string): RegExResult => {
@@ -954,7 +954,7 @@ export const buildCacheOptionsFromProvider = (provider: CacheProvider | any): Ca
 }
 
 export const createCacheManager = (options: CacheOptions): Cache => {
-    const {store, max, ttl = 60, host = 'localhost', port, auth_pass, db} = options;
+    const {store, max, ttl = 60, host = 'localhost', port, auth_pass, db, ...rest} = options;
     switch (store) {
         case 'none':
             return cacheManager.caching({store: 'none', max, ttl});
@@ -965,7 +965,8 @@ export const createCacheManager = (options: CacheOptions): Cache => {
                 port,
                 auth_pass,
                 db,
-                ttl
+                ttl,
+                ...rest,
             });
         case 'memory':
         default:
@@ -998,4 +999,35 @@ export const isScopeError = (err: any): boolean => {
         return authHeader !== undefined && authHeader.includes('insufficient_scope');
     }
     return false;
+}
+
+/**
+ * Cached activities lose type information when deserialized so need to check properties as well to see if the object is the shape of a Submission
+ * */
+export const isSubmission = (value: any) => {
+    return value instanceof Submission || value.domain !== undefined;
+}
+
+export const asSubmission = (value: any): value is Submission => {
+    return isSubmission(value);
+}
+
+/**
+ * Serialized activities store subreddit and user properties as their string representations (instead of proxy)
+ * */
+export const getActivitySubredditName = (activity: any): string => {
+    if(typeof activity.subreddit === 'string') {
+        return activity.subreddit;
+    }
+    return activity.subreddit.display_name;
+}
+
+/**
+ * Serialized activities store subreddit and user properties as their string representations (instead of proxy)
+ * */
+export const getActivityAuthorName = (author: any): string => {
+    if(typeof author === 'string') {
+        return author;
+    }
+    return author.name;
 }

@@ -2,7 +2,8 @@ import {Rule, RuleJSONConfig, RuleOptions, RuleResult} from "./index";
 import {Comment} from "snoowrap";
 import Submission from "snoowrap/dist/objects/Submission";
 import {
-    comparisonTextOp, FAIL, isExternalUrlSubmission, parseGenericValueComparison,
+    asSubmission,
+    comparisonTextOp, FAIL, isExternalUrlSubmission, isSubmission, parseGenericValueComparison,
     parseGenericValueOrPercentComparison, parseRegex,
     PASS
 } from "../util";
@@ -323,7 +324,7 @@ export class RegexRule extends Rule {
         let m: string[] = [];
         // determine what content we are testing
         let contents: string[] = [];
-        if (a instanceof Submission) {
+        if (asSubmission(a)) {
             for (const l of testOn) {
                 switch (l) {
                     case 'title':

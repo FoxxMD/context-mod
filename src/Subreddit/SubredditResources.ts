@@ -12,9 +12,10 @@ import Subreddit from 'snoowrap/dist/objects/Subreddit';
 import winston, {Logger} from "winston";
 import fetch from 'node-fetch';
 import {
+    asSubmission,
     buildCacheOptionsFromProvider,
     cacheStats, createCacheManager,
-    formatNumber,
+    formatNumber, getActivityAuthorName,
     mergeArr,
     parseExternalUrl,
     parseWikiContext
@@ -23,7 +24,7 @@ import LoggedError from "../Utils/LoggedError";
 import {
     BotInstanceConfig,
     CacheOptions, CommentState,
-    Footer, OperatorConfig, ResourceStats, SubmissionState,
+    Footer, OperatorConfig, ResourceStats, StrongCache, SubmissionState,
     SubredditCacheConfig, TTLConfig, TypedActivityStates, UserResultCache
 } from "../Common/interfaces";
 import UserNotes from "./UserNotes";
@@ -203,13 +204,13 @@ export class SubredditResources {
     async getActivity(item: Submission | Comment) {
         try {
             let hash = '';
-            if (item instanceof Submission && this.submissionTTL > 0) {
+            if (asSubmission(item) && this.submissionTTL > 0) {
                 hash = `sub-${item.name}`;
                 await this.stats.cache.submission.identifierRequestCount.set(hash, (await this.stats.cache.submission.identifierRequestCount.wrap(hash, () => 0) as number) + 1);
                 this.stats.cache.submission.requestTimestamps.push(Date.now());
                 this.stats.cache.submission.requests++;
                 const cachedSubmission = await this.cache.get(hash);
-                if (cachedSubmission !== undefined) {
+                if (cachedSubmission !== undefined && cachedSubmission !== null) {
                     this.logger.debug(`Cache Hit: Submission ${item.name}`);
                     return cachedSubmission;
                 }
@@ -224,7 +225,7 @@ export class SubredditResources {
                 this.stats.cache.comment.requestTimestamps.push(Date.now());
                 this.stats.cache.comment.requests++;
                 const cachedComment = await this.cache.get(hash);
-                if (cachedComment !== undefined) {
+                if (cachedComment !== undefined && cachedComment !== null) {
                     this.logger.debug(`Cache Hit: Comment ${item.name}`);
                     return cachedComment;
                 }
@@ -244,8 +245,8 @@ export class SubredditResources {
     }
 
     async getAuthorActivities(user: RedditUser, options: AuthorTypedActivitiesOptions): Promise<Array<Submission | Comment>> {
+        const userName = getActivityAuthorName(user);
         if (this.authorTTL > 0) {
-            const userName = user.name;
             const hashObj: any = {...options, userName};
             if (this.useSubredditAuthorCache) {
                 hashObj.subreddit = this.name;
@@ -253,11 +254,15 @@ export class SubredditResources {
             const hash = objectHash.sha1({...options, userName});
 
             this.stats.cache.author.requests++;
-            await this.stats.cache.author.identifierRequestCount.set(user.name, (await this.stats.cache.author.identifierRequestCount.wrap(user.name, () => 0) as number) + 1);
+            await this.stats.cache.author.identifierRequestCount.set(userName, (await this.stats.cache.author.identifierRequestCount.wrap(userName, () => 0) as number) + 1);
             this.stats.cache.author.requestTimestamps.push(Date.now());
             let miss = false;
             const cacheVal = await this.cache.wrap(hash, async () => {
                 miss = true;
+                if(typeof user === 'string') {
+                    // @ts-ignore
+                    user = await this.client.getUser(userName);
+                }
                 return await getAuthorActivities(user, options);
             }, {ttl: this.authorTTL});
             if (!miss) {
@@ -266,6 +271,10 @@ export class SubredditResources {
                 this.stats.cache.author.miss++;
             }
             return cacheVal as Array<Submission | Comment>;
+        }
+        if(typeof user === 'string') {
+            // @ts-ignore
+            user = await this.client.getUser(userName);
         }
         return await getAuthorActivities(user, options);
     }
@@ -304,7 +313,7 @@ export class SubredditResources {
             this.stats.cache.content.requestTimestamps.push(Date.now());
             this.stats.cache.content.requests++;
             const cachedContent = await this.cache.get(hash);
-            if (cachedContent !== undefined) {
+            if (cachedContent !== undefined && cachedContent !== null) {
                 this.logger.debug(`Cache Hit: ${cacheKey}`);
                 return cachedContent as string;
             } else {
@@ -398,7 +407,7 @@ export class SubredditResources {
                 this.stats.cache.itemCrit.requestTimestamps.push(Date.now());
                 this.stats.cache.itemCrit.requests++;
                 const cachedItem = await this.cache.get(hash);
-                if (cachedItem !== undefined) {
+                if (cachedItem !== undefined && cachedItem !== null) {
                     this.logger.debug(`Cache Hit: Item Check on ${item.name}`);
                     return cachedItem as boolean;
                 }
@@ -522,7 +531,10 @@ export class SubredditResources {
         }
         const hash = objectHash.sha1(criteria);
         this.stats.cache.commentCheck.requests++;
-        const result = await this.cache.get(hash) as UserResultCache | undefined;
+        let result = await this.cache.get(hash) as UserResultCache | undefined | null;
+        if(result === null) {
+            result = undefined;
+        }
         if(result === undefined) {
             this.stats.cache.commentCheck.miss++;
         }
@@ -566,6 +578,7 @@ export class BotResourcesManager {
     enabled: boolean = true;
     modStreams: Map<string, SPoll<Snoowrap.Submission | Snoowrap.Comment>> = new Map();
     defaultCache: Cache;
+    defaultCacheConfig: StrongCache
     cacheType: string = 'none';
     cacheHash: string;
     ttlDefaults: Required<TTLConfig>;
@@ -582,13 +595,29 @@ export class BotResourcesManager {
                 filterCriteriaTTL,
                 provider,
             },
+            name,
+            credentials,
             caching,
         } = config;
         this.cacheHash = objectHash.sha1(caching);
+        this.defaultCacheConfig = caching;
         this.ttlDefaults = {authorTTL, userNotesTTL, wikiTTL, commentTTL, submissionTTL, filterCriteriaTTL};
 
         const options = provider;
         this.cacheType = options.store;
+        if(this.cacheType === 'redis') {
+            // need to make sure there is a key prefix
+            if(options.prefix === undefined) {
+                // name is way more friendly but...
+                if(name !== undefined) {
+                    options.prefix = `${name}:`;
+                } else {
+                    // if no name given use credentials hash since that is most likely unique among all configured bots
+                    // and if it isn't then operator is running the same bot twice in which case a shared namespace isn't too bad since its technically running the same subreddits anyway
+                    options.prefix = `${objectHash.sha1(credentials)}:`
+                }
+            }
+        }
         this.defaultCache = createCacheManager(options);
         if (this.cacheType === 'memory') {
             const min = Math.min(...([this.ttlDefaults.wikiTTL, this.ttlDefaults.authorTTL, this.ttlDefaults.userNotesTTL].filter(x => x !== 0)));
@@ -626,7 +655,7 @@ export class BotResourcesManager {
         };
 
         if(caching !== undefined) {
-            const {provider = 'memory', ...rest} = caching;
+            const {provider = this.defaultCacheConfig.provider, ...rest} = caching;
             let cacheConfig = {
                 provider: buildCacheOptionsFromProvider(provider),
                 ttl: {
@@ -638,6 +667,10 @@ export class BotResourcesManager {
             // only need to create private if there settings are actually different than the default
             if(hash !== this.cacheHash) {
                 const {provider: trueProvider, ...trueRest} = cacheConfig;
+                if(trueProvider.store === 'redis') {
+                    // add subreddit name to prefix
+                    trueProvider.prefix = `${(trueProvider.prefix || '')}${subName}:`;
+                }
                 opts = {
                     cache: createCacheManager(trueProvider),
                     cacheType: trueProvider.store,

@@ -687,6 +687,8 @@
             "type": "object"
         },
         "CacheOptions": {
+            "additionalProperties": {
+            },
             "description": "Configure granular settings for a cache provider with this object",
             "properties": {
                 "auth_pass": {
@@ -2814,6 +2816,7 @@
             "description": "Cache the result of this check based on the comment author and the submission id\n\nThis is useful in this type of scenario:\n\n1. This check is configured to run on comments for specific submissions with high volume activity\n2. The rules being run are not dependent on the content of the comment\n3. The rule results are not likely to change while cache is valid",
             "properties": {
                 "enable": {
+                    "default": false,
                     "type": "boolean"
                 },
                 "runActions": {

@@ -151,7 +151,7 @@ export class UserNotes {
         let cacheMiss;
         if (this.notesTTL > 0) {
             const cachedPayload = await this.cache.get(this.identifier);
-            if (cachedPayload !== undefined) {
+            if (cachedPayload !== undefined && cachedPayload !== null) {
                 this.cacheCB(false);
                 return cachedPayload as unknown as RawUserNotesPayload;
             }

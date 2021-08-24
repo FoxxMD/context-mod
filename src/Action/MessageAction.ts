@@ -4,7 +4,7 @@ import Submission from "snoowrap/dist/objects/Submission";
 import {renderContent} from "../Utils/SnoowrapUtils";
 import {ActionProcessResult, Footer, RequiredRichContent, RichContent} from "../Common/interfaces";
 import {RuleResult} from "../Rule";
-import {boolToString} from "../util";
+import {asSubmission, boolToString, isSubmission} from "../util";
 
 export class MessageAction extends Action {
     content: string;
@@ -50,7 +50,7 @@ export class MessageAction extends Action {
             text: renderedContent,
             // @ts-ignore
             fromSubreddit: this.asSubreddit ? await item.subreddit.fetch() : undefined,
-            subject: this.title || `Concerning your ${item instanceof Submission ? 'Submission' : 'Comment'}`,
+            subject: this.title || `Concerning your ${isSubmission(item) ? 'Submission' : 'Comment'}`,
         };
 
         const msgPreview = `\r\n

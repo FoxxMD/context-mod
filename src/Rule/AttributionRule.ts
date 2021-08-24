@@ -5,9 +5,10 @@ import Submission from "snoowrap/dist/objects/Submission";
 import {getAttributionIdentifier} from "../Utils/SnoowrapUtils";
 import dayjs from "dayjs";
 import {
+    asSubmission,
     comparisonTextOp,
     FAIL,
-    formatNumber,
+    formatNumber, getActivitySubredditName, isSubmission,
     parseGenericValueOrPercentComparison,
     parseSubredditName,
     PASS
@@ -190,9 +191,9 @@ export class AttributionRule extends Rule {
             let activities = thresholdOn === 'submissions' ? await this.resources.getAuthorSubmissions(item.author, {window: window}) : await this.resources.getAuthorActivities(item.author, {window: window});
             activities = activities.filter(act => {
                 if (include.length > 0) {
-                    return include.some(x => x === act.subreddit.display_name.toLowerCase());
+                    return include.some(x => x === getActivitySubredditName(act).toLowerCase());
                 } else if (exclude.length > 0) {
-                    return !exclude.some(x => x === act.subreddit.display_name.toLowerCase())
+                    return !exclude.some(x => x === getActivitySubredditName(act).toLowerCase())
                 }
                 return true;
             });
@@ -219,7 +220,7 @@ export class AttributionRule extends Rule {
 
             const realDomains: DomainInfo[] = domains.map(x => {
                 if(x === SUBMISSION_DOMAIN) {
-                    if(!(item instanceof Submission)) {
+                    if(!(asSubmission(item))) {
                         throw new SimpleError('Cannot run Attribution Rule with the domain SELF:AGG on a Comment');
                     }
                     return getAttributionIdentifier(item, consolidateMediaDomains);
@@ -228,7 +229,7 @@ export class AttributionRule extends Rule {
             });
             const realDomainIdents = realDomains.map(x => x.aliases).flat(1).map(x => x.toLowerCase());
 
-            const submissions: Submission[] = thresholdOn === 'submissions' ? activities as Submission[] : activities.filter(x => x instanceof Submission) as Submission[];
+            const submissions: Submission[] = thresholdOn === 'submissions' ? activities as Submission[] : activities.filter(x => isSubmission(x)) as Submission[];
             const aggregatedSubmissions = submissions.reduce((acc: Map<string, DomainAgg>, sub) => {
                 const domainInfo = getAttributionIdentifier(sub, consolidateMediaDomains)
 

@@ -23,7 +23,7 @@
             "description": "The configuration for an **individual reddit account** ContextMod will run as a bot.\n\nMultiple bot configs may be specified (one per reddit account).\n\n**NOTE:** If `bots` is not specified in a `FILE` then a default `bot` is generated using `ENV/ARG` values IE `CLIENT_ID`, etc...but if `bots` IS specified the default is not generated.",
             "properties": {
                 "caching": {
-                    "description": "Settings to configure the default caching behavior for each suberddit",
+                    "description": "Settings to configure the default caching behavior for this bot\n\nEvery setting not specified will default to what is specified by the global operator caching config",
                     "properties": {
                         "authorTTL": {
                             "default": 60,
@@ -243,6 +243,8 @@
             "type": "object"
         },
         "CacheOptions": {
+            "additionalProperties": {
+            },
             "description": "Configure granular settings for a cache provider with this object",
             "properties": {
                 "auth_pass": {
@@ -526,6 +528,76 @@
                 "$ref": "#/definitions/BotInstanceJsonConfig"
             },
             "type": "array"
+        },
+        "caching": {
+            "description": "Settings to configure the default caching behavior globally\n\nThese settings will be used by each bot, and subreddit, that does not specify their own",
+            "properties": {
+                "authorTTL": {
+                    "default": 60,
+                    "description": "Amount of time, in seconds, author activity history (Comments/Submission) should be cached\n\n* ENV => `AUTHOR_TTL`\n* ARG => `--authorTTL <sec>`",
+                    "examples": [
+                        60
+                    ],
+                    "type": "number"
+                },
+                "commentTTL": {
+                    "default": 60,
+                    "description": "Amount of time, in seconds, a comment should be cached",
+                    "examples": [
+                        60
+                    ],
+                    "type": "number"
+                },
+                "filterCriteriaTTL": {
+                    "default": 60,
+                    "description": "Amount of time, in seconds, to cache filter criteria results (`authorIs` and `itemIs` results)\n\nThis is especially useful if when polling high-volume comments and your checks rely on author/item filters",
+                    "examples": [
+                        60
+                    ],
+                    "type": "number"
+                },
+                "provider": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/definitions/CacheOptions"
+                        },
+                        {
+                            "enum": [
+                                "memory",
+                                "none",
+                                "redis"
+                            ],
+                            "type": "string"
+                        }
+                    ],
+                    "description": "The cache provider and, optionally, a custom configuration for that provider\n\nIf not present or `null` provider will be `memory`.\n\nTo specify another `provider` but use its default configuration set this property to a string of one of the available providers: `memory`, `redis`, or `none`"
+                },
+                "submissionTTL": {
+                    "default": 60,
+                    "description": "Amount of time, in seconds, a submission should be cached",
+                    "examples": [
+                        60
+                    ],
+                    "type": "number"
+                },
+                "userNotesTTL": {
+                    "default": 300,
+                    "description": "Amount of time, in seconds, [Toolbox User Notes](https://www.reddit.com/r/toolbox/wiki/docs/usernotes) should be cached",
+                    "examples": [
+                        300
+                    ],
+                    "type": "number"
+                },
+                "wikiTTL": {
+                    "default": 300,
+                    "description": "Amount of time, in seconds, wiki content pages should be cached",
+                    "examples": [
+                        300
+                    ],
+                    "type": "number"
+                }
+            },
+            "type": "object"
         },
         "logging": {
             "description": "Settings to configure global logging defaults",

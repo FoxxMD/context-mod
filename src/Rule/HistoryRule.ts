@@ -5,9 +5,10 @@ import Submission from "snoowrap/dist/objects/Submission";
 import {getAuthorActivities} from "../Utils/SnoowrapUtils";
 import dayjs from "dayjs";
 import {
+    asSubmission,
     comparisonTextOp,
     FAIL,
-    formatNumber,
+    formatNumber, getActivitySubredditName, isSubmission,
     parseGenericValueOrPercentComparison, parseSubredditName,
     PASS,
     percentFromString
@@ -112,9 +113,9 @@ export class HistoryRule extends Rule {
             let activities = await this.resources.getAuthorActivities(item.author, {window: window});
             activities = activities.filter(act => {
                 if (this.include.length > 0) {
-                    return this.include.some(x => x === act.subreddit.display_name.toLowerCase());
+                    return this.include.some(x => x === getActivitySubredditName(act).toLowerCase());
                 } else if (this.exclude.length > 0) {
-                    return !this.exclude.some(x => x === act.subreddit.display_name.toLowerCase())
+                    return !this.exclude.some(x => x === getActivitySubredditName(act).toLowerCase())
                 }
                 return true;
             });
@@ -125,7 +126,7 @@ export class HistoryRule extends Rule {
 
             const activityTotal = activities.length;
             const {submissionTotal, commentTotal, opTotal} = activities.reduce((acc, act) => {
-                if(act instanceof Submission) {
+                if(asSubmission(act)) {
                     return {...acc, submissionTotal: acc.submissionTotal + 1};
                 }
                 let a = {...acc, commentTotal: acc.commentTotal + 1};

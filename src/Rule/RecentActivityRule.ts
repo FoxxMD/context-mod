@@ -2,8 +2,8 @@ import {Rule, RuleJSONConfig, RuleOptions, RulePremise, RuleResult} from "./inde
 import {Comment, VoteableContent} from "snoowrap";
 import Submission from "snoowrap/dist/objects/Submission";
 import {
-    activityWindowText,
-    comparisonTextOp, FAIL, formatNumber,
+    activityWindowText, asSubmission,
+    comparisonTextOp, FAIL, formatNumber, getActivitySubredditName, isSubmission,
     parseGenericValueOrPercentComparison, parseSubredditName,
     parseUsableLinkIdentifier,
     PASS
@@ -67,14 +67,14 @@ export class RecentActivityRule extends Rule {
 
         let viableActivity = activities;
         if (this.useSubmissionAsReference) {
-            if (!(item instanceof Submission)) {
+            if (!asSubmission(item)) {
                 this.logger.warn('Cannot use post as reference because triggered item is not a Submission');
             } else if (item.is_self) {
                 this.logger.warn('Cannot use post as reference because triggered Submission is not a link type');
             } else {
                 const usableUrl = parseLink(await item.url);
                 viableActivity = viableActivity.filter((x) => {
-                    if (!(x instanceof Submission)) {
+                    if (!asSubmission(x)) {
                         return false;
                     }
                     if (x.url === undefined) {
@@ -85,7 +85,7 @@ export class RecentActivityRule extends Rule {
             }
         }
         const groupedActivity = viableActivity.reduce((grouped, activity) => {
-            const s = activity.subreddit.display_name.toLowerCase();
+            const s = getActivitySubredditName(activity).toLowerCase();
             grouped[s] = (grouped[s] || []).concat(activity);
             return grouped;
         }, {} as Record<string, (Submission | Comment)[]>);

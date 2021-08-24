@@ -758,6 +758,8 @@ export interface CacheOptions {
      * @examples [500]
      * */
     max?: number
+
+    [key:string]: any
 }
 
 export type NotificationProvider = 'discord';
@@ -1054,7 +1056,9 @@ export interface BotInstanceJsonConfig {
     }
 
     /**
-     * Settings to configure the default caching behavior for each suberddit
+     * Settings to configure the default caching behavior for this bot
+     *
+     * Every setting not specified will default to what is specified by the global operator caching config
      * */
     caching?: {
         /**
@@ -1215,6 +1219,64 @@ export interface OperatorJsonConfig {
         path?: string,
     },
 
+    /**
+     * Settings to configure the default caching behavior globally
+     *
+     * These settings will be used by each bot, and subreddit, that does not specify their own
+     * */
+    caching?: {
+        /**
+         * Amount of time, in seconds, author activity history (Comments/Submission) should be cached
+         *
+         * * ENV => `AUTHOR_TTL`
+         * * ARG => `--authorTTL <sec>`
+         * @examples [60]
+         * @default 60
+         * */
+        authorTTL?: number;
+        /**
+         * Amount of time, in seconds, wiki content pages should be cached
+         * @examples [300]
+         * @default 300
+         * */
+        wikiTTL?: number;
+        /**
+         * Amount of time, in seconds, [Toolbox User Notes](https://www.reddit.com/r/toolbox/wiki/docs/usernotes) should be cached
+         * @examples [300]
+         * @default 300
+         * */
+        userNotesTTL?: number;
+        /**
+         * Amount of time, in seconds, a submission should be cached
+         * @examples [60]
+         * @default 60
+         * */
+        submissionTTL?: number;
+        /**
+         * Amount of time, in seconds, a comment should be cached
+         * @examples [60]
+         * @default 60
+         * */
+        commentTTL?: number;
+        /**
+         * Amount of time, in seconds, to cache filter criteria results (`authorIs` and `itemIs` results)
+         *
+         * This is especially useful if when polling high-volume comments and your checks rely on author/item filters
+         *
+         * @examples [60]
+         * @default 60
+         * */
+        filterCriteriaTTL?: number;
+        /**
+         * The cache provider and, optionally, a custom configuration for that provider
+         *
+         * If not present or `null` provider will be `memory`.
+         *
+         * To specify another `provider` but use its default configuration set this property to a string of one of the available providers: `memory`, `redis`, or `none`
+         * */
+        provider?: CacheProvider | CacheOptions
+    }
+
     bots?: BotInstanceJsonConfig[]
 
     /**
@@ -1365,6 +1427,7 @@ export interface OperatorConfig extends OperatorJsonConfig {
         level: LogLevel,
         path?: string,
     },
+    caching: StrongCache,
     web: {
         port: number,
         session: {
