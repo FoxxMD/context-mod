@@ -549,13 +549,8 @@ export class SubredditResources {
             ...checkConfig
         }
         const hash = objectHash.sha1(criteria);
-        // don't set if result is already cached
-        if(undefined !== await this.cache.get(hash)) {
-            this.logger.debug(`Check result already cached for User ${item.author.name} on Submission ${item.link_id}`);
-        } else {
-            await this.cache.set(hash, result, { ttl });
-            this.logger.debug(`Cached check result '${result.result}' for User ${item.author.name} on Submission ${item.link_id} for ${ttl} seconds`);
-        }
+        await this.cache.set(hash, result, { ttl });
+        this.logger.debug(`Cached check result '${result.result}' for User ${item.author.name} on Submission ${item.link_id} for ${ttl} seconds`);
     }
 
     async generateFooter(item: Submission | Comment, actionFooter?: false | string) {
