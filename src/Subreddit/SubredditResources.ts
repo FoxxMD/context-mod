@@ -35,6 +35,7 @@ import {SPoll} from "./Streams";
 import {Cache} from 'cache-manager';
 import {Submission, Comment} from "snoowrap/dist/objects";
 import {cacheTTLDefaults} from "../Common/defaults";
+import {check} from "tcp-port-used";
 
 export const DEFAULT_FOOTER = '\r\n*****\r\nThis action was performed by [a bot.]({{botLink}}) Mention a moderator or [send a modmail]({{modmailLink}}) if you any ideas, questions, or concerns about this action.';
 
@@ -258,11 +259,11 @@ export class SubredditResources {
     async getAuthorActivities(user: RedditUser, options: AuthorTypedActivitiesOptions): Promise<Array<Submission | Comment>> {
         const userName = getActivityAuthorName(user);
         if (this.authorTTL > 0) {
-            const hashObj: any = {...options, userName};
+            const hashObj: any = options;
             if (this.useSubredditAuthorCache) {
-                hashObj.subreddit = this.name;
+                hashObj.subreddit = this.subreddit;
             }
-            const hash = objectHash.sha1({...options, userName});
+            const hash = `authorActivities-${userName}-${options.type || 'overview'}-${objectHash.sha1(hashObj)}`;
 
             this.stats.cache.author.requests++;
             await this.stats.cache.author.identifierRequestCount.set(userName, (await this.stats.cache.author.identifierRequestCount.wrap(userName, () => 0) as number) + 1);
@@ -277,7 +278,7 @@ export class SubredditResources {
                 return await getAuthorActivities(user, options);
             }, {ttl: this.authorTTL});
             if (!miss) {
-                this.logger.debug(`Cache Hit: ${userName} (${options.type || 'overview'})`);
+                this.logger.debug(`Cache Hit: ${userName} (Hash ${hash})`);
             } else {
                 this.stats.cache.author.miss++;
             }
@@ -318,14 +319,14 @@ export class SubredditResources {
         }
 
         // try to get cached value first
-        let hash = `${subreddit.display_name}-${cacheKey}`;
+        let hash = `${subreddit.display_name}-content-${cacheKey}`;
         if (this.wikiTTL > 0) {
             await this.stats.cache.content.identifierRequestCount.set(cacheKey, (await this.stats.cache.content.identifierRequestCount.wrap(cacheKey, () => 0) as number) + 1);
             this.stats.cache.content.requestTimestamps.push(Date.now());
             this.stats.cache.content.requests++;
             const cachedContent = await this.cache.get(hash);
             if (cachedContent !== undefined && cachedContent !== null) {
-                this.logger.debug(`Cache Hit: ${cacheKey}`);
+                this.logger.debug(`Content Cache Hit: ${cacheKey}`);
                 return cachedContent as string;
             } else {
                 this.stats.cache.content.miss++;
@@ -378,8 +379,14 @@ export class SubredditResources {
 
     async testAuthorCriteria(item: (Comment | Submission), authorOpts: AuthorCriteria, include = true) {
         if (this.filterCriteriaTTL > 0) {
-            const hashObj = {itemId: item.id, ...authorOpts, include};
-            const hash = `authorCrit-${objectHash.sha1(hashObj)}`;
+            // in the criteria check we only actually use the `item` to get the author flair
+            // which will be the same for the entire subreddit
+            //
+            // so we can create a hash only using subreddit-author-criteria
+            // and ignore the actual item
+            const hashObj = {...authorOpts, include};
+            const userName = getActivityAuthorName(item);
+            const hash = `authorCrit-${this.subreddit.display_name}-${userName}-${objectHash.sha1(hashObj)}`;
             await this.stats.cache.authorCrit.identifierRequestCount.set(hash, (await this.stats.cache.authorCrit.identifierRequestCount.wrap(hash, () => 0) as number) + 1);
             this.stats.cache.authorCrit.requestTimestamps.push(Date.now());
             this.stats.cache.authorCrit.requests++;
@@ -389,7 +396,7 @@ export class SubredditResources {
                 return await testAuthorCriteria(item, authorOpts, include, this.userNotes);
             }, {ttl: this.filterCriteriaTTL});
             if (!miss) {
-                this.logger.debug(`Cache Hit: Author Check on ${item.id}`);
+                this.logger.debug(`Cache Hit: Author Check on ${userName} (Hash ${hash})`);
             } else {
                 this.stats.cache.authorCrit.miss++;
             }
@@ -412,19 +419,18 @@ export class SubredditResources {
                 states = (states[0] as CommentState).submissionState as SubmissionState[];
             }
             try {
-                const hashObj = {itemId: item.name, ...states};
-                const hash = `itemCrit-${objectHash.sha1(hashObj)}`;
+                const hash = `itemCrit-${item.name}-${objectHash.sha1(states)}`;
                 await this.stats.cache.itemCrit.identifierRequestCount.set(hash, (await this.stats.cache.itemCrit.identifierRequestCount.wrap(hash, () => 0) as number) + 1);
                 this.stats.cache.itemCrit.requestTimestamps.push(Date.now());
                 this.stats.cache.itemCrit.requests++;
                 const cachedItem = await this.cache.get(hash);
                 if (cachedItem !== undefined && cachedItem !== null) {
-                    this.logger.debug(`Cache Hit: Item Check on ${item.name}`);
+                    this.logger.debug(`Cache Hit: Item Check on ${item.name} (Hash ${hash})`);
                     return cachedItem as boolean;
                 }
                 const itemResult = await this.isItem(item, states, this.logger);
                 this.stats.cache.itemCrit.miss++;
-                const res = await this.cache.set(hash, itemResult, {ttl: this.filterCriteriaTTL});
+                await this.cache.set(hash, itemResult, {ttl: this.filterCriteriaTTL});
                 return itemResult;
             } catch (err) {
                 if (err.logged !== true) {
@@ -535,12 +541,8 @@ export class SubredditResources {
     }
 
     async getCommentCheckCacheResult(item: Comment, checkConfig: object): Promise<UserResultCache | undefined> {
-        const criteria = {
-            author: item.author.name,
-            submission: item.link_id,
-            ...checkConfig
-        }
-        const hash = objectHash.sha1(criteria);
+        const userName = getActivityAuthorName(item.author);
+        const hash = `commentUserResult-${userName}-${item.link_id}-${objectHash.sha1(checkConfig)}`;
         this.stats.cache.commentCheck.requests++;
         let result = await this.cache.get(hash) as UserResultCache | undefined | null;
         if(result === null) {
@@ -549,19 +551,15 @@ export class SubredditResources {
         if(result === undefined) {
             this.stats.cache.commentCheck.miss++;
         }
-        this.logger.debug(`Cache Hit: Comment Check for ${item.author.name} in Submission ${item.link_id}`);
+        this.logger.debug(`Cache Hit: Comment Check for ${userName} in Submission ${item.link_id} (Hash ${hash})`);
         return result;
     }
 
     async setCommentCheckCacheResult(item: Comment, checkConfig: object, result: UserResultCache, ttl: number) {
-        const criteria = {
-            author: item.author.name,
-            submission: item.link_id,
-            ...checkConfig
-        }
-        const hash = objectHash.sha1(criteria);
+        const userName = getActivityAuthorName(item.author);
+        const hash = `commentUserResult-${userName}-${item.link_id}-${objectHash.sha1(checkConfig)}`
         await this.cache.set(hash, result, { ttl });
-        this.logger.debug(`Cached check result '${result.result}' for User ${item.author.name} on Submission ${item.link_id} for ${ttl} seconds`);
+        this.logger.debug(`Cached check result '${result.result}' for User ${userName} on Submission ${item.link_id} for ${ttl} seconds (Hash ${hash})`);
     }
 
     async generateFooter(item: Submission | Comment, actionFooter?: false | string) {
