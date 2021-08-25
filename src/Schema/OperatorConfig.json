@@ -685,9 +685,6 @@
                             "type": "number"
                         }
                     },
-                    "required": [
-                        "maxAge"
-                    ],
                     "type": "object"
                 },
                 "logLevel": {
@@ -749,9 +746,6 @@
                             "type": "string"
                         }
                     },
-                    "required": [
-                        "maxAge"
-                    ],
                     "type": "object"
                 }
             },

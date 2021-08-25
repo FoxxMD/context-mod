@@ -1241,7 +1241,7 @@ export interface OperatorJsonConfig {
              * @default 86400
              * @examples [86400]
              * */
-            maxAge: number
+            maxAge?: number
             /**
              * The secret value used to encrypt session data
              *
@@ -1266,7 +1266,7 @@ export interface OperatorJsonConfig {
             * @default 0
             * @examples [0]
             * */
-            maxAge: number
+            maxAge?: number
         }
         /**
          * The default log level to filter to in the web interface
