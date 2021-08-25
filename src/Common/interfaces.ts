@@ -382,48 +382,79 @@ export interface PollingOptions extends PollingDefaults {
 
 export interface TTLConfig {
     /**
-     * Amount of time, in seconds, author activities (Comments/Submission) should be cached
+     * Amount of time, in seconds, author activity history (Comments/Submission) should be cached
+     *
+     * * If `0` or `true` will cache indefinitely (not recommended)
+     * * If `false` will not cache
+     *
+     * * ENV => `AUTHOR_TTL`
+     * * ARG => `--authorTTL <sec>`
      * @examples [60]
      * @default 60
      * */
-    authorTTL?: number;
+    authorTTL?: number | boolean;
     /**
      * Amount of time, in seconds, wiki content pages should be cached
+     *
+     * * If `0` or `true` will cache indefinitely (not recommended)
+     * * If `false` will not cache
+     *
      * @examples [300]
      * @default 300
      * */
-    wikiTTL?: number;
-
+    wikiTTL?: number | boolean;
     /**
-     * Amount of time, in milliseconds, [Toolbox User Notes](https://www.reddit.com/r/toolbox/wiki/docs/usernotes) should be cached
+     * Amount of time, in seconds, [Toolbox User Notes](https://www.reddit.com/r/toolbox/wiki/docs/usernotes) should be cached
+     *
+     * * If `0` or `true` will cache indefinitely (not recommended)
+     * * If `false` will not cache
+     *
      * @examples [300]
      * @default 300
      * */
-    userNotesTTL?: number;
+    userNotesTTL?: number | boolean;
     /**
      * Amount of time, in seconds, a submission should be cached
+     *
+     * * If `0` or `true` will cache indefinitely (not recommended)
+     * * If `false` will not cache
+     *
      * @examples [60]
      * @default 60
      * */
-    submissionTTL?: number;
+    submissionTTL?: number | boolean;
     /**
      * Amount of time, in seconds, a comment should be cached
+     *
+     * * If `0` or `true` will cache indefinitely (not recommended)
+     * * If `false` will not cache
+     *
      * @examples [60]
      * @default 60
      * */
-    commentTTL?: number;
+    commentTTL?: number | boolean;
     /**
      * Amount of time, in seconds, to cache filter criteria results (`authorIs` and `itemIs` results)
      *
      * This is especially useful if when polling high-volume comments and your checks rely on author/item filters
      *
+     * * If `0` or `true` will cache indefinitely (not recommended)
+     * * If `false` will not cache
+     *
      * @examples [60]
      * @default 60
      * */
-    filterCriteriaTTL?: number;
+    filterCriteriaTTL?: number | boolean;
 }
 
-export interface SubredditCacheConfig extends TTLConfig {
+export interface CacheConfig extends TTLConfig {
+    /**
+     * The cache provider and, optionally, a custom configuration for that provider
+     *
+     * If not present or `null` provider will be `memory`.
+     *
+     * To specify another `provider` but use its default configuration set this property to a string of one of the available providers: `memory`, `redis`, or `none`
+     * */
     provider?: CacheProvider | CacheOptions
 }
 
@@ -504,7 +535,7 @@ export interface ManagerOptions {
     /**
      * Per-subreddit config for caching TTL values. If set to `false` caching is disabled.
      * */
-    caching?: SubredditCacheConfig
+    caching?: CacheConfig
 
     /**
      * Use this option to override the `dryRun` setting for all `Checks`
@@ -693,12 +724,12 @@ export type CacheProvider = 'memory' | 'redis' | 'none';
 //     provider: CacheOptions
 // }
 export type StrongCache = {
-    authorTTL: number,
-    userNotesTTL: number,
-    wikiTTL: number,
-    submissionTTL: number,
-    commentTTL: number,
-    filterCriteriaTTL: number,
+    authorTTL: number | boolean,
+    userNotesTTL: number | boolean,
+    wikiTTL: number | boolean,
+    submissionTTL: number | boolean,
+    commentTTL: number | boolean,
+    filterCriteriaTTL: number | boolean,
     provider: CacheOptions
 }
 
@@ -1060,58 +1091,7 @@ export interface BotInstanceJsonConfig {
      *
      * Every setting not specified will default to what is specified by the global operator caching config
      * */
-    caching?: {
-        /**
-         * Amount of time, in seconds, author activity history (Comments/Submission) should be cached
-         *
-         * * ENV => `AUTHOR_TTL`
-         * * ARG => `--authorTTL <sec>`
-         * @examples [60]
-         * @default 60
-         * */
-        authorTTL?: number;
-        /**
-         * Amount of time, in seconds, wiki content pages should be cached
-         * @examples [300]
-         * @default 300
-         * */
-        wikiTTL?: number;
-        /**
-         * Amount of time, in seconds, [Toolbox User Notes](https://www.reddit.com/r/toolbox/wiki/docs/usernotes) should be cached
-         * @examples [300]
-         * @default 300
-         * */
-        userNotesTTL?: number;
-        /**
-         * Amount of time, in seconds, a submission should be cached
-         * @examples [60]
-         * @default 60
-         * */
-        submissionTTL?: number;
-        /**
-         * Amount of time, in seconds, a comment should be cached
-         * @examples [60]
-         * @default 60
-         * */
-        commentTTL?: number;
-        /**
-         * Amount of time, in seconds, to cache filter criteria results (`authorIs` and `itemIs` results)
-         *
-         * This is especially useful if when polling high-volume comments and your checks rely on author/item filters
-         *
-         * @examples [60]
-         * @default 60
-         * */
-        filterCriteriaTTL?: number;
-        /**
-         * The cache provider and, optionally, a custom configuration for that provider
-         *
-         * If not present or `null` provider will be `memory`.
-         *
-         * To specify another `provider` but use its default configuration set this property to a string of one of the available providers: `memory`, `redis`, or `none`
-         * */
-        provider?: CacheProvider | CacheOptions
-    }
+    caching?: CacheConfig
     /**
      * Settings related to managing heavy API usage.
      * */
@@ -1224,58 +1204,7 @@ export interface OperatorJsonConfig {
      *
      * These settings will be used by each bot, and subreddit, that does not specify their own
      * */
-    caching?: {
-        /**
-         * Amount of time, in seconds, author activity history (Comments/Submission) should be cached
-         *
-         * * ENV => `AUTHOR_TTL`
-         * * ARG => `--authorTTL <sec>`
-         * @examples [60]
-         * @default 60
-         * */
-        authorTTL?: number;
-        /**
-         * Amount of time, in seconds, wiki content pages should be cached
-         * @examples [300]
-         * @default 300
-         * */
-        wikiTTL?: number;
-        /**
-         * Amount of time, in seconds, [Toolbox User Notes](https://www.reddit.com/r/toolbox/wiki/docs/usernotes) should be cached
-         * @examples [300]
-         * @default 300
-         * */
-        userNotesTTL?: number;
-        /**
-         * Amount of time, in seconds, a submission should be cached
-         * @examples [60]
-         * @default 60
-         * */
-        submissionTTL?: number;
-        /**
-         * Amount of time, in seconds, a comment should be cached
-         * @examples [60]
-         * @default 60
-         * */
-        commentTTL?: number;
-        /**
-         * Amount of time, in seconds, to cache filter criteria results (`authorIs` and `itemIs` results)
-         *
-         * This is especially useful if when polling high-volume comments and your checks rely on author/item filters
-         *
-         * @examples [60]
-         * @default 60
-         * */
-        filterCriteriaTTL?: number;
-        /**
-         * The cache provider and, optionally, a custom configuration for that provider
-         *
-         * If not present or `null` provider will be `memory`.
-         *
-         * To specify another `provider` but use its default configuration set this property to a string of one of the available providers: `memory`, `redis`, or `none`
-         * */
-        provider?: CacheProvider | CacheOptions
-    }
+    caching?: CacheConfig
 
     bots?: BotInstanceJsonConfig[]
 

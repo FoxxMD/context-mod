@@ -55,7 +55,7 @@ export interface RawNote {
 export type UserNotesConstants = Pick<any, "users" | "warnings">;
 
 export class UserNotes {
-    notesTTL: number;
+    notesTTL: number | false;
     subreddit: Subreddit;
     wiki: WikiPage;
     moderators?: RedditUser[];
@@ -70,8 +70,8 @@ export class UserNotes {
     debounceCB: any;
     batchCount: number = 0;
 
-    constructor(ttl: number, subreddit: Subreddit, logger: Logger, cache: Cache, cacheCB: Function) {
-        this.notesTTL = ttl;
+    constructor(ttl: number | boolean, subreddit: Subreddit, logger: Logger, cache: Cache, cacheCB: Function) {
+        this.notesTTL = ttl === true ? 0 : ttl;
         this.subreddit = subreddit;
         this.logger = logger;
         this.wiki = subreddit.getWikiPage('usernotes');
@@ -179,7 +179,7 @@ export class UserNotes {
 
             userNotes.blob = inflateUserNotes(userNotes.blob);
 
-            if (this.notesTTL > 0) {
+            if (this.notesTTL !== false) {
                 await this.cache.set(`${this.subreddit.display_name}-usernotes`, userNotes, {ttl: this.notesTTL});
                 this.users = new Map();
             }
@@ -197,7 +197,7 @@ export class UserNotes {
         const blob = deflateUserNotes(payload.blob);
         const wikiPayload = {text: JSON.stringify({...payload, blob}), reason: 'ContextBot edited usernotes'};
         try {
-            if (this.notesTTL > 0) {
+            if (this.notesTTL !== false) {
                 // DISABLED for now because if it fails throws an uncaught rejection
                 // and need to figured out how to handle this other than just logging (want to interrupt action flow too?)
                 //

@@ -686,6 +686,93 @@
             ],
             "type": "object"
         },
+        "CacheConfig": {
+            "properties": {
+                "authorTTL": {
+                    "default": 60,
+                    "description": "Amount of time, in seconds, author activity history (Comments/Submission) should be cached\n\n* If `0` or `true` will cache indefinitely (not recommended)\n* If `false` will not cache\n\n* ENV => `AUTHOR_TTL`\n* ARG => `--authorTTL <sec>`",
+                    "examples": [
+                        60
+                    ],
+                    "type": [
+                        "number",
+                        "boolean"
+                    ]
+                },
+                "commentTTL": {
+                    "default": 60,
+                    "description": "Amount of time, in seconds, a comment should be cached\n\n* If `0` or `true` will cache indefinitely (not recommended)\n* If `false` will not cache",
+                    "examples": [
+                        60
+                    ],
+                    "type": [
+                        "number",
+                        "boolean"
+                    ]
+                },
+                "filterCriteriaTTL": {
+                    "default": 60,
+                    "description": "Amount of time, in seconds, to cache filter criteria results (`authorIs` and `itemIs` results)\n\nThis is especially useful if when polling high-volume comments and your checks rely on author/item filters\n\n* If `0` or `true` will cache indefinitely (not recommended)\n* If `false` will not cache",
+                    "examples": [
+                        60
+                    ],
+                    "type": [
+                        "number",
+                        "boolean"
+                    ]
+                },
+                "provider": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/definitions/CacheOptions"
+                        },
+                        {
+                            "enum": [
+                                "memory",
+                                "none",
+                                "redis"
+                            ],
+                            "type": "string"
+                        }
+                    ],
+                    "description": "The cache provider and, optionally, a custom configuration for that provider\n\nIf not present or `null` provider will be `memory`.\n\nTo specify another `provider` but use its default configuration set this property to a string of one of the available providers: `memory`, `redis`, or `none`"
+                },
+                "submissionTTL": {
+                    "default": 60,
+                    "description": "Amount of time, in seconds, a submission should be cached\n\n* If `0` or `true` will cache indefinitely (not recommended)\n* If `false` will not cache",
+                    "examples": [
+                        60
+                    ],
+                    "type": [
+                        "number",
+                        "boolean"
+                    ]
+                },
+                "userNotesTTL": {
+                    "default": 300,
+                    "description": "Amount of time, in seconds, [Toolbox User Notes](https://www.reddit.com/r/toolbox/wiki/docs/usernotes) should be cached\n\n* If `0` or `true` will cache indefinitely (not recommended)\n* If `false` will not cache",
+                    "examples": [
+                        300
+                    ],
+                    "type": [
+                        "number",
+                        "boolean"
+                    ]
+                },
+                "wikiTTL": {
+                    "default": 300,
+                    "description": "Amount of time, in seconds, wiki content pages should be cached\n\n* If `0` or `true` will cache indefinitely (not recommended)\n* If `false` will not cache",
+                    "examples": [
+                        300
+                    ],
+                    "type": [
+                        "number",
+                        "boolean"
+                    ]
+                }
+            },
+            "type": "object"
+        },
         "CacheOptions": {
             "additionalProperties": {
             },
@@ -2605,74 +2692,6 @@
             },
             "type": "object"
         },
-        "SubredditCacheConfig": {
-            "properties": {
-                "authorTTL": {
-                    "default": 60,
-                    "description": "Amount of time, in seconds, author activities (Comments/Submission) should be cached",
-                    "examples": [
-                        60
-                    ],
-                    "type": "number"
-                },
-                "commentTTL": {
-                    "default": 60,
-                    "description": "Amount of time, in seconds, a comment should be cached",
-                    "examples": [
-                        60
-                    ],
-                    "type": "number"
-                },
-                "filterCriteriaTTL": {
-                    "default": 60,
-                    "description": "Amount of time, in seconds, to cache filter criteria results (`authorIs` and `itemIs` results)\n\nThis is especially useful if when polling high-volume comments and your checks rely on author/item filters",
-                    "examples": [
-                        60
-                    ],
-                    "type": "number"
-                },
-                "provider": {
-                    "anyOf": [
-                        {
-                            "$ref": "#/definitions/CacheOptions"
-                        },
-                        {
-                            "enum": [
-                                "memory",
-                                "none",
-                                "redis"
-                            ],
-                            "type": "string"
-                        }
-                    ]
-                },
-                "submissionTTL": {
-                    "default": 60,
-                    "description": "Amount of time, in seconds, a submission should be cached",
-                    "examples": [
-                        60
-                    ],
-                    "type": "number"
-                },
-                "userNotesTTL": {
-                    "default": 300,
-                    "description": "Amount of time, in milliseconds, [Toolbox User Notes](https://www.reddit.com/r/toolbox/wiki/docs/usernotes) should be cached",
-                    "examples": [
-                        300
-                    ],
-                    "type": "number"
-                },
-                "wikiTTL": {
-                    "default": 300,
-                    "description": "Amount of time, in seconds, wiki content pages should be cached",
-                    "examples": [
-                        300
-                    ],
-                    "type": "number"
-                }
-            },
-            "type": "object"
-        },
         "UserNoteActionJson": {
             "description": "Add a Toolbox User Note to the Author of this Activity",
             "properties": {
@@ -2838,7 +2857,7 @@
     },
     "properties": {
         "caching": {
-            "$ref": "#/definitions/SubredditCacheConfig",
+            "$ref": "#/definitions/CacheConfig",
             "description": "Per-subreddit config for caching TTL values. If set to `false` caching is disabled."
         },
         "checks": {

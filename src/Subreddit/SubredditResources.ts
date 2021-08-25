@@ -25,7 +25,7 @@ import {
     BotInstanceConfig,
     CacheOptions, CommentState,
     Footer, OperatorConfig, ResourceStats, StrongCache, SubmissionState,
-    SubredditCacheConfig, TTLConfig, TypedActivityStates, UserResultCache
+    CacheConfig, TTLConfig, TypedActivityStates, UserResultCache
 } from "../Common/interfaces";
 import UserNotes from "./UserNotes";
 import Mustache from "mustache";
@@ -40,7 +40,7 @@ import {check} from "tcp-port-used";
 export const DEFAULT_FOOTER = '\r\n*****\r\nThis action was performed by [a bot.]({{botLink}}) Mention a moderator or [send a modmail]({{modmailLink}}) if you any ideas, questions, or concerns about this action.';
 
 export interface SubredditResourceConfig extends Footer {
-    caching?: SubredditCacheConfig,
+    caching?: CacheConfig,
     subreddit: Subreddit,
     logger: Logger;
     client: Snoowrap
@@ -57,17 +57,17 @@ interface SubredditResourceOptions extends Footer {
     prefix? :string;
 }
 
-export interface SubredditResourceSetOptions extends SubredditCacheConfig, Footer {
+export interface SubredditResourceSetOptions extends CacheConfig, Footer {
 }
 
 export class SubredditResources {
     //enabled!: boolean;
     protected useSubredditAuthorCache!: boolean;
-    protected authorTTL: number = cacheTTLDefaults.authorTTL;
-    protected wikiTTL: number = cacheTTLDefaults.wikiTTL;
-    protected submissionTTL: number = cacheTTLDefaults.submissionTTL;
-    protected commentTTL: number = cacheTTLDefaults.commentTTL;
-    protected filterCriteriaTTL: number = cacheTTLDefaults.filterCriteriaTTL;
+    protected authorTTL: number | false = cacheTTLDefaults.authorTTL;
+    protected wikiTTL: number | false = cacheTTLDefaults.wikiTTL;
+    protected submissionTTL: number | false = cacheTTLDefaults.submissionTTL;
+    protected commentTTL: number | false = cacheTTLDefaults.commentTTL;
+    protected filterCriteriaTTL: number | false = cacheTTLDefaults.filterCriteriaTTL;
     name: string;
     protected logger: Logger;
     userNotes: UserNotes;
@@ -106,11 +106,11 @@ export class SubredditResources {
         this.prefix = prefix;
         this.client = client;
         this.cacheType = cacheType;
-        this.authorTTL = authorTTL;
-        this.submissionTTL = submissionTTL;
-        this.commentTTL = commentTTL;
-        this.wikiTTL = wikiTTL;
-        this.filterCriteriaTTL = filterCriteriaTTL;
+        this.authorTTL = authorTTL === true ? 0 : authorTTL;
+        this.submissionTTL = submissionTTL === true ? 0 : submissionTTL;
+        this.commentTTL = commentTTL === true ? 0 : commentTTL;
+        this.wikiTTL = wikiTTL === true ? 0 : wikiTTL;
+        this.filterCriteriaTTL = filterCriteriaTTL === true ? 0 : filterCriteriaTTL;
         this.subreddit = subreddit;
         this.name = name;
         if (logger === undefined) {
@@ -132,7 +132,7 @@ export class SubredditResources {
         this.userNotes = new UserNotes(userNotesTTL, this.subreddit, this.logger, this.cache, cacheUseCB)
 
         if(this.cacheType === 'memory' && this.cacheSettingsHash !== 'default') {
-            const min = Math.min(...([wikiTTL, authorTTL, userNotesTTL].filter(x => x !== 0)));
+            const min = Math.min(...([this.wikiTTL, this.authorTTL, this.submissionTTL, this.commentTTL, this.filterCriteriaTTL].filter(x => typeof x === 'number' && x !== 0) as number[]));
             if(min > 0) {
                 // set default prune interval
                 this.pruneInterval = setInterval(() => {
@@ -216,7 +216,7 @@ export class SubredditResources {
     async getActivity(item: Submission | Comment) {
         try {
             let hash = '';
-            if (asSubmission(item) && this.submissionTTL > 0) {
+            if (this.submissionTTL !== false && asSubmission(item)) {
                 hash = `sub-${item.name}`;
                 await this.stats.cache.submission.identifierRequestCount.set(hash, (await this.stats.cache.submission.identifierRequestCount.wrap(hash, () => 0) as number) + 1);
                 this.stats.cache.submission.requestTimestamps.push(Date.now());
@@ -231,7 +231,7 @@ export class SubredditResources {
                 this.stats.cache.submission.miss++;
                 await this.cache.set(hash, submission, {ttl: this.submissionTTL});
                 return submission;
-            } else if (this.commentTTL > 0) {
+            } else if (this.commentTTL !== false) {
                 hash = `comm-${item.name}`;
                 await this.stats.cache.comment.identifierRequestCount.set(hash, (await this.stats.cache.comment.identifierRequestCount.wrap(hash, () => 0) as number) + 1);
                 this.stats.cache.comment.requestTimestamps.push(Date.now());
@@ -258,7 +258,7 @@ export class SubredditResources {
 
     async getAuthorActivities(user: RedditUser, options: AuthorTypedActivitiesOptions): Promise<Array<Submission | Comment>> {
         const userName = getActivityAuthorName(user);
-        if (this.authorTTL > 0) {
+        if (this.authorTTL !== false) {
             const hashObj: any = options;
             if (this.useSubredditAuthorCache) {
                 hashObj.subreddit = this.subreddit;
@@ -320,7 +320,7 @@ export class SubredditResources {
 
         // try to get cached value first
         let hash = `${subreddit.display_name}-content-${cacheKey}`;
-        if (this.wikiTTL > 0) {
+        if (this.wikiTTL !== false) {
             await this.stats.cache.content.identifierRequestCount.set(cacheKey, (await this.stats.cache.content.identifierRequestCount.wrap(cacheKey, () => 0) as number) + 1);
             this.stats.cache.content.requestTimestamps.push(Date.now());
             this.stats.cache.content.requests++;
@@ -370,7 +370,7 @@ export class SubredditResources {
             }
         }
 
-        if (this.wikiTTL > 0) {
+        if (this.wikiTTL !== false) {
             this.cache.set(hash, wikiContent, {ttl: this.wikiTTL});
         }
 
@@ -378,7 +378,7 @@ export class SubredditResources {
     }
 
     async testAuthorCriteria(item: (Comment | Submission), authorOpts: AuthorCriteria, include = true) {
-        if (this.filterCriteriaTTL > 0) {
+        if (this.filterCriteriaTTL !== false) {
             // in the criteria check we only actually use the `item` to get the author flair
             // which will be the same for the entire subreddit
             //
@@ -407,7 +407,7 @@ export class SubredditResources {
     }
 
     async testItemCriteria(i: (Comment | Submission), s: TypedActivityStates) {
-        if (this.filterCriteriaTTL > 0) {
+        if (this.filterCriteriaTTL !== false) {
             let item = i;
             let states = s;
             // optimize for submission only checks on comment item
@@ -612,7 +612,7 @@ export class BotResourcesManager {
         this.cacheType = options.store;
         this.defaultCache = createCacheManager(options);
         if (this.cacheType === 'memory') {
-            const min = Math.min(...([this.ttlDefaults.wikiTTL, this.ttlDefaults.authorTTL, this.ttlDefaults.userNotesTTL].filter(x => x !== 0)));
+            const min = Math.min(...([this.ttlDefaults.wikiTTL, this.ttlDefaults.authorTTL, this.ttlDefaults.userNotesTTL].filter(x => typeof x === 'number' && x !== 0) as number[]));
             if (min > 0) {
                 // set default prune interval
                 this.pruneInterval = setInterval(() => {
