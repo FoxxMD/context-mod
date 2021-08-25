@@ -385,7 +385,7 @@ export class SubredditResources {
             // so we can create a hash only using subreddit-author-criteria
             // and ignore the actual item
             const hashObj = {...authorOpts, include};
-            const userName = getActivityAuthorName(item);
+            const userName = getActivityAuthorName(item.author);
             const hash = `authorCrit-${this.subreddit.display_name}-${userName}-${objectHash.sha1(hashObj)}`;
             await this.stats.cache.authorCrit.identifierRequestCount.set(hash, (await this.stats.cache.authorCrit.identifierRequestCount.wrap(hash, () => 0) as number) + 1);
             this.stats.cache.authorCrit.requestTimestamps.push(Date.now());

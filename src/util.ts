@@ -28,6 +28,7 @@ import crypto from "crypto";
 import Autolinker from 'autolinker';
 import {create as createMemoryStore} from './Utils/memoryStore';
 import {MESSAGE} from "triple-beam";
+import {RedditUser} from "snoowrap/dist/objects";
 
 const {format} = winston;
 const {combine, printf, timestamp, label, splat, errors} = format;
@@ -1025,7 +1026,7 @@ export const getActivitySubredditName = (activity: any): string => {
 /**
  * Serialized activities store subreddit and user properties as their string representations (instead of proxy)
  * */
-export const getActivityAuthorName = (author: any): string => {
+export const getActivityAuthorName = (author: RedditUser | string): string => {
     if(typeof author === 'string') {
         return author;
     }
