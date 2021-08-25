@@ -90,6 +90,8 @@ export class SubredditResources {
                 authorTTL,
                 wikiTTL,
                 filterCriteriaTTL,
+                submissionTTL,
+                commentTTL,
             },
             cache,
             prefix,
@@ -104,6 +106,8 @@ export class SubredditResources {
         this.client = client;
         this.cacheType = cacheType;
         this.authorTTL = authorTTL;
+        this.submissionTTL = submissionTTL;
+        this.commentTTL = commentTTL;
         this.wikiTTL = wikiTTL;
         this.filterCriteriaTTL = filterCriteriaTTL;
         this.subreddit = subreddit;
@@ -383,7 +387,7 @@ export class SubredditResources {
             const cachedAuthorTest = await this.cache.wrap(hash, async () => {
                 miss = true;
                 return await testAuthorCriteria(item, authorOpts, include, this.userNotes);
-            }, {ttl: this.authorTTL});
+            }, {ttl: this.filterCriteriaTTL});
             if (!miss) {
                 this.logger.debug(`Cache Hit: Author Check on ${item.id}`);
             } else {
