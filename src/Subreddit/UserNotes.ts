@@ -2,7 +2,7 @@ import dayjs, {Dayjs} from "dayjs";
 import {Comment, RedditUser, WikiPage} from "snoowrap";
 import {
     COMMENT_URL_ID,
-    deflateUserNotes,
+    deflateUserNotes, getActivityAuthorName,
     inflateUserNotes,
     isScopeError,
     parseLinkIdentifier,
@@ -81,10 +81,11 @@ export class UserNotes {
     }
 
     async getUserNotes(user: RedditUser): Promise<UserNote[]> {
+        const userName = getActivityAuthorName(user);
         let notes: UserNote[] | undefined = [];
 
         if (this.users !== undefined) {
-            notes = this.users.get(user.name);
+            notes = this.users.get(userName);
             if (notes !== undefined) {
                 this.logger.debug('Returned cached notes');
                 return notes;
@@ -92,7 +93,7 @@ export class UserNotes {
         }
 
         const payload = await this.retrieveData();
-        const rawNotes = payload.blob[user.name];
+        const rawNotes = payload.blob[userName];
         if (rawNotes !== undefined) {
             if (this.moderators === undefined) {
                 this.moderators = await this.subreddit.getModerators();
@@ -101,7 +102,7 @@ export class UserNotes {
             // sort in ascending order by time
             notes.sort((a, b) => a.time.isBefore(b.time) ? -1 : 1);
             if (this.notesTTL > 0 && this.cache !== undefined) {
-                this.users.set(user.name, notes);
+                this.users.set(userName, notes);
             }
             return notes;
         } else {
@@ -112,6 +113,7 @@ export class UserNotes {
     async addUserNote(item: (Submission|Comment), type: string | number, text: string = ''): Promise<UserNote>
     {
         const payload = await this.retrieveData();
+        const userName = getActivityAuthorName(item.author);
 
         // idgaf
         // @ts-ignore
@@ -127,16 +129,16 @@ export class UserNotes {
         }
         const newNote = new UserNote(dayjs(), text, mod, type, `https://reddit.com${item.permalink}`);
 
-        if(payload.blob[item.author.name] === undefined) {
-            payload.blob[item.author.name] = {ns: []};
+        if(payload.blob[userName] === undefined) {
+            payload.blob[userName] = {ns: []};
         }
-        payload.blob[item.author.name].ns.push(newNote.toRaw(payload.constants));
+        payload.blob[userName].ns.push(newNote.toRaw(payload.constants));
 
         await this.saveData(payload);
         if(this.notesTTL > 0) {
-            const currNotes = this.users.get(item.author.name) || [];
+            const currNotes = this.users.get(userName) || [];
             currNotes.push(newNote);
-            this.users.set(item.author.name, currNotes);
+            this.users.set(userName, currNotes);
         }
         return newNote;
     }
