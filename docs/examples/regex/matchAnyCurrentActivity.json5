@@ -1,0 +1,14 @@
+// goes inside
+// "rules": []
+{
+  "name": "swear",
+  "kind": "regex",
+  "criteria": [
+    // triggers if current activity has more than 0 matches
+    {
+      "regex": "/fuck|shit|damn/",
+      // if "matchThreshold" is not specified it defaults to this -- default behavior is to trigger if there are any matches
+      // "matchThreshold": "> 0"
+    },
+  ]
+}

@@ -2,6 +2,7 @@ import {SubmissionActionConfig} from "./index";
 import Action, {ActionJson, ActionOptions} from "../index";
 import Snoowrap, {Comment, Submission} from "snoowrap";
 import {RuleResult} from "../../Rule";
+import {ActionProcessResult} from "../../Common/interfaces";
 
 export class FlairAction extends Action {
     text: string;
@@ -20,7 +21,8 @@ export class FlairAction extends Action {
         return 'Flair';
     }
 
-    async process(item: Comment | Submission, ruleResults: RuleResult[]): Promise<void> {
+    async process(item: Comment | Submission, ruleResults: RuleResult[], runtimeDryrun?: boolean): Promise<ActionProcessResult> {
+        const dryRun = runtimeDryrun || this.dryRun;
         if (item instanceof Submission) {
             if(!this.dryRun) {
                 // @ts-ignore
@@ -28,6 +30,15 @@ export class FlairAction extends Action {
             }
         } else {
             this.logger.warn('Cannot flair Comment');
+            return {
+                dryRun,
+                success: false,
+                result: 'Cannot flair Comment',
+            }
+        }
+        return {
+            dryRun,
+            success: true,
         }
     }
 }

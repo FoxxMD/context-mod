@@ -1,6 +1,13 @@
 import dayjs, {Dayjs} from "dayjs";
 import {Comment, RedditUser, WikiPage} from "snoowrap";
-import {COMMENT_URL_ID, deflateUserNotes, inflateUserNotes, parseLinkIdentifier, SUBMISSION_URL_ID} from "../util";
+import {
+    COMMENT_URL_ID,
+    deflateUserNotes, getActivityAuthorName,
+    inflateUserNotes,
+    isScopeError,
+    parseLinkIdentifier,
+    SUBMISSION_URL_ID
+} from "../util";
 import Subreddit from "snoowrap/dist/objects/Subreddit";
 import {Logger} from "winston";
 import LoggedError from "../Utils/LoggedError";
@@ -48,7 +55,7 @@ export interface RawNote {
 export type UserNotesConstants = Pick<any, "users" | "warnings">;
 
 export class UserNotes {
-    notesTTL: number;
+    notesTTL: number | false;
     subreddit: Subreddit;
     wiki: WikiPage;
     moderators?: RedditUser[];
@@ -63,8 +70,8 @@ export class UserNotes {
     debounceCB: any;
     batchCount: number = 0;
 
-    constructor(ttl: number, subreddit: Subreddit, logger: Logger, cache: Cache, cacheCB: Function) {
-        this.notesTTL = ttl;
+    constructor(ttl: number | boolean, subreddit: Subreddit, logger: Logger, cache: Cache, cacheCB: Function) {
+        this.notesTTL = ttl === true ? 0 : ttl;
         this.subreddit = subreddit;
         this.logger = logger;
         this.wiki = subreddit.getWikiPage('usernotes');
@@ -74,10 +81,11 @@ export class UserNotes {
     }
 
     async getUserNotes(user: RedditUser): Promise<UserNote[]> {
+        const userName = getActivityAuthorName(user);
         let notes: UserNote[] | undefined = [];
 
         if (this.users !== undefined) {
-            notes = this.users.get(user.name);
+            notes = this.users.get(userName);
             if (notes !== undefined) {
                 this.logger.debug('Returned cached notes');
                 return notes;
@@ -85,7 +93,7 @@ export class UserNotes {
         }
 
         const payload = await this.retrieveData();
-        const rawNotes = payload.blob[user.name];
+        const rawNotes = payload.blob[userName];
         if (rawNotes !== undefined) {
             if (this.moderators === undefined) {
                 this.moderators = await this.subreddit.getModerators();
@@ -94,7 +102,7 @@ export class UserNotes {
             // sort in ascending order by time
             notes.sort((a, b) => a.time.isBefore(b.time) ? -1 : 1);
             if (this.notesTTL > 0 && this.cache !== undefined) {
-                this.users.set(user.name, notes);
+                this.users.set(userName, notes);
             }
             return notes;
         } else {
@@ -105,6 +113,7 @@ export class UserNotes {
     async addUserNote(item: (Submission|Comment), type: string | number, text: string = ''): Promise<UserNote>
     {
         const payload = await this.retrieveData();
+        const userName = getActivityAuthorName(item.author);
 
         // idgaf
         // @ts-ignore
@@ -120,16 +129,16 @@ export class UserNotes {
         }
         const newNote = new UserNote(dayjs(), text, mod, type, `https://reddit.com${item.permalink}`);
 
-        if(payload.blob[item.author.name] === undefined) {
-            payload.blob[item.author.name] = {ns: []};
+        if(payload.blob[userName] === undefined) {
+            payload.blob[userName] = {ns: []};
         }
-        payload.blob[item.author.name].ns.push(newNote.toRaw(payload.constants));
+        payload.blob[userName].ns.push(newNote.toRaw(payload.constants));
 
         await this.saveData(payload);
         if(this.notesTTL > 0) {
-            const currNotes = this.users.get(item.author.name) || [];
+            const currNotes = this.users.get(userName) || [];
             currNotes.push(newNote);
-            this.users.set(item.author.name, currNotes);
+            this.users.set(userName, currNotes);
         }
         return newNote;
     }
@@ -144,7 +153,7 @@ export class UserNotes {
         let cacheMiss;
         if (this.notesTTL > 0) {
             const cachedPayload = await this.cache.get(this.identifier);
-            if (cachedPayload !== undefined) {
+            if (cachedPayload !== undefined && cachedPayload !== null) {
                 this.cacheCB(false);
                 return cachedPayload as unknown as RawUserNotesPayload;
             }
@@ -153,14 +162,15 @@ export class UserNotes {
         }
 
         try {
-            if(cacheMiss && this.debounceCB !== undefined) {
-                // timeout is still delayed. its our wiki data and we want it now! cm cacheworth 877 cache now
-                this.logger.debug(`Detected missed cache on usernotes retrieval while batch (${this.batchCount}) save is in progress, executing save immediately before retrieving new notes...`);
-                clearTimeout(this.saveDebounce);
-                await this.debounceCB();
-                this.debounceCB = undefined;
-                this.saveDebounce = undefined;
-            }
+            // DISABLED for now because I think its causing issues
+            // if(cacheMiss && this.debounceCB !== undefined) {
+            //     // timeout is still delayed. its our wiki data and we want it now! cm cacheworth 877 cache now
+            //     this.logger.debug(`Detected missed cache on usernotes retrieval while batch (${this.batchCount}) save is in progress, executing save immediately before retrieving new notes...`);
+            //     clearTimeout(this.saveDebounce);
+            //     await this.debounceCB();
+            //     this.debounceCB = undefined;
+            //     this.saveDebounce = undefined;
+            // }
             // @ts-ignore
             this.wiki = await this.subreddit.getWikiPage('usernotes').fetch();
             const wikiContent = this.wiki.content_md;
@@ -169,7 +179,7 @@ export class UserNotes {
 
             userNotes.blob = inflateUserNotes(userNotes.blob);
 
-            if (this.notesTTL > 0) {
+            if (this.notesTTL !== false) {
                 await this.cache.set(`${this.subreddit.display_name}-usernotes`, userNotes, {ttl: this.notesTTL});
                 this.users = new Map();
             }
@@ -187,30 +197,36 @@ export class UserNotes {
         const blob = deflateUserNotes(payload.blob);
         const wikiPayload = {text: JSON.stringify({...payload, blob}), reason: 'ContextBot edited usernotes'};
         try {
-            if (this.notesTTL > 0) {
+            if (this.notesTTL !== false) {
+                // DISABLED for now because if it fails throws an uncaught rejection
+                // and need to figured out how to handle this other than just logging (want to interrupt action flow too?)
+                //
                 // debounce usernote save by 5 seconds -- effectively batch usernote saves
                 //
                 // so that if we are processing a ton of checks that write user notes we aren't calling to save the wiki page on every call
                 // since we also have everything in cache (most likely...)
                 //
                 // TODO might want to increase timeout to 10 seconds
-                if(this.saveDebounce !== undefined) {
-                    clearTimeout(this.saveDebounce);
-                }
-                this.debounceCB = (async function () {
-                    const p = wikiPayload;
-                    // @ts-ignore
-                    const self = this as UserNotes;
-                    // @ts-ignore
-                    self.wiki = await self.subreddit.getWikiPage('usernotes').edit(p);
-                    self.logger.debug(`Batch saved ${self.batchCount} usernotes`);
-                    self.debounceCB = undefined;
-                    self.saveDebounce = undefined;
-                    self.batchCount = 0;
-                }).bind(this);
-                this.saveDebounce = setTimeout(this.debounceCB,5000);
-                this.batchCount++;
-                this.logger.debug(`Saving Usernotes has been debounced for 5 seconds (${this.batchCount} batched)`)
+                // if(this.saveDebounce !== undefined) {
+                //     clearTimeout(this.saveDebounce);
+                // }
+                // this.debounceCB = (async function () {
+                //     const p = wikiPayload;
+                //     // @ts-ignore
+                //     const self = this as UserNotes;
+                //     // @ts-ignore
+                //     self.wiki = await self.subreddit.getWikiPage('usernotes').edit(p);
+                //     self.logger.debug(`Batch saved ${self.batchCount} usernotes`);
+                //     self.debounceCB = undefined;
+                //     self.saveDebounce = undefined;
+                //     self.batchCount = 0;
+                // }).bind(this);
+                // this.saveDebounce = setTimeout(this.debounceCB,5000);
+                // this.batchCount++;
+                // this.logger.debug(`Saving Usernotes has been debounced for 5 seconds (${this.batchCount} batched)`)
+
+                // @ts-ignore
+                await this.subreddit.getWikiPage('usernotes').edit(wikiPayload);
                 await this.cache.set(this.identifier, payload, {ttl: this.notesTTL});
                 this.users = new Map();
             } else {
@@ -220,7 +236,13 @@ export class UserNotes {
 
             return payload as RawUserNotesPayload;
         } catch (err) {
-            const msg = `Could not edit usernotes. Make sure at least one moderator has used toolbox and usernotes before and that this account has editing permissions`;
+            let msg = 'Could not edit usernotes.';
+            // Make sure at least one moderator has used toolbox and usernotes before and that this account has editing permissions`;
+            if(isScopeError(err)) {
+                msg = `${msg} The bot account did not have sufficient OAUTH scope to perform this action. You must re-authenticate the bot and ensure it has has 'wikiedit' permissions.`
+            } else {
+                msg = `${msg} Make sure at least one moderator has used toolbox, created a usernote, and that this account has editing permissions for the wiki page.`;
+            }
             this.logger.error(msg, err);
             throw new LoggedError(msg);
         }

@@ -16,6 +16,7 @@ This directory contains example of valid, ready-to-go configurations for Context
   * [Repeat Activity](/docs/examples/repeatActivity)
   * [History](/docs/examples/history)
   * [Author](/docs/examples/author)
+  * [Regex](/docs/examples/regex)
 * [Toolbox User Notes](/docs/examples/userNotes)
 * [Advanced Concepts](/docs/examples/advancedConcepts)
   * [Rule Sets](/docs/examples/advancedConcepts/ruleSets.json5)

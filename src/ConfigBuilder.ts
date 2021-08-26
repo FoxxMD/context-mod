@@ -1,12 +1,12 @@
 import {Logger} from "winston";
 import {
-    buildCacheOptionsFromProvider,
+    buildCacheOptionsFromProvider, buildCachePrefix,
     createAjvFactory,
     mergeArr,
     normalizeName,
     overwriteMerge,
     parseBool, randomId,
-    readJson,
+    readConfigFile,
     removeUndefinedKeys
 } from "./util";
 import {CommentCheck} from "./Check/CommentCheck";
@@ -43,6 +43,7 @@ import {operatorConfig} from "./Utils/CommandConfig";
 import merge from 'deepmerge';
 import * as process from "process";
 import {cacheOptDefaults, cacheTTLDefaults} from "./Common/defaults";
+import objectHash from "object-hash";
 
 export interface ConfigBuilderOptions {
     logger: Logger,
@@ -291,10 +292,6 @@ export const parseDefaultBotInstanceFromArgs = (args: any): BotInstanceJsonConfi
         polling: {
             sharedMod,
         },
-        caching: {
-            provider: caching,
-            authorTTL
-        },
         nanny: {
             softLimit,
             hardLimit
@@ -316,6 +313,8 @@ export const parseOpConfigFromArgs = (args: any): OperatorJsonConfig => {
         sessionSecret,
         web,
         mode,
+        caching,
+        authorTTL,
     } = args || {};
 
     const data = {
@@ -327,6 +326,10 @@ export const parseOpConfigFromArgs = (args: any): OperatorJsonConfig => {
         logging: {
             level: logLevel,
             path: logDir === true ? `${process.cwd()}/logs` : undefined,
+        },
+        caching: {
+            provider: caching,
+            authorTTL
         },
         web: {
             enabled: web,
@@ -387,13 +390,6 @@ export const parseDefaultBotInstanceFromEnv = (): BotInstanceJsonConfig => {
         polling: {
             sharedMod: parseBool(process.env.SHARE_MOD),
         },
-        caching: {
-            provider: {
-                // @ts-ignore
-                store: process.env.CACHING as (CacheProvider | undefined)
-            },
-            authorTTL: process.env.AUTHOR_TTL !== undefined ? parseInt(process.env.AUTHOR_TTL) : undefined
-        },
         nanny: {
             softLimit: process.env.SOFT_LIMIT !== undefined ? parseInt(process.env.SOFT_LIMIT) : undefined,
             hardLimit: process.env.HARD_LIMIT !== undefined ? parseInt(process.env.HARD_LIMIT) : undefined
@@ -413,6 +409,13 @@ export const parseOpConfigFromEnv = (): OperatorJsonConfig => {
             // @ts-ignore
             level: process.env.LOG_LEVEL,
             path: process.env.LOG_DIR === 'true' ? `${process.cwd()}/logs` : undefined,
+        },
+        caching: {
+            provider: {
+                // @ts-ignore
+                store: process.env.CACHING as (CacheProvider | undefined)
+            },
+            authorTTL: process.env.AUTHOR_TTL !== undefined ? parseInt(process.env.AUTHOR_TTL) : undefined
         },
         web: {
             port: process.env.PORT !== undefined ? parseInt(process.env.PORT) : undefined,
@@ -473,7 +476,7 @@ export const parseOperatorConfigFromSources = async (args: any): Promise<Operato
     if (operatorConfig !== undefined) {
         let rawConfig;
         try {
-            rawConfig = await readJson(operatorConfig, {log: initLogger});
+            rawConfig = await readConfigFile(operatorConfig, {log: initLogger}) as object;
         } catch (err) {
             initLogger.error('Cannot continue app startup because operator config file was not parseable.');
             err.logged = true;
@@ -493,9 +496,17 @@ export const parseOperatorConfigFromSources = async (args: any): Promise<Operato
     const defaultBotInstanceFromEnv = parseDefaultBotInstanceFromEnv();
     const {bots: botInstancesFromFile = [], ...restConfigFile} = configFromFile;
 
-    const defaultBotInstance = merge.all([defaultBotInstanceFromEnv, defaultBotInstanceFromArgs], {
+    const mergedConfig = merge.all([opConfigFromEnv, restConfigFile, opConfigFromArgs], {
         arrayMerge: overwriteMerge,
     });
+
+    const defaultBotInstance = merge.all([defaultBotInstanceFromEnv, defaultBotInstanceFromArgs], {
+        arrayMerge: overwriteMerge,
+    }) as BotInstanceJsonConfig;
+
+    if(configFromFile.caching !== undefined) {
+        defaultBotInstance.caching = configFromFile.caching;
+    }
 
     let botInstances = [];
     if(botInstancesFromFile.length === 0) {
@@ -503,10 +514,6 @@ export const parseOperatorConfigFromSources = async (args: any): Promise<Operato
     } else {
         botInstances = botInstancesFromFile.map(x => merge.all([defaultBotInstance, x], {arrayMerge: overwriteMerge}));
     }
-
-    const mergedConfig = merge.all([opConfigFromEnv, restConfigFile, opConfigFromArgs], {
-        arrayMerge: overwriteMerge,
-    });
 
     return removeUndefinedKeys({...mergedConfig, bots: botInstances}) as OperatorJsonConfig;
 }
@@ -522,12 +529,17 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
             level = 'verbose',
             path,
         } = {},
+        caching: opCache,
         web: {
             port = 8085,
             maxLogs = 200,
+            caching: webCaching = {},
             session: {
                 secret = randomId(),
-                provider: sessionProvider = { store: 'memory' },
+                maxAge: sessionMaxAge = 86400,
+            } = {},
+            invites: {
+                maxAge: inviteMaxAge = 0,
             } = {},
             clients,
             credentials: webCredentials,
@@ -541,8 +553,44 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
         bots = [],
     } = data;
 
+    let cache: StrongCache;
+    let defaultProvider: CacheOptions;
+
+    if(opCache === undefined) {
+        defaultProvider =  {
+            store: 'memory',
+            ...cacheOptDefaults
+        };
+        cache = {
+            ...cacheTTLDefaults,
+            provider: defaultProvider
+        };
+
+    } else {
+        const {provider, ...restConfig} = opCache;
+        if(typeof provider === 'string') {
+            defaultProvider = {
+                store: provider as CacheProvider,
+                ...cacheOptDefaults
+            };
+        } else {
+            const {ttl = 60, max = 500, store = 'memory', ...rest} = provider || {};
+            defaultProvider = {
+                store,
+                ...cacheOptDefaults,
+                ...rest,
+            };
+        }
+        cache = {
+            ...cacheTTLDefaults,
+            ...restConfig,
+            provider: defaultProvider,
+        }
+    }
+
     let hydratedBots: BotInstanceConfig[]  = bots.map(x => {
        const {
+           name: botName,
            polling: {
                sharedMod = false,
                limit = 100,
@@ -572,10 +620,10 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
        } = x;
 
 
-    let cache: StrongCache;
+    let botCache: StrongCache;
 
     if(caching === undefined) {
-        cache = {
+        botCache = {
             ...cacheTTLDefaults,
             provider: {
                 store: 'memory',
@@ -585,7 +633,7 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
     } else {
         const {provider, ...restConfig} = caching;
         if (typeof provider === 'string') {
-            cache = {
+            botCache = {
                 ...cacheTTLDefaults,
                 ...restConfig,
                 provider: {
@@ -595,7 +643,7 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
             }
         } else {
             const {ttl = 60, max = 500, store = 'memory', ...rest} = provider || {};
-            cache = {
+            botCache = {
                 ...cacheTTLDefaults,
                 ...restConfig,
                 provider: {
@@ -607,7 +655,18 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
         }
     }
 
+    const botCreds =  {
+            clientId: (ci as string),
+                clientSecret: (cs as string),
+        ...restCred,
+        };
+        if (botCache.provider.prefix === undefined || botCache.provider.prefix === defaultProvider.prefix) {
+            // need to provide unique prefix to bot
+            botCache.provider.prefix = buildCachePrefix([botCache.provider.prefix, 'bot', (botName || objectHash.sha1(botCreds))]);
+        }
+
     return {
+        name: botName,
         snoowrap,
         subreddits: {
             names,
@@ -616,12 +675,8 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
             heartbeatInterval,
             dryRun,
         },
-        credentials: {
-            clientId: (ci as string),
-            clientSecret: (cs as string),
-            ...restCred,
-        },
-        caching: cache,
+        credentials: botCreds,
+        caching: botCache,
         polling: {
             sharedMod,
             limit,
@@ -637,6 +692,7 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
     }
 
     });
+
     const defaultOperators = typeof name === 'string' ? [name] : name;
 
     const config: OperatorConfig = {
@@ -649,19 +705,19 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
             level,
             path
         },
+        caching: cache,
         web: {
             port,
+            caching: {
+                ...defaultProvider,
+                ...webCaching
+            },
+            invites: {
+                maxAge: inviteMaxAge,
+            },
             session: {
                 secret,
-                provider: typeof sessionProvider === 'string' ? {
-                    ...buildCacheOptionsFromProvider({
-                        ttl: 86400000,
-                        store: sessionProvider,
-                    })
-                } : {
-                    ...buildCacheOptionsFromProvider(sessionProvider),
-                    ttl: 86400000,
-                },
+                maxAge: sessionMaxAge,
             },
             maxLogs,
             clients: clients === undefined ? [{host: 'localhost:8095', secret: apiSecret}] : clients,

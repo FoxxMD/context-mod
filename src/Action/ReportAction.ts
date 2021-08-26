@@ -4,7 +4,7 @@ import Snoowrap, {Comment, Submission} from "snoowrap";
 import {truncateStringToLength} from "../util";
 import {renderContent} from "../Utils/SnoowrapUtils";
 import {RuleResult} from "../Rule";
-import {RichContent} from "../Common/interfaces";
+import {ActionProcessResult, RichContent} from "../Common/interfaces";
 
 // https://www.reddit.com/dev/api/oauth#POST_api_report
 // denotes 100 characters maximum
@@ -23,7 +23,7 @@ export class ReportAction extends Action {
         return 'Report';
     }
 
-    async process(item: Comment | Submission, ruleResults: RuleResult[], runtimeDryrun?: boolean): Promise<void> {
+    async process(item: Comment | Submission, ruleResults: RuleResult[], runtimeDryrun?: boolean): Promise<ActionProcessResult> {
         const dryRun = runtimeDryrun || this.dryRun;
         const content = await this.resources.getContent(this.content, item.subreddit);
         const renderedContent = await renderContent(content, item, ruleResults, this.resources.userNotes);
@@ -33,6 +33,11 @@ export class ReportAction extends Action {
             // @ts-ignore
             await item.report({reason: truncatedContent});
         }
+
+        return {
+            dryRun,
+            success: true
+        };
     }
 }
 

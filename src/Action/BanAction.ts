@@ -3,7 +3,7 @@ import Action from "./index";
 import Snoowrap, {Comment, Submission} from "snoowrap";
 import {RuleResult} from "../Rule";
 import {renderContent} from "../Utils/SnoowrapUtils";
-import {Footer} from "../Common/interfaces";
+import {ActionProcessResult, Footer} from "../Common/interfaces";
 
 export class BanAction extends Action {
 
@@ -33,7 +33,7 @@ export class BanAction extends Action {
         return 'Ban';
     }
 
-    async process(item: Comment | Submission, ruleResults: RuleResult[], runtimeDryrun?: boolean): Promise<void> {
+    async process(item: Comment | Submission, ruleResults: RuleResult[], runtimeDryrun?: boolean): Promise<ActionProcessResult> {
         const dryRun = runtimeDryrun || this.dryRun;
         const content = this.message === undefined ? undefined : await this.resources.getContent(this.message, item.subreddit);
         const renderedBody = content === undefined ? undefined : await renderContent(content, item, ruleResults, this.resources.userNotes);
@@ -58,6 +58,11 @@ export class BanAction extends Action {
                 duration: this.duration
             });
         }
+        return {
+            dryRun,
+            success: true,
+            result: `Banned ${item.author.name} ${durText}${this.reason !== undefined ? ` (${this.reason})` : ''}`
+        };
     }
 }
 

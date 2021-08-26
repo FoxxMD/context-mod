@@ -1,8 +1,8 @@
 import {Rule, RuleJSONConfig, RuleOptions, RuleResult} from "./index";
 import {Comment} from "snoowrap";
 import {
-    activityWindowText,
-    comparisonTextOp, FAIL, isExternalUrlSubmission, isRedditMedia,
+    activityWindowText, asSubmission,
+    comparisonTextOp, FAIL, getActivitySubredditName, isExternalUrlSubmission, isRedditMedia,
     parseGenericValueComparison, parseSubredditName,
     parseUsableLinkIdentifier as linkParser, PASS
 } from "../util";
@@ -25,7 +25,7 @@ interface RepeatActivityReducer {
 
 const getActivityIdentifier = (activity: (Submission | Comment), length = 200) => {
     let identifier: string;
-    if (activity instanceof Submission) {
+    if (asSubmission(activity)) {
         if (activity.is_self) {
             identifier = `${activity.title}${activity.selftext.slice(0, length)}`;
         } else if(isRedditMedia(activity)) {
@@ -96,15 +96,15 @@ export class RepeatActivityRule extends Rule {
 
     async process(item: Submission|Comment): Promise<[boolean, RuleResult]> {
         let referenceUrl;
-        if(item instanceof Submission && this.useSubmissionAsReference) {
+        if(asSubmission(item) && this.useSubmissionAsReference) {
             referenceUrl = await item.url;
         }
 
         let filterFunc = (x: any) => true;
         if(this.include.length > 0) {
-            filterFunc = (x: Submission|Comment) => this.include.includes(x.subreddit.display_name.toLowerCase());
+            filterFunc = (x: Submission|Comment) => this.include.includes(getActivitySubredditName(x).toLowerCase());
         } else if(this.exclude.length > 0) {
-            filterFunc = (x: Submission|Comment) => !this.exclude.includes(x.subreddit.display_name.toLowerCase());
+            filterFunc = (x: Submission|Comment) => !this.exclude.includes(getActivitySubredditName(x).toLowerCase());
         }
 
         let activities: (Submission | Comment)[] = [];
@@ -223,7 +223,7 @@ export class RepeatActivityRule extends Rule {
             };
             for (let set of value) {
                 const test = comparisonTextOp(set.length, operator, thresholdValue);
-                const md = set.map((x: (Comment | Submission)) => `[${x instanceof Submission ? x.title : getActivityIdentifier(x, 50)}](https://reddit.com${x.permalink}) in ${x.subreddit_name_prefixed} on ${dayjs(x.created_utc * 1000).utc().format()}`);
+                const md = set.map((x: (Comment | Submission)) => `[${asSubmission(x) ? x.title : getActivityIdentifier(x, 50)}](https://reddit.com${x.permalink}) in ${x.subreddit_name_prefixed} on ${dayjs(x.created_utc * 1000).utc().format()}`);
 
                 summaryData.sets.push(set);
                 summaryData.largestTrigger = Math.max(summaryData.largestTrigger, set.length);

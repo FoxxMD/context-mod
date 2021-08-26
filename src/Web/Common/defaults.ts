@@ -33,7 +33,8 @@ const managerStats: ManagerStats = {
     rulesRunSinceStartTotal: 0,
     rulesRunTotal: 0,
     rulesTriggeredSinceStartTotal: 0,
-    rulesTriggeredTotal: 0
+    rulesTriggeredTotal: 0,
+    actionedEvents: 0,
 };
 const botStats: BotStats = {
     apiAvg: '-',

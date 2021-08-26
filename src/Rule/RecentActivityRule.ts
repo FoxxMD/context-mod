@@ -2,8 +2,8 @@ import {Rule, RuleJSONConfig, RuleOptions, RulePremise, RuleResult} from "./inde
 import {Comment, VoteableContent} from "snoowrap";
 import Submission from "snoowrap/dist/objects/Submission";
 import {
-    activityWindowText,
-    comparisonTextOp, FAIL, formatNumber,
+    activityWindowText, asSubmission,
+    comparisonTextOp, FAIL, formatNumber, getActivitySubredditName, isSubmission,
     parseGenericValueOrPercentComparison, parseSubredditName,
     parseUsableLinkIdentifier,
     PASS
@@ -67,14 +67,14 @@ export class RecentActivityRule extends Rule {
 
         let viableActivity = activities;
         if (this.useSubmissionAsReference) {
-            if (!(item instanceof Submission)) {
+            if (!asSubmission(item)) {
                 this.logger.warn('Cannot use post as reference because triggered item is not a Submission');
             } else if (item.is_self) {
                 this.logger.warn('Cannot use post as reference because triggered Submission is not a link type');
             } else {
                 const usableUrl = parseLink(await item.url);
                 viableActivity = viableActivity.filter((x) => {
-                    if (!(x instanceof Submission)) {
+                    if (!asSubmission(x)) {
                         return false;
                     }
                     if (x.url === undefined) {
@@ -85,7 +85,7 @@ export class RecentActivityRule extends Rule {
             }
         }
         const groupedActivity = viableActivity.reduce((grouped, activity) => {
-            const s = activity.subreddit.display_name.toLowerCase();
+            const s = getActivitySubredditName(activity).toLowerCase();
             grouped[s] = (grouped[s] || []).concat(activity);
             return grouped;
         }, {} as Record<string, (Submission | Comment)[]>);
@@ -96,17 +96,21 @@ export class RecentActivityRule extends Rule {
         for (const triggerSet of this.thresholds) {
             let currCount = 0;
             const presentSubs = [];
-            const {threshold = '>= 1', subreddits = []} = triggerSet;
+            let combinedKarma = 0;
+            const {threshold = '>= 1', subreddits = [], karma: karmaThreshold} = triggerSet;
             for (const sub of subreddits.map(x => parseSubredditName(x))) {
                 const isub = sub.toLowerCase();
                 const {[isub]: tSub = []} = groupedActivity;
                 if (tSub.length > 0) {
                     currCount += tSub.length;
                     presentSubs.push(sub);
+                    for(const a of tSub) {
+                        combinedKarma += a.score;
+                    }
                 }
             }
             const {operator, value, isPercent} = parseGenericValueOrPercentComparison(threshold);
-            let sum = {subsWithActivity: presentSubs, subreddits, count: currCount, threshold, triggered: false, testValue: currCount.toString()};
+            let sum = {subsWithActivity: presentSubs, combinedKarma, karmaThreshold, subreddits, count: currCount, threshold, triggered: false, testValue: currCount.toString()};
             if (isPercent) {
                 sum.testValue = `${formatNumber((currCount / viableActivity.length) * 100)}%`;
                 if (comparisonTextOp(currCount / viableActivity.length, operator, value / 100)) {
@@ -117,6 +121,15 @@ export class RecentActivityRule extends Rule {
                 sum.triggered = true;
                 totalTriggeredOn = sum;
             }
+            // if we would trigger on threshold need to also test for karma
+            if(totalTriggeredOn !== undefined && karmaThreshold !== undefined) {
+                const {operator: opKarma, value: valueKarma} = parseGenericValueOrPercentComparison(karmaThreshold);
+                if(!comparisonTextOp(combinedKarma, opKarma, valueKarma)) {
+                    sum.triggered = false;
+                    totalTriggeredOn = undefined;
+                }
+            }
+
             summaries.push(sum);
             // if either trigger condition is hit end the iteration early
             if (totalTriggeredOn !== undefined) {
@@ -150,10 +163,12 @@ export class RecentActivityRule extends Rule {
             subreddits = [],
             subsWithActivity = [],
             threshold,
-            triggered
+            triggered,
+            combinedKarma,
+            karmaThreshold,
         } = summary;
         const relevantSubs = subsWithActivity.length === 0 ? subreddits : subsWithActivity;
-        const totalSummary = `${testValue} activities over ${relevantSubs.length} subreddits ${triggered ? 'met' : 'did not meet'} threshold of ${threshold}`;
+        const totalSummary = `${testValue} activities over ${relevantSubs.length} subreddits${karmaThreshold !== undefined ? ` with ${combinedKarma} combined karma` : ''} ${triggered ? 'met' : 'did not meet'} threshold of ${threshold}${karmaThreshold !== undefined ? ` and ${karmaThreshold} combined karma` : ''}`;
         return {
             result: totalSummary,
             data: {
@@ -163,7 +178,8 @@ export class RecentActivityRule extends Rule {
                 subCount: relevantSubs.length,
                 totalCount: count,
                 threshold,
-                testValue
+                testValue,
+                karmaThreshold,
             }
         };
     }
@@ -191,6 +207,21 @@ export interface SubThreshold extends SubredditCriteria {
      * @examples [">= 1"]
      * */
     threshold?: string
+
+    /**
+     * Test the **combined karma** from Activities found in the specified subreddits
+     *
+     * Value is a string containing a comparison operator and a number of **combined karma** to compare against
+     *
+     * If specified then both `threshold` and `karma` must be met for this `SubThreshold` to be satisfied
+     *
+     * The syntax is `(< OR > OR <= OR >=) <number>`
+     *
+     * * EX `> 50`  => greater than 50 combined karma for all found Activities in specified subreddits
+     *
+     * @pattern ^\s*(>|>=|<|<=)\s*(\d+)\s*(%?)(.*)$
+     * */
+    karma?: string
 }
 
 interface RecentActivityConfig extends ActivityWindow, ReferenceSubmission {

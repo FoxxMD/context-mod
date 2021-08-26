@@ -28,6 +28,7 @@ import crypto from "crypto";
 import Autolinker from 'autolinker';
 import {create as createMemoryStore} from './Utils/memoryStore';
 import {MESSAGE} from "triple-beam";
+import {RedditUser} from "snoowrap/dist/objects";
 
 const {format} = winston;
 const {combine, printf, timestamp, label, splat, errors} = format;
@@ -824,7 +825,7 @@ export const isRedditMedia = (act: Submission): boolean => {
 }
 
 export const isExternalUrlSubmission = (act: Comment | Submission): boolean => {
-    return act instanceof Submission && !act.is_self && !isRedditMedia(act);
+    return asSubmission(act) && !act.is_self && !isRedditMedia(act);
 }
 
 export const parseRegex = (r: string | RegExp, val: string, flags?: string): RegExResult => {
@@ -855,12 +856,19 @@ export const parseRegex = (r: string | RegExp, val: string, flags?: string): Reg
     }
 }
 
-export async function readJson(path: string, opts: any) {
+export async function readConfigFile(path: string, opts: any) {
     const {log, throwOnNotFound = true} = opts;
     try {
         await promises.access(path, constants.R_OK);
         const data = await promises.readFile(path);
-        return JSON.parse(data as unknown as string);
+        const [configObj, jsonErr, yamlErr] = parseFromJsonOrYamlToObject(data as unknown as string);
+        if(configObj !== undefined) {
+            return configObj as object;
+        }
+        log.error(`Could not parse wiki page contents as JSON or YAML:`);
+        log.error(jsonErr);
+        log.error(yamlErr);
+        throw new SimpleError('Could not parse wiki page contents as JSON or YAML');
     } catch (e) {
         const {code} = e;
         if (code === 'ENOENT') {
@@ -947,7 +955,7 @@ export const buildCacheOptionsFromProvider = (provider: CacheProvider | any): Ca
 }
 
 export const createCacheManager = (options: CacheOptions): Cache => {
-    const {store, max, ttl = 60, host = 'localhost', port, auth_pass, db} = options;
+    const {store, max, ttl = 60, host = 'localhost', port, auth_pass, db, ...rest} = options;
     switch (store) {
         case 'none':
             return cacheManager.caching({store: 'none', max, ttl});
@@ -958,7 +966,8 @@ export const createCacheManager = (options: CacheOptions): Cache => {
                 port,
                 auth_pass,
                 db,
-                ttl
+                ttl,
+                ...rest,
             });
         case 'memory':
         default:
@@ -983,4 +992,51 @@ export const snooLogWrapper = (logger: Logger) => {
         info: (...args: any[]) => logger.info(args.slice(0, 2).join(' '), [args.slice(2)]),
         trace: (...args: any[]) => logger.debug(args.slice(0, 2).join(' '), [args.slice(2)]),
     }
+}
+
+export const isScopeError = (err: any): boolean => {
+    if(typeof err === 'object' && err.name === 'StatusCodeError' && err.response !== undefined) {
+        const authHeader = err.response.headers['www-authenticate'];
+        return authHeader !== undefined && authHeader.includes('insufficient_scope');
+    }
+    return false;
+}
+
+/**
+ * Cached activities lose type information when deserialized so need to check properties as well to see if the object is the shape of a Submission
+ * */
+export const isSubmission = (value: any) => {
+    return value instanceof Submission || value.domain !== undefined;
+}
+
+export const asSubmission = (value: any): value is Submission => {
+    return isSubmission(value);
+}
+
+/**
+ * Serialized activities store subreddit and user properties as their string representations (instead of proxy)
+ * */
+export const getActivitySubredditName = (activity: any): string => {
+    if(typeof activity.subreddit === 'string') {
+        return activity.subreddit;
+    }
+    return activity.subreddit.display_name;
+}
+
+/**
+ * Serialized activities store subreddit and user properties as their string representations (instead of proxy)
+ * */
+export const getActivityAuthorName = (author: RedditUser | string): string => {
+    if(typeof author === 'string') {
+        return author;
+    }
+    return author.name;
+}
+
+export const buildCachePrefix = (parts: any[]): string => {
+    const prefix = parts.filter(x => typeof x === 'string' && x !== '').map(x => x.trim()).map(x => x.split(':')).flat().filter(x => x !== '').join(':')
+    if(prefix !== '') {
+        return `${prefix}:`;
+    }
+    return prefix;
 }

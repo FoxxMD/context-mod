@@ -16,12 +16,13 @@ import {
     truncateStringToLength
 } from "../util";
 import {
+    ActionResult,
     ChecksActivityState,
     CommentState,
     JoinCondition,
     JoinOperands,
     SubmissionState,
-    TypedActivityStates
+    TypedActivityStates, UserResultCache
 } from "../Common/interfaces";
 import * as RuleSchema from '../Schema/Rule.json';
 import * as RuleSetSchema from '../Schema/RuleSet.json';
@@ -45,6 +46,7 @@ export abstract class Check implements ICheck {
         include: AuthorCriteria[],
         exclude: AuthorCriteria[]
     };
+    cacheUserResult: Required<UserResultCacheOptions>;
     dryRun?: boolean;
     notifyOnTrigger: boolean;
     resources: SubredditResources;
@@ -62,6 +64,7 @@ export abstract class Check implements ICheck {
             actions = [],
             notifyOnTrigger = false,
             subredditName,
+            cacheUserResult = {},
             itemIs = [],
             authorIs: {
                 include = [],
@@ -87,6 +90,10 @@ export abstract class Check implements ICheck {
         this.authorIs = {
             exclude: exclude.map(x => new Author(x)),
             include: include.map(x => new Author(x)),
+        }
+        this.cacheUserResult = {
+            ...userResultCacheDefault,
+            ...cacheUserResult
         }
         this.dryRun = dryRun;
         for (const r of rules) {
@@ -170,10 +177,14 @@ export abstract class Check implements ICheck {
         }
     }
 
-    abstract getCacheResult(item: Submission | Comment) : Promise<boolean | undefined>;
-    abstract setCacheResult(item: Submission | Comment, result: boolean): void;
+    async getCacheResult(item: Submission | Comment) : Promise<UserResultCache | undefined> {
+        return undefined;
+    }
 
-    async runRules(item: Submission | Comment, existingResults: RuleResult[] = []): Promise<[boolean, RuleResult[]]> {
+    async setCacheResult(item: Submission | Comment, result: UserResultCache): Promise<void> {
+    }
+
+    async runRules(item: Submission | Comment, existingResults: RuleResult[] = []): Promise<[boolean, RuleResult[], boolean?]> {
         try {
             let allRuleResults: RuleResult[] = [];
             let allResults: (RuleResult | RuleSetResult)[] = [];
@@ -182,7 +193,7 @@ export abstract class Check implements ICheck {
             const cacheResult = await this.getCacheResult(item);
             if(cacheResult !== undefined) {
                 this.logger.verbose(`Skipping rules run because result was found in cache, Check Triggered Result: ${cacheResult}`);
-                return [cacheResult, allRuleResults];
+                return [cacheResult.result, cacheResult.ruleResults, true];
             }
 
             const itemPass = await this.resources.testItemCriteria(item, this.itemIs);
@@ -264,23 +275,27 @@ export abstract class Check implements ICheck {
         }
     }
 
-    async runActions(item: Submission | Comment, ruleResults: RuleResult[], runtimeDryrun?: boolean): Promise<Action[]> {
+    async runActions(item: Submission | Comment, ruleResults: RuleResult[], runtimeDryrun?: boolean): Promise<ActionResult[]> {
         const dr = runtimeDryrun || this.dryRun;
         this.logger.debug(`${dr ? 'DRYRUN - ' : ''}Running Actions`);
-        const runActions: Action[] = [];
+        const runActions: ActionResult[] = [];
         for (const a of this.actions) {
             if(!a.enabled) {
+                runActions.push({
+                    kind: a.getKind(),
+                    name: a.getActionUniqueName(),
+                    run: false,
+                    success: false,
+                    runReason: 'Not enabled',
+                    dryRun: (a.dryRun || dr) || false,
+                });
                 this.logger.info(`Action ${a.getActionUniqueName()} not run because it is not enabled.`);
                 continue;
             }
-            try {
-                await a.handle(item, ruleResults, runtimeDryrun);
-                runActions.push(a);
-            } catch (err) {
-                this.logger.error(`Action ${a.getActionUniqueName()} encountered an error while running`, err);
-            }
+            const res = await a.handle(item, ruleResults, runtimeDryrun);
+            runActions.push(res);
         }
-        this.logger.info(`${dr ? 'DRYRUN - ' : ''}Ran Actions: ${runActions.map(x => x.getActionUniqueName()).join(' | ')}`);
+        this.logger.info(`${dr ? 'DRYRUN - ' : ''}Ran Actions: ${runActions.map(x => x.name).join(' | ')}`);
         return runActions;
     }
 }
@@ -337,6 +352,7 @@ export interface CheckOptions extends ICheck {
     notifyOnTrigger?: boolean
     resources: SubredditResources
     client: Snoowrap
+    cacheUserResult?: UserResultCacheOptions;
 }
 
 export interface CheckJson extends ICheck {
@@ -371,6 +387,8 @@ export interface CheckJson extends ICheck {
      * @default false
      * */
     notifyOnTrigger?: boolean,
+
+    cacheUserResult?: UserResultCacheOptions;
 }
 
 export interface SubmissionCheckJson extends CheckJson {
@@ -388,6 +406,9 @@ export interface SubmissionCheckJson extends CheckJson {
  * 3. The rule results are not likely to change while cache is valid
  * */
 export interface UserResultCacheOptions {
+    /**
+    * @default false
+    * */
     enable?: boolean,
     /**
      * The amount of time, in seconds, to cache this result
@@ -396,17 +417,23 @@ export interface UserResultCacheOptions {
      * @examples [60]
      * */
     ttl?: number,
+    /**
+     * In the event the cache returns a triggered result should the actions for the check also be run?
+     *
+     * @default true
+     * */
+    runActions?: boolean
 }
 
 export const userResultCacheDefault: Required<UserResultCacheOptions> = {
     enable: false,
     ttl: 60,
+    runActions: true,
 }
 
 export interface CommentCheckJson extends CheckJson {
     kind: 'comment'
     itemIs?: CommentState[]
-    cacheUserResult?:  UserResultCacheOptions
 }
 
 export type CheckStructuredJson = SubmissionCheckStructuredJson | CommentCheckStructuredJson;

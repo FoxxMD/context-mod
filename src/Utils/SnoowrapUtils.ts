@@ -504,7 +504,8 @@ export const itemContentPeek = async (item: (Comment | Submission), peekLength =
         peek = `${truncatePeek(item.title)} by ${author} https://reddit.com${item.permalink}`;
 
     } else if (item instanceof Comment) {
-        content = truncatePeek(item.body);
+        // replace newlines with spaces to make peek more compact
+        content = truncatePeek(item.body.replaceAll('\n', ' '));
         peek = `${truncatePeek(content)} by ${author} in https://reddit.com${item.permalink}`;
     }
 

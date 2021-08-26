@@ -1,6 +1,7 @@
 import {Check, CheckOptions, userResultCacheDefault, UserResultCacheOptions} from "./index";
-import {CommentState} from "../Common/interfaces";
+import {CommentState, UserResultCache} from "../Common/interfaces";
 import {Submission, Comment} from "snoowrap/dist/objects";
+import {RuleResult} from "../Rule";
 
 export interface CommentCheckOptions extends CheckOptions {
     cacheUserResult?: UserResultCacheOptions;
@@ -9,19 +10,11 @@ export interface CommentCheckOptions extends CheckOptions {
 export class CommentCheck extends Check {
     itemIs: CommentState[];
 
-    cacheUserResult: Required<UserResultCacheOptions>;
-
     constructor(options: CommentCheckOptions) {
         super(options);
         const {
             itemIs = [],
-            cacheUserResult = {},
         } = options;
-
-        this.cacheUserResult = {
-            ...userResultCacheDefault,
-            ...cacheUserResult
-        }
 
         this.itemIs = itemIs;
         this.logSummary();
@@ -31,7 +24,7 @@ export class CommentCheck extends Check {
         super.logSummary('comment');
     }
 
-    async getCacheResult(item: Submission | Comment): Promise<boolean | undefined> {
+    async getCacheResult(item: Submission | Comment): Promise<UserResultCache | undefined> {
         if (this.cacheUserResult.enable) {
             return await this.resources.getCommentCheckCacheResult(item as Comment, {
                 name: this.name,
@@ -42,13 +35,22 @@ export class CommentCheck extends Check {
         return undefined;
     }
 
-    async setCacheResult(item: Submission | Comment, result: boolean): Promise<void> {
+    async setCacheResult(item: Submission | Comment, result: UserResultCache): Promise<void> {
         if (this.cacheUserResult.enable) {
+            const {result: outcome, ruleResults} = result;
+
+            const res: UserResultCache = {
+                result: outcome,
+                // don't need to cache rule results if check was not triggered
+                // since we only use rule results for actions
+                ruleResults: outcome ? ruleResults : []
+            };
+
             await this.resources.setCommentCheckCacheResult(item as Comment, {
                 name: this.name,
                 authorIs: this.authorIs,
                 itemIs: this.itemIs
-            }, result, this.cacheUserResult.ttl)
+            }, res, this.cacheUserResult.ttl)
         }
     }
 }

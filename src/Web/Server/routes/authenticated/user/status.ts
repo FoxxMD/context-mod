@@ -221,7 +221,8 @@ const status = () => {
         }, cumRaw);
         const cacheReq = subManagerData.reduce((acc, curr) => acc + curr.stats.cache.totalRequests, 0);
         const cacheMiss = subManagerData.reduce((acc, curr) => acc + curr.stats.cache.totalMiss, 0);
-        const aManagerWithDefaultResources = bot.subManagers.find(x => x.resources !== undefined && x.resources.cacheSettingsHash === 'default');
+        const sharedSub = subManagerData.find(x => x.stats.cache.isShared);
+        const sharedCount = sharedSub !== undefined ? sharedSub.stats.cache.currentKeyCount : 0;
         let allManagerData: any = {
             name: 'All',
             status: bot.running ? 'RUNNING' : 'NOT RUNNING',
@@ -243,7 +244,7 @@ const status = () => {
             stats: {
                 ...rest,
                 cache: {
-                    currentKeyCount: aManagerWithDefaultResources !== undefined ? await aManagerWithDefaultResources.resources.getCacheKeyCount() : 'N/A',
+                    currentKeyCount: sharedCount + subManagerData.reduce((acc, curr) => curr.stats.cache.isShared ? acc : acc + curr.stats.cache.currentKeyCount,0),
                     isShared: false,
                     totalRequests: cacheReq,
                     totalMiss: cacheMiss,
