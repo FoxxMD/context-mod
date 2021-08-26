@@ -1195,6 +1195,11 @@
             "description": "At least one count property must be present. If both are present then either can trigger the rule",
             "minProperties": 1,
             "properties": {
+                "karma": {
+                    "description": "Test the **combined karma** from Activities found in the specified subreddits\n\nValue is a string containing a comparison operator and a number of **combined karma** to compare against\n\nIf specified then both `threshold` and `karma` must be met for this `SubThreshold` to be satisfied\n\nThe syntax is `(< OR > OR <= OR >=) <number>`\n\n* EX `> 50`  => greater than 50 combined karma for all found Activities in specified subreddits",
+                    "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
+                    "type": "string"
+                },
                 "subreddits": {
                     "description": "A list of Subreddits (by name, case-insensitive) to look for.\n\nEX [\"mealtimevideos\",\"askscience\"]",
                     "examples": [
