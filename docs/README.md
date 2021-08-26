@@ -100,7 +100,7 @@ Find detailed descriptions of all the Rules, with examples, below:
 * [Repeat Activity](/docs/examples/repeatActivity)
 * [History](/docs/examples/history)
 * [Author](/docs/examples/author)
-* Regex
+* [Regex](/docs/examples/regex)
 
 ### Rule Set
 
