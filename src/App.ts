@@ -3,7 +3,6 @@ import dayjs, {Dayjs} from "dayjs";
 import {getLogger} from "./Utils/loggerFactory";
 import {Invokee, OperatorConfig} from "./Common/interfaces";
 import Bot from "./Bot";
-import {castArray} from "lodash";
 import LoggedError from "./Utils/LoggedError";
 
 export class App {
@@ -53,8 +52,11 @@ export class App {
     }
 
     async onTerminate(reason = 'The application was shutdown') {
-        for(const m of this.bots) {
-            //await m.notificationManager.handle('runStateChanged', 'Application Shutdown', reason);
+        for(const b of this.bots) {
+            for(const m of b.subManagers) {
+                await m.notificationManager.handle('runStateChanged', 'Application Shutdown', reason);
+            }
+            //await b.notificationManager.handle('runStateChanged', 'Application Shutdown', reason);
         }
     }
 
