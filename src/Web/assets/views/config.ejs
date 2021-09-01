@@ -22,6 +22,7 @@
     <div class="container mx-auto">
         <div class="grid">
             <div class="dark:text-white mb-3 pl-2">
+                Schema <a href="/config?schema=subreddit" id="subredditSchemaType">Subreddit</a> / <a href="/config?schema=operator" id="operatorSchemaType">Operator</a>  |
                 <span class="has-tooltip">
                     <span style="z-index:999; margin-top: 30px;" class='tooltip rounded shadow-lg p-3 bg-gray-100 text-black space-y-2'>
                        <div>Copy + paste your configuration here to get:</div>
@@ -39,7 +40,6 @@
                         </ul>
                         <div>When done editing hit Ctrl+A (Command+A on macOS) to select all text, then copy + paste back into your wiki/file</div>
                     </span>
-                    <span id="schemaType"></span> |
                     <span class="cursor-help">
                             How To Use
                         <span>
@@ -55,7 +55,7 @@
                         </span>
                     </span>
                 </span>
-                | <a id="schemaOpen" href="">Open With Operator Schema</a>
+                | <input id="configUrl" class="text-black placeholder-gray-500 rounded mx-2" style="min-width:400px;" placeholder="URL of a config to load"/> <a href="#" id="loadConfig">Load</a>
                 <div id="error" class="font-semibold"></div>
             </div>
             <div style="min-height: 80vh" id="editor"></div>
@@ -104,22 +104,22 @@
     var searchParams = new URLSearchParams(window.location.search);
 
     let schemaType;
+    let schemaFile;
     if(searchParams.get('schema') === 'operator') {
-        schemaType = 'OperatorConfig.json';
+        schemaType = 'operator';
+        schemaFile = 'OperatorConfig.json';
         preamble.push('// automatic validation of your OPERATOR configuration');
         document.querySelector('#schemaTypeList').innerHTML = 'automatic validation of your OPERATOR configuration (yellow squiggly)';
-        document.querySelector('#schemaType').innerHTML = 'Operator Configuration';
-        document.querySelector('#schemaOpen').href = '/config?schema=subreddit';
-        document.querySelector('#schemaOpen').innerHTML = 'Open with Subreddit Schema';
+        document.querySelector('#operatorSchemaType').classList.add('font-bold', 'no-underline', 'pointer-events-none');
     } else {
-        schemaType = 'App.json';
+        schemaType = 'subreddit';
+        schemaFile = 'App.json';
         preamble.push('// automatic validation of your SUBREDDIT configuration');
         document.querySelector('#schemaTypeList').innerHTML = 'automatic validation of your SUBREDDIT configuration (yellow squiggly)'
-        document.querySelector('#schemaType').innerHTML = 'Subreddit Configuration';
-        document.querySelector('#schemaOpen').href = '/config?schema=operator';
+        document.querySelector('#subredditSchemaType').classList.add('font-bold', 'no-underline', 'pointer-events-none');
     }
 
-    const schemaUri = `${document.location.origin}/schemas/${schemaType}`;
+    const schemaUri = `${document.location.origin}/schemas/${schemaFile}`;
 
     require(['vs/editor/editor.main'], function () {
         const modelUri = monaco.Uri.parse("a://b/foo.json");
@@ -135,15 +135,44 @@
                         schema: schemaData
                     }]
                 });
-                if(searchParams.get('subreddit') !== null) {
-                    fetch(`${document.location.origin}/config/content${document.location.search}`).then((resp) => {
+                var model = monaco.editor.createModel(preamble.join('\r\n'), "json", modelUri);
+
+                document.querySelector('#loadConfig').addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const newUrl = document.querySelector('#configUrl').value;
+                    fetch(newUrl).then((resp) => {
+                        if(!resp.ok) {
+                            resp.text().then(data => {
+                                document.querySelector('#error').innerHTML = `Error occurred while fetching configuration => ${data}`
+                            });
+                        } else {
+                            var sp = new URLSearchParams();
+                            sp.append('schema', schemaType);
+                            sp.append('url', newUrl);
+                            history.pushState(null, '', `${window.location.pathname}?${sp.toString()}`);
+                            resp.text().then(data => {
+                                //model = monaco.editor.createModel(data, "json", modelUri);
+                                model.setValue(data);
+                            })
+                        }
+                    });
+                });
+
+                let dlUrl = searchParams.get('url');
+                if(dlUrl === null && searchParams.get('subreddit') !== null) {
+                    dlUrl = `${document.location.origin}/config/content${document.location.search}`
+                }
+                if(dlUrl !== null) {
+                    document.querySelector('#configUrl').value = dlUrl;
+                    fetch(dlUrl).then((resp) => {
                         if(!resp.ok) {
                             resp.text().then(data => {
                                 document.querySelector('#error').innerHTML = `Error occurred while fetching configuration => ${data}`
                             });
                         } else {
                             resp.text().then(data => {
-                                var model = monaco.editor.createModel(data, "json", modelUri);
+                                model.setValue(data);
+                                //model = monaco.editor.createModel(data, "json", modelUri);
                                 var editor = monaco.editor.create(document.getElementById('editor'), {
                                     model,
                                     theme: 'vs-dark',
@@ -154,9 +183,8 @@
                                 editor;
                             })
                         }
-                    })
+                    });
                 } else {
-                    var model = monaco.editor.createModel(preamble.join('\r\n'), "json", modelUri);
                     var editor = monaco.editor.create(document.getElementById('editor'), {
                         model,
                         theme: 'vs-dark',
