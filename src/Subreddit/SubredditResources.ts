@@ -25,7 +25,7 @@ import {
     BotInstanceConfig,
     CacheOptions, CommentState,
     Footer, OperatorConfig, ResourceStats, StrongCache, SubmissionState,
-    CacheConfig, TTLConfig, TypedActivityStates, UserResultCache
+    CacheConfig, TTLConfig, TypedActivityStates, UserResultCache, ActionedEvent
 } from "../Common/interfaces";
 import UserNotes from "./UserNotes";
 import Mustache from "mustache";
@@ -54,7 +54,8 @@ interface SubredditResourceOptions extends Footer {
     subreddit: Subreddit,
     logger: Logger;
     client: Snoowrap;
-    prefix? :string;
+    prefix?: string;
+    actionedEventsMax: number;
 }
 
 export interface SubredditResourceSetOptions extends CacheConfig, Footer {
@@ -79,6 +80,7 @@ export class SubredditResources {
     cacheSettingsHash?: string;
     pruneInterval?: any;
     prefix?: string
+    actionedEventsMax: number;
 
     stats: { cache: ResourceStats };
 
@@ -97,6 +99,7 @@ export class SubredditResources {
             cache,
             prefix,
             cacheType,
+            actionedEventsMax,
             cacheSettingsHash,
             client,
         } = options || {};
@@ -106,6 +109,7 @@ export class SubredditResources {
         this.prefix = prefix;
         this.client = client;
         this.cacheType = cacheType;
+        this.actionedEventsMax = actionedEventsMax;
         this.authorTTL = authorTTL === true ? 0 : authorTTL;
         this.submissionTTL = submissionTTL === true ? 0 : submissionTTL;
         this.commentTTL = commentTTL === true ? 0 : commentTTL;
@@ -211,6 +215,16 @@ export class SubredditResources {
 
     setLogger(logger: Logger) {
         this.logger = logger.child({labels: ['Resource Cache']}, mergeArr);
+    }
+
+    async getActionedEvents(): Promise<ActionedEvent[]> {
+        return await this.cache.wrap(`actionedEvents-${this.subreddit.display_name}`, () => []);
+    }
+
+    async addActionedEvent(ae: ActionedEvent) {
+        const events = await this.cache.wrap(`actionedEvents-${this.subreddit.display_name}`, () => []) as ActionedEvent[];
+        events.unshift(ae);
+        await this.cache.set(`actionedEvents-${this.subreddit.display_name}`, events.slice(0, this.actionedEventsMax));
     }
 
     async getActivity(item: Submission | Comment) {
@@ -586,6 +600,8 @@ export class BotResourcesManager {
     cacheType: string = 'none';
     cacheHash: string;
     ttlDefaults: Required<TTLConfig>;
+    actionedEventsMaxDefault?: number;
+    actionedEventsDefault: number;
     pruneInterval: any;
 
     constructor(config: BotInstanceConfig) {
@@ -598,18 +614,23 @@ export class BotResourcesManager {
                 submissionTTL,
                 filterCriteriaTTL,
                 provider,
+                actionedEventsMax,
+                actionedEventsDefault,
             },
             name,
             credentials,
             caching,
         } = config;
         caching.provider.prefix = buildCachePrefix([caching.provider.prefix, 'SHARED']);
-        this.cacheHash = objectHash.sha1(caching);
+        const {actionedEventsMax: eMax, actionedEventsDefault: eDef, ...relevantCacheSettings} = caching;
+        this.cacheHash = objectHash.sha1(relevantCacheSettings);
         this.defaultCacheConfig = caching;
         this.ttlDefaults = {authorTTL, userNotesTTL, wikiTTL, commentTTL, submissionTTL, filterCriteriaTTL};
 
         const options = provider;
         this.cacheType = options.store;
+        this.actionedEventsMaxDefault = actionedEventsMax;
+        this.actionedEventsDefault = actionedEventsDefault;
         this.defaultCache = createCacheManager(options);
         if (this.cacheType === 'memory') {
             const min = Math.min(...([this.ttlDefaults.wikiTTL, this.ttlDefaults.authorTTL, this.ttlDefaults.userNotesTTL].filter(x => typeof x === 'number' && x !== 0) as number[]));
@@ -644,11 +665,12 @@ export class BotResourcesManager {
             cacheSettingsHash: hash,
             ttl: this.ttlDefaults,
             prefix: this.defaultCacheConfig.provider.prefix,
+            actionedEventsMax: this.actionedEventsMaxDefault !== undefined ? Math.min(this.actionedEventsDefault, this.actionedEventsMaxDefault) : this.actionedEventsDefault,
             ...init,
         };
 
         if(caching !== undefined) {
-            const {provider = this.defaultCacheConfig.provider, ...rest} = caching;
+            const {provider = this.defaultCacheConfig.provider, actionedEventsMax = this.actionedEventsDefault, ...rest} = caching;
             let cacheConfig = {
                 provider: buildCacheOptionsFromProvider(provider),
                 ttl: {
@@ -663,8 +685,10 @@ export class BotResourcesManager {
                 const defaultPrefix = trueProvider.prefix;
                 const subPrefix = defaultPrefix === this.defaultCacheConfig.provider.prefix ? buildCachePrefix([(defaultPrefix !== undefined ? defaultPrefix.replace('SHARED', '') : defaultPrefix), subName]) : trueProvider.prefix;
                 trueProvider.prefix = subPrefix;
+                const eventsMax = this.actionedEventsMaxDefault !== undefined ? Math.min(actionedEventsMax, this.actionedEventsMaxDefault) : actionedEventsMax;
                 opts = {
                     cache: createCacheManager(trueProvider),
+                    actionedEventsMax: eventsMax,
                     cacheType: trueProvider.store,
                     cacheSettingsHash: hash,
                     prefix: subPrefix,

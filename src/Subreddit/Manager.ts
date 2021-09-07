@@ -85,7 +85,6 @@ export interface ManagerStats {
     actionsRunTotal: number
     actionsRunSinceStart: number,
     actionsRunSinceStartTotal: number
-    actionedEvents: number
     cache: {
         provider: string,
         currentKeyCount: number,
@@ -193,7 +192,6 @@ export class Manager {
             actionsRunTotal: totalFromMapStats(this.actionsRun),
             actionsRunSinceStart: this.actionsRunSinceStart,
             actionsRunSinceStartTotal: totalFromMapStats(this.actionsRunSinceStart),
-            actionedEvents: this.actionedEvents.length,
             cache: {
                 provider: 'none',
                 currentKeyCount: 0,
@@ -645,9 +643,7 @@ export class Manager {
                 }
                 actionedEvent.actionResults = runActions;
                 if(triggered) {
-                    this.actionedEvents.unshift(actionedEvent);
-                    // save last 25 triggered events
-                    this.actionedEvents = this.actionedEvents.slice(0, 25);
+                    await this.resources.addActionedEvent(actionedEvent);
                 }
 
                 this.logger.verbose(`Run Stats:        Checks ${checksRun} | Rules => Total: ${totalRulesRun} Unique: ${allRuleResults.length} Cached: ${totalRulesRun - allRuleResults.length} Rolling Avg: ~${formatNumber(this.rulesUniqueRollingAvg)}/s | Actions ${actionsRun}`);
@@ -973,7 +969,7 @@ export class Manager {
             causedBy
         }
         if(!suppressNotification) {
-            this.notificationManager.handle('runStateChanged', 'Bot Started', reason, causedBy)
+            //this.notificationManager.handle('runStateChanged', 'Bot Started', reason, causedBy)
         }
     }
 

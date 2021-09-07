@@ -23,7 +23,7 @@ const actionedEvents = async (req: Request, res: Response) => {
 
     const manager = req.manager as Manager;
 
-    return res.json(manager.actionedEvents);
+    return res.json(await manager.resources.getActionedEvents());
 };
 export const actionedEventsRoute = [authUserCheck(), botRoute(), subredditRoute(), actionedEvents];
 

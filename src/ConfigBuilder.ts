@@ -348,9 +348,9 @@ export const parseOpConfigFromArgs = (args: any): OperatorJsonConfig => {
     return removeUndefinedKeys(data) as OperatorJsonConfig;
 }
 
-const parseListFromEnv = (val: string|undefined) => {
+const parseListFromEnv = (val: string | undefined) => {
     let listVals: undefined | string[];
-    if(val === undefined) {
+    if (val === undefined) {
         return listVals;
     }
     const trimmedVal = val.trim();
@@ -401,7 +401,7 @@ export const parseDefaultBotInstanceFromEnv = (): BotInstanceJsonConfig => {
 export const parseOpConfigFromEnv = (): OperatorJsonConfig => {
     const data = {
         mode: process.env.MODE !== undefined ? process.env.MODE as ('all' | 'server' | 'client') : undefined,
-            operator: {
+        operator: {
             name: parseListFromEnv(process.env.OPERATOR),
             display: process.env.OPERATOR_DISPLAY
         },
@@ -504,12 +504,12 @@ export const parseOperatorConfigFromSources = async (args: any): Promise<Operato
         arrayMerge: overwriteMerge,
     }) as BotInstanceJsonConfig;
 
-    if(configFromFile.caching !== undefined) {
+    if (configFromFile.caching !== undefined) {
         defaultBotInstance.caching = configFromFile.caching;
     }
 
     let botInstances = [];
-    if(botInstancesFromFile.length === 0) {
+    if (botInstancesFromFile.length === 0) {
         botInstances = [defaultBotInstance];
     } else {
         botInstances = botInstancesFromFile.map(x => merge.all([defaultBotInstance, x], {arrayMerge: overwriteMerge}));
@@ -555,20 +555,29 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
 
     let cache: StrongCache;
     let defaultProvider: CacheOptions;
+    let opActionedEventsMax: number | undefined;
+    let opActionedEventsDefault: number = 25;
 
-    if(opCache === undefined) {
-        defaultProvider =  {
+    if (opCache === undefined) {
+        defaultProvider = {
             store: 'memory',
             ...cacheOptDefaults
         };
         cache = {
             ...cacheTTLDefaults,
-            provider: defaultProvider
+            provider: defaultProvider,
+            actionedEventsDefault: opActionedEventsDefault,
         };
 
     } else {
-        const {provider, ...restConfig} = opCache;
-        if(typeof provider === 'string') {
+        const {provider, actionedEventsMax, actionedEventsDefault = opActionedEventsDefault, ...restConfig} = opCache;
+
+        if (actionedEventsMax !== undefined && actionedEventsMax !== null) {
+            opActionedEventsMax = actionedEventsMax;
+            opActionedEventsDefault = Math.min(actionedEventsDefault, actionedEventsMax);
+        }
+
+        if (typeof provider === 'string') {
             defaultProvider = {
                 store: provider as CacheProvider,
                 ...cacheOptDefaults
@@ -584,112 +593,132 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
         cache = {
             ...cacheTTLDefaults,
             ...restConfig,
+            actionedEventsMax: opActionedEventsMax,
+            actionedEventsDefault: opActionedEventsDefault,
             provider: defaultProvider,
         }
     }
 
-    let hydratedBots: BotInstanceConfig[]  = bots.map(x => {
-       const {
-           name: botName,
-           polling: {
-               sharedMod = false,
-               limit = 100,
-               interval = 30,
-           } = {},
-           queue: {
-               maxWorkers = 1,
-           } = {},
-           caching,
-           nanny: {
-               softLimit = 250,
-               hardLimit = 50
-           } = {},
-           snoowrap = {},
-           credentials: {
-               clientId: ci,
-               clientSecret: cs,
-               ...restCred
-           } = {},
-           subreddits: {
-               names = [],
-               exclude = [],
-               wikiConfig = 'botconfig/contextbot',
-               dryRun,
-               heartbeatInterval = 300,
-           } = {},
-       } = x;
+    let hydratedBots: BotInstanceConfig[] = bots.map(x => {
+        const {
+            name: botName,
+            polling: {
+                sharedMod = false,
+                limit = 100,
+                interval = 30,
+            } = {},
+            queue: {
+                maxWorkers = 1,
+            } = {},
+            caching,
+            nanny: {
+                softLimit = 250,
+                hardLimit = 50
+            } = {},
+            snoowrap = {},
+            credentials: {
+                clientId: ci,
+                clientSecret: cs,
+                ...restCred
+            } = {},
+            subreddits: {
+                names = [],
+                exclude = [],
+                wikiConfig = 'botconfig/contextbot',
+                dryRun,
+                heartbeatInterval = 300,
+            } = {},
+        } = x;
 
 
-    let botCache: StrongCache;
+        let botCache: StrongCache;
+        let botActionedEventsDefault: number;
 
-    if(caching === undefined) {
-        botCache = {
-            ...cacheTTLDefaults,
-            provider: {
-                store: 'memory',
-                ...cacheOptDefaults
-            }
-        };
-    } else {
-        const {provider, ...restConfig} = caching;
-        if (typeof provider === 'string') {
+        if (caching === undefined) {
+
             botCache = {
                 ...cacheTTLDefaults,
-                ...restConfig,
+                actionedEventsDefault: opActionedEventsDefault,
+                actionedEventsMax: opActionedEventsMax,
                 provider: {
-                    store: provider as CacheProvider,
+                    store: 'memory',
                     ...cacheOptDefaults
                 }
-            }
+            };
         } else {
-            const {ttl = 60, max = 500, store = 'memory', ...rest} = provider || {};
-            botCache = {
-                ...cacheTTLDefaults,
-                ...restConfig,
-                provider: {
-                    store,
-                    ...cacheOptDefaults,
-                    ...rest,
-                },
+            const {
+                provider,
+                actionedEventsMax = opActionedEventsMax,
+                actionedEventsDefault = opActionedEventsDefault,
+                ...restConfig
+            } = caching;
+
+            botActionedEventsDefault = actionedEventsDefault;
+            if(actionedEventsMax !== undefined) {
+                botActionedEventsDefault = Math.min(actionedEventsDefault, actionedEventsMax);
+            }
+
+            if (typeof provider === 'string') {
+                botCache = {
+                    ...cacheTTLDefaults,
+                    ...restConfig,
+                    actionedEventsDefault: botActionedEventsDefault,
+                    provider: {
+                        store: provider as CacheProvider,
+                        ...cacheOptDefaults
+                    }
+                }
+            } else {
+                const {ttl = 60, max = 500, store = 'memory', ...rest} = provider || {};
+                botCache = {
+                    ...cacheTTLDefaults,
+                    ...restConfig,
+                    actionedEventsDefault: botActionedEventsDefault,
+                    actionedEventsMax,
+                    provider: {
+                        store,
+                        ...cacheOptDefaults,
+                        ...rest,
+                    },
+                }
             }
         }
-    }
 
-    const botCreds =  {
+        const botCreds = {
             clientId: (ci as string),
-                clientSecret: (cs as string),
-        ...restCred,
+            clientSecret: (cs as string),
+            ...restCred,
         };
         if (botCache.provider.prefix === undefined || botCache.provider.prefix === defaultProvider.prefix) {
             // need to provide unique prefix to bot
             botCache.provider.prefix = buildCachePrefix([botCache.provider.prefix, 'bot', (botName || objectHash.sha1(botCreds))]);
         }
 
-    return {
-        name: botName,
-        snoowrap,
-        subreddits: {
-            names,
-            exclude,
-            wikiConfig,
-            heartbeatInterval,
-            dryRun,
-        },
-        credentials: botCreds,
-        caching: botCache,
-        polling: {
-            sharedMod,
-            limit,
-            interval,
-        },
-        queue: {
-            maxWorkers,
-        },
-        nanny: {
-            softLimit,
-            hardLimit
+        return {
+            name: botName,
+            snoowrap,
+            subreddits: {
+                names,
+                exclude,
+                wikiConfig,
+                heartbeatInterval,
+                dryRun,
+            },
+            credentials: botCreds,
+            caching: botCache,
+            polling: {
+                sharedMod,
+                limit,
+                interval,
+            },
+            queue: {
+                maxWorkers,
+            },
+            nanny: {
+                softLimit,
+                hardLimit
+            }
         }
-    }
 
     });
 

@@ -23,7 +23,7 @@
             "description": "The configuration for an **individual reddit account** ContextMod will run as a bot.\n\nMultiple bot configs may be specified (one per reddit account).\n\n**NOTE:** If `bots` is not specified in a `FILE` then a default `bot` is generated using `ENV/ARG` values IE `CLIENT_ID`, etc...but if `bots` IS specified the default is not generated.",
             "properties": {
                 "caching": {
-                    "$ref": "#/definitions/CacheConfig",
+                    "$ref": "#/definitions/OperatorCacheConfig",
                     "description": "Settings to configure the default caching behavior for this bot\n\nEvery setting not specified will default to what is specified by the global operator caching config"
                 },
                 "credentials": {
@@ -172,93 +172,6 @@
                         }
                     },
                     "type": "object"
-                }
-            },
-            "type": "object"
-        },
-        "CacheConfig": {
-            "properties": {
-                "authorTTL": {
-                    "default": 60,
-                    "description": "Amount of time, in seconds, author activity history (Comments/Submission) should be cached\n\n* If `0` or `true` will cache indefinitely (not recommended)\n* If `false` will not cache\n\n* ENV => `AUTHOR_TTL`\n* ARG => `--authorTTL <sec>`",
-                    "examples": [
-                        60
-                    ],
-                    "type": [
-                        "number",
-                        "boolean"
-                    ]
-                },
-                "commentTTL": {
-                    "default": 60,
-                    "description": "Amount of time, in seconds, a comment should be cached\n\n* If `0` or `true` will cache indefinitely (not recommended)\n* If `false` will not cache",
-                    "examples": [
-                        60
-                    ],
-                    "type": [
-                        "number",
-                        "boolean"
-                    ]
-                },
-                "filterCriteriaTTL": {
-                    "default": 60,
-                    "description": "Amount of time, in seconds, to cache filter criteria results (`authorIs` and `itemIs` results)\n\nThis is especially useful if when polling high-volume comments and your checks rely on author/item filters\n\n* If `0` or `true` will cache indefinitely (not recommended)\n* If `false` will not cache",
-                    "examples": [
-                        60
-                    ],
-                    "type": [
-                        "number",
-                        "boolean"
-                    ]
-                },
-                "provider": {
-                    "anyOf": [
-                        {
-                            "$ref": "#/definitions/CacheOptions"
-                        },
-                        {
-                            "enum": [
-                                "memory",
-                                "none",
-                                "redis"
-                            ],
-                            "type": "string"
-                        }
-                    ],
-                    "description": "The cache provider and, optionally, a custom configuration for that provider\n\nIf not present or `null` provider will be `memory`.\n\nTo specify another `provider` but use its default configuration set this property to a string of one of the available providers: `memory`, `redis`, or `none`"
-                },
-                "submissionTTL": {
-                    "default": 60,
-                    "description": "Amount of time, in seconds, a submission should be cached\n\n* If `0` or `true` will cache indefinitely (not recommended)\n* If `false` will not cache",
-                    "examples": [
-                        60
-                    ],
-                    "type": [
-                        "number",
-                        "boolean"
-                    ]
-                },
-                "userNotesTTL": {
-                    "default": 300,
-                    "description": "Amount of time, in seconds, [Toolbox User Notes](https://www.reddit.com/r/toolbox/wiki/docs/usernotes) should be cached\n\n* If `0` or `true` will cache indefinitely (not recommended)\n* If `false` will not cache",
-                    "examples": [
-                        300
-                    ],
-                    "type": [
-                        "number",
-                        "boolean"
-                    ]
-                },
-                "wikiTTL": {
-                    "default": 300,
-                    "description": "Amount of time, in seconds, wiki content pages should be cached\n\n* If `0` or `true` will cache indefinitely (not recommended)\n* If `false` will not cache",
-                    "examples": [
-                        300
-                    ],
-                    "type": [
-                        "number",
-                        "boolean"
-                    ]
                 }
             },
             "type": "object"
@@ -417,6 +330,103 @@
             ],
             "type": "object"
         },
+        "OperatorCacheConfig": {
+            "properties": {
+                "actionedEventsDefault": {
+                    "default": 25,
+                    "description": "The **default** number of Events that the cache will store triggered result summaries for\n\nThese summaries are viewable through the Web UI.\n\nThe value specified cannot be larger than `actionedEventsMax` for the global/bot config (if set)",
+                    "type": "number"
+                },
+                "actionedEventsMax": {
+                    "default": 25,
+                    "description": "The **maximum** number of Events that the cache should store triggered result summaries for\n\nThese summaries are viewable through the Web UI.\n\nThe value specified by a subreddit cannot be larger than the value set by the Operator for the global/bot config (if set)",
+                    "type": "number"
+                },
+                "authorTTL": {
+                    "default": 60,
+                    "description": "Amount of time, in seconds, author activity history (Comments/Submission) should be cached\n\n* If `0` or `true` will cache indefinitely (not recommended)\n* If `false` will not cache\n\n* ENV => `AUTHOR_TTL`\n* ARG => `--authorTTL <sec>`",
+                    "examples": [
+                        60
+                    ],
+                    "type": [
+                        "number",
+                        "boolean"
+                    ]
+                },
+                "commentTTL": {
+                    "default": 60,
+                    "description": "Amount of time, in seconds, a comment should be cached\n\n* If `0` or `true` will cache indefinitely (not recommended)\n* If `false` will not cache",
+                    "examples": [
+                        60
+                    ],
+                    "type": [
+                        "number",
+                        "boolean"
+                    ]
+                },
+                "filterCriteriaTTL": {
+                    "default": 60,
+                    "description": "Amount of time, in seconds, to cache filter criteria results (`authorIs` and `itemIs` results)\n\nThis is especially useful if when polling high-volume comments and your checks rely on author/item filters\n\n* If `0` or `true` will cache indefinitely (not recommended)\n* If `false` will not cache",
+                    "examples": [
+                        60
+                    ],
+                    "type": [
+                        "number",
+                        "boolean"
+                    ]
+                },
+                "provider": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/definitions/CacheOptions"
+                        },
+                        {
+                            "enum": [
+                                "memory",
+                                "none",
+                                "redis"
+                            ],
+                            "type": "string"
+                        }
+                    ],
+                    "description": "The cache provider and, optionally, a custom configuration for that provider\n\nIf not present or `null` provider will be `memory`.\n\nTo specify another `provider` but use its default configuration set this property to a string of one of the available providers: `memory`, `redis`, or `none`"
+                },
+                "submissionTTL": {
+                    "default": 60,
+                    "description": "Amount of time, in seconds, a submission should be cached\n\n* If `0` or `true` will cache indefinitely (not recommended)\n* If `false` will not cache",
+                    "examples": [
+                        60
+                    ],
+                    "type": [
+                        "number",
+                        "boolean"
+                    ]
+                },
+                "userNotesTTL": {
+                    "default": 300,
+                    "description": "Amount of time, in seconds, [Toolbox User Notes](https://www.reddit.com/r/toolbox/wiki/docs/usernotes) should be cached\n\n* If `0` or `true` will cache indefinitely (not recommended)\n* If `false` will not cache",
+                    "examples": [
+                        300
+                    ],
+                    "type": [
+                        "number",
+                        "boolean"
+                    ]
+                },
+                "wikiTTL": {
+                    "default": 300,
+                    "description": "Amount of time, in seconds, wiki content pages should be cached\n\n* If `0` or `true` will cache indefinitely (not recommended)\n* If `false` will not cache",
+                    "examples": [
+                        300
+                    ],
+                    "type": [
+                        "number",
+                        "boolean"
+                    ]
+                }
+            },
+            "type": "object"
+        },
         "PollingDefaults": {
             "properties": {
                 "delayUntil": {
@@ -551,7 +561,7 @@
             "type": "array"
         },
         "caching": {
-            "$ref": "#/definitions/CacheConfig",
+            "$ref": "#/definitions/OperatorCacheConfig",
             "description": "Settings to configure the default caching behavior globally\n\nThese settings will be used by each bot, and subreddit, that does not specify their own"
         },
         "logging": {

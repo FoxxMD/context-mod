@@ -688,6 +688,11 @@
         },
         "CacheConfig": {
             "properties": {
+                "actionedEventsMax": {
+                    "default": 25,
+                    "description": "The **maximum** number of Events that the cache should store triggered result summaries for\n\nThese summaries are viewable through the Web UI.\n\nThe value specified by a subreddit cannot be larger than the value set by the Operator for the global/bot config (if set)",
+                    "type": "number"
+                },
                 "authorTTL": {
                     "default": 60,
                     "description": "Amount of time, in seconds, author activity history (Comments/Submission) should be cached\n\n* If `0` or `true` will cache indefinitely (not recommended)\n* If `false` will not cache\n\n* ENV => `AUTHOR_TTL`\n* ARG => `--authorTTL <sec>`",

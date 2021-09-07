@@ -34,7 +34,6 @@ const managerStats: ManagerStats = {
     rulesRunTotal: 0,
     rulesTriggeredSinceStartTotal: 0,
     rulesTriggeredTotal: 0,
-    actionedEvents: 0,
 };
 const botStats: BotStats = {
     apiAvg: '-',
