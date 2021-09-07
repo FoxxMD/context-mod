@@ -311,8 +311,12 @@ export class RegexRule extends Rule {
                 msg = `${msg} and ${c.matchCount} Total Matches`;
             }
             msg = `${msg} (Window: ${c.criteria.window})`;
-            let matchSample = `-- Matched Values: ${c.matches.slice(0, 3).map(x => `"${x}"`).join(', ')}${c.matches.length > 3 ? `, and ${c.matches.length - 3} more...` : ''}`;
-            logSummary.push(`${msg} ${matchSample}`);
+            if(c.matches.length > 0) {
+                let matchSample = `-- Matched Values: ${c.matches.slice(0, 3).map(x => `"${x}"`).join(', ')}${c.matches.length > 3 ? `, and ${c.matches.length - 3} more...` : ''}`;
+                logSummary.push(`${msg} ${matchSample}`);
+            } else {
+                logSummary.push(msg);
+            }
         }
 
         const result = `${triggeredIndicator(criteriaMet)} ${logSummary.join(' || ')}`;
