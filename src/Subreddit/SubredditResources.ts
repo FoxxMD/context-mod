@@ -224,7 +224,7 @@ export class SubredditResources {
     async addActionedEvent(ae: ActionedEvent) {
         const events = await this.cache.wrap(`actionedEvents-${this.subreddit.display_name}`, () => []) as ActionedEvent[];
         events.unshift(ae);
-        await this.cache.set(`actionedEvents-${this.subreddit.display_name}`, events.slice(0, this.actionedEventsMax));
+        await this.cache.set(`actionedEvents-${this.subreddit.display_name}`, events.slice(0, this.actionedEventsMax), {ttl: 0});
     }
 
     async getActivity(item: Submission | Comment) {
