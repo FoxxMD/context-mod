@@ -373,11 +373,7 @@
                                                         <span class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2'>
                                                             <span><%= data.stats.checksTriggeredTotal %></span> Triggered / <span><%= data.stats.checksRunTotal %></span> Run
                                                         </span>
-                                                        <% if (data.name !== 'All') { %>
-                                                            <a target="_blank" href="/events?instance=<%= instanceId %>&bot=<%= bot.system.name %>&subreddit=<%= data.name %>" class="underline" style="text-decoration-style: dotted"><%= data.stats.checksTriggeredTotal %> T</a>
-                                                        <% } else { %>
-                                                            <%= data.stats.checksTriggeredTotal %> T
-                                                        <% } %>/ <span><%= data.stats.checksRunTotal %></span> R</span>
+                                                        <span><%= data.stats.checksTriggeredTotal %> T / <span><%= data.stats.checksRunTotal %></span> R</span>
                                                     </span>
 
                                                     <label>Rules</label>
@@ -389,7 +385,11 @@
                                                     </span>
 
                                                     <label>Actions</label>
-                                                    <span><%= data.stats.actionsRunTotal %> Run</span>
+                                                    <% if (data.name !== 'All') { %>
+                                                        <a target="_blank" href="/events?instance=<%= instanceId %>&bot=<%= bot.system.name %>&subreddit=<%= data.name %>" class="underline" style="text-decoration-style: dotted"><%= data.stats.actionsRunTotal %> Run</a>
+                                                    <% } else { %>
+                                                        <span><%= data.stats.actionsRunTotal %> Run</span>
+                                                    <% } %>
                                                 </div>
                                             </div>
                                             <div>
