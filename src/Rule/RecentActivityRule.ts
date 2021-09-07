@@ -169,8 +169,8 @@ export class RecentActivityRule extends Rule {
         } = summary;
         const relevantSubs = subsWithActivity.length === 0 ? subreddits : subsWithActivity;
         let totalSummary = `${testValue} activities over ${relevantSubs.length} subreddits${karmaThreshold !== undefined ? ` with ${combinedKarma} combined karma` : ''} ${triggered ? 'met' : 'did not meet'} threshold of ${threshold}${karmaThreshold !== undefined ? ` and ${karmaThreshold} combined karma` : ''}`;
-        if(triggered) {
-            totalSummary = `${totalSummary} -- subreddits: ${relevantSubs.join(', ')}`;
+        if(triggered && subsWithActivity.length > 0) {
+            totalSummary = `${totalSummary} -- subreddits: ${subsWithActivity.join(', ')}`;
         }
         return {
             result: totalSummary,
