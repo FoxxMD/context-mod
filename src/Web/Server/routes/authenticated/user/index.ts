@@ -36,7 +36,9 @@ const actionedEvents = async (req: Request, res: Response) => {
 
     let events: ActionedEvent[] = [];
     for(const m of managers) {
-        events = events.concat(await m.resources.getActionedEvents());
+        if(m.resources !== undefined) {
+            events = events.concat(await m.resources.getActionedEvents());
+        }
     }
 
     events.sort((a, b) => b.timestamp - a.timestamp);
