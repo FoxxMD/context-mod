@@ -20,7 +20,7 @@
         }
     </style>
 </head>
-<body style="user-select: none;" class="">
+<body>
 <script>localStorage.getItem('ms-dark') === 'no' ? document.body.classList.remove('dark') : document.body.classList.add('dark')</script>
 <div class="min-w-screen min-h-screen bg-gray-100 bg-gray-100 dark:bg-gray-800 font-sans">
     <%- include('partials/title') %>
@@ -38,7 +38,7 @@
                                 <span class="peek"><%- eRes.activity.peek %></span><a target="_blank" href="https://reddit.com<%= eRes.activity.link%>">(Link)</a>
                                 </div>
                                 <div class="flex items-center flex-end">
-                                    <%= eRes.timestamp %>
+                                    <%= eRes.subreddit %> @ <%= eRes.timestamp %>
                                 </div>
                             </div>
                         </div>

@@ -1483,6 +1483,7 @@ export interface ActionedEvent {
     timestamp: number
     check: string
     ruleSummary: string,
+    subreddit: string,
     ruleResults: RuleResult[]
     actionResults: ActionResult[]
 }

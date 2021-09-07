@@ -388,7 +388,7 @@
                                                     <% if (data.name !== 'All') { %>
                                                         <a target="_blank" href="/events?instance=<%= instanceId %>&bot=<%= bot.system.name %>&subreddit=<%= data.name %>" class="underline" style="text-decoration-style: dotted"><%= data.stats.actionsRunTotal %> Run</a>
                                                     <% } else { %>
-                                                        <span><%= data.stats.actionsRunTotal %> Run</span>
+                                                        <a target="_blank" href="/events?instance=<%= instanceId %>&bot=<%= bot.system.name %>" class="underline" style="text-decoration-style: dotted"><%= data.stats.actionsRunTotal %> Run</a>
                                                     <% } %>
                                                 </div>
                                             </div>

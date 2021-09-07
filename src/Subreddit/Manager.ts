@@ -546,6 +546,7 @@ export class Manager {
         let totalRulesRun = 0;
         let runActions: ActionResult[] = [];
         let actionedEvent: ActionedEvent = {
+            subreddit: this.subreddit.display_name_prefixed,
             activity: {
                 peek: ePeek,
                 link: item.permalink
