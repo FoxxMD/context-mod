@@ -970,7 +970,7 @@ export class Manager {
             causedBy
         }
         if(!suppressNotification) {
-            //this.notificationManager.handle('runStateChanged', 'Bot Started', reason, causedBy)
+            this.notificationManager.handle('runStateChanged', 'Bot Started', reason, causedBy)
         }
     }
 
