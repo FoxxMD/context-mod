@@ -5,7 +5,7 @@ import {
     asSubmission,
     comparisonTextOp, FAIL, isExternalUrlSubmission, isSubmission, parseGenericValueComparison,
     parseGenericValueOrPercentComparison, parseRegex,
-    PASS
+    PASS, triggeredIndicator
 } from "../util";
 import {
     ActivityWindowType, JoinOperands,
@@ -140,7 +140,7 @@ export class RegexRule extends Rule {
             const {
                 name,
                 regex,
-                regexFlags,
+                regexFlags = 'g',
                 testOn: testOnVals = ['title', 'body'],
                 lookAt = 'all',
                 matchThreshold = '> 0',
@@ -158,7 +158,7 @@ export class RegexRule extends Rule {
             }, []);
 
             // check regex
-            const reg = new RegExp(regex);
+            const reg = new RegExp(regex, regexFlags);
             // ok cool its a valid regex
 
             const matchComparison = parseGenericValueComparison(matchThreshold);
@@ -301,20 +301,25 @@ export class RegexRule extends Rule {
         let index = 0;
         for (const c of criteriaResults) {
             index++;
-            let msg = `Crit ${c.criteria.name || index} ${c.triggered ? PASS : FAIL}`;
+            let msg = `Criteria ${c.criteria.name || `#${index}`} ${triggeredIndicator(c.triggered)}`;
             if (c.activityThresholdMet !== undefined) {
-                msg = `${msg} -- Activity Match=> ${c.activityThresholdMet ? PASS : FAIL} ${c.activitiesMatchedCount} ${c.criteria.activityMatchThreshold} (Threshold ${c.criteria.matchThreshold})`;
+                msg = `${msg} -- Activity Match ${triggeredIndicator(c.activityThresholdMet)} => ${c.activitiesMatchedCount} ${c.criteria.activityMatchThreshold} (Threshold ${c.criteria.matchThreshold})`;
             }
             if (c.totalThresholdMet !== undefined) {
-                msg = `${msg} -- Total Matches=> ${c.totalThresholdMet ? PASS : FAIL} ${c.matchCount} ${c.criteria.totalMatchThreshold}`;
+                msg = `${msg} -- Total Matches ${triggeredIndicator(c.totalThresholdMet)} => ${c.matchCount} ${c.criteria.totalMatchThreshold}`;
             } else {
                 msg = `${msg} and ${c.matchCount} Total Matches`;
             }
             msg = `${msg} (Window: ${c.criteria.window})`;
-            logSummary.push(msg);
+            if(c.matches.length > 0) {
+                let matchSample = `-- Matched Values: ${c.matches.slice(0, 3).map(x => `"${x}"`).join(', ')}${c.matches.length > 3 ? `, and ${c.matches.length - 3} more...` : ''}`;
+                logSummary.push(`${msg} ${matchSample}`);
+            } else {
+                logSummary.push(msg);
+            }
         }
 
-        const result = `${criteriaMet ? PASS : FAIL} ${logSummary.join(' || ')}`;
+        const result = `${triggeredIndicator(criteriaMet)} ${logSummary.join(' || ')}`;
         this.logger.verbose(result);
 
         return Promise.resolve([criteriaMet, this.getResult(criteriaMet, {result, data: criteriaResults})]);

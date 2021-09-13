@@ -2,6 +2,8 @@ import winston from 'winston';
 import 'winston-daily-rotate-file';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc.js';
+import advancedFormat from 'dayjs/plugin/advancedFormat';
+import tz from 'dayjs/plugin/timezone';
 import dduration from 'dayjs/plugin/duration.js';
 import relTime from 'dayjs/plugin/relativeTime.js';
 import sameafter from 'dayjs/plugin/isSameOrAfter.js';
@@ -31,6 +33,8 @@ dayjs.extend(dduration);
 dayjs.extend(relTime);
 dayjs.extend(sameafter);
 dayjs.extend(samebefore);
+dayjs.extend(tz);
+dayjs.extend(advancedFormat);
 
 const commentReg = parseLinkIdentifier([COMMENT_URL_ID]);
 const submissionReg = parseLinkIdentifier([SUBMISSION_URL_ID]);

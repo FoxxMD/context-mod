@@ -5,6 +5,7 @@ import winston from 'winston';
 import {COMMENT_URL_ID, parseLinkIdentifier, SUBMISSION_URL_ID} from "../../../../../util";
 import {booleanMiddle} from "../../../../Common/middleware";
 import {Manager} from "../../../../../Subreddit/Manager";
+import {ActionedEvent} from "../../../../../Common/interfaces";
 
 const commentReg = parseLinkIdentifier([COMMENT_URL_ID]);
 const submissionReg = parseLinkIdentifier([SUBMISSION_URL_ID]);
@@ -21,11 +22,30 @@ export const configRoute = [authUserCheck(), botRoute(), subredditRoute(), confi
 
 const actionedEvents = async (req: Request, res: Response) => {
 
-    const manager = req.manager as Manager;
+    let managers: Manager[] = [];
+    const manager = req.manager as Manager | undefined;
+    if(manager !== undefined) {
+        managers.push(manager);
+    } else {
+        for(const manager of req.serverBot.subManagers) {
+            if((req.user?.realManagers as string[]).includes(manager.displayLabel)) {
+                managers.push(manager);
+            }
+        }
+    }
 
-    return res.json(manager.actionedEvents);
+    let events: ActionedEvent[] = [];
+    for(const m of managers) {
+        if(m.resources !== undefined) {
+            events = events.concat(await m.resources.getActionedEvents());
+        }
+    }
+
+    events.sort((a, b) => b.timestamp - a.timestamp);
+
+    return res.json(events);
 };
-export const actionedEventsRoute = [authUserCheck(), botRoute(), subredditRoute(), actionedEvents];
+export const actionedEventsRoute = [authUserCheck(), botRoute(), subredditRoute(false), actionedEvents];
 
 const action = async (req: Request, res: Response) => {
     const bot = req.serverBot;

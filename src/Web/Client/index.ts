@@ -847,7 +847,7 @@ const webClient = async (options: OperatorConfig) => {
         return res.render('events', {
             data: resp.map((x) => {
                 const {timestamp, activity: {peek, link}, ruleResults = [], actionResults = [], ...rest} = x;
-                const time = dayjs(timestamp).local().format();
+                const time = dayjs(timestamp).local().format('YY-MM-DD HH:mm:ss z');
                 const formattedPeek = Autolinker.link(peek, {
                     email: false,
                     phone: false,
@@ -858,11 +858,11 @@ const webClient = async (options: OperatorConfig) => {
                 });
                 const formattedRuleResults = ruleResults.map((y: any) => {
                     const {triggered, result, ...restY} = y;
-                    let t = 'Not Triggered';
+                    let t = triggeredIndicator(false);
                     if(triggered === null) {
                         t = 'Skipped';
                     } else if(triggered === true) {
-                        t = 'Triggered';
+                        t = triggeredIndicator(true);
                     }
                     return {
                         ...restY,
@@ -876,7 +876,7 @@ const webClient = async (options: OperatorConfig) => {
                    if(!run) {
                        res = `Not Run - ${runReason === undefined ? '(No Reason)' : runReason}`;
                    } else {
-                       res = `Success: ${triggeredIndicator(success)}${result !== undefined ? ` - ${result}` : ''}`;
+                       res = `${triggeredIndicator(success)}${result !== undefined ? ` - ${result}` : ''}`;
                    }
                    return {
                        ...restA,
@@ -895,7 +895,7 @@ const webClient = async (options: OperatorConfig) => {
                     actionResults: formattedActionResults
                 }
             }),
-            title: `${subreddit} Actioned Events`
+            title: `${subreddit !== undefined ? `${subreddit} ` : ''}Actioned Events`
         });
     });
 

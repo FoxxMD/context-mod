@@ -456,6 +456,32 @@ export interface CacheConfig extends TTLConfig {
      * To specify another `provider` but use its default configuration set this property to a string of one of the available providers: `memory`, `redis`, or `none`
      * */
     provider?: CacheProvider | CacheOptions
+
+    /**
+     * The **maximum** number of Events that the cache should store triggered result summaries for
+     *
+     * These summaries are viewable through the Web UI.
+     *
+     * The value specified by a subreddit cannot be larger than the value set by the Operator for the global/bot config (if set)
+     *
+     * @default 25
+     * @example [25]
+     * */
+    actionedEventsMax?: number
+}
+
+export interface OperatorCacheConfig extends CacheConfig {
+    /**
+     * The **default** number of Events that the cache will store triggered result summaries for
+     *
+     * These summaries are viewable through the Web UI.
+     *
+     * The value specified cannot be larger than `actionedEventsMax` for the global/bot config (if set)
+     *
+     * @default 25
+     * @example [25]
+     * */
+    actionedEventsDefault?: number
 }
 
 export interface Footer {
@@ -731,6 +757,8 @@ export type StrongCache = {
     commentTTL: number | boolean,
     filterCriteriaTTL: number | boolean,
     provider: CacheOptions
+    actionedEventsMax?: number,
+    actionedEventsDefault: number,
 }
 
 /**
@@ -1091,7 +1119,7 @@ export interface BotInstanceJsonConfig {
      *
      * Every setting not specified will default to what is specified by the global operator caching config
      * */
-    caching?: CacheConfig
+    caching?: OperatorCacheConfig
     /**
      * Settings related to managing heavy API usage.
      * */
@@ -1204,7 +1232,7 @@ export interface OperatorJsonConfig {
      *
      * These settings will be used by each bot, and subreddit, that does not specify their own
      * */
-    caching?: CacheConfig
+    caching?: OperatorCacheConfig
 
     bots?: BotInstanceJsonConfig[]
 
@@ -1455,6 +1483,7 @@ export interface ActionedEvent {
     timestamp: number
     check: string
     ruleSummary: string,
+    subreddit: string,
     ruleResults: RuleResult[]
     actionResults: ActionResult[]
 }
