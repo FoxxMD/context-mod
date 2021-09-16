@@ -654,23 +654,28 @@
             "type": "object"
         },
         "HistoryCriteria": {
-            "description": "If both `submission` and `comment` are defined then criteria will only trigger if BOTH thresholds are met",
+            "description": "Criteria will only trigger if ALL present thresholds (comment, submission, total) are met",
             "properties": {
                 "comment": {
-                    "description": "A string containing a comparison operator and a value to compare comments against\n\nThe syntax is `(< OR > OR <= OR >=) <number>[percent sign] [OP]`\n\n* EX `> 100`  => greater than 100 comments\n* EX `<= 75%` => comments are equal to or less than 75% of all Activities\n\nIf your string also contains the text `OP` somewhere **after** `<number>[percent sign]`...:\n\n* EX `> 100 OP`  => greater than 100 comments as OP\n* EX `<= 25% as OP` => Comments as OP were less then or equal to 25% of **all Comments**",
+                    "description": "A string containing a comparison operator and a value to compare **filtered** (using `include` or `exclude`, if present) comments against\n\nThe syntax is `(< OR > OR <= OR >=) <number>[percent sign] [OP]`\n\n* EX `> 100`  => greater than 100 comments\n* EX `<= 75%` => comments are equal to or less than 75% of unfiltered Activities\n\nIf your string also contains the text `OP` somewhere **after** `<number>[percent sign]`...:\n\n* EX `> 100 OP`  => greater than 100 filtered comments as OP\n* EX `<= 25% as OP` => **Filtered** comments as OP were less then or equal to 25% of **unfiltered Comments**",
                     "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
                     "type": "string"
                 },
                 "minActivityCount": {
                     "default": 5,
-                    "description": "The minimum number of activities that must exist from the `window` results for this criteria to run",
+                    "description": "The minimum number of **filtered** activities that must exist from the `window` results for this criteria to run",
                     "type": "number"
                 },
                 "name": {
                     "type": "string"
                 },
                 "submission": {
-                    "description": "A string containing a comparison operator and a value to compare submissions against\n\nThe syntax is `(< OR > OR <= OR >=) <number>[percent sign]`\n\n* EX `> 100`  => greater than 100 submissions\n* EX `<= 75%` => submissions are equal to or less than 75% of all Activities",
+                    "description": "A string containing a comparison operator and a value to compare **filtered** (using `include` or `exclude`, if present) submissions against\n\nThe syntax is `(< OR > OR <= OR >=) <number>[percent sign]`\n\n* EX `> 100`  => greater than 100 filtered submissions\n* EX `<= 75%` => filtered submissions are equal to or less than 75% of unfiltered Activities",
+                    "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
+                    "type": "string"
+                },
+                "total": {
+                    "description": "A string containing a comparison operator and a value to compare **filtered** (using `include` or `exclude`) activities against\n\n**Note:** This is only useful if using `include` or `exclude` otherwise percent will always be 100% and total === activityTotal\n\nThe syntax is `(< OR > OR <= OR >=) <number>[percent sign] [OP]`\n\n* EX `> 100`  => greater than 100 filtered activities\n* EX `<= 75%` => filtered activities are equal to or less than 75% of all Activities",
                     "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
                     "type": "string"
                 },
@@ -739,27 +744,51 @@
                     "type": "array"
                 },
                 "exclude": {
-                    "description": "Do not include Submissions from this list of Subreddits (by name, case-insensitive)\n\nEX `[\"mealtimevideos\",\"askscience\"]`",
+                    "description": "If present, activities will be counted only if they are **NOT** found in this list of Subreddits\n\nEach value in the list can be either:\n\n * string (name of subreddit)\n * regular expression to run on the subreddit name\n * `SubredditState`\n\nEX `[\"mealtimevideos\",\"askscience\", \"/onlyfans*\\/i\", {\"over18\": true}]`\n\n**Note:** This affects **post-window retrieval** activities. So that:\n\n* `activityTotal` is number of activities retrieved from `window` -- NOT post-filtering\n* all comparisons using **percentages** will compare **post-filtering** results against **activity count from window**\n* -- to run this rule where all activities are only from include/exclude filtering instead use include/exclude in `window`",
                     "examples": [
-                        "mealtimevideos",
-                        "askscience"
+                        [
+                            "mealtimevideos",
+                            "askscience",
+                            "/onlyfans*/i",
+                            {
+                                "over18": true
+                            }
+                        ]
                     ],
                     "items": {
-                        "type": "string"
+                        "anyOf": [
+                            {
+                                "$ref": "#/definitions/SubredditState"
+                            },
+                            {
+                                "type": "string"
+                            }
+                        ]
                     },
-                    "minItems": 1,
                     "type": "array"
                 },
                 "include": {
-                    "description": "Only include Submissions from this list of Subreddits (by name, case-insensitive)\n\nEX `[\"mealtimevideos\",\"askscience\"]`",
+                    "description": "If present, activities will be counted only if they are found in this list of Subreddits.\n\nEach value in the list can be either:\n\n * string (name of subreddit)\n * regular expression to run on the subreddit name\n * `SubredditState`\n\nEX `[\"mealtimevideos\",\"askscience\", \"/onlyfans*\\/i\", {\"over18\": true}]`\n\n **Note:** This affects **post-window retrieval** activities. So that:\n\n* `activityTotal` is number of activities retrieved from `window` -- NOT post-filtering\n* all comparisons using **percentages** will compare **post-filtering** results against **activity count from window**\n* -- to run this rule where all activities are only from include/exclude filtering instead use include/exclude in `window`",
                     "examples": [
-                        "mealtimevideos",
-                        "askscience"
+                        [
+                            "mealtimevideos",
+                            "askscience",
+                            "/onlyfans*/i",
+                            {
+                                "over18": true
+                            }
+                        ]
                     ],
                     "items": {
-                        "type": "string"
+                        "anyOf": [
+                            {
+                                "$ref": "#/definitions/SubredditState"
+                            },
+                            {
+                                "type": "string"
+                            }
+                        ]
                     },
-                    "minItems": 1,
                     "type": "array"
                 },
                 "itemIs": {

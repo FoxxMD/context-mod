@@ -1,5 +1,5 @@
 
-import {ActivityWindowType, CompareValueOrPercent, ThresholdCriteria} from "../Common/interfaces";
+import {ActivityWindowType, CompareValueOrPercent, SubredditState, ThresholdCriteria} from "../Common/interfaces";
 import {Rule, RuleJSONConfig, RuleOptions, RuleResult} from "./index";
 import Submission from "snoowrap/dist/objects/Submission";
 import {getAuthorActivities} from "../Utils/SnoowrapUtils";
@@ -11,8 +11,9 @@ import {
     formatNumber, getActivitySubredditName, isSubmission,
     parseGenericValueOrPercentComparison, parseSubredditName,
     PASS,
-    percentFromString
+    percentFromString, toStrongSubredditState
 } from "../util";
+import {Comment} from "snoowrap";
 
 export interface CommentThresholdCriteria extends ThresholdCriteria {
     /**
@@ -24,42 +25,56 @@ export interface CommentThresholdCriteria extends ThresholdCriteria {
     asOp?: boolean
 }
 /**
- * If both `submission` and `comment` are defined then criteria will only trigger if BOTH thresholds are met
+ * Criteria will only trigger if ALL present thresholds (comment, submission, total) are met
  * */
 export interface HistoryCriteria {
 
     /**
-     * A string containing a comparison operator and a value to compare submissions against
+     * A string containing a comparison operator and a value to compare **filtered** (using `include` or `exclude`, if present) submissions against
      *
      * The syntax is `(< OR > OR <= OR >=) <number>[percent sign]`
      *
-     * * EX `> 100`  => greater than 100 submissions
-     * * EX `<= 75%` => submissions are equal to or less than 75% of all Activities
+     * * EX `> 100`  => greater than 100 filtered submissions
+     * * EX `<= 75%` => filtered submissions are equal to or less than 75% of unfiltered Activities
      *
      * @pattern ^\s*(>|>=|<|<=)\s*(\d+)\s*(%?)(.*)$
      * */
     submission?: CompareValueOrPercent
     /**
-     * A string containing a comparison operator and a value to compare comments against
+     * A string containing a comparison operator and a value to compare **filtered** (using `include` or `exclude`, if present) comments against
      *
      * The syntax is `(< OR > OR <= OR >=) <number>[percent sign] [OP]`
      *
      * * EX `> 100`  => greater than 100 comments
-     * * EX `<= 75%` => comments are equal to or less than 75% of all Activities
+     * * EX `<= 75%` => comments are equal to or less than 75% of unfiltered Activities
      *
      * If your string also contains the text `OP` somewhere **after** `<number>[percent sign]`...:
      *
-     * * EX `> 100 OP`  => greater than 100 comments as OP
-     * * EX `<= 25% as OP` => Comments as OP were less then or equal to 25% of **all Comments**
+     * * EX `> 100 OP`  => greater than 100 filtered comments as OP
+     * * EX `<= 25% as OP` => **Filtered** comments as OP were less then or equal to 25% of **unfiltered Comments**
      *
      * @pattern ^\s*(>|>=|<|<=)\s*(\d+)\s*(%?)(.*)$
      * */
     comment?: CompareValueOrPercent
 
+    /**
+     * A string containing a comparison operator and a value to compare **filtered** (using `include` or `exclude`) activities against
+     *
+     * **Note:** This is only useful if using `include` or `exclude` otherwise percent will always be 100% and total === activityTotal
+     *
+     * The syntax is `(< OR > OR <= OR >=) <number>[percent sign] [OP]`
+     *
+     * * EX `> 100`  => greater than 100 filtered activities
+     * * EX `<= 75%` => filtered activities are equal to or less than 75% of all Activities
+     *
+     * @pattern ^\s*(>|>=|<|<=)\s*(\d+)\s*(%?)(.*)$
+     * */
+    total?: CompareValueOrPercent
+
     window: ActivityWindowType
 
     /**
-     * The minimum number of activities that must exist from the `window` results for this criteria to run
+     * The minimum number of **filtered** activities that must exist from the `window` results for this criteria to run
      * @default 5
      * */
     minActivityCount?: number
@@ -69,8 +84,9 @@ export interface HistoryCriteria {
 export class HistoryRule extends Rule {
     criteria: HistoryCriteria[];
     condition: 'AND' | 'OR';
-    include: string[];
-    exclude: string[];
+    include: (string | SubredditState)[];
+    exclude: (string | SubredditState)[];
+    activityFilterFunc: (x: Submission|Comment) => Promise<boolean> = async (x) => true;
 
     constructor(options: HistoryOptions) {
         super(options);
@@ -86,8 +102,41 @@ export class HistoryRule extends Rule {
         if (this.criteria.length === 0) {
             throw new Error('Must provide at least one HistoryCriteria');
         }
-        this.include = include.map(x => parseSubredditName(x).toLowerCase());
-        this.exclude = exclude.map(x => parseSubredditName(x).toLowerCase());
+
+        this.include = include;
+        this.exclude = exclude;
+
+        if(this.include.length > 0) {
+            const subStates = include.map((x) => {
+                if(typeof x === 'string') {
+                    return toStrongSubredditState({name: x, stateDescription: x}, {defaultFlags: 'i', generateDescription: true});
+                }
+                return toStrongSubredditState(x, {defaultFlags: 'i', generateDescription: true});
+            });
+            this.activityFilterFunc = async (x: Submission|Comment) => {
+                for(const ss of subStates) {
+                    if(await this.resources.testSubredditCriteria(x, ss)) {
+                        return true;
+                    }
+                }
+                return false;
+            };
+        } else if(this.exclude.length > 0) {
+            const subStates = exclude.map((x) => {
+                if(typeof x === 'string') {
+                    return toStrongSubredditState({name: x, stateDescription: x}, {defaultFlags: 'i', generateDescription: true});
+                }
+                return toStrongSubredditState(x, {defaultFlags: 'i', generateDescription: true});
+            });
+            this.activityFilterFunc = async (x: Submission|Comment) => {
+                for(const ss of subStates) {
+                    if(await this.resources.testSubredditCriteria(x, ss)) {
+                        return false;
+                    }
+                }
+                return true;
+            };
+        }
     }
 
     getKind(): string {
@@ -108,19 +157,17 @@ export class HistoryRule extends Rule {
 
         for (const criteria of this.criteria) {
 
-            const {comment, window, submission, minActivityCount = 5} = criteria;
+            const {comment, window, submission, total, minActivityCount = 5} = criteria;
 
             let activities = await this.resources.getAuthorActivities(item.author, {window: window});
-            activities = activities.filter(act => {
-                if (this.include.length > 0) {
-                    return this.include.some(x => x === getActivitySubredditName(act).toLowerCase());
-                } else if (this.exclude.length > 0) {
-                    return !this.exclude.some(x => x === getActivitySubredditName(act).toLowerCase())
+            const filteredActivities = [];
+            for(const a of activities) {
+                if(await this.activityFilterFunc(a)) {
+                    filteredActivities.push(a);
                 }
-                return true;
-            });
+            }
 
-            if (activities.length < minActivityCount) {
+            if (filteredActivities.length < minActivityCount) {
                 continue;
             }
 
@@ -135,6 +182,24 @@ export class HistoryRule extends Rule {
                 }
                 return a;
             },{submissionTotal: 0, commentTotal: 0, opTotal: 0});
+            let fSubmissionTotal = submissionTotal;
+            let fCommentTotal = commentTotal;
+            let fOpTotal = opTotal;
+            if(activities.length !== filteredActivities.length) {
+                const filteredCounts = filteredActivities.reduce((acc, act) => {
+                    if(asSubmission(act)) {
+                        return {...acc, submissionTotal: acc.submissionTotal + 1};
+                    }
+                    let a = {...acc, commentTotal: acc.commentTotal + 1};
+                    if(act.is_submitter) {
+                        a.opTotal = a.opTotal + 1;
+                    }
+                    return a;
+                },{submissionTotal: 0, commentTotal: 0, opTotal: 0});
+                fSubmissionTotal = filteredCounts.submissionTotal;
+                fCommentTotal = filteredCounts.commentTotal;
+                fOpTotal = filteredCounts.opTotal;
+            }
 
             let commentTrigger = undefined;
             if(comment !== undefined) {
@@ -143,15 +208,15 @@ export class HistoryRule extends Rule {
                 if(isPercent) {
                     const per = value / 100;
                     if(asOp) {
-                        commentTrigger = comparisonTextOp(opTotal / commentTotal, operator, per);
+                        commentTrigger = comparisonTextOp(fOpTotal / commentTotal, operator, per);
                     } else {
-                        commentTrigger = comparisonTextOp(commentTotal / activityTotal, operator, per);
+                        commentTrigger = comparisonTextOp(fCommentTotal / activityTotal, operator, per);
                     }
                 } else {
                     if(asOp) {
-                        commentTrigger = comparisonTextOp(opTotal, operator, value);
+                        commentTrigger = comparisonTextOp(fOpTotal, operator, value);
                     } else {
-                        commentTrigger = comparisonTextOp(commentTotal, operator, value);
+                        commentTrigger = comparisonTextOp(fCommentTotal, operator, value);
                     }
                 }
             }
@@ -161,9 +226,20 @@ export class HistoryRule extends Rule {
                 const {operator, value, isPercent} = parseGenericValueOrPercentComparison(submission);
                 if(isPercent) {
                     const per = value / 100;
-                    submissionTrigger = comparisonTextOp(submissionTotal / activityTotal, operator, per);
+                    submissionTrigger = comparisonTextOp(fSubmissionTotal / activityTotal, operator, per);
                 } else {
-                    submissionTrigger = comparisonTextOp(submissionTotal, operator, value);
+                    submissionTrigger = comparisonTextOp(fSubmissionTotal, operator, value);
+                }
+            }
+
+            let totalTrigger = undefined;
+            if(total !== undefined) {
+                const {operator, value, isPercent} = parseGenericValueOrPercentComparison(total);
+                if(isPercent) {
+                    const per = value / 100;
+                    totalTrigger = comparisonTextOp(filteredActivities.length / activityTotal, operator, per);
+                } else {
+                    totalTrigger = comparisonTextOp(filteredActivities.length, operator, value);
                 }
             }
 
@@ -176,12 +252,14 @@ export class HistoryRule extends Rule {
                 criteria,
                 activityTotal,
                 activityTotalWindow,
-                submissionTotal,
-                commentTotal,
-                opTotal,
+                submissionTotal: fSubmissionTotal,
+                commentTotal: fCommentTotal,
+                opTotal: fOpTotal,
+                filteredTotal: filteredActivities.length,
                 submissionTrigger,
                 commentTrigger,
-                triggered: (submissionTrigger === undefined || submissionTrigger === true) && (commentTrigger === undefined || commentTrigger === true)
+                totalTrigger,
+                triggered: (submissionTrigger === undefined || submissionTrigger === true) && (commentTrigger === undefined || commentTrigger === true) && (totalTrigger === undefined || totalTrigger === true)
             });
         }
 
@@ -224,36 +302,50 @@ export class HistoryRule extends Rule {
             activityTotalWindow,
             submissionTotal,
             commentTotal,
+            filteredTotal,
             opTotal,
             criteria: {
                 comment,
                 submission,
+                total,
                 window,
             },
             criteria,
             triggered,
             submissionTrigger,
             commentTrigger,
+            totalTrigger,
         } = results;
 
         const data: any = {
             activityTotal,
             submissionTotal,
             commentTotal,
+            filteredTotal,
             opTotal,
             commentPercent: formatNumber((commentTotal/activityTotal)*100),
             submissionPercent: formatNumber((submissionTotal/activityTotal)*100),
             opPercent: formatNumber((opTotal/commentTotal)*100),
+            filteredPercent: formatNumber((filteredTotal/activityTotal)*100),
             criteria,
             window: typeof window === 'number' || activityTotal === 0 ? `${activityTotal} Items` : activityTotalWindow.humanize(true),
             triggered,
             submissionTrigger,
             commentTrigger,
+            totalTrigger,
         };
 
         let thresholdSummary = [];
+        let totalSummary;
         let submissionSummary;
         let commentSummary;
+        if(total !== undefined) {
+            const {operator, value, isPercent, displayText} = parseGenericValueOrPercentComparison(total);
+            const suffix = !isPercent ? 'Items' : `(${formatNumber((filteredTotal/activityTotal)*100)}%) of ${activityTotal} Total`;
+            totalSummary = `${includePassFailSymbols ? `${submissionTrigger ? PASS : FAIL} ` : ''}Filtered Activities (${filteredTotal}) were${totalTrigger ? '' : ' not'} ${displayText} ${suffix}`;
+            data.totalSummary = totalSummary;
+            thresholdSummary.push(totalSummary);
+        }
         if(submission !== undefined) {
             const {operator, value, isPercent, displayText} = parseGenericValueOrPercentComparison(submission);
             const suffix = !isPercent ? 'Items' : `(${formatNumber((submissionTotal/activityTotal)*100)}%) of ${activityTotal} Total`;
@@ -299,21 +391,45 @@ interface HistoryConfig  {
     condition?: 'AND' | 'OR'
 
     /**
-     * Only include Submissions from this list of Subreddits (by name, case-insensitive)
+     * If present, activities will be counted only if they are found in this list of Subreddits.
      *
-     * EX `["mealtimevideos","askscience"]`
-     * @examples ["mealtimevideos","askscience"]
-     * @minItems 1
+     * Each value in the list can be either:
+     *
+     *  * string (name of subreddit)
+     *  * regular expression to run on the subreddit name
+     *  * `SubredditState`
+     *
+     * EX `["mealtimevideos","askscience", "/onlyfans*\/i", {"over18": true}]`
+     *
+     *  **Note:** This affects **post-window retrieval** activities. So that:
+     *
+     * * `activityTotal` is number of activities retrieved from `window` -- NOT post-filtering
+     * * all comparisons using **percentages** will compare **post-filtering** results against **activity count from window**
+     * * -- to run this rule where all activities are only from include/exclude filtering instead use include/exclude in `window`
+     *
+     * @examples [["mealtimevideos","askscience", "/onlyfans*\/i", {"over18": true}]]
      * */
-    include?: string[],
+    include?: (string | SubredditState)[],
     /**
-     * Do not include Submissions from this list of Subreddits (by name, case-insensitive)
+     * If present, activities will be counted only if they are **NOT** found in this list of Subreddits
      *
-     * EX `["mealtimevideos","askscience"]`
-     * @examples ["mealtimevideos","askscience"]
-     * @minItems 1
+     * Each value in the list can be either:
+     *
+     *  * string (name of subreddit)
+     *  * regular expression to run on the subreddit name
+     *  * `SubredditState`
+     *
+     * EX `["mealtimevideos","askscience", "/onlyfans*\/i", {"over18": true}]`
+     *
+     * **Note:** This affects **post-window retrieval** activities. So that:
+     *
+     * * `activityTotal` is number of activities retrieved from `window` -- NOT post-filtering
+     * * all comparisons using **percentages** will compare **post-filtering** results against **activity count from window**
+     * * -- to run this rule where all activities are only from include/exclude filtering instead use include/exclude in `window`
+     *
+     * @examples [["mealtimevideos","askscience", "/onlyfans*\/i", {"over18": true}]]
      * */
-    exclude?: string[],
+    exclude?: (string | SubredditState)[],
 }
 
 export interface HistoryOptions extends HistoryConfig, RuleOptions {
