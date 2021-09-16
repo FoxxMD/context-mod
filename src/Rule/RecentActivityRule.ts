@@ -90,7 +90,7 @@ export class RecentActivityRule extends Rule {
         let totalTriggeredOn;
         for (const triggerSet of this.thresholds) {
             let currCount = 0;
-            const presentSubs = [];
+            const presentSubs: string[] = [];
             let combinedKarma = 0;
             const {
                 threshold = '>= 1',
@@ -129,7 +129,10 @@ export class RecentActivityRule extends Rule {
                 if(inSubreddits) {
                     currCount++;
                     combinedKarma += activity.score;
-                    presentSubs.push(getActivitySubredditName(activity));
+                    const pSub = getActivitySubredditName(activity);
+                    if(!presentSubs.includes(pSub)) {
+                        presentSubs.push(pSub);
+                    }
                 }
             }
 
