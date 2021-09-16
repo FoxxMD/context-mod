@@ -434,6 +434,16 @@ export interface TTLConfig {
      * */
     commentTTL?: number | boolean;
     /**
+     * Amount of time, in seconds, a subreddit (attributes) should be cached
+     *
+     * * If `0` or `true` will cache indefinitely (not recommended)
+     * * If `false` will not cache
+     *
+     * @examples [600]
+     * @default 600
+     * */
+    subredditTTL?: number | boolean;
+    /**
      * Amount of time, in seconds, to cache filter criteria results (`authorIs` and `itemIs` results)
      *
      * This is especially useful if when polling high-volume comments and your checks rely on author/item filters
@@ -703,6 +713,41 @@ export interface CommentState extends ActivityState {
     submissionState?: SubmissionState[]
 }
 
+/**
+ * Different attributes a `Subreddit` can be in. Only include a property if you want to check it.
+ * @examples [{"over18": true}]
+ * */
+export interface SubredditState {
+    /**
+     * Is subreddit quarantined?
+     * */
+    quarantine?: boolean
+    /**
+     * Is subreddit NSFW/over 18?
+     *
+     * **Note**: This is **mod-controlled flag** so it is up to the mods of the subreddit to correctly mark their subreddit as NSFW
+     * */
+    over18?: boolean
+    /**
+     * The name the subreddit.
+     *
+     * Can be a normal string (will check case-insensitive) or a regular expression
+     *
+     * EX `["mealtimevideos", "/onlyfans*\/i"]`
+     *
+     * @examples ["mealtimevideos", "/onlyfans*\/i"]
+     * */
+    name?: string | RegExp
+    /**
+     * A friendly description of what this State is trying to parse
+     * */
+    stateDescription?: string
+}
+
+export interface StrongSubredditState extends SubredditState {
+    name?: RegExp
+}
+
 export type TypedActivityStates = SubmissionState[] | CommentState[];
 
 export interface DomainInfo {
@@ -755,6 +800,7 @@ export type StrongCache = {
     wikiTTL: number | boolean,
     submissionTTL: number | boolean,
     commentTTL: number | boolean,
+    subredditTTL: number | boolean,
     filterCriteriaTTL: number | boolean,
     provider: CacheOptions
     actionedEventsMax?: number,

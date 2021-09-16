@@ -1,6 +1,72 @@
 {
     "$schema": "http://json-schema.org/draft-07/schema#",
     "definitions": {
+        "ActivityThreshold": {
+            "additionalProperties": false,
+            "description": "At least one count property must be present. If both are present then either can trigger the rule",
+            "minProperties": 1,
+            "properties": {
+                "commentState": {
+                    "$ref": "#/definitions/CommentState",
+                    "description": "When present, a Comment will only be counted if it meets this criteria",
+                    "examples": [
+                        {
+                            "op": true,
+                            "removed": false
+                        }
+                    ]
+                },
+                "karma": {
+                    "description": "Test the **combined karma** from Activities found in the specified subreddits\n\nValue is a string containing a comparison operator and a number of **combined karma** to compare against\n\nIf specified then both `threshold` and `karma` must be met for this `SubThreshold` to be satisfied\n\nThe syntax is `(< OR > OR <= OR >=) <number>`\n\n* EX `> 50`  => greater than 50 combined karma for all found Activities in specified subreddits",
+                    "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
+                    "type": "string"
+                },
+                "submissionState": {
+                    "$ref": "#/definitions/SubmissionState",
+                    "description": "When present, a Submission will only be counted if it meets this criteria",
+                    "examples": [
+                        {
+                            "over_18": true,
+                            "removed": false
+                        }
+                    ]
+                },
+                "subreddits": {
+                    "description": "Activities will be counted if they are found in this list of Subreddits\n\nEach value in the list can be either:\n\n * string (name of subreddit)\n * regular expression to run on the subreddit name\n * `SubredditState`\n\nEX `[\"mealtimevideos\",\"askscience\", \"/onlyfans*\\/i\", {\"over18\": true}]`",
+                    "examples": [
+                        [
+                            "mealtimevideos",
+                            "askscience",
+                            "/onlyfans*/i",
+                            {
+                                "over18": true
+                            }
+                        ]
+                    ],
+                    "items": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/definitions/SubredditState"
+                            },
+                            {
+                                "type": "string"
+                            }
+                        ]
+                    },
+                    "type": "array"
+                },
+                "threshold": {
+                    "default": ">= 1",
+                    "description": "A string containing a comparison operator and a value to compare recent activities against\n\nThe syntax is `(< OR > OR <= OR >=) <number>[percent sign]`\n\n* EX `> 3`  => greater than 3 activities found in the listed subreddits\n* EX `<= 75%` => number of Activities in the subreddits listed are equal to or less than 75% of all Activities\n\n**Note:** If you use percentage comparison here as well as `useSubmissionAsReference` then \"all Activities\" is only pertains to Activities that had the Link of the Submission, rather than all Activities from this window.",
+                    "examples": [
+                        ">= 1"
+                    ],
+                    "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
+                    "type": "string"
+                }
+            },
+            "type": "object"
+        },
         "ActivityWindowCriteria": {
             "additionalProperties": false,
             "description": "Multiple properties that may be used to define what range of Activity to retrieve.\n\nMay specify one, or both properties along with the `satisfyOn` property, to affect the retrieval behavior.",
@@ -747,6 +813,17 @@
                     "description": "Amount of time, in seconds, a submission should be cached\n\n* If `0` or `true` will cache indefinitely (not recommended)\n* If `false` will not cache",
                     "examples": [
                         60
+                    ],
+                    "type": [
+                        "number",
+                        "boolean"
+                    ]
+                },
+                "subredditTTL": {
+                    "default": 600,
+                    "description": "Amount of time, in seconds, a subreddit (attributes) should be cached\n\n* If `0` or `true` will cache indefinitely (not recommended)\n* If `false` will not cache",
+                    "examples": [
+                        600
                     ],
                     "type": [
                         "number",
@@ -1853,7 +1930,7 @@
                 "thresholds": {
                     "description": "A list of subreddits/count criteria that may trigger this rule. ANY SubThreshold will trigger this rule.",
                     "items": {
-                        "$ref": "#/definitions/SubThreshold"
+                        "$ref": "#/definitions/ActivityThreshold"
                     },
                     "minItems": 1,
                     "type": "array"
@@ -1887,6 +1964,49 @@
             "required": [
                 "kind",
                 "thresholds"
+            ],
+            "type": "object"
+        },
+        "RegExp": {
+            "properties": {
+                "dotAll": {
+                    "type": "boolean"
+                },
+                "flags": {
+                    "type": "string"
+                },
+                "global": {
+                    "type": "boolean"
+                },
+                "ignoreCase": {
+                    "type": "boolean"
+                },
+                "lastIndex": {
+                    "type": "number"
+                },
+                "multiline": {
+                    "type": "boolean"
+                },
+                "source": {
+                    "type": "string"
+                },
+                "sticky": {
+                    "type": "boolean"
+                },
+                "unicode": {
+                    "type": "boolean"
+                }
+            },
+            "required": [
+                "dotAll",
+                "flags",
+                "global",
+                "ignoreCase",
+                "lastIndex",
+                "multiline",
+                "source",
+                "sticky",
+                "unicode"
             ],
             "type": "object"
         },
@@ -2423,45 +2543,6 @@
             ],
             "type": "object"
         },
-        "SubThreshold": {
-            "additionalProperties": false,
-            "description": "At least one count property must be present. If both are present then either can trigger the rule",
-            "minProperties": 1,
-            "properties": {
-                "karma": {
-                    "description": "Test the **combined karma** from Activities found in the specified subreddits\n\nValue is a string containing a comparison operator and a number of **combined karma** to compare against\n\nIf specified then both `threshold` and `karma` must be met for this `SubThreshold` to be satisfied\n\nThe syntax is `(< OR > OR <= OR >=) <number>`\n\n* EX `> 50`  => greater than 50 combined karma for all found Activities in specified subreddits",
-                    "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
-                    "type": "string"
-                },
-                "subreddits": {
-                    "description": "A list of Subreddits (by name, case-insensitive) to look for.\n\nEX [\"mealtimevideos\",\"askscience\"]",
-                    "examples": [
-                        [
-                            "mealtimevideos",
-                            "askscience"
-                        ]
-                    ],
-                    "items": {
-                        "type": "string"
-                    },
-                    "minItems": 1,
-                    "type": "array"
-                },
-                "threshold": {
-                    "default": ">= 1",
-                    "description": "A string containing a comparison operator and a value to compare recent activities against\n\nThe syntax is `(< OR > OR <= OR >=) <number>[percent sign]`\n\n* EX `> 3`  => greater than 3 activities found in the listed subreddits\n* EX `<= 75%` => number of Activities in the subreddits listed are equal to or less than 75% of all Activities\n\n**Note:** If you use percentage comparison here as well as `useSubmissionAsReference` then \"all Activities\" is only pertains to Activities that had the Link of the Submission, rather than all Activities from this window.",
-                    "examples": [
-                        ">= 1"
-                    ],
-                    "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
-                    "type": "string"
-                }
-            },
-            "required": [
-                "subreddits"
-            ],
-            "type": "object"
-        },
         "SubmissionCheckJson": {
             "properties": {
                 "actions": {
@@ -2693,6 +2774,44 @@
                 },
                 "title": {
                     "description": "A valid regular expression to match against the title of the submission",
+                    "type": "string"
+                }
+            },
+            "type": "object"
+        },
+        "SubredditState": {
+            "description": "Different attributes a `Subreddit` can be in. Only include a property if you want to check it.",
+            "examples": [
+                {
+                    "over18": true
+                }
+            ],
+            "properties": {
+                "name": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/definitions/RegExp"
+                        },
+                        {
+                            "type": "string"
+                        }
+                    ],
+                    "description": "The name the subreddit.\n\nCan be a normal string (will check case-insensitive) or a regular expression\n\nEX `[\"mealtimevideos\", \"/onlyfans*\\/i\"]`",
+                    "examples": [
+                        "mealtimevideos",
+                        "/onlyfans*/i"
+                    ]
+                },
+                "over18": {
+                    "description": "Is subreddit NSFW/over 18?\n\n**Note**: This is **mod-controlled flag** so it is up to the mods of the subreddit to correctly mark their subreddit as NSFW",
+                    "type": "boolean"
+                },
+                "quarantine": {
+                    "description": "Is subreddit quarantined?",
+                    "type": "boolean"
+                },
+                "stateDescription": {
+                    "description": "A friendly description of what this State is trying to parse",
                     "type": "string"
                 }
             },

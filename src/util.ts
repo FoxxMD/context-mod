@@ -14,7 +14,7 @@ import {
     DurationComparison,
     GenericComparison, LogInfo, NamedGroup,
     PollingOptionsStrong, RegExResult, ResourceStats,
-    StringOperator
+    StringOperator, StrongSubredditState, SubredditState
 } from "./Common/interfaces";
 import JSON5 from "json5";
 import yaml, {JSON_SCHEMA} from "js-yaml";
@@ -869,6 +869,46 @@ export const parseRegex = (reg: RegExp, val: string): RegExResult => {
     }
 }
 
+export const isStrongSubredditState = (value: SubredditState | StrongSubredditState) => {
+    return value.name === undefined || value.name instanceof RegExp;
+}
+
+export const asStrongSubredditState = (value: any): value is StrongSubredditState => {
+    return isStrongSubredditState(value);
+}
+
+export interface StrongSubredditStateOptions {
+    defaultFlags?: string
+    generateDescription?: boolean
+}
+
+export const toStrongSubredditState = (s: SubredditState, opts?: StrongSubredditStateOptions): StrongSubredditState => {
+    const {defaultFlags, generateDescription = false} = opts || {};
+    const {name: nameVal, stateDescription} = s;
+
+    let nameReg: RegExp | undefined;
+    if (nameVal !== undefined) {
+        if (!(nameVal instanceof RegExp)) {
+            nameReg = parseStringToRegex(nameVal, defaultFlags);
+            if (nameReg === undefined) {
+                nameReg = new RegExp(parseSubredditName(nameVal), defaultFlags);
+            }
+        } else {
+            nameReg = nameVal;
+        }
+    }
+    const strongState = {
+        ...s,
+        name: nameReg
+    };
+
+    if (generateDescription && stateDescription === undefined) {
+        strongState.stateDescription = objectToStringSummary(strongState);
+    }
+
+    return strongState;
+}
+
 export async function readConfigFile(path: string, opts: any) {
     const {log, throwOnNotFound = true} = opts;
     try {
@@ -945,10 +985,12 @@ export const cacheStats = (): ResourceStats => {
         author: {requests: 0, miss: 0, identifierRequestCount: statMetricCache(), requestTimestamps: timestampArr(), averageTimeBetweenHits: 'N/A', identifierAverageHit: 0},
         authorCrit: {requests: 0, miss: 0, identifierRequestCount: statMetricCache(), requestTimestamps: timestampArr(), averageTimeBetweenHits: 'N/A', identifierAverageHit: 0},
         itemCrit: {requests: 0, miss: 0, identifierRequestCount: statMetricCache(), requestTimestamps: timestampArr(), averageTimeBetweenHits: 'N/A', identifierAverageHit: 0},
+        subredditCrit: {requests: 0, miss: 0, identifierRequestCount: statMetricCache(), requestTimestamps: timestampArr(), averageTimeBetweenHits: 'N/A', identifierAverageHit: 0},
         content: {requests: 0, miss: 0, identifierRequestCount: statMetricCache(), requestTimestamps: timestampArr(), averageTimeBetweenHits: 'N/A', identifierAverageHit: 0},
         userNotes: {requests: 0, miss: 0, identifierRequestCount: statMetricCache(), requestTimestamps: timestampArr(), averageTimeBetweenHits: 'N/A', identifierAverageHit: 0},
         submission: {requests: 0, miss: 0, identifierRequestCount: statMetricCache(), requestTimestamps: timestampArr(), averageTimeBetweenHits: 'N/A', identifierAverageHit: 0},
         comment: {requests: 0, miss: 0, identifierRequestCount: statMetricCache(), requestTimestamps: timestampArr(), averageTimeBetweenHits: 'N/A', identifierAverageHit: 0},
+        subreddit: {requests: 0, miss: 0, identifierRequestCount: statMetricCache(), requestTimestamps: timestampArr(), averageTimeBetweenHits: 'N/A', identifierAverageHit: 0},
         commentCheck: {requests: 0, miss: 0, identifierRequestCount: statMetricCache(), requestTimestamps: timestampArr(), averageTimeBetweenHits: 'N/A', identifierAverageHit: 0}
     };
 }
@@ -1052,4 +1094,12 @@ export const buildCachePrefix = (parts: any[]): string => {
         return `${prefix}:`;
     }
     return prefix;
+}
+
+export const objectToStringSummary = (obj: object): string => {
+    const parts = [];
+    for(const [key, val] of Object.entries(obj)) {
+        parts.push(`${key}: ${val}`);
+    }
+    return parts.join(' | ');
 }

@@ -402,6 +402,17 @@
                         "boolean"
                     ]
                 },
+                "subredditTTL": {
+                    "default": 600,
+                    "description": "Amount of time, in seconds, a subreddit (attributes) should be cached\n\n* If `0` or `true` will cache indefinitely (not recommended)\n* If `false` will not cache",
+                    "examples": [
+                        600
+                    ],
+                    "type": [
+                        "number",
+                        "boolean"
+                    ]
+                },
                 "userNotesTTL": {
                     "default": 300,
                     "description": "Amount of time, in seconds, [Toolbox User Notes](https://www.reddit.com/r/toolbox/wiki/docs/usernotes) should be cached\n\n* If `0` or `true` will cache indefinitely (not recommended)\n* If `false` will not cache",

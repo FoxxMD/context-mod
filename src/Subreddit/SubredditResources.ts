@@ -1,4 +1,4 @@
-import Snoowrap, {RedditUser} from "snoowrap";
+import Snoowrap, {RedditUser, Subreddit} from "snoowrap";
 import objectHash from 'object-hash';
 import {
     activityIsDeleted, activityIsFiltered,
@@ -8,24 +8,23 @@ import {
     getAuthorActivities,
     testAuthorCriteria
 } from "../Utils/SnoowrapUtils";
-import Subreddit from 'snoowrap/dist/objects/Subreddit';
 import winston, {Logger} from "winston";
 import fetch from 'node-fetch';
 import {
     asSubmission,
     buildCacheOptionsFromProvider, buildCachePrefix,
     cacheStats, createCacheManager,
-    formatNumber, getActivityAuthorName,
+    formatNumber, getActivityAuthorName, getActivitySubredditName, isStrongSubredditState,
     mergeArr,
     parseExternalUrl,
-    parseWikiContext
+    parseWikiContext, toStrongSubredditState
 } from "../util";
 import LoggedError from "../Utils/LoggedError";
 import {
     BotInstanceConfig,
     CacheOptions, CommentState,
     Footer, OperatorConfig, ResourceStats, StrongCache, SubmissionState,
-    CacheConfig, TTLConfig, TypedActivityStates, UserResultCache, ActionedEvent
+    CacheConfig, TTLConfig, TypedActivityStates, UserResultCache, ActionedEvent, SubredditState, StrongSubredditState
 } from "../Common/interfaces";
 import UserNotes from "./UserNotes";
 import Mustache from "mustache";
@@ -65,6 +64,7 @@ export class SubredditResources {
     //enabled!: boolean;
     protected useSubredditAuthorCache!: boolean;
     protected authorTTL: number | false = cacheTTLDefaults.authorTTL;
+    protected subredditTTL: number | false = cacheTTLDefaults.subredditTTL;
     protected wikiTTL: number | false = cacheTTLDefaults.wikiTTL;
     protected submissionTTL: number | false = cacheTTLDefaults.submissionTTL;
     protected commentTTL: number | false = cacheTTLDefaults.commentTTL;
@@ -95,6 +95,7 @@ export class SubredditResources {
                 filterCriteriaTTL,
                 submissionTTL,
                 commentTTL,
+                subredditTTL,
             },
             cache,
             prefix,
@@ -113,6 +114,7 @@ export class SubredditResources {
         this.authorTTL = authorTTL === true ? 0 : authorTTL;
         this.submissionTTL = submissionTTL === true ? 0 : submissionTTL;
         this.commentTTL = commentTTL === true ? 0 : commentTTL;
+        this.subredditTTL = subredditTTL === true ? 0 : subredditTTL;
         this.wikiTTL = wikiTTL === true ? 0 : wikiTTL;
         this.filterCriteriaTTL = filterCriteriaTTL === true ? 0 : filterCriteriaTTL;
         this.subreddit = subreddit;
@@ -270,6 +272,40 @@ export class SubredditResources {
         }
     }
 
+    // @ts-ignore
+    async getSubreddit(item: Submission | Comment) {
+        try {
+            let hash = '';
+            if (this.subredditTTL !== false) {
+                hash = `sub-${getActivitySubredditName(item)}`;
+                await this.stats.cache.subreddit.identifierRequestCount.set(hash, (await this.stats.cache.subreddit.identifierRequestCount.wrap(hash, () => 0) as number) + 1);
+                this.stats.cache.subreddit.requestTimestamps.push(Date.now());
+                this.stats.cache.subreddit.requests++;
+                const cachedSubreddit = await this.cache.get(hash);
+                if (cachedSubreddit !== undefined && cachedSubreddit !== null) {
+                    this.logger.debug(`Cache Hit: Subreddit ${item.subreddit.display_name}`);
+                    // @ts-ignore
+                    return cachedSubreddit as Subreddit;
+                }
+                // @ts-ignore
+                const subreddit = await this.client.getSubreddit(getActivitySubredditName(item)).fetch() as Subreddit;
+                this.stats.cache.subreddit.miss++;
+                // @ts-ignore
+                await this.cache.set(hash, subreddit, {ttl: this.subredditTTL});
+                // @ts-ignore
+                return subreddit as Subreddit;
+            } else {
+                // @ts-ignore
+                let subreddit = await this.client.getSubreddit(getActivitySubredditName(item));
+
+                return subreddit as Subreddit;
+            }
+        } catch (err) {
+            this.logger.error('Error while trying to fetch a cached activity', err);
+            throw err.logged;
+        }
+    }
+
     async getAuthorActivities(user: RedditUser, options: AuthorTypedActivitiesOptions): Promise<Array<Submission | Comment>> {
         const userName = getActivityAuthorName(user);
         if (this.authorTTL !== false) {
@@ -391,6 +427,46 @@ export class SubredditResources {
         return wikiContent;
     }
 
+    async testSubredditCriteria(item: (Comment | Submission), state: SubredditState | StrongSubredditState) {
+        if(Object.keys(state).length === 0) {
+            return true;
+        }
+        // optimize for name-only criteria checks
+        // -- we don't need to store cache results for this since we know subreddit name is always available from item (no request required)
+        const critCount = Object.entries(state).filter(([key, val]) => {
+            return val !== undefined && !['name','stateDescription'].includes(key);
+        }).length;
+        if(critCount === 0) {
+            const subName = getActivitySubredditName(item);
+            return await this.isSubreddit({display_name: subName} as Subreddit, state, this.logger);
+        }
+
+        if (this.filterCriteriaTTL !== false) {
+            try {
+                const hash = `subredditCrit-${getActivitySubredditName(item)}-${objectHash.sha1(state)}`;
+                await this.stats.cache.subredditCrit.identifierRequestCount.set(hash, (await this.stats.cache.subredditCrit.identifierRequestCount.wrap(hash, () => 0) as number) + 1);
+                this.stats.cache.subredditCrit.requestTimestamps.push(Date.now());
+                this.stats.cache.subredditCrit.requests++;
+                const cachedItem = await this.cache.get(hash);
+                if (cachedItem !== undefined && cachedItem !== null) {
+                    this.logger.debug(`Cache Hit: Subreddit Check on ${getActivitySubredditName(item)} (Hash ${hash})`);
+                    return cachedItem as boolean;
+                }
+                const itemResult = await this.isSubreddit(await this.getSubreddit(item), state, this.logger);
+                this.stats.cache.subredditCrit.miss++;
+                await this.cache.set(hash, itemResult, {ttl: this.filterCriteriaTTL});
+                return itemResult;
+            } catch (err) {
+                if (err.logged !== true) {
+                    this.logger.error('Error occurred while testing subreddit criteria', err);
+                }
+                throw err;
+            }
+        }
+
+        return await this.isSubreddit(await this.getSubreddit(item), state, this.logger);
+    }
+
     async testAuthorCriteria(item: (Comment | Submission), authorOpts: AuthorCriteria, include = true) {
         if (this.filterCriteriaTTL !== false) {
             // in the criteria check we only actually use the `item` to get the author flair
@@ -420,10 +496,10 @@ export class SubredditResources {
         return await testAuthorCriteria(item, authorOpts, include, this.userNotes);
     }
 
-    async testItemCriteria(i: (Comment | Submission), s: TypedActivityStates) {
+    async testItemCriteria(i: (Comment | Submission), activityStates: TypedActivityStates) {
         if (this.filterCriteriaTTL !== false) {
             let item = i;
-            let states = s;
+            let states = activityStates;
             // optimize for submission only checks on comment item
             if (item instanceof Comment && states.length === 1 && Object.keys(states[0]).length === 1 && (states[0] as CommentState).submissionState !== undefined) {
                 // @ts-ignore
@@ -454,7 +530,50 @@ export class SubredditResources {
             }
         }
 
-        return await this.isItem(i, s, this.logger);
+        return await this.isItem(i, activityStates, this.logger);
+    }
+
+    async isSubreddit (subreddit: Subreddit, stateCriteria: SubredditState | StrongSubredditState, logger: Logger) {
+        delete stateCriteria.stateDescription;
+
+        if (Object.keys(stateCriteria).length === 0) {
+            return true;
+        }
+
+        const crit = isStrongSubredditState(stateCriteria) ? stateCriteria : toStrongSubredditState(stateCriteria, {defaultFlags: 'i'});
+
+        const log = logger.child({leaf: 'Subreddit Check'}, mergeArr);
+
+        return await (async () => {
+            for (const k of Object.keys(crit)) {
+                // @ts-ignore
+                if (crit[k] !== undefined) {
+                    switch (k) {
+                        case 'name':
+                            const nameReg = crit[k] as RegExp;
+                            if(!nameReg.test(subreddit.display_name)) {
+                                return false;
+                            }
+                            break;
+                        default:
+                            // @ts-ignore
+                            if (crit[k] !== undefined) {
+                                // @ts-ignore
+                                if (crit[k] !== subreddit[k]) {
+                                    // @ts-ignore
+                                    log.debug(`Failed: Expected => ${k}:${crit[k]} | Found => ${k}:${subreddit[k]}`)
+                                    return false
+                                }
+                            } else {
+                                log.warn(`Tried to test for Subreddit property '${k}' but it did not exist`);
+                            }
+                            break;
+                    }
+                }
+            }
+            log.debug(`Passed: ${JSON.stringify(stateCriteria)}`);
+            return true;
+        })() as boolean;
     }
 
     async isItem (item: Submission | Comment, stateCriteria: TypedActivityStates, logger: Logger) {
@@ -612,6 +731,7 @@ export class BotResourcesManager {
                 wikiTTL,
                 commentTTL,
                 submissionTTL,
+                subredditTTL,
                 filterCriteriaTTL,
                 provider,
                 actionedEventsMax,
@@ -625,7 +745,7 @@ export class BotResourcesManager {
         const {actionedEventsMax: eMax, actionedEventsDefault: eDef, ...relevantCacheSettings} = caching;
         this.cacheHash = objectHash.sha1(relevantCacheSettings);
         this.defaultCacheConfig = caching;
-        this.ttlDefaults = {authorTTL, userNotesTTL, wikiTTL, commentTTL, submissionTTL, filterCriteriaTTL};
+        this.ttlDefaults = {authorTTL, userNotesTTL, wikiTTL, commentTTL, submissionTTL, filterCriteriaTTL, subredditTTL};
 
         const options = provider;
         this.cacheType = options.store;
