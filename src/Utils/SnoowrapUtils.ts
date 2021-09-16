@@ -607,6 +607,9 @@ export const getAttributionIdentifier = (sub: Submission, useParentMediaDomain =
     if (displayDomain === '') {
         displayDomain = domain;
     }
+    if(domainIdents.length === 0 && domain !== '') {
+        domainIdents.push(domain);
+    }
 
     return {display: displayDomain, domain, aliases: domainIdents, provider, mediaType};
 }
