@@ -29,6 +29,9 @@ import Autolinker from 'autolinker';
 import {create as createMemoryStore} from './Utils/memoryStore';
 import {MESSAGE} from "triple-beam";
 import {RedditUser} from "snoowrap/dist/objects";
+import reRegExp from '@stdlib/regexp-regexp';
+
+const ReReg = reRegExp();
 
 const {format} = winston;
 const {combine, printf, timestamp, label, splat, errors} = format;
@@ -828,9 +831,19 @@ export const isExternalUrlSubmission = (act: Comment | Submission): boolean => {
     return asSubmission(act) && !act.is_self && !isRedditMedia(act);
 }
 
-export const parseRegex = (r: string | RegExp, val: string, flags?: string): RegExResult => {
+export const parseStringToRegex = (val: string, defaultFlags?: string): RegExp | undefined => {
+    const result = ReReg.exec(val);
+    if (result === null) {
+        return undefined;
+    }
+    // index 0 => full string
+    // index 1 => regex without flags and forward slashes
+    // index 2 => flags
+    const flags = result[2] === '' ? (defaultFlags || '') : result[2];
+    return new RegExp(result[1], flags);
+}
 
-    const reg = r instanceof RegExp ? r : new RegExp(r, flags);
+export const parseRegex = (reg: RegExp, val: string): RegExResult => {
 
     if(reg.global) {
         const g = Array.from(val.matchAll(reg));

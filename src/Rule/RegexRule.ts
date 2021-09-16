@@ -4,13 +4,14 @@ import Submission from "snoowrap/dist/objects/Submission";
 import {
     asSubmission,
     comparisonTextOp, FAIL, isExternalUrlSubmission, isSubmission, parseGenericValueComparison,
-    parseGenericValueOrPercentComparison, parseRegex,
+    parseGenericValueOrPercentComparison, parseRegex, parseStringToRegex,
     PASS, triggeredIndicator
 } from "../util";
 import {
     ActivityWindowType, JoinOperands,
 } from "../Common/interfaces";
 import dayjs from 'dayjs';
+import SimpleError from "../Utils/SimpleError";
 
 export interface RegexCriteria {
     /**
@@ -22,17 +23,11 @@ export interface RegexCriteria {
     /**
      * A valid Regular Expression to test content against
      *
-     * Do not wrap expression in forward slashes
+     * If no flags are specified then the **global** flag is used by default
      *
-     * EX For the expression `/reddit|FoxxMD/` use the value should be `reddit|FoxxMD`
-     *
-     * @examples ["reddit|FoxxMD"]
+     * @examples ["/reddit|FoxxMD/ig"]
      * */
     regex: string,
-    /**
-     * Regex flags to use
-     * */
-    regexFlags?: string,
 
     /**
      * Which content from an Activity to test the regex against
@@ -135,12 +130,11 @@ export class RegexRule extends Rule {
 
         let criteriaResults = [];
 
-        for (const criteria of this.criteria) {
+        for (const [index, criteria] of this.criteria.entries()) {
 
             const {
-                name,
+                name = (index + 1),
                 regex,
-                regexFlags = 'g',
                 testOn: testOnVals = ['title', 'body'],
                 lookAt = 'all',
                 matchThreshold = '> 0',
@@ -158,7 +152,10 @@ export class RegexRule extends Rule {
             }, []);
 
             // check regex
-            const reg = new RegExp(regex, regexFlags);
+            const reg = parseStringToRegex(regex, 'g');
+            if(reg === undefined) {
+                throw new SimpleError(`Value given for regex on Criteria ${name} was not valid: ${regex}`);
+            }
             // ok cool its a valid regex
 
             const matchComparison = parseGenericValueComparison(matchThreshold);
@@ -177,7 +174,7 @@ export class RegexRule extends Rule {
 
             // first lets see if the activity we are checking satisfies thresholds
             // since we may be able to avoid api calls to get history
-            let actMatches = this.getMatchesFromActivity(item, testOn, reg, regexFlags);
+            let actMatches = this.getMatchesFromActivity(item, testOn, reg);
             matches = matches.concat(actMatches).slice(0, 100);
             matchCount += actMatches.length;
 
@@ -227,7 +224,7 @@ export class RegexRule extends Rule {
 
                 for (const h of history) {
                     activitiesTested++;
-                    const aMatches = this.getMatchesFromActivity(h, testOn, reg, regexFlags);
+                    const aMatches = this.getMatchesFromActivity(h, testOn, reg);
                     matches = matches.concat(aMatches).slice(0, 100);
                     matchCount += aMatches.length;
                     const matched = comparisonTextOp(aMatches.length, matchComparison.operator, matchComparison.value);
@@ -325,7 +322,7 @@ export class RegexRule extends Rule {
         return Promise.resolve([criteriaMet, this.getResult(criteriaMet, {result, data: criteriaResults})]);
     }
 
-    protected getMatchesFromActivity(a: (Submission | Comment), testOn: string[], reg: RegExp, flags?: string): string[] {
+    protected getMatchesFromActivity(a: (Submission | Comment), testOn: string[], reg: RegExp): string[] {
         let m: string[] = [];
         // determine what content we are testing
         let contents: string[] = [];
@@ -352,7 +349,7 @@ export class RegexRule extends Rule {
         }
 
         for (const c of contents) {
-            const results = parseRegex(reg, c, flags);
+            const results = parseRegex(reg, c);
             if (results.matched) {
                 m = m.concat(results.matches);
             }

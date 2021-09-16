@@ -882,14 +882,10 @@
                     "type": "string"
                 },
                 "regex": {
-                    "description": "A valid Regular Expression to test content against\n\nDo not wrap expression in forward slashes\n\nEX For the expression `/reddit|FoxxMD/` use the value should be `reddit|FoxxMD`",
+                    "description": "A valid Regular Expression to test content against\n\nIf no flags are specified then the **global** flag is used by default",
                     "examples": [
-                        "reddit|FoxxMD"
+                        "/reddit|FoxxMD/ig"
                     ],
-                    "type": "string"
-                },
-                "regexFlags": {
-                    "description": "Regex flags to use",
                     "type": "string"
                 },
                 "testOn": {
