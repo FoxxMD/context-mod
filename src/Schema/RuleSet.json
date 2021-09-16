@@ -1158,15 +1158,27 @@
                     ]
                 },
                 "exclude": {
-                    "description": "Do not include Submissions from this list of Subreddits (by name, case-insensitive)\n\nEX `[\"mealtimevideos\",\"askscience\"]`",
+                    "description": "If present, activities will be counted only if they are **NOT** found in this list of Subreddits\n\nEach value in the list can be either:\n\n * string (name of subreddit)\n * regular expression to run on the subreddit name\n * `SubredditState`\n\nEX `[\"mealtimevideos\",\"askscience\", \"/onlyfans*\\/i\", {\"over18\": true}]`",
                     "examples": [
-                        "mealtimevideos",
-                        "askscience"
+                        [
+                            "mealtimevideos",
+                            "askscience",
+                            "/onlyfans*/i",
+                            {
+                                "over18": true
+                            }
+                        ]
                     ],
                     "items": {
-                        "type": "string"
+                        "anyOf": [
+                            {
+                                "$ref": "#/definitions/SubredditState"
+                            },
+                            {
+                                "type": "string"
+                            }
+                        ]
                     },
-                    "minItems": 1,
                     "type": "array"
                 },
                 "gapAllowance": {
@@ -1174,15 +1186,27 @@
                     "type": "number"
                 },
                 "include": {
-                    "description": "Only include Submissions from this list of Subreddits (by name, case-insensitive)\n\nEX `[\"mealtimevideos\",\"askscience\"]`",
+                    "description": "If present, activities will be counted only if they are found in this list of Subreddits\n\nEach value in the list can be either:\n\n * string (name of subreddit)\n * regular expression to run on the subreddit name\n * `SubredditState`\n\nEX `[\"mealtimevideos\",\"askscience\", \"/onlyfans*\\/i\", {\"over18\": true}]`",
                     "examples": [
-                        "mealtimevideos",
-                        "askscience"
+                        [
+                            "mealtimevideos",
+                            "askscience",
+                            "/onlyfans*/i",
+                            {
+                                "over18": true
+                            }
+                        ]
                     ],
                     "items": {
-                        "type": "string"
+                        "anyOf": [
+                            {
+                                "$ref": "#/definitions/SubredditState"
+                            },
+                            {
+                                "type": "string"
+                            }
+                        ]
                     },
-                    "minItems": 1,
                     "type": "array"
                 },
                 "itemIs": {
