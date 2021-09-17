@@ -4,6 +4,7 @@ import Submission from "snoowrap/dist/objects/Submission";
 import {renderContent} from "../Utils/SnoowrapUtils";
 import {ActionProcessResult, Footer, RequiredRichContent, RichContent} from "../Common/interfaces";
 import {RuleResult} from "../Rule";
+import {truncateStringToLength} from "../util";
 
 export class CommentAction extends Action {
     content: string;
@@ -66,9 +67,18 @@ export class CommentAction extends Action {
             // @ts-ignore
             await reply.distinguish({sticky: this.sticky});
         }
+        let modifiers = [];
+        if(this.distinguish) {
+            modifiers.push('Distinguished');
+        }
+        if(this.sticky) {
+            modifiers.push('Stickied');
+        }
+        const modifierStr = modifiers.length === 0 ? '' : `[${modifiers.join(' | ')}]`;
         return {
             dryRun,
             success: true,
+            result: `${modifierStr}${this.lock ? ' - Locked Author\'s Activity - ' : ''}${truncateStringToLength(100)(body)}`
         };
     }
 }

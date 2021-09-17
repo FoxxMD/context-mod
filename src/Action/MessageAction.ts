@@ -4,7 +4,7 @@ import Submission from "snoowrap/dist/objects/Submission";
 import {renderContent} from "../Utils/SnoowrapUtils";
 import {ActionProcessResult, Footer, RequiredRichContent, RichContent} from "../Common/interfaces";
 import {RuleResult} from "../Rule";
-import {asSubmission, boolToString, isSubmission} from "../util";
+import {asSubmission, boolToString, isSubmission, truncateStringToLength} from "../util";
 
 export class MessageAction extends Action {
     content: string;
@@ -67,6 +67,7 @@ export class MessageAction extends Action {
         return {
             dryRun,
             success: true,
+            result: truncateStringToLength(200)(msgPreview)
         }
     }
 }

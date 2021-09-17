@@ -50,7 +50,8 @@ export class UserNoteAction extends Action {
         }
         return {
             success: true,
-            dryRun
+            dryRun,
+            result: `(${this.type}) ${renderedContent}`
         }
     }
 }

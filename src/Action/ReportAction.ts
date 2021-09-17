@@ -36,7 +36,8 @@ export class ReportAction extends Action {
 
         return {
             dryRun,
-            success: true
+            success: true,
+            result: truncatedContent
         };
     }
 }
