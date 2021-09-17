@@ -13,7 +13,7 @@ import {
     ActivityWindowCriteria, CacheOptions, CacheProvider,
     DurationComparison,
     GenericComparison, LogInfo, NamedGroup,
-    PollingOptionsStrong, RegExResult, ResourceStats,
+    PollingOptionsStrong, RedditEntity, RedditEntityType, RegExResult, ResourceStats,
     StringOperator, StrongSubredditState, SubredditState
 } from "./Common/interfaces";
 import JSON5 from "json5";
@@ -571,6 +571,24 @@ export const parseSubredditName = (val:string): string => {
         throw new InvalidRegexError(SUBREDDIT_NAME_REGEX, val, SUBREDDIT_NAME_REGEX_URL)
     }
     return matches[1] as string;
+}
+
+export const REDDIT_ENTITY_REGEX: RegExp = /^\s*(?<entityType>\/[ru]\/|[ru]\/)*(?<name>\w+)*\s*$/;
+export const REDDIT_ENTITY_REGEX_URL = 'https://regexr.com/65r9b';
+export const parseRedditEntity = (val:string): RedditEntity => {
+    const matches = val.match(REDDIT_ENTITY_REGEX);
+    if (matches === null) {
+        throw new InvalidRegexError(REDDIT_ENTITY_REGEX, val, REDDIT_ENTITY_REGEX_URL)
+    }
+    const groups = matches.groups as any;
+    let eType: RedditEntityType = 'user';
+    if(groups.entityType !== undefined && typeof groups.entityType === 'string' && groups.entityType.includes('r')) {
+        eType = 'subreddit';
+    }
+    return {
+        name: groups.name,
+        type: eType,
+    }
 }
 
 const WIKI_REGEX: RegExp = /^\s*wiki:(?<url>[^|]+)\|*(?<subreddit>[^\s]*)\s*$/;

@@ -1540,3 +1540,10 @@ export interface UserResultCache {
     result: boolean,
     ruleResults: RuleResult[]
 }
+
+export type RedditEntityType = 'user' | 'subreddit';
+
+export interface RedditEntity {
+    name: string
+    type: RedditEntityType
+}

@@ -1777,6 +1777,16 @@
                 "title": {
                     "description": "The title of the message\n\nIf not specified will be defaulted to `Concerning your [Submission/Comment]`",
                     "type": "string"
+                },
+                "to": {
+                    "description": "Entity to send message to.\n\nIf not present Message be will sent to the Author of the Activity being checked.\n\nValid formats:\n\n* `aUserName` -- send to /u/aUserName\n* `u/aUserName` -- send to /u/aUserName\n* `r/aSubreddit` -- sent to modmail of /r/aSubreddit\n\n**Note:** Reddit does not support sending a message AS a subreddit TO another subreddit",
+                    "examples": [
+                        "aUserName",
+                        "u/aUserName",
+                        "r/aSubreddit"
+                    ],
+                    "pattern": "^\\s*(\\/[ru]\\/|[ru]\\/)*(\\w+)*\\s*$",
+                    "type": "string"
                 }
             },
             "required": [

@@ -4,7 +4,15 @@ import Submission from "snoowrap/dist/objects/Submission";
 import {renderContent} from "../Utils/SnoowrapUtils";
 import {ActionProcessResult, Footer, RequiredRichContent, RichContent} from "../Common/interfaces";
 import {RuleResult} from "../Rule";
-import {asSubmission, boolToString, isSubmission, truncateStringToLength} from "../util";
+import {
+    asSubmission,
+    boolToString,
+    isSubmission,
+    parseRedditEntity,
+    REDDIT_ENTITY_REGEX_URL,
+    truncateStringToLength
+} from "../util";
+import SimpleError from "../Utils/SimpleError";
 
 export class MessageAction extends Action {
     content: string;
@@ -14,6 +22,7 @@ export class MessageAction extends Action {
     footer?: false | string;
 
     title?: string;
+    to?: string;
     asSubreddit: boolean;
 
     constructor(options: MessageActionOptions) {
@@ -23,7 +32,9 @@ export class MessageAction extends Action {
             asSubreddit,
             title,
             footer,
+            to,
         } = options;
+        this.to = to;
         this.footer = footer;
         this.content = content;
         this.asSubreddit = asSubreddit;
@@ -42,11 +53,30 @@ export class MessageAction extends Action {
         const footer = await this.resources.generateFooter(item, this.footer);
 
         const renderedContent = `${body}${footer}`;
-        // @ts-ignore
-        const author = await item.author.fetch() as RedditUser;
+
+        let recipient = item.author.name;
+        if(this.to !== undefined) {
+            // parse to value
+            try {
+                const entityData = parseRedditEntity(this.to);
+                if(entityData.type === 'user') {
+                    recipient = entityData.name;
+                } else {
+                    recipient = `/r/${entityData.name}`;
+                }
+            } catch (err) {
+                this.logger.error(`'to' field for message was not in a valid format. See ${REDDIT_ENTITY_REGEX_URL} for valid examples`);
+                this.logger.error(err);
+                err.logged = true;
+                throw err;
+            }
+            if(recipient.includes('/r/') && this.asSubreddit) {
+                throw new SimpleError(`Cannot send a message as a subreddit to another subreddit. Requested recipient: ${recipient}`);
+            }
+        }
 
         const msgOpts: ComposeMessageParams = {
-            to: author,
+            to: recipient,
             text: renderedContent,
             // @ts-ignore
             fromSubreddit: this.asSubreddit ? await item.subreddit.fetch() : undefined,
@@ -54,7 +84,7 @@ export class MessageAction extends Action {
         };
 
         const msgPreview = `\r\n
-        TO: ${author.name}\r\n
+        TO: ${recipient}\r\n
         Subject: ${msgOpts.subject}\r\n
         Sent As Modmail: ${boolToString(this.asSubreddit)}\r\n\r\n
         ${renderedContent}`;
@@ -77,6 +107,24 @@ export interface MessageActionConfig extends RequiredRichContent, Footer {
      * Should this message be sent from modmail (as the subreddit) or as the bot user?
      * */
     asSubreddit: boolean
+
+    /**
+     * Entity to send message to.
+     *
+     * If not present Message be will sent to the Author of the Activity being checked.
+     *
+     * Valid formats:
+     *
+     * * `aUserName` -- send to /u/aUserName
+     * * `u/aUserName` -- send to /u/aUserName
+     * * `r/aSubreddit` -- sent to modmail of /r/aSubreddit
+     *
+     * **Note:** Reddit does not support sending a message AS a subreddit TO another subreddit
+     *
+     * @pattern ^\s*(\/[ru]\/|[ru]\/)*(\w+)*\s*$
+     * @examples ["aUserName","u/aUserName","r/aSubreddit"]
+     * */
+    to?: string
 
     /**
      * The title of the message
