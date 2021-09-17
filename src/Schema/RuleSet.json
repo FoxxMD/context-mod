@@ -156,7 +156,7 @@
             "properties": {
                 "aggregateOn": {
                     "default": "undefined",
-                    "description": "If `domains` is not specified this list determines which categories of domains should be aggregated on. All aggregated domains will be tested against `threshold`\n\n* If `media` is included then aggregate author's submission history which reddit recognizes as media (youtube, vimeo, etc.)\n* If `self` is included then aggregate on author's submission history which are self-post (`self.[subreddit]`) or reddit image/video (i.redd.it / v.redd.it)\n* If `link` is included then aggregate author's submission history which is external links but not media\n\nIf nothing is specified or list is empty (default) all domains are aggregated",
+                    "description": "This list determines which categories of domains should be aggregated on. All aggregated domains will be tested against `threshold`\n\n* If `media` is included then aggregate author's submission history which reddit recognizes as media (youtube, vimeo, etc.)\n* If `self` is included then aggregate on author's submission history which are self-post (`self.[subreddit]`) or reddit image/video (i.redd.it / v.redd.it)\n* If `link` is included then aggregate author's submission history which is external links but not media\n\nIf nothing is specified or list is empty (default) all domains are aggregated",
                     "examples": [
                         [
                         ]
@@ -184,7 +184,7 @@
                         [
                         ]
                     ],
-                    "description": "A list of domains whose Activities will be tested against `threshold`.\n\nIf this is present then `aggregateOn` is ignored.\n\nThe values are tested as partial strings so you do not need to include full URLs, just the part that matters.\n\nEX `[\"youtube\"]` will match submissions with the domain `https://youtube.com/c/aChannel`\nEX `[\"youtube.com/c/bChannel\"]` will NOT match submissions with the domain `https://youtube.com/c/aChannel`\n\nIf you wish to aggregate on self-posts for a subreddit use the syntax `self.[subreddit]` EX `self.AskReddit`\n\n**If this Rule is part of a Check for a Submission and you wish to aggregate on the domain of the Submission use the special string `AGG:SELF`**\n\nIf nothing is specified or list is empty (default) aggregate using `aggregateOn`",
+                    "description": "A list of domains whose Activities will be tested against `threshold`.\n\nThe values are tested as partial strings so you do not need to include full URLs, just the part that matters.\n\nEX `[\"youtube\"]` will match submissions with the domain `https://youtube.com/c/aChannel`\nEX `[\"youtube.com/c/bChannel\"]` will NOT match submissions with the domain `https://youtube.com/c/aChannel`\n\nIf you wish to aggregate on self-posts for a subreddit use the syntax `self.[subreddit]` EX `self.AskReddit`\n\n**If this Rule is part of a Check for a Submission and you wish to aggregate on the domain of the Submission use the special string `AGG:SELF`**\n\nIf nothing is specified or list is empty (default) aggregate using `aggregateOn`",
                     "items": {
                         "type": "string"
                     },

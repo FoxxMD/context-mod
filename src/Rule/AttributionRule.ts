@@ -53,8 +53,6 @@ export interface AttributionCriteria {
     /**
      * A list of domains whose Activities will be tested against `threshold`.
      *
-     * If this is present then `aggregateOn` is ignored.
-     *
      * The values are tested as partial strings so you do not need to include full URLs, just the part that matters.
      *
      * EX `["youtube"]` will match submissions with the domain `https://youtube.com/c/aChannel`
@@ -98,7 +96,7 @@ export interface AttributionCriteria {
     exclude?: string[],
 
     /**
-     * If `domains` is not specified this list determines which categories of domains should be aggregated on. All aggregated domains will be tested against `threshold`
+     * This list determines which categories of domains should be aggregated on. All aggregated domains will be tested against `threshold`
      *
      * * If `media` is included then aggregate author's submission history which reddit recognizes as media (youtube, vimeo, etc.)
      * * If `self` is included then aggregate on author's submission history which are self-post (`self.[subreddit]`) or reddit image/video (i.redd.it / v.redd.it)
@@ -240,7 +238,7 @@ export class AttributionRule extends Rule {
                     domainType = 'self';
                 }
 
-                if(realDomains.length === 0 && aggregateOn.length !== 0) {
+                if(aggregateOn.length !== 0) {
                     if(domainType === 'media' && !aggregateOn.includes('media')) {
                         return acc;
                     }
