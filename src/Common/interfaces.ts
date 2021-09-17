@@ -675,6 +675,7 @@ export interface ActivityState {
     stickied?: boolean
     distinguished?: boolean
     approved?: boolean
+    score?: CompareValue
 }
 
 /**

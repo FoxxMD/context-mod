@@ -13,10 +13,10 @@ import fetch from 'node-fetch';
 import {
     asSubmission,
     buildCacheOptionsFromProvider, buildCachePrefix,
-    cacheStats, createCacheManager,
+    cacheStats, comparisonTextOp, createCacheManager,
     formatNumber, getActivityAuthorName, getActivitySubredditName, isStrongSubredditState,
     mergeArr,
-    parseExternalUrl,
+    parseExternalUrl, parseGenericValueComparison,
     parseWikiContext, toStrongSubredditState
 } from "../util";
 import LoggedError from "../Utils/LoggedError";
@@ -603,6 +603,14 @@ export class SubredditResources {
                                 const res = await this.testItemCriteria(sub, crit[k] as SubmissionState[], logger);
                                 if(!res) {
                                     return false;
+                                }
+                                break;
+                            case 'score':
+                                const {operator, value, isPercent} = parseGenericValueComparison(crit[k] as string);
+                                if(!comparisonTextOp(item.score, operator, value)) {
+                                    // @ts-ignore
+                                    log.debug(`Failed: Expected => ${k}:${crit[k]} | Found => ${k}:${item.score}`)
+                                    return false
                                 }
                                 break;
                             case 'removed':
