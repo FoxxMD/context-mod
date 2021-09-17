@@ -13,10 +13,16 @@ import {
     TypedActivityStates
 } from "../Common/interfaces";
 import {
-    compareDurationValue, comparisonTextOp,
+    compareDurationValue,
+    comparisonTextOp,
     isActivityWindowCriteria,
-    normalizeName, parseDuration,
-    parseDurationComparison, parseGenericValueComparison, parseGenericValueOrPercentComparison, parseSubredditName,
+    normalizeName,
+    parseDuration,
+    parseDurationComparison,
+    parseGenericValueComparison,
+    parseGenericValueOrPercentComparison,
+    parseRuleResultsToMarkdownSummary,
+    parseSubredditName,
     truncateStringToLength
 } from "../util";
 import UserNotes from "../Subreddit/UserNotes";
@@ -305,7 +311,7 @@ export const renderContent = async (template: string, data: (Submission | Commen
         };
     }, {});
 
-    const view = {item: templateData, rules: normalizedRuleResults};
+    const view = {item: templateData, ruleSummary: parseRuleResultsToMarkdownSummary(ruleResults), rules: normalizedRuleResults};
     const rendered = Mustache.render(template, view) as string;
     return he.decode(rendered);
 }

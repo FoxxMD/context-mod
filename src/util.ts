@@ -1,7 +1,7 @@
 import winston, {Logger} from "winston";
 import jsonStringify from 'safe-stable-stringify';
 import dayjs, {Dayjs, OpUnitType} from 'dayjs';
-import {isRuleSetResult, RulePremise, RuleResult, RuleSetResult} from "./Rule";
+import {FormattedRuleResult, isRuleSetResult, RulePremise, RuleResult, RuleSetResult} from "./Rule";
 import deepEqual from "fast-deep-equal";
 import {Duration} from 'dayjs/plugin/duration.js';
 import Ajv from "ajv";
@@ -1139,4 +1139,18 @@ export function findLastIndex<T>(array: Array<T>, predicate: (value: T, index: n
             return l;
     }
     return -1;
+}
+
+export const parseRuleResultsToMarkdownSummary = (ruleResults: RuleResult[]): string => {
+    const results = ruleResults.map((y: any) => {
+        const {triggered, result, name, ...restY} = y;
+        let t = triggeredIndicator(false);
+        if(triggered === null) {
+            t = 'Skipped';
+        } else if(triggered === true) {
+            t = triggeredIndicator(true);
+        }
+        return `* ${name} - ${t} - ${result || '-'}`;
+    });
+    return results.join('\r\n');
 }
