@@ -676,6 +676,7 @@ export interface ActivityState {
     distinguished?: boolean
     approved?: boolean
     score?: CompareValue
+    reports?: CompareValue
 }
 
 /**

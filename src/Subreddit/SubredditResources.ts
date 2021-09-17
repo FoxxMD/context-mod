@@ -606,10 +606,18 @@ export class SubredditResources {
                                 }
                                 break;
                             case 'score':
-                                const {operator, value, isPercent} = parseGenericValueComparison(crit[k] as string);
-                                if(!comparisonTextOp(item.score, operator, value)) {
+                                const scoreCompare = parseGenericValueComparison(crit[k] as string);
+                                if(!comparisonTextOp(item.score, scoreCompare.operator, scoreCompare.value)) {
                                     // @ts-ignore
                                     log.debug(`Failed: Expected => ${k}:${crit[k]} | Found => ${k}:${item.score}`)
+                                    return false
+                                }
+                                break;
+                            case 'reports':
+                                const reportCompare = parseGenericValueComparison(crit[k] as string);
+                                if(!comparisonTextOp(item.num_reports, reportCompare.operator, reportCompare.value)) {
+                                    // @ts-ignore
+                                    log.debug(`Failed: Expected => ${k}:${crit[k]} | Found => ${k}:${item.num_reports}`)
                                     return false
                                 }
                                 break;
