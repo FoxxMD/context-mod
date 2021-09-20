@@ -186,7 +186,7 @@ const program = new Command();
                     for(const manager of b.subManagers) {
                         const activities = await manager.subreddit.getUnmoderated();
                         for (const a of activities.reverse()) {
-                            manager.queue.push({
+                            manager.firehose.push({
                                 checkType: a instanceof Submission ? 'Submission' : 'Comment',
                                 activity: a,
                                 options: {checkNames: checks}
