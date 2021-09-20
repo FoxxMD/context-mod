@@ -14,8 +14,8 @@ import {
 } from "../Common/interfaces";
 import {
     compareDurationValue,
-    comparisonTextOp,
-    isActivityWindowCriteria,
+    comparisonTextOp, getActivityAuthorName,
+    isActivityWindowCriteria, isStatusError,
     normalizeName,
     parseDuration,
     parseDurationComparison,
@@ -125,17 +125,25 @@ export async function getAuthorActivities(user: RedditUser, options: AuthorTyped
 
     let items: Array<Submission | Comment> = [];
     //let count = 1;
-    let listing;
-    switch (options.type) {
-        case 'comment':
-            listing = await user.getComments({limit: chunkSize});
-            break;
-        case 'submission':
-            listing = await user.getSubmissions({limit: chunkSize});
-            break;
-        default:
-            listing = await user.getOverview({limit: chunkSize});
-            break;
+    let listing = [];
+    try {
+        switch (options.type) {
+            case 'comment':
+                listing = await user.getComments({limit: chunkSize});
+                break;
+            case 'submission':
+                listing = await user.getSubmissions({limit: chunkSize});
+                break;
+            default:
+                listing = await user.getOverview({limit: chunkSize});
+                break;
+        }
+    } catch (err) {
+        if(isStatusError(err) && err.statusCode === 404) {
+            throw new SimpleError('Reddit returned a 404 for user history. Likely this user is shadowbanned.');
+        } else {
+            throw err;
+        }
     }
     let hitEnd = false;
     let offset = chunkSize;
@@ -317,179 +325,211 @@ export const renderContent = async (template: string, data: (Submission | Commen
 }
 
 export const testAuthorCriteria = async (item: (Comment | Submission), authorOpts: AuthorCriteria, include = true, userNotes: UserNotes) => {
-    // @ts-ignore
-    const author: RedditUser = await item.author;
-    for (const k of Object.keys(authorOpts)) {
-        // @ts-ignore
-        if (authorOpts[k] !== undefined) {
-            switch (k) {
-                case 'name':
-                    const authPass = () => {
-                        // @ts-ignore
-                        for (const n of authorOpts[k]) {
-                            if (n.toLowerCase() === author.name.toLowerCase()) {
-                                return true;
-                            }
-                        }
-                        return false;
-                    }
-                    const authResult = authPass();
-                    if ((include && !authResult) || (!include && authResult)) {
-                        return false;
-                    }
-                    break;
-                case 'flairCssClass':
-                    const css = await item.author_flair_css_class;
-                    const cssPass = () => {
-                        // @ts-ignore
-                        for (const c of authorOpts[k]) {
-                            if (c === css) {
-                                return;
-                            }
-                        }
-                        return false;
-                    }
-                    const cssResult = cssPass();
-                    if ((include && !cssResult) || (!include && cssResult)) {
-                        return false;
-                    }
-                    break;
-                case 'flairText':
-                    const text = await item.author_flair_text;
-                    const textPass = () => {
-                        // @ts-ignore
-                        for (const c of authorOpts[k]) {
-                            if (c === text) {
-                                return
-                            }
-                        }
-                        return false;
-                    };
-                    const textResult = textPass();
-                    if ((include && !textResult) || (!include && textResult)) {
-                        return false;
-                    }
-                    break;
-                case 'isMod':
-                    const mods: RedditUser[] = await item.subreddit.getModerators();
-                    const isModerator = mods.some(x => x.name === item.author.name);
-                    const modMatch = authorOpts.isMod === isModerator;
-                    if ((include && !modMatch) || (!include && modMatch)) {
-                        return false;
-                    }
-                    break;
-                case 'age':
-                    const ageTest = compareDurationValue(parseDurationComparison(await authorOpts.age as string), dayjs.unix(await item.author.created));
-                    if ((include && !ageTest) || (!include && ageTest)) {
-                        return false;
-                    }
-                    break;
-                case 'linkKarma':
-                    const lkCompare = parseGenericValueOrPercentComparison(await authorOpts.linkKarma as string);
-                    let lkMatch;
-                    if (lkCompare.isPercent) {
-                        // @ts-ignore
-                        const tk = author.total_karma as number;
-                        lkMatch = comparisonTextOp(author.link_karma / tk, lkCompare.operator, lkCompare.value / 100);
-                    } else {
-                        lkMatch = comparisonTextOp(author.link_karma, lkCompare.operator, lkCompare.value);
-                    }
-                    if ((include && !lkMatch) || (!include && lkMatch)) {
-                        return false;
-                    }
-                    break;
-                case 'commentKarma':
-                    const ckCompare = parseGenericValueOrPercentComparison(await authorOpts.commentKarma as string);
-                    let ckMatch;
-                    if (ckCompare.isPercent) {
-                        // @ts-ignore
-                        const ck = author.total_karma as number;
-                        ckMatch = comparisonTextOp(author.comment_karma / ck, ckCompare.operator, ckCompare.value / 100);
-                    } else {
-                        ckMatch = comparisonTextOp(author.comment_karma, ckCompare.operator, ckCompare.value);
-                    }
-                    if ((include && !ckMatch) || (!include && ckMatch)) {
-                        return false;
-                    }
-                    break;
-                case 'totalKarma':
-                    const tkCompare = parseGenericValueComparison(await authorOpts.totalKarma as string);
-                    if (tkCompare.isPercent) {
-                        throw new SimpleError(`'totalKarma' value on AuthorCriteria cannot be a percentage`);
-                    }
-                    // @ts-ignore
-                    const totalKarma = author.total_karma as number;
-                    const tkMatch = comparisonTextOp(totalKarma, tkCompare.operator, tkCompare.value);
-                    if ((include && !tkMatch) || (!include && tkMatch)) {
-                        return false;
-                    }
-                    break;
-                case 'verified':
-                    const vMatch = await author.has_verified_mail === authorOpts.verified as boolean;
-                    if ((include && !vMatch) || (!include && vMatch)) {
-                        return false;
-                    }
-                    break;
-                case 'userNotes':
-                    const notes = await userNotes.getUserNotes(item.author);
-                    const notePass = () => {
-                        for (const noteCriteria of authorOpts[k] as UserNoteCriteria[]) {
-                            const {count = '>= 1', search = 'current', type} = noteCriteria;
-                            const {
-                                value,
-                                operator,
-                                isPercent,
-                                extra = ''
-                            } = parseGenericValueOrPercentComparison(count);
-                            const order = extra.includes('asc') ? 'ascending' : 'descending';
-                            switch (search) {
-                                case 'current':
-                                    if (notes.length > 0 && notes[notes.length - 1].noteType === type) {
-                                        return true;
-                                    }
-                                    break;
-                                case 'consecutive':
-                                    let orderedNotes = notes;
-                                    if (order === 'descending') {
-                                        orderedNotes = [...notes];
-                                        orderedNotes.reverse();
-                                    }
-                                    let currCount = 0;
-                                    for (const note of orderedNotes) {
-                                        if (note.noteType === type) {
-                                            currCount++;
-                                        } else {
-                                            currCount = 0;
-                                        }
-                                        if (isPercent) {
-                                            throw new SimpleError(`When comparing UserNotes with 'consecutive' search 'count' cannot be a percentage. Given: ${count}`);
-                                        }
-                                        if (comparisonTextOp(currCount, operator, value)) {
-                                            return true;
-                                        }
-                                    }
-                                    break;
-                                case 'total':
-                                    if (isPercent) {
-                                        if (comparisonTextOp(notes.filter(x => x.noteType === type).length / notes.length, operator, value / 100)) {
-                                            return true;
-                                        }
-                                    } else if (comparisonTextOp(notes.filter(x => x.noteType === type).length, operator, value)) {
-                                        return true;
-                                    }
-                            }
-                        }
-                        return false;
-                    }
-                    const noteResult = notePass();
-                    if ((include && !noteResult) || (!include && noteResult)) {
-                        return false;
-                    }
-                    break;
+    const {shadowBanned, ...rest} = authorOpts;
+
+    if(shadowBanned !== undefined) {
+        try {
+            // @ts-ignore
+            await item.author.fetch();
+            // user is not shadowbanned
+            // if criteria specifies they SHOULD be shadowbanned then return false now
+            if(shadowBanned) {
+                return false;
+            }
+        } catch (err) {
+            if(isStatusError(err) && err.statusCode === 404) {
+                // user is shadowbanned
+                // if criteria specifies they should not be shadowbanned then return false now
+                if(!shadowBanned) {
+                    return false;
+                }
+            } else {
+                throw err;
             }
         }
     }
-    return true;
+
+    try {
+        const authorName = getActivityAuthorName(item.author);
+
+        for (const k of Object.keys(rest)) {
+            // @ts-ignore
+            if (authorOpts[k] !== undefined) {
+                switch (k) {
+                    case 'name':
+                        const authPass = () => {
+                            // @ts-ignore
+                            for (const n of authorOpts[k]) {
+                                if (n.toLowerCase() === authorName.toLowerCase()) {
+                                    return true;
+                                }
+                            }
+                            return false;
+                        }
+                        const authResult = authPass();
+                        if ((include && !authResult) || (!include && authResult)) {
+                            return false;
+                        }
+                        break;
+                    case 'flairCssClass':
+                        const css = await item.author_flair_css_class;
+                        const cssPass = () => {
+                            // @ts-ignore
+                            for (const c of authorOpts[k]) {
+                                if (c === css) {
+                                    return;
+                                }
+                            }
+                            return false;
+                        }
+                        const cssResult = cssPass();
+                        if ((include && !cssResult) || (!include && cssResult)) {
+                            return false;
+                        }
+                        break;
+                    case 'flairText':
+                        const text = await item.author_flair_text;
+                        const textPass = () => {
+                            // @ts-ignore
+                            for (const c of authorOpts[k]) {
+                                if (c === text) {
+                                    return
+                                }
+                            }
+                            return false;
+                        };
+                        const textResult = textPass();
+                        if ((include && !textResult) || (!include && textResult)) {
+                            return false;
+                        }
+                        break;
+                    case 'isMod':
+                        const mods: RedditUser[] = await item.subreddit.getModerators();
+                        const isModerator = mods.some(x => x.name === authorName);
+                        const modMatch = authorOpts.isMod === isModerator;
+                        if ((include && !modMatch) || (!include && modMatch)) {
+                            return false;
+                        }
+                        break;
+                    case 'age':
+                        const ageTest = compareDurationValue(parseDurationComparison(await authorOpts.age as string), dayjs.unix(await item.author.created));
+                        if ((include && !ageTest) || (!include && ageTest)) {
+                            return false;
+                        }
+                        break;
+                    case 'linkKarma':
+                        const lkCompare = parseGenericValueOrPercentComparison(await authorOpts.linkKarma as string);
+                        let lkMatch;
+                        if (lkCompare.isPercent) {
+                            // @ts-ignore
+                            const tk = await item.author.total_karma as number;
+                            lkMatch = comparisonTextOp(item.author.link_karma / tk, lkCompare.operator, lkCompare.value / 100);
+                        } else {
+                            lkMatch = comparisonTextOp(item.author.link_karma, lkCompare.operator, lkCompare.value);
+                        }
+                        if ((include && !lkMatch) || (!include && lkMatch)) {
+                            return false;
+                        }
+                        break;
+                    case 'commentKarma':
+                        const ckCompare = parseGenericValueOrPercentComparison(await authorOpts.commentKarma as string);
+                        let ckMatch;
+                        if (ckCompare.isPercent) {
+                            // @ts-ignore
+                            const ck = await item.author.total_karma as number;
+                            ckMatch = comparisonTextOp(item.author.comment_karma / ck, ckCompare.operator, ckCompare.value / 100);
+                        } else {
+                            ckMatch = comparisonTextOp(item.author.comment_karma, ckCompare.operator, ckCompare.value);
+                        }
+                        if ((include && !ckMatch) || (!include && ckMatch)) {
+                            return false;
+                        }
+                        break;
+                    case 'totalKarma':
+                        const tkCompare = parseGenericValueComparison(await authorOpts.totalKarma as string);
+                        if (tkCompare.isPercent) {
+                            throw new SimpleError(`'totalKarma' value on AuthorCriteria cannot be a percentage`);
+                        }
+                        // @ts-ignore
+                        const totalKarma = await item.author.total_karma as number;
+                        const tkMatch = comparisonTextOp(totalKarma, tkCompare.operator, tkCompare.value);
+                        if ((include && !tkMatch) || (!include && tkMatch)) {
+                            return false;
+                        }
+                        break;
+                    case 'verified':
+                        const vMatch = await item.author.has_verified_mail === authorOpts.verified as boolean;
+                        if ((include && !vMatch) || (!include && vMatch)) {
+                            return false;
+                        }
+                        break;
+                    case 'userNotes':
+                        const notes = await userNotes.getUserNotes(item.author);
+                        const notePass = () => {
+                            for (const noteCriteria of authorOpts[k] as UserNoteCriteria[]) {
+                                const {count = '>= 1', search = 'current', type} = noteCriteria;
+                                const {
+                                    value,
+                                    operator,
+                                    isPercent,
+                                    extra = ''
+                                } = parseGenericValueOrPercentComparison(count);
+                                const order = extra.includes('asc') ? 'ascending' : 'descending';
+                                switch (search) {
+                                    case 'current':
+                                        if (notes.length > 0 && notes[notes.length - 1].noteType === type) {
+                                            return true;
+                                        }
+                                        break;
+                                    case 'consecutive':
+                                        let orderedNotes = notes;
+                                        if (order === 'descending') {
+                                            orderedNotes = [...notes];
+                                            orderedNotes.reverse();
+                                        }
+                                        let currCount = 0;
+                                        for (const note of orderedNotes) {
+                                            if (note.noteType === type) {
+                                                currCount++;
+                                            } else {
+                                                currCount = 0;
+                                            }
+                                            if (isPercent) {
+                                                throw new SimpleError(`When comparing UserNotes with 'consecutive' search 'count' cannot be a percentage. Given: ${count}`);
+                                            }
+                                            if (comparisonTextOp(currCount, operator, value)) {
+                                                return true;
+                                            }
+                                        }
+                                        break;
+                                    case 'total':
+                                        if (isPercent) {
+                                            if (comparisonTextOp(notes.filter(x => x.noteType === type).length / notes.length, operator, value / 100)) {
+                                                return true;
+                                            }
+                                        } else if (comparisonTextOp(notes.filter(x => x.noteType === type).length, operator, value)) {
+                                            return true;
+                                        }
+                                }
+                            }
+                            return false;
+                        }
+                        const noteResult = notePass();
+                        if ((include && !noteResult) || (!include && noteResult)) {
+                            return false;
+                        }
+                        break;
+                }
+            }
+        }
+        return true;
+    } catch (err) {
+        if(isStatusError(err) && err.statusCode === 404) {
+            throw new SimpleError('Reddit returned a 404 while trying to retrieve User profile. It is likely this user is shadowbanned.');
+        } else {
+            throw err;
+        }
+    }
 }
 
 export interface ItemContent {

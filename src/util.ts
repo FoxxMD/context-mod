@@ -13,7 +13,7 @@ import {
     ActivityWindowCriteria, CacheOptions, CacheProvider,
     DurationComparison,
     GenericComparison, LogInfo, NamedGroup,
-    PollingOptionsStrong, RedditEntity, RedditEntityType, RegExResult, ResourceStats,
+    PollingOptionsStrong, RedditEntity, RedditEntityType, RegExResult, ResourceStats, StatusCodeError,
     StringOperator, StrongSubredditState, SubredditState
 } from "./Common/interfaces";
 import JSON5 from "json5";
@@ -1073,6 +1073,10 @@ export const isScopeError = (err: any): boolean => {
         return authHeader !== undefined && authHeader.includes('insufficient_scope');
     }
     return false;
+}
+
+export const isStatusError = (err: any): err is StatusCodeError => {
+    return typeof err === 'object' && err.name === 'StatusCodeError' && err.response !== undefined;
 }
 
 /**

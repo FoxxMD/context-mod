@@ -4,6 +4,7 @@ import {MESSAGE} from 'triple-beam';
 import Poll from "snoostorm/out/util/Poll";
 import Snoowrap from "snoowrap";
 import {RuleResult} from "../Rule";
+import {IncomingMessage} from "http";
 
 /**
  * An ISO 8601 Duration
@@ -1546,4 +1547,12 @@ export type RedditEntityType = 'user' | 'subreddit';
 export interface RedditEntity {
     name: string
     type: RedditEntityType
+}
+
+export interface StatusCodeError extends Error {
+    name: 'StatusCodeError',
+    statusCode: number,
+    message: string,
+    response: IncomingMessage,
+    error: Error
 }

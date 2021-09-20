@@ -69,6 +69,10 @@
                     },
                     "type": "array"
                 },
+                "shadowBanned": {
+                    "description": "Is the author shadowbanned?\n\nThis is determined by trying to retrieve the author's profile. If a 404 is returned it is likely they are shadowbanned",
+                    "type": "boolean"
+                },
                 "totalKarma": {
                     "description": "A string containing a comparison operator and a value to compare against\n\nThe syntax is `(< OR > OR <= OR >=) <number>`\n\n* EX `> 100`  => greater than 100",
                     "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
