@@ -1,7 +1,7 @@
 import winston, {Logger} from "winston";
 import jsonStringify from 'safe-stable-stringify';
 import dayjs, {Dayjs, OpUnitType} from 'dayjs';
-import {isRuleSetResult, RulePremise, RuleResult, RuleSetResult} from "./Rule";
+import {FormattedRuleResult, isRuleSetResult, RulePremise, RuleResult, RuleSetResult} from "./Rule";
 import deepEqual from "fast-deep-equal";
 import {Duration} from 'dayjs/plugin/duration.js';
 import Ajv from "ajv";
@@ -13,8 +13,8 @@ import {
     ActivityWindowCriteria, CacheOptions, CacheProvider,
     DurationComparison,
     GenericComparison, LogInfo, NamedGroup,
-    PollingOptionsStrong, RegExResult, ResourceStats,
-    StringOperator
+    PollingOptionsStrong, RedditEntity, RedditEntityType, RegExResult, ResourceStats,
+    StringOperator, StrongSubredditState, SubredditState
 } from "./Common/interfaces";
 import JSON5 from "json5";
 import yaml, {JSON_SCHEMA} from "js-yaml";
@@ -29,6 +29,9 @@ import Autolinker from 'autolinker';
 import {create as createMemoryStore} from './Utils/memoryStore';
 import {MESSAGE} from "triple-beam";
 import {RedditUser} from "snoowrap/dist/objects";
+import reRegExp from '@stdlib/regexp-regexp';
+
+const ReReg = reRegExp();
 
 const {format} = winston;
 const {combine, printf, timestamp, label, splat, errors} = format;
@@ -570,6 +573,24 @@ export const parseSubredditName = (val:string): string => {
     return matches[1] as string;
 }
 
+export const REDDIT_ENTITY_REGEX: RegExp = /^\s*(?<entityType>\/[ru]\/|[ru]\/)*(?<name>\w+)*\s*$/;
+export const REDDIT_ENTITY_REGEX_URL = 'https://regexr.com/65r9b';
+export const parseRedditEntity = (val:string): RedditEntity => {
+    const matches = val.match(REDDIT_ENTITY_REGEX);
+    if (matches === null) {
+        throw new InvalidRegexError(REDDIT_ENTITY_REGEX, val, REDDIT_ENTITY_REGEX_URL)
+    }
+    const groups = matches.groups as any;
+    let eType: RedditEntityType = 'user';
+    if(groups.entityType !== undefined && typeof groups.entityType === 'string' && groups.entityType.includes('r')) {
+        eType = 'subreddit';
+    }
+    return {
+        name: groups.name,
+        type: eType,
+    }
+}
+
 const WIKI_REGEX: RegExp = /^\s*wiki:(?<url>[^|]+)\|*(?<subreddit>[^\s]*)\s*$/;
 const WIKI_REGEX_URL = 'https://regexr.com/61bq1';
 const URL_REGEX: RegExp = /^\s*url:(?<url>[^\s]+)\s*$/;
@@ -828,9 +849,19 @@ export const isExternalUrlSubmission = (act: Comment | Submission): boolean => {
     return asSubmission(act) && !act.is_self && !isRedditMedia(act);
 }
 
-export const parseRegex = (r: string | RegExp, val: string, flags?: string): RegExResult => {
+export const parseStringToRegex = (val: string, defaultFlags?: string): RegExp | undefined => {
+    const result = ReReg.exec(val);
+    if (result === null) {
+        return undefined;
+    }
+    // index 0 => full string
+    // index 1 => regex without flags and forward slashes
+    // index 2 => flags
+    const flags = result[2] === '' ? (defaultFlags || '') : result[2];
+    return new RegExp(result[1], flags);
+}
 
-    const reg = r instanceof RegExp ? r : new RegExp(r, flags);
+export const parseRegex = (reg: RegExp, val: string): RegExResult => {
 
     if(reg.global) {
         const g = Array.from(val.matchAll(reg));
@@ -854,6 +885,46 @@ export const parseRegex = (r: string | RegExp, val: string, flags?: string): Reg
         matches: m !== null ? m.slice(0) : [],
         global: [],
     }
+}
+
+export const isStrongSubredditState = (value: SubredditState | StrongSubredditState) => {
+    return value.name === undefined || value.name instanceof RegExp;
+}
+
+export const asStrongSubredditState = (value: any): value is StrongSubredditState => {
+    return isStrongSubredditState(value);
+}
+
+export interface StrongSubredditStateOptions {
+    defaultFlags?: string
+    generateDescription?: boolean
+}
+
+export const toStrongSubredditState = (s: SubredditState, opts?: StrongSubredditStateOptions): StrongSubredditState => {
+    const {defaultFlags, generateDescription = false} = opts || {};
+    const {name: nameVal, stateDescription} = s;
+
+    let nameReg: RegExp | undefined;
+    if (nameVal !== undefined) {
+        if (!(nameVal instanceof RegExp)) {
+            nameReg = parseStringToRegex(nameVal, defaultFlags);
+            if (nameReg === undefined) {
+                nameReg = new RegExp(parseSubredditName(nameVal), defaultFlags);
+            }
+        } else {
+            nameReg = nameVal;
+        }
+    }
+    const strongState = {
+        ...s,
+        name: nameReg
+    };
+
+    if (generateDescription && stateDescription === undefined) {
+        strongState.stateDescription = objectToStringSummary(strongState);
+    }
+
+    return strongState;
 }
 
 export async function readConfigFile(path: string, opts: any) {
@@ -932,10 +1003,12 @@ export const cacheStats = (): ResourceStats => {
         author: {requests: 0, miss: 0, identifierRequestCount: statMetricCache(), requestTimestamps: timestampArr(), averageTimeBetweenHits: 'N/A', identifierAverageHit: 0},
         authorCrit: {requests: 0, miss: 0, identifierRequestCount: statMetricCache(), requestTimestamps: timestampArr(), averageTimeBetweenHits: 'N/A', identifierAverageHit: 0},
         itemCrit: {requests: 0, miss: 0, identifierRequestCount: statMetricCache(), requestTimestamps: timestampArr(), averageTimeBetweenHits: 'N/A', identifierAverageHit: 0},
+        subredditCrit: {requests: 0, miss: 0, identifierRequestCount: statMetricCache(), requestTimestamps: timestampArr(), averageTimeBetweenHits: 'N/A', identifierAverageHit: 0},
         content: {requests: 0, miss: 0, identifierRequestCount: statMetricCache(), requestTimestamps: timestampArr(), averageTimeBetweenHits: 'N/A', identifierAverageHit: 0},
         userNotes: {requests: 0, miss: 0, identifierRequestCount: statMetricCache(), requestTimestamps: timestampArr(), averageTimeBetweenHits: 'N/A', identifierAverageHit: 0},
         submission: {requests: 0, miss: 0, identifierRequestCount: statMetricCache(), requestTimestamps: timestampArr(), averageTimeBetweenHits: 'N/A', identifierAverageHit: 0},
         comment: {requests: 0, miss: 0, identifierRequestCount: statMetricCache(), requestTimestamps: timestampArr(), averageTimeBetweenHits: 'N/A', identifierAverageHit: 0},
+        subreddit: {requests: 0, miss: 0, identifierRequestCount: statMetricCache(), requestTimestamps: timestampArr(), averageTimeBetweenHits: 'N/A', identifierAverageHit: 0},
         commentCheck: {requests: 0, miss: 0, identifierRequestCount: statMetricCache(), requestTimestamps: timestampArr(), averageTimeBetweenHits: 'N/A', identifierAverageHit: 0}
     };
 }
@@ -1039,4 +1112,45 @@ export const buildCachePrefix = (parts: any[]): string => {
         return `${prefix}:`;
     }
     return prefix;
+}
+
+export const objectToStringSummary = (obj: object): string => {
+    const parts = [];
+    for(const [key, val] of Object.entries(obj)) {
+        parts.push(`${key}: ${val}`);
+    }
+    return parts.join(' | ');
+}
+
+/**
+ * Returns the index of the last element in the array where predicate is true, and -1
+ * otherwise.
+ * @param array The source array to search in
+ * @param predicate find calls predicate once for each element of the array, in descending
+ * order, until it finds one where predicate returns true. If such an element is found,
+ * findLastIndex immediately returns that element index. Otherwise, findLastIndex returns -1.
+ *
+ * @see https://stackoverflow.com/a/53187807/1469797
+ */
+export function findLastIndex<T>(array: Array<T>, predicate: (value: T, index: number, obj: T[]) => boolean): number {
+    let l = array.length;
+    while (l--) {
+        if (predicate(array[l], l, array))
+            return l;
+    }
+    return -1;
+}
+
+export const parseRuleResultsToMarkdownSummary = (ruleResults: RuleResult[]): string => {
+    const results = ruleResults.map((y: any) => {
+        const {triggered, result, name, ...restY} = y;
+        let t = triggeredIndicator(false);
+        if(triggered === null) {
+            t = 'Skipped';
+        } else if(triggered === true) {
+            t = triggeredIndicator(true);
+        }
+        return `* ${name} - ${t} - ${result || '-'}`;
+    });
+    return results.join('\r\n');
 }

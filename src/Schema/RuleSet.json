@@ -1,6 +1,72 @@
 {
     "$schema": "http://json-schema.org/draft-07/schema#",
     "definitions": {
+        "ActivityThreshold": {
+            "additionalProperties": false,
+            "description": "At least one count property must be present. If both are present then either can trigger the rule",
+            "minProperties": 1,
+            "properties": {
+                "commentState": {
+                    "$ref": "#/definitions/CommentState",
+                    "description": "When present, a Comment will only be counted if it meets this criteria",
+                    "examples": [
+                        {
+                            "op": true,
+                            "removed": false
+                        }
+                    ]
+                },
+                "karma": {
+                    "description": "Test the **combined karma** from Activities found in the specified subreddits\n\nValue is a string containing a comparison operator and a number of **combined karma** to compare against\n\nIf specified then both `threshold` and `karma` must be met for this `SubThreshold` to be satisfied\n\nThe syntax is `(< OR > OR <= OR >=) <number>`\n\n* EX `> 50`  => greater than 50 combined karma for all found Activities in specified subreddits",
+                    "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
+                    "type": "string"
+                },
+                "submissionState": {
+                    "$ref": "#/definitions/SubmissionState",
+                    "description": "When present, a Submission will only be counted if it meets this criteria",
+                    "examples": [
+                        {
+                            "over_18": true,
+                            "removed": false
+                        }
+                    ]
+                },
+                "subreddits": {
+                    "description": "Activities will be counted if they are found in this list of Subreddits\n\nEach value in the list can be either:\n\n * string (name of subreddit)\n * regular expression to run on the subreddit name\n * `SubredditState`\n\nEX `[\"mealtimevideos\",\"askscience\", \"/onlyfans*\\/i\", {\"over18\": true}]`",
+                    "examples": [
+                        [
+                            "mealtimevideos",
+                            "askscience",
+                            "/onlyfans*/i",
+                            {
+                                "over18": true
+                            }
+                        ]
+                    ],
+                    "items": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/definitions/SubredditState"
+                            },
+                            {
+                                "type": "string"
+                            }
+                        ]
+                    },
+                    "type": "array"
+                },
+                "threshold": {
+                    "default": ">= 1",
+                    "description": "A string containing a comparison operator and a value to compare recent activities against\n\nThe syntax is `(< OR > OR <= OR >=) <number>[percent sign]`\n\n* EX `> 3`  => greater than 3 activities found in the listed subreddits\n* EX `<= 75%` => number of Activities in the subreddits listed are equal to or less than 75% of all Activities\n\n**Note:** If you use percentage comparison here as well as `useSubmissionAsReference` then \"all Activities\" is only pertains to Activities that had the Link of the Submission, rather than all Activities from this window.",
+                    "examples": [
+                        ">= 1"
+                    ],
+                    "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
+                    "type": "string"
+                }
+            },
+            "type": "object"
+        },
         "ActivityWindowCriteria": {
             "additionalProperties": false,
             "description": "Multiple properties that may be used to define what range of Activity to retrieve.\n\nMay specify one, or both properties along with the `satisfyOn` property, to affect the retrieval behavior.",
@@ -90,7 +156,7 @@
             "properties": {
                 "aggregateOn": {
                     "default": "undefined",
-                    "description": "If `domains` is not specified this list determines which categories of domains should be aggregated on. All aggregated domains will be tested against `threshold`\n\n* If `media` is included then aggregate author's submission history which reddit recognizes as media (youtube, vimeo, etc.)\n* If `self` is included then aggregate on author's submission history which are self-post (`self.[subreddit]`) or reddit image/video (i.redd.it / v.redd.it)\n* If `link` is included then aggregate author's submission history which is external links but not media\n\nIf nothing is specified or list is empty (default) all domains are aggregated",
+                    "description": "This list determines which categories of domains should be aggregated on. All aggregated domains will be tested against `threshold`\n\n* If `media` is included then aggregate author's submission history which reddit recognizes as media (youtube, vimeo, etc.)\n* If `self` is included then aggregate on author's submission history which are self-post (`self.[subreddit]`) or reddit image/video (i.redd.it / v.redd.it)\n* If `link` is included then aggregate author's submission history which is external links but not media\n\nIf nothing is specified or list is empty (default) all domains are aggregated",
                     "examples": [
                         [
                         ]
@@ -118,7 +184,7 @@
                         [
                         ]
                     ],
-                    "description": "A list of domains whose Activities will be tested against `threshold`.\n\nIf this is present then `aggregateOn` is ignored.\n\nThe values are tested as partial strings so you do not need to include full URLs, just the part that matters.\n\nEX `[\"youtube\"]` will match submissions with the domain `https://youtube.com/c/aChannel`\nEX `[\"youtube.com/c/bChannel\"]` will NOT match submissions with the domain `https://youtube.com/c/aChannel`\n\nIf you wish to aggregate on self-posts for a subreddit use the syntax `self.[subreddit]` EX `self.AskReddit`\n\n**If this Rule is part of a Check for a Submission and you wish to aggregate on the domain of the Submission use the special string `AGG:SELF`**\n\nIf nothing is specified or list is empty (default) aggregate using `aggregateOn`",
+                    "description": "A list of domains whose Activities will be tested against `threshold`.\n\nThe values are tested as partial strings so you do not need to include full URLs, just the part that matters.\n\nEX `[\"youtube\"]` will match submissions with the domain `https://youtube.com/c/aChannel`\nEX `[\"youtube.com/c/bChannel\"]` will NOT match submissions with the domain `https://youtube.com/c/aChannel`\n\nIf you wish to aggregate on self-posts for a subreddit use the syntax `self.[subreddit]` EX `self.AskReddit`\n\n**If this Rule is part of a Check for a Submission and you wish to aggregate on the domain of the Submission use the special string `AGG:SELF`**\n\nIf nothing is specified or list is empty (default) aggregate using `aggregateOn`",
                     "items": {
                         "type": "string"
                     },
@@ -515,6 +581,16 @@
                 "removed": {
                     "type": "boolean"
                 },
+                "reports": {
+                    "description": "A string containing a comparison operator and a value to compare against\n\nThe syntax is `(< OR > OR <= OR >=) <number>`\n\n* EX `> 100`  => greater than 100",
+                    "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
+                    "type": "string"
+                },
+                "score": {
+                    "description": "A string containing a comparison operator and a value to compare against\n\nThe syntax is `(< OR > OR <= OR >=) <number>`\n\n* EX `> 100`  => greater than 100",
+                    "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
+                    "type": "string"
+                },
                 "spam": {
                     "type": "boolean"
                 },
@@ -588,23 +664,28 @@
             "type": "object"
         },
         "HistoryCriteria": {
-            "description": "If both `submission` and `comment` are defined then criteria will only trigger if BOTH thresholds are met",
+            "description": "Criteria will only trigger if ALL present thresholds (comment, submission, total) are met",
             "properties": {
                 "comment": {
-                    "description": "A string containing a comparison operator and a value to compare comments against\n\nThe syntax is `(< OR > OR <= OR >=) <number>[percent sign] [OP]`\n\n* EX `> 100`  => greater than 100 comments\n* EX `<= 75%` => comments are equal to or less than 75% of all Activities\n\nIf your string also contains the text `OP` somewhere **after** `<number>[percent sign]`...:\n\n* EX `> 100 OP`  => greater than 100 comments as OP\n* EX `<= 25% as OP` => Comments as OP were less then or equal to 25% of **all Comments**",
+                    "description": "A string containing a comparison operator and a value to compare **filtered** (using `include` or `exclude`, if present) comments against\n\nThe syntax is `(< OR > OR <= OR >=) <number>[percent sign] [OP]`\n\n* EX `> 100`  => greater than 100 comments\n* EX `<= 75%` => comments are equal to or less than 75% of unfiltered Activities\n\nIf your string also contains the text `OP` somewhere **after** `<number>[percent sign]`...:\n\n* EX `> 100 OP`  => greater than 100 filtered comments as OP\n* EX `<= 25% as OP` => **Filtered** comments as OP were less then or equal to 25% of **unfiltered Comments**",
                     "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
                     "type": "string"
                 },
                 "minActivityCount": {
                     "default": 5,
-                    "description": "The minimum number of activities that must exist from the `window` results for this criteria to run",
+                    "description": "The minimum number of **filtered** activities that must exist from the `window` results for this criteria to run",
                     "type": "number"
                 },
                 "name": {
                     "type": "string"
                 },
                 "submission": {
-                    "description": "A string containing a comparison operator and a value to compare submissions against\n\nThe syntax is `(< OR > OR <= OR >=) <number>[percent sign]`\n\n* EX `> 100`  => greater than 100 submissions\n* EX `<= 75%` => submissions are equal to or less than 75% of all Activities",
+                    "description": "A string containing a comparison operator and a value to compare **filtered** (using `include` or `exclude`, if present) submissions against\n\nThe syntax is `(< OR > OR <= OR >=) <number>[percent sign]`\n\n* EX `> 100`  => greater than 100 filtered submissions\n* EX `<= 75%` => filtered submissions are equal to or less than 75% of unfiltered Activities",
+                    "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
+                    "type": "string"
+                },
+                "total": {
+                    "description": "A string containing a comparison operator and a value to compare **filtered** (using `include` or `exclude`) activities against\n\n**Note:** This is only useful if using `include` or `exclude` otherwise percent will always be 100% and total === activityTotal\n\nThe syntax is `(< OR > OR <= OR >=) <number>[percent sign] [OP]`\n\n* EX `> 100`  => greater than 100 filtered activities\n* EX `<= 75%` => filtered activities are equal to or less than 75% of all Activities",
                     "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
                     "type": "string"
                 },
@@ -673,27 +754,51 @@
                     "type": "array"
                 },
                 "exclude": {
-                    "description": "Do not include Submissions from this list of Subreddits (by name, case-insensitive)\n\nEX `[\"mealtimevideos\",\"askscience\"]`",
+                    "description": "If present, activities will be counted only if they are **NOT** found in this list of Subreddits\n\nEach value in the list can be either:\n\n * string (name of subreddit)\n * regular expression to run on the subreddit name\n * `SubredditState`\n\nEX `[\"mealtimevideos\",\"askscience\", \"/onlyfans*\\/i\", {\"over18\": true}]`\n\n**Note:** This affects **post-window retrieval** activities. So that:\n\n* `activityTotal` is number of activities retrieved from `window` -- NOT post-filtering\n* all comparisons using **percentages** will compare **post-filtering** results against **activity count from window**\n* -- to run this rule where all activities are only from include/exclude filtering instead use include/exclude in `window`",
                     "examples": [
-                        "mealtimevideos",
-                        "askscience"
+                        [
+                            "mealtimevideos",
+                            "askscience",
+                            "/onlyfans*/i",
+                            {
+                                "over18": true
+                            }
+                        ]
                     ],
                     "items": {
-                        "type": "string"
+                        "anyOf": [
+                            {
+                                "$ref": "#/definitions/SubredditState"
+                            },
+                            {
+                                "type": "string"
+                            }
+                        ]
                     },
-                    "minItems": 1,
                     "type": "array"
                 },
                 "include": {
-                    "description": "Only include Submissions from this list of Subreddits (by name, case-insensitive)\n\nEX `[\"mealtimevideos\",\"askscience\"]`",
+                    "description": "If present, activities will be counted only if they are found in this list of Subreddits.\n\nEach value in the list can be either:\n\n * string (name of subreddit)\n * regular expression to run on the subreddit name\n * `SubredditState`\n\nEX `[\"mealtimevideos\",\"askscience\", \"/onlyfans*\\/i\", {\"over18\": true}]`\n\n **Note:** This affects **post-window retrieval** activities. So that:\n\n* `activityTotal` is number of activities retrieved from `window` -- NOT post-filtering\n* all comparisons using **percentages** will compare **post-filtering** results against **activity count from window**\n* -- to run this rule where all activities are only from include/exclude filtering instead use include/exclude in `window`",
                     "examples": [
-                        "mealtimevideos",
-                        "askscience"
+                        [
+                            "mealtimevideos",
+                            "askscience",
+                            "/onlyfans*/i",
+                            {
+                                "over18": true
+                            }
+                        ]
                     ],
                     "items": {
-                        "type": "string"
+                        "anyOf": [
+                            {
+                                "$ref": "#/definitions/SubredditState"
+                            },
+                            {
+                                "type": "string"
+                            }
+                        ]
                     },
-                    "minItems": 1,
                     "type": "array"
                 },
                 "itemIs": {
@@ -807,7 +912,7 @@
                 "thresholds": {
                     "description": "A list of subreddits/count criteria that may trigger this rule. ANY SubThreshold will trigger this rule.",
                     "items": {
-                        "$ref": "#/definitions/SubThreshold"
+                        "$ref": "#/definitions/ActivityThreshold"
                     },
                     "minItems": 1,
                     "type": "array"
@@ -841,6 +946,49 @@
             "required": [
                 "kind",
                 "thresholds"
+            ],
+            "type": "object"
+        },
+        "RegExp": {
+            "properties": {
+                "dotAll": {
+                    "type": "boolean"
+                },
+                "flags": {
+                    "type": "string"
+                },
+                "global": {
+                    "type": "boolean"
+                },
+                "ignoreCase": {
+                    "type": "boolean"
+                },
+                "lastIndex": {
+                    "type": "number"
+                },
+                "multiline": {
+                    "type": "boolean"
+                },
+                "source": {
+                    "type": "string"
+                },
+                "sticky": {
+                    "type": "boolean"
+                },
+                "unicode": {
+                    "type": "boolean"
+                }
+            },
+            "required": [
+                "dotAll",
+                "flags",
+                "global",
+                "ignoreCase",
+                "lastIndex",
+                "multiline",
+                "source",
+                "sticky",
+                "unicode"
             ],
             "type": "object"
         },
@@ -882,14 +1030,10 @@
                     "type": "string"
                 },
                 "regex": {
-                    "description": "A valid Regular Expression to test content against\n\nDo not wrap expression in forward slashes\n\nEX For the expression `/reddit|FoxxMD/` use the value should be `reddit|FoxxMD`",
+                    "description": "A valid Regular Expression to test content against\n\nIf no flags are specified then the **global** flag is used by default",
                     "examples": [
-                        "reddit|FoxxMD"
+                        "/reddit|FoxxMD/ig"
                     ],
-                    "type": "string"
-                },
-                "regexFlags": {
-                    "description": "Regex flags to use",
                     "type": "string"
                 },
                 "testOn": {
@@ -1053,15 +1197,27 @@
                     ]
                 },
                 "exclude": {
-                    "description": "Do not include Submissions from this list of Subreddits (by name, case-insensitive)\n\nEX `[\"mealtimevideos\",\"askscience\"]`",
+                    "description": "If present, activities will be counted only if they are **NOT** found in this list of Subreddits\n\nEach value in the list can be either:\n\n * string (name of subreddit)\n * regular expression to run on the subreddit name\n * `SubredditState`\n\nEX `[\"mealtimevideos\",\"askscience\", \"/onlyfans*\\/i\", {\"over18\": true}]`",
                     "examples": [
-                        "mealtimevideos",
-                        "askscience"
+                        [
+                            "mealtimevideos",
+                            "askscience",
+                            "/onlyfans*/i",
+                            {
+                                "over18": true
+                            }
+                        ]
                     ],
                     "items": {
-                        "type": "string"
+                        "anyOf": [
+                            {
+                                "$ref": "#/definitions/SubredditState"
+                            },
+                            {
+                                "type": "string"
+                            }
+                        ]
                     },
-                    "minItems": 1,
                     "type": "array"
                 },
                 "gapAllowance": {
@@ -1069,15 +1225,27 @@
                     "type": "number"
                 },
                 "include": {
-                    "description": "Only include Submissions from this list of Subreddits (by name, case-insensitive)\n\nEX `[\"mealtimevideos\",\"askscience\"]`",
+                    "description": "If present, activities will be counted only if they are found in this list of Subreddits\n\nEach value in the list can be either:\n\n * string (name of subreddit)\n * regular expression to run on the subreddit name\n * `SubredditState`\n\nEX `[\"mealtimevideos\",\"askscience\", \"/onlyfans*\\/i\", {\"over18\": true}]`",
                     "examples": [
-                        "mealtimevideos",
-                        "askscience"
+                        [
+                            "mealtimevideos",
+                            "askscience",
+                            "/onlyfans*/i",
+                            {
+                                "over18": true
+                            }
+                        ]
                     ],
                     "items": {
-                        "type": "string"
+                        "anyOf": [
+                            {
+                                "$ref": "#/definitions/SubredditState"
+                            },
+                            {
+                                "type": "string"
+                            }
+                        ]
                     },
-                    "minItems": 1,
                     "type": "array"
                 },
                 "itemIs": {
@@ -1167,45 +1335,6 @@
             ],
             "type": "object"
         },
-        "SubThreshold": {
-            "additionalProperties": false,
-            "description": "At least one count property must be present. If both are present then either can trigger the rule",
-            "minProperties": 1,
-            "properties": {
-                "karma": {
-                    "description": "Test the **combined karma** from Activities found in the specified subreddits\n\nValue is a string containing a comparison operator and a number of **combined karma** to compare against\n\nIf specified then both `threshold` and `karma` must be met for this `SubThreshold` to be satisfied\n\nThe syntax is `(< OR > OR <= OR >=) <number>`\n\n* EX `> 50`  => greater than 50 combined karma for all found Activities in specified subreddits",
-                    "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
-                    "type": "string"
-                },
-                "subreddits": {
-                    "description": "A list of Subreddits (by name, case-insensitive) to look for.\n\nEX [\"mealtimevideos\",\"askscience\"]",
-                    "examples": [
-                        [
-                            "mealtimevideos",
-                            "askscience"
-                        ]
-                    ],
-                    "items": {
-                        "type": "string"
-                    },
-                    "minItems": 1,
-                    "type": "array"
-                },
-                "threshold": {
-                    "default": ">= 1",
-                    "description": "A string containing a comparison operator and a value to compare recent activities against\n\nThe syntax is `(< OR > OR <= OR >=) <number>[percent sign]`\n\n* EX `> 3`  => greater than 3 activities found in the listed subreddits\n* EX `<= 75%` => number of Activities in the subreddits listed are equal to or less than 75% of all Activities\n\n**Note:** If you use percentage comparison here as well as `useSubmissionAsReference` then \"all Activities\" is only pertains to Activities that had the Link of the Submission, rather than all Activities from this window.",
-                    "examples": [
-                        ">= 1"
-                    ],
-                    "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
-                    "type": "string"
-                }
-            },
-            "required": [
-                "subreddits"
-            ],
-            "type": "object"
-        },
         "SubmissionState": {
             "description": "Different attributes a `Submission` can be in. Only include a property if you want to check it.",
             "examples": [
@@ -1249,6 +1378,16 @@
                 "removed": {
                     "type": "boolean"
                 },
+                "reports": {
+                    "description": "A string containing a comparison operator and a value to compare against\n\nThe syntax is `(< OR > OR <= OR >=) <number>`\n\n* EX `> 100`  => greater than 100",
+                    "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
+                    "type": "string"
+                },
+                "score": {
+                    "description": "A string containing a comparison operator and a value to compare against\n\nThe syntax is `(< OR > OR <= OR >=) <number>`\n\n* EX `> 100`  => greater than 100",
+                    "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
+                    "type": "string"
+                },
                 "spam": {
                     "type": "boolean"
                 },
@@ -1260,6 +1399,44 @@
                 },
                 "title": {
                     "description": "A valid regular expression to match against the title of the submission",
+                    "type": "string"
+                }
+            },
+            "type": "object"
+        },
+        "SubredditState": {
+            "description": "Different attributes a `Subreddit` can be in. Only include a property if you want to check it.",
+            "examples": [
+                {
+                    "over18": true
+                }
+            ],
+            "properties": {
+                "name": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/definitions/RegExp"
+                        },
+                        {
+                            "type": "string"
+                        }
+                    ],
+                    "description": "The name the subreddit.\n\nCan be a normal string (will check case-insensitive) or a regular expression\n\nEX `[\"mealtimevideos\", \"/onlyfans*\\/i\"]`",
+                    "examples": [
+                        "mealtimevideos",
+                        "/onlyfans*/i"
+                    ]
+                },
+                "over18": {
+                    "description": "Is subreddit NSFW/over 18?\n\n**Note**: This is **mod-controlled flag** so it is up to the mods of the subreddit to correctly mark their subreddit as NSFW",
+                    "type": "boolean"
+                },
+                "quarantine": {
+                    "description": "Is subreddit quarantined?",
+                    "type": "boolean"
+                },
+                "stateDescription": {
+                    "description": "A friendly description of what this State is trying to parse",
                     "type": "string"
                 }
             },

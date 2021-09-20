@@ -3,24 +3,25 @@ import {Comment, VoteableContent} from "snoowrap";
 import Submission from "snoowrap/dist/objects/Submission";
 import {
     activityWindowText, asSubmission,
-    comparisonTextOp, FAIL, formatNumber, getActivitySubredditName, isSubmission,
-    parseGenericValueOrPercentComparison, parseSubredditName,
+    comparisonTextOp, FAIL, formatNumber, getActivitySubredditName, isSubmission, objectToStringSummary,
+    parseGenericValueOrPercentComparison, parseStringToRegex, parseSubredditName,
     parseUsableLinkIdentifier,
-    PASS
+    PASS, toStrongSubredditState
 } from "../util";
 import {
     ActivityWindow,
     ActivityWindowCriteria,
-    ActivityWindowType,
-    ReferenceSubmission,
-    SubredditCriteria
+    ActivityWindowType, CommentState,
+    ReferenceSubmission, StrongSubredditState, SubmissionState,
+    SubredditCriteria, SubredditState
 } from "../Common/interfaces";
+import {SubredditResources} from "../Subreddit/SubredditResources";
 
 const parseLink = parseUsableLinkIdentifier();
 
 export class RecentActivityRule extends Rule {
     window: ActivityWindowType;
-    thresholds: SubThreshold[];
+    thresholds: ActivityThreshold[];
     useSubmissionAsReference: boolean;
     lookAt?: 'comments' | 'submissions';
 
@@ -84,33 +85,59 @@ export class RecentActivityRule extends Rule {
                 });
             }
         }
-        const groupedActivity = viableActivity.reduce((grouped, activity) => {
-            const s = getActivitySubredditName(activity).toLowerCase();
-            grouped[s] = (grouped[s] || []).concat(activity);
-            return grouped;
-        }, {} as Record<string, (Submission | Comment)[]>);
-
 
         const summaries = [];
         let totalTriggeredOn;
         for (const triggerSet of this.thresholds) {
             let currCount = 0;
-            const presentSubs = [];
+            const presentSubs: string[] = [];
             let combinedKarma = 0;
-            const {threshold = '>= 1', subreddits = [], karma: karmaThreshold} = triggerSet;
-            for (const sub of subreddits.map(x => parseSubredditName(x))) {
-                const isub = sub.toLowerCase();
-                const {[isub]: tSub = []} = groupedActivity;
-                if (tSub.length > 0) {
-                    currCount += tSub.length;
-                    presentSubs.push(sub);
-                    for(const a of tSub) {
-                        combinedKarma += a.score;
+            const {
+                threshold = '>= 1',
+                subreddits = [],
+                karma: karmaThreshold,
+                commentState,
+                submissionState,
+            } = triggerSet;
+
+            // convert subreddits array into entirely StrongSubredditState
+            const subStates: StrongSubredditState[] = subreddits.map((x) => {
+                if(typeof x === 'string') {
+                    return toStrongSubredditState({name: x, stateDescription: x}, {defaultFlags: 'i', generateDescription: true});
+                }
+                return toStrongSubredditState(x, {defaultFlags: 'i', generateDescription: true});
+            });
+
+            for(const activity of viableActivity) {
+                if(asSubmission(activity) && submissionState !== undefined) {
+                    if(!(await this.resources.testItemCriteria(activity, [submissionState]))) {
+                        continue;
+                    }
+                } else if(commentState !== undefined) {
+                    if(!(await this.resources.testItemCriteria(activity, [commentState]))) {
+                        continue;
+                    }
+                }
+                let inSubreddits = false;
+                for(const ss of subStates) {
+                    const res = await this.resources.testSubredditCriteria(activity, ss);
+                    if(res) {
+                        inSubreddits = true;
+                        break;
+                    }
+                }
+                if(inSubreddits) {
+                    currCount++;
+                    combinedKarma += activity.score;
+                    const pSub = getActivitySubredditName(activity);
+                    if(!presentSubs.includes(pSub)) {
+                        presentSubs.push(pSub);
                     }
                 }
             }
+
             const {operator, value, isPercent} = parseGenericValueOrPercentComparison(threshold);
-            let sum = {subsWithActivity: presentSubs, combinedKarma, karmaThreshold, subreddits, count: currCount, threshold, triggered: false, testValue: currCount.toString()};
+            let sum = {subsWithActivity: presentSubs, combinedKarma, karmaThreshold, subreddits: subStates.map(x => x.stateDescription), count: currCount, threshold, triggered: false, testValue: currCount.toString()};
             if (isPercent) {
                 sum.testValue = `${formatNumber((currCount / viableActivity.length) * 100)}%`;
                 if (comparisonTextOp(currCount / viableActivity.length, operator, value / 100)) {
@@ -194,7 +221,16 @@ export class RecentActivityRule extends Rule {
  * @minProperties 1
  * @additionalProperties false
  * */
-export interface SubThreshold extends SubredditCriteria {
+export interface ActivityThreshold {
+    /**
+    * When present, a Submission will only be counted if it meets this criteria
+    * */
+    submissionState?: SubmissionState
+    /**
+    * When present, a Comment will only be counted if it meets this criteria
+    * */
+    commentState?: CommentState
+
     /**
      * A string containing a comparison operator and a value to compare recent activities against
      *
@@ -225,6 +261,20 @@ export interface SubThreshold extends SubredditCriteria {
      * @pattern ^\s*(>|>=|<|<=)\s*(\d+)\s*(%?)(.*)$
      * */
     karma?: string
+
+    /**
+     * Activities will be counted if they are found in this list of Subreddits
+     *
+     * Each value in the list can be either:
+     *
+     *  * string (name of subreddit)
+     *  * regular expression to run on the subreddit name
+     *  * `SubredditState`
+     *
+     * EX `["mealtimevideos","askscience", "/onlyfans*\/i", {"over18": true}]`
+     * @examples [["mealtimevideos","askscience", "/onlyfans*\/i", {"over18": true}]]
+     * */
+    subreddits?: (string | SubredditState)[]
 }
 
 interface RecentActivityConfig extends ActivityWindow, ReferenceSubmission {
@@ -237,7 +287,7 @@ interface RecentActivityConfig extends ActivityWindow, ReferenceSubmission {
      * A list of subreddits/count criteria that may trigger this rule. ANY SubThreshold will trigger this rule.
      * @minItems 1
      * */
-    thresholds: SubThreshold[],
+    thresholds: ActivityThreshold[],
 }
 
 export interface RecentActivityRuleOptions extends RecentActivityConfig, RuleOptions {

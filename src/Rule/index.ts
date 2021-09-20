@@ -32,6 +32,11 @@ export interface RuleResult extends ResultContext {
     triggered: (boolean | null)
 }
 
+export type FormattedRuleResult = RuleResult & {
+    triggered: string
+    result: string
+}
+
 export interface RuleSetResult {
     results: RuleResult[],
     condition: 'OR' | 'AND',

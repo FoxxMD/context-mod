@@ -23,6 +23,15 @@ export class FlairAction extends Action {
 
     async process(item: Comment | Submission, ruleResults: RuleResult[], runtimeDryrun?: boolean): Promise<ActionProcessResult> {
         const dryRun = runtimeDryrun || this.dryRun;
+        let flairParts = [];
+        if(this.text !== '') {
+            flairParts.push(`Text: ${this.text}`);
+        }
+        if(this.css !== '') {
+            flairParts.push(`CSS: ${this.css}`);
+        }
+        const flairSummary = flairParts.length === 0 ? 'No flair (unflaired)' : flairParts.join(' | ');
+        this.logger.verbose(flairSummary);
         if (item instanceof Submission) {
             if(!this.dryRun) {
                 // @ts-ignore
@@ -39,6 +48,7 @@ export class FlairAction extends Action {
         return {
             dryRun,
             success: true,
+            result: flairSummary
         }
     }
 }

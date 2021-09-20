@@ -4,9 +4,15 @@ import {
     activityWindowText, asSubmission,
     comparisonTextOp, FAIL, getActivitySubredditName, isExternalUrlSubmission, isRedditMedia,
     parseGenericValueComparison, parseSubredditName,
-    parseUsableLinkIdentifier as linkParser, PASS
+    parseUsableLinkIdentifier as linkParser, PASS, toStrongSubredditState
 } from "../util";
-import {ActivityWindow, ActivityWindowType, ReferenceSubmission} from "../Common/interfaces";
+import {
+    ActivityWindow,
+    ActivityWindowType,
+    ReferenceSubmission,
+    StrongSubredditState,
+    SubredditState
+} from "../Common/interfaces";
 import Submission from "snoowrap/dist/objects/Submission";
 import dayjs from "dayjs";
 import Fuse from 'fuse.js'
@@ -50,8 +56,9 @@ export class RepeatActivityRule extends Rule {
     gapAllowance?: number;
     useSubmissionAsReference: boolean;
     lookAt: 'submissions' | 'all';
-    include: string[];
-    exclude: string[];
+    include: (string | SubredditState)[];
+    exclude: (string | SubredditState)[];
+    activityFilterFunc: (x: Submission|Comment) => Promise<boolean> = async (x) => true;
     keepRemoved: boolean;
     minWordCount: number;
 
@@ -74,8 +81,40 @@ export class RepeatActivityRule extends Rule {
         this.window = window;
         this.gapAllowance = gapAllowance;
         this.useSubmissionAsReference = useSubmissionAsReference;
-        this.include = include.map(x => parseSubredditName(x).toLowerCase());
-        this.exclude = exclude.map(x => parseSubredditName(x).toLowerCase());
+        this.include = include;
+        this.exclude = exclude;
+
+        if(this.include.length > 0) {
+            const subStates = include.map((x) => {
+                if(typeof x === 'string') {
+                    return toStrongSubredditState({name: x, stateDescription: x}, {defaultFlags: 'i', generateDescription: true});
+                }
+                return toStrongSubredditState(x, {defaultFlags: 'i', generateDescription: true});
+            });
+            this.activityFilterFunc = async (x: Submission|Comment) => {
+                for(const ss of subStates) {
+                    if(await this.resources.testSubredditCriteria(x, ss)) {
+                        return true;
+                    }
+                }
+                return false;
+            };
+        } else if(this.exclude.length > 0) {
+            const subStates = exclude.map((x) => {
+                if(typeof x === 'string') {
+                    return toStrongSubredditState({name: x, stateDescription: x}, {defaultFlags: 'i', generateDescription: true});
+                }
+                return toStrongSubredditState(x, {defaultFlags: 'i', generateDescription: true});
+            });
+            this.activityFilterFunc = async (x: Submission|Comment) => {
+                for(const ss of subStates) {
+                    if(await this.resources.testSubredditCriteria(x, ss)) {
+                        return false;
+                    }
+                }
+                return true;
+            };
+        }
         this.lookAt = lookAt;
     }
 
@@ -100,13 +139,6 @@ export class RepeatActivityRule extends Rule {
             referenceUrl = await item.url;
         }
 
-        let filterFunc = (x: any) => true;
-        if(this.include.length > 0) {
-            filterFunc = (x: Submission|Comment) => this.include.includes(getActivitySubredditName(x).toLowerCase());
-        } else if(this.exclude.length > 0) {
-            filterFunc = (x: Submission|Comment) => !this.exclude.includes(getActivitySubredditName(x).toLowerCase());
-        }
-
         let activities: (Submission | Comment)[] = [];
         switch (this.lookAt) {
             case 'submissions':
@@ -117,13 +149,14 @@ export class RepeatActivityRule extends Rule {
                 break;
         }
 
-        const condensedActivities = activities.reduce((acc: RepeatActivityReducer, activity: (Submission | Comment), index: number) => {
+        const condensedActivities = await activities.reduce(async (accProm: Promise<RepeatActivityReducer>, activity: (Submission | Comment), index: number) => {
+            const acc = await accProm;
             const {openSets = [], allSets = []} = acc;
 
             let identifier = getActivityIdentifier(activity);
             const isUrl = isExternalUrlSubmission(activity);
             let fu = new Fuse([identifier], !isUrl ? fuzzyOptions : {...fuzzyOptions, distance: 5});
-            const validSub = filterFunc(activity);
+            const validSub = await this.activityFilterFunc(activity);
             let minMet = identifier.length >= this.minWordCount;
 
             let updatedAllSets = [...allSets];
@@ -174,7 +207,7 @@ export class RepeatActivityRule extends Rule {
 
             return {openSets: updatedOpenSets, allSets: updatedAllSets};
 
-        }, {openSets: [], allSets: []});
+        }, Promise.resolve({openSets: [], allSets: []}));
 
         const allRepeatSets = [...condensedActivities.allSets, ...condensedActivities.openSets];
 
@@ -294,21 +327,31 @@ interface RepeatActivityConfig extends ActivityWindow, ReferenceSubmission {
      * */
     gapAllowance?: number,
     /**
-     * Only include Submissions from this list of Subreddits (by name, case-insensitive)
+     * If present, activities will be counted only if they are found in this list of Subreddits
      *
-     * EX `["mealtimevideos","askscience"]`
-     * @examples ["mealtimevideos","askscience"]
-     * @minItems 1
+     * Each value in the list can be either:
+     *
+     *  * string (name of subreddit)
+     *  * regular expression to run on the subreddit name
+     *  * `SubredditState`
+     *
+     * EX `["mealtimevideos","askscience", "/onlyfans*\/i", {"over18": true}]`
+     * @examples [["mealtimevideos","askscience", "/onlyfans*\/i", {"over18": true}]]
      * */
-    include?: string[],
+    include?: (string | SubredditState)[],
     /**
-     * Do not include Submissions from this list of Subreddits (by name, case-insensitive)
+     * If present, activities will be counted only if they are **NOT** found in this list of Subreddits
      *
-     * EX `["mealtimevideos","askscience"]`
-     * @examples ["mealtimevideos","askscience"]
-     * @minItems 1
+     * Each value in the list can be either:
+     *
+     *  * string (name of subreddit)
+     *  * regular expression to run on the subreddit name
+     *  * `SubredditState`
+     *
+     * EX `["mealtimevideos","askscience", "/onlyfans*\/i", {"over18": true}]`
+     * @examples [["mealtimevideos","askscience", "/onlyfans*\/i", {"over18": true}]]
      * */
-    exclude?: string[],
+    exclude?: (string | SubredditState)[],
 
     /**
      * If present determines which activities to consider for gapAllowance.
