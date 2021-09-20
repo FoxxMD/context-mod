@@ -99,15 +99,16 @@ export interface AttributionCriteria {
      * This list determines which categories of domains should be aggregated on. All aggregated domains will be tested against `threshold`
      *
      * * If `media` is included then aggregate author's submission history which reddit recognizes as media (youtube, vimeo, etc.)
-     * * If `self` is included then aggregate on author's submission history which are self-post (`self.[subreddit]`) or reddit image/video (i.redd.it / v.redd.it)
-     * * If `link` is included then aggregate author's submission history which is external links but not media
+     * * If `redditMedia` is included then aggregate on author's submissions history which are media hosted on reddit: galleries, videos, and images (i.redd.it / v.redd.it)
+     * * If `self` is included then aggregate on author's submission history which are self-post (`self.[subreddit]`) or domain is `reddit.com`
+     * * If `link` is included then aggregate author's submission history which is external links and not recognized as `media` by reddit
      *
      * If nothing is specified or list is empty (default) all domains are aggregated
      *
      *  @default undefined
      *  @examples [[]]
      * */
-    aggregateOn?: ('media' | 'self' | 'link')[],
+    aggregateOn?: ('media' | 'redditMedia' | 'self' | 'link')[],
 
     /**
      * Should the criteria consolidate recognized media domains into the parent domain?
@@ -232,14 +233,21 @@ export class AttributionRule extends Rule {
                 const domainInfo = getAttributionIdentifier(sub, consolidateMediaDomains)
 
                 let domainType = 'link';
-                if(sub.secure_media !== undefined && sub.secure_media !== null) {
-                    domainType = 'media';
-                } else if((sub.is_self || sub.is_video || sub.domain === 'i.redd.it')) {
+                if(sub.is_video || ['i.redd.it','v.redd.it'].includes(sub.domain)
+                    // @ts-ignore
+                    || sub.gallery_data !== undefined) {
+                    domainType = 'redditMedia';
+                } else if(sub.is_self || sub.domain === 'reddit.com') {
                     domainType = 'self';
+                } else if(sub.secure_media !== undefined && sub.secure_media !== null) {
+                    domainType = 'media';
                 }
 
                 if(aggregateOn.length !== 0) {
                     if(domainType === 'media' && !aggregateOn.includes('media')) {
+                        return acc;
+                    }
+                    if(domainType === 'redditMedia' && !aggregateOn.includes('redditMedia')) {
                         return acc;
                     }
                     if(domainType === 'self' && !aggregateOn.includes('self')) {
