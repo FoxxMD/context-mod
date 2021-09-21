@@ -99,6 +99,13 @@ export interface AuthorCriteria {
      * Does Author's account have a verified email?
      * */
     verified?: boolean
+
+    /**
+     * Is the author shadowbanned?
+     *
+     * This is determined by trying to retrieve the author's profile. If a 404 is returned it is likely they are shadowbanned
+     * */
+    shadowBanned?: boolean
 }
 
 export class Author implements AuthorCriteria {
@@ -112,6 +119,7 @@ export class Author implements AuthorCriteria {
     linkKarma?: string;
     totalKarma?: string;
     verified?: boolean;
+    shadowBanned?: boolean;
 
     constructor(options: AuthorCriteria) {
         this.name = options.name;
@@ -123,6 +131,7 @@ export class Author implements AuthorCriteria {
         this.commentKarma = options.commentKarma;
         this.linkKarma = options.linkKarma;
         this.totalKarma = options.totalKarma;
+        this.shadowBanned = options.shadowBanned;
     }
 }
 
