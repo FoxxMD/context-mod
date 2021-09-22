@@ -9,10 +9,12 @@ import {InvalidOptionArgumentError} from "commander";
 import Submission from "snoowrap/dist/objects/Submission";
 import {Comment} from "snoowrap";
 import {inflateSync, deflateSync} from "zlib";
+import sizeOf from 'image-size';
+import pixelmatch from 'pixelmatch';
 import {
     ActivityWindowCriteria, CacheOptions, CacheProvider,
     DurationComparison,
-    GenericComparison, LogInfo, NamedGroup,
+    GenericComparison, ImageData, ImageDetection, LogInfo, NamedGroup,
     PollingOptionsStrong, RedditEntity, RedditEntityType, RegExResult, ResourceStats, StatusCodeError,
     StringOperator, StrongSubredditState, SubredditState
 } from "./Common/interfaces";
@@ -30,6 +32,10 @@ import {create as createMemoryStore} from './Utils/memoryStore';
 import {MESSAGE} from "triple-beam";
 import {RedditUser} from "snoowrap/dist/objects";
 import reRegExp from '@stdlib/regexp-regexp';
+import fetch, {Response} from "node-fetch";
+// @ts-ignore
+import ci from 'resemblejs/compareImages';
+import {ResembleSingleCallbackComparisonResult} from "resemblejs";
 
 const ReReg = reRegExp();
 
@@ -1157,4 +1163,41 @@ export const parseRuleResultsToMarkdownSummary = (ruleResults: RuleResult[]): st
         return `* ${name} - ${t} - ${result || '-'}`;
     });
     return results.join('\r\n');
+}
+
+export const isValidImageURL = (str: string): boolean => {
+    return !!str.match(/\w+\.(jpg|jpeg|gif|png|tiff|bmp)$/gi);
+}
+
+export const getImageDataFromUrl = async (url: string, aggressive = false): Promise<[Response?, ImageData?, string?]> => {
+    if (!aggressive && !isValidImageURL(url)) {
+        return [undefined, undefined, 'URL did not end with a valid image extension'];
+    }
+    try {
+        const response = await fetch(url);
+        if (response.ok) {
+            const ct = response.headers.get('Content-Type');
+            if (ct !== null && ct.includes('image')) {
+                let buffer = await response.buffer();
+                const dimensions = sizeOf(buffer);
+                return [response, {
+                    data: buffer,
+                    width: dimensions.width as number - 5,
+                    height: dimensions.height as number - 5,
+                    pixels: (dimensions.height as number - 5) * (dimensions.width as number - 5)
+                }];
+            }
+            return [response, undefined, 'Content-Type for fetched URL did not contain "image"'];
+        }
+        return [response, undefined, `URL response was not OK: (${response.status})${response.statusText}`];
+    } catch (err) {
+        return [undefined, undefined, `Error occurred while fetching response from URL: ${err.message}`];
+    }
+}
+
+export const compareImages = async (data1: ImageData, data2: ImageData, threshold: number) => {
+    const results = await ci(data1.data, data2.data, {
+        returnEarlyThreshold: threshold
+    }) as ResembleSingleCallbackComparisonResult;
+    return Number.parseInt(results.misMatchPercentage) >= threshold;
 }

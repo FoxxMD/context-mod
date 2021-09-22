@@ -224,6 +224,55 @@ export interface ReferenceSubmission {
     useSubmissionAsReference?: boolean,
 }
 
+/**
+ * When comparing submissions detect if the reference submission is an image and do a pixel-comparison to other detected image submissions.
+ *
+ * **Note:** This is an **experimental feature**
+ * */
+export interface ImageDetection {
+    /**
+     * Is image detection enabled?
+     * */
+    enable?: boolean
+    /**
+     * Determines how and when to check if a URL is an image
+     *
+     * **Note:** After fetching a URL the **Content-Type** is validated to contain `image` before detection occurs
+     *
+     * **When `extension`:** (default)
+     *
+     * * Only URLs that end in known image extensions (.png, .jpg, etc...) are fetched
+     *
+     * **When `unknown`:**
+     *
+     * * URLs that end in known image extensions (.png, .jpg, etc...) are fetched
+     * * URLs with no extension or unknown (IE non-video, non-doc, etc...) are fetched
+     *
+     * **When `all`:**
+     *
+     * * All submissions that have URLs (non-self) will be fetched, regardless of extension
+     * * **Note:** This can be bandwidth/CPU intensive if history window is large so use with care
+     *
+     * @default "extension"
+     * */
+    fetchBehavior?: 'extension' | 'unknown' | 'all',
+    /**
+     * The percentage, as a whole number, of pixels that are **different** between the two images at which point the images are not considered the same.
+     *
+     * Default is `5`
+     *
+     * @default 5
+     * */
+    threshold?: number
+}
+
+export interface ImageData {
+    data: Buffer,
+    width: number,
+    height: number
+    pixels: number
+}
+
 export interface RichContent {
     /**
      * The Content to submit for this Action. Content is interpreted as reddit-flavored Markdown.
