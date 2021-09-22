@@ -73,9 +73,10 @@ export class RecentActivityRule extends Rule {
             } else if (item.is_self) {
                 this.logger.warn('Cannot use post as reference because triggered Submission is not a link type');
             } else {
+                const itemId = item.id;
                 const usableUrl = parseLink(await item.url);
                 viableActivity = viableActivity.filter((x) => {
-                    if (!asSubmission(x)) {
+                    if (!asSubmission(x) || x.id === itemId) {
                         return false;
                     }
                     if (x.url === undefined) {
