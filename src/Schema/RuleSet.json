@@ -342,11 +342,6 @@
                     ],
                     "pattern": "^[a-zA-Z]([\\w -]*[\\w])?$",
                     "type": "string"
-                },
-                "useSubmissionAsReference": {
-                    "default": true,
-                    "description": "If activity is a Submission and is a link (not self-post) then only look at Submissions that contain this link, otherwise consider all activities.",
-                    "type": "boolean"
                 }
             },
             "required": [

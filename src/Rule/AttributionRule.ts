@@ -392,7 +392,7 @@ export class AttributionRule extends Rule {
 
 }
 
-interface AttributionConfig extends ReferenceSubmission {
+interface AttributionConfig {
 
     /**
      * A list threshold-window values to test attribution against
