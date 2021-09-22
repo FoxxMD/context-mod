@@ -103,7 +103,7 @@ export interface AttributionCriteria {
      * * If `self` is included then aggregate on author's submission history which are self-post (`self.[subreddit]`) or domain is `reddit.com`
      * * If `link` is included then aggregate author's submission history which is external links and not recognized as `media` by reddit
      *
-     * If nothing is specified or list is empty (default) all domains are aggregated
+     * If nothing is specified or list is empty (default) rule will only aggregate on `link` and `media` (ignores reddit-hosted content and self-posts)
      *
      *  @default undefined
      *  @examples [[]]
@@ -174,7 +174,7 @@ export class AttributionRule extends Rule {
                 window,
                 thresholdOn = 'all',
                 minActivityCount = 10,
-                aggregateOn = [],
+                aggregateOn = ['link','media'],
                 consolidateMediaDomains = false,
                 domains = [],
                 domainsCombined = false,
