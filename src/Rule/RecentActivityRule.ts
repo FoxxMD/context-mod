@@ -111,6 +111,13 @@ export class RecentActivityRule extends Rule {
                         referenceImage = imgData
                     }
                 }
+                let longRun;
+                if(referenceImage !== undefined) {
+                    const l = this.logger;
+                    longRun = setTimeout(() => {
+                        l.verbose('FYI: Image processing is causing rule to take longer than normal');
+                    }, 2500);
+                }
                 for(const x of viableActivity) {
                     if (!asSubmission(x) || x.id === itemId) {
                         continue;
@@ -136,6 +143,9 @@ export class RecentActivityRule extends Rule {
                             }
                         }
                     }
+                }
+                if(longRun !== undefined) {
+                    clearTimeout(longRun);
                 }
                 viableActivity = filteredActivity;
             }
