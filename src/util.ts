@@ -10,7 +10,6 @@ import Submission from "snoowrap/dist/objects/Submission";
 import {Comment} from "snoowrap";
 import {inflateSync, deflateSync} from "zlib";
 import sizeOf from 'image-size';
-import pixelmatch from 'pixelmatch';
 import {
     ActivityWindowCriteria, CacheOptions, CacheProvider,
     DurationComparison,
@@ -33,9 +32,6 @@ import {MESSAGE} from "triple-beam";
 import {RedditUser} from "snoowrap/dist/objects";
 import reRegExp from '@stdlib/regexp-regexp';
 import fetch, {Response} from "node-fetch";
-// @ts-ignore
-import ci from 'resemblejs/compareImages';
-import {ResembleSingleCallbackComparisonResult} from "resemblejs";
 
 const ReReg = reRegExp();
 
@@ -1195,7 +1191,29 @@ export const getImageDataFromUrl = async (url: string, aggressive = false): Prom
     }
 }
 
+let resembleCIFunc: Function;
+
+const getCIFunc = async () => {
+    if (resembleCIFunc === undefined) {
+        // @ts-ignore
+        const resembleModule = await import('resemblejs/compareImages');
+        if (resembleModule === undefined) {
+            throw new Error('Could not import resemblejs');
+        }
+        resembleCIFunc = resembleModule.default;
+    }
+    return resembleCIFunc;
+}
+
 export const compareImages = async (data1: ImageData, data2: ImageData, threshold?: number): Promise<[ResembleResult, boolean?]> => {
+    let ci: Function;
+
+    try {
+        ci = await getCIFunc();
+    } catch (err) {
+        err.message = `Unable to do image comparison due to an issue importing the comparison library. It is likely 'node-canvas' is not installed (see ContextMod docs). Error Message: ${err.message}`;
+        throw err;
+    }
     const results = await ci(data1.data, data2.data, {
         returnEarlyThreshold: threshold !== undefined ? Math.min(threshold + 5, 100) : undefined,
     }) as ResembleResult;
