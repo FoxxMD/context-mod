@@ -137,6 +137,7 @@ export class RecentActivityRule extends Rule {
                         }
                     }
                 }
+                viableActivity = filteredActivity;
             }
         }
 
