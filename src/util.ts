@@ -15,7 +15,7 @@ import {
     ActivityWindowCriteria, CacheOptions, CacheProvider,
     DurationComparison,
     GenericComparison, ImageData, ImageDetection, LogInfo, NamedGroup,
-    PollingOptionsStrong, RedditEntity, RedditEntityType, RegExResult, ResourceStats, StatusCodeError,
+    PollingOptionsStrong, RedditEntity, RedditEntityType, RegExResult, ResembleResult, ResourceStats, StatusCodeError,
     StringOperator, StrongSubredditState, SubredditState
 } from "./Common/interfaces";
 import JSON5 from "json5";
@@ -847,8 +847,8 @@ export const boolToString = (val: boolean): string => {
     return val ? 'Yes' : 'No';
 }
 
-export const isRedditMedia = (act: Submission): boolean => {
-    return act.is_reddit_media_domain || act.is_video || ['v.redd.it','i.redd.it'].includes(act.domain);
+export const isRedditMedia = (act: Comment | Submission): boolean => {
+    return asSubmission(act) && (act.is_reddit_media_domain || act.is_video || ['v.redd.it','i.redd.it'].includes(act.domain));
 }
 
 export const isExternalUrlSubmission = (act: Comment | Submission): boolean => {
@@ -1195,9 +1195,11 @@ export const getImageDataFromUrl = async (url: string, aggressive = false): Prom
     }
 }
 
-export const compareImages = async (data1: ImageData, data2: ImageData, threshold: number) => {
+export const compareImages = async (data1: ImageData, data2: ImageData, threshold?: number): Promise<[ResembleResult, boolean?]> => {
     const results = await ci(data1.data, data2.data, {
-        returnEarlyThreshold: threshold
-    }) as ResembleSingleCallbackComparisonResult;
-    return Number.parseInt(results.misMatchPercentage) >= threshold;
+        returnEarlyThreshold: threshold !== undefined ? Math.min(threshold + 5, 100) : undefined,
+    }) as ResembleResult;
+
+    const sameImage = threshold === undefined ? undefined : results.rawMisMatchPercentage < threshold;
+    return [results, sameImage];
 }

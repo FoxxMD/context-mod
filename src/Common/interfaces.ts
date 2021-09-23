@@ -5,6 +5,7 @@ import Poll from "snoostorm/out/util/Poll";
 import Snoowrap from "snoowrap";
 import {RuleResult} from "../Rule";
 import {IncomingMessage} from "http";
+import {ResembleSingleCallbackComparisonResult} from "resemblejs";
 
 /**
  * An ISO 8601 Duration
@@ -271,6 +272,10 @@ export interface ImageData {
     width: number,
     height: number
     pixels: number
+}
+
+export interface ResembleResult extends ResembleSingleCallbackComparisonResult {
+    rawMisMatchPercentage: number
 }
 
 export interface RichContent {

@@ -127,7 +127,8 @@ export class RecentActivityRule extends Rule {
                         const [response, imgData, reason] = await getImageDataFromUrl(x.url);
                         if(imgData !== undefined) {
                             try {
-                                if(await compareImages(referenceImage, imgData, this.imageDetection.threshold)) {
+                                const [compareResult, sameImage] = await compareImages(referenceImage, imgData, this.imageDetection.threshold);
+                                if(sameImage) {
                                     filteredActivity.push(x);
                                 }
                             } catch (err) {
