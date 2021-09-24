@@ -39,7 +39,7 @@ import {JSONConfig} from "../JsonConfig";
 import {CheckStructuredJson} from "../Check";
 import NotificationManager from "../Notification/NotificationManager";
 import action from "../Web/Server/routes/authenticated/user/action";
-import {historicalDefaults} from "../Common/defaults";
+import {createHistoricalDefaults, historicalDefaults} from "../Common/defaults";
 
 export interface RunningState {
     state: RunState,
@@ -145,8 +145,8 @@ export class Manager {
             eventsAvg: formatNumber(this.eventsRollingAvg),
             rulesAvg: formatNumber(this.rulesUniqueRollingAvg),
             historical: {
-                lastReload: createHistoricalStatsDisplay(historicalDefaults),
-                allTime: createHistoricalStatsDisplay(historicalDefaults),
+                lastReload: createHistoricalStatsDisplay(createHistoricalDefaults()),
+                allTime: createHistoricalStatsDisplay(createHistoricalDefaults()),
             },
             cache: {
                 provider: 'none',

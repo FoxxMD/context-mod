@@ -14,3 +14,18 @@ export const historicalDefaults: HistoricalStats = {
     rulesTriggered: new Map(),
     actionsRun: new Map(),
 }
+
+export const createHistoricalDefaults = (): HistoricalStats => {
+    return {
+        eventsCheckedTotal: 0,
+        eventsActionedTotal: 0,
+        checksRun: new Map(),
+        checksFromCache: new Map(),
+        checksTriggered: new Map(),
+        rulesRun: new Map(),
+        //rulesCached: new Map(),
+        rulesCachedTotal: 0,
+        rulesTriggered: new Map(),
+        actionsRun: new Map(),
+    };
+}

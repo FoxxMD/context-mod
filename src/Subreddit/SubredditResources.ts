@@ -45,7 +45,7 @@ import {AuthorCriteria} from "../Author/Author";
 import {SPoll} from "./Streams";
 import {Cache} from 'cache-manager';
 import {Submission, Comment} from "snoowrap/dist/objects";
-import {cacheTTLDefaults, historicalDefaults} from "../Common/defaults";
+import {cacheTTLDefaults, createHistoricalDefaults, historicalDefaults} from "../Common/defaults";
 import {check} from "tcp-port-used";
 
 export const DEFAULT_FOOTER = '\r\n*****\r\nThis action was performed by [a bot.]({{botLink}}) Mention a moderator or [send a modmail]({{modmailLink}}) if you any ideas, questions, or concerns about this action.';
@@ -145,8 +145,8 @@ export class SubredditResources {
         this.stats = {
             cache: cacheStats(),
             historical: {
-                allTime: {...historicalDefaults},
-                lastReload: {...historicalDefaults}
+                allTime: createHistoricalDefaults(),
+                lastReload: createHistoricalDefaults()
             }
         };
 
@@ -172,7 +172,7 @@ export class SubredditResources {
     }
 
     async initHistoricalStats() {
-         const at = await this.cache.wrap(`${this.name}-historical-allTime`, () => historicalDefaults, {ttl: 0}) as object;
+         const at = await this.cache.wrap(`${this.name}-historical-allTime`, () => createHistoricalDefaults(), {ttl: 0}) as object;
          const rehydratedAt: any = {};
          for(const [k, v] of Object.entries(at)) {
             if(Array.isArray(v)) {
@@ -183,7 +183,7 @@ export class SubredditResources {
          }
          this.stats.historical.allTime = rehydratedAt as HistoricalStats;
 
-        // const lr = await this.cache.wrap(`${this.name}-historical-lastReload`, () => historicalDefaults, {ttl: 0}) as object;
+        // const lr = await this.cache.wrap(`${this.name}-historical-lastReload`, () => createHistoricalDefaults(), {ttl: 0}) as object;
         // const rehydratedLr: any = {};
         // for(const [k, v] of Object.entries(lr)) {
         //     if(Array.isArray(v)) {
@@ -250,9 +250,11 @@ export class SubredditResources {
     }
 
     setHistoricalSaveInterval() {
-        this.historicalSaveInterval = setInterval(async () => {
-            await this.saveHistoricalStats();
-        },10000)
+        this.historicalSaveInterval = setInterval((function(self) {
+            return async () => {
+                await self.saveHistoricalStats();
+            }
+        })(this),10000);
     }
 
     async getCacheKeyCount() {
@@ -957,7 +959,7 @@ export class BotResourcesManager {
             // reset cache stats when configuration is reloaded
             resource.stats.cache = cacheStats();
         }
-        resource.stats.historical.lastReload = historicalDefaults;
+        resource.stats.historical.lastReload = createHistoricalDefaults();
 
         return resource;
     }
