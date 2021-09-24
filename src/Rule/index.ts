@@ -28,6 +28,7 @@ interface ResultContext {
 
 export interface RuleResult extends ResultContext {
     premise: RulePremise
+    kind: string
     name: string
     triggered: (boolean | null)
 }
@@ -153,6 +154,7 @@ export abstract class Rule implements IRule, Triggerable {
     protected getResult(triggered: (boolean | null) = null, context: ResultContext = {}): RuleResult {
         return {
             premise: this.getPremise(),
+            kind: this.getKind(),
             name: this.name,
             triggered,
             ...context,

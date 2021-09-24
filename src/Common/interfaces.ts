@@ -1610,3 +1610,83 @@ export interface StatusCodeError extends Error {
     response: IncomingMessage,
     error: Error
 }
+
+export interface HistoricalStatsDisplay extends HistoricalStats {
+    checksRunTotal: number
+    checksFromCacheTotal: number
+    checksTriggeredTotal: number
+    rulesRunTotal: number
+    rulesCachedTotal: number
+    rulesTriggeredTotal: number
+    actionsRunTotal: number
+}
+
+export interface HistoricalStats {
+    eventsCheckedTotal: number
+    eventsActionedTotal: number
+    checksRun: Map<string, number>
+    checksFromCache: Map<string, number>
+    checksTriggered: Map<string, number>
+    rulesRun: Map<string, number>
+    //rulesCached: Map<string, number>
+    rulesCachedTotal: number
+    rulesTriggered: Map<string, number>
+    actionsRun: Map<string, number>
+    [index: string]: any
+}
+
+export interface SubredditHistoricalStats {
+    allTime: HistoricalStats
+    lastReload: HistoricalStats
+}
+
+export interface SubredditHistoricalStatsDisplay {
+    allTime: HistoricalStatsDisplay
+    lastReload: HistoricalStatsDisplay
+}
+
+export interface ManagerStats {
+    // eventsCheckedTotal: number
+    // eventsCheckedSinceStartTotal: number
+    eventsAvg: number
+    // checksRunTotal: number
+    // checksRunSinceStartTotal: number
+    // checksTriggered: number
+    // checksTriggeredTotal: number
+    // checksTriggeredSinceStart: number
+    // checksTriggeredSinceStartTotal: number
+    // rulesRunTotal: number
+    // rulesRunSinceStartTotal: number
+    // rulesCachedTotal: number
+    // rulesCachedSinceStartTotal: number
+    // rulesTriggeredTotal: number
+    // rulesTriggeredSinceStartTotal: number
+    rulesAvg: number
+    // actionsRun: number
+    // actionsRunTotal: number
+    // actionsRunSinceStart: number,
+    // actionsRunSinceStartTotal: number
+    historical: SubredditHistoricalStatsDisplay
+    cache: {
+        provider: string,
+        currentKeyCount: number,
+        isShared: boolean,
+        totalRequests: number,
+        totalMiss: number,
+        missPercent: string,
+        requestRate: number,
+        types: ResourceStats
+    },
+}
+
+export interface HistoricalStatUpdateData {
+    eventsCheckedTotal?: number
+    eventsActionedTotal?: number
+    checksRun: string[] | string
+    checksTriggered: string[] | string
+    checksFromCache: string[] | string
+    actionsRun: string[] | string
+    rulesRun: string[] | string
+    rulesCachedTotal: number
+    rulesTriggered: string[] | string
+}

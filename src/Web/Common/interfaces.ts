@@ -1,4 +1,5 @@
-import {ManagerStats, RunningState} from "../../Subreddit/Manager";
+import {RunningState} from "../../Subreddit/Manager";
+import {ManagerStats} from "../../Common/interfaces";
 
 export interface BotStats {
     startedAtHuman: string,

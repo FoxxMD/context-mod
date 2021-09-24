@@ -3,7 +3,7 @@ import {Logger} from "winston";
 import {SubmissionCheck} from "../Check/SubmissionCheck";
 import {CommentCheck} from "../Check/CommentCheck";
 import {
-    cacheStats,
+    cacheStats, createHistoricalStatsDisplay,
     createRetryHandler,
     determineNewResults, findLastIndex, formatNumber,
     mergeArr, parseFromJsonOrYamlToObject, pollingInfo, resultsSummary, sleep, totalFromMapStats, triggeredIndicator,
@@ -17,7 +17,7 @@ import {
     ActionResult,
     DEFAULT_POLLING_INTERVAL,
     DEFAULT_POLLING_LIMIT, Invokee,
-    ManagerOptions, ManagerStateChangeOption, PAUSED,
+    ManagerOptions, ManagerStateChangeOption, ManagerStats, PAUSED,
     PollingOptionsStrong, ResourceStats, RUNNING, RunState, STOPPED, SYSTEM, USER
 } from "../Common/interfaces";
 import Submission from "snoowrap/dist/objects/Submission";
@@ -39,6 +39,7 @@ import {JSONConfig} from "../JsonConfig";
 import {CheckStructuredJson} from "../Check";
 import NotificationManager from "../Notification/NotificationManager";
 import action from "../Web/Server/routes/authenticated/user/action";
+import {historicalDefaults} from "../Common/defaults";
 
 export interface RunningState {
     state: RunState,
@@ -63,39 +64,6 @@ export interface RuntimeManagerOptions extends ManagerOptions {
     wikiLocation?: string;
     botName: string;
     maxWorkers: number;
-}
-
-export interface ManagerStats {
-    eventsCheckedTotal: number
-    eventsCheckedSinceStartTotal: number
-    eventsAvg: number
-    checksRunTotal: number
-    checksRunSinceStartTotal: number
-    checksTriggered: number
-    checksTriggeredTotal: number
-    checksTriggeredSinceStart: number
-    checksTriggeredSinceStartTotal: number
-    rulesRunTotal: number
-    rulesRunSinceStartTotal: number
-    rulesCachedTotal: number
-    rulesCachedSinceStartTotal: number
-    rulesTriggeredTotal: number
-    rulesTriggeredSinceStartTotal: number
-    rulesAvg: number
-    actionsRun: number
-    actionsRunTotal: number
-    actionsRunSinceStart: number,
-    actionsRunSinceStartTotal: number
-    cache: {
-        provider: string,
-        currentKeyCount: number,
-        isShared: boolean,
-        totalRequests: number,
-        totalMiss: number,
-        missPercent: string,
-        requestRate: number,
-        types: ResourceStats
-    },
 }
 
 interface QueuedIdentifier {
@@ -164,50 +132,22 @@ export class Manager {
     // use by api nanny to slow event consumption
     delayBy?: number;
 
-    eventsCheckedTotal: number = 0;
-    eventsCheckedSinceStartTotal: number = 0;
     eventsSample: number[] = [];
     eventsSampleInterval: any;
     eventsRollingAvg: number = 0;
-    checksRunTotal: number = 0;
-    checksRunSinceStartTotal: number = 0;
-    checksTriggered: Map<string, number> = new Map();
-    checksTriggeredSinceStart: Map<string, number> = new Map();
-    rulesRunTotal: number = 0;
-    rulesRunSinceStartTotal: number = 0;
-    rulesCachedTotal: number = 0;
-    rulesCachedSinceStartTotal: number = 0;
-    rulesTriggeredTotal: number = 0;
-    rulesTriggeredSinceStartTotal: number = 0;
     rulesUniqueSample: number[] = [];
     rulesUniqueSampleInterval: any;
     rulesUniqueRollingAvg: number = 0;
-    actionsRun: Map<string, number> = new Map();
-    actionsRunSinceStart: Map<string, number> = new Map();
     actionedEvents: ActionedEvent[] = [];
 
     getStats = async (): Promise<ManagerStats> => {
         const data: any = {
-            eventsCheckedTotal: this.eventsCheckedTotal,
-            eventsCheckedSinceStartTotal: this.eventsCheckedSinceStartTotal,
             eventsAvg: formatNumber(this.eventsRollingAvg),
-            checksRunTotal: this.checksRunTotal,
-            checksRunSinceStartTotal: this.checksRunSinceStartTotal,
-            checksTriggered: this.checksTriggered,
-            checksTriggeredTotal: totalFromMapStats(this.checksTriggered),
-            checksTriggeredSinceStart: this.checksTriggeredSinceStart,
-            checksTriggeredSinceStartTotal: totalFromMapStats(this.checksTriggeredSinceStart),
-            rulesRunTotal: this.rulesRunTotal,
-            rulesRunSinceStartTotal: this.rulesRunSinceStartTotal,
-            rulesCachedTotal: this.rulesCachedTotal,
-            rulesCachedSinceStartTotal: this.rulesCachedSinceStartTotal,
-            rulesTriggeredTotal: this.rulesTriggeredTotal,
-            rulesTriggeredSinceStartTotal: this.rulesTriggeredSinceStartTotal,
             rulesAvg: formatNumber(this.rulesUniqueRollingAvg),
-            actionsRun: this.actionsRun,
-            actionsRunTotal: totalFromMapStats(this.actionsRun),
-            actionsRunSinceStart: this.actionsRunSinceStart,
-            actionsRunSinceStartTotal: totalFromMapStats(this.actionsRunSinceStart),
+            historical: {
+                lastReload: createHistoricalStatsDisplay(historicalDefaults),
+                allTime: createHistoricalStatsDisplay(historicalDefaults),
+            },
             cache: {
                 provider: 'none',
                 currentKeyCount: 0,
@@ -223,6 +163,7 @@ export class Manager {
         if (this.resources !== undefined) {
             const resStats = await this.resources.getStats();
 
+            data.historical = this.resources.getHistoricalDisplayStats();
             data.cache = resStats.cache;
             data.cache.currentKeyCount = await this.resources.getCacheKeyCount();
             data.cache.isShared = this.resources.cacheSettingsHash === 'default';
@@ -270,8 +211,9 @@ export class Manager {
 
         this.eventsSampleInterval = setInterval((function(self) {
             return function() {
+                const et = self.resources !== undefined ? self.resources.stats.historical.allTime.eventsCheckedTotal : 0;
                 const rollingSample = self.eventsSample.slice(0, 7)
-                rollingSample.unshift(self.eventsCheckedTotal)
+                rollingSample.unshift(et)
                 self.eventsSample = rollingSample;
                 const diff = self.eventsSample.reduceRight((acc: number[], curr, index) => {
                     if(self.eventsSample[index + 1] !== undefined) {
@@ -291,7 +233,8 @@ export class Manager {
         this.rulesUniqueSampleInterval = setInterval((function(self) {
             return function() {
                 const rollingSample = self.rulesUniqueSample.slice(0, 7)
-                rollingSample.unshift(self.rulesRunTotal - self.rulesCachedTotal);
+                const rt = self.resources !== undefined ? self.resources.stats.historical.allTime.rulesRunTotal - self.resources.stats.historical.allTime.rulesCachedTotal : 0;
+                rollingSample.unshift(rt);
                 self.rulesUniqueSample = rollingSample;
                 const diff = self.rulesUniqueSample.reduceRight((acc: number[], curr, index) => {
                     if(self.rulesUniqueSample[index + 1] !== undefined) {
@@ -387,7 +330,7 @@ export class Manager {
         return q;
     }
 
-    protected parseConfigurationFromObject(configObj: object) {
+    protected async parseConfigurationFromObject(configObj: object) {
         try {
             const configBuilder = new ConfigBuilder({logger: this.logger});
             const validJson = configBuilder.validateJson(configObj);
@@ -437,7 +380,7 @@ export class Manager {
                 caching,
                 client: this.client,
             };
-            this.resources = this.cacheManager.set(this.subreddit.display_name, resourceConfig);
+            this.resources = await this.cacheManager.set(this.subreddit.display_name, resourceConfig);
             this.resources.setLogger(this.logger);
 
             this.logger.info('Subreddit-specific options updated');
@@ -532,7 +475,7 @@ export class Manager {
                 throw new ConfigParseError('Could not parse wiki page contents as JSON or YAML')
             }
 
-            this.parseConfigurationFromObject(configObj);
+            await this.parseConfigurationFromObject(configObj);
             this.logger.info('Checks updated');
 
             if(!suppressNotification) {
@@ -549,8 +492,6 @@ export class Manager {
     async runChecks(checkType: ('Comment' | 'Submission'), activity: (Submission | Comment), options?: runCheckOptions): Promise<void> {
         const checks = checkType === 'Comment' ? this.commentChecks : this.submissionChecks;
         let item = activity;
-        this.eventsCheckedTotal++;
-        this.eventsCheckedSinceStartTotal++;
         const itemId = await item.id;
         let allRuleResults: RuleResult[] = [];
         const itemIdentifier = `${checkType === 'Submission' ? 'SUB' : 'COM'} ${itemId}`;
@@ -622,7 +563,9 @@ export class Manager {
             actionResults: [],
         }
         let triggered = false;
-
+        let triggeredCheckName;
+        const checksRunNames = [];
+        const cachedCheckNames = [];
         try {
             for (const check of checks) {
                 if (checkNames.length > 0 && !checkNames.map(x => x.toLowerCase()).some(x => x === check.name.toLowerCase())) {
@@ -633,6 +576,7 @@ export class Manager {
                     this.logger.info(`Check ${check.name} not run because it is not enabled, skipping...`);
                     continue;
                 }
+                checksRunNames.push(check.name);
                 checksRun++;
                 triggered = false;
                 let isFromCache = false;
@@ -642,6 +586,8 @@ export class Manager {
                     isFromCache = fromCache;
                     if(!fromCache) {
                         await check.setCacheResult(item, {result: checkTriggered, ruleResults: checkResults});
+                    } else {
+                        cachedCheckNames.push(check.name);
                     }
                     currentResults = checkResults;
                     totalRulesRun += checkResults.length;
@@ -658,6 +604,7 @@ export class Manager {
                 }
 
                 if (triggered) {
+                    triggeredCheckName = check.name;
                     actionedEvent.check = check.name;
                     actionedEvent.ruleResults = currentResults;
                     if(isFromCache) {
@@ -665,8 +612,6 @@ export class Manager {
                     } else {
                         actionedEvent.ruleSummary = resultsSummary(currentResults, check.condition);
                     }
-                    this.checksTriggered.set(check.name, (this.checksTriggered.get(check.name) || 0) + 1);
-                    this.checksTriggeredSinceStart.set(check.name, (this.checksTriggeredSinceStart.get(check.name) || 0) + 1);
                     runActions = await check.runActions(item, currentResults.filter(x => x.triggered), dryRun);
                     actionsRun = runActions.length;
 
@@ -688,23 +633,6 @@ export class Manager {
             }
         } finally {
             try {
-                const cachedTotal = totalRulesRun - allRuleResults.length;
-                const triggeredRulesTotal = allRuleResults.filter(x => x.triggered).length;
-
-                this.checksRunTotal += checksRun;
-                this.checksRunSinceStartTotal += checksRun;
-                this.rulesRunTotal += totalRulesRun;
-                this.rulesRunSinceStartTotal += totalRulesRun;
-                this.rulesCachedTotal += cachedTotal;
-                this.rulesCachedSinceStartTotal += cachedTotal;
-                this.rulesTriggeredTotal += triggeredRulesTotal;
-                this.rulesTriggeredSinceStartTotal += triggeredRulesTotal;
-
-                for (const a of runActions) {
-                    const name = a.name;
-                    this.actionsRun.set(name, (this.actionsRun.get(name) || 0) + 1);
-                    this.actionsRunSinceStart.set(name, (this.actionsRunSinceStart.get(name) || 0) + 1);
-                }
                 actionedEvent.actionResults = runActions;
                 if(triggered) {
                     await this.resources.addActionedEvent(actionedEvent);
@@ -715,6 +643,18 @@ export class Manager {
                 this.currentLabels = [];
             } catch (err) {
                 this.logger.error('Error occurred while cleaning up Activity check and generating stats', err);
+            } finally {
+                this.resources.updateHistoricalStats({
+                    eventsCheckedTotal: 1,
+                    eventsActionedTotal: triggered ? 1 : 0,
+                    checksTriggered: triggeredCheckName !== undefined ? [triggeredCheckName] : [],
+                    checksRun: checksRunNames,
+                    checksFromCache: cachedCheckNames,
+                    actionsRun: runActions.map(x => x.name),
+                    rulesRun: allRuleResults.map(x => x.name),
+                    rulesTriggered: allRuleResults.filter(x => x.triggered).map(x => x.name),
+                    rulesCachedTotal: totalRulesRun - allRuleResults.length,
+                });
             }
         }
     }
@@ -1002,13 +942,6 @@ export class Manager {
                 stream.removeListener('item', v);
             }
             this.startedAt = undefined;
-            this.eventsCheckedSinceStartTotal = 0;
-            this.checksRunSinceStartTotal = 0;
-            this.rulesRunSinceStartTotal = 0;
-            this.rulesCachedSinceStartTotal = 0;
-            this.rulesTriggeredSinceStartTotal = 0;
-            this.checksTriggeredSinceStart = new Map();
-            this.actionsRunSinceStart = new Map();
             this.logger.info(`Events STOPPED by ${causedBy}`);
             this.eventsState = {
                 state: STOPPED,

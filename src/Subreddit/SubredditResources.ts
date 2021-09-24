@@ -13,7 +13,7 @@ import fetch from 'node-fetch';
 import {
     asSubmission,
     buildCacheOptionsFromProvider, buildCachePrefix,
-    cacheStats, comparisonTextOp, createCacheManager,
+    cacheStats, comparisonTextOp, createCacheManager, createHistoricalStatsDisplay,
     formatNumber, getActivityAuthorName, getActivitySubredditName, isStrongSubredditState,
     mergeArr,
     parseExternalUrl, parseGenericValueComparison,
@@ -22,9 +22,21 @@ import {
 import LoggedError from "../Utils/LoggedError";
 import {
     BotInstanceConfig,
-    CacheOptions, CommentState,
-    Footer, OperatorConfig, ResourceStats, StrongCache, SubmissionState,
-    CacheConfig, TTLConfig, TypedActivityStates, UserResultCache, ActionedEvent, SubredditState, StrongSubredditState
+    CacheOptions,
+    CommentState,
+    Footer,
+    OperatorConfig,
+    ResourceStats,
+    StrongCache,
+    SubmissionState,
+    CacheConfig,
+    TTLConfig,
+    TypedActivityStates,
+    UserResultCache,
+    ActionedEvent,
+    SubredditState,
+    StrongSubredditState,
+    HistoricalStats, HistoricalStatUpdateData, SubredditHistoricalStats, SubredditHistoricalStatsDisplay
 } from "../Common/interfaces";
 import UserNotes from "./UserNotes";
 import Mustache from "mustache";
@@ -33,7 +45,7 @@ import {AuthorCriteria} from "../Author/Author";
 import {SPoll} from "./Streams";
 import {Cache} from 'cache-manager';
 import {Submission, Comment} from "snoowrap/dist/objects";
-import {cacheTTLDefaults} from "../Common/defaults";
+import {cacheTTLDefaults, historicalDefaults} from "../Common/defaults";
 import {check} from "tcp-port-used";
 
 export const DEFAULT_FOOTER = '\r\n*****\r\nThis action was performed by [a bot.]({{botLink}}) Mention a moderator or [send a modmail]({{modmailLink}}) if you any ideas, questions, or concerns about this action.';
@@ -79,10 +91,14 @@ export class SubredditResources {
     cacheType: string
     cacheSettingsHash?: string;
     pruneInterval?: any;
+    historicalSaveInterval?: any;
     prefix?: string
     actionedEventsMax: number;
 
-    stats: { cache: ResourceStats };
+    stats: {
+        cache: ResourceStats
+        historical: SubredditHistoricalStats
+    };
 
     constructor(name: string, options: SubredditResourceOptions) {
         const {
@@ -127,7 +143,11 @@ export class SubredditResources {
         }
 
         this.stats = {
-            cache: cacheStats()
+            cache: cacheStats(),
+            historical: {
+                allTime: {...historicalDefaults},
+                lastReload: {...historicalDefaults}
+            }
         };
 
         const cacheUseCB = (miss: boolean) => {
@@ -149,6 +169,90 @@ export class SubredditResources {
                 },min * 1000 * 2)
             }
         }
+    }
+
+    async initHistoricalStats() {
+         const at = await this.cache.wrap(`${this.name}-historical-allTime`, () => historicalDefaults, {ttl: 0}) as object;
+         const rehydratedAt: any = {};
+         for(const [k, v] of Object.entries(at)) {
+            if(Array.isArray(v)) {
+                rehydratedAt[k] = new Map(v);
+            } else {
+                rehydratedAt[k] = v;
+            }
+         }
+         this.stats.historical.allTime = rehydratedAt as HistoricalStats;
+
+        // const lr = await this.cache.wrap(`${this.name}-historical-lastReload`, () => historicalDefaults, {ttl: 0}) as object;
+        // const rehydratedLr: any = {};
+        // for(const [k, v] of Object.entries(lr)) {
+        //     if(Array.isArray(v)) {
+        //         rehydratedLr[k] = new Map(v);
+        //     } else {
+        //         rehydratedLr[k] = v;
+        //     }
+        // }
+        // this.stats.historical.lastReload = rehydratedLr;
+    }
+
+    updateHistoricalStats(data: HistoricalStatUpdateData) {
+        for(const [k, v] of Object.entries(data)) {
+            if(this.stats.historical.lastReload[k] !== undefined) {
+                if(typeof v === 'number') {
+                    this.stats.historical.lastReload[k] += v;
+                } else if(this.stats.historical.lastReload[k] instanceof Map) {
+                    const keys = Array.isArray(v) ? v : [v];
+                    for(const key of keys) {
+                        this.stats.historical.lastReload[k].set(key, (this.stats.historical.lastReload[k].get(key) || 0) + 1);
+                    }
+                }
+            }
+            if(this.stats.historical.allTime[k] !== undefined) {
+                if(typeof v === 'number') {
+                    this.stats.historical.allTime[k] += v;
+                } else if(this.stats.historical.allTime[k] instanceof Map) {
+                    const keys = Array.isArray(v) ? v : [v];
+                    for(const key of keys) {
+                        this.stats.historical.allTime[k].set(key, (this.stats.historical.allTime[k].get(key) || 0) + 1);
+                    }
+                }
+            }
+        }
+    }
+
+    getHistoricalDisplayStats(): SubredditHistoricalStatsDisplay {
+        return {
+            allTime: createHistoricalStatsDisplay(this.stats.historical.allTime),
+            lastReload: createHistoricalStatsDisplay(this.stats.historical.lastReload)
+        }
+    }
+
+    async saveHistoricalStats() {
+        const atSerializable: any = {};
+        for(const [k, v] of Object.entries(this.stats.historical.allTime)) {
+            if(v instanceof Map) {
+                atSerializable[k] = Array.from(v.entries());
+            } else {
+                atSerializable[k] = v;
+            }
+        }
+        await this.cache.set(`${this.name}-historical-allTime`, atSerializable, {ttl: 0});
+
+        // const lrSerializable: any = {};
+        // for(const [k, v] of Object.entries(this.stats.historical.lastReload)) {
+        //     if(v instanceof Map) {
+        //         lrSerializable[k] = Array.from(v.entries());
+        //     } else {
+        //         lrSerializable[k] = v;
+        //     }
+        // }
+        // await this.cache.set(`${this.name}-historical-lastReload`, lrSerializable, {ttl: 0});
+    }
+
+    setHistoricalSaveInterval() {
+        this.historicalSaveInterval = setInterval(async () => {
+            await this.saveHistoricalStats();
+        },10000)
     }
 
     async getCacheKeyCount() {
@@ -791,7 +895,7 @@ export class BotResourcesManager {
         return undefined;
     }
 
-    set(subName: string, initOptions: SubredditResourceConfig): SubredditResources {
+    async set(subName: string, initOptions: SubredditResourceConfig): Promise<SubredditResources> {
         let hash = 'default';
         const { caching, ...init } = initOptions;
 
@@ -841,6 +945,8 @@ export class BotResourcesManager {
                 res.cache.reset();
             }
             resource = new SubredditResources(subName, opts);
+            await resource.initHistoricalStats();
+            resource.setHistoricalSaveInterval();
             this.resources.set(subName, resource);
         } else {
             // just set non-cache related settings
@@ -851,6 +957,7 @@ export class BotResourcesManager {
             // reset cache stats when configuration is reloaded
             resource.stats.cache = cacheStats();
         }
+        resource.stats.historical.lastReload = historicalDefaults;
 
         return resource;
     }

@@ -13,7 +13,7 @@ import sizeOf from 'image-size';
 import {
     ActivityWindowCriteria, CacheOptions, CacheProvider,
     DurationComparison,
-    GenericComparison, ImageData, ImageDetection, LogInfo, NamedGroup,
+    GenericComparison, HistoricalStats, HistoricalStatsDisplay, ImageData, ImageDetection, LogInfo, NamedGroup,
     PollingOptionsStrong, RedditEntity, RedditEntityType, RegExResult, ResembleResult, ResourceStats, StatusCodeError,
     StringOperator, StrongSubredditState, SubredditState
 } from "./Common/interfaces";
@@ -1220,4 +1220,18 @@ export const compareImages = async (data1: ImageData, data2: ImageData, threshol
 
     const sameImage = threshold === undefined ? undefined : results.rawMisMatchPercentage < threshold;
     return [results, sameImage];
+}
+
+export const createHistoricalStatsDisplay = (data: HistoricalStats): HistoricalStatsDisplay => {
+    const display: any = {};
+    for(const [k, v] of Object.entries(data)) {
+        if(v instanceof Map) {
+            display[k] = v;
+            display[`${k}Total`] = Array.from(v.values()).reduce((acc, curr) => acc + curr, 0);
+        } else {
+            display[k] = v;
+        }
+    }
+
+    return display as HistoricalStatsDisplay;
 }
