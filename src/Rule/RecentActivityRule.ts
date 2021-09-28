@@ -1,21 +1,32 @@
 import {Rule, RuleJSONConfig, RuleOptions, RulePremise, RuleResult} from "./index";
 import {Comment, VoteableContent} from "snoowrap";
 import Submission from "snoowrap/dist/objects/Submission";
+// @ts-ignore
+import subImageMatch from 'matches-subimage';
 import {
-    activityWindowText, asSubmission,
-    comparisonTextOp, FAIL, formatNumber, getActivitySubredditName, isSubmission, objectToStringSummary,
-    parseGenericValueOrPercentComparison, parseStringToRegex, parseSubredditName,
+    activityWindowText,
+    asSubmission, compareImages,
+    comparisonTextOp,
+    FAIL,
+    formatNumber,
+    getActivitySubredditName, getImageDataFromUrl,
+    isSubmission,
+    isValidImageURL,
+    objectToStringSummary,
+    parseGenericValueOrPercentComparison,
+    parseStringToRegex,
+    parseSubredditName,
     parseUsableLinkIdentifier,
-    PASS, toStrongSubredditState
+    PASS,
+    toStrongSubredditState
 } from "../util";
 import {
     ActivityWindow,
     ActivityWindowCriteria,
-    ActivityWindowType, CommentState,
+    ActivityWindowType, CommentState, ImageDetection,
     ReferenceSubmission, StrongSubredditState, SubmissionState,
     SubredditCriteria, SubredditState
 } from "../Common/interfaces";
-import {SubredditResources} from "../Subreddit/SubredditResources";
 
 const parseLink = parseUsableLinkIdentifier();
 
@@ -23,6 +34,7 @@ export class RecentActivityRule extends Rule {
     window: ActivityWindowType;
     thresholds: ActivityThreshold[];
     useSubmissionAsReference: boolean;
+    imageDetection: Required<ImageDetection>
     lookAt?: 'comments' | 'submissions';
 
     constructor(options: RecentActivityRuleOptions) {
@@ -30,8 +42,21 @@ export class RecentActivityRule extends Rule {
         const {
             window = 15,
             useSubmissionAsReference = true,
+            imageDetection,
             lookAt,
         } = options || {};
+
+        const {
+            enable = false,
+            fetchBehavior = 'extension',
+            threshold = 5
+        } = imageDetection || {};
+
+        this.imageDetection = {
+            enable,
+            fetchBehavior,
+            threshold
+        };
         this.lookAt = lookAt;
         this.useSubmissionAsReference = useSubmissionAsReference;
         this.window = window;
@@ -73,16 +98,56 @@ export class RecentActivityRule extends Rule {
             } else if (item.is_self) {
                 this.logger.warn('Cannot use post as reference because triggered Submission is not a link type');
             } else {
-                const usableUrl = parseLink(await item.url);
-                viableActivity = viableActivity.filter((x) => {
-                    if (!asSubmission(x)) {
-                        return false;
+                const itemId = item.id;
+                const referenceUrl = await item.url;
+                const usableUrl = parseLink(referenceUrl);
+                const filteredActivity = [];
+                let referenceImage;
+                if(this.imageDetection.enable) {
+                    const [response, imgData, reason] = await getImageDataFromUrl(referenceUrl);
+                    if(reason !== undefined) {
+                        this.logger.verbose(reason);
+                    } else {
+                        referenceImage = imgData
+                    }
+                }
+                let longRun;
+                if(referenceImage !== undefined) {
+                    const l = this.logger;
+                    longRun = setTimeout(() => {
+                        l.verbose('FYI: Image processing is causing rule to take longer than normal');
+                    }, 2500);
+                }
+                for(const x of viableActivity) {
+                    if (!asSubmission(x) || x.id === itemId) {
+                        continue;
                     }
                     if (x.url === undefined) {
-                        return false;
+                        continue;
                     }
-                    return parseLink(x.url) === usableUrl;
-                });
+                    if(parseLink(x.url) === usableUrl) {
+                        filteredActivity.push(x);
+                    }
+                    // only do image detection if regular URL comparison and other conditions fail first
+                    // to reduce CPU/bandwidth usage
+                    if(referenceImage !== undefined) {
+                        const [response, imgData, reason] = await getImageDataFromUrl(x.url);
+                        if(imgData !== undefined) {
+                            try {
+                                const [compareResult, sameImage] = await compareImages(referenceImage, imgData, this.imageDetection.threshold);
+                                if(sameImage) {
+                                    filteredActivity.push(x);
+                                }
+                            } catch (err) {
+                                this.logger.warn(`Unexpected error encountered while comparing images, will skip comparison: ${err.message}`);
+                            }
+                        }
+                    }
+                }
+                if(longRun !== undefined) {
+                    clearTimeout(longRun);
+                }
+                viableActivity = filteredActivity;
             }
         }
 
@@ -288,6 +353,8 @@ interface RecentActivityConfig extends ActivityWindow, ReferenceSubmission {
      * @minItems 1
      * */
     thresholds: ActivityThreshold[],
+
+    imageDetection?: ImageDetection
 }
 
 export interface RecentActivityRuleOptions extends RecentActivityConfig, RuleOptions {

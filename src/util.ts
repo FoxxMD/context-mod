@@ -9,11 +9,12 @@ import {InvalidOptionArgumentError} from "commander";
 import Submission from "snoowrap/dist/objects/Submission";
 import {Comment} from "snoowrap";
 import {inflateSync, deflateSync} from "zlib";
+import sizeOf from 'image-size';
 import {
     ActivityWindowCriteria, CacheOptions, CacheProvider,
     DurationComparison,
-    GenericComparison, LogInfo, NamedGroup,
-    PollingOptionsStrong, RedditEntity, RedditEntityType, RegExResult, ResourceStats, StatusCodeError,
+    GenericComparison, HistoricalStats, HistoricalStatsDisplay, ImageData, ImageDetection, LogInfo, NamedGroup,
+    PollingOptionsStrong, RedditEntity, RedditEntityType, RegExResult, ResembleResult, ResourceStats, StatusCodeError,
     StringOperator, StrongSubredditState, SubredditState
 } from "./Common/interfaces";
 import JSON5 from "json5";
@@ -30,6 +31,7 @@ import {create as createMemoryStore} from './Utils/memoryStore';
 import {MESSAGE} from "triple-beam";
 import {RedditUser} from "snoowrap/dist/objects";
 import reRegExp from '@stdlib/regexp-regexp';
+import fetch, {Response} from "node-fetch";
 
 const ReReg = reRegExp();
 
@@ -841,8 +843,8 @@ export const boolToString = (val: boolean): string => {
     return val ? 'Yes' : 'No';
 }
 
-export const isRedditMedia = (act: Submission): boolean => {
-    return act.is_reddit_media_domain || act.is_video || ['v.redd.it','i.redd.it'].includes(act.domain);
+export const isRedditMedia = (act: Comment | Submission): boolean => {
+    return asSubmission(act) && (act.is_reddit_media_domain || act.is_video || ['v.redd.it','i.redd.it'].includes(act.domain));
 }
 
 export const isExternalUrlSubmission = (act: Comment | Submission): boolean => {
@@ -1157,4 +1159,79 @@ export const parseRuleResultsToMarkdownSummary = (ruleResults: RuleResult[]): st
         return `* ${name} - ${t} - ${result || '-'}`;
     });
     return results.join('\r\n');
+}
+
+export const isValidImageURL = (str: string): boolean => {
+    return !!str.match(/\w+\.(jpg|jpeg|gif|png|tiff|bmp)$/gi);
+}
+
+export const getImageDataFromUrl = async (url: string, aggressive = false): Promise<[Response?, ImageData?, string?]> => {
+    if (!aggressive && !isValidImageURL(url)) {
+        return [undefined, undefined, 'URL did not end with a valid image extension'];
+    }
+    try {
+        const response = await fetch(url);
+        if (response.ok) {
+            const ct = response.headers.get('Content-Type');
+            if (ct !== null && ct.includes('image')) {
+                let buffer = await response.buffer();
+                const dimensions = sizeOf(buffer);
+                return [response, {
+                    data: buffer,
+                    width: dimensions.width as number - 5,
+                    height: dimensions.height as number - 5,
+                    pixels: (dimensions.height as number - 5) * (dimensions.width as number - 5)
+                }];
+            }
+            return [response, undefined, 'Content-Type for fetched URL did not contain "image"'];
+        }
+        return [response, undefined, `URL response was not OK: (${response.status})${response.statusText}`];
+    } catch (err) {
+        return [undefined, undefined, `Error occurred while fetching response from URL: ${err.message}`];
+    }
+}
+
+let resembleCIFunc: Function;
+
+const getCIFunc = async () => {
+    if (resembleCIFunc === undefined) {
+        // @ts-ignore
+        const resembleModule = await import('resemblejs/compareImages');
+        if (resembleModule === undefined) {
+            throw new Error('Could not import resemblejs');
+        }
+        resembleCIFunc = resembleModule.default;
+    }
+    return resembleCIFunc;
+}
+
+export const compareImages = async (data1: ImageData, data2: ImageData, threshold?: number): Promise<[ResembleResult, boolean?]> => {
+    let ci: Function;
+
+    try {
+        ci = await getCIFunc();
+    } catch (err) {
+        err.message = `Unable to do image comparison due to an issue importing the comparison library. It is likely 'node-canvas' is not installed (see ContextMod docs). Error Message: ${err.message}`;
+        throw err;
+    }
+    const results = await ci(data1.data, data2.data, {
+        returnEarlyThreshold: threshold !== undefined ? Math.min(threshold + 5, 100) : undefined,
+    }) as ResembleResult;
+
+    const sameImage = threshold === undefined ? undefined : results.rawMisMatchPercentage < threshold;
+    return [results, sameImage];
+}
+
+export const createHistoricalStatsDisplay = (data: HistoricalStats): HistoricalStatsDisplay => {
+    const display: any = {};
+    for(const [k, v] of Object.entries(data)) {
+        if(v instanceof Map) {
+            display[k] = v;
+            display[`${k}Total`] = Array.from(v.values()).reduce((acc, curr) => acc + curr, 0);
+        } else {
+            display[k] = v;
+        }
+    }
+
+    return display as HistoricalStatsDisplay;
 }

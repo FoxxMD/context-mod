@@ -333,64 +333,63 @@
                                                 <% } %>
                                                 <% if (data.name !== 'All') { %>
                                                     <div data-subreddit="<%= data.name %>"
-                                                         class="stats botStats reloadStats">
+                                                         class="stats botStats reloadStats mb-2">
                                                         <label>Events</label>
                                                         <span>
-                                                            <%= data.stats.eventsCheckedSinceStartTotal === undefined ? '-' : data.stats.eventsCheckedSinceStartTotal %>
+                                                            <%= data.stats.historical.lastReload.eventsCheckedTotal === undefined ? '-' : data.stats.historical.lastReload.eventsCheckedTotal %>
                                                         </span>
                                                         <label>Checks</label>
                                                         <span class="has-tooltip">
                                                         <span class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2'>
-                                                            <span><%= data.stats.checksTriggeredSinceStartTotal %></span> Triggered / <span><%= data.stats.checksRunSinceStartTotal %></span> Run
+                                                            <span><%= data.stats.historical.lastReload.checksTriggeredTotal %></span> Triggered / <span><%= data.stats.historical.lastReload.checksRunTotal %></span> Run / <span><%= data.stats.historical.lastReload.checksFromCacheTotal %></span> Cached
                                                         </span>
-                                                        <% if (data.name !== 'All') { %>
-                                                            <a target="_blank" href="/events?instance=<%= instanceId %>&bot=<%= bot.system.name %>&subreddit=<%= data.name %>" class="underline" style="text-decoration-style: dotted"><%= data.stats.checksTriggeredSinceStartTotal %> T</a>
-                                                        <% } else { %>
-                                                                <%= data.stats.checksTriggeredSinceStartTotal %> T
-                                                        <% } %>/ <span><%= data.stats.checksRunSinceStartTotal %></span> R
+                                                        <span class="cursor-help underline" style="text-decoration-style: dotted"><%= data.stats.historical.lastReload.checksTriggeredTotal %> Triggered</span>
                                                     </span>
 
                                                         <label>Rules</label>
                                                         <span class="has-tooltip">
                                                     <span class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2'>
-                                                        <span><%= data.stats.rulesTriggeredSinceStartTotal %></span> Triggered / <span><%= data.stats.rulesCachedSinceStartTotal %></span> Cached / <span><%= data.stats.rulesRunSinceStartTotal %></span> Run
+                                                        <span><%= data.stats.historical.lastReload.rulesTriggeredTotal %></span> Triggered / <span><%= data.stats.historical.lastReload.rulesCachedTotal %></span> Cached / <span><%= data.stats.historical.lastReload.rulesRunTotal %></span> Run
                                                     </span>
-                                                    <span class="cursor-help">
-                                                        <span><%= data.stats.rulesTriggeredSinceStartTotal %></span> T / <span><%= data.stats.rulesCachedSinceStartTotal %></span> C / <span><%= data.stats.rulesRunSinceStartTotal %></span> R</span>
+                                                    <span class="cursor-help cursor-help underline" style="text-decoration-style: dotted">
+                                                        <span><%= data.stats.historical.lastReload.rulesTriggeredTotal %></span> Triggered</span>
                                                 </span>
 
                                                         <label>Actions</label>
-                                                        <span class="cursor-help"><%= data.stats.actionsRunSinceStartTotal === undefined ? '-' : data.stats.actionsRunSinceStartTotal %></span>
+                                                        <span><%= data.stats.historical.lastReload.actionsRunTotal === undefined ? '0' : data.stats.historical.lastReload.actionsRunTotal %> Run</span>
                                                     </div>
                                                 <% } %>
-                                                <div data-subreddit="<%= data.name %>" class="stats botStats allStats">
+                                                <div data-subreddit="<%= data.name %>" class="stats botStats allStats mb-2">
                                                     <label>Events</label>
                                                     <span>
-                                                        <%= data.stats.eventsCheckedTotal %>
+                                                        <%= data.stats.historical.allTime.eventsCheckedTotal %>
                                                     </span>
                                                     <label>Checks</label>
                                                     <span class="has-tooltip">
                                                         <span class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2'>
-                                                            <span><%= data.stats.checksTriggeredTotal %></span> Triggered / <span><%= data.stats.checksRunTotal %></span> Run
+                                                            <span><%= data.stats.historical.allTime.checksTriggeredTotal %></span> Triggered / <span><%= data.stats.historical.allTime.checksRunTotal %></span> Run / <span><%= data.stats.historical.allTime.checksFromCacheTotal %></span> Cached
                                                         </span>
-                                                        <span><%= data.stats.checksTriggeredTotal %> T / <span><%= data.stats.checksRunTotal %></span> R</span>
+                                                        <span class="cursor-help underline" style="text-decoration-style: dotted"><%= data.stats.historical.allTime.checksTriggeredTotal %> Triggered</span>
                                                     </span>
 
                                                     <label>Rules</label>
                                                     <span class="has-tooltip">
                                                         <span class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2'>
-                                                            <span><%= data.stats.rulesTriggeredTotal %></span> Triggered / <span><%= data.stats.rulesCachedTotal %></span> Cached / <span><%= data.stats.rulesRunTotal %></span> Run
+                                                            <span><%= data.stats.historical.allTime.rulesTriggeredTotal %></span> Triggered / <span><%= data.stats.historical.allTime.rulesCachedTotal %></span> Cached / <span><%= data.stats.historical.allTime.rulesRunTotal %></span> Run
                                                         </span>
-                                                        <span class="cursor-help"><span><%= data.stats.rulesTriggeredTotal %></span> T / <span><%= data.stats.rulesCachedTotal %></span> C / <span><%= data.stats.rulesRunTotal %></span> R</span>
+                                                        <span class="cursor-help underline" style="text-decoration-style: dotted"><span><%= data.stats.historical.allTime.rulesTriggeredTotal %></span> Triggered</span>
                                                     </span>
 
                                                     <label>Actions</label>
-                                                    <% if (data.name !== 'All') { %>
-                                                        <a target="_blank" href="/events?instance=<%= instanceId %>&bot=<%= bot.system.name %>&subreddit=<%= data.name %>" class="underline" style="text-decoration-style: dotted"><%= data.stats.actionsRunTotal %> Run</a>
-                                                    <% } else { %>
-                                                        <a target="_blank" href="/events?instance=<%= instanceId %>&bot=<%= bot.system.name %>" class="underline" style="text-decoration-style: dotted"><%= data.stats.actionsRunTotal %> Run</a>
-                                                    <% } %>
+                                                    <span>
+                                                        <span><%= data.stats.historical.allTime.actionsRunTotal === undefined ? '0' : data.stats.historical.allTime.actionsRunTotal %> Run</span>
+                                                    </span>
                                                 </div>
+                                                <% if (data.name !== 'All') { %>
+                                                    <a target="_blank" href="/events?instance=<%= instanceId %>&bot=<%= bot.system.name %>&subreddit=<%= data.name %>" style="text-decoration-style: dotted">Actioned Events</a>
+                                                <% } else { %>
+                                                    <a target="_blank" href="/events?instance=<%= instanceId %>&bot=<%= bot.system.name %>">Actioned Events</a>
+                                                <% } %>
                                             </div>
                                             <div>
                                                 <div class="text-left pb-2">

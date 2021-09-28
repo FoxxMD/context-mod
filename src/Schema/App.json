@@ -233,7 +233,7 @@
             "properties": {
                 "aggregateOn": {
                     "default": "undefined",
-                    "description": "This list determines which categories of domains should be aggregated on. All aggregated domains will be tested against `threshold`\n\n* If `media` is included then aggregate author's submission history which reddit recognizes as media (youtube, vimeo, etc.)\n* If `redditMedia` is included then aggregate on author's submissions history which are media hosted on reddit: galleries, videos, and images (i.redd.it / v.redd.it)\n* If `self` is included then aggregate on author's submission history which are self-post (`self.[subreddit]`) or domain is `reddit.com`\n* If `link` is included then aggregate author's submission history which is external links and not recognized as `media` by reddit\n\nIf nothing is specified or list is empty (default) all domains are aggregated",
+                    "description": "This list determines which categories of domains should be aggregated on. All aggregated domains will be tested against `threshold`\n\n* If `media` is included then aggregate author's submission history which reddit recognizes as media (youtube, vimeo, etc.)\n* If `redditMedia` is included then aggregate on author's submissions history which are media hosted on reddit: galleries, videos, and images (i.redd.it / v.redd.it)\n* If `self` is included then aggregate on author's submission history which are self-post (`self.[subreddit]`) or domain is `reddit.com`\n* If `link` is included then aggregate author's submission history which is external links and not recognized as `media` by reddit\n\nIf nothing is specified or list is empty (default) rule will only aggregate on `link` and `media` (ignores reddit-hosted content and self-posts)",
                     "examples": [
                         [
                         ]
@@ -419,11 +419,6 @@
                     ],
                     "pattern": "^[a-zA-Z]([\\w -]*[\\w])?$",
                     "type": "string"
-                },
-                "useSubmissionAsReference": {
-                    "default": true,
-                    "description": "If activity is a Submission and is a link (not self-post) then only look at Submissions that contain this link, otherwise consider all activities.",
-                    "type": "boolean"
                 }
             },
             "required": [
@@ -1609,6 +1604,31 @@
             ],
             "type": "object"
         },
+        "ImageDetection": {
+            "description": "When comparing submissions detect if the reference submission is an image and do a pixel-comparison to other detected image submissions.\n\n**Note:** This is an **experimental feature**",
+            "properties": {
+                "enable": {
+                    "description": "Is image detection enabled?",
+                    "type": "boolean"
+                },
+                "fetchBehavior": {
+                    "default": "extension",
+                    "description": "Determines how and when to check if a URL is an image\n\n**Note:** After fetching a URL the **Content-Type** is validated to contain `image` before detection occurs\n\n**When `extension`:** (default)\n\n* Only URLs that end in known image extensions (.png, .jpg, etc...) are fetched\n\n**When `unknown`:**\n\n* URLs that end in known image extensions (.png, .jpg, etc...) are fetched\n* URLs with no extension or unknown (IE non-video, non-doc, etc...) are fetched\n\n**When `all`:**\n\n* All submissions that have URLs (non-self) will be fetched, regardless of extension\n* **Note:** This can be bandwidth/CPU intensive if history window is large so use with care",
+                    "enum": [
+                        "all",
+                        "extension",
+                        "unknown"
+                    ],
+                    "type": "string"
+                },
+                "threshold": {
+                    "default": 5,
+                    "description": "The percentage, as a whole number, of pixels that are **different** between the two images at which point the images are not considered the same.\n\nDefault is `5`",
+                    "type": "number"
+                }
+            },
+            "type": "object"
+        },
         "LockActionJson": {
             "description": "Lock the Activity",
             "properties": {
@@ -1933,6 +1953,10 @@
                             ]
                         }
                     ]
+                },
+                "imageDetection": {
+                    "$ref": "#/definitions/ImageDetection",
+                    "description": "When comparing submissions detect if the reference submission is an image and do a pixel-comparison to other detected image submissions.\n\n**Note:** This is an **experimental feature**"
                 },
                 "itemIs": {
                     "anyOf": [

@@ -5,6 +5,7 @@ import Poll from "snoostorm/out/util/Poll";
 import Snoowrap from "snoowrap";
 import {RuleResult} from "../Rule";
 import {IncomingMessage} from "http";
+import {ResembleSingleCallbackComparisonResult} from "resemblejs";
 
 /**
  * An ISO 8601 Duration
@@ -222,6 +223,59 @@ export interface ReferenceSubmission {
      * @default true
      * */
     useSubmissionAsReference?: boolean,
+}
+
+/**
+ * When comparing submissions detect if the reference submission is an image and do a pixel-comparison to other detected image submissions.
+ *
+ * **Note:** This is an **experimental feature**
+ * */
+export interface ImageDetection {
+    /**
+     * Is image detection enabled?
+     * */
+    enable?: boolean
+    /**
+     * Determines how and when to check if a URL is an image
+     *
+     * **Note:** After fetching a URL the **Content-Type** is validated to contain `image` before detection occurs
+     *
+     * **When `extension`:** (default)
+     *
+     * * Only URLs that end in known image extensions (.png, .jpg, etc...) are fetched
+     *
+     * **When `unknown`:**
+     *
+     * * URLs that end in known image extensions (.png, .jpg, etc...) are fetched
+     * * URLs with no extension or unknown (IE non-video, non-doc, etc...) are fetched
+     *
+     * **When `all`:**
+     *
+     * * All submissions that have URLs (non-self) will be fetched, regardless of extension
+     * * **Note:** This can be bandwidth/CPU intensive if history window is large so use with care
+     *
+     * @default "extension"
+     * */
+    fetchBehavior?: 'extension' | 'unknown' | 'all',
+    /**
+     * The percentage, as a whole number, of pixels that are **different** between the two images at which point the images are not considered the same.
+     *
+     * Default is `5`
+     *
+     * @default 5
+     * */
+    threshold?: number
+}
+
+export interface ImageData {
+    data: Buffer,
+    width: number,
+    height: number
+    pixels: number
+}
+
+export interface ResembleResult extends ResembleSingleCallbackComparisonResult {
+    rawMisMatchPercentage: number
 }
 
 export interface RichContent {
@@ -1555,4 +1609,84 @@ export interface StatusCodeError extends Error {
     message: string,
     response: IncomingMessage,
     error: Error
+}
+
+export interface HistoricalStatsDisplay extends HistoricalStats {
+    checksRunTotal: number
+    checksFromCacheTotal: number
+    checksTriggeredTotal: number
+    rulesRunTotal: number
+    rulesCachedTotal: number
+    rulesTriggeredTotal: number
+    actionsRunTotal: number
+}
+
+export interface HistoricalStats {
+    eventsCheckedTotal: number
+    eventsActionedTotal: number
+    checksRun: Map<string, number>
+    checksFromCache: Map<string, number>
+    checksTriggered: Map<string, number>
+    rulesRun: Map<string, number>
+    //rulesCached: Map<string, number>
+    rulesCachedTotal: number
+    rulesTriggered: Map<string, number>
+    actionsRun: Map<string, number>
+    [index: string]: any
+}
+
+export interface SubredditHistoricalStats {
+    allTime: HistoricalStats
+    lastReload: HistoricalStats
+}
+
+export interface SubredditHistoricalStatsDisplay {
+    allTime: HistoricalStatsDisplay
+    lastReload: HistoricalStatsDisplay
+}
+
+export interface ManagerStats {
+    // eventsCheckedTotal: number
+    // eventsCheckedSinceStartTotal: number
+    eventsAvg: number
+    // checksRunTotal: number
+    // checksRunSinceStartTotal: number
+    // checksTriggered: number
+    // checksTriggeredTotal: number
+    // checksTriggeredSinceStart: number
+    // checksTriggeredSinceStartTotal: number
+    // rulesRunTotal: number
+    // rulesRunSinceStartTotal: number
+    // rulesCachedTotal: number
+    // rulesCachedSinceStartTotal: number
+    // rulesTriggeredTotal: number
+    // rulesTriggeredSinceStartTotal: number
+    rulesAvg: number
+    // actionsRun: number
+    // actionsRunTotal: number
+    // actionsRunSinceStart: number,
+    // actionsRunSinceStartTotal: number
+    historical: SubredditHistoricalStatsDisplay
+    cache: {
+        provider: string,
+        currentKeyCount: number,
+        isShared: boolean,
+        totalRequests: number,
+        totalMiss: number,
+        missPercent: string,
+        requestRate: number,
+        types: ResourceStats
+    },
+}
+
+export interface HistoricalStatUpdateData {
+    eventsCheckedTotal?: number
+    eventsActionedTotal?: number
+    checksRun: string[] | string
+    checksTriggered: string[] | string
+    checksFromCache: string[] | string
+    actionsRun: string[] | string
+    rulesRun: string[] | string
+    rulesCachedTotal: number
+    rulesTriggered: string[] | string
 }

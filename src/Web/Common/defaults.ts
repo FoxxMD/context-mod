@@ -1,13 +1,10 @@
 import {BotStats, BotStatusResponse, SubredditDataResponse} from "./interfaces";
-import {ManagerStats, RunningState} from "../../Subreddit/Manager";
-import {Invokee, RunState} from "../../Common/interfaces";
-import {cacheStats} from "../../util";
+import {RunningState} from "../../Subreddit/Manager";
+import {Invokee, ManagerStats, RunState} from "../../Common/interfaces";
+import {cacheStats, createHistoricalStatsDisplay} from "../../util";
+import {createHistoricalDefaults, historicalDefaults} from "../../Common/defaults";
 
 const managerStats: ManagerStats = {
-    actionsRun: 0,
-    actionsRunSinceStart: 0,
-    actionsRunSinceStartTotal: 0,
-    actionsRunTotal: 0,
     cache: {
         currentKeyCount: 0,
         isShared: false,
@@ -18,22 +15,12 @@ const managerStats: ManagerStats = {
         totalRequests: 0,
         types: cacheStats()
     },
-    checksRunSinceStartTotal: 0,
-    checksRunTotal: 0,
-    checksTriggered: 0,
-    checksTriggeredSinceStart: 0,
-    checksTriggeredSinceStartTotal: 0,
-    checksTriggeredTotal: 0,
+    historical: {
+        lastReload: createHistoricalStatsDisplay(createHistoricalDefaults()),
+        allTime: createHistoricalStatsDisplay(createHistoricalDefaults()),
+    },
     eventsAvg: 0,
-    eventsCheckedSinceStartTotal: 0,
-    eventsCheckedTotal: 0,
     rulesAvg: 0,
-    rulesCachedSinceStartTotal: 0,
-    rulesCachedTotal: 0,
-    rulesRunSinceStartTotal: 0,
-    rulesRunTotal: 0,
-    rulesTriggeredSinceStartTotal: 0,
-    rulesTriggeredTotal: 0,
 };
 const botStats: BotStats = {
     apiAvg: '-',
