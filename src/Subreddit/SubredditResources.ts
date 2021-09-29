@@ -260,7 +260,8 @@ export class SubredditResources {
     async getCacheKeyCount() {
         if (this.cache.store.keys !== undefined) {
             if(this.cacheType === 'redis') {
-                return (await this.cache.store.keys(`${this.prefix}*`)).length;
+                const keys = await this.cache.store.keys(`${this.prefix}*`);
+                return keys.length;
             }
             return (await this.cache.store.keys()).length;
         }
@@ -382,19 +383,20 @@ export class SubredditResources {
     async getSubreddit(item: Submission | Comment) {
         try {
             let hash = '';
+            const subName = getActivitySubredditName(item);
             if (this.subredditTTL !== false) {
-                hash = `sub-${getActivitySubredditName(item)}`;
+                hash = `sub-${subName}`;
                 await this.stats.cache.subreddit.identifierRequestCount.set(hash, (await this.stats.cache.subreddit.identifierRequestCount.wrap(hash, () => 0) as number) + 1);
                 this.stats.cache.subreddit.requestTimestamps.push(Date.now());
                 this.stats.cache.subreddit.requests++;
                 const cachedSubreddit = await this.cache.get(hash);
                 if (cachedSubreddit !== undefined && cachedSubreddit !== null) {
-                    this.logger.debug(`Cache Hit: Subreddit ${item.subreddit.display_name}`);
+                    this.logger.debug(`Cache Hit: Subreddit ${subName}`);
                     // @ts-ignore
                     return cachedSubreddit as Subreddit;
                 }
                 // @ts-ignore
-                const subreddit = await this.client.getSubreddit(getActivitySubredditName(item)).fetch() as Subreddit;
+                const subreddit = await this.client.getSubreddit(subName).fetch() as Subreddit;
                 this.stats.cache.subreddit.miss++;
                 // @ts-ignore
                 await this.cache.set(hash, subreddit, {ttl: this.subredditTTL});
@@ -402,7 +404,7 @@ export class SubredditResources {
                 return subreddit as Subreddit;
             } else {
                 // @ts-ignore
-                let subreddit = await this.client.getSubreddit(getActivitySubredditName(item));
+                let subreddit = await this.client.getSubreddit(subName);
 
                 return subreddit as Subreddit;
             }
@@ -661,9 +663,20 @@ export class SubredditResources {
                                 return false;
                             }
                             break;
+                        case 'over18':
+                        case 'over_18':
+                            // handling an edge case where user may have confused Comment/Submission state "over_18" with SubredditState "over18"
+
+                            // @ts-ignore
+                            if (crit[k] !== subreddit.over18) {
+                                // @ts-ignore
+                                log.debug(`Failed: Expected => ${k}:${crit[k]} | Found => ${k}:${subreddit.over18}`)
+                                return false
+                            }
+                            break;
                         default:
                             // @ts-ignore
-                            if (crit[k] !== undefined) {
+                            if (subreddit[k] !== undefined) {
                                 // @ts-ignore
                                 if (crit[k] !== subreddit[k]) {
                                     // @ts-ignore
