@@ -17,7 +17,7 @@ import {
     formatNumber, getActivityAuthorName, getActivitySubredditName, isStrongSubredditState,
     mergeArr,
     parseExternalUrl, parseGenericValueComparison,
-    parseWikiContext, toStrongSubredditState
+    parseWikiContext, shouldCacheSubredditStateCriteriaResult, toStrongSubredditState
 } from "../util";
 import LoggedError from "../Utils/LoggedError";
 import {
@@ -549,7 +549,8 @@ export class SubredditResources {
             return await this.isSubreddit({display_name: subName} as Subreddit, state, this.logger);
         }
 
-        if (this.filterCriteriaTTL !== false) {
+        // see comments on shouldCacheSubredditStateCriteriaResult() for why this is needed
+        if (this.filterCriteriaTTL !== false && shouldCacheSubredditStateCriteriaResult(state)) {
             try {
                 const hash = `subredditCrit-${getActivitySubredditName(item)}-${objectHash.sha1(state)}`;
                 await this.stats.cache.subredditCrit.identifierRequestCount.set(hash, (await this.stats.cache.subredditCrit.identifierRequestCount.wrap(hash, () => 0) as number) + 1);
@@ -605,6 +606,10 @@ export class SubredditResources {
     }
 
     async testItemCriteria(i: (Comment | Submission), activityStates: TypedActivityStates) {
+        // return early if nothing is being checked for so we don't store an empty cache result for this (duh)
+        if(activityStates.length === 0) {
+            return true;
+        }
         if (this.filterCriteriaTTL !== false) {
             let item = i;
             let states = activityStates;

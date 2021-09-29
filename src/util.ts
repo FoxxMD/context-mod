@@ -1236,3 +1236,19 @@ export const createHistoricalStatsDisplay = (data: HistoricalStats): HistoricalS
 
     return display as HistoricalStatsDisplay;
 }
+
+/**
+ * Determine if the state criteria being checked are
+ * 1 ) expensive to compute or
+ * 2 ) require additional api requests
+ *
+ * If neither then do not cache results as the number of unique keys (sub-state) increases AT LEAST linearly taking up space (especially in memory cache)
+ * when they are probably not necessary to begin with
+ * */
+export const shouldCacheSubredditStateCriteriaResult = (state: SubredditState | StrongSubredditState): boolean => {
+    // currently there are no scenarios where we need to cache results
+    // since only things computed from state are comparisons for properties already cached on subreddit object
+    // and regexes for name which aren't that costly
+    // -- so just return false
+    return false;
+}
