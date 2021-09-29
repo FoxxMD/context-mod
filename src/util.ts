@@ -904,17 +904,18 @@ export interface StrongSubredditStateOptions {
 
 export const toStrongSubredditState = (s: SubredditState, opts?: StrongSubredditStateOptions): StrongSubredditState => {
     const {defaultFlags, generateDescription = false} = opts || {};
-    const {name: nameVal, stateDescription} = s;
+    const {name: nameValRaw, stateDescription} = s;
 
     let nameReg: RegExp | undefined;
-    if (nameVal !== undefined) {
-        if (!(nameVal instanceof RegExp)) {
+    if (nameValRaw !== undefined) {
+        if (!(nameValRaw instanceof RegExp)) {
+            const nameVal = nameValRaw.trim();
             nameReg = parseStringToRegex(nameVal, defaultFlags);
             if (nameReg === undefined) {
-                nameReg = new RegExp(parseSubredditName(nameVal), defaultFlags);
+                nameReg = parseStringToRegex(`/^${parseSubredditName(nameVal)}$/`, defaultFlags);
             }
         } else {
-            nameReg = nameVal;
+            nameReg = nameValRaw;
         }
     }
     const strongState = {
