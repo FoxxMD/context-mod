@@ -4,7 +4,7 @@ import {
     activityWindowText, asSubmission,
     comparisonTextOp, FAIL, getActivitySubredditName, isExternalUrlSubmission, isRedditMedia,
     parseGenericValueComparison, parseSubredditName,
-    parseUsableLinkIdentifier as linkParser, PASS, toStrongSubredditState
+    parseUsableLinkIdentifier as linkParser, PASS, subredditStateIsNameOnly, toStrongSubredditState
 } from "../util";
 import {
     ActivityWindow,
@@ -58,6 +58,7 @@ export class RepeatActivityRule extends Rule {
     lookAt: 'submissions' | 'all';
     include: (string | SubredditState)[];
     exclude: (string | SubredditState)[];
+    hasFullSubredditCrits: boolean = false;
     activityFilterFunc: (x: Submission|Comment) => Promise<boolean> = async (x) => true;
     keepRemoved: boolean;
     minWordCount: number;
@@ -91,6 +92,7 @@ export class RepeatActivityRule extends Rule {
                 }
                 return toStrongSubredditState(x, {defaultFlags: 'i', generateDescription: true});
             });
+            this.hasFullSubredditCrits = !subStates.every(x => subredditStateIsNameOnly(x));
             this.activityFilterFunc = async (x: Submission|Comment) => {
                 for(const ss of subStates) {
                     if(await this.resources.testSubredditCriteria(x, ss)) {
@@ -106,6 +108,7 @@ export class RepeatActivityRule extends Rule {
                 }
                 return toStrongSubredditState(x, {defaultFlags: 'i', generateDescription: true});
             });
+            this.hasFullSubredditCrits = !subStates.every(x => subredditStateIsNameOnly(x));
             this.activityFilterFunc = async (x: Submission|Comment) => {
                 for(const ss of subStates) {
                     if(await this.resources.testSubredditCriteria(x, ss)) {
@@ -147,6 +150,12 @@ export class RepeatActivityRule extends Rule {
             default:
                 activities = await this.resources.getAuthorActivities(item.author, {window: this.window, keepRemoved: this.keepRemoved});
                 break;
+        }
+
+        if(this.hasFullSubredditCrits) {
+            // go ahead and cache subreddits now
+            // because we can't use batch test since testing activities in order is important for this rule
+            await this.resources.cacheSubreddits(activities.map(x => x.subreddit));
         }
 
         const condensedActivities = await activities.reduce(async (accProm: Promise<RepeatActivityReducer>, activity: (Submission | Comment), index: number) => {

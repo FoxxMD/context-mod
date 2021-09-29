@@ -40,6 +40,7 @@ import {CheckStructuredJson} from "../Check";
 import NotificationManager from "../Notification/NotificationManager";
 import action from "../Web/Server/routes/authenticated/user/action";
 import {createHistoricalDefaults, historicalDefaults} from "../Common/defaults";
+import {ExtendedSnoowrap} from "../Utils/SnoowrapClients";
 
 export interface RunningState {
     state: RunState,
@@ -74,7 +75,7 @@ interface QueuedIdentifier {
 
 export class Manager {
     subreddit: Subreddit;
-    client: Snoowrap;
+    client: ExtendedSnoowrap;
     logger: Logger;
     botName: string;
     pollOptions: PollingOptionsStrong[] = [];
@@ -180,7 +181,7 @@ export class Manager {
         return this.displayLabel;
     }
 
-    constructor(sub: Subreddit, client: Snoowrap, logger: Logger, cacheManager: BotResourcesManager, opts: RuntimeManagerOptions = {botName: 'ContextMod', maxWorkers: 1}) {
+    constructor(sub: Subreddit, client: ExtendedSnoowrap, logger: Logger, cacheManager: BotResourcesManager, opts: RuntimeManagerOptions = {botName: 'ContextMod', maxWorkers: 1}) {
         const {dryRun, sharedModqueue = false, wikiLocation = 'botconfig/contextbot', botName, maxWorkers} = opts;
         this.displayLabel = opts.nickname || `${sub.display_name_prefixed}`;
         const getLabels = this.getCurrentLabels;

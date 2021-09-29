@@ -1,4 +1,4 @@
-import Snoowrap, {RedditUser, Subreddit} from "snoowrap";
+import Snoowrap, {RedditUser} from "snoowrap";
 import objectHash from 'object-hash';
 import {
     activityIsDeleted, activityIsFiltered,
@@ -9,6 +9,7 @@ import {
     testAuthorCriteria
 } from "../Utils/SnoowrapUtils";
 import winston, {Logger} from "winston";
+import as from 'async';
 import fetch from 'node-fetch';
 import {
     asSubmission,
@@ -17,7 +18,7 @@ import {
     formatNumber, getActivityAuthorName, getActivitySubredditName, isStrongSubredditState,
     mergeArr,
     parseExternalUrl, parseGenericValueComparison,
-    parseWikiContext, shouldCacheSubredditStateCriteriaResult, toStrongSubredditState
+    parseWikiContext, shouldCacheSubredditStateCriteriaResult, subredditStateIsNameOnly, toStrongSubredditState
 } from "../util";
 import LoggedError from "../Utils/LoggedError";
 import {
@@ -44,9 +45,10 @@ import he from "he";
 import {AuthorCriteria} from "../Author/Author";
 import {SPoll} from "./Streams";
 import {Cache} from 'cache-manager';
-import {Submission, Comment} from "snoowrap/dist/objects";
+import {Submission, Comment, Subreddit} from "snoowrap/dist/objects";
 import {cacheTTLDefaults, createHistoricalDefaults, historicalDefaults} from "../Common/defaults";
 import {check} from "tcp-port-used";
+import {ExtendedSnoowrap} from "../Utils/SnoowrapClients";
 
 export const DEFAULT_FOOTER = '\r\n*****\r\nThis action was performed by [a bot.]({{botLink}}) Mention a moderator or [send a modmail]({{modmailLink}}) if you any ideas, questions, or concerns about this action.';
 
@@ -54,7 +56,7 @@ export interface SubredditResourceConfig extends Footer {
     caching?: CacheConfig,
     subreddit: Subreddit,
     logger: Logger;
-    client: Snoowrap
+    client: ExtendedSnoowrap
 }
 
 interface SubredditResourceOptions extends Footer {
@@ -64,7 +66,7 @@ interface SubredditResourceOptions extends Footer {
     cacheSettingsHash: string
     subreddit: Subreddit,
     logger: Logger;
-    client: Snoowrap;
+    client: ExtendedSnoowrap;
     prefix?: string;
     actionedEventsMax: number;
 }
@@ -86,7 +88,7 @@ export class SubredditResources {
     userNotes: UserNotes;
     footer: false | string = DEFAULT_FOOTER;
     subreddit: Subreddit
-    client: Snoowrap
+    client: ExtendedSnoowrap
     cache: Cache
     cacheType: string
     cacheSettingsHash?: string;
@@ -414,6 +416,15 @@ export class SubredditResources {
         }
     }
 
+    async hasSubreddit(name: string) {
+        if (this.subredditTTL !== false) {
+            const hash = `sub-${name}`;
+            const val = await this.cache.get(hash);
+            return val !== undefined && val !== null;
+        }
+        return false;
+    }
+
     async getAuthorActivities(user: RedditUser, options: AuthorTypedActivitiesOptions): Promise<Array<Submission | Comment>> {
         const userName = getActivityAuthorName(user);
         if (this.authorTTL !== false) {
@@ -533,6 +544,67 @@ export class SubredditResources {
         }
 
         return wikiContent;
+    }
+
+    async cacheSubreddits(subs: (Subreddit | string)[]) {
+        const allSubs = subs.map(x => typeof x !== 'string' ? x.display_name : x);
+        const subNames = [...new Set(allSubs)];
+        const uncachedSubs = [];
+
+        for(const s of subNames) {
+            if(!(await this.hasSubreddit(s))) {
+                uncachedSubs.push(s);
+            }
+        }
+        if(uncachedSubs.length > 0) {
+            // cache all uncached subs batchly-like
+            const subResults = await this.client.getManySubreddits(uncachedSubs);
+            for(const s of subResults) {
+                // @ts-ignore
+                await this.cache.set(`sub-${s.display_name}`, s, {ttl: this.subredditTTL});
+            }
+        }
+    }
+
+    async batchTestSubredditCriteria(items: (Comment | Submission)[], states: (SubredditState | StrongSubredditState)[]): Promise<(Comment | Submission)[]> {
+        let passedItems: (Comment | Submission)[] = [];
+        let unpassedItems: (Comment | Submission)[] = [];
+
+        const {nameOnly =  [], full = []} = states.reduce((acc: {nameOnly: (SubredditState | StrongSubredditState)[], full: (SubredditState | StrongSubredditState)[]}, curr) => {
+            if(subredditStateIsNameOnly(curr)) {
+                return {...acc, nameOnly: acc.nameOnly.concat(curr)};
+            }
+            return {...acc, full: acc.full.concat(curr)};
+        }, {nameOnly: [], full: []});
+
+        if(nameOnly.length === 0) {
+            unpassedItems = items;
+        } else {
+            for(const item of items) {
+                const subName = getActivitySubredditName(item);
+                for(const state of nameOnly) {
+                    if(await this.isSubreddit({display_name: subName} as Subreddit, state, this.logger)) {
+                        passedItems.push(item);
+                        break;
+                    }
+                }
+                unpassedItems.push(item);
+            }
+        }
+
+        if(unpassedItems.length > 0 && full.length > 0) {
+            await this.cacheSubreddits(unpassedItems.map(x => x.subreddit));
+            for(const item of unpassedItems) {
+                for(const state of full) {
+                    if(await this.isSubreddit(await this.getSubreddit(item), state, this.logger)) {
+                        passedItems.push(item);
+                        break;
+                    }
+                }
+            }
+        }
+
+        return passedItems;
     }
 
     async testSubredditCriteria(item: (Comment | Submission), state: SubredditState | StrongSubredditState) {

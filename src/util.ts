@@ -909,10 +909,17 @@ export const toStrongSubredditState = (s: SubredditState, opts?: StrongSubreddit
     let nameReg: RegExp | undefined;
     if (nameValRaw !== undefined) {
         if (!(nameValRaw instanceof RegExp)) {
-            const nameVal = nameValRaw.trim();
+            let nameVal = nameValRaw.trim();
             nameReg = parseStringToRegex(nameVal, defaultFlags);
             if (nameReg === undefined) {
-                nameReg = parseStringToRegex(`/^${parseSubredditName(nameVal)}$/`, defaultFlags);
+                try {
+                    const parsedVal = parseSubredditName(nameVal);
+                    nameVal = parsedVal;
+                } catch (err) {
+                    // oh well
+                    const f = 1;
+                }
+                nameReg = parseStringToRegex(`/^${nameVal}$/`, defaultFlags);
             }
         } else {
             nameReg = nameValRaw;
@@ -1251,4 +1258,11 @@ export const shouldCacheSubredditStateCriteriaResult = (state: SubredditState | 
     // and regexes for name which aren't that costly
     // -- so just return false
     return false;
+}
+
+export const subredditStateIsNameOnly = (state: SubredditState | StrongSubredditState): boolean => {
+    const critCount = Object.entries(state).filter(([key, val]) => {
+        return val !== undefined && !['name','stateDescription'].includes(key);
+    }).length;
+    return critCount === 0;
 }

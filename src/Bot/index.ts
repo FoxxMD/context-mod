@@ -15,7 +15,7 @@ import {
     snooLogWrapper
 } from "../util";
 import {Manager} from "../Subreddit/Manager";
-import {ProxiedSnoowrap} from "../Utils/SnoowrapClients";
+import {ExtendedSnoowrap, ProxiedSnoowrap} from "../Utils/SnoowrapClients";
 import {ModQueueStream, UnmoderatedStream} from "../Subreddit/Streams";
 import {BotResourcesManager} from "../Subreddit/SubredditResources";
 import LoggedError from "../Utils/LoggedError";
@@ -24,7 +24,7 @@ import pEvent from "p-event";
 
 class Bot {
 
-    client!: Snoowrap;
+    client!: ExtendedSnoowrap;
     logger!: Logger;
     wikiLocation: string;
     dryRun?: true | undefined;
@@ -166,7 +166,7 @@ class Bot {
         }
 
         try {
-            this.client = proxy === undefined ? new Snoowrap(creds) : new ProxiedSnoowrap({...creds, proxy});
+            this.client = proxy === undefined ? new ExtendedSnoowrap(creds) : new ProxiedSnoowrap({...creds, proxy});
             this.client.config({
                 warnings: true,
                 maxRetryAttempts: 5,

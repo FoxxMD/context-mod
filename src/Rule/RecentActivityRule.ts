@@ -1,6 +1,7 @@
 import {Rule, RuleJSONConfig, RuleOptions, RulePremise, RuleResult} from "./index";
 import {Comment, VoteableContent} from "snoowrap";
 import Submission from "snoowrap/dist/objects/Submission";
+import as from 'async';
 // @ts-ignore
 import subImageMatch from 'matches-subimage';
 import {
@@ -172,6 +173,26 @@ export class RecentActivityRule extends Rule {
                 }
                 return toStrongSubredditState(x, {defaultFlags: 'i', generateDescription: true});
             });
+
+            let validActivity: (Comment | Submission)[] = await as.filter(viableActivity, async (activity) => {
+                if(asSubmission(activity) && submissionState !== undefined) {
+                    return await this.resources.testItemCriteria(activity, [submissionState]);
+                } else if(commentState !== undefined) {
+                    return await this.resources.testItemCriteria(activity, [commentState]);
+                }
+                return true;
+            });
+
+            validActivity = await this.resources.batchTestSubredditCriteria(validActivity, subStates);
+            for(const activity of validActivity) {
+                currCount++;
+                // @ts-ignore
+                combinedKarma += activity.score;
+                const pSub = getActivitySubredditName(activity);
+                if(!presentSubs.includes(pSub)) {
+                    presentSubs.push(pSub);
+                }
+            }
 
             for(const activity of viableActivity) {
                 if(asSubmission(activity) && submissionState !== undefined) {
