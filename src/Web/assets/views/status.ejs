@@ -494,6 +494,16 @@
                                                                     <span>
                                                                     </span>
 
+                                                                    <label class="newRow">Subreddit Criteria</label>
+                                                                    <span class="newRow"><%= data.stats.cache.types.subredditCrit.requests %> | <%= data.stats.cache.types.subredditCrit.miss %> (<%= data.stats.cache.types.subredditCrit.missPercent %>) miss</span>
+                                                                    <span class="newRow">
+                                                                        - <span class="font-mono">SubredditState</span> results
+                                                                    </span>
+                                                                    <label>Avgs</label>
+                                                                    <span>Hits/Key <%= data.stats.cache.types.subredditCrit.identifierAverageHit %> | Hit Interval <%= data.stats.cache.types.subredditCrit.averageTimeBetweenHits %>s</span>
+                                                                    <span>
+                                                                    </span>
+
                                                                     <label class="newRow">Comment Check</label>
                                                                     <span class="newRow"><%= data.stats.cache.types.commentCheck.requests %> | <%= data.stats.cache.types.commentCheck.miss %> (<%= data.stats.cache.types.commentCheck.missPercent %>) miss</span>
                                                                     <span class="newRow">
@@ -517,6 +527,14 @@
                                                                     <span class="newRow"></span>
                                                                     <label>Avgs</label>
                                                                     <span>Hits/Key <%= data.stats.cache.types.comment.identifierAverageHit %> | Hit Interval <%= data.stats.cache.types.comment.averageTimeBetweenHits %>s</span>
+                                                                    <span>
+                                                                    </span>
+
+                                                                    <label class="newRow">Subreddits</label>
+                                                                    <span class="newRow"><%= data.stats.cache.types.subreddit.requests %> | <%= data.stats.cache.types.subreddit.miss %> (<%= data.stats.cache.types.subreddit.missPercent %>) miss</span>
+                                                                    <span class="newRow"></span>
+                                                                    <label>Avgs</label>
+                                                                    <span>Hits/Key <%= data.stats.cache.types.subreddit.identifierAverageHit %> | Hit Interval <%= data.stats.cache.types.subreddit.averageTimeBetweenHits %>s</span>
                                                                     <span>
                                                                     </span>
 
