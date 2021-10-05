@@ -922,6 +922,24 @@
             ],
             "type": "string"
         },
+        "ClearProcessedOptions": {
+            "description": "For very long-running, high-volume subreddits clearing the list of processed activities helps manage memory bloat\n\nAll of these options have default values based on the limit and/or interval set for polling options on each subreddit stream. They only need to modified if the defaults are not sufficient.\n\nIf both `after` and `size` are defined whichever is hit first will trigger the list to clear. `after` will be reset after ever clear.",
+            "properties": {
+                "after": {
+                    "description": "Number of seconds after which the processed list should be clear",
+                    "type": "number"
+                },
+                "retain": {
+                    "description": "The number of activities to retain in processed list after clearing.\n\nDefaults to `limit` number of activities",
+                    "type": "number"
+                },
+                "size": {
+                    "description": "Number of activities found in processed list after which the list should be cleared.\n\nDefaults to 2x the `limit` value from `PollingOptions`",
+                    "type": "number"
+                }
+            },
+            "type": "object"
+        },
         "CommentActionJson": {
             "description": "Reply to the Activity. For a submission the reply will be a top-level comment.",
             "properties": {
@@ -1896,6 +1914,10 @@
                 }
             ],
             "properties": {
+                "clearProcessed": {
+                    "$ref": "#/definitions/ClearProcessedOptions",
+                    "description": "For very long-running, high-volume subreddits clearing the list of processed activities helps manage memory bloat\n\nAll of these options have default values based on the limit and/or interval set for polling options on each subreddit stream. They only need to modified if the defaults are not sufficient.\n\nIf both `after` and `size` are defined whichever is hit first will trigger the list to clear. `after` will be reset after ever clear."
+                },
                 "delayUntil": {
                     "description": "Delay processing Activity until it is `N` seconds old\n\nUseful if there are other bots that may process an Activity and you want this bot to run first/last/etc.\n\nIf the Activity is already `N` seconds old when it is initially retrieved no refresh of the Activity occurs (no API request is made) and it is immediately processed.",
                     "type": "number"

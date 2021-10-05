@@ -673,7 +673,8 @@ export class Manager {
                 pollOn,
                 limit,
                 interval,
-                delayUntil
+                delayUntil,
+                clearProcessed,
             } = pollOpt;
             let stream: SPoll<Snoowrap.Submission | Snoowrap.Comment>;
             let modStreamType: string | undefined;
@@ -689,6 +690,7 @@ export class Manager {
                             subreddit: this.subreddit.display_name,
                             limit: limit,
                             pollTime: interval * 1000,
+                            clearProcessed,
                         });
                     }
                     break;
@@ -702,6 +704,7 @@ export class Manager {
                             subreddit: this.subreddit.display_name,
                             limit: limit,
                             pollTime: interval * 1000,
+                            clearProcessed
                         });
                     }
                     break;
@@ -710,6 +713,7 @@ export class Manager {
                         subreddit: this.subreddit.display_name,
                         limit: limit,
                         pollTime: interval * 1000,
+                        clearProcessed
                     });
                     break;
                 case 'newComm':
@@ -717,6 +721,7 @@ export class Manager {
                         subreddit: this.subreddit.display_name,
                         limit: limit,
                         pollTime: interval * 1000,
+                        clearProcessed
                     });
                     break;
             }
