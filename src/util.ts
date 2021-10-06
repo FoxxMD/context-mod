@@ -11,11 +11,28 @@ import {Comment} from "snoowrap";
 import {inflateSync, deflateSync} from "zlib";
 import sizeOf from 'image-size';
 import {
-    ActivityWindowCriteria, CacheOptions, CacheProvider,
+    ActivityWindowCriteria,
+    CacheOptions,
+    CacheProvider,
     DurationComparison,
-    GenericComparison, HistoricalStats, HistoricalStatsDisplay, ImageData, ImageDetection, LogInfo, NamedGroup,
-    PollingOptionsStrong, RedditEntity, RedditEntityType, RegExResult, ResembleResult, ResourceStats, StatusCodeError,
-    StringOperator, StrongSubredditState, SubredditState
+    GenericComparison,
+    HistoricalStats,
+    HistoricalStatsDisplay,
+    //ImageData,
+    ImageDetection,
+    //ImageDownloadOptions,
+    LogInfo,
+    NamedGroup,
+    PollingOptionsStrong,
+    RedditEntity,
+    RedditEntityType,
+    RegExResult,
+    ResembleResult,
+    ResourceStats,
+    StatusCodeError,
+    StringOperator,
+    StrongSubredditState,
+    SubredditState
 } from "./Common/interfaces";
 import JSON5 from "json5";
 import yaml, {JSON_SCHEMA} from "js-yaml";
@@ -32,6 +49,8 @@ import {MESSAGE} from "triple-beam";
 import {RedditUser} from "snoowrap/dist/objects";
 import reRegExp from '@stdlib/regexp-regexp';
 import fetch, {Response} from "node-fetch";
+import { URL } from "url";
+import ImageData from "./Common/ImageData";
 
 const ReReg = reRegExp();
 
@@ -93,6 +112,7 @@ export const defaultFormat = (defaultLabel = 'App') => printf(({
                                                                    leaf,
                                                                    itemId,
                                                                    timestamp,
+                                                                   durationMs,
                                                                    // @ts-ignore
                                                                    [SPLAT]: splatObj,
                                                                    stack,
@@ -122,7 +142,7 @@ export const defaultFormat = (defaultLabel = 'App') => printf(({
     }
     const labelContent = `${nodes.map((x: string) => `[${x}]`).join(' ')}`;
 
-    return `${timestamp} ${level.padEnd(7)}: ${instance !== undefined ? `|${instance}| ` : ''}${bot !== undefined ? `~${bot}~ ` : ''}${subreddit !== undefined ? `{${subreddit}} ` : ''}${labelContent} ${msg}${stringifyValue !== '' ? ` ${stringifyValue}` : ''}${stackMsg}`;
+    return `${timestamp} ${level.padEnd(7)}: ${instance !== undefined ? `|${instance}| ` : ''}${bot !== undefined ? `~${bot}~ ` : ''}${subreddit !== undefined ? `{${subreddit}} ` : ''}${labelContent} ${msg}${durationMs !== undefined ? ` Elapsed: ${durationMs}ms (${formatNumber(durationMs/1000)}s) ` : ''}${stringifyValue !== '' ? ` ${stringifyValue}` : ''}${stackMsg}`;
 });
 
 
@@ -1173,32 +1193,6 @@ export const isValidImageURL = (str: string): boolean => {
     return !!str.match(/\w+\.(jpg|jpeg|gif|png|tiff|bmp)$/gi);
 }
 
-export const getImageDataFromUrl = async (url: string, aggressive = false): Promise<[Response?, ImageData?, string?]> => {
-    if (!aggressive && !isValidImageURL(url)) {
-        return [undefined, undefined, 'URL did not end with a valid image extension'];
-    }
-    try {
-        const response = await fetch(url);
-        if (response.ok) {
-            const ct = response.headers.get('Content-Type');
-            if (ct !== null && ct.includes('image')) {
-                let buffer = await response.buffer();
-                const dimensions = sizeOf(buffer);
-                return [response, {
-                    data: buffer,
-                    width: dimensions.width as number - 5,
-                    height: dimensions.height as number - 5,
-                    pixels: (dimensions.height as number - 5) * (dimensions.width as number - 5)
-                }];
-            }
-            return [response, undefined, 'Content-Type for fetched URL did not contain "image"'];
-        }
-        return [response, undefined, `URL response was not OK: (${response.status})${response.statusText}`];
-    } catch (err) {
-        return [undefined, undefined, `Error occurred while fetching response from URL: ${err.message}`];
-    }
-}
-
 let resembleCIFunc: Function;
 
 const getCIFunc = async () => {
@@ -1213,7 +1207,7 @@ const getCIFunc = async () => {
     return resembleCIFunc;
 }
 
-export const compareImages = async (data1: ImageData, data2: ImageData, threshold?: number): Promise<[ResembleResult, boolean?]> => {
+export const compareImages = async (data1: ImageData, data2: ImageData, threshold?: number, variantDimensionDiff = 0): Promise<[ResembleResult, boolean?]> => {
     let ci: Function;
 
     try {
@@ -1222,8 +1216,11 @@ export const compareImages = async (data1: ImageData, data2: ImageData, threshol
         err.message = `Unable to do image comparison due to an issue importing the comparison library. It is likely 'node-canvas' is not installed (see ContextMod docs). Error Message: ${err.message}`;
         throw err;
     }
+
+    let results: ResembleResult | undefined = undefined;
+
     //const [minWidth, minHeight] = getMinimumDimensions(data1, data2);
-    const results = await ci(data1.data, data2.data, {
+    const compareOptions = {
         // "ignore": [
         //     'colors' //  ~100% than nothing because resemble computes brightness information from rgb for each pixel
         // ],
@@ -1241,14 +1238,21 @@ export const compareImages = async (data1: ImageData, data2: ImageData, threshol
         //     },
         // },
         returnEarlyThreshold: threshold !== undefined ? Math.min(threshold + 5, 100) : undefined,
-    }) as ResembleResult;
+    };
+
+    if(data1.preferredResolution !== undefined) {
+        const [prefWidth, prefHeight] = data1.preferredResolution;
+        const prefImgData = data2.getSimilarResolutionVariant(prefWidth, prefHeight, variantDimensionDiff);
+        if(prefImgData !== undefined) {
+            results = await ci(await data1.getSimilarResolutionVariant(prefWidth, prefHeight)?.data, await prefImgData.data, compareOptions) as ResembleResult;
+        }
+    }
+    if(results === undefined) {
+        results = await ci(await data1.data, await data2.data, compareOptions) as ResembleResult;
+    }
 
     const sameImage = threshold === undefined ? undefined : results.rawMisMatchPercentage < threshold;
     return [results, sameImage];
-}
-
-export const getMinimumDimensions = (data1: ImageData, data2: ImageData): [number, number] => {
-    return [Math.min(data1.width, data2.width), Math.min(data1.height, data2.height)];
 }
 
 export const createHistoricalStatsDisplay = (data: HistoricalStats): HistoricalStatsDisplay => {
@@ -1286,4 +1290,8 @@ export const subredditStateIsNameOnly = (state: SubredditState | StrongSubreddit
         return val !== undefined && !['name','stateDescription'].includes(key);
     }).length;
     return critCount === 0;
+}
+
+export const absPercentDifference = (num1: number, num2: number) => {
+    return Math.abs((num1 - num2) / num1) * 100;
 }

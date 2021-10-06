@@ -267,12 +267,15 @@ export interface ImageDetection {
     threshold?: number
 }
 
-export interface ImageData {
-    data: Buffer,
-    width: number,
-    height: number
-    pixels: number
-}
+// export interface ImageData {
+//     data: Promise<Buffer>,
+//     buf?: Buffer,
+//     width: number,
+//     height: number
+//     pixels?: number
+//     url: string
+//     variants?: ImageData[]
+// }
 
 export interface ResembleResult extends ResembleSingleCallbackComparisonResult {
     rawMisMatchPercentage: number
