@@ -715,6 +715,22 @@ export interface ManagerOptions {
 export type CompareValue = string;
 
 /**
+ * A duration and how to compare it against a value
+ *
+ * The syntax is `(< OR > OR <= OR >=) <number> <unit>` EX `> 100 days`, `<= 2 months`
+ *
+ * * EX `> 100 days` => Passes if the date being compared is before 100 days ago
+ * * EX `<= 2 months` => Passes if the date being compared is after or equal to 2 months
+ *
+ * Unit must be one of [DayJS Duration units](https://day.js.org/docs/en/durations/creating)
+ *
+ * [See] https://regexr.com/609n8 for example
+ *
+ * @pattern ^\s*(>|>=|<|<=)\s*(\d+)\s*(days|weeks|months|years|hours|minutes|seconds|milliseconds)\s*$
+ * */
+export type DurationComparor = string;
+
+/**
  * A string containing a comparison operator and a value to compare against
  *
  * The syntax is `(< OR > OR <= OR >=) <number>[percent sign]`
@@ -761,6 +777,7 @@ export interface ActivityState {
     approved?: boolean
     score?: CompareValue
     reports?: CompareValue
+    age?: DurationComparor
 }
 
 /**

@@ -1,5 +1,5 @@
-import {DurationComparor, UserNoteCriteria} from "../Rule";
-import {CompareValue, CompareValueOrPercent} from "../Common/interfaces";
+import {UserNoteCriteria} from "../Rule";
+import {CompareValue, CompareValueOrPercent, DurationComparor} from "../Common/interfaces";
 
 /**
  * If present then these Author criteria are checked before running the rule. If criteria fails then the rule is skipped.

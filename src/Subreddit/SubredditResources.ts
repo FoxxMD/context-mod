@@ -14,9 +14,9 @@ import fetch from 'node-fetch';
 import {
     asSubmission,
     buildCacheOptionsFromProvider, buildCachePrefix,
-    cacheStats, comparisonTextOp, createCacheManager, createHistoricalStatsDisplay,
+    cacheStats, compareDurationValue, comparisonTextOp, createCacheManager, createHistoricalStatsDisplay,
     formatNumber, getActivityAuthorName, getActivitySubredditName, isStrongSubredditState,
-    mergeArr,
+    mergeArr, parseDurationComparison,
     parseExternalUrl, parseGenericValueComparison,
     parseWikiContext, shouldCacheSubredditStateCriteriaResult, subredditStateIsNameOnly, toStrongSubredditState
 } from "../util";
@@ -49,6 +49,7 @@ import {Submission, Comment, Subreddit} from "snoowrap/dist/objects";
 import {cacheTTLDefaults, createHistoricalDefaults, historicalDefaults} from "../Common/defaults";
 import {check} from "tcp-port-used";
 import {ExtendedSnoowrap} from "../Utils/SnoowrapClients";
+import dayjs from "dayjs";
 
 export const DEFAULT_FOOTER = '\r\n*****\r\nThis action was performed by [a bot.]({{botLink}}) Mention a moderator or [send a modmail]({{modmailLink}}) if you any ideas, questions, or concerns about this action.';
 
@@ -839,6 +840,13 @@ export class SubredditResources {
                                     // @ts-ignore
                                     log.debug(`Failed: Expected => ${k}:${crit[k]} | Found => ${k}:${filtered}`)
                                     return false
+                                }
+                                break;
+                            case 'age':
+                                const ageTest = compareDurationValue(parseDurationComparison(crit[k] as string), dayjs.unix(await item.created));
+                                if (!ageTest) {
+                                    log.debug(`Failed: Activity did not pass age test "${crit[k] as string}"`);
+                                    return false;
                                 }
                                 break;
                             case 'title':
