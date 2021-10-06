@@ -1222,12 +1222,33 @@ export const compareImages = async (data1: ImageData, data2: ImageData, threshol
         err.message = `Unable to do image comparison due to an issue importing the comparison library. It is likely 'node-canvas' is not installed (see ContextMod docs). Error Message: ${err.message}`;
         throw err;
     }
+    //const [minWidth, minHeight] = getMinimumDimensions(data1, data2);
     const results = await ci(data1.data, data2.data, {
+        // "ignore": [
+        //     'colors' //  ~100% than nothing because resemble computes brightness information from rgb for each pixel
+        // ],
+        // boundingBox is ~30% slower than no restrictions
+        // because resemble has to check that each pixel is within the box
+        //
+        // output: {
+        //     // compare at most 800x800 section to increase performance
+        //     // -- potentially allow this to be user-configurable in the future if not sufficient for dup detection
+        //     boundingBox: {
+        //         left: 0,
+        //         top: 0,
+        //         right: Math.min(minWidth, 800),
+        //         bottom: Math.min(minHeight, 800)
+        //     },
+        // },
         returnEarlyThreshold: threshold !== undefined ? Math.min(threshold + 5, 100) : undefined,
     }) as ResembleResult;
 
     const sameImage = threshold === undefined ? undefined : results.rawMisMatchPercentage < threshold;
     return [results, sameImage];
+}
+
+export const getMinimumDimensions = (data1: ImageData, data2: ImageData): [number, number] => {
+    return [Math.min(data1.width, data2.width), Math.min(data1.height, data2.height)];
 }
 
 export const createHistoricalStatsDisplay = (data: HistoricalStats): HistoricalStatsDisplay => {
