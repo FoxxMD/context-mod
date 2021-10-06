@@ -105,40 +105,40 @@ export class RecentActivityRule extends Rule {
                 const filteredActivity = [];
                 const analysisTimes = [];
                 let referenceImage;
-                if(this.imageDetection.enable) {
+                if (this.imageDetection.enable) {
                     const [response, imgData, reason] = await getImageDataFromUrl(referenceUrl);
-                    if(reason !== undefined) {
+                    if (reason !== undefined) {
                         this.logger.verbose(reason);
                     } else {
                         referenceImage = imgData
                     }
                 }
                 let longRun;
-                if(referenceImage !== undefined) {
+                if (referenceImage !== undefined) {
                     const l = this.logger;
                     longRun = setTimeout(() => {
                         l.verbose('FYI: Image processing is causing rule to take longer than normal');
                     }, 2500);
                 }
-                for(const x of viableActivity) {
+                for (const x of viableActivity) {
                     if (!asSubmission(x) || x.id === itemId) {
                         continue;
                     }
                     if (x.url === undefined) {
                         continue;
                     }
-                    if(parseLink(x.url) === usableUrl) {
+                    if (parseLink(x.url) === usableUrl) {
                         filteredActivity.push(x);
                     }
                     // only do image detection if regular URL comparison and other conditions fail first
                     // to reduce CPU/bandwidth usage
-                    if(referenceImage !== undefined) {
+                    if (referenceImage !== undefined) {
                         const [response, imgData, reason] = await getImageDataFromUrl(x.url);
-                        if(imgData !== undefined) {
+                        if (imgData !== undefined) {
                             try {
                                 const [compareResult, sameImage] = await compareImages(referenceImage, imgData, this.imageDetection.threshold);
                                 analysisTimes.push(compareResult.analysisTime);
-                                if(sameImage) {
+                                if (sameImage) {
                                     filteredActivity.push(x);
                                 }
                             } catch (err) {
@@ -147,11 +147,11 @@ export class RecentActivityRule extends Rule {
                         }
                     }
                 }
-                if(longRun !== undefined) {
+                if (longRun !== undefined) {
                     clearTimeout(longRun);
                 }
-                const totalAnalysisTime = analysisTimes.reduce((acc, x) => acc + x,0);
-                this.logger.debug(`Reference image compared ${analysisTimes.length} times. Timings: Avg ${formatNumber(totalAnalysisTime / analysisTimes.length, {toFixed: 0})}ms | Max: ${Math.max(...analysisTimes)}ms | Min: ${Math.min(...analysisTimes)}ms | Total: ${totalAnalysisTime}ms (${formatNumber(totalAnalysisTime/1000)}s)`);
+                const totalAnalysisTime = analysisTimes.reduce((acc, x) => acc + x, 0);
+                this.logger.debug(`Reference image compared ${analysisTimes.length} times. Timings: Avg ${formatNumber(totalAnalysisTime / analysisTimes.length, {toFixed: 0})}ms | Max: ${Math.max(...analysisTimes)}ms | Min: ${Math.min(...analysisTimes)}ms | Total: ${totalAnalysisTime}ms (${formatNumber(totalAnalysisTime / 1000)}s)`);
                 viableActivity = filteredActivity;
             }
         }
@@ -172,62 +172,74 @@ export class RecentActivityRule extends Rule {
 
             // convert subreddits array into entirely StrongSubredditState
             const subStates: StrongSubredditState[] = subreddits.map((x) => {
-                if(typeof x === 'string') {
-                    return toStrongSubredditState({name: x, stateDescription: x}, {defaultFlags: 'i', generateDescription: true});
+                if (typeof x === 'string') {
+                    return toStrongSubredditState({name: x, stateDescription: x}, {
+                        defaultFlags: 'i',
+                        generateDescription: true
+                    });
                 }
                 return toStrongSubredditState(x, {defaultFlags: 'i', generateDescription: true});
             });
 
             let validActivity: (Comment | Submission)[] = await as.filter(viableActivity, async (activity) => {
-                if(asSubmission(activity) && submissionState !== undefined) {
+                if (asSubmission(activity) && submissionState !== undefined) {
                     return await this.resources.testItemCriteria(activity, [submissionState]);
-                } else if(commentState !== undefined) {
+                } else if (commentState !== undefined) {
                     return await this.resources.testItemCriteria(activity, [commentState]);
                 }
                 return true;
             });
 
             validActivity = await this.resources.batchTestSubredditCriteria(validActivity, subStates);
-            for(const activity of validActivity) {
+            for (const activity of validActivity) {
                 currCount++;
                 // @ts-ignore
                 combinedKarma += activity.score;
                 const pSub = getActivitySubredditName(activity);
-                if(!presentSubs.includes(pSub)) {
+                if (!presentSubs.includes(pSub)) {
                     presentSubs.push(pSub);
                 }
             }
 
-            for(const activity of viableActivity) {
-                if(asSubmission(activity) && submissionState !== undefined) {
-                    if(!(await this.resources.testItemCriteria(activity, [submissionState]))) {
+            for (const activity of viableActivity) {
+                if (asSubmission(activity) && submissionState !== undefined) {
+                    if (!(await this.resources.testItemCriteria(activity, [submissionState]))) {
                         continue;
                     }
-                } else if(commentState !== undefined) {
-                    if(!(await this.resources.testItemCriteria(activity, [commentState]))) {
+                } else if (commentState !== undefined) {
+                    if (!(await this.resources.testItemCriteria(activity, [commentState]))) {
                         continue;
                     }
                 }
                 let inSubreddits = false;
-                for(const ss of subStates) {
+                for (const ss of subStates) {
                     const res = await this.resources.testSubredditCriteria(activity, ss);
-                    if(res) {
+                    if (res) {
                         inSubreddits = true;
                         break;
                     }
                 }
-                if(inSubreddits) {
+                if (inSubreddits) {
                     currCount++;
                     combinedKarma += activity.score;
                     const pSub = getActivitySubredditName(activity);
-                    if(!presentSubs.includes(pSub)) {
+                    if (!presentSubs.includes(pSub)) {
                         presentSubs.push(pSub);
                     }
                 }
             }
 
             const {operator, value, isPercent} = parseGenericValueOrPercentComparison(threshold);
-            let sum = {subsWithActivity: presentSubs, combinedKarma, karmaThreshold, subreddits: subStates.map(x => x.stateDescription), count: currCount, threshold, triggered: false, testValue: currCount.toString()};
+            let sum = {
+                subsWithActivity: presentSubs,
+                combinedKarma,
+                karmaThreshold,
+                subreddits: subStates.map(x => x.stateDescription),
+                count: currCount,
+                threshold,
+                triggered: false,
+                testValue: currCount.toString()
+            };
             if (isPercent) {
                 sum.testValue = `${formatNumber((currCount / viableActivity.length) * 100)}%`;
                 if (comparisonTextOp(currCount / viableActivity.length, operator, value / 100)) {
@@ -239,9 +251,9 @@ export class RecentActivityRule extends Rule {
                 totalTriggeredOn = sum;
             }
             // if we would trigger on threshold need to also test for karma
-            if(totalTriggeredOn !== undefined && karmaThreshold !== undefined) {
+            if (totalTriggeredOn !== undefined && karmaThreshold !== undefined) {
                 const {operator: opKarma, value: valueKarma} = parseGenericValueOrPercentComparison(karmaThreshold);
-                if(!comparisonTextOp(combinedKarma, opKarma, valueKarma)) {
+                if (!comparisonTextOp(combinedKarma, opKarma, valueKarma)) {
                     sum.triggered = false;
                     totalTriggeredOn = undefined;
                 }
@@ -259,7 +271,7 @@ export class RecentActivityRule extends Rule {
             result = `${PASS} ${resultData.result}`;
             this.logger.verbose(result);
             return Promise.resolve([true, this.getResult(true, resultData)]);
-        } else if(summaries.length === 1) {
+        } else if (summaries.length === 1) {
             // can display result if its only one summary otherwise need to log to debug
             const res = this.generateResultData(summaries[0], viableActivity);
             result = `${FAIL} ${res.result}`;
@@ -272,7 +284,7 @@ export class RecentActivityRule extends Rule {
 
         return Promise.resolve([false, this.getResult(false, {result})]);
     }
-    
+
     generateResultData(summary: any, activities: (Submission | Comment)[] = []) {
         const {
             count,
@@ -286,7 +298,7 @@ export class RecentActivityRule extends Rule {
         } = summary;
         const relevantSubs = subsWithActivity.length === 0 ? subreddits : subsWithActivity;
         let totalSummary = `${testValue} activities over ${relevantSubs.length} subreddits${karmaThreshold !== undefined ? ` with ${combinedKarma} combined karma` : ''} ${triggered ? 'met' : 'did not meet'} threshold of ${threshold}${karmaThreshold !== undefined ? ` and ${karmaThreshold} combined karma` : ''}`;
-        if(triggered && subsWithActivity.length > 0) {
+        if (triggered && subsWithActivity.length > 0) {
             totalSummary = `${totalSummary} -- subreddits: ${subsWithActivity.join(', ')}`;
         }
         return {
@@ -313,12 +325,12 @@ export class RecentActivityRule extends Rule {
  * */
 export interface ActivityThreshold {
     /**
-    * When present, a Submission will only be counted if it meets this criteria
-    * */
+     * When present, a Submission will only be counted if it meets this criteria
+     * */
     submissionState?: SubmissionState
     /**
-    * When present, a Comment will only be counted if it meets this criteria
-    * */
+     * When present, a Comment will only be counted if it meets this criteria
+     * */
     commentState?: CommentState
 
     /**
