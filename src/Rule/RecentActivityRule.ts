@@ -103,6 +103,7 @@ export class RecentActivityRule extends Rule {
                 const referenceUrl = await item.url;
                 const usableUrl = parseLink(referenceUrl);
                 const filteredActivity = [];
+                const analysisTimes = [];
                 let referenceImage;
                 if(this.imageDetection.enable) {
                     const [response, imgData, reason] = await getImageDataFromUrl(referenceUrl);
@@ -136,6 +137,7 @@ export class RecentActivityRule extends Rule {
                         if(imgData !== undefined) {
                             try {
                                 const [compareResult, sameImage] = await compareImages(referenceImage, imgData, this.imageDetection.threshold);
+                                analysisTimes.push(compareResult.analysisTime);
                                 if(sameImage) {
                                     filteredActivity.push(x);
                                 }
@@ -148,6 +150,8 @@ export class RecentActivityRule extends Rule {
                 if(longRun !== undefined) {
                     clearTimeout(longRun);
                 }
+                const totalAnalysisTime = analysisTimes.reduce((acc, x) => acc + x,0);
+                this.logger.debug(`Reference image compared ${analysisTimes.length} times. Timings: Avg ${formatNumber(totalAnalysisTime / analysisTimes.length, {toFixed: 0})}ms | Max: ${Math.max(...analysisTimes)}ms | Min: ${Math.min(...analysisTimes)}ms | Total: ${totalAnalysisTime}ms (${formatNumber(totalAnalysisTime/1000)}s)`);
                 viableActivity = filteredActivity;
             }
         }
