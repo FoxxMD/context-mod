@@ -4,6 +4,8 @@ import {EventEmitter} from "events";
 import {PollConfiguration} from "snoostorm/out/util/Poll";
 import {ClearProcessedOptions, DEFAULT_POLLING_INTERVAL} from "../Common/interfaces";
 import dayjs, {Dayjs} from "dayjs";
+import { Duration } from "dayjs/plugin/duration";
+import {parseDuration} from "../util";
 
 type Awaitable<T> = Promise<T> | T;
 
@@ -21,7 +23,7 @@ export class SPoll<T extends object> extends Poll<T> {
     getter: () => Awaitable<T[]>;
     frequency;
     running: boolean = false;
-    clearProcessedInterval?: number;
+    clearProcessedDuration?: Duration;
     clearProcessedSize?: number;
     clearProcessedAfter?: Dayjs;
     retainProcessed: number = 0;
@@ -36,11 +38,13 @@ export class SPoll<T extends object> extends Poll<T> {
             size,
             retain = 0,
         } = options.clearProcessed || {};
-        this.clearProcessedInterval = after;
+        if(after !== undefined) {
+            this.clearProcessedDuration = parseDuration(after);
+        }
         this.clearProcessedSize = size;
         this.retainProcessed = retain;
-        if (after !== undefined) {
-            this.clearProcessedAfter = dayjs().add(after, 's');
+        if (this.clearProcessedDuration !== undefined) {
+            this.clearProcessedAfter = dayjs().add(this.clearProcessedDuration.asSeconds(), 's');
         }
         clearInterval(this.interval);
     }
@@ -66,8 +70,8 @@ export class SPoll<T extends object> extends Poll<T> {
                             self.processed = new Set(Array.from(self.processed).slice(Math.max(0, self.processed.size - self.retainProcessed)));
                         }
                         // reset time interval if there is one
-                        if (self.clearProcessedAfter !== undefined) {
-                            self.clearProcessedAfter = dayjs().add((self.clearProcessedInterval as number), 's');
+                        if (self.clearProcessedAfter !== undefined && self.clearProcessedDuration !== undefined) {
+                            self.clearProcessedAfter = dayjs().add(self.clearProcessedDuration.asSeconds(), 's');
                         }
                     }
                     const batch = await self.getter();

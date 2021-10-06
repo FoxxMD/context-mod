@@ -199,10 +199,10 @@ class Bot {
             }
         }
 
-        const defaultUnmoderatedStream = new UnmoderatedStream(this.client, {subreddit: 'mod', limit: 50, clearProcessed: { size: 150, retain: 50 }});
+        const defaultUnmoderatedStream = new UnmoderatedStream(this.client, {subreddit: 'mod', limit: 100, clearProcessed: { size: 100, retain: 100 }});
         // @ts-ignore
         defaultUnmoderatedStream.on('error', modStreamErrorListener('unmoderated'));
-        const defaultModqueueStream = new ModQueueStream(this.client, {subreddit: 'mod', limit: 50, clearProcessed: { size: 150, retain: 50 }});
+        const defaultModqueueStream = new ModQueueStream(this.client, {subreddit: 'mod', limit: 100, clearProcessed: { size: 100, retain: 100 }});
         // @ts-ignore
         defaultModqueueStream.on('error', modStreamErrorListener('modqueue'));
         this.cacheManager.modStreams.set('unmoderated', defaultUnmoderatedStream);

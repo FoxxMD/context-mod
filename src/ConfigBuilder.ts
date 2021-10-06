@@ -147,7 +147,7 @@ export const buildPollingOptions = (values: (string | PollingOptions)[]): Pollin
                 interval: DEFAULT_POLLING_INTERVAL,
                 limit: DEFAULT_POLLING_LIMIT,
                 clearProcessed: {
-                    size: DEFAULT_POLLING_LIMIT * 2,
+                    size: DEFAULT_POLLING_LIMIT,
                     retain: DEFAULT_POLLING_LIMIT,
                 }
             });
@@ -157,7 +157,7 @@ export const buildPollingOptions = (values: (string | PollingOptions)[]): Pollin
                 interval = DEFAULT_POLLING_INTERVAL,
                 limit = DEFAULT_POLLING_LIMIT,
                 delayUntil,
-                clearProcessed = {size: limit * 2, retain: limit},
+                clearProcessed = {size: limit, retain: limit},
             } = v;
             opts.push({
                 pollOn: p as PollOn,

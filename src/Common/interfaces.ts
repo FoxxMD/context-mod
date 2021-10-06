@@ -372,19 +372,24 @@ export interface PollingOptionsStrong extends PollingOptions {
  * */
 export interface ClearProcessedOptions {
     /**
-     * Number of seconds after which the processed list should be clear
+     * An interval the processed list should be cleared after.
+     *
+     * * EX `9 days`
+     * * EX `3 months`
+     * * EX `5 minutes`
+     * @pattern ^\s*(?<time>\d+)\s*(?<unit>days?|weeks?|months?|years?|hours?|minutes?|seconds?|milliseconds?)\s*$
      * */
-    after?: number,
+    after?: string,
     /**
      * Number of activities found in processed list after which the list should be cleared.
      *
-     * Defaults to 2x the `limit` value from `PollingOptions`
+     * Defaults to the `limit` value from `PollingOptions`
      * */
     size?: number,
     /**
      * The number of activities to retain in processed list after clearing.
      *
-     * Defaults to `limit` number of activities
+     * Defaults to `limit` value from `PollingOptions`
      * */
     retain?: number,
 }
