@@ -79,6 +79,10 @@
                                     "default": false,
                                     "description": "If set to `true` all subreddits polling unmoderated/modqueue with default polling settings will share a request to \"r/mod\"\notherwise each subreddit will poll its own mod view\n\n* ENV => `SHARE_MOD`\n* ARG => `--shareMod`",
                                     "type": "boolean"
+                                },
+                                "stagger": {
+                                    "description": "If sharing a mod stream stagger pushing relevant Activities to individual subreddits.\n\nUseful when running many subreddits and rules are potentially cpu/memory/traffic heavy -- allows spreading out load",
+                                    "type": "number"
                                 }
                             },
                             "type": "object"

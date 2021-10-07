@@ -759,11 +759,10 @@ export class Manager {
                 }
             };
 
-            stream.on('item', onItem);
-
             if (modStreamType !== undefined) {
                 this.modStreamCallbacks.set(pollOn, onItem);
             } else {
+                stream.on('item', onItem);
                 // @ts-ignore
                 stream.on('error', async (err: any) => {
 
@@ -943,10 +942,11 @@ export class Manager {
                 s.end();
             }
             this.streams = [];
-            for (const [k, v] of this.modStreamCallbacks) {
-                const stream = this.cacheManager.modStreams.get(k) as Poll<Snoowrap.Submission | Snoowrap.Comment>;
-                stream.removeListener('item', v);
-            }
+            // for (const [k, v] of this.modStreamCallbacks) {
+            //     const stream = this.cacheManager.modStreams.get(k) as Poll<Snoowrap.Submission | Snoowrap.Comment>;
+            //     stream.removeListener('item', v);
+            // }
+            this.modStreamCallbacks = new Map();
             this.startedAt = undefined;
             this.logger.info(`Events STOPPED by ${causedBy}`);
             this.eventsState = {

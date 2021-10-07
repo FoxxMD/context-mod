@@ -4,6 +4,7 @@ import {getLogger} from "./Utils/loggerFactory";
 import {Invokee, OperatorConfig} from "./Common/interfaces";
 import Bot from "./Bot";
 import LoggedError from "./Utils/LoggedError";
+import {sleep} from "./util";
 
 export class App {
 
@@ -66,6 +67,7 @@ export class App {
                 try {
                     await b.testClient();
                     await b.buildManagers();
+                    await sleep(2000);
                     b.runManagers(causedBy).catch((err) => {
                         this.logger.error(`Unexpected error occurred while running Bot ${b.botName}. Bot must be re-built to restart`);
                         if (!err.logged || !(err instanceof LoggedError)) {

@@ -9,7 +9,7 @@ import {InvalidOptionArgumentError} from "commander";
 import Submission from "snoowrap/dist/objects/Submission";
 import {Comment} from "snoowrap";
 import {inflateSync, deflateSync} from "zlib";
-import sizeOf from 'image-size';
+import pixelmatch from 'pixelmatch';
 import {
     ActivityWindowCriteria,
     CacheOptions,
@@ -17,7 +17,7 @@ import {
     DurationComparison,
     GenericComparison,
     HistoricalStats,
-    HistoricalStatsDisplay,
+    HistoricalStatsDisplay, ImageComparisonResult,
     //ImageData,
     ImageDetection,
     //ImageDownloadOptions,
@@ -51,6 +51,7 @@ import reRegExp from '@stdlib/regexp-regexp';
 import fetch, {Response} from "node-fetch";
 import { URL } from "url";
 import ImageData from "./Common/ImageData";
+import {Sharp, SharpOptions} from "sharp";
 
 const ReReg = reRegExp();
 
@@ -1194,6 +1195,19 @@ export const isValidImageURL = (str: string): boolean => {
 }
 
 let resembleCIFunc: Function;
+type SharpCreate = (input?:
+| Buffer
+| Uint8Array
+| Uint8ClampedArray
+| Int8Array
+| Uint16Array
+| Int16Array
+| Uint32Array
+| Int32Array
+| Float32Array
+| Float64Array
+| string,) => Sharp;
+let sharpImg: SharpCreate;
 
 const getCIFunc = async () => {
     if (resembleCIFunc === undefined) {
@@ -1207,7 +1221,103 @@ const getCIFunc = async () => {
     return resembleCIFunc;
 }
 
-export const compareImages = async (data1: ImageData, data2: ImageData, threshold?: number, variantDimensionDiff = 0): Promise<[ResembleResult, boolean?]> => {
+export const getSharpAsync = async (): Promise<SharpCreate> => {
+    if (sharpImg === undefined) {
+        const sharpModule = await import('sharp');
+        if (sharpModule === undefined) {
+            throw new Error('Could not import sharp');
+        }
+        // @ts-ignore
+        sharpImg = sharpModule.default;
+    }
+    return sharpImg;
+}
+
+export const compareImages = async (data1: ImageData, data2: ImageData, threshold: number, variantDimensionDiff = 0): Promise<[ImageComparisonResult, boolean, string[]]> => {
+    let results: ImageComparisonResult | undefined;
+    const errors = [];
+    try {
+        results = await pixelImageCompare(data1, data2);
+    } catch (err) {
+        if(!(err instanceof SimpleError)) {
+            errors.push(err.message);
+        }
+        // swallow this and continue with resemble
+    }
+    if (results === undefined) {
+        results = await resembleImageCompare(data1, data2, threshold, variantDimensionDiff);
+    }
+
+    return [results, results.misMatchPercentage < threshold, errors];
+}
+
+export const pixelImageCompare = async (data1: ImageData, data2: ImageData): Promise<ImageComparisonResult> => {
+
+    let pixelDiff: number | undefined = undefined;
+
+    let sharpFunc: SharpCreate;
+
+    try {
+        sharpFunc = await getSharpAsync();
+    } catch (err) {
+        err.message = `Unable to do image comparison due to an issue importing the comparison library. It is likely sharp is not installed (see ContextMod docs). Error Message: ${err.message}`;
+        throw err;
+    }
+
+    if(data1.preferredResolution !== undefined) {
+        const [prefWidth, prefHeight] = data1.preferredResolution;
+        const prefImgData = data2.getSimilarResolutionVariant(prefWidth, prefHeight);
+        if(prefImgData !== undefined) {
+            const refThumbnail = data1.getSimilarResolutionVariant(prefWidth, prefHeight) as ImageData;
+            // go ahead and fetch comparing image data so analysis time doesn't include download time
+            await prefImgData.data();
+            const [actualWidth, actualHeight] = refThumbnail.actualResolution as [number, number];
+            //const normalRefData = await sharpFunc(await refThumbnail.data).normalise().ensureAlpha().raw().toBuffer({resolveWithObject: true});
+            const time = Date.now();
+            //pixelDiff = pixelmatch(normalRefData.data, await sharpFunc(await prefImgData.data).ensureAlpha().raw().toBuffer(), null, normalRefData.info.width, normalRefData.info.height);
+            const refInfo = await (await refThumbnail.sharp()).resize(400, null, {fit: 'outside'}).raw().toBuffer({resolveWithObject: true});
+            pixelDiff = pixelmatch(refInfo.data, await (await prefImgData.sharp()).resize(400, null, {fit: 'outside'}).raw().toBuffer(), null, refInfo.info.width, refInfo.info.height);
+            return {
+                isSameDimensions: true,
+                dimensionDifference: {
+                    height: 0,
+                    width: 0,
+                },
+                misMatchPercentage: pixelDiff / (refInfo.info.width * refInfo.info.height),
+                analysisTime: Date.now() - time,
+            }
+        }
+    }
+    // try to determine by provided dimensions (if any) before downloading
+    if(data1.hasDimensions && data2.hasDimensions && !data1.isSameDimensions(data2)) {
+        throw new SimpleError('No images have same dimensions');
+    }
+    // download anyway because resemblejs uses a lot of memory (15-30MB per image) vs. 2 downloads which will be ~2-5MB
+    if(!data1.hasDimensions) {
+        await data1.data;
+    }
+    if(!data2.hasDimensions) {
+        await data2.data;
+    }
+    // should have all dimensions now
+    if(!data1.isSameDimensions(data2)) {
+        throw new SimpleError('No images have same dimensions');
+    }
+    // ok so now are sure everything is same dimensions
+    const time = Date.now();
+    pixelDiff = pixelmatch(await data1.data(), await data2.data(), null, data1.width as number, data2.height as number);
+    return {
+        isSameDimensions: true,
+        dimensionDifference: {
+            height: 0,
+            width: 0,
+        },
+        misMatchPercentage: pixelDiff / (data1.pixels as number),
+        analysisTime: Date.now() - time,
+    }
+}
+
+export const resembleImageCompare = async (data1: ImageData, data2: ImageData, threshold?: number, variantDimensionDiff = 0): Promise<ImageComparisonResult> => {
     let ci: Function;
 
     try {
@@ -1217,7 +1327,9 @@ export const compareImages = async (data1: ImageData, data2: ImageData, threshol
         throw err;
     }
 
-    let results: ResembleResult | undefined = undefined;
+    let results: ImageComparisonResult | undefined = undefined;
+    // @ts-ignore
+    let resResult: ResembleResult = undefined;
 
     //const [minWidth, minHeight] = getMinimumDimensions(data1, data2);
     const compareOptions = {
@@ -1244,15 +1356,22 @@ export const compareImages = async (data1: ImageData, data2: ImageData, threshol
         const [prefWidth, prefHeight] = data1.preferredResolution;
         const prefImgData = data2.getSimilarResolutionVariant(prefWidth, prefHeight, variantDimensionDiff);
         if(prefImgData !== undefined) {
-            results = await ci(await data1.getSimilarResolutionVariant(prefWidth, prefHeight)?.data, await prefImgData.data, compareOptions) as ResembleResult;
+            resResult = await ci(await (await (data1.getSimilarResolutionVariant(prefWidth, prefHeight) as ImageData).sharp()).resize(400, null, {fit: 'outside'}).jpeg().toBuffer()
+                , await (await prefImgData.sharp()).resize(400, null, {fit: 'outside'}).jpeg().toBuffer()
+                , compareOptions) as ResembleResult;
         }
     }
-    if(results === undefined) {
-        results = await ci(await data1.data, await data2.data, compareOptions) as ResembleResult;
+    if(resResult === undefined) {
+        resResult = await ci(await (await data1.sharp()).resize(400, null, {fit: 'outside'}).jpeg().toBuffer(),
+            await (await data2.sharp()).resize(400, null, {fit: 'outside'}).jpeg().toBuffer(), compareOptions) as ResembleResult;
     }
 
-    const sameImage = threshold === undefined ? undefined : results.rawMisMatchPercentage < threshold;
-    return [results, sameImage];
+    return {
+        isSameDimensions: resResult.isSameDimensions,
+        dimensionDifference: resResult.dimensionDifference,
+        misMatchPercentage: resResult.rawMisMatchPercentage,
+        analysisTime: resResult.analysisTime
+    };
 }
 
 export const createHistoricalStatsDisplay = (data: HistoricalStats): HistoricalStatsDisplay => {

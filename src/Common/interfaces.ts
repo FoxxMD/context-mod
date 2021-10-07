@@ -277,6 +277,16 @@ export interface ImageDetection {
 //     variants?: ImageData[]
 // }
 
+export interface ImageComparisonResult {
+    isSameDimensions: boolean
+    dimensionDifference: {
+        width: number;
+        height: number;
+    };
+    misMatchPercentage: number;
+    analysisTime: number;
+}
+
 export interface ResembleResult extends ResembleSingleCallbackComparisonResult {
     rawMisMatchPercentage: number
 }
@@ -1253,6 +1263,13 @@ export interface BotInstanceJsonConfig {
          * @default false
          * */
         sharedMod?: boolean,
+
+        /**
+         * If sharing a mod stream stagger pushing relevant Activities to individual subreddits.
+         *
+         * Useful when running many subreddits and rules are potentially cpu/memory/traffic heavy -- allows spreading out load
+         * */
+        stagger?: number,
     },
     /**
      * Settings related to default configurations for queue behavior for subreddits
@@ -1539,6 +1556,7 @@ export interface BotInstanceConfig extends BotInstanceJsonConfig {
     },
     polling: {
         sharedMod: boolean,
+        stagger?: number,
         limit: number,
         interval: number,
     },

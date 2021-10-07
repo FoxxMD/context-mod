@@ -1,9 +1,10 @@
 import fetch from "node-fetch";
 import {Submission} from "snoowrap/dist/objects";
 import {URL} from "url";
-import {absPercentDifference, isValidImageURL} from "../util";
+import {absPercentDifference, getSharpAsync, isValidImageURL} from "../util";
 import sizeOf from "image-size";
 import SimpleError from "../Utils/SimpleError";
+import {Sharp} from "sharp";
 
 export interface ImageDataOptions {
     width?: number,
@@ -19,7 +20,8 @@ class ImageData {
     url: URL
     variants: ImageData[] = []
     preferredResolution?: [number, number]
-    private buff?: Buffer;
+    sharpImg!: Sharp
+    actualResolution?: [number, number]
 
     constructor(data: ImageDataOptions, aggressive = false) {
         this.width = data.width;
@@ -31,41 +33,64 @@ class ImageData {
         this.variants = data.variants || [];
     }
 
-    get data(): Promise<Buffer> {
-        return (async () => {
-            if (this.buff === undefined) {
-                try {
-                    const response = await fetch(this.url.toString())
-                    if (response.ok) {
-                        const ct = response.headers.get('Content-Type');
-                        if (ct !== null && ct.includes('image')) {
-                            this.buff = await response.buffer();
-                            if (this.width === undefined || this.height === undefined) {
-                                const dimensions = sizeOf(this.buff);
-                                this.width = dimensions.width;
-                                this.height = dimensions.height;
-                            }
-                        } else {
-                            throw new SimpleError(`Content-Type for fetched URL ${this.url} did not contain "image"`);
+    async data(format?: string): Promise<Buffer> {
+        await this.sharp();
+        switch(format) {
+            case 'jpg':
+                return this.sharpImg.jpeg().toBuffer();
+            case 'png':
+                return this.sharpImg.png().toBuffer();
+            default:
+                return this.sharpImg.raw().toBuffer();
+        }
+        //return this.buff;
+    }
+
+    async sharp(): Promise<Sharp> {
+        if (this.sharpImg === undefined) {
+            try {
+                const response = await fetch(this.url.toString())
+                if (response.ok) {
+                    const ct = response.headers.get('Content-Type');
+                    if (ct !== null && ct.includes('image')) {
+                        const sFunc = await getSharpAsync();
+                        //const imgInfo = await sFunc(await response.buffer()).ensureAlpha().raw().toBuffer({resolveWithObject: true});
+                        this.sharpImg = await sFunc(await response.buffer()).ensureAlpha();
+                        const meta = await this.sharpImg.metadata();
+                        //this.buff =  imgInfo.data;
+                        //this.buff = await response.buffer();
+                        if (this.width === undefined || this.height === undefined) {
+                            // this.width = imgInfo.info.width;
+                            // this.height = imgInfo.info.height;
+                            this.width = meta.width;
+                            this.height = meta.height;
                         }
+                        //this.actualResolution = [imgInfo.info.width, imgInfo.info.height];
+                        this.actualResolution = [meta.width as number, meta.height as number];
+                        //this.sharpImg = sharpImg;
                     } else {
-                        throw new SimpleError(`URL response was not OK: (${response.status})${response.statusText}`);
+                        throw new SimpleError(`Content-Type for fetched URL ${this.url} did not contain "image"`);
                     }
+                } else {
+                    throw new SimpleError(`URL response was not OK: (${response.status})${response.statusText}`);
+                }
 
 
-                } catch (err) {
-                    if(!(err instanceof SimpleError)) {
-                        throw new Error(`Error occurred while fetching response from URL: ${err.message}`);
-                    } else {
-                      throw err;
-                    }
+            } catch (err) {
+                if(!(err instanceof SimpleError)) {
+                    throw new Error(`Error occurred while fetching response from URL: ${err.message}`);
+                } else {
+                    throw err;
                 }
             }
-            return this.buff;
-        })();
+        }
+        return this.sharpImg;
     }
 
     get pixels() {
+        if (this.actualResolution !== undefined) {
+            return this.actualResolution[0] * this.actualResolution[1];
+        }
         if (this.width === undefined || this.height === undefined) {
             return undefined;
         }
@@ -100,6 +125,13 @@ class ImageData {
         return this.variants.find(x => {
             return x.hasDimensions && (absPercentDifference(width, x.width as number) <= allowablePercentDiff) && (absPercentDifference(height, x.height as number) <= allowablePercentDiff);
         });
+    }
+
+    isSameDimensions(otherImage: ImageData) {
+        if (!this.hasDimensions || !otherImage.hasDimensions) {
+            return false;
+        }
+        return this.width === otherImage.width && this.height === otherImage.height;
     }
 
     static fromSubmission(sub: Submission, aggressive = false): ImageData {

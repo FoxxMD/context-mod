@@ -2,6 +2,7 @@ import {Rule, RuleJSONConfig, RuleOptions, RulePremise, RuleResult} from "./inde
 import {Comment, VoteableContent} from "snoowrap";
 import Submission from "snoowrap/dist/objects/Submission";
 import as from 'async';
+import pMap from 'p-map';
 // @ts-ignore
 import subImageMatch from 'matches-subimage';
 import {
@@ -19,7 +20,7 @@ import {
     parseStringToRegex,
     parseSubredditName,
     parseUsableLinkIdentifier,
-    PASS,
+    PASS, sleep,
     toStrongSubredditState
 } from "../util";
 import {
@@ -112,7 +113,11 @@ export class RecentActivityRule extends Rule {
                 if(this.imageDetection.enable) {
                     try {
                         referenceImage = ImageData.fromSubmission(item);
+                        await referenceImage.sharp();
                         referenceImage.setPreferredResolutionByWidth(1000);
+                        if(referenceImage.preferredResolution !== undefined) {
+                            await (referenceImage.getSimilarResolutionVariant(...referenceImage.preferredResolution) as ImageData).sharp();
+                        }
                     } catch (err) {
                         this.logger.verbose(err.message);
                     }
@@ -159,7 +164,7 @@ export class RecentActivityRule extends Rule {
                 }
                 // parallel all the things
                 this.logger.profile('asyncCompare');
-                const results = await Promise.all(viableActivity.map(x => ci(x)));
+                const results = await pMap(viableActivity, ci, {concurrency: 2});
                 this.logger.profile('asyncCompare', {level: 'debug', message: 'Total time for image download and compare'});
                 const totalAnalysisTime = analysisTimes.reduce((acc, x) => acc + x,0);
                 this.logger.debug(`Reference image compared ${analysisTimes.length} times. Timings: Avg ${formatNumber(totalAnalysisTime / analysisTimes.length, {toFixed: 0})}ms | Max: ${Math.max(...analysisTimes)}ms | Min: ${Math.min(...analysisTimes)}ms | Total: ${totalAnalysisTime}ms (${formatNumber(totalAnalysisTime/1000)}s)`);
