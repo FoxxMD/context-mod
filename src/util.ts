@@ -1270,13 +1270,13 @@ export const pixelImageCompare = async (data1: ImageData, data2: ImageData): Pro
         if(prefImgData !== undefined) {
             const refThumbnail = data1.getSimilarResolutionVariant(prefWidth, prefHeight) as ImageData;
             // go ahead and fetch comparing image data so analysis time doesn't include download time
-            await prefImgData.data();
+            await prefImgData.sharp();
             const [actualWidth, actualHeight] = refThumbnail.actualResolution as [number, number];
             //const normalRefData = await sharpFunc(await refThumbnail.data).normalise().ensureAlpha().raw().toBuffer({resolveWithObject: true});
             const time = Date.now();
             //pixelDiff = pixelmatch(normalRefData.data, await sharpFunc(await prefImgData.data).ensureAlpha().raw().toBuffer(), null, normalRefData.info.width, normalRefData.info.height);
-            const refInfo = await (await refThumbnail.sharp()).resize(400, null, {fit: 'outside'}).raw().toBuffer({resolveWithObject: true});
-            pixelDiff = pixelmatch(refInfo.data, await (await prefImgData.sharp()).resize(400, null, {fit: 'outside'}).raw().toBuffer(), null, refInfo.info.width, refInfo.info.height);
+            const refInfo = await (await refThumbnail.sharp()).clone().resize(400, null, {fit: 'outside'}).raw().toBuffer({resolveWithObject: true});
+            pixelDiff = pixelmatch(refInfo.data, await (await prefImgData.sharp()).clone().resize(400, null, {fit: 'outside'}).raw().toBuffer(), null, refInfo.info.width, refInfo.info.height);
             return {
                 isSameDimensions: true,
                 dimensionDifference: {
@@ -1294,10 +1294,10 @@ export const pixelImageCompare = async (data1: ImageData, data2: ImageData): Pro
     }
     // download anyway because resemblejs uses a lot of memory (15-30MB per image) vs. 2 downloads which will be ~2-5MB
     if(!data1.hasDimensions) {
-        await data1.data;
+        await data1.sharp();
     }
     if(!data2.hasDimensions) {
-        await data2.data;
+        await data2.sharp();
     }
     // should have all dimensions now
     if(!data1.isSameDimensions(data2)) {
@@ -1356,14 +1356,20 @@ export const resembleImageCompare = async (data1: ImageData, data2: ImageData, t
         const [prefWidth, prefHeight] = data1.preferredResolution;
         const prefImgData = data2.getSimilarResolutionVariant(prefWidth, prefHeight, variantDimensionDiff);
         if(prefImgData !== undefined) {
-            resResult = await ci(await (await (data1.getSimilarResolutionVariant(prefWidth, prefHeight) as ImageData).sharp()).resize(400, null, {fit: 'outside'}).jpeg().toBuffer()
-                , await (await prefImgData.sharp()).resize(400, null, {fit: 'outside'}).jpeg().toBuffer()
-                , compareOptions) as ResembleResult;
+            let refThumbnail;
+            try {
+                refThumbnail = data1.getSimilarResolutionVariant(prefWidth, prefHeight) as ImageData;
+                resResult = await ci(await (await refThumbnail.sharp()).clone().resize(400, null, {fit: 'outside'}).jpeg().toBuffer()
+                    , await (await prefImgData.sharp()).clone().resize(400, null, {fit: 'outside'}).jpeg().toBuffer()
+                    , compareOptions) as ResembleResult;
+            } catch(err) {
+                throw err;
+            }
         }
     }
     if(resResult === undefined) {
-        resResult = await ci(await (await data1.sharp()).resize(400, null, {fit: 'outside'}).jpeg().toBuffer(),
-            await (await data2.sharp()).resize(400, null, {fit: 'outside'}).jpeg().toBuffer(), compareOptions) as ResembleResult;
+        resResult = await ci(await (await data1.sharp()).clone().resize(400, null, {fit: 'outside'}).jpeg().toBuffer(),
+            await (await data2.sharp()).clone().resize(400, null, {fit: 'outside'}).jpeg().toBuffer(), compareOptions) as ResembleResult;
     }
 
     return {

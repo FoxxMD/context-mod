@@ -33,17 +33,9 @@ class ImageData {
         this.variants = data.variants || [];
     }
 
-    async data(format?: string): Promise<Buffer> {
-        await this.sharp();
-        switch(format) {
-            case 'jpg':
-                return this.sharpImg.jpeg().toBuffer();
-            case 'png':
-                return this.sharpImg.png().toBuffer();
-            default:
-                return this.sharpImg.raw().toBuffer();
-        }
-        //return this.buff;
+    async data(format = 'raw'): Promise<Buffer> {
+        // @ts-ignore
+        return await (await this.sharp()).clone().toFormat(format).toBuffer();
     }
 
     async sharp(): Promise<Sharp> {
