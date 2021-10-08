@@ -11,7 +11,7 @@ import {
     comparisonTextOp,
     FAIL,
     formatNumber,
-    getActivitySubredditName,
+    getActivitySubredditName, imageCompareMaxConcurrencyGuess,
     //getImageDataFromUrl,
     isSubmission,
     isValidImageURL,
@@ -146,7 +146,7 @@ export class RecentActivityRule extends Rule {
                         try {
                             let imgData =  ImageData.fromSubmission(x);
                             try {
-                                const [compareResult, sameImage] = await compareImages(referenceImage, imgData, this.imageDetection.threshold);
+                                const [compareResult, sameImage] = await compareImages(referenceImage, imgData, this.imageDetection.threshold / 100);
                                 analysisTimes.push(compareResult.analysisTime);
                                 if (sameImage) {
                                     return x;
@@ -164,7 +164,7 @@ export class RecentActivityRule extends Rule {
                 }
                 // parallel all the things
                 this.logger.profile('asyncCompare');
-                const results = await pMap(viableActivity, ci, {concurrency: 2});
+                const results = await pMap(viableActivity, ci, {concurrency: imageCompareMaxConcurrencyGuess});
                 this.logger.profile('asyncCompare', {level: 'debug', message: 'Total time for image download and compare'});
                 const totalAnalysisTime = analysisTimes.reduce((acc, x) => acc + x,0);
                 this.logger.debug(`Reference image compared ${analysisTimes.length} times. Timings: Avg ${formatNumber(totalAnalysisTime / analysisTimes.length, {toFixed: 0})}ms | Max: ${Math.max(...analysisTimes)}ms | Min: ${Math.min(...analysisTimes)}ms | Total: ${totalAnalysisTime}ms (${formatNumber(totalAnalysisTime/1000)}s)`);

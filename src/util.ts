@@ -10,6 +10,7 @@ import Submission from "snoowrap/dist/objects/Submission";
 import {Comment} from "snoowrap";
 import {inflateSync, deflateSync} from "zlib";
 import pixelmatch from 'pixelmatch';
+import os from 'os';
 import {
     ActivityWindowCriteria,
     CacheOptions,
@@ -27,7 +28,6 @@ import {
     RedditEntity,
     RedditEntityType,
     RegExResult,
-    ResembleResult,
     ResourceStats,
     StatusCodeError,
     StringOperator,
@@ -52,6 +52,15 @@ import fetch, {Response} from "node-fetch";
 import { URL } from "url";
 import ImageData from "./Common/ImageData";
 import {Sharp, SharpOptions} from "sharp";
+//import {ResembleSingleCallbackComparisonResult} from "resemblejs";
+
+// want to guess how many concurrent image comparisons we should be doing
+// assuming, conservatively and based on real-world results, that comparing 30 images takes about ~30MB memory...
+// and we really want to use less than a fourth of available ram (should be low-footprint!)...
+// and base-line operation of RCB is usually around 40MB (liberal)
+const availMemory = (os.freemem() / (1024 * 1024)) / 4 + 40;
+export const imageCompareMaxConcurrencyGuess = Math.min(3, Math.max(Math.floor(availMemory/30), 1));
+
 
 const ReReg = reRegExp();
 
@@ -1191,7 +1200,7 @@ export const parseRuleResultsToMarkdownSummary = (ruleResults: RuleResult[]): st
 }
 
 export const isValidImageURL = (str: string): boolean => {
-    return !!str.match(/\w+\.(jpg|jpeg|gif|png|tiff|bmp)$/gi);
+    return !!str.match(/\w+\.(jpg|jpeg|gif|png|tiff|bmp|webp)$/gi);
 }
 
 let resembleCIFunc: Function;
@@ -1206,7 +1215,7 @@ type SharpCreate = (input?:
 | Int32Array
 | Float32Array
 | Float64Array
-| string,) => Sharp;
+| string, options?: SharpOptions) => Sharp;
 let sharpImg: SharpCreate;
 
 const getCIFunc = async () => {
@@ -1235,18 +1244,28 @@ export const getSharpAsync = async (): Promise<SharpCreate> => {
 
 export const compareImages = async (data1: ImageData, data2: ImageData, threshold: number, variantDimensionDiff = 0): Promise<[ImageComparisonResult, boolean, string[]]> => {
     let results: ImageComparisonResult | undefined;
-    const errors = [];
-    try {
-        results = await pixelImageCompare(data1, data2);
-    } catch (err) {
-        if(!(err instanceof SimpleError)) {
-            errors.push(err.message);
-        }
-        // swallow this and continue with resemble
-    }
-    if (results === undefined) {
-        results = await resembleImageCompare(data1, data2, threshold, variantDimensionDiff);
-    }
+    const errors: string[] = [];
+
+    results = await pixelImageCompare(data1, data2);
+
+    // may decide to bring resemble back at some point in the future if pixelmatch has issues
+    // but for now...
+    // sharp is a *much* more useful utility and i'd rather have it as a dependency than node-canvas
+    // it's much faster, uses less memory, and its libraries more likely to already be available on a host
+    // -- with it i can control how images are normalized for dimensions which is basically what resemble was doing anyway (using canvas)
+
+    // try {
+    //     results = await pixelImageCompare(data1, data2);
+    // } catch (err) {
+    //     if(!(err instanceof SimpleError)) {
+    //         errors.push(err.message);
+    //     }
+    //     // swallow this and continue with resemble
+    // }
+    // if (results === undefined) {
+    //     results = await resembleImageCompare(data1, data2, threshold, variantDimensionDiff);
+    // }
+
 
     return [results, results.misMatchPercentage < threshold, errors];
 }
@@ -1264,121 +1283,88 @@ export const pixelImageCompare = async (data1: ImageData, data2: ImageData): Pro
         throw err;
     }
 
-    if(data1.preferredResolution !== undefined) {
-        const [prefWidth, prefHeight] = data1.preferredResolution;
-        const prefImgData = data2.getSimilarResolutionVariant(prefWidth, prefHeight);
-        if(prefImgData !== undefined) {
-            const refThumbnail = data1.getSimilarResolutionVariant(prefWidth, prefHeight) as ImageData;
-            // go ahead and fetch comparing image data so analysis time doesn't include download time
-            await prefImgData.sharp();
-            const [actualWidth, actualHeight] = refThumbnail.actualResolution as [number, number];
-            //const normalRefData = await sharpFunc(await refThumbnail.data).normalise().ensureAlpha().raw().toBuffer({resolveWithObject: true});
-            const time = Date.now();
-            //pixelDiff = pixelmatch(normalRefData.data, await sharpFunc(await prefImgData.data).ensureAlpha().raw().toBuffer(), null, normalRefData.info.width, normalRefData.info.height);
-            const refInfo = await (await refThumbnail.sharp()).clone().resize(400, null, {fit: 'outside'}).raw().toBuffer({resolveWithObject: true});
-            pixelDiff = pixelmatch(refInfo.data, await (await prefImgData.sharp()).clone().resize(400, null, {fit: 'outside'}).raw().toBuffer(), null, refInfo.info.width, refInfo.info.height);
-            return {
-                isSameDimensions: true,
-                dimensionDifference: {
-                    height: 0,
-                    width: 0,
-                },
-                misMatchPercentage: pixelDiff / (refInfo.info.width * refInfo.info.height),
-                analysisTime: Date.now() - time,
-            }
-        }
-    }
-    // try to determine by provided dimensions (if any) before downloading
-    if(data1.hasDimensions && data2.hasDimensions && !data1.isSameDimensions(data2)) {
-        throw new SimpleError('No images have same dimensions');
-    }
-    // download anyway because resemblejs uses a lot of memory (15-30MB per image) vs. 2 downloads which will be ~2-5MB
-    if(!data1.hasDimensions) {
-        await data1.sharp();
-    }
-    if(!data2.hasDimensions) {
-        await data2.sharp();
-    }
-    // should have all dimensions now
-    if(!data1.isSameDimensions(data2)) {
-        throw new SimpleError('No images have same dimensions');
-    }
-    // ok so now are sure everything is same dimensions
+    const [refImg, compareImg, width, height] = await data1.normalizeImagesForComparison('pixel', data2);
     const time = Date.now();
-    pixelDiff = pixelmatch(await data1.data(), await data2.data(), null, data1.width as number, data2.height as number);
+    // ensureAlpha() is imperative here because pixelmatch expects an alpha layer
+    pixelDiff = pixelmatch(await refImg.ensureAlpha().raw().toBuffer(), await compareImg.ensureAlpha().raw().toBuffer(), null, width, height);
     return {
         isSameDimensions: true,
         dimensionDifference: {
             height: 0,
             width: 0,
         },
-        misMatchPercentage: pixelDiff / (data1.pixels as number),
+        misMatchPercentage: pixelDiff / (width * height),
         analysisTime: Date.now() - time,
     }
 }
 
-export const resembleImageCompare = async (data1: ImageData, data2: ImageData, threshold?: number, variantDimensionDiff = 0): Promise<ImageComparisonResult> => {
-    let ci: Function;
+// see comments in compareImages
+//
 
-    try {
-        ci = await getCIFunc();
-    } catch (err) {
-        err.message = `Unable to do image comparison due to an issue importing the comparison library. It is likely 'node-canvas' is not installed (see ContextMod docs). Error Message: ${err.message}`;
-        throw err;
-    }
-
-    let results: ImageComparisonResult | undefined = undefined;
-    // @ts-ignore
-    let resResult: ResembleResult = undefined;
-
-    //const [minWidth, minHeight] = getMinimumDimensions(data1, data2);
-    const compareOptions = {
-        // "ignore": [
-        //     'colors' //  ~100% than nothing because resemble computes brightness information from rgb for each pixel
-        // ],
-        // boundingBox is ~30% slower than no restrictions
-        // because resemble has to check that each pixel is within the box
-        //
-        // output: {
-        //     // compare at most 800x800 section to increase performance
-        //     // -- potentially allow this to be user-configurable in the future if not sufficient for dup detection
-        //     boundingBox: {
-        //         left: 0,
-        //         top: 0,
-        //         right: Math.min(minWidth, 800),
-        //         bottom: Math.min(minHeight, 800)
-        //     },
-        // },
-        returnEarlyThreshold: threshold !== undefined ? Math.min(threshold + 5, 100) : undefined,
-    };
-
-    if(data1.preferredResolution !== undefined) {
-        const [prefWidth, prefHeight] = data1.preferredResolution;
-        const prefImgData = data2.getSimilarResolutionVariant(prefWidth, prefHeight, variantDimensionDiff);
-        if(prefImgData !== undefined) {
-            let refThumbnail;
-            try {
-                refThumbnail = data1.getSimilarResolutionVariant(prefWidth, prefHeight) as ImageData;
-                resResult = await ci(await (await refThumbnail.sharp()).clone().resize(400, null, {fit: 'outside'}).jpeg().toBuffer()
-                    , await (await prefImgData.sharp()).clone().resize(400, null, {fit: 'outside'}).jpeg().toBuffer()
-                    , compareOptions) as ResembleResult;
-            } catch(err) {
-                throw err;
-            }
-        }
-    }
-    if(resResult === undefined) {
-        resResult = await ci(await (await data1.sharp()).clone().resize(400, null, {fit: 'outside'}).jpeg().toBuffer(),
-            await (await data2.sharp()).clone().resize(400, null, {fit: 'outside'}).jpeg().toBuffer(), compareOptions) as ResembleResult;
-    }
-
-    return {
-        isSameDimensions: resResult.isSameDimensions,
-        dimensionDifference: resResult.dimensionDifference,
-        misMatchPercentage: resResult.rawMisMatchPercentage,
-        analysisTime: resResult.analysisTime
-    };
-}
+// export const resembleImageCompare = async (data1: ImageData, data2: ImageData, threshold?: number, variantDimensionDiff = 0): Promise<ImageComparisonResult> => {
+//     let ci: Function;
+//
+//     try {
+//         ci = await getCIFunc();
+//     } catch (err) {
+//         err.message = `Unable to do image comparison due to an issue importing the comparison library. It is likely 'node-canvas' is not installed (see ContextMod docs). Error Message: ${err.message}`;
+//         throw err;
+//     }
+//
+//     let results: ImageComparisonResult | undefined = undefined;
+//     // @ts-ignore
+//     let resResult: ResembleSingleCallbackComparisonResult = undefined;
+//
+//     //const [minWidth, minHeight] = getMinimumDimensions(data1, data2);
+//     const compareOptions = {
+//         // "ignore": [
+//         //     'colors' //  ~100% than nothing because resemble computes brightness information from rgb for each pixel
+//         // ],
+//         // boundingBox is ~30% slower than no restrictions
+//         // because resemble has to check that each pixel is within the box
+//         //
+//         // output: {
+//         //     // compare at most 800x800 section to increase performance
+//         //     // -- potentially allow this to be user-configurable in the future if not sufficient for dup detection
+//         //     boundingBox: {
+//         //         left: 0,
+//         //         top: 0,
+//         //         right: Math.min(minWidth, 800),
+//         //         bottom: Math.min(minHeight, 800)
+//         //     },
+//         // },
+//         returnEarlyThreshold: threshold !== undefined ? Math.min(threshold + 5, 100) : undefined,
+//     };
+//
+//     if(data1.preferredResolution !== undefined) {
+//         const [prefWidth, prefHeight] = data1.preferredResolution;
+//         const prefImgData = data2.getSimilarResolutionVariant(prefWidth, prefHeight, variantDimensionDiff);
+//         if(prefImgData !== undefined) {
+//             let refThumbnail;
+//             try {
+//                 refThumbnail = data1.getSimilarResolutionVariant(prefWidth, prefHeight) as ImageData;
+//                 resResult = await ci(await (await refThumbnail.sharp()).clone().resize(400, null, {fit: 'outside'}).jpeg().toBuffer()
+//                     , await (await prefImgData.sharp()).clone().resize(400, null, {fit: 'outside'}).jpeg().toBuffer()
+//                     , compareOptions) as ResembleSingleCallbackComparisonResult;
+//             } catch(err) {
+//                 throw err;
+//             }
+//         }
+//     }
+//     if(resResult === undefined) {
+//         resResult = await ci(await (await data1.sharp()).clone().resize(400, null, {fit: 'outside'}).jpeg().toBuffer(),
+//             await (await data2.sharp()).clone().resize(400, null, {fit: 'outside'}).jpeg().toBuffer(), compareOptions) as ResembleSingleCallbackComparisonResult;
+//     }
+//
+//
+//     return {
+//         isSameDimensions: resResult.isSameDimensions,
+//         dimensionDifference: resResult.dimensionDifference,
+//         // @ts-ignore
+//         misMatchPercentage: resResult.rawMisMatchPercentage,
+//         analysisTime: resResult.analysisTime
+//     };
+// }
 
 export const createHistoricalStatsDisplay = (data: HistoricalStats): HistoricalStatsDisplay => {
     const display: any = {};

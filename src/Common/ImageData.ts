@@ -46,20 +46,19 @@ class ImageData {
                     const ct = response.headers.get('Content-Type');
                     if (ct !== null && ct.includes('image')) {
                         const sFunc = await getSharpAsync();
-                        //const imgInfo = await sFunc(await response.buffer()).ensureAlpha().raw().toBuffer({resolveWithObject: true});
-                        this.sharpImg = await sFunc(await response.buffer()).ensureAlpha();
+                        // if image is animated then we want to extract the first frame and convert it to a regular image
+                        // so we can compare two static images later (also because sharp can't use resize() on animated images)
+                        if(['gif','webp'].some(x => ct.includes(x))) {
+                            this.sharpImg = await sFunc(await (await sFunc(await response.buffer(), {pages: 1, animated: false})).png().toBuffer());
+                        } else {
+                            this.sharpImg = await sFunc(await response.buffer());
+                        }
                         const meta = await this.sharpImg.metadata();
-                        //this.buff =  imgInfo.data;
-                        //this.buff = await response.buffer();
                         if (this.width === undefined || this.height === undefined) {
-                            // this.width = imgInfo.info.width;
-                            // this.height = imgInfo.info.height;
                             this.width = meta.width;
                             this.height = meta.height;
                         }
-                        //this.actualResolution = [imgInfo.info.width, imgInfo.info.height];
                         this.actualResolution = [meta.width as number, meta.height as number];
-                        //this.sharpImg = sharpImg;
                     } else {
                         throw new SimpleError(`Content-Type for fetched URL ${this.url} did not contain "image"`);
                     }
@@ -124,6 +123,87 @@ class ImageData {
             return false;
         }
         return this.width === otherImage.width && this.height === otherImage.height;
+    }
+
+    async sameAspectRatio(otherImage: ImageData) {
+        let thisRes = this.actualResolution;
+        let otherRes = otherImage.actualResolution;
+        if(thisRes === undefined) {
+            const tMeta = await (await this.sharp()).metadata();
+            const thisMeta = {width: tMeta.width as  number, height: tMeta.height as number };
+            this.actualResolution = [thisMeta.width, thisMeta.height];
+            thisRes = this.actualResolution;
+        }
+        if(otherRes === undefined) {
+            const otherMeta = await (await otherImage.sharp()).metadata();
+            otherRes = [otherMeta.width as number, otherMeta.height as number];
+        }
+        const thisRatio = thisRes[0] / thisRes[1];
+        const otherRatio = otherRes[0] / otherRes[1];
+
+        // a little leeway
+        return Math.abs(thisRatio - otherRatio) < 0.1;
+    }
+
+    static async dimensionsFromMetadata(img: Sharp) {
+        const {width, height, ...rest} = await img.metadata();
+        return {width: width as number, height: height as number};
+    }
+
+    async normalizeImagesForComparison(compareLibrary: ('pixel' | 'resemble'), imgToCompare: ImageData): Promise<[Sharp, Sharp, number, number]> {
+        const sFunc = await getSharpAsync();
+
+        let refImage = this as ImageData;
+        let compareImage = imgToCompare;
+        if (this.preferredResolution !== undefined) {
+            const matchingVariant = compareImage.getSimilarResolutionVariant(this.preferredResolution[0], this.preferredResolution[1]);
+            if (matchingVariant !== undefined) {
+                compareImage = matchingVariant;
+                refImage = this.getSimilarResolutionVariant(this.preferredResolution[0], this.preferredResolution[1]) as ImageData;
+            }
+        }
+
+        let refSharp = (await refImage.sharp()).clone();
+        let refMeta = await ImageData.dimensionsFromMetadata(refSharp);
+        let compareSharp = (await compareImage.sharp()).clone();
+        let compareMeta = await ImageData.dimensionsFromMetadata(compareSharp);
+
+        // if dimensions on not the same we need to crop or resize before final resize
+        if (refMeta.width !== compareMeta.width || refMeta.height !== compareMeta.height) {
+            const thisRatio = refMeta.width / (refMeta.height);
+            const otherRatio = compareMeta.width / compareMeta.height;
+
+            const sameRatio = Math.abs(thisRatio - otherRatio) < 0.04;
+            if (sameRatio) {
+                // then resize first since its most likely the same image
+                // can be fairly sure a downscale will get pixels close to the same
+                if (refMeta.width > compareMeta.width) {
+                    refSharp = sFunc(await refSharp.resize(compareMeta.width, null, {fit: 'outside'}).toBuffer());
+                } else {
+                    compareSharp = sFunc(await compareSharp.resize(refMeta.width, null, {fit: 'outside'}).toBuffer());
+                }
+                refMeta = await ImageData.dimensionsFromMetadata(refSharp);
+                compareMeta = await ImageData.dimensionsFromMetadata(compareSharp);
+            }
+            // find smallest common dimensions
+            const sWidth = refMeta.width <= compareMeta.width ? refMeta.width : compareMeta.width;
+            const sHeight = refMeta.height <= compareMeta.height ? refMeta.height : compareMeta.height;
+
+            // crop if necessary
+            if(sWidth !== refMeta.width || sHeight !== refMeta.height) {
+                refSharp = sFunc(await refSharp.extract({left: 0, top: 0, width: sWidth, height: sHeight}).toBuffer());
+            }
+            if(sWidth !== compareMeta.width || sHeight !== compareMeta.height) {
+                compareSharp = sFunc(await compareSharp.extract({left: 0, top: 0, width: sWidth, height: sHeight}).toBuffer());
+            }
+        }
+
+        // final resize to reduce memory/cpu usage during comparison
+        refSharp = sFunc(await refSharp.resize(400, null, {fit: 'outside'}).toBuffer());
+        compareSharp = sFunc(await compareSharp.resize(400, null, {fit: 'outside'}).toBuffer());
+
+        const {width, height} = await ImageData.dimensionsFromMetadata(refSharp);
+        return [refSharp, compareSharp, width, height];
     }
 
     static fromSubmission(sub: Submission, aggressive = false): ImageData {

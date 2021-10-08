@@ -68,7 +68,6 @@
     "passport-jwt": "^4.0.0",
     "pixelmatch": "^5.2.1",
     "pretty-print-json": "^1.0.3",
-    "resemblejs": "^4.0.0",
     "safe-stable-stringify": "^1.1.1",
     "set-random-interval": "^1.1.0",
     "snoostorm": "^1.5.2",
@@ -116,7 +115,6 @@
     "typescript-json-schema": "^0.50.1"
   },
   "optionalDependencies": {
-    "node-canvas": "^2.7.0",
     "sharp": "^0.29.1"
   }
 }
