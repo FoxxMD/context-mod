@@ -2,6 +2,7 @@ import {Rule, RuleJSONConfig, RuleOptions, RulePremise, RuleResult} from "./inde
 import {Comment, VoteableContent} from "snoowrap";
 import Submission from "snoowrap/dist/objects/Submission";
 import as from 'async';
+import pMap from 'p-map';
 // @ts-ignore
 import subImageMatch from 'matches-subimage';
 import {
@@ -10,7 +11,8 @@ import {
     comparisonTextOp,
     FAIL,
     formatNumber,
-    getActivitySubredditName, getImageDataFromUrl,
+    getActivitySubredditName, imageCompareMaxConcurrencyGuess,
+    //getImageDataFromUrl,
     isSubmission,
     isValidImageURL,
     objectToStringSummary,
@@ -18,16 +20,19 @@ import {
     parseStringToRegex,
     parseSubredditName,
     parseUsableLinkIdentifier,
-    PASS,
+    PASS, sleep,
     toStrongSubredditState
 } from "../util";
 import {
     ActivityWindow,
     ActivityWindowCriteria,
-    ActivityWindowType, CommentState, ImageDetection,
+    ActivityWindowType, CommentState,
+    //ImageData,
+    ImageDetection,
     ReferenceSubmission, StrongSubredditState, SubmissionState,
     SubredditCriteria, SubredditState
 } from "../Common/interfaces";
+import ImageData from "../Common/ImageData";
 
 const parseLink = parseUsableLinkIdentifier();
 
@@ -102,15 +107,19 @@ export class RecentActivityRule extends Rule {
                 const itemId = item.id;
                 const referenceUrl = await item.url;
                 const usableUrl = parseLink(referenceUrl);
-                const filteredActivity = [];
-                const analysisTimes = [];
-                let referenceImage;
+                let filteredActivity: (Submission|Comment)[] = [];
+                let analysisTimes: number[] = [];
+                let referenceImage: ImageData | undefined;
                 if (this.imageDetection.enable) {
-                    const [response, imgData, reason] = await getImageDataFromUrl(referenceUrl);
-                    if (reason !== undefined) {
-                        this.logger.verbose(reason);
-                    } else {
-                        referenceImage = imgData
+                    try {
+                        referenceImage = ImageData.fromSubmission(item);
+                        await referenceImage.sharp();
+                        referenceImage.setPreferredResolutionByWidth(1000);
+                        if (referenceImage.preferredResolution !== undefined) {
+                            await (referenceImage.getSimilarResolutionVariant(...referenceImage.preferredResolution) as ImageData).sharp();
+                        }
+                    } catch (err) {
+                        this.logger.verbose(err.message);
                     }
                 }
                 let longRun;
@@ -120,38 +129,49 @@ export class RecentActivityRule extends Rule {
                         l.verbose('FYI: Image processing is causing rule to take longer than normal');
                     }, 2500);
                 }
-                for (const x of viableActivity) {
+                // @ts-ignore
+                const ci = async (x: (Submission|Comment)) => {
                     if (!asSubmission(x) || x.id === itemId) {
-                        continue;
+                        return null;
                     }
                     if (x.url === undefined) {
-                        continue;
+                        return null;
                     }
                     if (parseLink(x.url) === usableUrl) {
-                        filteredActivity.push(x);
+                        return x;
                     }
                     // only do image detection if regular URL comparison and other conditions fail first
                     // to reduce CPU/bandwidth usage
                     if (referenceImage !== undefined) {
-                        const [response, imgData, reason] = await getImageDataFromUrl(x.url);
-                        if (imgData !== undefined) {
+                        try {
+                            let imgData =  ImageData.fromSubmission(x);
                             try {
-                                const [compareResult, sameImage] = await compareImages(referenceImage, imgData, this.imageDetection.threshold);
+                                const [compareResult, sameImage] = await compareImages(referenceImage, imgData, this.imageDetection.threshold / 100);
                                 analysisTimes.push(compareResult.analysisTime);
                                 if (sameImage) {
-                                    filteredActivity.push(x);
+                                    return x;
                                 }
                             } catch (err) {
-                                this.logger.warn(`Unexpected error encountered while comparing images, will skip comparison: ${err.message}`);
+                                this.logger.warn(`Unexpected error encountered while comparing images, will skip comparison => ${err.message}`);
+                            }
+                        } catch (err) {
+                            if(!err.message.includes('did not end with a valid image extension')) {
+                                this.logger.warn(`Will not compare image from Submission ${x.id} due to error while parsing image URL => ${err.message}`);
                             }
                         }
                     }
+                    return null;
                 }
+                // parallel all the things
+                this.logger.profile('asyncCompare');
+                const results = await pMap(viableActivity, ci, {concurrency: imageCompareMaxConcurrencyGuess});
+                this.logger.profile('asyncCompare', {level: 'debug', message: 'Total time for image download and compare'});
+                const totalAnalysisTime = analysisTimes.reduce((acc, x) => acc + x,0);
+                this.logger.debug(`Reference image compared ${analysisTimes.length} times. Timings: Avg ${formatNumber(totalAnalysisTime / analysisTimes.length, {toFixed: 0})}ms | Max: ${Math.max(...analysisTimes)}ms | Min: ${Math.min(...analysisTimes)}ms | Total: ${totalAnalysisTime}ms (${formatNumber(totalAnalysisTime/1000)}s)`);
+                filteredActivity = filteredActivity.concat(results.filter(x => x !== null));
                 if (longRun !== undefined) {
                     clearTimeout(longRun);
                 }
-                const totalAnalysisTime = analysisTimes.reduce((acc, x) => acc + x, 0);
-                this.logger.debug(`Reference image compared ${analysisTimes.length} times. Timings: Avg ${formatNumber(totalAnalysisTime / analysisTimes.length, {toFixed: 0})}ms | Max: ${Math.max(...analysisTimes)}ms | Min: ${Math.min(...analysisTimes)}ms | Total: ${totalAnalysisTime}ms (${formatNumber(totalAnalysisTime / 1000)}s)`);
                 viableActivity = filteredActivity;
             }
         }

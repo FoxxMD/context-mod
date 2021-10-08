@@ -619,6 +619,7 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
             name: botName,
             polling: {
                 sharedMod = false,
+                stagger,
                 limit = 100,
                 interval = 30,
             } = {},
@@ -723,6 +724,7 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
             caching: botCache,
             polling: {
                 sharedMod,
+                stagger,
                 limit,
                 interval,
             },

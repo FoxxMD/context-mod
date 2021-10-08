@@ -1,4 +1,4 @@
-import Snoowrap, {Subreddit} from "snoowrap";
+import Snoowrap, {Comment, Submission, Subreddit} from "snoowrap";
 import {Logger} from "winston";
 import dayjs, {Dayjs} from "dayjs";
 import {Duration} from "dayjs/plugin/duration";
@@ -49,6 +49,7 @@ class Bot {
     maxWorkers: number;
     startedAt: Dayjs = dayjs();
     sharedModqueue: boolean = false;
+    streamListedOnce: string[] = [];
 
     apiSample: number[] = [];
     apiRollingAvg: number = 0;
@@ -91,6 +92,7 @@ class Bot {
             },
             polling: {
                 sharedMod,
+                stagger,
             },
             queue: {
                 maxWorkers,
@@ -199,12 +201,32 @@ class Bot {
             }
         }
 
+        const modStreamListingListener = (name: string) => async (listing: (Comment|Submission)[]) => {
+            // dole out in order they were received
+            if(!this.streamListedOnce.includes(name)) {
+                this.streamListedOnce.push(name);
+                return;
+            }
+            for(const i of listing) {
+                const foundManager = this.subManagers.find(x => x.subreddit.display_name === i.subreddit.display_name && x.modStreamCallbacks.get(name) !== undefined);
+                if(foundManager !== undefined) {
+                    foundManager.modStreamCallbacks.get(name)(i);
+                    if(stagger !== undefined) {
+                        await sleep(stagger);
+                    }
+                }
+            }
+
+        }
+
         const defaultUnmoderatedStream = new UnmoderatedStream(this.client, {subreddit: 'mod', limit: 100, clearProcessed: { size: 100, retain: 100 }});
         // @ts-ignore
         defaultUnmoderatedStream.on('error', modStreamErrorListener('unmoderated'));
+        defaultUnmoderatedStream.on('listing', modStreamListingListener('unmoderated'));
         const defaultModqueueStream = new ModQueueStream(this.client, {subreddit: 'mod', limit: 100, clearProcessed: { size: 100, retain: 100 }});
         // @ts-ignore
         defaultModqueueStream.on('error', modStreamErrorListener('modqueue'));
+        defaultModqueueStream.on('listing', modStreamListingListener('modqueue'));
         this.cacheManager.modStreams.set('unmoderated', defaultUnmoderatedStream);
         this.cacheManager.modStreams.set('modqueue', defaultModqueueStream);
 
@@ -337,7 +359,7 @@ class Bot {
 
     async runModStreams(notify = false) {
         for(const [k,v] of this.cacheManager.modStreams) {
-            if(!v.running && v.listeners('item').length > 0) {
+            if(!v.running && this.subManagers.some(x => x.modStreamCallbacks.get(k) !== undefined)) {
                 v.startInterval();
                 this.logger.info(`Starting default ${k.toUpperCase()} mod stream`);
                 if(notify) {
@@ -347,6 +369,7 @@ class Bot {
                         }
                     }
                 }
+                await sleep(2000);
             }
         }
     }
@@ -359,6 +382,7 @@ class Bot {
         for (const manager of this.subManagers) {
             if (manager.validConfigLoaded && manager.botState.state !== RUNNING) {
                 await manager.start(causedBy, {reason: 'Caused by application startup'});
+                await sleep(2000);
             }
         }
 

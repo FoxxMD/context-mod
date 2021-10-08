@@ -5,7 +5,6 @@ import Poll from "snoostorm/out/util/Poll";
 import Snoowrap from "snoowrap";
 import {RuleResult} from "../Rule";
 import {IncomingMessage} from "http";
-import {ResembleSingleCallbackComparisonResult} from "resemblejs";
 
 /**
  * An ISO 8601 Duration
@@ -267,15 +266,24 @@ export interface ImageDetection {
     threshold?: number
 }
 
-export interface ImageData {
-    data: Buffer,
-    width: number,
-    height: number
-    pixels: number
-}
+// export interface ImageData {
+//     data: Promise<Buffer>,
+//     buf?: Buffer,
+//     width: number,
+//     height: number
+//     pixels?: number
+//     url: string
+//     variants?: ImageData[]
+// }
 
-export interface ResembleResult extends ResembleSingleCallbackComparisonResult {
-    rawMisMatchPercentage: number
+export interface ImageComparisonResult {
+    isSameDimensions: boolean
+    dimensionDifference: {
+        width: number;
+        height: number;
+    };
+    misMatchPercentage: number;
+    analysisTime: number;
 }
 
 export interface RichContent {
@@ -1250,6 +1258,13 @@ export interface BotInstanceJsonConfig {
          * @default false
          * */
         sharedMod?: boolean,
+
+        /**
+         * If sharing a mod stream stagger pushing relevant Activities to individual subreddits.
+         *
+         * Useful when running many subreddits and rules are potentially cpu/memory/traffic heavy -- allows spreading out load
+         * */
+        stagger?: number,
     },
     /**
      * Settings related to default configurations for queue behavior for subreddits
@@ -1536,6 +1551,7 @@ export interface BotInstanceConfig extends BotInstanceJsonConfig {
     },
     polling: {
         sharedMod: boolean,
+        stagger?: number,
         limit: number,
         interval: number,
     },

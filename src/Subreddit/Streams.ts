@@ -5,7 +5,8 @@ import {PollConfiguration} from "snoostorm/out/util/Poll";
 import {ClearProcessedOptions, DEFAULT_POLLING_INTERVAL} from "../Common/interfaces";
 import dayjs, {Dayjs} from "dayjs";
 import { Duration } from "dayjs/plugin/duration";
-import {parseDuration} from "../util";
+import {parseDuration, sleep} from "../util";
+import setRandomInterval from 'set-random-interval';
 
 type Awaitable<T> = Promise<T> | T;
 
@@ -27,6 +28,7 @@ export class SPoll<T extends object> extends Poll<T> {
     clearProcessedSize?: number;
     clearProcessedAfter?: Dayjs;
     retainProcessed: number = 0;
+    randInterval?: { clear: () => void };
 
     constructor(options: RCBPollConfiguration<T>) {
         super(options);
@@ -51,7 +53,7 @@ export class SPoll<T extends object> extends Poll<T> {
 
     startInterval = () => {
         this.running = true;
-        this.interval = setInterval((function (self) {
+        this.randInterval = setRandomInterval((function (self) {
             return async () => {
                 try {
                     // clear the tracked, processed activity ids after a set period or number of activities have been processed
@@ -93,11 +95,14 @@ export class SPoll<T extends object> extends Poll<T> {
                     self.end();
                 }
             }
-        })(this), this.frequency);
+        })(this), this.frequency - 1, this.frequency + 1);
     }
 
     end = () => {
         this.running = false;
+        if(this.randInterval !== undefined) {
+            this.randInterval.clear();
+        }
         super.end();
     }
 }
