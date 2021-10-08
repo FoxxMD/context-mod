@@ -8,7 +8,7 @@ RUN apk update
 # https://github.com/node-gfx/node-canvas-prebuilt/issues/77#issuecomment-884365161
 RUN apk add --no-cache build-base g++ cairo-dev jpeg-dev pango-dev giflib-dev
 # required dependencies in order to compile linux-musl (node-canvas) on alpine
-RUN apk add --update --repository http://dl-3.alpinelinux.org/alpine/edge/testing libmount ttf-dejavu ttf-droid ttf-freefont ttf-liberation ttf-ubuntu-font-family fontconfig
+RUN apk add --update --repository http://dl-3.alpinelinux.org/alpine/edge/testing libmount ttf-dejavu ttf-droid ttf-freefont ttf-liberation ttf-ubuntu-font-family fontconfig vips
 
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
