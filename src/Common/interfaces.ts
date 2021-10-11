@@ -257,13 +257,131 @@ export interface ImageDetection {
      * */
     fetchBehavior?: 'extension' | 'unknown' | 'all',
     /**
-     * The percentage, as a whole number, of pixels that are **different** between the two images at which point the images are not considered the same.
+     * The percentage, as a whole number, of difference between two images at which point they will not be considered the same.
+     *
+     * Will be used as `hash.hardThreshold` and `pixel.threshold` if those values are not specified
      *
      * Default is `5`
      *
      * @default 5
      * */
     threshold?: number
+
+    /**
+     * Use perceptual hashing (blockhash-js) to compare images
+     *
+     * Pros:
+     *
+     * * very fast
+     * * low cpu/memory usage
+     * * results can be cached
+     *
+     * Cons:
+     *
+     * * not as accurate as pixel comparison
+     * * weaker for text-heavy images
+     * * mostly color-blind
+     *
+     * Best uses:
+     *
+     * * Detecting (general) duplicate images
+     * * Comparing large number of images
+     * */
+    hash?: {
+        /**
+         * Enabled by default.
+         *
+         * If both `hash` and `pixel` are enabled then `pixel` will be used to verify image comparison when hashes matches
+         *
+         * @default true
+         * */
+        enable?: boolean
+
+        /**
+         * Bit count determines accuracy of hash and granularity of hash comparison (comparison to other hashes)
+         *
+         * Default is `32`
+         *
+         * **NOTE:** Hashes of different sizes (bitS) cannot be compared. If you are caching results make sure all rules where results may be shared use the same bit count to ensure hashes can be compared. Otherwise hashes will be recomputed.
+         *
+         * @default 32
+         * */
+        bits?: number
+
+        /**
+         * Number of seconds to cache image hash
+         * */
+        ttl?: number
+        /**
+         * High Confidence Threshold
+         *
+         * If the difference in comparison is equal to or less than this number the images are considered the same and pixel comparison WILL NOT occur
+         *
+         * Defaults to the parent-level `threshold` value if not present
+         *
+         * Use `null` if you want pixel comparison to ALWAYS occur (softThreshold must be present)
+         * */
+        hardThreshold?: number | null
+        /**
+         * Low Confidence Threshold -- only used if `pixel` is enabled
+         *
+         * If the difference in comparison is
+         *
+         * 1) equal to or less than this value and
+         * 2) the value is greater than `hardThreshold`
+         *
+         * the images will be compared using the `pixel` method
+         * */
+        softThreshold?: number
+    }
+
+    /**
+     * Use pixel counting to compare images
+     *
+     * Pros:
+     *
+     * * most accurate
+     * * strong with text or color-only changes
+     *
+     * Cons:
+     *
+     * * much slower than hashing
+     * * memory/cpu intensive
+     *
+     * Best uses:
+     *
+     * * Comparison text-only images
+     * * Comparison requires high degree of accuracy or changes are subtle
+     * */
+    pixel?: {
+        /**
+         * Disabled by default.
+         *
+         * @default false
+         * */
+        enable?: boolean
+        /**
+         * The percentage, as a whole number, of pixels that are **different** between the two images at which point the images are not considered the same.
+         * */
+        threshold?: number
+    }
+}
+
+export interface StrongImageDetection {
+    enable: boolean,
+    fetchBehavior: 'extension' | 'unknown' | 'all'
+    threshold: number,
+    hash: {
+        enable: boolean
+        bits: number
+        ttl?: number
+        hardThreshold: number | null
+        softThreshold?: number
+    }
+    pixel: {
+        enable: boolean
+        threshold: number
+    }
 }
 
 // export interface ImageData {

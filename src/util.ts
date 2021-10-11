@@ -52,6 +52,8 @@ import fetch, {Response} from "node-fetch";
 import { URL } from "url";
 import ImageData from "./Common/ImageData";
 import {Sharp, SharpOptions} from "sharp";
+// @ts-ignore
+import {blockhashData, hammingDistance} from 'blockhash';
 //import {ResembleSingleCallbackComparisonResult} from "resemblejs";
 
 // want to guess how many concurrent image comparisons we should be doing
@@ -1049,7 +1051,8 @@ export const cacheStats = (): ResourceStats => {
         submission: {requests: 0, miss: 0, identifierRequestCount: statMetricCache(), requestTimestamps: timestampArr(), averageTimeBetweenHits: 'N/A', identifierAverageHit: 0},
         comment: {requests: 0, miss: 0, identifierRequestCount: statMetricCache(), requestTimestamps: timestampArr(), averageTimeBetweenHits: 'N/A', identifierAverageHit: 0},
         subreddit: {requests: 0, miss: 0, identifierRequestCount: statMetricCache(), requestTimestamps: timestampArr(), averageTimeBetweenHits: 'N/A', identifierAverageHit: 0},
-        commentCheck: {requests: 0, miss: 0, identifierRequestCount: statMetricCache(), requestTimestamps: timestampArr(), averageTimeBetweenHits: 'N/A', identifierAverageHit: 0}
+        commentCheck: {requests: 0, miss: 0, identifierRequestCount: statMetricCache(), requestTimestamps: timestampArr(), averageTimeBetweenHits: 'N/A', identifierAverageHit: 0},
+        imageHash: {requests: 0, miss: 0, identifierRequestCount: statMetricCache(), requestTimestamps: timestampArr(), averageTimeBetweenHits: 'N/A', identifierAverageHit: 0}
     };
 }
 
@@ -1405,4 +1408,8 @@ export const subredditStateIsNameOnly = (state: SubredditState | StrongSubreddit
 
 export const absPercentDifference = (num1: number, num2: number) => {
     return Math.abs((num1 - num2) / num1) * 100;
+}
+
+export const bitsToHexLength = (bits: number): number => {
+    return Math.pow(bits, 2) / 4;
 }

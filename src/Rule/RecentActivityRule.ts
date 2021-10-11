@@ -7,7 +7,9 @@ import pMap from 'p-map';
 import subImageMatch from 'matches-subimage';
 import {
     activityWindowText,
-    asSubmission, compareImages,
+    asSubmission, bitsToHexLength,
+    // blockHashImage,
+    compareImages,
     comparisonTextOp,
     FAIL,
     formatNumber,
@@ -29,10 +31,12 @@ import {
     ActivityWindowType, CommentState,
     //ImageData,
     ImageDetection,
-    ReferenceSubmission, StrongSubredditState, SubmissionState,
+    ReferenceSubmission, StrongImageDetection, StrongSubredditState, SubmissionState,
     SubredditCriteria, SubredditState
 } from "../Common/interfaces";
 import ImageData from "../Common/ImageData";
+import {blockhash, hammingDistance} from "../Common/blockhash/blockhash";
+import leven from "leven";
 
 const parseLink = parseUsableLinkIdentifier();
 
@@ -40,7 +44,7 @@ export class RecentActivityRule extends Rule {
     window: ActivityWindowType;
     thresholds: ActivityThreshold[];
     useSubmissionAsReference: boolean;
-    imageDetection: Required<ImageDetection>
+    imageDetection: StrongImageDetection
     lookAt?: 'comments' | 'submissions';
 
     constructor(options: RecentActivityRuleOptions) {
@@ -55,13 +59,39 @@ export class RecentActivityRule extends Rule {
         const {
             enable = false,
             fetchBehavior = 'extension',
-            threshold = 5
+            threshold = 5,
+            hash = {},
+            pixel = {},
         } = imageDetection || {};
+
+        const {
+            enable: hEnable = true,
+            bits = 16,
+            ttl = 60,
+            hardThreshold = threshold,
+            softThreshold
+        } = hash || {};
+
+        const {
+            enable: pEnable = true,
+            threshold: pThreshold = threshold,
+        } = pixel || {};
 
         this.imageDetection = {
             enable,
             fetchBehavior,
-            threshold
+            threshold,
+            hash: {
+                enable: hEnable,
+                hardThreshold,
+                softThreshold,
+                bits,
+                ttl,
+            },
+            pixel: {
+                enable: pEnable,
+                threshold: pThreshold
+            }
         };
         this.lookAt = lookAt;
         this.useSubmissionAsReference = useSubmissionAsReference;
@@ -113,11 +143,28 @@ export class RecentActivityRule extends Rule {
                 if (this.imageDetection.enable) {
                     try {
                         referenceImage = ImageData.fromSubmission(item);
-                        await referenceImage.sharp();
-                        referenceImage.setPreferredResolutionByWidth(1000);
-                        if (referenceImage.preferredResolution !== undefined) {
-                            await (referenceImage.getSimilarResolutionVariant(...referenceImage.preferredResolution) as ImageData).sharp();
+                        referenceImage.setPreferredResolutionByWidth(800);
+                        if(this.imageDetection.hash.enable) {
+                            let refHash: string | undefined;
+                            if(this.imageDetection.hash.ttl !== undefined) {
+                                refHash = await this.resources.getImageHash(referenceImage);
+                                if(refHash === undefined) {
+                                    refHash = await referenceImage.hash(this.imageDetection.hash.bits);
+                                    await this.resources.setImageHash(referenceImage, refHash, this.imageDetection.hash.ttl);
+                                } else if(refHash.length !== bitsToHexLength(this.imageDetection.hash.bits)) {
+                                    this.logger.warn('Reference image hash length did not correspond to bits specified in config. Recomputing...');
+                                    refHash = await referenceImage.hash(this.imageDetection.hash.bits);
+                                    await this.resources.setImageHash(referenceImage, refHash, this.imageDetection.hash.ttl);
+                                }
+                            } else {
+                                refHash = await referenceImage.hash(this.imageDetection.hash.bits);
+                            }
                         }
+                        //await referenceImage.sharp();
+                        // await referenceImage.hash();
+                        // if (referenceImage.preferredResolution !== undefined) {
+                        //     await (referenceImage.getSimilarResolutionVariant(...referenceImage.preferredResolution) as ImageData).sharp();
+                        // }
                     } catch (err) {
                         this.logger.verbose(err.message);
                     }
@@ -145,14 +192,58 @@ export class RecentActivityRule extends Rule {
                     if (referenceImage !== undefined) {
                         try {
                             let imgData =  ImageData.fromSubmission(x);
-                            try {
-                                const [compareResult, sameImage] = await compareImages(referenceImage, imgData, this.imageDetection.threshold / 100);
-                                analysisTimes.push(compareResult.analysisTime);
-                                if (sameImage) {
+                            imgData.setPreferredResolutionByWidth(800);
+                            if(this.imageDetection.hash.enable) {
+                                let compareHash: string | undefined;
+                                if(this.imageDetection.hash.ttl !== undefined) {
+                                    compareHash = await this.resources.getImageHash(imgData);
+                                }
+                                if(compareHash === undefined)
+                                {
+                                    compareHash = await imgData.hash(this.imageDetection.hash.bits);
+                                    if(this.imageDetection.hash.ttl !== undefined) {
+                                        await this.resources.setImageHash(imgData, compareHash, this.imageDetection.hash.ttl);
+                                    }
+                                }
+                                const refHash = await referenceImage.hash(this.imageDetection.hash.bits);
+                                if(refHash.length !== compareHash.length) {
+                                    this.logger.debug(`Hash lengths were not the same! Will need to recompute compare hash to match reference.\n\nReference: ${referenceImage.baseUrl} has is ${refHash.length} char long | Comparing: ${imgData.baseUrl} has is ${compareHash} ${compareHash.length} long`);
+                                    compareHash = await imgData.hash(this.imageDetection.hash.bits)
+                                }
+                                const distance = leven(refHash, compareHash);
+                                const diff = (distance/refHash.length)*100;
+
+
+                                // return image if hard is defined and diff is less
+                                if(null !== this.imageDetection.hash.hardThreshold && diff <= this.imageDetection.hash.hardThreshold) {
                                     return x;
                                 }
-                            } catch (err) {
-                                this.logger.warn(`Unexpected error encountered while comparing images, will skip comparison => ${err.message}`);
+                                // hard is either not defined or diff was gerater than hard
+
+                                // if soft is defined
+                                if (this.imageDetection.hash.softThreshold !== undefined) {
+                                    // and diff is greater than soft allowance
+                                    if(diff > this.imageDetection.hash.softThreshold) {
+                                        // not similar enough
+                                        return null;
+                                    }
+                                   // similar enough, will continue on to pixel (if enabled!)
+                                } else {
+                                    // only hard was defined and did not pass
+                                    return null;
+                                }
+                            }
+                            // at this point either hash was not enabled or it was and we hit soft threshold but not hard
+                            if(this.imageDetection.pixel.enable) {
+                                try {
+                                    const [compareResult, sameImage] = await compareImages(referenceImage, imgData, this.imageDetection.pixel.threshold / 100);
+                                    analysisTimes.push(compareResult.analysisTime);
+                                    if (sameImage) {
+                                        return x;
+                                    }
+                                } catch (err) {
+                                    this.logger.warn(`Unexpected error encountered while pixel-comparing images, will skip comparison => ${err.message}`);
+                                }
                             }
                         } catch (err) {
                             if(!err.message.includes('did not end with a valid image extension')) {
@@ -164,10 +255,12 @@ export class RecentActivityRule extends Rule {
                 }
                 // parallel all the things
                 this.logger.profile('asyncCompare');
-                const results = await pMap(viableActivity, ci, {concurrency: imageCompareMaxConcurrencyGuess});
-                this.logger.profile('asyncCompare', {level: 'debug', message: 'Total time for image download and compare'});
+                const results = await pMap(viableActivity, ci, {concurrency: 1});
+                this.logger.profile('asyncCompare', {level: 'debug', message: 'Total time for image comparison (incl download/cache calls)'});
                 const totalAnalysisTime = analysisTimes.reduce((acc, x) => acc + x,0);
-                this.logger.debug(`Reference image compared ${analysisTimes.length} times. Timings: Avg ${formatNumber(totalAnalysisTime / analysisTimes.length, {toFixed: 0})}ms | Max: ${Math.max(...analysisTimes)}ms | Min: ${Math.min(...analysisTimes)}ms | Total: ${totalAnalysisTime}ms (${formatNumber(totalAnalysisTime/1000)}s)`);
+                if(analysisTimes.length > 0) {
+                    this.logger.debug(`Reference image pixel-compared ${analysisTimes.length} times. Timings: Avg ${formatNumber(totalAnalysisTime / analysisTimes.length, {toFixed: 0})}ms | Max: ${Math.max(...analysisTimes)}ms | Min: ${Math.min(...analysisTimes)}ms | Total: ${totalAnalysisTime}ms (${formatNumber(totalAnalysisTime/1000)}s)`);
+                }
                 filteredActivity = filteredActivity.concat(results.filter(x => x !== null));
                 if (longRun !== undefined) {
                     clearTimeout(longRun);

@@ -50,6 +50,7 @@ import {cacheTTLDefaults, createHistoricalDefaults, historicalDefaults} from "..
 import {check} from "tcp-port-used";
 import {ExtendedSnoowrap} from "../Utils/SnoowrapClients";
 import dayjs from "dayjs";
+import ImageData from "../Common/ImageData";
 
 export const DEFAULT_FOOTER = '\r\n*****\r\nThis action was performed by [a bot.]({{botLink}}) Mention a moderator or [send a modmail]({{modmailLink}}) if you any ideas, questions, or concerns about this action.';
 
@@ -420,7 +421,13 @@ export class SubredditResources {
     async hasSubreddit(name: string) {
         if (this.subredditTTL !== false) {
             const hash = `sub-${name}`;
+            this.stats.cache.subreddit.requests++
+            this.stats.cache.subreddit.requestTimestamps.push(Date.now());
+            await this.stats.cache.subreddit.identifierRequestCount.set(hash, (await this.stats.cache.subreddit.identifierRequestCount.wrap(hash, () => 0) as number) + 1);
             const val = await this.cache.get(hash);
+            if(val === undefined || val === null) {
+                this.stats.cache.subreddit.miss++;
+            }
             return val !== undefined && val !== null;
         }
         return false;
@@ -897,6 +904,8 @@ export class SubredditResources {
         const userName = getActivityAuthorName(item.author);
         const hash = `commentUserResult-${userName}-${item.link_id}-${objectHash.sha1(checkConfig)}`;
         this.stats.cache.commentCheck.requests++;
+        this.stats.cache.commentCheck.requestTimestamps.push(Date.now());
+        await this.stats.cache.commentCheck.identifierRequestCount.set(hash, (await this.stats.cache.commentCheck.identifierRequestCount.wrap(hash, () => 0) as number) + 1);
         let result = await this.cache.get(hash) as UserResultCache | undefined | null;
         if(result === null) {
             result = undefined;
@@ -926,6 +935,33 @@ export class SubredditResources {
 
         const footerRawContent = await this.getContent(footer, item.subreddit);
         return he.decode(Mustache.render(footerRawContent, {subName, permaLink, modmailLink, botLink: BOT_LINK}));
+    }
+
+    async getImageHash(img: ImageData): Promise<string|undefined> {
+        const hash = `imgHash-${img.baseUrl}`;
+        const result = await this.cache.get(hash) as string | undefined | null;
+        this.stats.cache.imageHash.requests++
+        this.stats.cache.imageHash.requestTimestamps.push(Date.now());
+        await this.stats.cache.imageHash.identifierRequestCount.set(hash, (await this.stats.cache.imageHash.identifierRequestCount.wrap(hash, () => 0) as number) + 1);
+        if(result !== undefined && result !== null) {
+            return result;
+        }
+        this.stats.cache.commentCheck.miss++;
+        return undefined;
+        // const hash = await this.cache.wrap(img.baseUrl, async () => await img.hash(true), { ttl }) as string;
+        // if(img.hashResult === undefined) {
+        //     img.hashResult = hash;
+        // }
+        // return hash;
+    }
+
+    async setImageHash(img: ImageData, hash: string, ttl: number): Promise<void> {
+        await this.cache.set(`imgHash-${img.baseUrl}`, hash, {ttl});
+        // const hash = await this.cache.wrap(img.baseUrl, async () => await img.hash(true), { ttl }) as string;
+        // if(img.hashResult === undefined) {
+        //     img.hashResult = hash;
+        // }
+        // return hash;
     }
 }
 

@@ -5,6 +5,7 @@ import {absPercentDifference, getSharpAsync, isValidImageURL} from "../util";
 import sizeOf from "image-size";
 import SimpleError from "../Utils/SimpleError";
 import {Sharp} from "sharp";
+import {blockhash} from "./blockhash/blockhash";
 
 export interface ImageDataOptions {
     width?: number,
@@ -21,6 +22,7 @@ class ImageData {
     variants: ImageData[] = []
     preferredResolution?: [number, number]
     sharpImg!: Sharp
+    hashResult!: string
     actualResolution?: [number, number]
 
     constructor(data: ImageDataOptions, aggressive = false) {
@@ -36,6 +38,20 @@ class ImageData {
     async data(format = 'raw'): Promise<Buffer> {
         // @ts-ignore
         return await (await this.sharp()).clone().toFormat(format).toBuffer();
+    }
+
+    async hash(bits: number, useVariantIfPossible = true): Promise<string> {
+        if(this.hashResult === undefined) {
+            let ref: ImageData | undefined;
+            if(useVariantIfPossible && this.preferredResolution !== undefined) {
+                ref = this.getSimilarResolutionVariant(this.preferredResolution[0], this.preferredResolution[1]);
+            }
+            if(ref === undefined) {
+                ref = this;
+            }
+            this.hashResult = await blockhash((await ref.sharp()).clone(), bits);
+        }
+        return this.hashResult;
     }
 
     async sharp(): Promise<Sharp> {
@@ -90,6 +106,10 @@ class ImageData {
 
     get hasDimensions() {
         return this.width !== undefined && this.height !== undefined;
+    }
+
+    get baseUrl() {
+        return `${this.url.origin}${this.url.pathname}`;
     }
 
     setPreferredResolutionByWidth(prefWidth: number) {
