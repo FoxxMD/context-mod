@@ -9,13 +9,30 @@ import {InvalidOptionArgumentError} from "commander";
 import Submission from "snoowrap/dist/objects/Submission";
 import {Comment} from "snoowrap";
 import {inflateSync, deflateSync} from "zlib";
-import sizeOf from 'image-size';
+import pixelmatch from 'pixelmatch';
+import os from 'os';
 import {
-    ActivityWindowCriteria, CacheOptions, CacheProvider,
+    ActivityWindowCriteria,
+    CacheOptions,
+    CacheProvider,
     DurationComparison,
-    GenericComparison, HistoricalStats, HistoricalStatsDisplay, ImageData, ImageDetection, LogInfo, NamedGroup,
-    PollingOptionsStrong, RedditEntity, RedditEntityType, RegExResult, ResembleResult, ResourceStats, StatusCodeError,
-    StringOperator, StrongSubredditState, SubredditState
+    GenericComparison,
+    HistoricalStats,
+    HistoricalStatsDisplay, ImageComparisonResult,
+    //ImageData,
+    ImageDetection,
+    //ImageDownloadOptions,
+    LogInfo,
+    NamedGroup,
+    PollingOptionsStrong,
+    RedditEntity,
+    RedditEntityType,
+    RegExResult,
+    ResourceStats,
+    StatusCodeError,
+    StringOperator,
+    StrongSubredditState,
+    SubredditState
 } from "./Common/interfaces";
 import JSON5 from "json5";
 import yaml, {JSON_SCHEMA} from "js-yaml";
@@ -32,6 +49,20 @@ import {MESSAGE} from "triple-beam";
 import {RedditUser} from "snoowrap/dist/objects";
 import reRegExp from '@stdlib/regexp-regexp';
 import fetch, {Response} from "node-fetch";
+import { URL } from "url";
+import ImageData from "./Common/ImageData";
+import {Sharp, SharpOptions} from "sharp";
+// @ts-ignore
+import {blockhashData, hammingDistance} from 'blockhash';
+//import {ResembleSingleCallbackComparisonResult} from "resemblejs";
+
+// want to guess how many concurrent image comparisons we should be doing
+// assuming, conservatively and based on real-world results, that comparing 30 images takes about ~30MB memory...
+// and we really want to use less than a fourth of available ram (should be low-footprint!)...
+// and base-line operation of RCB is usually around 40MB (liberal)
+const availMemory = (os.freemem() / (1024 * 1024)) / 4 + 40;
+export const imageCompareMaxConcurrencyGuess = Math.min(3, Math.max(Math.floor(availMemory/30), 1));
+
 
 const ReReg = reRegExp();
 
@@ -93,6 +124,7 @@ export const defaultFormat = (defaultLabel = 'App') => printf(({
                                                                    leaf,
                                                                    itemId,
                                                                    timestamp,
+                                                                   durationMs,
                                                                    // @ts-ignore
                                                                    [SPLAT]: splatObj,
                                                                    stack,
@@ -122,7 +154,7 @@ export const defaultFormat = (defaultLabel = 'App') => printf(({
     }
     const labelContent = `${nodes.map((x: string) => `[${x}]`).join(' ')}`;
 
-    return `${timestamp} ${level.padEnd(7)}: ${instance !== undefined ? `|${instance}| ` : ''}${bot !== undefined ? `~${bot}~ ` : ''}${subreddit !== undefined ? `{${subreddit}} ` : ''}${labelContent} ${msg}${stringifyValue !== '' ? ` ${stringifyValue}` : ''}${stackMsg}`;
+    return `${timestamp} ${level.padEnd(7)}: ${instance !== undefined ? `|${instance}| ` : ''}${bot !== undefined ? `~${bot}~ ` : ''}${subreddit !== undefined ? `{${subreddit}} ` : ''}${labelContent} ${msg}${durationMs !== undefined ? ` Elapsed: ${durationMs}ms (${formatNumber(durationMs/1000)}s) ` : ''}${stringifyValue !== '' ? ` ${stringifyValue}` : ''}${stackMsg}`;
 });
 
 
@@ -904,17 +936,25 @@ export interface StrongSubredditStateOptions {
 
 export const toStrongSubredditState = (s: SubredditState, opts?: StrongSubredditStateOptions): StrongSubredditState => {
     const {defaultFlags, generateDescription = false} = opts || {};
-    const {name: nameVal, stateDescription} = s;
+    const {name: nameValRaw, stateDescription} = s;
 
     let nameReg: RegExp | undefined;
-    if (nameVal !== undefined) {
-        if (!(nameVal instanceof RegExp)) {
+    if (nameValRaw !== undefined) {
+        if (!(nameValRaw instanceof RegExp)) {
+            let nameVal = nameValRaw.trim();
             nameReg = parseStringToRegex(nameVal, defaultFlags);
             if (nameReg === undefined) {
-                nameReg = new RegExp(parseSubredditName(nameVal), defaultFlags);
+                try {
+                    const parsedVal = parseSubredditName(nameVal);
+                    nameVal = parsedVal;
+                } catch (err) {
+                    // oh well
+                    const f = 1;
+                }
+                nameReg = parseStringToRegex(`/^${nameVal}$/`, defaultFlags);
             }
         } else {
-            nameReg = nameVal;
+            nameReg = nameValRaw;
         }
     }
     const strongState = {
@@ -1011,7 +1051,8 @@ export const cacheStats = (): ResourceStats => {
         submission: {requests: 0, miss: 0, identifierRequestCount: statMetricCache(), requestTimestamps: timestampArr(), averageTimeBetweenHits: 'N/A', identifierAverageHit: 0},
         comment: {requests: 0, miss: 0, identifierRequestCount: statMetricCache(), requestTimestamps: timestampArr(), averageTimeBetweenHits: 'N/A', identifierAverageHit: 0},
         subreddit: {requests: 0, miss: 0, identifierRequestCount: statMetricCache(), requestTimestamps: timestampArr(), averageTimeBetweenHits: 'N/A', identifierAverageHit: 0},
-        commentCheck: {requests: 0, miss: 0, identifierRequestCount: statMetricCache(), requestTimestamps: timestampArr(), averageTimeBetweenHits: 'N/A', identifierAverageHit: 0}
+        commentCheck: {requests: 0, miss: 0, identifierRequestCount: statMetricCache(), requestTimestamps: timestampArr(), averageTimeBetweenHits: 'N/A', identifierAverageHit: 0},
+        imageHash: {requests: 0, miss: 0, identifierRequestCount: statMetricCache(), requestTimestamps: timestampArr(), averageTimeBetweenHits: 'N/A', identifierAverageHit: 0}
     };
 }
 
@@ -1162,36 +1203,23 @@ export const parseRuleResultsToMarkdownSummary = (ruleResults: RuleResult[]): st
 }
 
 export const isValidImageURL = (str: string): boolean => {
-    return !!str.match(/\w+\.(jpg|jpeg|gif|png|tiff|bmp)$/gi);
-}
-
-export const getImageDataFromUrl = async (url: string, aggressive = false): Promise<[Response?, ImageData?, string?]> => {
-    if (!aggressive && !isValidImageURL(url)) {
-        return [undefined, undefined, 'URL did not end with a valid image extension'];
-    }
-    try {
-        const response = await fetch(url);
-        if (response.ok) {
-            const ct = response.headers.get('Content-Type');
-            if (ct !== null && ct.includes('image')) {
-                let buffer = await response.buffer();
-                const dimensions = sizeOf(buffer);
-                return [response, {
-                    data: buffer,
-                    width: dimensions.width as number - 5,
-                    height: dimensions.height as number - 5,
-                    pixels: (dimensions.height as number - 5) * (dimensions.width as number - 5)
-                }];
-            }
-            return [response, undefined, 'Content-Type for fetched URL did not contain "image"'];
-        }
-        return [response, undefined, `URL response was not OK: (${response.status})${response.statusText}`];
-    } catch (err) {
-        return [undefined, undefined, `Error occurred while fetching response from URL: ${err.message}`];
-    }
+    return !!str.match(/\w+\.(jpg|jpeg|gif|png|tiff|bmp|webp)$/gi);
 }
 
 let resembleCIFunc: Function;
+type SharpCreate = (input?:
+| Buffer
+| Uint8Array
+| Uint8ClampedArray
+| Int8Array
+| Uint16Array
+| Int16Array
+| Uint32Array
+| Int32Array
+| Float32Array
+| Float64Array
+| string, options?: SharpOptions) => Sharp;
+let sharpImg: SharpCreate;
 
 const getCIFunc = async () => {
     if (resembleCIFunc === undefined) {
@@ -1205,22 +1233,141 @@ const getCIFunc = async () => {
     return resembleCIFunc;
 }
 
-export const compareImages = async (data1: ImageData, data2: ImageData, threshold?: number): Promise<[ResembleResult, boolean?]> => {
-    let ci: Function;
+export const getSharpAsync = async (): Promise<SharpCreate> => {
+    if (sharpImg === undefined) {
+        const sharpModule = await import('sharp');
+        if (sharpModule === undefined) {
+            throw new Error('Could not import sharp');
+        }
+        // @ts-ignore
+        sharpImg = sharpModule.default;
+    }
+    return sharpImg;
+}
+
+export const compareImages = async (data1: ImageData, data2: ImageData, threshold: number, variantDimensionDiff = 0): Promise<[ImageComparisonResult, boolean, string[]]> => {
+    let results: ImageComparisonResult | undefined;
+    const errors: string[] = [];
+
+    results = await pixelImageCompare(data1, data2);
+
+    // may decide to bring resemble back at some point in the future if pixelmatch has issues
+    // but for now...
+    // sharp is a *much* more useful utility and i'd rather have it as a dependency than node-canvas
+    // it's much faster, uses less memory, and its libraries more likely to already be available on a host
+    // -- with it i can control how images are normalized for dimensions which is basically what resemble was doing anyway (using canvas)
+
+    // try {
+    //     results = await pixelImageCompare(data1, data2);
+    // } catch (err) {
+    //     if(!(err instanceof SimpleError)) {
+    //         errors.push(err.message);
+    //     }
+    //     // swallow this and continue with resemble
+    // }
+    // if (results === undefined) {
+    //     results = await resembleImageCompare(data1, data2, threshold, variantDimensionDiff);
+    // }
+
+
+    return [results, results.misMatchPercentage < threshold, errors];
+}
+
+export const pixelImageCompare = async (data1: ImageData, data2: ImageData): Promise<ImageComparisonResult> => {
+
+    let pixelDiff: number | undefined = undefined;
+
+    let sharpFunc: SharpCreate;
 
     try {
-        ci = await getCIFunc();
+        sharpFunc = await getSharpAsync();
     } catch (err) {
-        err.message = `Unable to do image comparison due to an issue importing the comparison library. It is likely 'node-canvas' is not installed (see ContextMod docs). Error Message: ${err.message}`;
+        err.message = `Unable to do image comparison due to an issue importing the comparison library. It is likely sharp is not installed (see ContextMod docs). Error Message: ${err.message}`;
         throw err;
     }
-    const results = await ci(data1.data, data2.data, {
-        returnEarlyThreshold: threshold !== undefined ? Math.min(threshold + 5, 100) : undefined,
-    }) as ResembleResult;
 
-    const sameImage = threshold === undefined ? undefined : results.rawMisMatchPercentage < threshold;
-    return [results, sameImage];
+    const [refImg, compareImg, width, height] = await data1.normalizeImagesForComparison('pixel', data2);
+    const time = Date.now();
+    // ensureAlpha() is imperative here because pixelmatch expects an alpha layer
+    pixelDiff = pixelmatch(await refImg.ensureAlpha().raw().toBuffer(), await compareImg.ensureAlpha().raw().toBuffer(), null, width, height);
+    return {
+        isSameDimensions: true,
+        dimensionDifference: {
+            height: 0,
+            width: 0,
+        },
+        misMatchPercentage: pixelDiff / (width * height),
+        analysisTime: Date.now() - time,
+    }
 }
+
+// see comments in compareImages
+//
+
+// export const resembleImageCompare = async (data1: ImageData, data2: ImageData, threshold?: number, variantDimensionDiff = 0): Promise<ImageComparisonResult> => {
+//     let ci: Function;
+//
+//     try {
+//         ci = await getCIFunc();
+//     } catch (err) {
+//         err.message = `Unable to do image comparison due to an issue importing the comparison library. It is likely 'node-canvas' is not installed (see ContextMod docs). Error Message: ${err.message}`;
+//         throw err;
+//     }
+//
+//     let results: ImageComparisonResult | undefined = undefined;
+//     // @ts-ignore
+//     let resResult: ResembleSingleCallbackComparisonResult = undefined;
+//
+//     //const [minWidth, minHeight] = getMinimumDimensions(data1, data2);
+//     const compareOptions = {
+//         // "ignore": [
+//         //     'colors' //  ~100% than nothing because resemble computes brightness information from rgb for each pixel
+//         // ],
+//         // boundingBox is ~30% slower than no restrictions
+//         // because resemble has to check that each pixel is within the box
+//         //
+//         // output: {
+//         //     // compare at most 800x800 section to increase performance
+//         //     // -- potentially allow this to be user-configurable in the future if not sufficient for dup detection
+//         //     boundingBox: {
+//         //         left: 0,
+//         //         top: 0,
+//         //         right: Math.min(minWidth, 800),
+//         //         bottom: Math.min(minHeight, 800)
+//         //     },
+//         // },
+//         returnEarlyThreshold: threshold !== undefined ? Math.min(threshold + 5, 100) : undefined,
+//     };
+//
+//     if(data1.preferredResolution !== undefined) {
+//         const [prefWidth, prefHeight] = data1.preferredResolution;
+//         const prefImgData = data2.getSimilarResolutionVariant(prefWidth, prefHeight, variantDimensionDiff);
+//         if(prefImgData !== undefined) {
+//             let refThumbnail;
+//             try {
+//                 refThumbnail = data1.getSimilarResolutionVariant(prefWidth, prefHeight) as ImageData;
+//                 resResult = await ci(await (await refThumbnail.sharp()).clone().resize(400, null, {fit: 'outside'}).jpeg().toBuffer()
+//                     , await (await prefImgData.sharp()).clone().resize(400, null, {fit: 'outside'}).jpeg().toBuffer()
+//                     , compareOptions) as ResembleSingleCallbackComparisonResult;
+//             } catch(err) {
+//                 throw err;
+//             }
+//         }
+//     }
+//     if(resResult === undefined) {
+//         resResult = await ci(await (await data1.sharp()).clone().resize(400, null, {fit: 'outside'}).jpeg().toBuffer(),
+//             await (await data2.sharp()).clone().resize(400, null, {fit: 'outside'}).jpeg().toBuffer(), compareOptions) as ResembleSingleCallbackComparisonResult;
+//     }
+//
+//
+//     return {
+//         isSameDimensions: resResult.isSameDimensions,
+//         dimensionDifference: resResult.dimensionDifference,
+//         // @ts-ignore
+//         misMatchPercentage: resResult.rawMisMatchPercentage,
+//         analysisTime: resResult.analysisTime
+//     };
+// }
 
 export const createHistoricalStatsDisplay = (data: HistoricalStats): HistoricalStatsDisplay => {
     const display: any = {};
@@ -1234,4 +1381,35 @@ export const createHistoricalStatsDisplay = (data: HistoricalStats): HistoricalS
     }
 
     return display as HistoricalStatsDisplay;
+}
+
+/**
+ * Determine if the state criteria being checked are
+ * 1 ) expensive to compute or
+ * 2 ) require additional api requests
+ *
+ * If neither then do not cache results as the number of unique keys (sub-state) increases AT LEAST linearly taking up space (especially in memory cache)
+ * when they are probably not necessary to begin with
+ * */
+export const shouldCacheSubredditStateCriteriaResult = (state: SubredditState | StrongSubredditState): boolean => {
+    // currently there are no scenarios where we need to cache results
+    // since only things computed from state are comparisons for properties already cached on subreddit object
+    // and regexes for name which aren't that costly
+    // -- so just return false
+    return false;
+}
+
+export const subredditStateIsNameOnly = (state: SubredditState | StrongSubredditState): boolean => {
+    const critCount = Object.entries(state).filter(([key, val]) => {
+        return val !== undefined && !['name','stateDescription'].includes(key);
+    }).length;
+    return critCount === 0;
+}
+
+export const absPercentDifference = (num1: number, num2: number) => {
+    return Math.abs((num1 - num2) / num1) * 100;
+}
+
+export const bitsToHexLength = (bits: number): number => {
+    return Math.pow(bits, 2) / 4;
 }

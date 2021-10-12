@@ -26,6 +26,7 @@ Some feature highlights:
   * Author criteria (name, css flair/text, age, karma, moderator status, and [Toolbox User Notes](https://www.reddit.com/r/toolbox/wiki/docs/usernotes))
   * Activity state (removed, locked, distinguished, etc.)
 * Rules and Actions support named references (write once, reference anywhere)
+* [**Image Comparisons**](/docs/imageComparison.md) via fingerprinting and/or pixel differences
 * Global/subreddit-level **API caching**
 * Support for [Toolbox User Notes](https://www.reddit.com/r/toolbox/wiki/docs/usernotes) as criteria or Actions (writing notes)
 * Docker container support

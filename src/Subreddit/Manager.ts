@@ -40,6 +40,7 @@ import {CheckStructuredJson} from "../Check";
 import NotificationManager from "../Notification/NotificationManager";
 import action from "../Web/Server/routes/authenticated/user/action";
 import {createHistoricalDefaults, historicalDefaults} from "../Common/defaults";
+import {ExtendedSnoowrap} from "../Utils/SnoowrapClients";
 
 export interface RunningState {
     state: RunState,
@@ -74,7 +75,7 @@ interface QueuedIdentifier {
 
 export class Manager {
     subreddit: Subreddit;
-    client: Snoowrap;
+    client: ExtendedSnoowrap;
     logger: Logger;
     botName: string;
     pollOptions: PollingOptionsStrong[] = [];
@@ -180,7 +181,7 @@ export class Manager {
         return this.displayLabel;
     }
 
-    constructor(sub: Subreddit, client: Snoowrap, logger: Logger, cacheManager: BotResourcesManager, opts: RuntimeManagerOptions = {botName: 'ContextMod', maxWorkers: 1}) {
+    constructor(sub: Subreddit, client: ExtendedSnoowrap, logger: Logger, cacheManager: BotResourcesManager, opts: RuntimeManagerOptions = {botName: 'ContextMod', maxWorkers: 1}) {
         const {dryRun, sharedModqueue = false, wikiLocation = 'botconfig/contextbot', botName, maxWorkers} = opts;
         this.displayLabel = opts.nickname || `${sub.display_name_prefixed}`;
         const getLabels = this.getCurrentLabels;
@@ -672,7 +673,8 @@ export class Manager {
                 pollOn,
                 limit,
                 interval,
-                delayUntil
+                delayUntil,
+                clearProcessed,
             } = pollOpt;
             let stream: SPoll<Snoowrap.Submission | Snoowrap.Comment>;
             let modStreamType: string | undefined;
@@ -688,6 +690,7 @@ export class Manager {
                             subreddit: this.subreddit.display_name,
                             limit: limit,
                             pollTime: interval * 1000,
+                            clearProcessed,
                         });
                     }
                     break;
@@ -701,6 +704,7 @@ export class Manager {
                             subreddit: this.subreddit.display_name,
                             limit: limit,
                             pollTime: interval * 1000,
+                            clearProcessed
                         });
                     }
                     break;
@@ -709,6 +713,7 @@ export class Manager {
                         subreddit: this.subreddit.display_name,
                         limit: limit,
                         pollTime: interval * 1000,
+                        clearProcessed
                     });
                     break;
                 case 'newComm':
@@ -716,6 +721,7 @@ export class Manager {
                         subreddit: this.subreddit.display_name,
                         limit: limit,
                         pollTime: interval * 1000,
+                        clearProcessed
                     });
                     break;
             }
@@ -753,11 +759,10 @@ export class Manager {
                 }
             };
 
-            stream.on('item', onItem);
-
             if (modStreamType !== undefined) {
                 this.modStreamCallbacks.set(pollOn, onItem);
             } else {
+                stream.on('item', onItem);
                 // @ts-ignore
                 stream.on('error', async (err: any) => {
 
@@ -937,10 +942,11 @@ export class Manager {
                 s.end();
             }
             this.streams = [];
-            for (const [k, v] of this.modStreamCallbacks) {
-                const stream = this.cacheManager.modStreams.get(k) as Poll<Snoowrap.Submission | Snoowrap.Comment>;
-                stream.removeListener('item', v);
-            }
+            // for (const [k, v] of this.modStreamCallbacks) {
+            //     const stream = this.cacheManager.modStreams.get(k) as Poll<Snoowrap.Submission | Snoowrap.Comment>;
+            //     stream.removeListener('item', v);
+            // }
+            this.modStreamCallbacks = new Map();
             this.startedAt = undefined;
             this.logger.info(`Events STOPPED by ${causedBy}`);
             this.eventsState = {

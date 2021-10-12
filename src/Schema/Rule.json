@@ -582,6 +582,11 @@
                 }
             ],
             "properties": {
+                "age": {
+                    "description": "A duration and how to compare it against a value\n\nThe syntax is `(< OR > OR <= OR >=) <number> <unit>` EX `> 100 days`, `<= 2 months`\n\n* EX `> 100 days` => Passes if the date being compared is before 100 days ago\n* EX `<= 2 months` => Passes if the date being compared is after or equal to 2 months\n\nUnit must be one of [DayJS Duration units](https://day.js.org/docs/en/durations/creating)\n\n[See] https://regexr.com/609n8 for example",
+                    "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(days|weeks|months|years|hours|minutes|seconds|milliseconds)\\s*$",
+                    "type": "string"
+                },
                 "approved": {
                     "type": "boolean"
                 },
@@ -880,9 +885,55 @@
                     ],
                     "type": "string"
                 },
+                "hash": {
+                    "description": "Use perceptual hashing (blockhash-js) to compare images\n\nPros:\n\n* very fast\n* low cpu/memory usage\n* results can be cached\n\nCons:\n\n* not as accurate as pixel comparison\n* weaker for text-heavy images\n* mostly color-blind\n\nBest uses:\n\n* Detecting (general) duplicate images\n* Comparing large number of images",
+                    "properties": {
+                        "bits": {
+                            "default": 32,
+                            "description": "Bit count determines accuracy of hash and granularity of hash comparison (comparison to other hashes)\n\nDefault is `32`\n\n**NOTE:** Hashes of different sizes (bits) cannot be compared. If you are caching results make sure all rules where results may be shared use the same bit count to ensure hashes can be compared. Otherwise hashes will be recomputed.",
+                            "type": "number"
+                        },
+                        "enable": {
+                            "default": true,
+                            "description": "Enabled by default.\n\nIf both `hash` and `pixel` are enabled then `pixel` will be used to verify image comparison when hashes matches",
+                            "type": "boolean"
+                        },
+                        "hardThreshold": {
+                            "description": "High Confidence Threshold\n\nIf the difference in comparison is equal to or less than this number the images are considered the same and pixel comparison WILL NOT occur\n\nDefaults to the parent-level `threshold` value if not present\n\nUse `null` if you want pixel comparison to ALWAYS occur (softThreshold must be present)",
+                            "type": [
+                                "null",
+                                "number"
+                            ]
+                        },
+                        "softThreshold": {
+                            "description": "Low Confidence Threshold -- only used if `pixel` is enabled\n\nIf the difference in comparison is\n\n1) equal to or less than this value and\n2) the value is greater than `hardThreshold`\n\nthe images will be compared using the `pixel` method",
+                            "type": "number"
+                        },
+                        "ttl": {
+                            "description": "Number of seconds to cache image hash",
+                            "type": "number"
+                        }
+                    },
+                    "type": "object"
+                },
+                "pixel": {
+                    "description": "Use pixel counting to compare images\n\nPros:\n\n* most accurate\n* strong with text or color-only changes\n\nCons:\n\n* much slower than hashing\n* memory/cpu intensive\n\nBest uses:\n\n* Comparison text-only images\n* Comparison requires high degree of accuracy or changes are subtle",
+                    "properties": {
+                        "enable": {
+                            "default": false,
+                            "description": "Disabled by default.",
+                            "type": "boolean"
+                        },
+                        "threshold": {
+                            "description": "The percentage, as a whole number, of pixels that are **different** between the two images at which point the images are not considered the same.",
+                            "type": "number"
+                        }
+                    },
+                    "type": "object"
+                },
                 "threshold": {
                     "default": 5,
-                    "description": "The percentage, as a whole number, of pixels that are **different** between the two images at which point the images are not considered the same.\n\nDefault is `5`",
+                    "description": "The percentage, as a whole number, of difference between two images at which point they will not be considered the same.\n\nWill be used as `hash.hardThreshold` and `pixel.threshold` if those values are not specified\n\nDefault is `5`",
                     "type": "number"
                 }
             },
@@ -1396,6 +1447,11 @@
                 }
             ],
             "properties": {
+                "age": {
+                    "description": "A duration and how to compare it against a value\n\nThe syntax is `(< OR > OR <= OR >=) <number> <unit>` EX `> 100 days`, `<= 2 months`\n\n* EX `> 100 days` => Passes if the date being compared is before 100 days ago\n* EX `<= 2 months` => Passes if the date being compared is after or equal to 2 months\n\nUnit must be one of [DayJS Duration units](https://day.js.org/docs/en/durations/creating)\n\n[See] https://regexr.com/609n8 for example",
+                    "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(days|weeks|months|years|hours|minutes|seconds|milliseconds)\\s*$",
+                    "type": "string"
+                },
                 "approved": {
                     "type": "boolean"
                 },

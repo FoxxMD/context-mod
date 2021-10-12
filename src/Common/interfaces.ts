@@ -5,7 +5,6 @@ import Poll from "snoostorm/out/util/Poll";
 import Snoowrap from "snoowrap";
 import {RuleResult} from "../Rule";
 import {IncomingMessage} from "http";
-import {ResembleSingleCallbackComparisonResult} from "resemblejs";
 
 /**
  * An ISO 8601 Duration
@@ -258,24 +257,151 @@ export interface ImageDetection {
      * */
     fetchBehavior?: 'extension' | 'unknown' | 'all',
     /**
-     * The percentage, as a whole number, of pixels that are **different** between the two images at which point the images are not considered the same.
+     * The percentage, as a whole number, of difference between two images at which point they will not be considered the same.
+     *
+     * Will be used as `hash.hardThreshold` and `pixel.threshold` if those values are not specified
      *
      * Default is `5`
      *
      * @default 5
      * */
     threshold?: number
+
+    /**
+     * Use perceptual hashing (blockhash-js) to compare images
+     *
+     * Pros:
+     *
+     * * very fast
+     * * low cpu/memory usage
+     * * results can be cached
+     *
+     * Cons:
+     *
+     * * not as accurate as pixel comparison
+     * * weaker for text-heavy images
+     * * mostly color-blind
+     *
+     * Best uses:
+     *
+     * * Detecting (general) duplicate images
+     * * Comparing large number of images
+     * */
+    hash?: {
+        /**
+         * Enabled by default.
+         *
+         * If both `hash` and `pixel` are enabled then `pixel` will be used to verify image comparison when hashes matches
+         *
+         * @default true
+         * */
+        enable?: boolean
+
+        /**
+         * Bit count determines accuracy of hash and granularity of hash comparison (comparison to other hashes)
+         *
+         * Default is `32`
+         *
+         * **NOTE:** Hashes of different sizes (bits) cannot be compared. If you are caching results make sure all rules where results may be shared use the same bit count to ensure hashes can be compared. Otherwise hashes will be recomputed.
+         *
+         * @default 32
+         * */
+        bits?: number
+
+        /**
+         * Number of seconds to cache image hash
+         * */
+        ttl?: number
+        /**
+         * High Confidence Threshold
+         *
+         * If the difference in comparison is equal to or less than this number the images are considered the same and pixel comparison WILL NOT occur
+         *
+         * Defaults to the parent-level `threshold` value if not present
+         *
+         * Use `null` if you want pixel comparison to ALWAYS occur (softThreshold must be present)
+         * */
+        hardThreshold?: number | null
+        /**
+         * Low Confidence Threshold -- only used if `pixel` is enabled
+         *
+         * If the difference in comparison is
+         *
+         * 1) equal to or less than this value and
+         * 2) the value is greater than `hardThreshold`
+         *
+         * the images will be compared using the `pixel` method
+         * */
+        softThreshold?: number
+    }
+
+    /**
+     * Use pixel counting to compare images
+     *
+     * Pros:
+     *
+     * * most accurate
+     * * strong with text or color-only changes
+     *
+     * Cons:
+     *
+     * * much slower than hashing
+     * * memory/cpu intensive
+     *
+     * Best uses:
+     *
+     * * Comparison text-only images
+     * * Comparison requires high degree of accuracy or changes are subtle
+     * */
+    pixel?: {
+        /**
+         * Disabled by default.
+         *
+         * @default false
+         * */
+        enable?: boolean
+        /**
+         * The percentage, as a whole number, of pixels that are **different** between the two images at which point the images are not considered the same.
+         * */
+        threshold?: number
+    }
 }
 
-export interface ImageData {
-    data: Buffer,
-    width: number,
-    height: number
-    pixels: number
+export interface StrongImageDetection {
+    enable: boolean,
+    fetchBehavior: 'extension' | 'unknown' | 'all'
+    threshold: number,
+    hash: {
+        enable: boolean
+        bits: number
+        ttl?: number
+        hardThreshold: number | null
+        softThreshold?: number
+    }
+    pixel: {
+        enable: boolean
+        threshold: number
+    }
 }
 
-export interface ResembleResult extends ResembleSingleCallbackComparisonResult {
-    rawMisMatchPercentage: number
+// export interface ImageData {
+//     data: Promise<Buffer>,
+//     buf?: Buffer,
+//     width: number,
+//     height: number
+//     pixels?: number
+//     url: string
+//     variants?: ImageData[]
+// }
+
+export interface ImageComparisonResult {
+    isSameDimensions: boolean
+    dimensionDifference: {
+        width: number;
+        height: number;
+    };
+    misMatchPercentage: number;
+    analysisTime: number;
 }
 
 export interface RichContent {
@@ -360,6 +486,38 @@ export type PollOn = 'unmoderated' | 'modqueue' | 'newSub' | 'newComm';
 export interface PollingOptionsStrong extends PollingOptions {
     limit: number,
     interval: number,
+    clearProcessed: ClearProcessedOptions
+}
+
+/**
+ * For very long-running, high-volume subreddits clearing the list of processed activities helps manage memory bloat
+ *
+ * All of these options have default values based on the limit and/or interval set for polling options on each subreddit stream. They only need to modified if the defaults are not sufficient.
+ *
+ * If both `after` and `size` are defined whichever is hit first will trigger the list to clear. `after` will be reset after ever clear.
+ * */
+export interface ClearProcessedOptions {
+    /**
+     * An interval the processed list should be cleared after.
+     *
+     * * EX `9 days`
+     * * EX `3 months`
+     * * EX `5 minutes`
+     * @pattern ^\s*(?<time>\d+)\s*(?<unit>days?|weeks?|months?|years?|hours?|minutes?|seconds?|milliseconds?)\s*$
+     * */
+    after?: string,
+    /**
+     * Number of activities found in processed list after which the list should be cleared.
+     *
+     * Defaults to the `limit` value from `PollingOptions`
+     * */
+    size?: number,
+    /**
+     * The number of activities to retain in processed list after clearing.
+     *
+     * Defaults to `limit` value from `PollingOptions`
+     * */
+    retain?: number,
 }
 
 export interface PollingDefaults {
@@ -433,6 +591,8 @@ export interface PollingOptions extends PollingDefaults {
      *
      * */
     pollOn: 'unmoderated' | 'modqueue' | 'newSub' | 'newComm'
+
+    clearProcessed?: ClearProcessedOptions
 }
 
 export interface TTLConfig {
@@ -686,6 +846,22 @@ export interface ManagerOptions {
 export type CompareValue = string;
 
 /**
+ * A duration and how to compare it against a value
+ *
+ * The syntax is `(< OR > OR <= OR >=) <number> <unit>` EX `> 100 days`, `<= 2 months`
+ *
+ * * EX `> 100 days` => Passes if the date being compared is before 100 days ago
+ * * EX `<= 2 months` => Passes if the date being compared is after or equal to 2 months
+ *
+ * Unit must be one of [DayJS Duration units](https://day.js.org/docs/en/durations/creating)
+ *
+ * [See] https://regexr.com/609n8 for example
+ *
+ * @pattern ^\s*(>|>=|<|<=)\s*(\d+)\s*(days|weeks|months|years|hours|minutes|seconds|milliseconds)\s*$
+ * */
+export type DurationComparor = string;
+
+/**
  * A string containing a comparison operator and a value to compare against
  *
  * The syntax is `(< OR > OR <= OR >=) <number>[percent sign]`
@@ -732,6 +908,7 @@ export interface ActivityState {
     approved?: boolean
     score?: CompareValue
     reports?: CompareValue
+    age?: DurationComparor
 }
 
 /**
@@ -1199,6 +1376,13 @@ export interface BotInstanceJsonConfig {
          * @default false
          * */
         sharedMod?: boolean,
+
+        /**
+         * If sharing a mod stream stagger pushing relevant Activities to individual subreddits.
+         *
+         * Useful when running many subreddits and rules are potentially cpu/memory/traffic heavy -- allows spreading out load
+         * */
+        stagger?: number,
     },
     /**
      * Settings related to default configurations for queue behavior for subreddits
@@ -1485,6 +1669,7 @@ export interface BotInstanceConfig extends BotInstanceJsonConfig {
     },
     polling: {
         sharedMod: boolean,
+        stagger?: number,
         limit: number,
         interval: number,
     },

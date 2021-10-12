@@ -142,15 +142,30 @@ export const buildPollingOptions = (values: (string | PollingOptions)[]): Pollin
     let opts: PollingOptionsStrong[] = [];
     for (const v of values) {
         if (typeof v === 'string') {
-            opts.push({pollOn: v as PollOn, interval: DEFAULT_POLLING_INTERVAL, limit: DEFAULT_POLLING_LIMIT});
+            opts.push({
+                pollOn: v as PollOn,
+                interval: DEFAULT_POLLING_INTERVAL,
+                limit: DEFAULT_POLLING_LIMIT,
+                clearProcessed: {
+                    size: DEFAULT_POLLING_LIMIT,
+                    retain: DEFAULT_POLLING_LIMIT,
+                }
+            });
         } else {
             const {
                 pollOn: p,
                 interval = DEFAULT_POLLING_INTERVAL,
                 limit = DEFAULT_POLLING_LIMIT,
                 delayUntil,
+                clearProcessed = {size: limit, retain: limit},
             } = v;
-            opts.push({pollOn: p as PollOn, interval, limit, delayUntil});
+            opts.push({
+                pollOn: p as PollOn,
+                interval,
+                limit,
+                delayUntil,
+                clearProcessed
+            });
         }
     }
     return opts;
@@ -604,6 +619,7 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
             name: botName,
             polling: {
                 sharedMod = false,
+                stagger,
                 limit = 100,
                 interval = 30,
             } = {},
@@ -654,7 +670,7 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
             } = caching;
 
             botActionedEventsDefault = actionedEventsDefault;
-            if(actionedEventsMax !== undefined) {
+            if (actionedEventsMax !== undefined) {
                 botActionedEventsDefault = Math.min(actionedEventsDefault, actionedEventsMax);
             }
 
@@ -708,6 +724,7 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
             caching: botCache,
             polling: {
                 sharedMod,
+                stagger,
                 limit,
                 interval,
             },

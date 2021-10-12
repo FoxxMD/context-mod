@@ -1,15 +1,20 @@
 import {Rule, RuleJSONConfig, RuleOptions, RulePremise, RuleResult} from "./index";
 import {Comment, VoteableContent} from "snoowrap";
 import Submission from "snoowrap/dist/objects/Submission";
+import as from 'async';
+import pMap from 'p-map';
 // @ts-ignore
 import subImageMatch from 'matches-subimage';
 import {
     activityWindowText,
-    asSubmission, compareImages,
+    asSubmission, bitsToHexLength,
+    // blockHashImage,
+    compareImages,
     comparisonTextOp,
     FAIL,
     formatNumber,
-    getActivitySubredditName, getImageDataFromUrl,
+    getActivitySubredditName, imageCompareMaxConcurrencyGuess,
+    //getImageDataFromUrl,
     isSubmission,
     isValidImageURL,
     objectToStringSummary,
@@ -17,16 +22,21 @@ import {
     parseStringToRegex,
     parseSubredditName,
     parseUsableLinkIdentifier,
-    PASS,
+    PASS, sleep,
     toStrongSubredditState
 } from "../util";
 import {
     ActivityWindow,
     ActivityWindowCriteria,
-    ActivityWindowType, CommentState, ImageDetection,
-    ReferenceSubmission, StrongSubredditState, SubmissionState,
+    ActivityWindowType, CommentState,
+    //ImageData,
+    ImageDetection,
+    ReferenceSubmission, StrongImageDetection, StrongSubredditState, SubmissionState,
     SubredditCriteria, SubredditState
 } from "../Common/interfaces";
+import ImageData from "../Common/ImageData";
+import {blockhash, hammingDistance} from "../Common/blockhash/blockhash";
+import leven from "leven";
 
 const parseLink = parseUsableLinkIdentifier();
 
@@ -34,7 +44,7 @@ export class RecentActivityRule extends Rule {
     window: ActivityWindowType;
     thresholds: ActivityThreshold[];
     useSubmissionAsReference: boolean;
-    imageDetection: Required<ImageDetection>
+    imageDetection: StrongImageDetection
     lookAt?: 'comments' | 'submissions';
 
     constructor(options: RecentActivityRuleOptions) {
@@ -49,13 +59,39 @@ export class RecentActivityRule extends Rule {
         const {
             enable = false,
             fetchBehavior = 'extension',
-            threshold = 5
+            threshold = 5,
+            hash = {},
+            pixel = {},
         } = imageDetection || {};
+
+        const {
+            enable: hEnable = true,
+            bits = 16,
+            ttl = 60,
+            hardThreshold = threshold,
+            softThreshold
+        } = hash || {};
+
+        const {
+            enable: pEnable = true,
+            threshold: pThreshold = threshold,
+        } = pixel || {};
 
         this.imageDetection = {
             enable,
             fetchBehavior,
-            threshold
+            threshold,
+            hash: {
+                enable: hEnable,
+                hardThreshold,
+                softThreshold,
+                bits,
+                ttl,
+            },
+            pixel: {
+                enable: pEnable,
+                threshold: pThreshold
+            }
         };
         this.lookAt = lookAt;
         this.useSubmissionAsReference = useSubmissionAsReference;
@@ -101,50 +137,132 @@ export class RecentActivityRule extends Rule {
                 const itemId = item.id;
                 const referenceUrl = await item.url;
                 const usableUrl = parseLink(referenceUrl);
-                const filteredActivity = [];
-                let referenceImage;
-                if(this.imageDetection.enable) {
-                    const [response, imgData, reason] = await getImageDataFromUrl(referenceUrl);
-                    if(reason !== undefined) {
-                        this.logger.verbose(reason);
-                    } else {
-                        referenceImage = imgData
+                let filteredActivity: (Submission|Comment)[] = [];
+                let analysisTimes: number[] = [];
+                let referenceImage: ImageData | undefined;
+                if (this.imageDetection.enable) {
+                    try {
+                        referenceImage = ImageData.fromSubmission(item);
+                        referenceImage.setPreferredResolutionByWidth(800);
+                        if(this.imageDetection.hash.enable) {
+                            let refHash: string | undefined;
+                            if(this.imageDetection.hash.ttl !== undefined) {
+                                refHash = await this.resources.getImageHash(referenceImage);
+                                if(refHash === undefined) {
+                                    refHash = await referenceImage.hash(this.imageDetection.hash.bits);
+                                    await this.resources.setImageHash(referenceImage, refHash, this.imageDetection.hash.ttl);
+                                } else if(refHash.length !== bitsToHexLength(this.imageDetection.hash.bits)) {
+                                    this.logger.warn('Reference image hash length did not correspond to bits specified in config. Recomputing...');
+                                    refHash = await referenceImage.hash(this.imageDetection.hash.bits);
+                                    await this.resources.setImageHash(referenceImage, refHash, this.imageDetection.hash.ttl);
+                                }
+                            } else {
+                                refHash = await referenceImage.hash(this.imageDetection.hash.bits);
+                            }
+                        }
+                        //await referenceImage.sharp();
+                        // await referenceImage.hash();
+                        // if (referenceImage.preferredResolution !== undefined) {
+                        //     await (referenceImage.getSimilarResolutionVariant(...referenceImage.preferredResolution) as ImageData).sharp();
+                        // }
+                    } catch (err) {
+                        this.logger.verbose(err.message);
                     }
                 }
                 let longRun;
-                if(referenceImage !== undefined) {
+                if (referenceImage !== undefined) {
                     const l = this.logger;
                     longRun = setTimeout(() => {
                         l.verbose('FYI: Image processing is causing rule to take longer than normal');
                     }, 2500);
                 }
-                for(const x of viableActivity) {
+                // @ts-ignore
+                const ci = async (x: (Submission|Comment)) => {
                     if (!asSubmission(x) || x.id === itemId) {
-                        continue;
+                        return null;
                     }
                     if (x.url === undefined) {
-                        continue;
+                        return null;
                     }
-                    if(parseLink(x.url) === usableUrl) {
-                        filteredActivity.push(x);
+                    if (parseLink(x.url) === usableUrl) {
+                        return x;
                     }
                     // only do image detection if regular URL comparison and other conditions fail first
                     // to reduce CPU/bandwidth usage
-                    if(referenceImage !== undefined) {
-                        const [response, imgData, reason] = await getImageDataFromUrl(x.url);
-                        if(imgData !== undefined) {
-                            try {
-                                const [compareResult, sameImage] = await compareImages(referenceImage, imgData, this.imageDetection.threshold);
-                                if(sameImage) {
-                                    filteredActivity.push(x);
+                    if (referenceImage !== undefined) {
+                        try {
+                            let imgData =  ImageData.fromSubmission(x);
+                            imgData.setPreferredResolutionByWidth(800);
+                            if(this.imageDetection.hash.enable) {
+                                let compareHash: string | undefined;
+                                if(this.imageDetection.hash.ttl !== undefined) {
+                                    compareHash = await this.resources.getImageHash(imgData);
                                 }
-                            } catch (err) {
-                                this.logger.warn(`Unexpected error encountered while comparing images, will skip comparison: ${err.message}`);
+                                if(compareHash === undefined)
+                                {
+                                    compareHash = await imgData.hash(this.imageDetection.hash.bits);
+                                    if(this.imageDetection.hash.ttl !== undefined) {
+                                        await this.resources.setImageHash(imgData, compareHash, this.imageDetection.hash.ttl);
+                                    }
+                                }
+                                const refHash = await referenceImage.hash(this.imageDetection.hash.bits);
+                                if(refHash.length !== compareHash.length) {
+                                    this.logger.debug(`Hash lengths were not the same! Will need to recompute compare hash to match reference.\n\nReference: ${referenceImage.baseUrl} has is ${refHash.length} char long | Comparing: ${imgData.baseUrl} has is ${compareHash} ${compareHash.length} long`);
+                                    compareHash = await imgData.hash(this.imageDetection.hash.bits)
+                                }
+                                const distance = leven(refHash, compareHash);
+                                const diff = (distance/refHash.length)*100;
+
+
+                                // return image if hard is defined and diff is less
+                                if(null !== this.imageDetection.hash.hardThreshold && diff <= this.imageDetection.hash.hardThreshold) {
+                                    return x;
+                                }
+                                // hard is either not defined or diff was gerater than hard
+
+                                // if soft is defined
+                                if (this.imageDetection.hash.softThreshold !== undefined) {
+                                    // and diff is greater than soft allowance
+                                    if(diff > this.imageDetection.hash.softThreshold) {
+                                        // not similar enough
+                                        return null;
+                                    }
+                                   // similar enough, will continue on to pixel (if enabled!)
+                                } else {
+                                    // only hard was defined and did not pass
+                                    return null;
+                                }
+                            }
+                            // at this point either hash was not enabled or it was and we hit soft threshold but not hard
+                            if(this.imageDetection.pixel.enable) {
+                                try {
+                                    const [compareResult, sameImage] = await compareImages(referenceImage, imgData, this.imageDetection.pixel.threshold / 100);
+                                    analysisTimes.push(compareResult.analysisTime);
+                                    if (sameImage) {
+                                        return x;
+                                    }
+                                } catch (err) {
+                                    this.logger.warn(`Unexpected error encountered while pixel-comparing images, will skip comparison => ${err.message}`);
+                                }
+                            }
+                        } catch (err) {
+                            if(!err.message.includes('did not end with a valid image extension')) {
+                                this.logger.warn(`Will not compare image from Submission ${x.id} due to error while parsing image URL => ${err.message}`);
                             }
                         }
                     }
+                    return null;
                 }
-                if(longRun !== undefined) {
+                // parallel all the things
+                this.logger.profile('asyncCompare');
+                const results = await pMap(viableActivity, ci, {concurrency: imageCompareMaxConcurrencyGuess});
+                this.logger.profile('asyncCompare', {level: 'debug', message: 'Total time for image comparison (incl download/cache calls)'});
+                const totalAnalysisTime = analysisTimes.reduce((acc, x) => acc + x,0);
+                if(analysisTimes.length > 0) {
+                    this.logger.debug(`Reference image pixel-compared ${analysisTimes.length} times. Timings: Avg ${formatNumber(totalAnalysisTime / analysisTimes.length, {toFixed: 0})}ms | Max: ${Math.max(...analysisTimes)}ms | Min: ${Math.min(...analysisTimes)}ms | Total: ${totalAnalysisTime}ms (${formatNumber(totalAnalysisTime/1000)}s)`);
+                }
+                filteredActivity = filteredActivity.concat(results.filter(x => x !== null));
+                if (longRun !== undefined) {
                     clearTimeout(longRun);
                 }
                 viableActivity = filteredActivity;
@@ -167,42 +285,74 @@ export class RecentActivityRule extends Rule {
 
             // convert subreddits array into entirely StrongSubredditState
             const subStates: StrongSubredditState[] = subreddits.map((x) => {
-                if(typeof x === 'string') {
-                    return toStrongSubredditState({name: x, stateDescription: x}, {defaultFlags: 'i', generateDescription: true});
+                if (typeof x === 'string') {
+                    return toStrongSubredditState({name: x, stateDescription: x}, {
+                        defaultFlags: 'i',
+                        generateDescription: true
+                    });
                 }
                 return toStrongSubredditState(x, {defaultFlags: 'i', generateDescription: true});
             });
 
-            for(const activity of viableActivity) {
-                if(asSubmission(activity) && submissionState !== undefined) {
-                    if(!(await this.resources.testItemCriteria(activity, [submissionState]))) {
+            let validActivity: (Comment | Submission)[] = await as.filter(viableActivity, async (activity) => {
+                if (asSubmission(activity) && submissionState !== undefined) {
+                    return await this.resources.testItemCriteria(activity, [submissionState]);
+                } else if (commentState !== undefined) {
+                    return await this.resources.testItemCriteria(activity, [commentState]);
+                }
+                return true;
+            });
+
+            validActivity = await this.resources.batchTestSubredditCriteria(validActivity, subStates);
+            for (const activity of validActivity) {
+                currCount++;
+                // @ts-ignore
+                combinedKarma += activity.score;
+                const pSub = getActivitySubredditName(activity);
+                if (!presentSubs.includes(pSub)) {
+                    presentSubs.push(pSub);
+                }
+            }
+
+            for (const activity of viableActivity) {
+                if (asSubmission(activity) && submissionState !== undefined) {
+                    if (!(await this.resources.testItemCriteria(activity, [submissionState]))) {
                         continue;
                     }
-                } else if(commentState !== undefined) {
-                    if(!(await this.resources.testItemCriteria(activity, [commentState]))) {
+                } else if (commentState !== undefined) {
+                    if (!(await this.resources.testItemCriteria(activity, [commentState]))) {
                         continue;
                     }
                 }
                 let inSubreddits = false;
-                for(const ss of subStates) {
+                for (const ss of subStates) {
                     const res = await this.resources.testSubredditCriteria(activity, ss);
-                    if(res) {
+                    if (res) {
                         inSubreddits = true;
                         break;
                     }
                 }
-                if(inSubreddits) {
+                if (inSubreddits) {
                     currCount++;
                     combinedKarma += activity.score;
                     const pSub = getActivitySubredditName(activity);
-                    if(!presentSubs.includes(pSub)) {
+                    if (!presentSubs.includes(pSub)) {
                         presentSubs.push(pSub);
                     }
                 }
             }
 
             const {operator, value, isPercent} = parseGenericValueOrPercentComparison(threshold);
-            let sum = {subsWithActivity: presentSubs, combinedKarma, karmaThreshold, subreddits: subStates.map(x => x.stateDescription), count: currCount, threshold, triggered: false, testValue: currCount.toString()};
+            let sum = {
+                subsWithActivity: presentSubs,
+                combinedKarma,
+                karmaThreshold,
+                subreddits: subStates.map(x => x.stateDescription),
+                count: currCount,
+                threshold,
+                triggered: false,
+                testValue: currCount.toString()
+            };
             if (isPercent) {
                 sum.testValue = `${formatNumber((currCount / viableActivity.length) * 100)}%`;
                 if (comparisonTextOp(currCount / viableActivity.length, operator, value / 100)) {
@@ -214,9 +364,9 @@ export class RecentActivityRule extends Rule {
                 totalTriggeredOn = sum;
             }
             // if we would trigger on threshold need to also test for karma
-            if(totalTriggeredOn !== undefined && karmaThreshold !== undefined) {
+            if (totalTriggeredOn !== undefined && karmaThreshold !== undefined) {
                 const {operator: opKarma, value: valueKarma} = parseGenericValueOrPercentComparison(karmaThreshold);
-                if(!comparisonTextOp(combinedKarma, opKarma, valueKarma)) {
+                if (!comparisonTextOp(combinedKarma, opKarma, valueKarma)) {
                     sum.triggered = false;
                     totalTriggeredOn = undefined;
                 }
@@ -234,7 +384,7 @@ export class RecentActivityRule extends Rule {
             result = `${PASS} ${resultData.result}`;
             this.logger.verbose(result);
             return Promise.resolve([true, this.getResult(true, resultData)]);
-        } else if(summaries.length === 1) {
+        } else if (summaries.length === 1) {
             // can display result if its only one summary otherwise need to log to debug
             const res = this.generateResultData(summaries[0], viableActivity);
             result = `${FAIL} ${res.result}`;
@@ -247,7 +397,7 @@ export class RecentActivityRule extends Rule {
 
         return Promise.resolve([false, this.getResult(false, {result})]);
     }
-    
+
     generateResultData(summary: any, activities: (Submission | Comment)[] = []) {
         const {
             count,
@@ -261,7 +411,7 @@ export class RecentActivityRule extends Rule {
         } = summary;
         const relevantSubs = subsWithActivity.length === 0 ? subreddits : subsWithActivity;
         let totalSummary = `${testValue} activities over ${relevantSubs.length} subreddits${karmaThreshold !== undefined ? ` with ${combinedKarma} combined karma` : ''} ${triggered ? 'met' : 'did not meet'} threshold of ${threshold}${karmaThreshold !== undefined ? ` and ${karmaThreshold} combined karma` : ''}`;
-        if(triggered && subsWithActivity.length > 0) {
+        if (triggered && subsWithActivity.length > 0) {
             totalSummary = `${totalSummary} -- subreddits: ${subsWithActivity.join(', ')}`;
         }
         return {
@@ -288,12 +438,12 @@ export class RecentActivityRule extends Rule {
  * */
 export interface ActivityThreshold {
     /**
-    * When present, a Submission will only be counted if it meets this criteria
-    * */
+     * When present, a Submission will only be counted if it meets this criteria
+     * */
     submissionState?: SubmissionState
     /**
-    * When present, a Comment will only be counted if it meets this criteria
-    * */
+     * When present, a Comment will only be counted if it meets this criteria
+     * */
     commentState?: CommentState
 
     /**
