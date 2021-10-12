@@ -255,7 +255,7 @@ export class RecentActivityRule extends Rule {
                 }
                 // parallel all the things
                 this.logger.profile('asyncCompare');
-                const results = await pMap(viableActivity, ci, {concurrency: 1});
+                const results = await pMap(viableActivity, ci, {concurrency: imageCompareMaxConcurrencyGuess});
                 this.logger.profile('asyncCompare', {level: 'debug', message: 'Total time for image comparison (incl download/cache calls)'});
                 const totalAnalysisTime = analysisTimes.reduce((acc, x) => acc + x,0);
                 if(analysisTimes.length > 0) {
