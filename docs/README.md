@@ -18,6 +18,7 @@
   * [Activities `window`](#activities-window)
   * [Comparisons](#thresholds-and-comparisons)
   * [Activity Templating](/docs/actionTemplating.md)
+  * [Image Comparisons](#image-comparisons)
 * [Best Practices](#best-practices)
   * [Named Rules](#named-rules)
   * [Rule Order](#rule-order)
@@ -267,6 +268,12 @@ Some criteria accept an optional **duration** to compare against:
 The duration value compares a time range from **now** to `duration value` time in the past.
 
 Refer to [duration values in activity window documentation](/docs/activitiesWindow.md#duration-values) as well as the individual rule/criteria schema to see what this duration is comparing against.
+
+### Image Comparisons
+
+ContextMod implements two methods for comparing **image content**, perceptual hashing and pixel-to-pixel comparisons. Comparisons can be used to filter activities in some activities.
+
+See [image comparison documentation](/docs/imageComparison.md) for a full reference. 
 
 ## Best Practices
 

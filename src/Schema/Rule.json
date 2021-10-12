@@ -890,7 +890,7 @@
                     "properties": {
                         "bits": {
                             "default": 32,
-                            "description": "Bit count determines accuracy of hash and granularity of hash comparison (comparison to other hashes)\n\nDefault is `32`\n\n**NOTE:** Hashes of different sizes (bitS) cannot be compared. If you are caching results make sure all rules where results may be shared use the same bit count to ensure hashes can be compared. Otherwise hashes will be recomputed.",
+                            "description": "Bit count determines accuracy of hash and granularity of hash comparison (comparison to other hashes)\n\nDefault is `32`\n\n**NOTE:** Hashes of different sizes (bits) cannot be compared. If you are caching results make sure all rules where results may be shared use the same bit count to ensure hashes can be compared. Otherwise hashes will be recomputed.",
                             "type": "number"
                         },
                         "enable": {

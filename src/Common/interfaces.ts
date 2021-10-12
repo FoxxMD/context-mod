@@ -302,7 +302,7 @@ export interface ImageDetection {
          *
          * Default is `32`
          *
-         * **NOTE:** Hashes of different sizes (bitS) cannot be compared. If you are caching results make sure all rules where results may be shared use the same bit count to ensure hashes can be compared. Otherwise hashes will be recomputed.
+         * **NOTE:** Hashes of different sizes (bits) cannot be compared. If you are caching results make sure all rules where results may be shared use the same bit count to ensure hashes can be compared. Otherwise hashes will be recomputed.
          *
          * @default 32
          * */
