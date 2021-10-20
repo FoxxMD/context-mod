@@ -14,14 +14,14 @@ import {
 } from "../Common/interfaces";
 import {
     compareDurationValue,
-    comparisonTextOp, getActivityAuthorName,
+    comparisonTextOp, escapeRegex, getActivityAuthorName,
     isActivityWindowCriteria, isStatusError,
     normalizeName,
     parseDuration,
     parseDurationComparison,
     parseGenericValueComparison,
     parseGenericValueOrPercentComparison,
-    parseRuleResultsToMarkdownSummary,
+    parseRuleResultsToMarkdownSummary, parseStringToRegex,
     parseSubredditName,
     truncateStringToLength
 } from "../util";
@@ -460,6 +460,28 @@ export const testAuthorCriteria = async (item: (Comment | Submission), authorOpt
                     case 'verified':
                         const vMatch = await item.author.has_verified_mail === authorOpts.verified as boolean;
                         if ((include && !vMatch) || (!include && vMatch)) {
+                            return false;
+                        }
+                        break;
+                    case 'description':
+                        // @ts-ignore
+                        const desc = await item.author.subreddit?.display_name.public_description;
+                        const dVals = authorOpts[k] as string[];
+                        let passed = false;
+                        for(const val of dVals) {
+                            let reg = parseStringToRegex(val, 'i');
+                            if(reg === undefined) {
+                                reg = parseStringToRegex(`/.*${escapeRegex(val.trim())}.*/`, 'i');
+                                if(reg === undefined) {
+                                    throw new SimpleError(`Could not convert 'description' value to a valid regex: ${authorOpts[k] as string}`);
+                                }
+                            }
+                            if(reg.test(desc)) {
+                                passed = true;
+                                break;
+                            }
+                        }
+                        if(!passed) {
                             return false;
                         }
                         break;

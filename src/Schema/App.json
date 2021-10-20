@@ -454,6 +454,26 @@
                     "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
                     "type": "string"
                 },
+                "description": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "string"
+                        }
+                    ],
+                    "description": "An (array of) string/regular expression to test contents of an Author's profile description against\n\nIf no flags are specified then the **insensitive** flag is used by default\n\nIf using an array then if **any** value in the array passes the description test passes",
+                    "examples": [
+                        [
+                            "/test$/i",
+                            "look for this string literal"
+                        ]
+                    ]
+                },
                 "flairCssClass": {
                     "description": "A list of (user) flair css class values from the subreddit to match against",
                     "examples": [

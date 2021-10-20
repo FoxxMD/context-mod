@@ -1413,3 +1413,7 @@ export const absPercentDifference = (num1: number, num2: number) => {
 export const bitsToHexLength = (bits: number): number => {
     return Math.pow(bits, 2) / 4;
 }
+
+export const escapeRegex = (val: string) => {
+    return val.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+}
