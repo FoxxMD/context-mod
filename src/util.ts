@@ -756,11 +756,11 @@ export const formatLogLineToHtml = (log: string | LogInfo) => {
         stripPrefix: false,
         sanitizeHtml: true,
     })
-        .replace(/(\s*debug\s*):/i, '<span class="debug text-pink-400">$1</span>:')
-        .replace(/(\s*warn\s*):/i, '<span class="warn text-yellow-400">$1</span>:')
-        .replace(/(\s*info\s*):/i, '<span class="info text-blue-300">$1</span>:')
-        .replace(/(\s*error\s*):/i, '<span class="error text-red-400">$1</span>:')
-        .replace(/(\s*verbose\s*):/i, '<span class="error text-purple-400">$1</span>:')
+        .replace(/(\s*debug\s*):/i, '<span class="debug blue">$1</span>:')
+        .replace(/(\s*warn\s*):/i, '<span class="warn yellow">$1</span>:')
+        .replace(/(\s*info\s*):/i, '<span class="info green">$1</span>:')
+        .replace(/(\s*error\s*):/i, '<span class="error red">$1</span>:')
+        .replace(/(\s*verbose\s*):/i, '<span class="error purple">$1</span>:')
         .replaceAll('\n', '<br />');
         //.replace(HYPERLINK_REGEX, '<a target="_blank" href="$&">$&</a>');
     return `<div class="logLine">${logContent}</div>`

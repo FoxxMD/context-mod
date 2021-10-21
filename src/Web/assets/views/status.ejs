@@ -2,19 +2,19 @@
 <%- include('partials/head', {title: undefined}) %>
 <body class="">
 <script>localStorage.getItem('ms-dark') === 'no' ? document.body.classList.remove('dark') : document.body.classList.add('dark')</script>
-<div class="min-w-screen min-h-screen bg-gray-100 bg-gray-100 dark:bg-gray-800 font-sans">
+<div class="min-w-screen min-h-screen bg-gray-100 dark:bg-gray-900 font-sans">
     <%- include('partials/header') %>
     <%- include('partials/botsTab') %>
     <div class="container mx-auto">
         <%- include('partials/subredditsTab') %>
         <div class="grid">
-            <div class="bg-white dark:bg-gray-500 dark:text-white">
+            <div class="bg-white dark:bg-gray-900 dark:text-white">
                 <div class="pb-6 md:px-7">
                     <% bots.forEach(function (bot){ %>
                         <% bot.subreddits.forEach(function (data){ %>
                         <div class="sub <%= bot.system.running ? '' : 'offline' %>" data-subreddit="<%= data.name %>" data-bot="<%= bot.system.name %>">
                             <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-3 gap-5">
-                                <div class="bg-white shadow-md rounded my-3 dark:bg-gray-500 dark:text-white">
+                                <div class="bg-white shadow-md rounded my-3 dark:bg-gray-600 dark:text-white">
                                     <div class="space-x-4 px-4 p-2 leading-2 font-semibold bg-gray-300 dark:bg-gray-700 dark:text-white">
                                         <div class="flex items-center justify-between">
                                             <h4>Overview</h4>
@@ -235,7 +235,7 @@
                                     </div>
                                 </div>
                                 <% if (data.name === 'All') { %>
-                                    <div class="bg-white shadow-md rounded my-3 dark:bg-gray-500 dark:text-white">
+                                    <div class="bg-white shadow-md rounded my-3 dark:bg-gray-600 dark:text-white">
                                         <div class="space-x-4 px-4 p-2 leading-2 font-semibold bg-gray-300 dark:bg-gray-700 dark:text-white">
                                             <h4>API</h4>
                                         </div>
@@ -264,7 +264,7 @@
                                     </div>
                                 <% } %>
                                 <% if (data.name !== 'All') { %>
-                                    <div class="bg-white shadow-md rounded my-3 dark:bg-gray-500 dark:text-white">
+                                    <div class="bg-white shadow-md rounded my-3 dark:bg-gray-600 dark:text-white">
                                         <div class="space-x-4 px-4 p-2 leading-2 font-semibold bg-gray-300 dark:bg-gray-700 dark:text-white">
                                             <h4>Config
                                                 <span>
@@ -316,7 +316,7 @@
                                         </div>
                                     </div>
                                 <% } %>
-                                <div class="bg-white shadow-md rounded my-3 dark:bg-gray-500 dark:text-white">
+                                <div class="bg-white shadow-md rounded my-3 dark:bg-gray-600 dark:text-white">
                                     <div class="space-x-4 px-4 p-2 leading-2 font-semibold bg-gray-300 dark:bg-gray-700 dark:text-white">
                                         <h4>Usage</h4>
                                     </div>
