@@ -1,14 +1,13 @@
-<html>
+<html lang="en">
 <%- include('partials/head', {title: undefined}) %>
-<body class="">
-<script>localStorage.getItem('ms-dark') === 'no' ? document.body.classList.remove('dark') : document.body.classList.add('dark')</script>
-<div class="min-w-screen min-h-screen bg-gray-100 bg-gray-100 dark:bg-gray-800 font-sans">
+<body class="bg-gray-900 text-white font-sans">
+<div class="min-w-screen min-h-screen">
     <%- include('partials/header') %>
     <%- include('partials/botsTab') %>
     <div class="container mx-auto">
         <%- include('partials/subredditsTab') %>
         <div class="grid">
-            <div class="bg-white dark:bg-gray-500 dark:text-white">
+            <div class="bg-gray-700">
                 <div class="pb-6 md:px-7">
                     <div class="sub active" data-subreddit="All" data-bot="All">
                         Instance is currently <b>OFFLINE</b>
@@ -31,7 +30,6 @@
 </div>
 <%- include('partials/footer') %>
 <%- include('partials/instanceTabJs') %>
-<%- include('partials/themeJs') %>
 <%- include('partials/logSettingsJs') %>
 <script src="https://cdn.socket.io/4.1.2/socket.io.min.js" integrity="sha384-toS6mmwu70G0fw54EGlWWeA4z3dyJ+dlXBtSURSKN4vyRFOcxd3Bzjj/AoOwY+Rg" crossorigin="anonymous"></script>
 <script>

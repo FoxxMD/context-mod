@@ -1,11 +1,6 @@
-<html>
+<html lang="en">
 <head>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.0.3/tailwind.min.css"
-          integrity="sha512-wl80ucxCRpLkfaCnbM88y4AxnutbGk327762eM9E/rRTvY/ZGAHWMZrYUq66VQBYMIYDFpDdJAOGSLyIPHZ2IQ=="
-          crossorigin="anonymous"/>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.0.3/tailwind-dark.min.css"
-          integrity="sha512-WvyKyiVHgInX5UQt67447ExtRRZG/8GUijaq1MpqTNYp8wY4/EJOG5bI80sRp/5crDy4Z6bBUydZI2OFV3Vbtg=="
-          crossorigin="anonymous"/>
+    <link rel="stylesheet" href="/public/tailwind.min.css"/>
     <script src="https://code.iconify.design/1/1.0.4/iconify.min.js"></script>
     <link rel="stylesheet" href="/public/themeToggle.css">
     <link rel="stylesheet" href="/public/app.css">
@@ -15,13 +10,12 @@
     <meta name="viewport" content="width=device-width,initial-scale=1.0">
     <!--icons from https://heroicons.com -->
 </head>
-<body style="user-select: none;" class="">
-<script>localStorage.getItem('ms-dark') === 'no' ? document.body.classList.remove('dark') : document.body.classList.add('dark')</script>
-<div class="min-w-screen min-h-screen bg-gray-100 bg-gray-100 dark:bg-gray-800 font-sans">
+<body style="user-select: none;" class="bg-gray-900 text-white font-sans">
+<div class="min-w-screen min-h-screen bg-gray-800">
     <%- include('partials/title') %>
     <div class="container mx-auto">
         <div class="grid">
-            <div class="dark:text-white mb-3 pl-2">
+            <div class="my-3 pl-2">
                 Schema <a href="/config?schema=subreddit" id="subredditSchemaType">Subreddit</a> / <a href="/config?schema=operator" id="operatorSchemaType">Operator</a>  |
                 <span class="has-tooltip">
                     <span style="z-index:999; margin-top: 30px;" class='tooltip rounded shadow-lg p-3 bg-gray-100 text-black space-y-2'>
@@ -63,35 +57,6 @@
     </div>
     <%- include('partials/footer') %>
 </div>
-<script>
-    document.querySelectorAll('.theme').forEach(el => {
-        el.addEventListener('click', e => {
-            e.preventDefault();
-            if (e.target.id === 'dark') {
-                document.body.classList.add('dark');
-                localStorage.setItem('ms-dark', 'yes');
-            } else {
-                document.body.classList.remove('dark');
-                localStorage.setItem('ms-dark', 'no');
-            }
-            document.querySelectorAll('.theme').forEach(el => {
-                el.classList.remove('font-bold', 'no-underline', 'pointer-events-none');
-            });
-            e.target.classList.add('font-bold', 'no-underline', 'pointer-events-none');
-        })
-    })
-
-    document.querySelector("#themeToggle").checked = localStorage.getItem('ms-dark') !== 'no';
-    document.querySelector("#themeToggle").onchange = (e) => {
-        if (e.target.checked === true) {
-            document.body.classList.add('dark');
-            localStorage.setItem('ms-dark', 'yes');
-        } else {
-            document.body.classList.remove('dark');
-            localStorage.setItem('ms-dark', 'no');
-        }
-    }
-</script>
 <script src="/monaco/dev/vs/loader.js"></script>
 <script>
     require.config({ paths: { vs: 'monaco/dev/vs' } });

@@ -4,16 +4,12 @@ a {
 
 .loading {
     height: 35px;
-    fill: black;
+    fill: white;
     display: none;
 }
 
 .connected .loading {
     display: inline;
-}
-
-.dark .loading {
-    fill: white;
 }
 
 .sub {
@@ -90,4 +86,20 @@ a {
 .sub.offline .logs a {
     pointer-events: initial;
     text-decoration: initial;
+}
+
+.blue {
+    color: rgb(97, 175, 239)
+}
+.red {
+    color: rgb(255 123 133);
+}
+.green {
+    color: rgb(170 255 109);
+}
+.purple {
+    color: rgb(224 124 253);
+}
+.yellow {
+    color: rgb(253 198 94);
 }
