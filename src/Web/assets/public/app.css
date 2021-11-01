@@ -4,16 +4,12 @@ a {
 
 .loading {
     height: 35px;
-    fill: black;
+    fill: white;
     display: none;
 }
 
 .connected .loading {
     display: inline;
-}
-
-.dark .loading {
-    fill: white;
 }
 
 .sub {

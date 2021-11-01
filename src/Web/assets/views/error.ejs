@@ -1,12 +1,11 @@
 <html>
 <%- include('partials/head', {title: 'CM'}) %>
-<body class="">
-<script>localStorage.getItem('ms-dark') === 'no' ? document.body.classList.remove('dark') : document.body.classList.add('dark')</script>
-<div class="min-w-screen min-h-screen bg-gray-100 bg-gray-100 dark:bg-gray-800 font-sans">
+<body class="bg-gray-900 text-white font-sans">
+<div class="min-w-screen min-h-screen">
     <%- include('partials/title', {title: 'Error'}) %>
     <div class="container mx-auto">
         <div class="grid">
-            <div class="bg-white dark:bg-gray-500 dark:text-white">
+            <div class="bg-gray-600">
                 <div class="p-6 md:px-10 md:py-6">
                     <div class="text-xl mb-4">Oops 😬</div>
                     <div class="space-y-3">

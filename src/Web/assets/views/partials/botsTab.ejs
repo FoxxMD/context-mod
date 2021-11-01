@@ -1,9 +1,9 @@
-<div class="space-x-4 py-1 md:px-10 leading-6 font-semibold bg-gray-500 dark:bg-gray-700 text-white">
+<div class="space-x-4 py-1 md:px-10 leading-6 font-semibold bg-gray-700">
     <div class="container mx-auto">
         <% if(locals.bots !== undefined) { %>
         <ul id="botTabs" class="inline-flex flex-wrap">
             <% bots.forEach(function (data){ %>
-                <li class="my-3 px-3 dark:text-white">
+                <li class="my-3 px-3">
                         <span data-bot="<%= data.system.name %>" class="rounded-md py-2 px-3 tabSelectWrapper">
                         <a class="tabSelect font-normal pointer hover:font-bold"
                            data-bot="<%= data.system.name %>">
@@ -16,7 +16,7 @@
                 </li>
             <% }) %>
             <% if(locals.isOperator === true && locals.instanceId !== undefined) { %>
-                    <li class="my-3 px-3 dark:text-white">
+                    <li class="my-3 px-3">
                         <span class="rounded-md py-2 px-3 border">
                         <a class="font-normal pointer hover:font-bold" href="/auth/helper">
                             Add Bot +
