@@ -37,7 +37,10 @@ import {
     ActionedEvent,
     SubredditState,
     StrongSubredditState,
-    HistoricalStats, HistoricalStatUpdateData, SubredditHistoricalStats, SubredditHistoricalStatsDisplay
+    HistoricalStats,
+    HistoricalStatUpdateData,
+    SubredditHistoricalStats,
+    SubredditHistoricalStatsDisplay,
 } from "../Common/interfaces";
 import UserNotes from "./UserNotes";
 import Mustache from "mustache";
@@ -818,6 +821,10 @@ export class SubredditResources {
                                 }
                                 break;
                             case 'reports':
+                                if (!item.can_mod_post) {
+                                    log.debug(`Cannot test for reports on Activity in a subreddit bot account is not a moderato Activist. Skipping criteria...`);
+                                    break;
+                                }
                                 const reportCompare = parseGenericValueComparison(crit[k] as string);
                                 if(!comparisonTextOp(item.num_reports, reportCompare.operator, reportCompare.value)) {
                                     // @ts-ignore
@@ -842,6 +849,10 @@ export class SubredditResources {
                                 }
                                 break;
                             case 'filtered':
+                                if (!item.can_mod_post) {
+                                    log.debug(`Cannot test for 'filtered' state on Activity in a subreddit bot account is not a moderator for. Skipping criteria...`);
+                                    break;
+                                }
                                 const filtered = activityIsFiltered(item);
                                 if (filtered !== crit['filtered']) {
                                     // @ts-ignore
@@ -864,13 +875,26 @@ export class SubredditResources {
                                 // @ts-ignore
                                 const titleReg = crit[k] as string;
                                 try {
-                                    if(null === item.title.match(titleReg)) {
+                                    if (null === item.title.match(titleReg)) {
                                         // @ts-ignore
                                         log.debug(`Failed to match title as regular expression: ${titleReg}`);
                                         return false;
                                     }
                                 } catch (err) {
                                     log.error(`An error occurred while attempting to match title against string as regular expression: ${titleReg}. Most likely the string does not make a valid regular expression.`, err);
+                                    return false
+                                }
+                                break;
+                            case 'approved':
+                            case 'spam':
+                                if(!item.can_mod_post) {
+                                    log.debug(`Cannot test for '${k}' state on Activity in a subreddit bot account is not a moderator for. Skipping criteria...`);
+                                    break;
+                                }
+                                // @ts-ignore
+                                if (item[k] !== crit[k]) {
+                                    // @ts-ignore
+                                    log.debug(`Failed: Expected => ${k}:${crit[k]} | Found => ${k}:${item[k]}`)
                                     return false
                                 }
                                 break;
@@ -884,7 +908,11 @@ export class SubredditResources {
                                         return false
                                     }
                                 } else {
-                                    log.warn(`Tried to test for Item property '${k}' but it did not exist`);
+                                    if(!item.can_mod_post) {
+                                        log.warn(`Tried to test for Activity property '${k}' but it did not exist. This Activity is not in a subreddit the bot can mod so it may be that this property is only available to mods of that subreddit. Or the property may be misspelled.`);
+                                    } else {
+                                        log.warn(`Tried to test for Activity property '${k}' but it did not exist. Check the spelling of the property.`);
+                                    }
                                 }
                                 break;
                         }

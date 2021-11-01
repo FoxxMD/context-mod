@@ -1,5 +1,6 @@
 import {UserNoteCriteria} from "../Rule";
 import {CompareValue, CompareValueOrPercent, DurationComparor} from "../Common/interfaces";
+import {parseStringToRegex} from "../util";
 
 /**
  * If present then these Author criteria are checked before running the rule. If criteria fails then the rule is skipped.
@@ -106,6 +107,17 @@ export interface AuthorCriteria {
      * This is determined by trying to retrieve the author's profile. If a 404 is returned it is likely they are shadowbanned
      * */
     shadowBanned?: boolean
+
+    /**
+     * An (array of) string/regular expression to test contents of an Author's profile description against
+     *
+     * If no flags are specified then the **insensitive** flag is used by default
+     *
+     * If using an array then if **any** value in the array passes the description test passes
+     *
+     * @examples [["/test$/i", "look for this string literal"]]
+     * */
+    description?: string | string[]
 }
 
 export class Author implements AuthorCriteria {
@@ -120,6 +132,7 @@ export class Author implements AuthorCriteria {
     totalKarma?: string;
     verified?: boolean;
     shadowBanned?: boolean;
+    description?: string[];
 
     constructor(options: AuthorCriteria) {
         this.name = options.name;
@@ -132,6 +145,7 @@ export class Author implements AuthorCriteria {
         this.linkKarma = options.linkKarma;
         this.totalKarma = options.totalKarma;
         this.shadowBanned = options.shadowBanned;
+        this.description = options.description === undefined ? undefined : Array.isArray(options.description) ? options.description : [options.description];
     }
 }
 

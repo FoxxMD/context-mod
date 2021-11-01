@@ -969,6 +969,13 @@ export const toStrongSubredditState = (s: SubredditState, opts?: StrongSubreddit
     return strongState;
 }
 
+export const convertSubredditsRawToStrong = (x: (SubredditState | string), opts: StrongSubredditStateOptions): StrongSubredditState => {
+    if (typeof x === 'string') {
+        return toStrongSubredditState({name: x, stateDescription: x}, opts);
+    }
+    return toStrongSubredditState(x, opts);
+}
+
 export async function readConfigFile(path: string, opts: any) {
     const {log, throwOnNotFound = true} = opts;
     try {
@@ -1412,4 +1419,8 @@ export const absPercentDifference = (num1: number, num2: number) => {
 
 export const bitsToHexLength = (bits: number): number => {
     return Math.pow(bits, 2) / 4;
+}
+
+export const escapeRegex = (val: string) => {
+    return val.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
 }

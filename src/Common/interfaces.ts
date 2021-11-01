@@ -932,6 +932,9 @@ export interface SubmissionState extends ActivityState {
     link_flair_css_class?: string
 }
 
+// properties calculated/derived by CM -- not provided as plain values by reddit
+export const cmActivityProperties = ['submissionState','score','reports','removed','deleted','filtered','age','title'];
+
 /**
  * Different attributes a `Comment` can be in. Only include a property if you want to check it.
  * @examples [{"op": true, "removed": false}]
