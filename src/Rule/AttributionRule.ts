@@ -203,7 +203,6 @@ export class AttributionRule extends Rule {
 
             const {operator, value, isPercent, extra = ''} = parseGenericValueOrPercentComparison(threshold);
 
-            debugger;
             let activities = thresholdOn === 'submissions' ? await this.resources.getAuthorSubmissions(item.author, {window: window}) : await this.resources.getAuthorActivities(item.author, {window: window});
 
             if(include.length > 0 || exclude.length > 0) {
