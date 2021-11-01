@@ -195,6 +195,16 @@
                     },
                     "type": "array"
                 },
+                "commentState": {
+                    "$ref": "#/definitions/CommentState",
+                    "description": "When present, Comments from `window` will only be counted if they meet this criteria",
+                    "examples": [
+                        {
+                            "op": true,
+                            "removed": false
+                        }
+                    ]
+                },
                 "consolidateMediaDomains": {
                     "default": false,
                     "description": "Should the criteria consolidate recognized media domains into the parent domain?\n\nSubmissions to major media domains (youtube, vimeo) can be identified by individual Channel/Author...\n\n* If `false` then domains will be aggregated at the channel level IE Youtube Channel A (2 counts), Youtube Channel B  (3 counts)\n* If `true` then then media domains will be consolidated at domain level and then aggregated IE youtube.com (5 counts)",
@@ -223,27 +233,37 @@
                     "type": "boolean"
                 },
                 "exclude": {
-                    "description": "Do not include Activities from this list of Subreddits (by name, case-insensitive)\n\nWill be ignored if `include` is present.\n\nEX `[\"mealtimevideos\",\"askscience\"]`",
+                    "description": "When present, Activities WILL NOT be counted if they are found in this list of Subreddits\n\nEach value in the list can be either:\n\n * string (name of subreddit)\n * regular expression to run on the subreddit name\n * `SubredditState`\n\nEX `[\"mealtimevideos\",\"askscience\", \"/onlyfans*\\/i\", {\"over18\": true}]`",
                     "examples": [
-                        "mealtimevideos",
-                        "askscience"
+                        [
+                            "mealtimevideos",
+                            "askscience",
+                            "/onlyfans*/i",
+                            {
+                                "over18": true
+                            }
+                        ]
                     ],
                     "items": {
                         "type": "string"
                     },
-                    "minItems": 1,
                     "type": "array"
                 },
                 "include": {
-                    "description": "Only include Activities from this list of Subreddits (by name, case-insensitive)\n\n\nEX `[\"mealtimevideos\",\"askscience\"]`",
+                    "description": "When present, Activities WILL ONLY be counted if they are found in this list of Subreddits\n\nEach value in the list can be either:\n\n * string (name of subreddit)\n * regular expression to run on the subreddit name\n * `SubredditState`\n\nEX `[\"mealtimevideos\",\"askscience\", \"/onlyfans*\\/i\", {\"over18\": true}]`",
                     "examples": [
-                        "mealtimevideos",
-                        "askscience"
+                        [
+                            "mealtimevideos",
+                            "askscience",
+                            "/onlyfans*/i",
+                            {
+                                "over18": true
+                            }
+                        ]
                     ],
                     "items": {
                         "type": "string"
                     },
-                    "minItems": 1,
                     "type": "array"
                 },
                 "minActivityCount": {
@@ -253,6 +273,16 @@
                 },
                 "name": {
                     "type": "string"
+                },
+                "submissionState": {
+                    "$ref": "#/definitions/SubmissionState",
+                    "description": "When present, Submissions from `window` will only be counted if they meet this criteria",
+                    "examples": [
+                        {
+                            "over_18": true,
+                            "removed": false
+                        }
+                    ]
                 },
                 "threshold": {
                     "default": "> 10%",

@@ -10,7 +10,7 @@ import {
     asSubmission, bitsToHexLength,
     // blockHashImage,
     compareImages,
-    comparisonTextOp,
+    comparisonTextOp, convertSubredditsRawToStrong,
     FAIL,
     formatNumber,
     getActivitySubredditName, imageCompareMaxConcurrencyGuess,
@@ -284,15 +284,11 @@ export class RecentActivityRule extends Rule {
             } = triggerSet;
 
             // convert subreddits array into entirely StrongSubredditState
-            const subStates: StrongSubredditState[] = subreddits.map((x) => {
-                if (typeof x === 'string') {
-                    return toStrongSubredditState({name: x, stateDescription: x}, {
-                        defaultFlags: 'i',
-                        generateDescription: true
-                    });
-                }
-                return toStrongSubredditState(x, {defaultFlags: 'i', generateDescription: true});
-            });
+            const defaultOpts = {
+                defaultFlags: 'i',
+                generateDescription: true
+            };
+            const subStates: StrongSubredditState[] = subreddits.map((x) => convertSubredditsRawToStrong(x, defaultOpts));
 
             let validActivity: (Comment | Submission)[] = await as.filter(viableActivity, async (activity) => {
                 if (asSubmission(activity) && submissionState !== undefined) {

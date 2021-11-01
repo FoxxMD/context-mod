@@ -1,12 +1,12 @@
 import {SubmissionRule, SubmissionRuleJSONConfig} from "./SubmissionRule";
-import {ActivityWindowType, DomainInfo, ReferenceSubmission} from "../Common/interfaces";
+import {ActivityWindowType, CommentState, DomainInfo, ReferenceSubmission, SubmissionState} from "../Common/interfaces";
 import {Rule, RuleOptions, RuleResult} from "./index";
 import Submission from "snoowrap/dist/objects/Submission";
 import {getAttributionIdentifier} from "../Utils/SnoowrapUtils";
 import dayjs from "dayjs";
 import {
     asSubmission,
-    comparisonTextOp,
+    comparisonTextOp, convertSubredditsRawToStrong,
     FAIL,
     formatNumber, getActivitySubredditName, isSubmission,
     parseGenericValueOrPercentComparison,
@@ -15,6 +15,7 @@ import {
 } from "../util";
 import { Comment } from "snoowrap/dist/objects";
 import SimpleError from "../Utils/SimpleError";
+import as from "async";
 
 
 export interface AttributionCriteria {
@@ -76,24 +77,40 @@ export interface AttributionCriteria {
     domainsCombined?: boolean,
 
     /**
-     * Only include Activities from this list of Subreddits (by name, case-insensitive)
+     * When present, Activities WILL ONLY be counted if they are found in this list of Subreddits
      *
+     * Each value in the list can be either:
      *
-     * EX `["mealtimevideos","askscience"]`
-     * @examples ["mealtimevideos","askscience"]
-     * @minItems 1
+     *  * string (name of subreddit)
+     *  * regular expression to run on the subreddit name
+     *  * `SubredditState`
+     *
+     * EX `["mealtimevideos","askscience", "/onlyfans*\/i", {"over18": true}]`
+     * @examples [["mealtimevideos","askscience", "/onlyfans*\/i", {"over18": true}]]
      * */
     include?: string[],
     /**
-     * Do not include Activities from this list of Subreddits (by name, case-insensitive)
+     * When present, Activities WILL NOT be counted if they are found in this list of Subreddits
      *
-     * Will be ignored if `include` is present.
+     * Each value in the list can be either:
      *
-     * EX `["mealtimevideos","askscience"]`
-     * @examples ["mealtimevideos","askscience"]
-     * @minItems 1
+     *  * string (name of subreddit)
+     *  * regular expression to run on the subreddit name
+     *  * `SubredditState`
+     *
+     * EX `["mealtimevideos","askscience", "/onlyfans*\/i", {"over18": true}]`
+     * @examples [["mealtimevideos","askscience", "/onlyfans*\/i", {"over18": true}]]
      * */
     exclude?: string[],
+
+    /**
+     * When present, Submissions from `window` will only be counted if they meet this criteria
+     * */
+    submissionState?: SubmissionState
+    /**
+     * When present, Comments from `window` will only be counted if they meet this criteria
+     * */
+    commentState?: CommentState
 
     /**
      * This list determines which categories of domains should be aggregated on. All aggregated domains will be tested against `threshold`
@@ -178,21 +195,37 @@ export class AttributionRule extends Rule {
                 consolidateMediaDomains = false,
                 domains = [],
                 domainsCombined = false,
-                include: includeRaw = [],
-                exclude: excludeRaw = [],
+                include = [],
+                exclude = [],
+                commentState,
+                submissionState,
             } = criteria;
-
-            const include = includeRaw.map(x => parseSubredditName(x).toLowerCase());
-            const exclude = excludeRaw.map(x => parseSubredditName(x).toLowerCase());
 
             const {operator, value, isPercent, extra = ''} = parseGenericValueOrPercentComparison(threshold);
 
+            debugger;
             let activities = thresholdOn === 'submissions' ? await this.resources.getAuthorSubmissions(item.author, {window: window}) : await this.resources.getAuthorActivities(item.author, {window: window});
-            activities = activities.filter(act => {
-                if (include.length > 0) {
-                    return include.some(x => x === getActivitySubredditName(act).toLowerCase());
-                } else if (exclude.length > 0) {
-                    return !exclude.some(x => x === getActivitySubredditName(act).toLowerCase())
+
+            if(include.length > 0 || exclude.length > 0) {
+                const defaultOpts = {
+                    defaultFlags: 'i',
+                    generateDescription: true
+                };
+                if(include.length > 0) {
+                    const subStates = include.map(x => convertSubredditsRawToStrong(x, defaultOpts));
+                    activities = await this.resources.batchTestSubredditCriteria(activities, subStates);
+                } else {
+                    const subStates = exclude.map(x => convertSubredditsRawToStrong(x, defaultOpts));
+                    const toExclude = (await this.resources.batchTestSubredditCriteria(activities, subStates)).map(x => x.id);
+                    activities = activities.filter(x => !toExclude.includes(x.id));
+                }
+            }
+
+            activities = await as.filter(activities, async (activity) => {
+                if (asSubmission(activity) && submissionState !== undefined) {
+                    return await this.resources.testItemCriteria(activity, [submissionState]);
+                } else if (commentState !== undefined) {
+                    return await this.resources.testItemCriteria(activity, [commentState]);
                 }
                 return true;
             });
