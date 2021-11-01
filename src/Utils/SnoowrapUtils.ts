@@ -377,7 +377,7 @@ export const testAuthorCriteria = async (item: (Comment | Submission), authorOpt
                             // @ts-ignore
                             for (const c of authorOpts[k]) {
                                 if (c === css) {
-                                    return;
+                                    return true;
                                 }
                             }
                             return false;
@@ -393,7 +393,7 @@ export const testAuthorCriteria = async (item: (Comment | Submission), authorOpt
                             // @ts-ignore
                             for (const c of authorOpts[k]) {
                                 if (c === text) {
-                                    return
+                                    return true;
                                 }
                             }
                             return false;
