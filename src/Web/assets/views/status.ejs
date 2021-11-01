@@ -62,10 +62,7 @@
                                                                          class="h-4 w-4 inline-block cursor-help"
                                                                          fill="none"
                                                                          viewBox="0 0 24 24" stroke="currentColor">
-                                                                        <path stroke-linecap="round"
-                                                                              stroke-linejoin="round"
-                                                                              stroke-width="2"
-                                                                              d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                                                        <use xlink:href="public/questionsymbol.svg#q" />
                                                                     </svg>
                                                                 </span>
                                                         </span>
@@ -98,10 +95,7 @@
                                                                          class="h-4 w-4 inline-block cursor-help"
                                                                          fill="none"
                                                                          viewBox="0 0 24 24" stroke="currentColor">
-                                                                        <path stroke-linecap="round"
-                                                                              stroke-linejoin="round"
-                                                                              stroke-width="2"
-                                                                              d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                                                        <use xlink:href="public/questionsymbol.svg#q" />
                                                                     </svg>
                                                                 </span>
                                                         </span>
@@ -135,10 +129,7 @@
                                                                          class="h-4 w-4 inline-block cursor-help"
                                                                          fill="none"
                                                                          viewBox="0 0 24 24" stroke="currentColor">
-                                                                        <path stroke-linecap="round"
-                                                                              stroke-linejoin="round"
-                                                                              stroke-width="2"
-                                                                              d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                                                        <use xlink:href="public/questionsymbol.svg#q" />
                                                                     </svg>
                                                                 </span>
                                                         </span>
@@ -208,11 +199,8 @@
                                                                           class="h-4 w-4 inline-block cursor-help"
                                                                           fill="none"
                                                                           viewBox="0 0 24 24" stroke="currentColor">
-                                                                        <path stroke-linecap="round"
-                                                                              stroke-linejoin="round"
-                                                                              stroke-width="2"
-                                                                              d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                                                                    </svg>
+                                                                        <use xlink:href="public/questionsymbol.svg#q" />
+                                                        </svg>
                                                     </span>
                                                 </span>
                                             </label>
@@ -249,9 +237,40 @@
                                                 <label>Api Usage</label>
                                                 <span><span id="apiLimit"><%= data.apiLimit %></span>/600 (~<span
                                                             id="apiAvg"><%= data.apiAvg %></span>req/s)</span>
-                                                <label>Depleted</label>
+                                                <label>
+                                                    <span class="has-tooltip">
+                                                       <span style="margin-top:55px" class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black space-y-3 p-2 text-left'>
+                                                            <p>Reddit restricts api usage, per account, to <b>600 requests every 10 minutes.</b></p>
+                                                            <p><b>Depleted</b> is the estimated time until all 600 requests are used based on <b>Api Usage.</b></p>
+                                                            <p>API usage is sustainable when <b>Depleted</b> is greater than <b>Limit Reset</b></p>
+                                                        </span>
+                                                        <span>
+                                                            Depleted <svg xmlns="http://www.w3.org/2000/svg"
+                                                                             class="h-4 w-4 inline-block cursor-help"
+                                                                             fill="none"
+                                                                             viewBox="0 0 24 24" stroke="currentColor">
+                                                                <use xlink:href="public/questionsymbol.svg#q" />
+                                                            </svg>
+                                                        </span>
+                                                    </span>
+                                                </label>
                                                 <span>in ~<span id="apiDepletion"><%= data.apiDepletion %></span></span>
-                                                <label>Limit Reset</label>
+                                                <label>
+                                                    <span class="has-tooltip">
+                                                       <span style="margin-top:35px" class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black space-y-3 p-2 text-left'>
+                                                            <p>Reddit restricts api usage, per account, to <b>600 requests every 10 minutes.</b></p>
+                                                            <p><b>Limit Reset</b> is the amount of time remaining in the current 10 minute period until the limit is reset to 600.</p>
+                                                        </span>
+                                                        <span>
+                                                            Limit Reset <svg xmlns="http://www.w3.org/2000/svg"
+                                                                          class="h-4 w-4 inline-block cursor-help"
+                                                                          fill="none"
+                                                                          viewBox="0 0 24 24" stroke="currentColor">
+                                                                <use xlink:href="public/questionsymbol.svg#q" />
+                                                            </svg>
+                                                        </span>
+                                                    </span>
+                                                </label>
                                                 <span class="has-tooltip">
                                                     <span class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2'>
                                                         <span id="limitReset"><%= data.limitReset %></span>
@@ -439,10 +458,7 @@
                                                                          class="h-4 w-4 inline-block cursor-help"
                                                                          fill="none"
                                                                          viewBox="0 0 24 24" stroke="currentColor">
-                                                                        <path stroke-linecap="round"
-                                                                              stroke-linejoin="round"
-                                                                              stroke-width="2"
-                                                                              d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                                                        <use xlink:href="public/questionsymbol.svg#q" />
                                                                     </svg>
                                                                 </span>
                                                         </span>
@@ -579,10 +595,7 @@
                                                                          class="h-4 w-4 inline-block cursor-help"
                                                                          fill="none"
                                                                          viewBox="0 0 24 24" stroke="currentColor">
-                                                                        <path stroke-linecap="round"
-                                                                              stroke-linejoin="round"
-                                                                              stroke-width="2"
-                                                                              d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                                                        <use xlink:href="public/questionsymbol.svg#q" />
                                                                     </svg>
                                                                 </span>
                                                         </span>
