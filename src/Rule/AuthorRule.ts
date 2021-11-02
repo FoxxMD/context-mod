@@ -12,11 +12,11 @@ export interface AuthorRuleConfig {
     /**
      * Will "pass" if any set of AuthorCriteria passes
      * */
-    include: AuthorCriteria[];
+    include?: AuthorCriteria[];
     /**
      * Only runs if include is not present. Will "pass" if any of set of the AuthorCriteria does not pass
      * */
-    exclude: AuthorCriteria[];
+    exclude?: AuthorCriteria[];
 }
 
 export interface AuthorRuleOptions extends AuthorRuleConfig, RuleOptions {
@@ -34,8 +34,13 @@ export class AuthorRule extends Rule {
     constructor(options: AuthorRuleOptions) {
         super(options);
 
-        this.include = options.include.map(x => new Author(x));
-        this.exclude = options.exclude.map(x => new Author(x));
+        const {
+            include,
+            exclude,
+        } = options;
+
+        this.include = include !== undefined ? include.map(x => new Author(x)) : [];
+        this.exclude = exclude !== undefined ? exclude.map(x => new Author(x)) : [];
 
         if(this.include.length === 0 && this.exclude.length === 0) {
             throw new Error('At least one of the properties [include,exclude] on Author Rule must not be empty');

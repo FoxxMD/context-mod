@@ -671,8 +671,6 @@
                 }
             },
             "required": [
-                "exclude",
-                "include",
                 "kind"
             ],
             "type": "object"
