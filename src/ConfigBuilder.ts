@@ -656,10 +656,7 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
                 ...cacheTTLDefaults,
                 actionedEventsDefault: opActionedEventsDefault,
                 actionedEventsMax: opActionedEventsMax,
-                provider: {
-                    store: 'memory',
-                    ...cacheOptDefaults
-                }
+                provider: {...defaultProvider}
             };
         } else {
             const {
