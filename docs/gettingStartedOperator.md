@@ -50,6 +50,18 @@ tsc -p .
 ### [Heroku Quick Deploy](https://heroku.com/about)
 [![Deploy](https://www.herokucdn.com/deploy/button.svg)](https://dashboard.heroku.com/new?template=https://github.com/FoxxMD/context-mod)
 
+This template provides a **web** and **worker** dyno for heroku.
+
+* **Web** -- Will run the bot **and** the web interface for ContextMod.
+* **Worker** -- Will run **just** the bot.
+
+Be aware that Heroku's [free dyno plan](https://devcenter.heroku.com/articles/free-dyno-hours#dyno-sleeping) enacts some limits:
+
+* A **Web** dyno will go to sleep (pause) after 30 minutes without web activity -- so your bot will ALSO go to sleep at this time
+* The **Worker** dyno **will not** go to sleep but you will NOT be able to access the web interface. You can, however, still see how Cm is running by reading the logs for the dyno.
+
+If you want to use a free dyno it is recommended you perform first-time setup (bot authentication and configuration, testing, etc...) with the **Web** dyno, then SWITCH to a **Worker** dyno so it can run 24/7.
+
 # Bot Authentication
 
 Next you need to create a bot and authenticate it with Reddit. Follow the [bot authentication guide](/docs/botAuthentication.md) to complete this step.
