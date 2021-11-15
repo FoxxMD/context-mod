@@ -324,8 +324,8 @@ class Bot {
                 const normalExcludes = this.excludeSubreddits.map(x => x.toLowerCase());
                 subsToRun = availSubs.filter(x => !normalExcludes.includes(x.display_name.toLowerCase()));
             } else {
-                this.logger.info('No user-defined subreddit constraints detected, will run on all moderated subreddits');
-                subsToRun = availSubs;
+                this.logger.info(`No user-defined subreddit constraints detected, will run on all moderated subreddits EXCEPT own profile (${this.botAccount})`);
+                subsToRun = availSubs.filter(x => x.display_name_prefixed !== this.botAccount);
             }
         }
 
