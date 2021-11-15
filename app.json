@@ -25,8 +25,13 @@
       "required": false
     },
     "REDIRECT_URI": {
-      "description": "Redirect URI you specified when creating your Reddit ApApplication. Required if you want to use the web interface. In the provided example replace 'your-heroku-app-name' with the name of your HEROKU app.",
+      "description": "Redirect URI you specified when creating your Reddit Application. Required if you want to use the web interface. In the provided example replace 'your-heroku-app-name' with the name of your HEROKU app.",
       "value": "https://your-heroku-6app-name.herokuapp.com/callback",
+      "required": false
+    },
+    "OPERATOR": {
+      "description": "Your reddit username WITHOUT any prefixes EXAMPLE /u/FoxxMD => FoxxMD. Specified user will be recognized as an admin.",
+      "value": "",
       "required": false
     },
     "WIKI_CONFIG": {
