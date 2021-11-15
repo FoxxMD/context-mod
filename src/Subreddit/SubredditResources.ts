@@ -898,6 +898,18 @@ export class SubredditResources {
                                     return false
                                 }
                                 break;
+                            case 'op':
+                                if(item instanceof Submission) {
+                                    log.warn(`On a Submission the 'op' property will always be true. Did you mean to use this on a comment instead?`);
+                                    break;
+                                }
+                                // @ts-ignore
+                                if (item.is_submitter !== crit[k]) {
+                                    // @ts-ignore
+                                    log.debug(`Failed: Expected => ${k}:${crit[k]} | Found => ${k}:${item[k]}`)
+                                    return false
+                                }
+                                break;
                             default:
                                 // @ts-ignore
                                 if (item[k] !== undefined) {
