@@ -1,3 +1,4 @@
 build:
   docker:
-    worker: Dockerfile
+    web: heroku.Dockerfile
+    worker: heroku.Dockerfile
