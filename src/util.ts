@@ -985,10 +985,10 @@ export async function readConfigFile(path: string, opts: any) {
         if(configObj !== undefined) {
             return configObj as object;
         }
-        log.error(`Could not parse wiki page contents as JSON or YAML:`);
+        log.error(`Could not parse file contents at ${path} as JSON or YAML:`);
         log.error(jsonErr);
         log.error(yamlErr);
-        throw new SimpleError('Could not parse wiki page contents as JSON or YAML');
+        throw new SimpleError(`Could not parse file contents at ${path} as JSON or YAML`);
     } catch (e) {
         const {code} = e;
         if (code === 'ENOENT') {
