@@ -339,6 +339,7 @@ export class Manager {
             const {
                 polling = [{pollOn: 'unmoderated', limit: DEFAULT_POLLING_LIMIT, interval: DEFAULT_POLLING_INTERVAL}],
                 caching,
+                credentials,
                 dryRun,
                 footer,
                 nickname,
@@ -379,6 +380,7 @@ export class Manager {
                 logger: this.logger,
                 subreddit: this.subreddit,
                 caching,
+                credentials,
                 client: this.client,
             };
             this.resources = await this.cacheManager.set(this.subreddit.display_name, resourceConfig);

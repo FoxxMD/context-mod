@@ -12,10 +12,10 @@ import {inflateSync, deflateSync} from "zlib";
 import pixelmatch from 'pixelmatch';
 import os from 'os';
 import {
-    ActivityWindowCriteria,
+    ActivityWindowCriteria, ActivityWindowType,
     CacheOptions,
     CacheProvider,
-    DurationComparison,
+    DurationComparison, DurationVal,
     GenericComparison,
     HistoricalStats,
     HistoricalStatsDisplay, ImageComparisonResult,
@@ -27,8 +27,8 @@ import {
     PollingOptionsStrong,
     RedditEntity,
     RedditEntityType,
-    RegExResult,
-    ResourceStats,
+    RegExResult, RepostItem, RepostItemResult,
+    ResourceStats, SearchAndReplaceRegExp,
     StatusCodeError,
     StringOperator,
     StrongSubredditState,
@@ -54,6 +54,7 @@ import ImageData from "./Common/ImageData";
 import {Sharp, SharpOptions} from "sharp";
 // @ts-ignore
 import {blockhashData, hammingDistance} from 'blockhash';
+import leven from "leven";
 //import {ResembleSingleCallbackComparisonResult} from "resemblejs";
 
 // want to guess how many concurrent image comparisons we should be doing
@@ -1423,4 +1424,81 @@ export const bitsToHexLength = (bits: number): number => {
 
 export const escapeRegex = (val: string) => {
     return val.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+}
+
+export const windowToActivityWindowCriteria = (window: (Duration | ActivityWindowType | ActivityWindowCriteria)): ActivityWindowCriteria => {
+    let crit: ActivityWindowCriteria;
+
+    if (isActivityWindowCriteria(window)) {
+        crit = window;
+    } else if (typeof window === 'number') {
+        crit = {count: window};
+    } else {
+        crit = {duration: window as DurationVal};
+    }
+
+    const {
+        satisfyOn = 'any',
+        count,
+        duration,
+        subreddits: {
+            include = [],
+            exclude = [],
+        } = {},
+    } = crit;
+
+    const includes = include.map(x => parseSubredditName(x).toLowerCase());
+    const excludes = exclude.map(x => parseSubredditName(x).toLowerCase());
+
+    return {
+        satisfyOn,
+        count,
+        duration,
+        subreddits: {
+            include: includes,
+            exclude: excludes
+        }
+    }
+}
+
+export const searchAndReplace = (val: string, ops: SearchAndReplaceRegExp[]) => {
+    if (ops.length === 0) {
+        return val;
+    }
+    return ops.reduce((acc, curr) => {
+        let reg = parseStringToRegex(curr.search, 'ig');
+        if (reg === undefined) {
+            reg = parseStringToRegex(`/.*${escapeRegex(curr.search.trim())}.*/`, 'ig');
+        }
+        return acc.replace(reg ?? val, curr.replace);
+    }, val);
+}
+
+export const isRepostItemResult = (val: (RepostItem|RepostItemResult)): val is RepostItemResult => {
+    return 'sameness' in val;
+}
+
+export const stringSameness = (valA: string, valB: string) => {
+    let longer: string;
+    let shorter: string;
+    if (valA.length > valB.length) {
+        longer = valA;
+        shorter = valB;
+    } else {
+        longer = valB;
+        shorter = valA;
+    }
+
+    const distance = leven(longer, shorter);
+    const diff = (distance / longer.length) * 100;
+    return [distance, 100 - diff];
+}
+
+// https://stackoverflow.com/a/18679657/1469797
+export const wordCount = (str: string): number => {
+    return str.split(' ')
+        .filter(function (n) {
+            return n != ''
+        })
+        .length;
 }

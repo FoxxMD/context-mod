@@ -26,6 +26,7 @@
   "license": "ISC",
   "dependencies": {
     "@awaitjs/express": "^0.8.0",
+    "@googleapis/youtube": "^2.0.0",
     "@stdlib/regexp-regexp": "^0.0.6",
     "ajv": "^7.2.4",
     "async": "^3.2.0",
