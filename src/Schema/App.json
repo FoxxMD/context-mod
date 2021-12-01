@@ -2737,15 +2737,14 @@
                         }
                     ]
                 },
-                "externalItemCount": {
-                    "default": 20,
-                    "description": "The maximum number of comments/replies/items to retrieve from an external source.\n\nNote: External items, where possible, are returned/sorted in order of popularity (likes, replies, etc...) so if you are looking for reposts of popular items the default max items retrieved will mostly contain all relevant items.\n\nDefaults to 20",
-                    "type": "number"
-                },
                 "maxExternalItems": {
+                    "default": 50,
+                    "description": "The maximum number of external items (youtube comments) to check (and cache for comment checks)",
                     "type": "number"
                 },
                 "maxRedditItems": {
+                    "default": 50,
+                    "description": "The maximum number of comments/submissions to check\n\nIn both cases this list is gathered from sorting all submissions or all comments from all submission by number of votes and taking the \"top\" maximum specified\n\nFor comment checks this is the number of comments cached",
                     "type": "number"
                 },
                 "searchOn": {
@@ -2986,11 +2985,6 @@
                             "type": "string"
                         }
                     ]
-                },
-                "matchDistance": {
-                    "default": 15,
-                    "description": "The distance, from the expected location, a character can be found and still be considered a match\n\nDefaults to 15. Learn more about fuzziness score https://fusejs.io/concepts/scoring-theory.html#fuzziness-score",
-                    "type": "number"
                 },
                 "matchScore": {
                     "default": 85,
@@ -3340,11 +3334,6 @@
                     "default": false,
                     "description": "Should text matching be case sensitive?\n\nDefaults to false",
                     "type": "boolean"
-                },
-                "matchDistance": {
-                    "default": 15,
-                    "description": "The distance, from the expected location, a character can be found and still be considered a match\n\nDefaults to 15. Learn more about fuzziness score https://fusejs.io/concepts/scoring-theory.html#fuzziness-score",
-                    "type": "number"
                 },
                 "matchScore": {
                     "default": 85,

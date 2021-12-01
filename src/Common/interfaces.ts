@@ -1929,10 +1929,20 @@ export interface HistoricalStatUpdateData {
     rulesTriggered: string[] | string
 }
 
+export type SearchFacetType = 'title' | 'url' | 'duplicates' | 'crossposts' | 'external';
+
 export interface RepostItem {
     value: string
     createdOn?: number
     source: string
     sourceUrl?: string
     score?: number
+    itemType: string
+    acquisitionType: SearchFacetType | 'comment'
+    sourceObj?: any
+    reqSameness?: number
+}
+
+export interface RepostItemResult extends RepostItem {
+    sameness: number
 }

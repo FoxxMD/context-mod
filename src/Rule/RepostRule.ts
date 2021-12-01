@@ -3,12 +3,14 @@ import {Listing, SearchOptions} from "snoowrap";
 import Submission from "snoowrap/dist/objects/Submission";
 import Comment from "snoowrap/dist/objects/Comment";
 import {
+    FAIL, formatNumber,
+    isRepostItemResult,
     parseUsableLinkIdentifier,
-    PASS, searchAndReplace, triggeredIndicator, windowToActivityWindowCriteria
+    PASS, searchAndReplace, stringSameness, triggeredIndicator, windowToActivityWindowCriteria, wordCount
 } from "../util";
 import {
     ActivityWindow,
-    ActivityWindowType, JoinOperands, RepostItem, SearchAndReplaceRegExp,
+    ActivityWindowType, JoinOperands, RepostItem, RepostItemResult, SearchAndReplaceRegExp, SearchFacetType,
 } from "../Common/interfaces";
 import objectHash from "object-hash";
 import {getActivities, getAttributionIdentifier} from "../Utils/SnoowrapUtils";
@@ -19,15 +21,6 @@ import {YoutubeClient, commentsAsRepostItems} from "../Utils/ThirdParty/YoutubeC
 const parseYtIdentifier = parseUsableLinkIdentifier();
 
 export interface TextMatchOptions {
-    /**
-     * The distance, from the expected location, a character can be found and still be considered a match
-     *
-     * Defaults to 15. Learn more about fuzziness score https://fusejs.io/concepts/scoring-theory.html#fuzziness-score
-     *
-     * @default 15
-     * @example [15]
-     * */
-    matchDistance?: number
     /**
      * The percentage, as a whole number, of a repost title/comment that must match the title/comment being checked in order to consider both a match
      *
@@ -80,8 +73,6 @@ export interface TextTransformOptions {
     transformationsActivity?: SearchAndReplaceRegExp[]
 }
 
-export type SearchFacetType = 'title' | 'url' | 'duplicates' | 'crossposts' | 'external';
-
 export interface SearchFacetJSONConfig extends TextMatchOptions, TextTransformOptions, ActivityWindow {
     kind: SearchFacetType | SearchFacetType[]
 }
@@ -108,39 +99,39 @@ export interface RepostCriteria extends ActivityWindow {
 
     criteria?: TextMatchOptions & TextTransformOptions
 
+    /**
+     * The maximum number of comments/submissions to check
+     *
+     * In both cases this list is gathered from sorting all submissions or all comments from all submission by number of votes and taking the "top" maximum specified
+     *
+     * For comment checks this is the number of comments cached
+     *
+     * @default 50
+     * @example [50]
+     * */
     maxRedditItems?: number
 
-    maxExternalItems?: number
-
     /**
-     * The maximum number of comments/replies/items to retrieve from an external source.
+     * The maximum number of external items (youtube comments) to check (and cache for comment checks)
      *
-     * Note: External items, where possible, are returned/sorted in order of popularity (likes, replies, etc...) so if you are looking for reposts of popular items the default max items retrieved will mostly contain all relevant items.
-     *
-     * Defaults to 20
-     *
-     * @default 20
-     * @example [20]
+     * @default 50
+     * @example [50]
      * */
-    externalItemCount?: number
+    maxExternalItems?: number
 }
 
 const parentSubmissionSearchFacetDefaults = {
     title: {
-        matchDistance: 15,
         matchScore: 85,
         minWordCount: 2
     },
     url: {
-        matchDistance: 15,
         matchScore: 0, // when looking for submissions to find repost comments on automatically include any with exact same url
     },
     duplicates: {
-        matchDistance: 15,
         matchScore: 0, // when looking for submissions to find repost comments on automatically include any that reddit thinks are duplicates
     },
     crossposts: {
-        matchDistance: 15,
         matchScore: 0, // when looking for submissions to find repost comments on automatically include any that reddit thinks are crossposts
     },
     external: {}
@@ -153,7 +144,7 @@ const isSearchFacetType = (val: any): val is SearchFacetType => {
     return false;
 }
 
-const generateSearchFacet = (val: SearchFacetType | SearchFacetJSONConfig, sourceActivity: (Submission | Comment)): SearchFacet[] => {
+const generateSearchFacet = (val: SearchFacetType | SearchFacetJSONConfig): SearchFacet[] => {
     let facets: SearchFacet[] = [];
     if (isSearchFacetType(val)) {
         facets.push({
@@ -165,26 +156,12 @@ const generateSearchFacet = (val: SearchFacetType | SearchFacetJSONConfig, sourc
         facets.push(val as SearchFacet);
     }
 
-    const sourceIsComm = sourceActivity instanceof Comment;
-
     return facets.map(x => {
-        if (sourceIsComm) {
-            return {
-                ...parentSubmissionSearchFacetDefaults[x.kind],
-                ...x,
-            }
-        }
         return {
-            matchDistance: 15,
-            matchScore: 0,
+            ...parentSubmissionSearchFacetDefaults[x.kind],
             ...x,
         }
     });
-}
-
-interface CriteriaResult {
-    match: RepostItem,
-    score: number
 }
 
 export class RepostRule extends Rule {
@@ -228,21 +205,27 @@ export class RepostRule extends Rule {
 
     protected async process(item: Submission | Comment): Promise<[boolean, RuleResult]> {
 
-        let criteriaResults: CriteriaResult[] = [];
+        let criteriaResults: RepostItemResult[] = [];
         let ytClient: YoutubeClient | undefined = undefined;
-        const criteriaMatchedResults: CriteriaResult[] = [];
+        let criteriaMatchedResults: RepostItemResult[] = [];
+        let totalSubs = 0;
+        let totalCommentSubs = 0;
+        let totalComments = 0;
+        let totalExternal = new Map<string,number>();
+        let fromCache = false;
+        let andFail = false;
 
         for (const rCriteria of this.criteria) {
+            criteriaMatchedResults = [];
             const {
                 searchOn = (item instanceof Submission ? ['title', 'url', 'duplicates', 'crossposts'] : ['external', 'title', 'url', 'duplicates', 'crossposts']),
                 criteria = {},
-                externalItemCount = 20,
-                maxRedditItems = 20,
-                maxExternalItems = 20,
+                maxRedditItems = 50,
+                maxExternalItems = 50,
                 window = 20,
             } = rCriteria;
 
-            const searchFacets = searchOn.map(x => generateSearchFacet(x, item)).flat(1) as SearchFacet[];
+            const searchFacets = searchOn.map(x => generateSearchFacet(x)).flat(1) as SearchFacet[];
 
             const includeCrossposts = searchFacets.some(x => x.kind === 'crossposts');
 
@@ -255,14 +238,13 @@ export class RepostRule extends Rule {
                 window,
                 searchOn
             })}`;
-            let items: RepostItem[] = [];
+            let items: (RepostItem|RepostItemResult)[] = [];
             let cacheRes = undefined;
             if (item instanceof Comment) {
-                //cacheRes = await this.resources.cache.get(candidateHash) as (RepostItem[] | undefined | null);
+                cacheRes = await this.resources.cache.get(candidateHash) as ((RepostItem|RepostItemResult)[] | undefined | null);
             }
 
             if (cacheRes === undefined || cacheRes === null) {
-                let sourceSubmissions: Submission[] = [];
 
                 const sub = await this.getSubmission(item);
                 let dups: (Submission[] | undefined) = undefined;
@@ -270,12 +252,9 @@ export class RepostRule extends Rule {
                 for (const sf of searchFacets) {
 
                     const {
-                        matchDistance = 15,
                         matchScore = 85,
                         minWordCount = 2,
-                        caseSensitive = false,
                         transformations = [],
-                        transformationsActivity = transformations,
                     } = sf;
 
                     if (sf.kind === 'external') {
@@ -289,7 +268,9 @@ export class RepostRule extends Rule {
                                 if (ytClient === undefined) {
                                     ytClient = new YoutubeClient(ytCreds.apiKey);
                                 }
-                                items = items.concat(commentsAsRepostItems(await ytClient.getVideoTopComments(sub.url, maxExternalItems)))
+                                const ytComments = commentsAsRepostItems(await ytClient.getVideoTopComments(sub.url, maxExternalItems));
+                                items = items.concat(ytComments)
+                                totalExternal.set('Youtube comments', (totalExternal.get('Youtube comments') ?? 0) + ytComments.length);
                                 break;
                             default:
                                 if (attribution.provider === undefined) {
@@ -375,66 +356,85 @@ export class RepostRule extends Rule {
                             }
                         }
 
-                        if (matchScore === 0) {
-                            sourceSubmissions = sourceSubmissions.concat(subs);
-                        } else {
-                            let sourceTitle = searchAndReplace(sub.title, transformationsActivity);
-                            if (!caseSensitive) {
-                                sourceTitle = sourceTitle.toLowerCase();
-                            }
-                            sourceSubmissions = sourceSubmissions.concat(subs.filter(x => {
+                        // filter by minimum word count
+                        subs = subs.filter(x => wordCount(x.title) > minWordCount);
 
-                                let cleanTitle = searchAndReplace(x.title, transformations);
-                                if (!caseSensitive) {
-                                    cleanTitle = cleanTitle.toLowerCase();
-                                }
-                                const distance = leven(sourceTitle, cleanTitle);
-                                const diff = (distance / sourceTitle.length) * 100;
-                                if(diff < 100 - matchScore) {
-                                }
-                                return diff < 100 - matchScore;
-                            }));
-                        }
+                        items = items.concat(subs.map(x => ({
+                            value: searchAndReplace(x.title, transformations),
+                            createdOn: x.created,
+                            source: 'reddit',
+                            sourceUrl: x.permalink,
+                            score: x.score,
+                            itemType: 'submission',
+                            acquisitionType: sf.kind,
+                            sourceObj: x,
+                            reqSameness: matchScore,
+                        })));
 
                     }
                 }
-
-                // make submissions unique and remove own
-                sourceSubmissions = sourceSubmissions.reduce((acc: Submission[], curr) => {
-                    if (!acc.some(x => x.id === curr.id)) {
-                        return acc.concat(curr);
-                    }
-                    return acc;
-                }, []).filter(x => x.id !== sub.id);
 
                 if (!includeCrossposts) {
                     const sub = await this.getSubmission(item);
                     // remove submissions if they are official crossposts of the submission being checked and searchOn did not include 'crossposts'
-                    // @ts-ignore
-                    sourceSubmissions = sourceSubmissions.filter(x => !(x.crosspost_parent !== undefined && x.crosspost_parent === sub.id));
+                    items = items.filter(x => x.itemType !== 'submission' || !(x.sourceObj.crosspost_parent !== undefined && x.sourceObj.crosspost_parent === sub.id))
                 }
 
+                let sourceTitle = searchAndReplace(sub.title, criteria.transformationsActivity ?? []);
 
-                if (item instanceof Submission) {
-                    // get titles
-                    items = items.concat(sourceSubmissions.slice(0, maxRedditItems).map(x => ({
-                        value: searchAndReplace(x.title, criteria.transformations ?? []),
-                        createdOn: x.created,
-                        source: 'reddit',
-                        sourceUrl: x.permalink,
-                        score: x.score,
-                    })));
-                } else {
-                    // otherwise we are gathering comments
+                // do submission scoring BEFORE pruning duplicates bc...
+                // might end up in a situation where we get same submission for both title and url
+                // -- url is always a repost but title is not guaranteed and we if remove the url item but not the title we could potentially filter the title submission out and miss this repost
+                items = items.reduce((acc: (RepostItem|RepostItemResult)[], x) => {
+                    if(x.itemType === 'submission') {
+                        totalSubs++;
+                        const sf = searchFacets.find(y => y.kind === x.acquisitionType) as SearchFacet;
+
+                        let cleanTitle = x.value;
+                        if (!(sf.caseSensitive ?? false)) {
+                            cleanTitle = cleanTitle.toLowerCase();
+                        }
+                        const [distance, sameness] = stringSameness(sourceTitle, cleanTitle);
+                        if(sameness >= (x.reqSameness as number)) {
+                            return acc.concat({
+                                ...x,
+                                sameness,
+                            });
+                        }
+                        return acc;
+                    }
+                    return acc.concat(x);
+                }, []);
+
+                // now remove duplicate submissions
+                items = items.reduce((acc: RepostItem[], curr) => {
+                    if(curr.itemType !== 'submission') {
+                        return acc.concat(curr);
+                    }
+                    const subId = curr.sourceObj.id;
+                    if (sub.id !== subId && !acc.some(x => x.itemType === 'submission' && x.sourceObj.id === subId)) {
+                        return acc.concat(curr);
+                    }
+                    return acc;
+                }, []);
+
+
+                if (item instanceof Comment) {
+                    // we need to gather comments from submissions
 
                     // first cut down the number of submissions to retrieve because we don't care about have ALL submissions,
                     // just most popular comments (which will be in the most popular submissions)
-                    sourceSubmissions.sort((a, b) => a.score - b.score).reverse();
+                    let subs = items.filter(x => x.itemType === 'submission').map(x => x.sourceObj) as Submission[];
+                    totalCommentSubs += subs.length;
+
+                    const nonSubItems = items.filter(x => x.itemType !== 'submission');
+
+                    subs.sort((a, b) => a.score - b.score).reverse();
                     // take top 10 submissions
-                    sourceSubmissions = sourceSubmissions.slice(0, 10);
+                    subs = subs.slice(0, 10);
 
                     let comments: Comment[] = [];
-                    for (const sub of sourceSubmissions) {
+                    for (const sub of subs) {
 
                         const commFunc = (limit: number) => {
                             return this.client.oauthRequest({
@@ -456,23 +456,37 @@ export class RepostRule extends Rule {
 
                     // sort by highest scores
                     comments.sort((a, b) => a.score - b.score).reverse();
+                    // filter out all comments with fewer words than required (prevent false negatives)
+                    comments.filter(x => wordCount(x.body) > (criteria.minWordCount ?? 2));
+                    totalComments += Math.min(comments.length, maxRedditItems);
 
                     // and take the user-defined maximum number of items
-                    items = items.concat(comments.slice(0, maxRedditItems).map(x => ({
+                    items = nonSubItems.concat(comments.slice(0, maxRedditItems).map(x => ({
                         value: searchAndReplace(x.body, criteria.transformations ?? []),
                         createdOn: x.created,
                         source: 'reddit',
                         sourceUrl: x.permalink,
-                        score: x.score
+                        score: x.score,
+                        itemType: 'comment',
+                        acquisitionType: 'comment'
                     })));
                 }
 
-                if (item instanceof Comment) {
-                    // cache items for 20 minutes
-                    await this.resources.cache.set(candidateHash, items, {ttl: 1200});
-                }
+                // cache items for 20 minutes
+                await this.resources.cache.set(candidateHash, items, {ttl: 1200});
             } else {
                 items = cacheRes;
+                totalExternal = items.reduce((acc, curr) => {
+                    if(curr.acquisitionType === 'external') {
+                        acc.set(`${curr.source} comments`, (acc.get(`${curr.source} comments`) ?? 0 ) + 1);
+                        return acc;
+                    }
+                    return acc;
+                }, new Map<string, number>());
+                //totalSubs = items.filter(x => x.itemType === 'submission').length;
+                //totalCommentSubs = totalSubs;
+                totalComments = items.filter(x => x.itemType === 'comment' && x.source === 'reddit').length;
+                fromCache = true;
             }
 
             if(item instanceof Submission) {
@@ -481,33 +495,36 @@ export class RepostRule extends Rule {
                 // * very similar title (default sameness of 85% or more)
                 // * duplicate/same URL -- which is a repost, duh
                 // so just add all items to critMatches at this point
-            }
+                criteriaMatchedResults = criteriaMatchedResults.concat(items.filter(x => "sameness" in x) as RepostItemResult[]);
+            } else {
+                const {
+                    matchScore = 85,
+                    caseSensitive = false,
+                    transformations = [],
+                    transformationsActivity = transformations,
+                } = criteria;
 
-            const {
-                matchDistance = 15,
-                matchScore = 85,
-                minWordCount = 2,
-                caseSensitive = false,
-                transformations = [],
-                transformationsActivity = transformations,
-            } = criteria;
+                let sourceContent = searchAndReplace(item.body, transformationsActivity);
+                if (!caseSensitive) {
+                    sourceContent = sourceContent.toLowerCase();
+                }
 
-            let sourceContent = searchAndReplace(item instanceof Submission ? item.title : item.body, transformationsActivity);
-            if (!caseSensitive) {
-                sourceContent = sourceContent.toLowerCase();
-            }
-
-
-            for (const i of items) {
-                const itemContent = !caseSensitive ? i.value.toLowerCase() : i.value;
-                const distance = leven(sourceContent, itemContent);
-                const diff = (distance / sourceContent.length) * 100;
-                if (diff < 100 - matchScore) {
-                    criteriaMatchedResults.push({match: i, score: diff});
+                for (const i of items) {
+                    const itemContent = !caseSensitive ? i.value.toLowerCase() : i.value;
+                    const [distance, sameness] = stringSameness(sourceContent, itemContent);
+                    if(sameness >= matchScore) {
+                        criteriaMatchedResults.push({
+                          ...i,
+                          reqSameness: sameness,
+                          sameness
+                        });
+                    }
                 }
             }
+
             if (criteriaMatchedResults.length === 0 && this.condition === 'AND') {
-                return [false, this.getResult(false, {data: criteriaResults, result: 'Not all criteria matched'})];
+                andFail = true;
+                break;
             }
             if (criteriaMatchedResults.length > 0) {
                 criteriaResults = criteriaResults.concat(criteriaMatchedResults);
@@ -516,10 +533,49 @@ export class RepostRule extends Rule {
                 }
             }
         }
+        criteriaResults.sort((a, b) => a.sameness - b.sameness).reverse();
         const foundRepost = criteriaResults.length > 0;
 
-        return [foundRepost, this.getResult(foundRepost, {
-            result: foundRepost ? 'Found a repost' : 'no reposts found',
+
+        let avgSameness = null;
+        let searchCandidateSummary = '';
+
+        if(item instanceof Comment) {
+            searchCandidateSummary = `Searched top ${totalComments} comments in top 10 ${fromCache ? '' : `of ${totalCommentSubs} `}most popular submissions`;
+            if(totalExternal.size > 0) {
+                searchCandidateSummary += ", ";
+                const extSumm: string[] = [];
+                totalExternal.forEach((v, k) => {
+                    extSumm.push(`${v} ${k}`);
+                });
+                searchCandidateSummary += extSumm.join(', ');
+            }
+        } else {
+            searchCandidateSummary = `Searched ${totalSubs}`
+        }
+
+        let summary = `${searchCandidateSummary} and found ${criteriaResults.length} reposts.`;
+
+        if(criteriaResults.length > 0) {
+            avgSameness = formatNumber(criteriaResults.reduce((acc, curr) => acc + curr.sameness, 0) / criteriaResults.length);
+            const closest = criteriaResults[0];
+            summary += ` --- Closest Match => >> ${closest.value} << from ${closest.source} (${closest.sourceUrl}) with ${formatNumber(closest.sameness)}% sameness.`
+            if(criteriaResults.length > 1) {
+                summary += ` Avg ${formatNumber(avgSameness)}%`;
+            }
+
+            if(andFail) {
+                summary += ' BUT at least one criteria failed to find reposts so the rule fails (AND condition)';
+            }
+        }
+
+        const passed = foundRepost && !andFail;
+
+        const result = `${passed ? PASS : FAIL} ${summary}`;
+        this.logger.verbose(result);
+
+        return [passed, this.getResult(passed, {
+            result,
             data: criteriaResults
         })];
     }

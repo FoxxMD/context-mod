@@ -49,7 +49,9 @@ export const commentsAsRepostItems = (comments: Schema$CommentThread[]): RepostI
             createdOn: dayjs(publishedAt as string).unix(),
             source: 'Youtube',
             sourceUrl: `https://youtube.com/watch?v=${videoId}&lc=${id}`,
-            score: x.snippet?.topLevelComment?.snippet?.likeCount as number
+            score: x.snippet?.topLevelComment?.snippet?.likeCount as number,
+            acquisitionType: 'external',
+            itemType: 'comment'
         };
     })
 }

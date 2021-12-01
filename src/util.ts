@@ -27,7 +27,7 @@ import {
     PollingOptionsStrong,
     RedditEntity,
     RedditEntityType,
-    RegExResult,
+    RegExResult, RepostItem, RepostItemResult,
     ResourceStats, SearchAndReplaceRegExp,
     StatusCodeError,
     StringOperator,
@@ -54,6 +54,7 @@ import ImageData from "./Common/ImageData";
 import {Sharp, SharpOptions} from "sharp";
 // @ts-ignore
 import {blockhashData, hammingDistance} from 'blockhash';
+import leven from "leven";
 //import {ResembleSingleCallbackComparisonResult} from "resemblejs";
 
 // want to guess how many concurrent image comparisons we should be doing
@@ -1471,4 +1472,33 @@ export const searchAndReplace = (val: string, ops: SearchAndReplaceRegExp[]) => 
         }
         return acc.replace(reg ?? val, curr.replace);
     }, val);
+}
+
+export const isRepostItemResult = (val: (RepostItem|RepostItemResult)): val is RepostItemResult => {
+    return 'sameness' in val;
+}
+
+export const stringSameness = (valA: string, valB: string) => {
+    let longer: string;
+    let shorter: string;
+    if (valA.length > valB.length) {
+        longer = valA;
+        shorter = valB;
+    } else {
+        longer = valB;
+        shorter = valA;
+    }
+
+    const distance = leven(longer, shorter);
+    const diff = (distance / longer.length) * 100;
+    return [distance, 100 - diff];
+}
+
+// https://stackoverflow.com/a/18679657/1469797
+export const wordCount = (str: string): number => {
+    return str.split(' ')
+        .filter(function (n) {
+            return n != ''
+        })
+        .length;
 }
