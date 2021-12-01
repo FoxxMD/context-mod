@@ -1,4 +1,4 @@
-import Snoowrap, {RedditUser} from "snoowrap";
+import Snoowrap, {Listing, RedditUser} from "snoowrap";
 import Submission from "snoowrap/dist/objects/Submission";
 import Comment from "snoowrap/dist/objects/Comment";
 import {Duration, DurationUnitsObjectType} from "dayjs/plugin/duration";
@@ -23,7 +23,7 @@ import {
     parseGenericValueOrPercentComparison,
     parseRuleResultsToMarkdownSummary, parseStringToRegex,
     parseSubredditName,
-    truncateStringToLength
+    truncateStringToLength, windowToActivityWindowCriteria
 } from "../util";
 import UserNotes from "../Subreddit/UserNotes";
 import {Logger} from "winston";
@@ -43,14 +43,16 @@ export interface AuthorActivitiesOptions {
     chunkSize?: number,
     // TODO maybe move this into window
     keepRemoved?: boolean,
+    [key: string]: any,
 }
 
-export async function getAuthorActivities(user: RedditUser, options: AuthorTypedActivitiesOptions): Promise<Array<Submission | Comment>> {
+export async function getActivities(listingFunc: (limit: number) => Promise<Listing<Submission | Comment>>, options: AuthorActivitiesOptions): Promise<Array<Submission | Comment>> {
 
     const {
         chunkSize: cs = 100,
         window: optWindow,
         keepRemoved = true,
+        ...restFetchOptions
     } = options;
 
     let satisfiedCount: number | undefined,
@@ -64,32 +66,55 @@ export async function getAuthorActivities(user: RedditUser, options: AuthorTyped
     let includes: string[] = [];
     let excludes: string[] = [];
 
-    if (isActivityWindowCriteria(optWindow)) {
-        const {
-            satisfyOn = 'any',
-            count,
-            duration,
-            subreddits: {
-                include = [],
-                exclude = [],
-            } = {},
-        } = optWindow;
+    const strongWindow = windowToActivityWindowCriteria(optWindow);
 
-        includes = include.map(x => parseSubredditName(x).toLowerCase());
-        excludes = exclude.map(x => parseSubredditName(x).toLowerCase());
+    const {
+        satisfyOn = 'any',
+        count,
+        duration: oDuration,
+        subreddits: {
+            include = [],
+            exclude = [],
+        } = {},
+    } = strongWindow;
 
-        if (includes.length > 0 && excludes.length > 0) {
-            // TODO add logger so this can be logged...
-            // this.logger.warn('include and exclude both specified, exclude will be ignored');
-        }
-        satisfiedCount = count;
-        durVal = duration;
-        satisfy = satisfyOn
-    } else if (typeof optWindow === 'number') {
-        satisfiedCount = optWindow;
-    } else {
-        durVal = optWindow as DurationVal;
+    satisfy = satisfyOn;
+    satisfiedCount = count;
+    includes = include;
+    excludes = exclude;
+    durVal = oDuration;
+
+    if (includes.length > 0 && excludes.length > 0) {
+        // TODO add logger so this can be logged...
+        // this.logger.warn('include and exclude both specified, exclude will be ignored');
     }
+
+    // if (isActivityWindowCriteria(optWindow)) {
+    //     const {
+    //         satisfyOn = 'any',
+    //         count,
+    //         duration,
+    //         subreddits: {
+    //             include = [],
+    //             exclude = [],
+    //         } = {},
+    //     } = optWindow;
+    //
+    //     includes = include.map(x => parseSubredditName(x).toLowerCase());
+    //     excludes = exclude.map(x => parseSubredditName(x).toLowerCase());
+    //
+    //     if (includes.length > 0 && excludes.length > 0) {
+    //         // TODO add logger so this can be logged...
+    //         // this.logger.warn('include and exclude both specified, exclude will be ignored');
+    //     }
+    //     satisfiedCount = count;
+    //     durVal = duration;
+    //     satisfy = satisfyOn
+    // } else if (typeof optWindow === 'number') {
+    //     satisfiedCount = optWindow;
+    // } else {
+    //     durVal = optWindow as DurationVal;
+    // }
 
     // if count is less than max limit (100) go ahead and just get that many. may result in faster response time for low numbers
     if (satisfiedCount !== undefined) {
@@ -124,27 +149,8 @@ export async function getAuthorActivities(user: RedditUser, options: AuthorTyped
     }
 
     let items: Array<Submission | Comment> = [];
-    //let count = 1;
-    let listing = [];
-    try {
-        switch (options.type) {
-            case 'comment':
-                listing = await user.getComments({limit: chunkSize});
-                break;
-            case 'submission':
-                listing = await user.getSubmissions({limit: chunkSize});
-                break;
-            default:
-                listing = await user.getOverview({limit: chunkSize});
-                break;
-        }
-    } catch (err) {
-        if(isStatusError(err) && err.statusCode === 404) {
-            throw new SimpleError('Reddit returned a 404 for user history. Likely this user is shadowbanned.');
-        } else {
-            throw err;
-        }
-    }
+
+    let listing = await listingFunc(chunkSize);
     let hitEnd = false;
     let offset = chunkSize;
     while (!hitEnd) {
@@ -219,10 +225,33 @@ export async function getAuthorActivities(user: RedditUser, options: AuthorTyped
 
         if (!hitEnd) {
             offset += chunkSize;
-            listing = await listing.fetchMore({amount: chunkSize});
+            listing = await listing.fetchMore({amount: chunkSize, ...restFetchOptions});
         }
     }
     return Promise.resolve(items);
+}
+
+export async function getAuthorActivities(user: RedditUser, options: AuthorTypedActivitiesOptions): Promise<Array<Submission | Comment>> {
+
+    const listFunc = (chunkSize: number): Promise<Listing<Submission | Comment>> => {
+        switch (options.type) {
+            case 'comment':
+                return user.getComments({limit: chunkSize});
+            case 'submission':
+                return user.getSubmissions({limit: chunkSize});
+            default:
+                return user.getOverview({limit: chunkSize});
+        }
+    };
+    try {
+        return await getActivities(listFunc, options);
+    } catch (err) {
+        if(isStatusError(err) && err.statusCode === 404) {
+            throw new SimpleError('Reddit returned a 404 for user history. Likely this user is shadowbanned.');
+        } else {
+            throw err;
+        }
+    }
 }
 
 export const getAuthorComments = async (user: RedditUser, options: AuthorActivitiesOptions): Promise<Comment[]> => {

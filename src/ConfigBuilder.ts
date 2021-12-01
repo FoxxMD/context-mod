@@ -31,7 +31,7 @@ import {
     CacheOptions,
     BotInstanceJsonConfig,
     BotInstanceConfig,
-    RequiredWebRedditCredentials
+    RequiredWebRedditCredentials, RedditCredentials, BotCredentialsJsonConfig, BotCredentialsConfig
 } from "./Common/interfaces";
 import {isRuleSetJSON, RuleSetJson, RuleSetObjectJson} from "./Rule/RuleSet";
 import deepEqual from "fast-deep-equal";
@@ -387,10 +387,13 @@ const parseListFromEnv = (val: string | undefined) => {
 export const parseDefaultBotInstanceFromEnv = (): BotInstanceJsonConfig => {
     const data = {
         credentials: {
-            clientId: process.env.CLIENT_ID,
-            clientSecret: process.env.CLIENT_SECRET,
-            accessToken: process.env.ACCESS_TOKEN,
-            refreshToken: process.env.REFRESH_TOKEN,
+            reddit: {
+                clientId: process.env.CLIENT_ID,
+                clientSecret: process.env.CLIENT_SECRET,
+                accessToken: process.env.ACCESS_TOKEN,
+                refreshToken: process.env.REFRESH_TOKEN,
+            },
+            youtube: process.env.YOUTUBE_API_KEY
         },
         subreddits: {
             names: parseListFromEnv(process.env.SUBREDDITS),
@@ -443,6 +446,11 @@ export const parseOpConfigFromEnv = (): OperatorJsonConfig => {
                 clientSecret: process.env.CLIENT_SECRET,
                 redirectUri: process.env.REDIRECT_URI,
             },
+        },
+        credentials: {
+          youtube: {
+              apiKey: process.env.YOUTUBE_API_KEY
+          }
         }
     }
 
@@ -565,6 +573,7 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
             secret: apiSecret = randomId(),
             friendly,
         } = {},
+        credentials = {},
         bots = [],
     } = data;
 
@@ -632,11 +641,7 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
                 hardLimit = 50
             } = {},
             snoowrap = {},
-            credentials: {
-                clientId: ci,
-                clientSecret: cs,
-                ...restCred
-            } = {},
+            credentials = {},
             subreddits: {
                 names = [],
                 exclude = [],
@@ -645,7 +650,6 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
                 heartbeatInterval = 300,
             } = {},
         } = x;
-
 
         let botCache: StrongCache;
         let botActionedEventsDefault: number;
@@ -697,11 +701,42 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
             }
         }
 
-        const botCreds = {
-            clientId: (ci as string),
-            clientSecret: (cs as string),
-            ...restCred,
-        };
+        let botCreds: BotCredentialsConfig;
+
+        if((credentials as any).clientId !== undefined) {
+            const creds = credentials as RedditCredentials;
+            const {
+                clientId: ci,
+                clientSecret: cs,
+                ...restCred
+            } = creds;
+            botCreds = {
+                reddit: {
+                        clientId: (ci as string),
+                        clientSecret: (cs as string),
+                        ...restCred,
+                }
+            }
+        } else {
+            const creds = credentials as BotCredentialsJsonConfig;
+            const {
+                reddit: {
+                    clientId: ci,
+                    clientSecret: cs,
+                    ...restRedditCreds
+                },
+                ...rest
+            } = creds;
+            botCreds = {
+                reddit: {
+                    clientId: (ci as string),
+                    clientSecret: (cs as string),
+                    ...restRedditCreds,
+                },
+                ...rest
+            }
+        }
+
         if (botCache.provider.prefix === undefined || botCache.provider.prefix === defaultProvider.prefix) {
             // need to provide unique prefix to bot
             botCache.provider.prefix = buildCachePrefix([botCache.provider.prefix, 'bot', (botName || objectHash.sha1(botCreds))]);
@@ -773,6 +808,7 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
             friendly
         },
         bots: hydratedBots,
+        credentials,
     };
 
     return config;

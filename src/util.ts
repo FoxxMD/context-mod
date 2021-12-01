@@ -12,10 +12,10 @@ import {inflateSync, deflateSync} from "zlib";
 import pixelmatch from 'pixelmatch';
 import os from 'os';
 import {
-    ActivityWindowCriteria,
+    ActivityWindowCriteria, ActivityWindowType,
     CacheOptions,
     CacheProvider,
-    DurationComparison,
+    DurationComparison, DurationVal,
     GenericComparison,
     HistoricalStats,
     HistoricalStatsDisplay, ImageComparisonResult,
@@ -28,7 +28,7 @@ import {
     RedditEntity,
     RedditEntityType,
     RegExResult,
-    ResourceStats,
+    ResourceStats, SearchAndReplaceRegExp,
     StatusCodeError,
     StringOperator,
     StrongSubredditState,
@@ -1423,4 +1423,52 @@ export const bitsToHexLength = (bits: number): number => {
 
 export const escapeRegex = (val: string) => {
     return val.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+}
+
+export const windowToActivityWindowCriteria = (window: (Duration | ActivityWindowType | ActivityWindowCriteria)): ActivityWindowCriteria => {
+    let crit: ActivityWindowCriteria;
+
+    if (isActivityWindowCriteria(window)) {
+        crit = window;
+    } else if (typeof window === 'number') {
+        crit = {count: window};
+    } else {
+        crit = {duration: window as DurationVal};
+    }
+
+    const {
+        satisfyOn = 'any',
+        count,
+        duration,
+        subreddits: {
+            include = [],
+            exclude = [],
+        } = {},
+    } = crit;
+
+    const includes = include.map(x => parseSubredditName(x).toLowerCase());
+    const excludes = exclude.map(x => parseSubredditName(x).toLowerCase());
+
+    return {
+        satisfyOn,
+        count,
+        duration,
+        subreddits: {
+            include: includes,
+            exclude: excludes
+        }
+    }
+}
+
+export const searchAndReplace = (val: string, ops: SearchAndReplaceRegExp[]) => {
+    if (ops.length === 0) {
+        return val;
+    }
+    return ops.reduce((acc, curr) => {
+        let reg = parseStringToRegex(curr.search, 'ig');
+        if (reg === undefined) {
+            reg = parseStringToRegex(`/.*${escapeRegex(curr.search.trim())}.*/`, 'ig');
+        }
+        return acc.replace(reg ?? val, curr.replace);
+    }, val);
 }

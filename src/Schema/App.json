@@ -1257,6 +1257,9 @@
                                 "$ref": "#/definitions/RegexRuleJSONConfig"
                             },
                             {
+                                "$ref": "#/definitions/RepostRuleJSONConfig"
+                            },
+                            {
                                 "$ref": "#/definitions/RuleSetJson"
                             },
                             {
@@ -1293,6 +1296,11 @@
                 },
                 "deleted": {
                     "type": "boolean"
+                },
+                "depth": {
+                    "description": "The (nested) level of a comment.\n\n* 0 mean the comment is at top-level (replying to submission)\n* non-zero, Nth value means the comment has N parent comments",
+                    "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(days|weeks|months|years|hours|minutes|seconds|milliseconds)\\s*$",
+                    "type": "string"
                 },
                 "distinguished": {
                     "type": "boolean"
@@ -2716,6 +2724,160 @@
             ],
             "type": "object"
         },
+        "RepostCriteria": {
+            "description": "A set of criteria used to find reposts\n\nContains options and conditions used to define how candidate reposts are retrieved and if they are a match.",
+            "properties": {
+                "criteria": {
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/TextMatchOptions"
+                        },
+                        {
+                            "$ref": "#/definitions/TextTransformOptions"
+                        }
+                    ]
+                },
+                "externalItemCount": {
+                    "default": 20,
+                    "description": "The maximum number of comments/replies/items to retrieve from an external source.\n\nNote: External items, where possible, are returned/sorted in order of popularity (likes, replies, etc...) so if you are looking for reposts of popular items the default max items retrieved will mostly contain all relevant items.\n\nDefaults to 20",
+                    "type": "number"
+                },
+                "maxExternalItems": {
+                    "type": "number"
+                },
+                "maxRedditItems": {
+                    "type": "number"
+                },
+                "searchOn": {
+                    "description": "Define how to find candidate reposts\n\n* **title** -- search reddit for submissions with the same title\n* **url** -- search reddit for submissions with the same url\n* **external** -- WHEN ACTIVITY IS A COMMENT - tries to get comments from external source (youtube, twitter, etc...)",
+                    "items": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/definitions/SearchFacetJSONConfig"
+                            },
+                            {
+                                "enum": [
+                                    "crossposts",
+                                    "duplicates",
+                                    "external",
+                                    "title",
+                                    "url"
+                                ],
+                                "type": "string"
+                            }
+                        ]
+                    },
+                    "type": "array"
+                },
+                "window": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/definitions/ActivityWindowCriteria"
+                        },
+                        {
+                            "$ref": "#/definitions/DurationObject"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "number"
+                            ]
+                        }
+                    ],
+                    "description": "A value to define the range of Activities to retrieve.\n\nAcceptable values:\n\n**`ActivityWindowCriteria` object**\n\nAllows specify multiple range properties and more specific behavior\n\n**A `number` of Activities to retrieve**\n\n* EX `100` => 100 Activities\n\n*****\n\nAny of the below values that specify the amount of time to subtract from `NOW` to create a time range IE `NOW <---> [duration] ago`\n\nAcceptable values:\n\n**A `string` consisting of a value and a [Day.js](https://day.js.org/docs/en/durations/creating#list-of-all-available-units) time UNIT**\n\n* EX `9 days` => Range is `NOW <---> 9 days ago`\n\n**A [Day.js](https://day.js.org/docs/en/durations/creating) `object`**\n\n* EX `{\"days\": 90, \"minutes\": 15}` => Range is `NOW <---> 90 days and 15 minutes ago`\n\n**An [ISO 8601 duration](https://en.wikipedia.org/wiki/ISO_8601#Durations) `string`**\n\n* EX `PT15M` => 15 minutes => Range is `NOW <----> 15 minutes ago`",
+                    "examples": [
+                        "90 days"
+                    ]
+                }
+            },
+            "type": "object"
+        },
+        "RepostRuleJSONConfig": {
+            "description": "Search for reposts of a Submission or Comment\n\n* For submissions the title or URL can searched and matched against\n* For comments, candidate comments are gathered from similar reddit submissions and/or external sources (youtube, twitter, etc..) and then matched against",
+            "properties": {
+                "authorIs": {
+                    "$ref": "#/definitions/AuthorOptions",
+                    "description": "If present then these Author criteria are checked before running the rule. If criteria fails then the rule is skipped.",
+                    "examples": [
+                        {
+                            "include": [
+                                {
+                                    "flairText": [
+                                        "Contributor",
+                                        "Veteran"
+                                    ]
+                                },
+                                {
+                                    "isMod": true
+                                }
+                            ]
+                        }
+                    ]
+                },
+                "condition": {
+                    "default": "OR",
+                    "description": "* If `OR` then any set of Criteria that pass will trigger the Rule\n* If `AND` then all Criteria sets must pass to trigger the Rule",
+                    "enum": [
+                        "AND",
+                        "OR"
+                    ],
+                    "type": "string"
+                },
+                "criteria": {
+                    "description": "A list of Regular Expressions and conditions under which tested Activity(ies) are matched",
+                    "examples": [
+                        {
+                            "matchThreshold": "> 3",
+                            "regex": "/reddit/"
+                        }
+                    ],
+                    "items": {
+                        "$ref": "#/definitions/RepostCriteria"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                },
+                "itemIs": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "$ref": "#/definitions/SubmissionState"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "items": {
+                                "$ref": "#/definitions/CommentState"
+                            },
+                            "type": "array"
+                        }
+                    ],
+                    "description": "A list of criteria to test the state of the `Activity` against before running the Rule.\n\nIf any set of criteria passes the Rule will be run. If the criteria fails then the Rule is skipped."
+                },
+                "kind": {
+                    "description": "The kind of rule to run",
+                    "enum": [
+                        "repost"
+                    ],
+                    "examples": [
+                        "repost"
+                    ],
+                    "type": "string"
+                },
+                "name": {
+                    "description": "An optional, but highly recommended, friendly name for this rule. If not present will default to `kind`.\n\nCan only contain letters, numbers, underscore, spaces, and dashes\n\nname is used to reference Rule result data during Action content templating. See CommentAction or ReportAction for more details.",
+                    "examples": [
+                        "myNewRule"
+                    ],
+                    "pattern": "^[a-zA-Z]([\\w -]*[\\w])?$",
+                    "type": "string"
+                }
+            },
+            "required": [
+                "kind"
+            ],
+            "type": "object"
+        },
         "RuleSetJson": {
             "description": "A RuleSet is a \"nested\" set of `Rule` objects that can be used to create more complex AND/OR behavior. Think of the outcome of a `RuleSet` as the result of all of its run `Rule` objects (based on `condition`)",
             "properties": {
@@ -2754,6 +2916,9 @@
                                 "$ref": "#/definitions/RegexRuleJSONConfig"
                             },
                             {
+                                "$ref": "#/definitions/RepostRuleJSONConfig"
+                            },
+                            {
                                 "type": "string"
                             }
                         ]
@@ -2764,6 +2929,116 @@
             },
             "required": [
                 "rules"
+            ],
+            "type": "object"
+        },
+        "SearchAndReplaceRegExp": {
+            "properties": {
+                "replace": {
+                    "description": "The replacement string/value to use when search is found\n\nThis can be a literal string like `'replace with this`, an empty string to remove the search value (`''`), or a special regex value\n\nSee replacement here for more information: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/replace",
+                    "type": "string"
+                },
+                "search": {
+                    "description": "The search value to test for\n\nCan be a normal string (converted to a case-sensitive literal) or a valid regular expression\n\nEX `[\"find this string\", \"/some string*\\/ig\"]`",
+                    "examples": [
+                        "find this string",
+                        "/some string*/ig"
+                    ],
+                    "type": "string"
+                }
+            },
+            "required": [
+                "replace",
+                "search"
+            ],
+            "type": "object"
+        },
+        "SearchFacetJSONConfig": {
+            "properties": {
+                "caseSensitive": {
+                    "default": false,
+                    "description": "Should text matching be case sensitive?\n\nDefaults to false",
+                    "type": "boolean"
+                },
+                "kind": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "enum": [
+                                    "crossposts",
+                                    "duplicates",
+                                    "external",
+                                    "title",
+                                    "url"
+                                ],
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "enum": [
+                                "crossposts",
+                                "duplicates",
+                                "external",
+                                "title",
+                                "url"
+                            ],
+                            "type": "string"
+                        }
+                    ]
+                },
+                "matchDistance": {
+                    "default": 15,
+                    "description": "The distance, from the expected location, a character can be found and still be considered a match\n\nDefaults to 15. Learn more about fuzziness score https://fusejs.io/concepts/scoring-theory.html#fuzziness-score",
+                    "type": "number"
+                },
+                "matchScore": {
+                    "default": 85,
+                    "description": "The percentage, as a whole number, of a repost title/comment that must match the title/comment being checked in order to consider both a match\n\nNote: Setting to 0 will make every candidate considered a match -- useful if you want to match if the URL has been reposted anywhere\n\nDefaults to `85` (85%)",
+                    "type": "number"
+                },
+                "minWordCount": {
+                    "default": 2,
+                    "description": "The minimum number of words in the activity being checked for which this rule will run on\n\nIf the word count is below the minimum the rule fails\n\nDefaults to 2",
+                    "type": "number"
+                },
+                "transformations": {
+                    "description": "A set of search-and-replace operations to perform on text values before performing a match. Transformations are performed in the order they are defined.\n\n* If `transformationsActivity` IS NOT defined then these transformations will be performed on BOTH the activity text (submission title or comment) AND the repost candidate text\n* If `transformationsActivity` IS defined then these transformations are only performed on repost candidate text",
+                    "items": {
+                        "$ref": "#/definitions/SearchAndReplaceRegExp"
+                    },
+                    "type": "array"
+                },
+                "transformationsActivity": {
+                    "description": "Specify a separate set of transformations for the activity text (submission title or comment)\n\nTo perform no transformations when `transformations` is defined set this to an empty array (`[]`)",
+                    "items": {
+                        "$ref": "#/definitions/SearchAndReplaceRegExp"
+                    },
+                    "type": "array"
+                },
+                "window": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/definitions/ActivityWindowCriteria"
+                        },
+                        {
+                            "$ref": "#/definitions/DurationObject"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "number"
+                            ]
+                        }
+                    ],
+                    "description": "A value to define the range of Activities to retrieve.\n\nAcceptable values:\n\n**`ActivityWindowCriteria` object**\n\nAllows specify multiple range properties and more specific behavior\n\n**A `number` of Activities to retrieve**\n\n* EX `100` => 100 Activities\n\n*****\n\nAny of the below values that specify the amount of time to subtract from `NOW` to create a time range IE `NOW <---> [duration] ago`\n\nAcceptable values:\n\n**A `string` consisting of a value and a [Day.js](https://day.js.org/docs/en/durations/creating#list-of-all-available-units) time UNIT**\n\n* EX `9 days` => Range is `NOW <---> 9 days ago`\n\n**A [Day.js](https://day.js.org/docs/en/durations/creating) `object`**\n\n* EX `{\"days\": 90, \"minutes\": 15}` => Range is `NOW <---> 90 days and 15 minutes ago`\n\n**An [ISO 8601 duration](https://en.wikipedia.org/wiki/ISO_8601#Durations) `string`**\n\n* EX `PT15M` => 15 minutes => Range is `NOW <----> 15 minutes ago`",
+                    "examples": [
+                        "90 days"
+                    ]
+                }
+            },
+            "required": [
+                "kind"
             ],
             "type": "object"
         },
@@ -2927,6 +3202,9 @@
                                 "$ref": "#/definitions/RegexRuleJSONConfig"
                             },
                             {
+                                "$ref": "#/definitions/RepostRuleJSONConfig"
+                            },
+                            {
                                 "$ref": "#/definitions/RuleSetJson"
                             },
                             {
@@ -3052,6 +3330,68 @@
                 "stateDescription": {
                     "description": "A friendly description of what this State is trying to parse",
                     "type": "string"
+                }
+            },
+            "type": "object"
+        },
+        "TextMatchOptions": {
+            "properties": {
+                "caseSensitive": {
+                    "default": false,
+                    "description": "Should text matching be case sensitive?\n\nDefaults to false",
+                    "type": "boolean"
+                },
+                "matchDistance": {
+                    "default": 15,
+                    "description": "The distance, from the expected location, a character can be found and still be considered a match\n\nDefaults to 15. Learn more about fuzziness score https://fusejs.io/concepts/scoring-theory.html#fuzziness-score",
+                    "type": "number"
+                },
+                "matchScore": {
+                    "default": 85,
+                    "description": "The percentage, as a whole number, of a repost title/comment that must match the title/comment being checked in order to consider both a match\n\nNote: Setting to 0 will make every candidate considered a match -- useful if you want to match if the URL has been reposted anywhere\n\nDefaults to `85` (85%)",
+                    "type": "number"
+                },
+                "minWordCount": {
+                    "default": 2,
+                    "description": "The minimum number of words in the activity being checked for which this rule will run on\n\nIf the word count is below the minimum the rule fails\n\nDefaults to 2",
+                    "type": "number"
+                }
+            },
+            "type": "object"
+        },
+        "TextTransformOptions": {
+            "properties": {
+                "transformations": {
+                    "description": "A set of search-and-replace operations to perform on text values before performing a match. Transformations are performed in the order they are defined.\n\n* If `transformationsActivity` IS NOT defined then these transformations will be performed on BOTH the activity text (submission title or comment) AND the repost candidate text\n* If `transformationsActivity` IS defined then these transformations are only performed on repost candidate text",
+                    "items": {
+                        "$ref": "#/definitions/SearchAndReplaceRegExp"
+                    },
+                    "type": "array"
+                },
+                "transformationsActivity": {
+                    "description": "Specify a separate set of transformations for the activity text (submission title or comment)\n\nTo perform no transformations when `transformations` is defined set this to an empty array (`[]`)",
+                    "items": {
+                        "$ref": "#/definitions/SearchAndReplaceRegExp"
+                    },
+                    "type": "array"
+                }
+            },
+            "type": "object"
+        },
+        "ThirdPartyCredentialsJsonConfig": {
+            "additionalProperties": {
+            },
+            "properties": {
+                "youtube": {
+                    "properties": {
+                        "apiKey": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "apiKey"
+                    ],
+                    "type": "object"
                 }
             },
             "type": "object"
@@ -3238,6 +3578,9 @@
             },
             "minItems": 1,
             "type": "array"
+        },
+        "credentials": {
+            "$ref": "#/definitions/ThirdPartyCredentialsJsonConfig"
         },
         "dryRun": {
             "default": "undefined",

@@ -40,7 +40,7 @@ import {
     HistoricalStats,
     HistoricalStatUpdateData,
     SubredditHistoricalStats,
-    SubredditHistoricalStatsDisplay,
+    SubredditHistoricalStatsDisplay, ThirdPartyCredentialsJsonConfig,
 } from "../Common/interfaces";
 import UserNotes from "./UserNotes";
 import Mustache from "mustache";
@@ -62,6 +62,7 @@ export interface SubredditResourceConfig extends Footer {
     subreddit: Subreddit,
     logger: Logger;
     client: ExtendedSnoowrap
+    credentials?: ThirdPartyCredentialsJsonConfig
 }
 
 interface SubredditResourceOptions extends Footer {
@@ -74,6 +75,7 @@ interface SubredditResourceOptions extends Footer {
     client: ExtendedSnoowrap;
     prefix?: string;
     actionedEventsMax: number;
+    thirdPartyCredentials: ThirdPartyCredentialsJsonConfig
 }
 
 export interface SubredditResourceSetOptions extends CacheConfig, Footer {
@@ -101,6 +103,7 @@ export class SubredditResources {
     historicalSaveInterval?: any;
     prefix?: string
     actionedEventsMax: number;
+    thirdPartyCredentials: ThirdPartyCredentialsJsonConfig;
 
     stats: {
         cache: ResourceStats
@@ -126,6 +129,7 @@ export class SubredditResources {
             actionedEventsMax,
             cacheSettingsHash,
             client,
+            thirdPartyCredentials,
         } = options || {};
 
         this.cacheSettingsHash = cacheSettingsHash;
@@ -141,6 +145,7 @@ export class SubredditResources {
         this.wikiTTL = wikiTTL === true ? 0 : wikiTTL;
         this.filterCriteriaTTL = filterCriteriaTTL === true ? 0 : filterCriteriaTTL;
         this.subreddit = subreddit;
+        this.thirdPartyCredentials = thirdPartyCredentials;
         this.name = name;
         if (logger === undefined) {
             const alogger = winston.loggers.get('app')
@@ -910,6 +915,19 @@ export class SubredditResources {
                                     return false
                                 }
                                 break;
+                            case 'depth':
+                                if(item instanceof Submission) {
+                                    log.warn(`Cannot test for 'depth' on a Submission`);
+                                    break;
+                                }
+                                // @ts-ignore
+                                const depthCompare = parseGenericValueComparison(crit[k] as string);
+                                if(!comparisonTextOp(item.score, depthCompare.operator, depthCompare.value)) {
+                                    // @ts-ignore
+                                    log.debug(`Failed: Expected => ${k}:${crit[k]} | Found => ${k}:${item.score}`)
+                                    return false
+                                }
+                                break;
                             default:
                                 // @ts-ignore
                                 if (item[k] !== undefined) {
@@ -1003,6 +1021,13 @@ export class SubredditResources {
         // }
         // return hash;
     }
+
+    getThirdPartyCredentials(name: string) {
+        if(this.thirdPartyCredentials[name] !== undefined) {
+            return this.thirdPartyCredentials[name];
+        }
+        return undefined;
+    }
 }
 
 export class BotResourcesManager {
@@ -1018,6 +1043,7 @@ export class BotResourcesManager {
     actionedEventsMaxDefault?: number;
     actionedEventsDefault: number;
     pruneInterval: any;
+    defaultThirdPartyCredentials: ThirdPartyCredentialsJsonConfig;
 
     constructor(config: BotInstanceConfig) {
         const {
@@ -1034,13 +1060,17 @@ export class BotResourcesManager {
                 actionedEventsDefault,
             },
             name,
-            credentials,
+            credentials: {
+                reddit,
+                ...thirdParty
+            },
             caching,
         } = config;
         caching.provider.prefix = buildCachePrefix([caching.provider.prefix, 'SHARED']);
         const {actionedEventsMax: eMax, actionedEventsDefault: eDef, ...relevantCacheSettings} = caching;
         this.cacheHash = objectHash.sha1(relevantCacheSettings);
         this.defaultCacheConfig = caching;
+        this.defaultThirdPartyCredentials = thirdParty;
         this.ttlDefaults = {authorTTL, userNotesTTL, wikiTTL, commentTTL, submissionTTL, filterCriteriaTTL, subredditTTL};
 
         const options = provider;
@@ -1073,13 +1103,14 @@ export class BotResourcesManager {
 
     async set(subName: string, initOptions: SubredditResourceConfig): Promise<SubredditResources> {
         let hash = 'default';
-        const { caching, ...init } = initOptions;
+        const { caching, credentials, ...init } = initOptions;
 
         let opts: SubredditResourceOptions = {
             cache: this.defaultCache,
             cacheType: this.cacheType,
             cacheSettingsHash: hash,
             ttl: this.ttlDefaults,
+            thirdPartyCredentials: credentials ?? this.defaultThirdPartyCredentials,
             prefix: this.defaultCacheConfig.provider.prefix,
             actionedEventsMax: this.actionedEventsMaxDefault !== undefined ? Math.min(this.actionedEventsDefault, this.actionedEventsMaxDefault) : this.actionedEventsDefault,
             ...init,
@@ -1107,6 +1138,7 @@ export class BotResourcesManager {
                     actionedEventsMax: eventsMax,
                     cacheType: trueProvider.store,
                     cacheSettingsHash: hash,
+                    thirdPartyCredentials: credentials ?? this.defaultThirdPartyCredentials,
                     prefix: subPrefix,
                     ...init,
                     ...trueRest,

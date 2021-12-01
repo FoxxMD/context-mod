@@ -81,10 +81,12 @@ class Bot {
                 heartbeatInterval,
             },
             credentials: {
-                clientId,
-                clientSecret,
-                refreshToken,
-                accessToken,
+                reddit: {
+                    clientId,
+                    clientSecret,
+                    refreshToken,
+                    accessToken,
+                },
             },
             snoowrap: {
                 proxy,

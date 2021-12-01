@@ -8,6 +8,7 @@ import HistoryRule, {HistoryJSONConfig} from "./HistoryRule";
 import RegexRule, {RegexRuleJSONConfig} from "./RegexRule";
 import {SubredditResources} from "../Subreddit/SubredditResources";
 import Snoowrap from "snoowrap";
+import {RepostRule, RepostRuleJSONConfig} from "./RepostRule";
 
 export function ruleFactory
 (config: RuleJSONConfig, logger: Logger, subredditName: string, resources: SubredditResources, client: Snoowrap): Rule {
@@ -31,6 +32,9 @@ export function ruleFactory
         case 'regex':
             cfg = config as RegexRuleJSONConfig;
             return new RegexRule({...cfg, logger, subredditName, resources, client});
+        case 'repost':
+            cfg = config as RepostRuleJSONConfig;
+            return new RepostRule({...cfg, logger, subredditName, resources, client});
         default:
             throw new Error('rule "kind" was not recognized.');
     }
