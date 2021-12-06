@@ -1937,6 +1937,7 @@ export interface RepostItem {
     source: string
     sourceUrl?: string
     score?: number
+    id: string
     itemType: string
     acquisitionType: SearchFacetType | 'comment'
     sourceObj?: any

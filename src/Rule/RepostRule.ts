@@ -3,20 +3,29 @@ import {Listing, SearchOptions} from "snoowrap";
 import Submission from "snoowrap/dist/objects/Submission";
 import Comment from "snoowrap/dist/objects/Comment";
 import {
+    compareDurationValue,
+    comparisonTextOp,
     FAIL, formatNumber,
-    isRepostItemResult,
+    isRepostItemResult, parseDurationComparison, parseGenericValueComparison,
     parseUsableLinkIdentifier,
     PASS, searchAndReplace, stringSameness, triggeredIndicator, windowToActivityWindowCriteria, wordCount
 } from "../util";
 import {
     ActivityWindow,
-    ActivityWindowType, JoinOperands, RepostItem, RepostItemResult, SearchAndReplaceRegExp, SearchFacetType,
+    ActivityWindowType,
+    CompareValue, DurationComparor,
+    JoinOperands,
+    RepostItem,
+    RepostItemResult,
+    SearchAndReplaceRegExp,
+    SearchFacetType,
 } from "../Common/interfaces";
 import objectHash from "object-hash";
 import {getActivities, getAttributionIdentifier} from "../Utils/SnoowrapUtils";
 import Fuse from "fuse.js";
 import leven from "leven";
 import {YoutubeClient, commentsAsRepostItems} from "../Utils/ThirdParty/YoutubeClient";
+import dayjs from "dayjs";
 
 const parseYtIdentifier = parseUsableLinkIdentifier();
 
@@ -81,6 +90,19 @@ export interface SearchFacet extends SearchFacetJSONConfig {
     kind: SearchFacetType
 }
 
+export type TimeBasedSelector = "newest" | "oldest" | "any" | "all";
+
+export interface OccurredAt {
+    /**
+     * Which repost to test on
+     *
+     * * `any` -- ANY repost passing `condition` will cause this criteria to be true
+     * * `all` -- ALL reposts must pass `condition` for this criteria to be true
+     * */
+    "testOn": TimeBasedSelector,
+    "condition": DurationComparor
+}
+
 /**
  * A set of criteria used to find reposts
  *
@@ -97,7 +119,60 @@ export interface RepostCriteria extends ActivityWindow {
      * */
     searchOn?: (SearchFacetType | SearchFacetJSONConfig)[]
 
-    criteria?: TextMatchOptions & TextTransformOptions
+    criteria?: TextMatchOptions & TextTransformOptions & {
+
+
+        /**
+         * A set of comparisons to test against the number of reposts found
+         *
+         * If not specified the default is "AND [occurrences] > 0" IE any reposts makes this test pass
+         * */
+        occurrences?: {
+            /**
+             * How to test all the specified comparisons
+             *
+             * * AND -- All criteria must be true
+             * * OR -- Any criteria must be true
+             *
+             * Defaults to AND
+             *
+             * @default AND
+             * @example ["AND", "OR"]
+             * */
+            condition?: JoinOperands
+            /**
+             * An array of strings containing a comparison operator and the number of repost occurrences to compare against
+             *
+             * Examples:
+             *
+             * * `">= 7"` -- TRUE if 7 or more reposts were found
+             * * `"< 1"` -- TRUE if less than 0 reposts were found
+             * */
+            criteria: CompareValue[]
+        }
+
+        /**
+         * Test the time the reposts occurred at
+         * */
+        occurredAt?: {
+            /**
+             * How to test all the specified comparisons
+             *
+             * * AND -- All criteria must be true
+             * * OR -- Any criteria must be true
+             *
+             * Defaults to AND
+             *
+             * @default AND
+             * @example ["AND", "OR"]
+             * */
+            condition?: JoinOperands
+            /**
+             * An array of time-based conditions to test against found reposts (test when a repost was made)
+             * */
+            criteria: OccurredAt[]
+        }
+    }
 
     /**
      * The maximum number of comments/submissions to check
@@ -118,6 +193,14 @@ export interface RepostCriteria extends ActivityWindow {
      * @example [50]
      * */
     maxExternalItems?: number
+}
+
+export interface CriteriaResult {
+    passed: boolean
+    passedConditions: string[]
+    failedConditions: string[]
+    conditionsSummary: string
+    items: RepostItemResult[]
 }
 
 const parentSubmissionSearchFacetDefaults = {
@@ -205,7 +288,7 @@ export class RepostRule extends Rule {
 
     protected async process(item: Submission | Comment): Promise<[boolean, RuleResult]> {
 
-        let criteriaResults: RepostItemResult[] = [];
+        let criteriaResults: CriteriaResult[] = [];
         let ytClient: YoutubeClient | undefined = undefined;
         let criteriaMatchedResults: RepostItemResult[] = [];
         let totalSubs = 0;
@@ -364,6 +447,7 @@ export class RepostRule extends Rule {
                             createdOn: x.created,
                             source: 'reddit',
                             sourceUrl: x.permalink,
+                            id: x.id,
                             score: x.score,
                             itemType: 'submission',
                             acquisitionType: sf.kind,
@@ -465,6 +549,7 @@ export class RepostRule extends Rule {
                         value: searchAndReplace(x.body, criteria.transformations ?? []),
                         createdOn: x.created,
                         source: 'reddit',
+                        id: x.id,
                         sourceUrl: x.permalink,
                         score: x.score,
                         itemType: 'comment',
@@ -489,6 +574,21 @@ export class RepostRule extends Rule {
                 fromCache = true;
             }
 
+            const {
+                matchScore = 85,
+                caseSensitive = false,
+                transformations = [],
+                transformationsActivity = transformations,
+                occurrences: {
+                    condition: oCondition = 'AND',
+                    criteria: oCriteria = ['> 0']
+                } = {},
+                occurredAt: {
+                    condition: tCondition = 'AND',
+                    criteria: tCriteria = [],
+                } = {}
+            } = criteria;
+
             if(item instanceof Submission) {
                 // we've already done difference calculations in the searchFacet phase
                 // and when the check is for a sub it means we are only checking if the submissions has been reposted which means either:
@@ -497,13 +597,6 @@ export class RepostRule extends Rule {
                 // so just add all items to critMatches at this point
                 criteriaMatchedResults = criteriaMatchedResults.concat(items.filter(x => "sameness" in x) as RepostItemResult[]);
             } else {
-                const {
-                    matchScore = 85,
-                    caseSensitive = false,
-                    transformations = [],
-                    transformationsActivity = transformations,
-                } = criteria;
-
                 let sourceContent = searchAndReplace(item.body, transformationsActivity);
                 if (!caseSensitive) {
                     sourceContent = sourceContent.toLowerCase();
@@ -522,18 +615,111 @@ export class RepostRule extends Rule {
                 }
             }
 
-            if (criteriaMatchedResults.length === 0 && this.condition === 'AND') {
+            // now do occurrence and time tests
+
+            let conditionFailSummaries = [];
+
+            const passedConditions = [];
+            const failedConditions = [];
+            for(const oc of oCriteria) {
+                const ocCompare = parseGenericValueComparison(oc);
+                const ocMatch = comparisonTextOp(criteriaMatchedResults.length, ocCompare.operator, ocCompare.value);
+                if(ocMatch) {
+                    passedConditions.push(oc);
+                } else {
+                    failedConditions.push(oc);
+                    if(oCondition === 'AND') {
+                        conditionFailSummaries.push(`(AND) ${oc} occurrences was not true`);
+                        break;
+                    }
+                }
+            }
+            if(passedConditions.length === 0 && oCriteria.length > 0) {
+                conditionFailSummaries.push('(OR) No occurrence tests passed');
+            }
+
+            const existingPassed = passedConditions.length;
+            if(conditionFailSummaries.length === 0) {
+                const timeAwareReposts = [...criteriaMatchedResults].filter(x => x.createdOn !== undefined).sort((a, b) => (a.createdOn as number) - (b.createdOn as number));
+                for(const tc of tCriteria) {
+                    let toTest: RepostItemResult[] = [];
+                    const durationCompare = parseDurationComparison(tc.condition);
+                    switch(tc.testOn) {
+                        case 'newest':
+                        case 'oldest':
+                           if(tc.testOn === 'newest') {
+                               toTest = timeAwareReposts.slice(-1);
+                           } else {
+                               toTest = timeAwareReposts.slice(0, 1);
+                           }
+                            break;
+                        case 'any':
+                        case 'all':
+                            toTest = timeAwareReposts;
+                            break;
+                    }
+                    const timePass = tc.testOn === 'any' ? toTest.some(x => compareDurationValue(durationCompare, dayjs.unix(x.createdOn as number))) : toTest.every(x => compareDurationValue(durationCompare, dayjs.unix(x.createdOn as number)));
+                    if(timePass) {
+                        passedConditions.push(tc.condition);
+                    } else {
+                        failedConditions.push(tc.condition);
+                        if(tCondition === 'AND') {
+                            conditionFailSummaries.push(`(AND) ${tc.condition} was not true`);
+                            break;
+                        }
+                    }
+                }
+                if(tCriteria.length > 0 && passedConditions.length === existingPassed) {
+                    conditionFailSummaries.push('(OR) No time-based tests passed');
+                }
+            }
+
+            let failSummaryText = '';
+            if(conditionFailSummaries.length === 0) {
+                failSummaryText = passedConditions.length === 0 && failedConditions.length === 0 ? 'No conditions specified' : 'All conditions passed';
+            } else {
+                failSummaryText = conditionFailSummaries.join(' | ');
+            }
+
+            const results = {
+                passed: conditionFailSummaries.length === 0,
+                conditionsSummary: failSummaryText,
+                passedConditions,
+                failedConditions,
+                items: criteriaMatchedResults
+            };
+            criteriaResults.push(results)
+
+
+            if(!results.passed) {
+                if(this.condition === 'AND') {
+                    andFail = true;
+                    break;
+                }
+            } else if(this.condition === 'OR') {
+                break;
+            }
+            if (!results.passed && this.condition === 'AND') {
                 andFail = true;
                 break;
             }
-            if (criteriaMatchedResults.length > 0) {
-                criteriaResults = criteriaResults.concat(criteriaMatchedResults);
-                if (this.condition === 'OR') {
-                    break;
-                }
-            }
         }
-        criteriaResults.sort((a, b) => a.sameness - b.sameness).reverse();
+
+        // get all repost items for stats and SCIENCE
+        const repostItemResults = [...criteriaResults
+            // only want reposts from criteria that passed
+            .filter(x => x.passed).map(x => x.items)
+            .flat()
+            // make sure we are only accumulating unique reposts
+            .reduce((acc, curr) => {
+            const hash = `${curr.source}-${curr.itemType}-${curr.id}`;
+            if (acc.has(hash)) {
+                acc.set(hash, curr);
+            }
+            return acc;
+        }, new Map<string, RepostItemResult>()).values()];
+
+        repostItemResults.sort((a, b) => a.sameness - b.sameness).reverse();
         const foundRepost = criteriaResults.length > 0;
 
 
@@ -554,22 +740,36 @@ export class RepostRule extends Rule {
             searchCandidateSummary = `Searched ${totalSubs}`
         }
 
-        let summary = `${searchCandidateSummary} and found ${criteriaResults.length} reposts.`;
+        let summary = `${searchCandidateSummary} and found ${repostItemResults.length} reposts.`;
 
-        if(criteriaResults.length > 0) {
-            avgSameness = formatNumber(criteriaResults.reduce((acc, curr) => acc + curr.sameness, 0) / criteriaResults.length);
-            const closest = criteriaResults[0];
+        if(repostItemResults.length > 0) {
+            avgSameness = formatNumber(repostItemResults.reduce((acc, curr) => acc + curr.sameness, 0) / criteriaResults.length);
+            const closest = repostItemResults[0];
             summary += ` --- Closest Match => >> ${closest.value} << from ${closest.source} (${closest.sourceUrl}) with ${formatNumber(closest.sameness)}% sameness.`
             if(criteriaResults.length > 1) {
                 summary += ` Avg ${formatNumber(avgSameness)}%`;
             }
-
-            if(andFail) {
-                summary += ' BUT at least one criteria failed to find reposts so the rule fails (AND condition)';
-            }
         }
 
-        const passed = foundRepost && !andFail;
+        let passed;
+
+        if(this.condition === 'AND') {
+            const failedCrit = criteriaResults.find(x => !x.passed);
+            if(failedCrit !== undefined) {
+                summary += `BUT a criteria failed >> ${failedCrit.conditionsSummary} << and rule has AND condition.`;
+                passed = false;
+            } else {
+                passed = true;
+            }
+        } else {
+            const passedCrit = criteriaResults.find(x => x.passed);
+            if(passedCrit === undefined) {
+                summary += `BUT all criteria failed`;
+                passed = false;
+            } else {
+                passed = true;
+            }
+        }
 
         const result = `${passed ? PASS : FAIL} ${summary}`;
         this.logger.verbose(result);

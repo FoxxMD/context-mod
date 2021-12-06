@@ -995,6 +995,24 @@
             },
             "type": "object"
         },
+        "OccurredAt": {
+            "properties": {
+                "condition": {
+                    "description": "A duration and how to compare it against a value\n\nThe syntax is `(< OR > OR <= OR >=) <number> <unit>` EX `> 100 days`, `<= 2 months`\n\n* EX `> 100 days` => Passes if the date being compared is before 100 days ago\n* EX `<= 2 months` => Passes if the date being compared is after or equal to 2 months\n\nUnit must be one of [DayJS Duration units](https://day.js.org/docs/en/durations/creating)\n\n[See] https://regexr.com/609n8 for example",
+                    "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(days|weeks|months|years|hours|minutes|seconds|milliseconds)\\s*$",
+                    "type": "string"
+                },
+                "testOn": {
+                    "$ref": "#/definitions/TimeBasedSelector",
+                    "description": "Which repost to test on\n\n* `any` -- ANY repost passing `condition` will cause this criteria to be true\n* `all` -- ALL reposts must pass `condition` for this criteria to be true"
+                }
+            },
+            "required": [
+                "condition",
+                "testOn"
+            ],
+            "type": "object"
+        },
         "RecentActivityRuleJSONConfig": {
             "description": "Checks a user's history for any Activity (Submission/Comment) in the subreddits specified in thresholds\n\nAvailable data for [Action templating](https://github.com/FoxxMD/context-mod#action-templating):\n\n```\nsummary    => comma-deliminated list of subreddits that hit the threshold and their count EX subredditA(1), subredditB(4),...\nsubCount   => Total number of subreddits that hit the threshold\ntotalCount => Total number of all activity occurrences in subreddits\n```",
             "properties": {
@@ -1504,6 +1522,61 @@
                         },
                         {
                             "$ref": "#/definitions/TextTransformOptions"
+                        },
+                        {
+                            "properties": {
+                                "occurredAt": {
+                                    "description": "Test the time the reposts occurred at",
+                                    "properties": {
+                                        "condition": {
+                                            "default": "AND",
+                                            "description": "How to test all the specified comparisons\n\n* AND -- All criteria must be true\n* OR -- Any criteria must be true\n\nDefaults to AND",
+                                            "enum": [
+                                                "AND",
+                                                "OR"
+                                            ],
+                                            "type": "string"
+                                        },
+                                        "criteria": {
+                                            "description": "An array of time-based conditions to test against found reposts (test when a repost was made)",
+                                            "items": {
+                                                "$ref": "#/definitions/OccurredAt"
+                                            },
+                                            "type": "array"
+                                        }
+                                    },
+                                    "required": [
+                                        "criteria"
+                                    ],
+                                    "type": "object"
+                                },
+                                "occurrences": {
+                                    "description": "A set of comparisons to test against the number of reposts found\n\nIf not specified the default is \"AND [occurrences] > 0\" IE any reposts makes this test pass",
+                                    "properties": {
+                                        "condition": {
+                                            "default": "AND",
+                                            "description": "How to test all the specified comparisons\n\n* AND -- All criteria must be true\n* OR -- Any criteria must be true\n\nDefaults to AND",
+                                            "enum": [
+                                                "AND",
+                                                "OR"
+                                            ],
+                                            "type": "string"
+                                        },
+                                        "criteria": {
+                                            "description": "An array of strings containing a comparison operator and the number of repost occurrences to compare against\n\nExamples:\n\n* `\">= 7\"` -- TRUE if 7 or more reposts were found\n* `\"< 1\"` -- TRUE if less than 0 reposts were found",
+                                            "items": {
+                                                "type": "string"
+                                            },
+                                            "type": "array"
+                                        }
+                                    },
+                                    "required": [
+                                        "criteria"
+                                    ],
+                                    "type": "object"
+                                }
+                            },
+                            "type": "object"
                         }
                     ]
                 },
@@ -1902,6 +1975,15 @@
                 }
             },
             "type": "object"
+        },
+        "TimeBasedSelector": {
+            "enum": [
+                "all",
+                "any",
+                "newest",
+                "oldest"
+            ],
+            "type": "string"
         },
         "UserNoteCriteria": {
             "properties": {

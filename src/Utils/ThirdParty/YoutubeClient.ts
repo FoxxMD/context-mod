@@ -48,6 +48,7 @@ export const commentsAsRepostItems = (comments: Schema$CommentThread[]): RepostI
             value: textDisplay as string,
             createdOn: dayjs(publishedAt as string).unix(),
             source: 'Youtube',
+            id: x.snippet?.topLevelComment?.id as string,
             sourceUrl: `https://youtube.com/watch?v=${videoId}&lc=${id}`,
             score: x.snippet?.topLevelComment?.snippet?.likeCount as number,
             acquisitionType: 'external',
