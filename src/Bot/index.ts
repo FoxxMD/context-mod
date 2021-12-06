@@ -464,6 +464,8 @@ class Bot {
                 continue;
             }
             try {
+                // ensure calls to wiki page are also staggered so we aren't hitting api hard when bot has a ton of subreddits to check
+                await sleep(this.stagger);
                 const newConfig = await s.parseConfiguration();
                 const willStart = newConfig || (s.queueState.state !== RUNNING && s.queueState.causedBy === SYSTEM) || (s.eventsState.state !== RUNNING && s.eventsState.causedBy === SYSTEM);
                 if(willStart) {
