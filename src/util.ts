@@ -654,18 +654,20 @@ export const parseExternalUrl = (val: string) => {
 export interface RetryOptions {
     maxRequestRetry: number,
     maxOtherRetry: number,
+    waitOnRetry?: boolean,
+    clearRetryCountAfter?: number,
 }
 
 export const createRetryHandler = (opts: RetryOptions, logger: Logger) => {
-    const {maxRequestRetry, maxOtherRetry} = opts;
+    const {maxRequestRetry, maxOtherRetry, waitOnRetry = true, clearRetryCountAfter = 3} = opts;
 
     let timeoutCount = 0;
     let otherRetryCount = 0;
     let lastErrorAt: Dayjs | undefined;
 
     return async (err: any): Promise<boolean> => {
-        if (lastErrorAt !== undefined && dayjs().diff(lastErrorAt, 'minute') >= 3) {
-            // if its been longer than 5 minutes since last error clear counters
+        if (lastErrorAt !== undefined && dayjs().diff(lastErrorAt, 'minute') >= clearRetryCountAfter) {
+            // if its been longer than 3 minutes since last error clear counters
             timeoutCount = 0;
             otherRetryCount = 0;
         }
@@ -679,10 +681,12 @@ export const createRetryHandler = (opts: RetryOptions, logger: Logger) => {
                     logger.error(`Reddit request error retries (${timeoutCount}) exceeded max allowed (${maxRequestRetry})`);
                     return false;
                 }
-                // exponential backoff
-                const ms = (Math.pow(2, timeoutCount - 1) + (Math.random() - 0.3) + 1) * 1000;
-                logger.warn(`Error occurred while making a request to Reddit (${timeoutCount} in 3 minutes). Will wait ${formatNumber(ms / 1000)} seconds before retrying`);
-                await sleep(ms);
+                if(waitOnRetry) {
+                    // exponential backoff
+                    const ms = (Math.pow(2, timeoutCount - 1) + (Math.random() - 0.3) + 1) * 1000;
+                    logger.warn(`Error occurred while making a request to Reddit (${timeoutCount} in 3 minutes). Will wait ${formatNumber(ms / 1000)} seconds before retrying`);
+                    await sleep(ms);
+                }
                 return true;
 
             } else {
@@ -694,9 +698,11 @@ export const createRetryHandler = (opts: RetryOptions, logger: Logger) => {
             if (maxOtherRetry < otherRetryCount) {
                 return false;
             }
-            const ms = (4 * 1000) * otherRetryCount;
-            logger.warn(`Non-request error occurred. Will wait ${formatNumber(ms / 1000)} seconds before retrying`);
-            await sleep(ms);
+            if(waitOnRetry) {
+                const ms = (4 * 1000) * otherRetryCount;
+                logger.warn(`Non-request error occurred. Will wait ${formatNumber(ms / 1000)} seconds before retrying`);
+                await sleep(ms);
+            }
             return true;
         }
     }
@@ -1116,18 +1122,6 @@ export const snooLogWrapper = (logger: Logger) => {
         info: (...args: any[]) => logger.info(args.slice(0, 2).join(' '), [args.slice(2)]),
         trace: (...args: any[]) => logger.debug(args.slice(0, 2).join(' '), [args.slice(2)]),
     }
-}
-
-export const isScopeError = (err: any): boolean => {
-    if(typeof err === 'object' && err.name === 'StatusCodeError' && err.response !== undefined) {
-        const authHeader = err.response.headers['www-authenticate'];
-        return authHeader !== undefined && authHeader.includes('insufficient_scope');
-    }
-    return false;
-}
-
-export const isStatusError = (err: any): err is StatusCodeError => {
-    return typeof err === 'object' && err.name === 'StatusCodeError' && err.response !== undefined;
 }
 
 /**

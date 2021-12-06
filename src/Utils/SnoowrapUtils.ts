@@ -15,7 +15,7 @@ import {
 import {
     compareDurationValue,
     comparisonTextOp, escapeRegex, getActivityAuthorName,
-    isActivityWindowCriteria, isStatusError,
+    isActivityWindowCriteria,
     normalizeName,
     parseDuration,
     parseDurationComparison,
@@ -31,6 +31,7 @@ import InvalidRegexError from "./InvalidRegexError";
 import SimpleError from "./SimpleError";
 import {AuthorCriteria} from "../Author/Author";
 import {URL} from "url";
+import {isStatusError} from "./Errors";
 
 export const BOT_LINK = 'https://www.reddit.com/r/ContextModBot/comments/otz396/introduction_to_contextmodbot';
 
@@ -600,7 +601,7 @@ export const itemContentPeek = async (item: (Comment | Submission), peekLength =
         submissionTitle = item.title;
         peek = `${truncatePeek(item.title)} by ${author} https://reddit.com${item.permalink}`;
 
-    } else if (item instanceof Comment) {
+    } else {
         // replace newlines with spaces to make peek more compact
         content = truncatePeek(item.body.replaceAll('\n', ' '));
         peek = `${truncatePeek(content)} by ${author} in https://reddit.com${item.permalink}`;

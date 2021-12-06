@@ -4,7 +4,6 @@ import {
     COMMENT_URL_ID,
     deflateUserNotes, getActivityAuthorName,
     inflateUserNotes,
-    isScopeError,
     parseLinkIdentifier,
     SUBMISSION_URL_ID
 } from "../util";
@@ -14,6 +13,7 @@ import LoggedError from "../Utils/LoggedError";
 import Submission from "snoowrap/dist/objects/Submission";
 import {RichContent} from "../Common/interfaces";
 import {Cache} from 'cache-manager';
+import {isScopeError} from "../Utils/Errors";
 
 interface RawUserNotesPayload {
     ver: number,

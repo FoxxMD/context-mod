@@ -41,6 +41,7 @@ import NotificationManager from "../Notification/NotificationManager";
 import action from "../Web/Server/routes/authenticated/user/action";
 import {createHistoricalDefaults, historicalDefaults} from "../Common/defaults";
 import {ExtendedSnoowrap} from "../Utils/SnoowrapClients";
+import {isRateLimitError} from "../Utils/Errors";
 
 export interface RunningState {
     state: RunState,
@@ -73,7 +74,7 @@ interface QueuedIdentifier {
     state: 'queued' | 'processing'
 }
 
-export class Manager {
+export class Manager extends EventEmitter {
     subreddit: Subreddit;
     client: ExtendedSnoowrap;
     logger: Logger;
@@ -94,7 +95,6 @@ export class Manager {
     sharedModqueue: boolean;
     cacheManager: BotResourcesManager;
     globalDryRun?: boolean;
-    emitter: EventEmitter = new EventEmitter();
     queue: QueueObject<CheckTask>;
     // firehose is used to ensure all activities from different polling streams are unique
     // that is -- if the same activities is in both modqueue and unmoderated we don't want to process the activity twice or use stale data
@@ -182,6 +182,8 @@ export class Manager {
     }
 
     constructor(sub: Subreddit, client: ExtendedSnoowrap, logger: Logger, cacheManager: BotResourcesManager, opts: RuntimeManagerOptions = {botName: 'ContextMod', maxWorkers: 1}) {
+        super();
+
         const {dryRun, sharedModqueue = false, wikiLocation = 'botconfig/contextbot', botName, maxWorkers} = opts;
         this.displayLabel = opts.nickname || `${sub.display_name_prefixed}`;
         const getLabels = this.getCurrentLabels;
@@ -508,46 +510,6 @@ export class Manager {
             this.logger.error(`Error occurred while generate item peek for ${checkType} Activity ${itemId}`, err);
         }
 
-        const {
-            checkNames = [],
-            delayUntil,
-            dryRun,
-            refresh = false,
-        } = options || {};
-
-        let wasRefreshed = false;
-
-        if (delayUntil !== undefined) {
-            const created = dayjs.unix(item.created_utc);
-            const diff = dayjs().diff(created, 's');
-            if (diff < delayUntil) {
-                this.logger.verbose(`Delaying processing until Activity is ${delayUntil} seconds old (${delayUntil - diff}s)`);
-                await sleep(delayUntil - diff);
-                // @ts-ignore
-                item = await activity.refresh();
-                wasRefreshed = true;
-            }
-        }
-        // refresh signal from firehose if activity was ingested multiple times before processing or re-queued while processing
-        // want to make sure we have the most recent data
-        if(!wasRefreshed && refresh === true) {
-            this.logger.verbose('Refreshed data (probably due to signal from firehose)');
-            // @ts-ignore
-            item = await activity.refresh();
-        }
-
-        const startingApiLimit = this.client.ratelimitRemaining;
-
-        if (item instanceof Submission) {
-            if (await item.removed_by_category === 'deleted') {
-                this.logger.warn('Submission was deleted, cannot process.');
-                return;
-            }
-        } else if (item.author.name === '[deleted]') {
-            this.logger.warn('Comment was deleted, cannot process.');
-            return;
-        }
-
         let checksRun = 0;
         let actionsRun = 0;
         let totalRulesRun = 0;
@@ -569,7 +531,48 @@ export class Manager {
         let triggeredCheckName;
         const checksRunNames = [];
         const cachedCheckNames = [];
+        const startingApiLimit = this.client.ratelimitRemaining;
+
+        const {
+            checkNames = [],
+            delayUntil,
+            dryRun,
+            refresh = false,
+        } = options || {};
+
+        let wasRefreshed = false;
+
         try {
+
+            if (delayUntil !== undefined) {
+                const created = dayjs.unix(item.created_utc);
+                const diff = dayjs().diff(created, 's');
+                if (diff < delayUntil) {
+                    this.logger.verbose(`Delaying processing until Activity is ${delayUntil} seconds old (${delayUntil - diff}s)`);
+                    await sleep(delayUntil - diff);
+                    // @ts-ignore
+                    item = await activity.refresh();
+                    wasRefreshed = true;
+                }
+            }
+            // refresh signal from firehose if activity was ingested multiple times before processing or re-queued while processing
+            // want to make sure we have the most recent data
+            if(!wasRefreshed && refresh === true) {
+                this.logger.verbose('Refreshed data (probably due to signal from firehose)');
+                // @ts-ignore
+                item = await activity.refresh();
+            }
+
+            if (item instanceof Submission) {
+                if (await item.removed_by_category === 'deleted') {
+                    this.logger.warn('Submission was deleted, cannot process.');
+                    return;
+                }
+            } else if (item.author.name === '[deleted]') {
+                this.logger.warn('Comment was deleted, cannot process.');
+                return;
+            }
+
             for (const check of checks) {
                 if (checkNames.length > 0 && !checkNames.map(x => x.toLowerCase()).some(x => x === check.name.toLowerCase())) {
                     this.logger.warn(`Check ${check.name} not in array of requested checks to run, skipping...`);
@@ -634,6 +637,7 @@ export class Manager {
             if (!(err instanceof LoggedError) && err.logged !== true) {
                 this.logger.error('An unhandled error occurred while running checks', err);
             }
+            this.emit('error', err);
         } finally {
             try {
                 actionedEvent.actionResults = runActions;
@@ -666,7 +670,7 @@ export class Manager {
         // give current handle() time to stop
         //await sleep(1000);
 
-        const retryHandler = createRetryHandler({maxRequestRetry: 5, maxOtherRetry: 1}, this.logger);
+        const retryHandler = createRetryHandler({maxRequestRetry: 3, maxOtherRetry: 1}, this.logger);
 
         const subName = this.subreddit.display_name;
 
@@ -768,13 +772,19 @@ export class Manager {
                 // @ts-ignore
                 stream.on('error', async (err: any) => {
 
+                    this.emit('error', err);
+
+                    if(isRateLimitError(err)) {
+                        this.logger.error('Encountered rate limit while polling! Bot is all out of requests :( Stopping subreddit queue and polling.');
+                        await this.stop();
+                    }
                     this.logger.error('Polling error occurred', err);
                     const shouldRetry = await retryHandler(err);
                     if (shouldRetry) {
                         stream.startInterval();
                     } else {
-                        this.logger.warn('Pausing event polling due to too many errors');
-                        await this.pauseEvents();
+                        this.logger.warn('Stopping subreddit processing/polling due to too many errors');
+                        await this.stop();
                     }
                 });
                 this.streams.push(stream);
@@ -858,9 +868,18 @@ export class Manager {
             } else {
                 const pauseWaitStart = dayjs();
                 this.logger.info(`Activity processing queue is stopping...waiting for ${this.queue.running()} activities to finish processing`);
+                const fullStopTime = dayjs().add(5, 'seconds');
+                let gracefulStop = true;
                 while (this.queue.running() > 0) {
+                    gracefulStop = false;
+                    if(dayjs().isAfter(fullStopTime)) {
+                        break;
+                    }
                     await sleep(1500);
                     this.logger.verbose(`Activity processing queue is stopping...waiting for ${this.queue.running()} activities to finish processing`);
+                }
+                if(!gracefulStop) {
+                    this.logger.warn('Waited longer than 5 seconds to stop activities. Something isn\'t right so forcing stop :/ ');
                 }
                 this.logger.info(`Activity processing queue stopped by ${causedBy} and ${this.queue.length()} queued activities cleared (waited ${dayjs().diff(pauseWaitStart, 's')} seconds while activity processing finished)`);
                 this.firehose.kill();
