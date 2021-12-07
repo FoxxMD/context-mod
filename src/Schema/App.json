@@ -2030,6 +2030,58 @@
             ],
             "type": "object"
         },
+        "OccurrenceTests": {
+            "properties": {
+                "count": {
+                    "properties": {
+                        "condition": {
+                            "enum": [
+                                "AND",
+                                "OR"
+                            ],
+                            "type": "string"
+                        },
+                        "test": {
+                            "description": "An array of strings containing a comparison operator and the number of repost occurrences to compare against\n\nExamples:\n\n* `\">= 7\"` -- TRUE if 7 or more reposts were found\n* `\"< 1\"` -- TRUE if less than 0 reposts were found",
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        }
+                    },
+                    "required": [
+                        "test"
+                    ],
+                    "type": "object"
+                },
+                "time": {
+                    "description": "Test the time the reposts occurred at",
+                    "properties": {
+                        "condition": {
+                            "default": "AND",
+                            "description": "How to test all the specified comparisons\n\n* AND -- All criteria must be true\n* OR -- Any criteria must be true\n\nDefaults to AND",
+                            "enum": [
+                                "AND",
+                                "OR"
+                            ],
+                            "type": "string"
+                        },
+                        "test": {
+                            "description": "An array of time-based conditions to test against found reposts (test when a repost was made)",
+                            "items": {
+                                "$ref": "#/definitions/OccurredAt"
+                            },
+                            "type": "array"
+                        }
+                    },
+                    "required": [
+                        "test"
+                    ],
+                    "type": "object"
+                }
+            },
+            "type": "object"
+        },
         "PollingOptions": {
             "description": "A configuration for where, how, and when to poll Reddit for Activities to process",
             "examples": [
@@ -2745,70 +2797,15 @@
         "RepostCriteria": {
             "description": "A set of criteria used to find reposts\n\nContains options and conditions used to define how candidate reposts are retrieved and if they are a match.",
             "properties": {
-                "criteria": {
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/TextMatchOptions"
-                        },
-                        {
-                            "$ref": "#/definitions/TextTransformOptions"
-                        },
-                        {
-                            "properties": {
-                                "occurredAt": {
-                                    "description": "Test the time the reposts occurred at",
-                                    "properties": {
-                                        "condition": {
-                                            "default": "AND",
-                                            "description": "How to test all the specified comparisons\n\n* AND -- All criteria must be true\n* OR -- Any criteria must be true\n\nDefaults to AND",
-                                            "enum": [
-                                                "AND",
-                                                "OR"
-                                            ],
-                                            "type": "string"
-                                        },
-                                        "criteria": {
-                                            "description": "An array of time-based conditions to test against found reposts (test when a repost was made)",
-                                            "items": {
-                                                "$ref": "#/definitions/OccurredAt"
-                                            },
-                                            "type": "array"
-                                        }
-                                    },
-                                    "required": [
-                                        "criteria"
-                                    ],
-                                    "type": "object"
-                                },
-                                "occurrences": {
-                                    "description": "A set of comparisons to test against the number of reposts found\n\nIf not specified the default is \"AND [occurrences] > 0\" IE any reposts makes this test pass",
-                                    "properties": {
-                                        "condition": {
-                                            "default": "AND",
-                                            "description": "How to test all the specified comparisons\n\n* AND -- All criteria must be true\n* OR -- Any criteria must be true\n\nDefaults to AND",
-                                            "enum": [
-                                                "AND",
-                                                "OR"
-                                            ],
-                                            "type": "string"
-                                        },
-                                        "criteria": {
-                                            "description": "An array of strings containing a comparison operator and the number of repost occurrences to compare against\n\nExamples:\n\n* `\">= 7\"` -- TRUE if 7 or more reposts were found\n* `\"< 1\"` -- TRUE if less than 0 reposts were found",
-                                            "items": {
-                                                "type": "string"
-                                            },
-                                            "type": "array"
-                                        }
-                                    },
-                                    "required": [
-                                        "criteria"
-                                    ],
-                                    "type": "object"
-                                }
-                            },
-                            "type": "object"
-                        }
-                    ]
+                "caseSensitive": {
+                    "default": false,
+                    "description": "Should text matching be case sensitive?\n\nDefaults to false",
+                    "type": "boolean"
+                },
+                "matchScore": {
+                    "default": 85,
+                    "description": "The percentage, as a whole number, of a repost title/comment that must match the title/comment being checked in order to consider both a match\n\nNote: Setting to 0 will make every candidate considered a match -- useful if you want to match if the URL has been reposted anywhere\n\nDefaults to `85` (85%)",
+                    "type": "number"
                 },
                 "maxExternalItems": {
                     "default": 50,
@@ -2819,6 +2816,57 @@
                     "default": 50,
                     "description": "The maximum number of comments/submissions to check\n\nIn both cases this list is gathered from sorting all submissions or all comments from all submission by number of votes and taking the \"top\" maximum specified\n\nFor comment checks this is the number of comments cached",
                     "type": "number"
+                },
+                "minWordCount": {
+                    "default": 2,
+                    "description": "The minimum number of words in the activity being checked for which this rule will run on\n\nIf the word count is below the minimum the rule fails\n\nDefaults to 2",
+                    "type": "number"
+                },
+                "occurredAt": {
+                    "description": "Test the time the reposts occurred at",
+                    "properties": {
+                        "condition": {
+                            "default": "AND",
+                            "description": "How to test all the specified comparisons\n\n* AND -- All criteria must be true\n* OR -- Any criteria must be true\n\nDefaults to AND",
+                            "enum": [
+                                "AND",
+                                "OR"
+                            ],
+                            "type": "string"
+                        },
+                        "criteria": {
+                            "description": "An array of time-based conditions to test against found reposts (test when a repost was made)",
+                            "items": {
+                                "$ref": "#/definitions/OccurredAt"
+                            },
+                            "type": "array"
+                        }
+                    },
+                    "required": [
+                        "criteria"
+                    ],
+                    "type": "object"
+                },
+                "occurrences": {
+                    "description": "A set of comparisons to test against the number of reposts found\n\nIf not specified the default is \"AND [occurrences] > 0\" IE any reposts makes this test pass",
+                    "properties": {
+                        "condition": {
+                            "default": "AND",
+                            "description": "How to test all the specified comparisons\n\n* AND -- All criteria must be true\n* OR -- Any criteria must be true\n\nDefaults to AND",
+                            "enum": [
+                                "AND",
+                                "OR"
+                            ],
+                            "type": "string"
+                        },
+                        "criteria": {
+                            "items": {
+                                "$ref": "#/definitions/OccurrenceTests"
+                            },
+                            "type": "array"
+                        }
+                    },
+                    "type": "object"
                 },
                 "searchOn": {
                     "description": "Define how to find candidate reposts\n\n* **title** -- search reddit for submissions with the same title\n* **url** -- search reddit for submissions with the same url\n* **external** -- WHEN ACTIVITY IS A COMMENT - tries to get comments from external source (youtube, twitter, etc...)",
@@ -2838,6 +2886,20 @@
                                 "type": "string"
                             }
                         ]
+                    },
+                    "type": "array"
+                },
+                "transformations": {
+                    "description": "A set of search-and-replace operations to perform on text values before performing a match. Transformations are performed in the order they are defined.\n\n* If `transformationsActivity` IS NOT defined then these transformations will be performed on BOTH the activity text (submission title or comment) AND the repost candidate text\n* If `transformationsActivity` IS defined then these transformations are only performed on repost candidate text",
+                    "items": {
+                        "$ref": "#/definitions/SearchAndReplaceRegExp"
+                    },
+                    "type": "array"
+                },
+                "transformationsActivity": {
+                    "description": "Specify a separate set of transformations for the activity text (submission title or comment)\n\nTo perform no transformations when `transformations` is defined set this to an empty array (`[]`)",
+                    "items": {
+                        "$ref": "#/definitions/SearchAndReplaceRegExp"
                     },
                     "type": "array"
                 },
@@ -3397,45 +3459,6 @@
                 "stateDescription": {
                     "description": "A friendly description of what this State is trying to parse",
                     "type": "string"
-                }
-            },
-            "type": "object"
-        },
-        "TextMatchOptions": {
-            "properties": {
-                "caseSensitive": {
-                    "default": false,
-                    "description": "Should text matching be case sensitive?\n\nDefaults to false",
-                    "type": "boolean"
-                },
-                "matchScore": {
-                    "default": 85,
-                    "description": "The percentage, as a whole number, of a repost title/comment that must match the title/comment being checked in order to consider both a match\n\nNote: Setting to 0 will make every candidate considered a match -- useful if you want to match if the URL has been reposted anywhere\n\nDefaults to `85` (85%)",
-                    "type": "number"
-                },
-                "minWordCount": {
-                    "default": 2,
-                    "description": "The minimum number of words in the activity being checked for which this rule will run on\n\nIf the word count is below the minimum the rule fails\n\nDefaults to 2",
-                    "type": "number"
-                }
-            },
-            "type": "object"
-        },
-        "TextTransformOptions": {
-            "properties": {
-                "transformations": {
-                    "description": "A set of search-and-replace operations to perform on text values before performing a match. Transformations are performed in the order they are defined.\n\n* If `transformationsActivity` IS NOT defined then these transformations will be performed on BOTH the activity text (submission title or comment) AND the repost candidate text\n* If `transformationsActivity` IS defined then these transformations are only performed on repost candidate text",
-                    "items": {
-                        "$ref": "#/definitions/SearchAndReplaceRegExp"
-                    },
-                    "type": "array"
-                },
-                "transformationsActivity": {
-                    "description": "Specify a separate set of transformations for the activity text (submission title or comment)\n\nTo perform no transformations when `transformations` is defined set this to an empty array (`[]`)",
-                    "items": {
-                        "$ref": "#/definitions/SearchAndReplaceRegExp"
-                    },
-                    "type": "array"
                 }
             },
             "type": "object"

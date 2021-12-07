@@ -26,6 +26,7 @@ import Fuse from "fuse.js";
 import leven from "leven";
 import {YoutubeClient, commentsAsRepostItems} from "../Utils/ThirdParty/YoutubeClient";
 import dayjs from "dayjs";
+import {rest} from "lodash";
 
 const parseYtIdentifier = parseUsableLinkIdentifier();
 
@@ -103,13 +104,50 @@ export interface OccurredAt {
     "condition": DurationComparor
 }
 
+export interface OccurrenceTests {
+    count?: {
+        condition?: JoinOperands
+        /**
+         * An array of strings containing a comparison operator and the number of repost occurrences to compare against
+         *
+         * Examples:
+         *
+         * * `">= 7"` -- TRUE if 7 or more reposts were found
+         * * `"< 1"` -- TRUE if less than 0 reposts were found
+         * */
+         test: CompareValue[]
+    }
+
+    /**
+     * Test the time the reposts occurred at
+     * */
+    time?: {
+        /**
+         * How to test all the specified comparisons
+         *
+         * * AND -- All criteria must be true
+         * * OR -- Any criteria must be true
+         *
+         * Defaults to AND
+         *
+         * @default AND
+         * @example ["AND", "OR"]
+         * */
+        condition?: JoinOperands
+        /**
+         * An array of time-based conditions to test against found reposts (test when a repost was made)
+         * */
+        test: OccurredAt[]
+    }
+}
+
 /**
  * A set of criteria used to find reposts
  *
  * Contains options and conditions used to define how candidate reposts are retrieved and if they are a match.
  *
  * */
-export interface RepostCriteria extends ActivityWindow {
+export interface RepostCriteria extends ActivityWindow, TextMatchOptions, TextTransformOptions  {
     /**
      * Define how to find candidate reposts
      *
@@ -119,59 +157,48 @@ export interface RepostCriteria extends ActivityWindow {
      * */
     searchOn?: (SearchFacetType | SearchFacetJSONConfig)[]
 
-    criteria?: TextMatchOptions & TextTransformOptions & {
-
-
+    /**
+     * A set of comparisons to test against the number of reposts found
+     *
+     * If not specified the default is "AND [occurrences] > 0" IE any reposts makes this test pass
+     * */
+    occurrences?: {
         /**
-         * A set of comparisons to test against the number of reposts found
+         * How to test all the specified comparisons
          *
-         * If not specified the default is "AND [occurrences] > 0" IE any reposts makes this test pass
+         * * AND -- All criteria must be true
+         * * OR -- Any criteria must be true
+         *
+         * Defaults to AND
+         *
+         * @default AND
+         * @example ["AND", "OR"]
          * */
-        occurrences?: {
-            /**
-             * How to test all the specified comparisons
-             *
-             * * AND -- All criteria must be true
-             * * OR -- Any criteria must be true
-             *
-             * Defaults to AND
-             *
-             * @default AND
-             * @example ["AND", "OR"]
-             * */
-            condition?: JoinOperands
-            /**
-             * An array of strings containing a comparison operator and the number of repost occurrences to compare against
-             *
-             * Examples:
-             *
-             * * `">= 7"` -- TRUE if 7 or more reposts were found
-             * * `"< 1"` -- TRUE if less than 0 reposts were found
-             * */
-            criteria: CompareValue[]
-        }
+        condition?: JoinOperands
 
+        criteria?: OccurrenceTests[]
+    }
+
+    /**
+     * Test the time the reposts occurred at
+     * */
+    occurredAt?: {
         /**
-         * Test the time the reposts occurred at
+         * How to test all the specified comparisons
+         *
+         * * AND -- All criteria must be true
+         * * OR -- Any criteria must be true
+         *
+         * Defaults to AND
+         *
+         * @default AND
+         * @example ["AND", "OR"]
          * */
-        occurredAt?: {
-            /**
-             * How to test all the specified comparisons
-             *
-             * * AND -- All criteria must be true
-             * * OR -- Any criteria must be true
-             *
-             * Defaults to AND
-             *
-             * @default AND
-             * @example ["AND", "OR"]
-             * */
-            condition?: JoinOperands
-            /**
-             * An array of time-based conditions to test against found reposts (test when a repost was made)
-             * */
-            criteria: OccurredAt[]
-        }
+        condition?: JoinOperands
+        /**
+         * An array of time-based conditions to test against found reposts (test when a repost was made)
+         * */
+        criteria: OccurredAt[]
     }
 
     /**
@@ -197,8 +224,6 @@ export interface RepostCriteria extends ActivityWindow {
 
 export interface CriteriaResult {
     passed: boolean
-    passedConditions: string[]
-    failedConditions: string[]
     conditionsSummary: string
     items: RepostItemResult[]
 }
@@ -302,10 +327,11 @@ export class RepostRule extends Rule {
             criteriaMatchedResults = [];
             const {
                 searchOn = (item instanceof Submission ? ['title', 'url', 'duplicates', 'crossposts'] : ['external', 'title', 'url', 'duplicates', 'crossposts']),
-                criteria = {},
+                //criteria = {},
                 maxRedditItems = 50,
                 maxExternalItems = 50,
                 window = 20,
+                ...restCriteria
             } = rCriteria;
 
             const searchFacets = searchOn.map(x => generateSearchFacet(x)).flat(1) as SearchFacet[];
@@ -464,7 +490,7 @@ export class RepostRule extends Rule {
                     items = items.filter(x => x.itemType !== 'submission' || !(x.sourceObj.crosspost_parent !== undefined && x.sourceObj.crosspost_parent === sub.id))
                 }
 
-                let sourceTitle = searchAndReplace(sub.title, criteria.transformationsActivity ?? []);
+                let sourceTitle = searchAndReplace(sub.title, restCriteria.transformationsActivity ?? []);
 
                 // do submission scoring BEFORE pruning duplicates bc...
                 // might end up in a situation where we get same submission for both title and url
@@ -541,12 +567,12 @@ export class RepostRule extends Rule {
                     // sort by highest scores
                     comments.sort((a, b) => a.score - b.score).reverse();
                     // filter out all comments with fewer words than required (prevent false negatives)
-                    comments.filter(x => wordCount(x.body) > (criteria.minWordCount ?? 2));
+                    comments.filter(x => wordCount(x.body) > (restCriteria.minWordCount ?? 2));
                     totalComments += Math.min(comments.length, maxRedditItems);
 
                     // and take the user-defined maximum number of items
                     items = nonSubItems.concat(comments.slice(0, maxRedditItems).map(x => ({
-                        value: searchAndReplace(x.body, criteria.transformations ?? []),
+                        value: searchAndReplace(x.body, restCriteria.transformations ?? []),
                         createdOn: x.created,
                         source: 'reddit',
                         id: x.id,
@@ -579,15 +605,17 @@ export class RepostRule extends Rule {
                 caseSensitive = false,
                 transformations = [],
                 transformationsActivity = transformations,
-                occurrences: {
-                    condition: oCondition = 'AND',
-                    criteria: oCriteria = ['> 0']
-                } = {},
-                occurredAt: {
-                    condition: tCondition = 'AND',
-                    criteria: tCriteria = [],
-                } = {}
-            } = criteria;
+                occurrences = {
+                    condition: 'AND',
+                    criteria: [
+                        {
+                            count: {
+                                test: ['> 0']
+                            }
+                        }
+                    ]
+                },
+            } = restCriteria;
 
             if(item instanceof Submission) {
                 // we've already done difference calculations in the searchFacet phase
@@ -617,75 +645,120 @@ export class RepostRule extends Rule {
 
             // now do occurrence and time tests
 
-            let conditionFailSummaries = [];
-
-            const passedConditions = [];
-            const failedConditions = [];
-            for(const oc of oCriteria) {
-                const ocCompare = parseGenericValueComparison(oc);
-                const ocMatch = comparisonTextOp(criteriaMatchedResults.length, ocCompare.operator, ocCompare.value);
-                if(ocMatch) {
-                    passedConditions.push(oc);
-                } else {
-                    failedConditions.push(oc);
-                    if(oCondition === 'AND') {
-                        conditionFailSummaries.push(`(AND) ${oc} occurrences was not true`);
-                        break;
+            const {
+                condition: occCondition = 'AND',
+                criteria: occCriteria = [
+                    {
+                        count: {
+                            test: ['> 0']
+                        }
                     }
-                }
-            }
-            if(passedConditions.length === 0 && oCriteria.length > 0) {
-                conditionFailSummaries.push('(OR) No occurrence tests passed');
-            }
+                ]
+            } = occurrences;
 
-            const existingPassed = passedConditions.length;
-            if(conditionFailSummaries.length === 0) {
-                const timeAwareReposts = [...criteriaMatchedResults].filter(x => x.createdOn !== undefined).sort((a, b) => (a.createdOn as number) - (b.createdOn as number));
-                for(const tc of tCriteria) {
-                    let toTest: RepostItemResult[] = [];
-                    const durationCompare = parseDurationComparison(tc.condition);
-                    switch(tc.testOn) {
-                        case 'newest':
-                        case 'oldest':
-                           if(tc.testOn === 'newest') {
-                               toTest = timeAwareReposts.slice(-1);
-                           } else {
-                               toTest = timeAwareReposts.slice(0, 1);
-                           }
-                            break;
-                        case 'any':
-                        case 'all':
-                            toTest = timeAwareReposts;
-                            break;
-                    }
-                    const timePass = tc.testOn === 'any' ? toTest.some(x => compareDurationValue(durationCompare, dayjs.unix(x.createdOn as number))) : toTest.every(x => compareDurationValue(durationCompare, dayjs.unix(x.createdOn as number)));
-                    if(timePass) {
-                        passedConditions.push(tc.condition);
+            let orPass = false;
+            let occurrenceReason = null;
+
+            for(const occurrenceTest of occCriteria) {
+
+                const {
+                    count:{
+                        condition: oCondition = 'AND',
+                        test: oCriteria = []
+                    } = {},
+                    time: {
+                        condition: tCondition = 'AND',
+                        test: tCriteria = [],
+                    } = {}
+                } = occurrenceTest;
+
+                let conditionFailSummaries = [];
+
+                const passedConditions = [];
+                const failedConditions = [];
+
+                for (const oc of oCriteria) {
+                    const ocCompare = parseGenericValueComparison(oc);
+                    const ocMatch = comparisonTextOp(criteriaMatchedResults.length, ocCompare.operator, ocCompare.value);
+                    if (ocMatch) {
+                        passedConditions.push(oc);
                     } else {
-                        failedConditions.push(tc.condition);
-                        if(tCondition === 'AND') {
-                            conditionFailSummaries.push(`(AND) ${tc.condition} was not true`);
+                        failedConditions.push(oc);
+                        if (oCondition === 'AND') {
+                            conditionFailSummaries.push(`(AND) ${oc} occurrences was not true`);
                             break;
                         }
                     }
                 }
-                if(tCriteria.length > 0 && passedConditions.length === existingPassed) {
-                    conditionFailSummaries.push('(OR) No time-based tests passed');
+                if (passedConditions.length === 0 && oCriteria.length > 0) {
+                    conditionFailSummaries.push('(OR) No occurrence tests passed');
+                }
+
+                const existingPassed = passedConditions.length;
+                if (conditionFailSummaries.length === 0) {
+                    const timeAwareReposts = [...criteriaMatchedResults].filter(x => x.createdOn !== undefined).sort((a, b) => (a.createdOn as number) - (b.createdOn as number));
+                    for (const tc of tCriteria) {
+                        let toTest: RepostItemResult[] = [];
+                        const durationCompare = parseDurationComparison(tc.condition);
+                        switch (tc.testOn) {
+                            case 'newest':
+                            case 'oldest':
+                                if (tc.testOn === 'newest') {
+                                    toTest = timeAwareReposts.slice(-1);
+                                } else {
+                                    toTest = timeAwareReposts.slice(0, 1);
+                                }
+                                break;
+                            case 'any':
+                            case 'all':
+                                toTest = timeAwareReposts;
+                                break;
+                        }
+                        const timePass = tc.testOn === 'any' ? toTest.some(x => compareDurationValue(durationCompare, dayjs.unix(x.createdOn as number))) : toTest.every(x => compareDurationValue(durationCompare, dayjs.unix(x.createdOn as number)));
+                        if (timePass) {
+                            passedConditions.push(tc.condition);
+                        } else {
+                            failedConditions.push(tc.condition);
+                            if (tCondition === 'AND') {
+                                conditionFailSummaries.push(`(AND) ${tc.condition} was not true`);
+                                break;
+                            }
+                        }
+                    }
+                    if (tCriteria.length > 0 && passedConditions.length === existingPassed) {
+                        conditionFailSummaries.push('(OR) No time-based tests passed');
+                    }
+                }
+
+                if(conditionFailSummaries.length !== 0 && occCondition === 'AND') {
+                    // failed occurrence tests (high-level)
+                    occurrenceReason = conditionFailSummaries.join(' | ');
+                    break;
+                }
+
+                if(passedConditions.length > 0 && occCondition === 'OR') {
+                    occurrenceReason = passedConditions.join(' | ');
+                    orPass = true;
+                    break;
                 }
             }
 
-            let failSummaryText = '';
-            if(conditionFailSummaries.length === 0) {
-                failSummaryText = passedConditions.length === 0 && failedConditions.length === 0 ? 'No conditions specified' : 'All conditions passed';
-            } else {
-                failSummaryText = conditionFailSummaries.join(' | ');
+            let passed = occCriteria.length === 0;
+
+            if(occCriteria.length > 0) {
+                if(occCondition === 'OR') {
+                    passed = orPass;
+                    occurrenceReason = occurrenceReason === null ? 'No occurrence test sets passed' : occurrenceReason;
+                } else if(occCondition === 'AND') {
+                    passed = occurrenceReason === null;
+                    occurrenceReason = occurrenceReason === null ? 'All tests passed' : occurrenceReason;
+                }
+               //passed = (occCondition === 'OR' && orPass) || (occurrenceFailureReason === null && occCondition === 'AND')
             }
 
             const results = {
-                passed: conditionFailSummaries.length === 0,
-                conditionsSummary: failSummaryText,
-                passedConditions,
-                failedConditions,
+                passed,
+                conditionsSummary: occurrenceReason as string,
                 items: criteriaMatchedResults
             };
             criteriaResults.push(results)
