@@ -29,6 +29,7 @@
     "@googleapis/youtube": "^2.0.0",
     "@stdlib/regexp-regexp": "^0.0.6",
     "ajv": "^7.2.4",
+    "ansi-regex": ">=5.0.1",
     "async": "^3.2.0",
     "autolinker": "^3.14.3",
     "body-parser": "^1.19.0",
