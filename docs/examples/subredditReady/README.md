@@ -39,3 +39,26 @@ then remove the submission
 ### [Remove comment if the user has posted the same comment 4 or more times in a row](/docs/examples/subredditReady/commentSpam.json5)
 
 If the user made the same comment (with some fuzzy matching) 4 or more times in a row in the past (50 activities or 6 months) then remove the comment.
+
+### [Remove comment if it is discord invite link spam](/docs/examples/subredditReady/discordSpam.json5)
+
+This rule goes a step further than automod can by being more discretionary about how it handles this type of spam. 
+
+* Remove the comment and **ban a user** if:
+  * Comment being checked contains **only** a discord link (no other text) AND
+  * Discord links appear **anywhere** in three or more of the last 10 comments the Author has made
+
+otherwise...
+
+* Remove the comment if:
+  * Comment being checked contains **only** a discord link (no other text) OR
+    * Comment contains a discord link **anywhere** AND
+    * Discord links appear **anywhere** in three or more of the last 10 comments the Author has made
+
+Using these checks ContextMod can more easily distinguish between these use cases for a user commenting with a discord link:
+
+* actual spammers who only spam a discord link
+* users who may comment with a link but have context for it either in the current comment or in their history
+* users who many comment with a link but it's a one-off event (no other links historically)
+
+Additionally, you could modify both/either of these checks to not remove one-off discord link comments but still remove if the user has a historical trend for spamming links
