@@ -312,10 +312,12 @@ class Bot {
         }
         this.logger.info(`Bot Name${botNameFromConfig ? ' (from config)' : ''}: ${this.botName}`);
 
-        for (const sub of await this.client.getModeratedSubreddits()) {
-            // TODO don't know a way to check permissions yet
-            availSubs.push(sub);
+        let subListing = await this.client.getModeratedSubreddits({count: 100});
+        while(!subListing.isFinished) {
+            subListing = await subListing.fetchMore({amount: 100});
         }
+        availSubs = subListing;
+
         this.logger.info(`u/${user.name} is a moderator of these subreddits: ${availSubs.map(x => x.display_name_prefixed).join(', ')}`);
 
         let subsToRun: Subreddit[] = [];

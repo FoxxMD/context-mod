@@ -394,6 +394,10 @@ export class Manager extends EventEmitter {
             const commentChecks: Array<CommentCheck> = [];
             const subChecks: Array<SubmissionCheck> = [];
             const structuredChecks = configBuilder.parseToStructured(validJson);
+
+            // TODO check that bot has permissions for subreddit for all specified actions
+            // can find permissions in this.subreddit.mod_permissions
+
             for (const jCheck of structuredChecks) {
                 const checkConfig = {
                     ...jCheck,
