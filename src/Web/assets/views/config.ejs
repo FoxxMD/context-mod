@@ -57,9 +57,11 @@
     </div>
     <%- include('partials/footer') %>
 </div>
-<script src="/monaco/dev/vs/loader.js"></script>
+<!--Use CDN for loading monaco https://stackoverflow.com/a/63179814/1469797 -->
+<!-- Reduces app size (docker) by a big chunk to not serve it locally AND it's not necessary for essential operation -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.26.1/min/vs/loader.min.js"></script>
 <script>
-    require.config({ paths: { vs: 'monaco/dev/vs' } });
+    require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.26.1/min/vs' }});
 
     const preamble = [
         '// Copy + paste your configuration here to get',
