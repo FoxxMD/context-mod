@@ -83,7 +83,7 @@ const action = async (req: express.Request, res: express.Response) => {
                     }
                     break;
             }
-        } catch (err) {
+        } catch (err: any) {
             if (!(err instanceof LoggedError)) {
                 mLogger.error(err, {subreddit: manager.displayLabel});
             }

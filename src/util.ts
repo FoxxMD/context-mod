@@ -55,6 +55,7 @@ import {Sharp, SharpOptions} from "sharp";
 // @ts-ignore
 import {blockhashData, hammingDistance} from 'blockhash';
 import leven from "leven";
+import {SetRandomInterval} from "./Common/types";
 //import {ResembleSingleCallbackComparisonResult} from "resemblejs";
 
 // want to guess how many concurrent image comparisons we should be doing
@@ -466,7 +467,7 @@ export const parseFromJsonOrYamlToObject = (content: string): [object?, Error?, 
             jsonErr = new SimpleError(`Parsing as json produced data of type '${oType}' (expected 'object')`);
             obj = undefined;
         }
-    } catch (err) {
+    } catch (err: any) {
         jsonErr = err;
     }
     if (obj === undefined) {
@@ -477,7 +478,7 @@ export const parseFromJsonOrYamlToObject = (content: string): [object?, Error?, 
                 yamlErr = new SimpleError(`Parsing as yaml produced data of type '${oType}' (expected 'object')`);
                 obj = undefined;
             }
-        } catch (err) {
+        } catch (err: any) {
             yamlErr = err;
         }
     }
@@ -1013,7 +1014,7 @@ export async function readConfigFile(path: string, opts: any) {
         log.error(jsonErr);
         log.error(yamlErr);
         throw new SimpleError(`Could not parse file contents at ${path} as JSON or YAML`);
-    } catch (e) {
+    } catch (e: any) {
         const {code} = e;
         if (code === 'ENOENT') {
             if (throwOnNotFound) {
@@ -1278,7 +1279,7 @@ export const compareImages = async (data1: ImageData, data2: ImageData, threshol
 
     // try {
     //     results = await pixelImageCompare(data1, data2);
-    // } catch (err) {
+    // } catch (err: any) {
     //     if(!(err instanceof SimpleError)) {
     //         errors.push(err.message);
     //     }
@@ -1300,7 +1301,7 @@ export const pixelImageCompare = async (data1: ImageData, data2: ImageData): Pro
 
     try {
         sharpFunc = await getSharpAsync();
-    } catch (err) {
+    } catch (err: any) {
         err.message = `Unable to do image comparison due to an issue importing the comparison library. It is likely sharp is not installed (see ContextMod docs). Error Message: ${err.message}`;
         throw err;
     }
@@ -1328,7 +1329,7 @@ export const pixelImageCompare = async (data1: ImageData, data2: ImageData): Pro
 //
 //     try {
 //         ci = await getCIFunc();
-//     } catch (err) {
+//     } catch (err: any) {
 //         err.message = `Unable to do image comparison due to an issue importing the comparison library. It is likely 'node-canvas' is not installed (see ContextMod docs). Error Message: ${err.message}`;
 //         throw err;
 //     }
@@ -1513,3 +1514,41 @@ export const wordCount = (str: string): number => {
         })
         .length;
 }
+
+export const random = (min: number, max: number): number => (
+    Math.floor(Math.random() * (max - min + 1)) + min
+);
+
+
+// copy-pasting interval function from this project because bad tooling on the author's side means A WHOLE OTHER typescript lib is always downloaded just for this one function
+
+/**
+ * Repeatedly calls a function with a random time delay between each call.
+ *
+ * @param intervalFunction - A function to be executed at random times between `minDelay` and
+ * `maxDelay`. The function is not passed any arguments, and no return value is expected.
+ * @param minDelay - The minimum amount of time, in milliseconds (thousandths of a second), the
+ * timer should delay in between executions of `intervalFunction`.
+ * @param maxDelay - The maximum amount of time, in milliseconds (thousandths of a second), the
+ * timer should delay in between executions of `intervalFunction`.
+ *
+ * Borrowed from https://github.com/jabacchetta/set-random-interval/blob/master/src/index.ts
+ */
+export const setRandomInterval: SetRandomInterval = (intervalFunction, minDelay = 0, maxDelay = 0) => {
+    let timeout: ReturnType<typeof setTimeout>;
+
+    const runInterval = (): void => {
+        timeout = globalThis.setTimeout(() => {
+            intervalFunction();
+            runInterval();
+        }, random(minDelay, maxDelay));
+    };
+
+    runInterval();
+
+    return {
+        clear(): void {
+            clearTimeout(timeout);
+        },
+    };
+};

@@ -114,7 +114,7 @@ const rcbServer = async function (options: OperatorConfig) {
     try {
         httpServer = await server.listen(port);
         io = new SocketServer(httpServer);
-    } catch (err) {
+    } catch (err: any) {
         logger.error('Error occurred while initializing web or socket.io server', err);
         err.logged = true;
         throw err;
@@ -206,7 +206,7 @@ const rcbServer = async function (options: OperatorConfig) {
         if(newApp.error === undefined) {
             try {
                 await newApp.initBots(causedBy);
-            } catch (err) {
+            } catch (err: any) {
                 if(newApp.error === undefined) {
                     newApp.error = err.message;
                 }

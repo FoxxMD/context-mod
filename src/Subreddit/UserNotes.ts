@@ -185,7 +185,7 @@ export class UserNotes {
             }
 
             return userNotes as RawUserNotesPayload;
-        } catch (err) {
+        } catch (err: any) {
             const msg = `Could not read usernotes. Make sure at least one moderator has used toolbox and usernotes before.`;
             this.logger.error(msg, err);
             throw new LoggedError(msg);
@@ -235,7 +235,7 @@ export class UserNotes {
             }
 
             return payload as RawUserNotesPayload;
-        } catch (err) {
+        } catch (err: any) {
             let msg = 'Could not edit usernotes.';
             // Make sure at least one moderator has used toolbox and usernotes before and that this account has editing permissions`;
             if(isScopeError(err)) {

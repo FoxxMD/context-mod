@@ -246,7 +246,7 @@ export async function getAuthorActivities(user: RedditUser, options: AuthorTyped
     };
     try {
         return await getActivities(listFunc, options);
-    } catch (err) {
+    } catch (err: any) {
         if(isStatusError(err) && err.statusCode === 404) {
             throw new SimpleError('Reddit returned a 404 for user history. Likely this user is shadowbanned.');
         } else {
@@ -366,7 +366,7 @@ export const testAuthorCriteria = async (item: (Comment | Submission), authorOpt
             if(shadowBanned) {
                 return false;
             }
-        } catch (err) {
+        } catch (err: any) {
             if(isStatusError(err) && err.statusCode === 404) {
                 // user is shadowbanned
                 // if criteria specifies they should not be shadowbanned then return false now
@@ -575,7 +575,7 @@ export const testAuthorCriteria = async (item: (Comment | Submission), authorOpt
             }
         }
         return true;
-    } catch (err) {
+    } catch (err: any) {
         if(isStatusError(err) && err.statusCode === 404) {
             throw new SimpleError('Reddit returned a 404 while trying to retrieve User profile. It is likely this user is shadowbanned.');
         } else {

@@ -165,7 +165,7 @@ export class RecentActivityRule extends Rule {
                         // if (referenceImage.preferredResolution !== undefined) {
                         //     await (referenceImage.getSimilarResolutionVariant(...referenceImage.preferredResolution) as ImageData).sharp();
                         // }
-                    } catch (err) {
+                    } catch (err: any) {
                         this.logger.verbose(err.message);
                     }
                 }
@@ -241,11 +241,11 @@ export class RecentActivityRule extends Rule {
                                     if (sameImage) {
                                         return x;
                                     }
-                                } catch (err) {
+                                } catch (err: any) {
                                     this.logger.warn(`Unexpected error encountered while pixel-comparing images, will skip comparison => ${err.message}`);
                                 }
                             }
-                        } catch (err) {
+                        } catch (err: any) {
                             if(!err.message.includes('did not end with a valid image extension')) {
                                 this.logger.warn(`Will not compare image from Submission ${x.id} due to error while parsing image URL => ${err.message}`);
                             }

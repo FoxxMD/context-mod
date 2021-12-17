@@ -484,7 +484,7 @@ export const parseOperatorConfigFromSources = async (args: any): Promise<Operato
                 process.env[k] = v;
             }
         }
-    } catch (err) {
+    } catch (err: any) {
         let msg = 'No .env file found at default location (./env)';
         if (envPath !== undefined) {
             msg = `${msg} or OPERATOR_ENV path (${envPath})`;
@@ -500,14 +500,14 @@ export const parseOperatorConfigFromSources = async (args: any): Promise<Operato
         let rawConfig;
         try {
             rawConfig = await readConfigFile(operatorConfig, {log: initLogger}) as object;
-        } catch (err) {
+        } catch (err: any) {
             initLogger.error('Cannot continue app startup because operator config file was not parseable.');
             err.logged = true;
             throw err;
         }
         try {
             configFromFile = validateJson(rawConfig, operatorSchema, initLogger) as OperatorJsonConfig;
-        } catch (err) {
+        } catch (err: any) {
             initLogger.error('Cannot continue app startup because operator config file was not valid.');
             throw err;
         }

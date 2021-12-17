@@ -423,7 +423,7 @@ export class Manager extends EventEmitter {
                 this.logger.info(checkSummary);
             }
             this.validConfigLoaded = true;
-        } catch (err) {
+        } catch (err: any) {
             this.validConfigLoaded = false;
             throw err;
         }
@@ -464,7 +464,7 @@ export class Manager extends EventEmitter {
 
                 this.lastWikiRevision = revisionDate;
                 sourceData = await wiki.content_md;
-            } catch (err) {
+            } catch (err: any) {
                 const msg = `Could not read wiki configuration. Please ensure the page https://reddit.com${this.subreddit.url}wiki/${this.wikiLocation} exists and is readable -- error: ${err.message}`;
                 this.logger.error(msg);
                 throw new ConfigParseError(msg);
@@ -492,7 +492,7 @@ export class Manager extends EventEmitter {
             }
 
             return true;
-        } catch (err) {
+        } catch (err: any) {
             this.validConfigLoaded = false;
             throw err;
         }
@@ -510,7 +510,7 @@ export class Manager extends EventEmitter {
             const [peek, _] = await itemContentPeek(item);
             ePeek = peek;
             this.logger.info(`<EVENT> ${peek}`);
-        } catch (err) {
+        } catch (err: any) {
             this.logger.error(`Error occurred while generate item peek for ${checkType} Activity ${itemId}`, err);
         }
 
@@ -607,7 +607,7 @@ export class Manager extends EventEmitter {
                         this.logger.info('Check was triggered but cache result options specified NOT to run actions...counting as check NOT triggered');
                         triggered = false;
                     }
-                } catch (e) {
+                } catch (e: any) {
                     if (e.logged !== true) {
                         this.logger.warn(`Running rules for Check ${check.name} failed due to uncaught exception`, e);
                     }
@@ -637,7 +637,7 @@ export class Manager extends EventEmitter {
                 this.logger.info('No checks triggered');
             }
 
-        } catch (err) {
+        } catch (err: any) {
             if (!(err instanceof LoggedError) && err.logged !== true) {
                 this.logger.error('An unhandled error occurred while running checks', err);
             }
@@ -652,7 +652,7 @@ export class Manager extends EventEmitter {
                 this.logger.verbose(`Run Stats:        Checks ${checksRun} | Rules => Total: ${totalRulesRun} Unique: ${allRuleResults.length} Cached: ${totalRulesRun - allRuleResults.length} Rolling Avg: ~${formatNumber(this.rulesUniqueRollingAvg)}/s | Actions ${actionsRun}`);
                 this.logger.verbose(`Reddit API Stats: Initial ${startingApiLimit} | Current ${this.client.ratelimitRemaining} | Used ~${startingApiLimit - this.client.ratelimitRemaining} | Events ~${formatNumber(this.eventsRollingAvg)}/s`);
                 this.currentLabels = [];
-            } catch (err) {
+            } catch (err: any) {
                 this.logger.error('Error occurred while cleaning up Activity check and generating stats', err);
             } finally {
                 this.resources.updateHistoricalStats({

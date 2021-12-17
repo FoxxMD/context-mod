@@ -75,7 +75,7 @@ const program = new Command();
                 if(mode === 'all' || mode === 'server') {
                     await apiServer(config);
                 }
-            } catch (err) {
+            } catch (err: any) {
                 throw err;
             }
         });
@@ -199,7 +199,7 @@ const program = new Command();
 
         await program.parseAsync();
 
-    } catch (err) {
+    } catch (err: any) {
         if (!err.logged && !(err instanceof LoggedError)) {
             const logger = winston.loggers.get('app');
             if(isScopeError(err)) {

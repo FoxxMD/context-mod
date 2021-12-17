@@ -385,7 +385,7 @@ export class SubredditResources {
                 // @ts-ignore
                 return await item.fetch();
             }
-        } catch (err) {
+        } catch (err: any) {
             this.logger.error('Error while trying to fetch a cached activity', err);
             throw err.logged;
         }
@@ -420,7 +420,7 @@ export class SubredditResources {
 
                 return subreddit as Subreddit;
             }
-        } catch (err) {
+        } catch (err: any) {
             this.logger.error('Error while trying to fetch a cached activity', err);
             throw err.logged;
         }
@@ -532,7 +532,7 @@ export class SubredditResources {
                 // @ts-ignore
                 const wikiPage = sub.getWikiPage(wikiContext.wiki);
                 wikiContent = await wikiPage.content_md;
-            } catch (err) {
+            } catch (err: any) {
                 let msg = `Could not read wiki page for an unknown reason. Please ensure the page 'https://reddit.com${sub.display_name_prefixed}/wiki/${wikiContext.wiki}' exists and is readable`;
                 if(err.statusCode !== undefined) {
                     if(err.statusCode === 404) {
@@ -548,7 +548,7 @@ export class SubredditResources {
             try {
                 const response = await fetch(extUrl as string);
                 wikiContent = await response.text();
-            } catch (err) {
+            } catch (err: any) {
                 const msg = `Error occurred while trying to fetch the url ${extUrl}`;
                 this.logger.error(msg, err);
                 throw new LoggedError(msg);
@@ -653,7 +653,7 @@ export class SubredditResources {
                 this.stats.cache.subredditCrit.miss++;
                 await this.cache.set(hash, itemResult, {ttl: this.filterCriteriaTTL});
                 return itemResult;
-            } catch (err) {
+            } catch (err: any) {
                 if (err.logged !== true) {
                     this.logger.error('Error occurred while testing subreddit criteria', err);
                 }
@@ -723,7 +723,7 @@ export class SubredditResources {
                 this.stats.cache.itemCrit.miss++;
                 await this.cache.set(hash, itemResult, {ttl: this.filterCriteriaTTL});
                 return itemResult;
-            } catch (err) {
+            } catch (err: any) {
                 if (err.logged !== true) {
                     this.logger.error('Error occurred while testing item criteria', err);
                 }
@@ -894,7 +894,7 @@ export class SubredditResources {
                                         log.debug(`Failed to match title as regular expression: ${titleReg}`);
                                         return false;
                                     }
-                                } catch (err) {
+                                } catch (err: any) {
                                     log.error(`An error occurred while attempting to match title against string as regular expression: ${titleReg}. Most likely the string does not make a valid regular expression.`, err);
                                     return false
                                 }

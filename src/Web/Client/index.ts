@@ -572,7 +572,7 @@ const webClient = async (options: OperatorConfig) => {
     try {
         server = await app.listen(port);
         io = new SocketServer(server);
-    } catch (err) {
+    } catch (err: any) {
         logger.error('Error occurred while initializing web or socket.io server', err);
         err.logged = true;
         throw err;
@@ -761,7 +761,7 @@ const webClient = async (options: OperatorConfig) => {
                 },
             }).json() as any;
 
-        } catch(err) {
+        } catch(err: any) {
             logger.error(`Error occurred while retrieving bot information. Will update heartbeat -- ${err.message}`, {instance: instance.friendly});
             refreshClient(clients.find(x => normalizeUrl(x.host) === instance.normalUrl) as BotConnection);
             return res.render('offline', {
@@ -989,7 +989,7 @@ const webClient = async (options: OperatorConfig) => {
                                     }
                                 }).json() as object;
                                 io.to(session.id).emit('opStats', resp);
-                            } catch (err) {
+                            } catch (err: any) {
                                 logger.error(`Could not retrieve stats ${err.message}`, {instance: bot.friendly});
                                 clearInterval(interval);
                             }
@@ -1027,7 +1027,7 @@ const webClient = async (options: OperatorConfig) => {
                 }
             }).json() as object;
             return {success: true, ...resp};
-        } catch (err) {
+        } catch (err: any) {
             return {success: false, error: err.message};
         }
     }
@@ -1096,7 +1096,7 @@ const webClient = async (options: OperatorConfig) => {
                 //     botStat.indicator = 'red';
                 // }
                 logger.verbose(`Heartbeat detected`, {instance: botStat.friendly});
-            } catch (err) {
+            } catch (err: any) {
                 botStat.error = err.message;
                 logger.error(`Heartbeat response from ${botStat.friendly} was not ok: ${err.message}`, {instance: botStat.friendly});
             } finally {

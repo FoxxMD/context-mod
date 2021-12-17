@@ -183,7 +183,7 @@ class Bot {
                 logger: snooLogWrapper(this.logger.child({labels: ['Snoowrap']}, mergeArr)),
                 continueAfterRatelimitError: false,
             });
-        } catch (err) {
+        } catch (err: any) {
             if(this.error === undefined) {
                 this.error = err.message;
                 this.logger.error(err);
@@ -274,7 +274,7 @@ class Bot {
             // @ts-ignore
             await this.client.getMe();
             this.logger.info('Test API call successful');
-        } catch (err) {
+        } catch (err: any) {
             if (initial) {
                 this.logger.error('An error occurred while trying to initialize the Reddit API Client which would prevent the entire application from running.');
             }
@@ -351,7 +351,7 @@ class Bot {
             const manager = new Manager(sub, this.client, this.logger, this.cacheManager, {dryRun: this.dryRun, sharedModqueue: this.sharedModqueue, wikiLocation: this.wikiLocation, botName: this.botName, maxWorkers: this.maxWorkers});
             try {
                 await manager.parseConfiguration('system', true, {suppressNotification: true});
-            } catch (err) {
+            } catch (err: any) {
                 if (!(err instanceof LoggedError)) {
                     this.logger.error(`Config was not valid:`, {subreddit: sub.display_name_prefixed});
                     this.logger.error(err, {subreddit: sub.display_name_prefixed});
@@ -431,7 +431,7 @@ class Bot {
                 try {
                     await this.runApiNanny();
                     this.nextNannyCheck = dayjs().add(10, 'second');
-                } catch (err) {
+                } catch (err: any) {
                     this.logger.info('Delaying next nanny check for 2 minutes due to emitted error');
                     this.nextNannyCheck = dayjs().add(120, 'second');
                 }
@@ -439,7 +439,7 @@ class Bot {
             if(dayjs().isSameOrAfter(this.nextHeartbeat)) {
                 try {
                     await this.heartbeat();
-                } catch (err) {
+                } catch (err: any) {
                     this.logger.error(`Error occurred during heartbeat check: ${err.message}`);
                 }
                 this.nextHeartbeat = dayjs().add(this.heartbeatInterval, 'second');
@@ -455,7 +455,7 @@ class Bot {
         // run sanity check to see if there is a service issue
         try {
             await this.testClient(false);
-        } catch (err) {
+        } catch (err: any) {
             throw new SimpleError(`Something isn't right! This could be a Reddit API issue (service is down? buggy??) or an issue with the Bot account. Will not run heartbeat operations and will wait until next heartbeat (${dayjs.duration(this.nextHeartbeat.diff(dayjs())).humanize()}) to try again`);
         }
         let startedAny = false;
@@ -491,7 +491,7 @@ class Bot {
                         causedBy: 'system',
                     }
                 }
-            } catch (err) {
+            } catch (err: any) {
                 this.logger.info('Stopping event polling to prevent activity processing queue from backing up. Will be restarted when config update succeeds.')
                 await s.stopEvents('system', {reason: 'Invalid config will cause events to pile up in queue. Will be restarted when config update succeeds (next heartbeat).'});
                 if(!(err instanceof LoggedError)) {
@@ -518,7 +518,7 @@ class Bot {
                         // @ts-ignore
                         await this.client.getMe();
                         shouldRetry = false;
-                    } catch (err) {
+                    } catch (err: any) {
                         if(isRateLimitError(err)) {
                             throw err;
                         }
@@ -639,7 +639,7 @@ class Bot {
                 this.nannyMode = undefined;
             }
 
-        } catch (err) {
+        } catch (err: any) {
             this.logger.error(`Error occurred during nanny loop: ${err.message}`);
             throw err;
         }

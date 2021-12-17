@@ -117,13 +117,13 @@ export abstract class Rule implements IRule, Triggerable {
                 this.logger.verbose('(Skipped) Exclusive author criteria not matched');
                 return Promise.resolve([null, this.getResult(null, {result: 'Exclusive author criteria not matched'})]);
             }
-        } catch (err) {
+        } catch (err: any) {
             this.logger.error('Error occurred during Rule pre-process checks');
             throw err;
         }
         try {
             return this.process(item);
-        } catch (err) {
+        } catch (err: any) {
             this.logger.error('Error occurred while processing rule');
             throw err;
         }

@@ -26,7 +26,7 @@ export class ExtendedSnoowrap extends Snoowrap {
             }
             try {
                 return parseSubredditName(x);
-            } catch (err) {
+            } catch (err: any) {
                 return x;
             }
         });

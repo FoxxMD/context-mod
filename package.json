@@ -71,7 +71,6 @@
     "pixelmatch": "^5.2.1",
     "pretty-print-json": "^1.0.3",
     "safe-stable-stringify": "^1.1.1",
-    "set-random-interval": "^1.1.0",
     "snoostorm": "^1.5.2",
     "snoowrap": "^1.23.0",
     "socket.io": "^4.1.3",

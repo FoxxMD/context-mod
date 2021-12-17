@@ -64,7 +64,7 @@ export class MessageAction extends Action {
                 } else {
                     recipient = `/r/${entityData.name}`;
                 }
-            } catch (err) {
+            } catch (err: any) {
                 this.logger.error(`'to' field for message was not in a valid format. See ${REDDIT_ENTITY_REGEX_URL} for valid examples`);
                 this.logger.error(err);
                 err.logged = true;

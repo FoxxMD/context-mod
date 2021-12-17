@@ -5,8 +5,7 @@ import {PollConfiguration} from "snoostorm/out/util/Poll";
 import {ClearProcessedOptions, DEFAULT_POLLING_INTERVAL} from "../Common/interfaces";
 import dayjs, {Dayjs} from "dayjs";
 import { Duration } from "dayjs/plugin/duration";
-import {parseDuration, sleep} from "../util";
-import setRandomInterval from 'set-random-interval';
+import {parseDuration, setRandomInterval, sleep} from "../util";
 
 type Awaitable<T> = Promise<T> | T;
 
@@ -90,7 +89,7 @@ export class SPoll<T extends object> extends Poll<T> {
 
                     // Emit the new listing of all new items
                     self.emit("listing", newItems);
-                } catch (err) {
+                } catch (err: any) {
                     self.emit('error', err);
                     self.end();
                 }
