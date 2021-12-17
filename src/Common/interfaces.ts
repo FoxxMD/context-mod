@@ -989,6 +989,8 @@ export interface SubredditState {
      * A friendly description of what this State is trying to parse
      * */
     stateDescription?: string
+
+    isUserProfile?: boolean
 }
 
 export interface StrongSubredditState extends SubredditState {

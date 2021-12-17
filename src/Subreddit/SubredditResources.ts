@@ -17,7 +17,7 @@ import {
     cacheStats, compareDurationValue, comparisonTextOp, createCacheManager, createHistoricalStatsDisplay,
     formatNumber, getActivityAuthorName, getActivitySubredditName, isStrongSubredditState,
     mergeArr, parseDurationComparison,
-    parseExternalUrl, parseGenericValueComparison,
+    parseExternalUrl, parseGenericValueComparison, parseRedditEntity,
     parseWikiContext, shouldCacheSubredditStateCriteriaResult, subredditStateIsNameOnly, toStrongSubredditState
 } from "../util";
 import LoggedError from "../Utils/LoggedError";
@@ -754,6 +754,15 @@ export class SubredditResources {
                             const nameReg = crit[k] as RegExp;
                             if(!nameReg.test(subreddit.display_name)) {
                                 return false;
+                            }
+                            break;
+                        case 'isUserProfile':
+                            const entity = parseRedditEntity(subreddit.display_name);
+                            const entityIsUserProfile = entity.type === 'user';
+                            if(crit[k] !== entityIsUserProfile) {
+                                // @ts-ignore
+                                log.debug(`Failed: Expected => ${k}:${crit[k]} | Found => ${k}:${entityIsUserProfile}`)
+                                return false
                             }
                             break;
                         case 'over18':

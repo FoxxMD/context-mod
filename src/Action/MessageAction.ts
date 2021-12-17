@@ -58,7 +58,7 @@ export class MessageAction extends Action {
         if(this.to !== undefined) {
             // parse to value
             try {
-                const entityData = parseRedditEntity(this.to);
+                const entityData = parseRedditEntity(this.to, 'user');
                 if(entityData.type === 'user') {
                     recipient = entityData.name;
                 } else {

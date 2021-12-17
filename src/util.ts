@@ -608,17 +608,24 @@ export const parseSubredditName = (val:string): string => {
     return matches[1] as string;
 }
 
-export const REDDIT_ENTITY_REGEX: RegExp = /^\s*(?<entityType>\/[ru]\/|[ru]\/)*(?<name>\w+)*\s*$/;
-export const REDDIT_ENTITY_REGEX_URL = 'https://regexr.com/65r9b';
-export const parseRedditEntity = (val:string): RedditEntity => {
+export const REDDIT_ENTITY_REGEX: RegExp = /^\s*(?<entityType>\/[ru]\/|[ru]\/|u_)*(?<name>\w+)*\s*$/;
+export const REDDIT_ENTITY_REGEX_URL = 'https://regexr.com/6bq1g';
+export const parseRedditEntity = (val:string, defaultUndefinedPrefix: RedditEntityType = 'subreddit'): RedditEntity => {
+    if(val.trim().length === 0) {
+        throw new Error('Entity name cannot be empty or only whitespace');
+    }
     const matches = val.match(REDDIT_ENTITY_REGEX);
     if (matches === null) {
         throw new InvalidRegexError(REDDIT_ENTITY_REGEX, val, REDDIT_ENTITY_REGEX_URL)
     }
     const groups = matches.groups as any;
-    let eType: RedditEntityType = 'user';
-    if(groups.entityType !== undefined && typeof groups.entityType === 'string' && groups.entityType.includes('r')) {
+    let eType: RedditEntityType;
+    if(groups.entityType === undefined || groups.entityType === null) {
+        eType = defaultUndefinedPrefix;
+    } else if(groups.entityType.includes('r')) {
         eType = 'subreddit';
+    } else {
+        eType = 'user';
     }
     return {
         name: groups.name,
@@ -942,8 +949,10 @@ export interface StrongSubredditStateOptions {
 }
 
 export const toStrongSubredditState = (s: SubredditState, opts?: StrongSubredditStateOptions): StrongSubredditState => {
-    const {defaultFlags, generateDescription = false} = opts || {};
-    const {name: nameValRaw, stateDescription} = s;
+    const {defaultFlags = 'i', generateDescription = false} = opts || {};
+    const {name: nameValRaw, stateDescription, isUserProfile, ...rest} = s;
+
+    let nameValOriginallyRegex = false;
 
     let nameReg: RegExp | undefined;
     if (nameValRaw !== undefined) {
@@ -951,23 +960,31 @@ export const toStrongSubredditState = (s: SubredditState, opts?: StrongSubreddit
             let nameVal = nameValRaw.trim();
             nameReg = parseStringToRegex(nameVal, defaultFlags);
             if (nameReg === undefined) {
-                try {
-                    const parsedVal = parseSubredditName(nameVal);
-                    nameVal = parsedVal;
-                } catch (err) {
-                    // oh well
-                    const f = 1;
-                }
-                nameReg = parseStringToRegex(`/^${nameVal}$/`, defaultFlags);
+                // if sub state has `isUserProfile=true` and config did not provide a regex then
+                // assume the user wants to use the value in "name" to look for a user profile so we prefix created regex with u_
+                const parsedEntity = parseRedditEntity(nameVal, isUserProfile !== undefined && isUserProfile ? 'user' : 'subreddit');
+                // technically they could provide "u_Username" as the value for "name" and we will then match on it regardless of isUserProfile
+                // but like...why would they do that? There shouldn't be any subreddits that start with u_ that aren't user profiles anyway(?)
+                const regPrefix = parsedEntity.type === 'user' ? 'u_' : '';
+                nameReg = parseStringToRegex(`/^${regPrefix}${nameVal}$/`, defaultFlags);
+            } else {
+                nameValOriginallyRegex = true;
             }
         } else {
+            nameValOriginallyRegex = true;
             nameReg = nameValRaw;
         }
     }
-    const strongState = {
-        ...s,
+    const strongState: StrongSubredditState = {
+        ...rest,
         name: nameReg
     };
+
+    // if user provided a regex for "name" then add isUserProfile so we can do a SEPARATE check on the name specifically for user profile prefix
+    // -- this way user can regex for a specific name but still filter by prefix
+    if(nameValOriginallyRegex) {
+        strongState.isUserProfile = isUserProfile;
+    }
 
     if (generateDescription && stateDescription === undefined) {
         strongState.stateDescription = objectToStringSummary(strongState);
@@ -1403,7 +1420,7 @@ export const shouldCacheSubredditStateCriteriaResult = (state: SubredditState | 
 
 export const subredditStateIsNameOnly = (state: SubredditState | StrongSubredditState): boolean => {
     const critCount = Object.entries(state).filter(([key, val]) => {
-        return val !== undefined && !['name','stateDescription'].includes(key);
+        return val !== undefined && !['name','stateDescription', 'isUserProfile'].includes(key);
     }).length;
     return critCount === 0;
 }

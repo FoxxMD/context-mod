@@ -3433,6 +3433,9 @@
                 }
             ],
             "properties": {
+                "isUserProfile": {
+                    "type": "boolean"
+                },
                 "name": {
                     "anyOf": [
                         {
