@@ -2151,8 +2151,14 @@ export const windowToActivityWindowCriteria = (window: (Duration | ActivityWindo
         } = {},
     } = crit;
 
-    const includes = include.map(x => parseSubredditName(x).toLowerCase());
-    const excludes = exclude.map(x => parseSubredditName(x).toLowerCase());
+    const includes = include.map(x => typeof x === 'string' || !asStrongSubredditState(x) ? convertSubredditsRawToStrong(x, {
+        defaultFlags: 'i',
+        generateDescription: true
+    }) : x);
+    const excludes = exclude.map(x => typeof x === 'string' || !asStrongSubredditState(x) ? convertSubredditsRawToStrong(x, {
+        defaultFlags: 'i',
+        generateDescription: true
+    }) : x);
 
     return {
         satisfyOn,

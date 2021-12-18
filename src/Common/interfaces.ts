@@ -142,7 +142,7 @@ export interface ActivityWindowCriteria {
          *
          * @examples [["mealtimevideos","askscience"]]
          * */
-        include?: string[],
+        include?: (string | SubredditState)[],
         /**
          * Exclude any results from these subreddits
          *
@@ -150,7 +150,7 @@ export interface ActivityWindowCriteria {
          *
          * @examples [["mealtimevideos","askscience"]]
          * */
-        exclude?: string[],
+        exclude?: (string | SubredditState)[],
     }
 }
 

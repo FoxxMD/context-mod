@@ -1,6 +1,7 @@
 import Snoowrap, {Listing, RedditUser} from "snoowrap";
 import Submission from "snoowrap/dist/objects/Submission";
 import Comment from "snoowrap/dist/objects/Comment";
+import Subreddit from "snoowrap/dist/objects/Subreddit";
 import {Duration, DurationUnitsObjectType} from "dayjs/plugin/duration";
 import dayjs, {Dayjs} from "dayjs";
 import Mustache from "mustache";
@@ -9,22 +10,38 @@ import {
     ActivityWindowType, AuthorCriteria, CommentState, DomainInfo,
     DurationVal, FilterCriteriaPropertyResult, FilterCriteriaResult, RuleResult,
     SubmissionState,
-    TypedActivityStates, UserNoteCriteria
+    TypedActivityStates, UserNoteCriteria, StrongSubredditState, SubredditState,
 } from "../Common/interfaces";
 import {
     asSubmission,
     asUserNoteCriteria,
     compareDurationValue,
-    comparisonTextOp, escapeRegex, formatNumber, getActivityAuthorName,
-    isActivityWindowCriteria, isSubmission, isUserNoteCriteria,
+    comparisonTextOp,
+    escapeRegex,
+    formatNumber,
+    getActivityAuthorName,
+    isActivityWindowCriteria,
+    isSubmission,
+    isUserNoteCriteria,
     normalizeName,
     parseDuration,
-    parseDurationComparison, parseDurationValToDuration,
+    parseDurationComparison,
+    parseDurationValToDuration,
     parseGenericValueComparison,
     parseGenericValueOrPercentComparison,
-    parseRuleResultsToMarkdownSummary, parseStringToRegex,
-    parseSubredditName, removeUndefinedKeys,
-    truncateStringToLength, userNoteCriteriaSummary, windowToActivityWindowCriteria
+    parseRedditEntity,
+    parseRuleResultsToMarkdownSummary,
+    parseStringToRegex,
+    parseSubredditName,
+    removeUndefinedKeys,
+    truncateStringToLength,
+    userNoteCriteriaSummary,
+    windowToActivityWindowCriteria,
+    subredditStateIsNameOnly,
+    getActivitySubredditName,
+    asStrongSubredditState,
+    convertSubredditsRawToStrong,
+    isStrongSubredditState, mergeArr, toStrongSubredditState
 } from "../util";
 import UserNotes from "../Subreddit/UserNotes";
 import {Logger} from "winston";
@@ -46,7 +63,26 @@ export interface AuthorActivitiesOptions {
     chunkSize?: number,
     // TODO maybe move this into window
     keepRemoved?: boolean,
+    includeFilter?: (items: (Submission|Comment)[], states: StrongSubredditState[]) => Promise<(Submission|Comment)[]>
+    excludeFilter?: (items: (Submission|Comment)[], states: StrongSubredditState[]) => Promise<(Submission|Comment)[]>
     [key: string]: any,
+}
+
+const defaultOpts = {
+    defaultFlags: 'i',
+    generateDescription: true
+};
+
+const defaultIncludeFilter = async (items: (Submission|Comment)[], states: StrongSubredditState[]) => {
+    // can only use states that only use name
+    const nameStates = states.filter(subredditStateIsNameOnly);
+    return items.filter(x => nameStates.some(y => isSubreddit({display_name: getActivitySubredditName(x)} as Subreddit,y)));
+}
+
+const defaultExcludeFilter = async (items: (Submission|Comment)[], states: StrongSubredditState[]) => {
+    // can only use states that only use name
+    const nameStates = states.filter(subredditStateIsNameOnly);
+    return items.filter(x => nameStates.every(y => !isSubreddit({display_name: getActivitySubredditName(x)} as Subreddit,y)));
 }
 
 export async function getActivities(listingFunc: (limit: number) => Promise<Listing<Submission | Comment>>, options: AuthorActivitiesOptions): Promise<Array<Submission | Comment>> {
@@ -55,6 +91,8 @@ export async function getActivities(listingFunc: (limit: number) => Promise<List
         chunkSize: cs = 100,
         window: optWindow,
         keepRemoved = true,
+        includeFilter = defaultIncludeFilter,
+        excludeFilter = defaultExcludeFilter,
         ...restFetchOptions
     } = options;
 
@@ -66,8 +104,8 @@ export async function getActivities(listingFunc: (limit: number) => Promise<List
     let durVal: DurationVal | undefined;
     let duration: Duration | undefined;
 
-    let includes: string[] = [];
-    let excludes: string[] = [];
+    let includes: (string | SubredditState)[] = [];
+    let excludes: (string | SubredditState)[] = [];
 
     const strongWindow = windowToActivityWindowCriteria(optWindow);
 
@@ -150,15 +188,19 @@ export async function getActivities(listingFunc: (limit: number) => Promise<List
         let listSlice = listing.slice(offset - chunkSize)
         // TODO partition list by filtered so we can log a debug statement with count of filtered out activities
         if (includes.length > 0) {
-            listSlice = listSlice.filter(x => {
-                const actSub = x.subreddit.display_name.toLowerCase();
-                return includes.includes(actSub);
-            });
+            const strongIncludes = includes.map(y => typeof y === 'string' || !asStrongSubredditState(y) ? convertSubredditsRawToStrong(y, defaultOpts) : y);
+            listSlice = await includeFilter(listSlice, strongIncludes);
+            // listSlice = listSlice.filter(x => {
+            //     const actSub = x.subreddit.display_name.toLowerCase();
+            //     return includes.includes(actSub);
+            // });
         } else if (excludes.length > 0) {
-            listSlice = listSlice.filter(x => {
-                const actSub = x.subreddit.display_name.toLowerCase();
-                return !excludes.includes(actSub);
-            });
+            const strongExcludes = excludes.map(y => typeof y === 'string' || !asStrongSubredditState(y) ? convertSubredditsRawToStrong(y, defaultOpts) : y);
+            listSlice = await excludeFilter(listSlice, strongExcludes);
+            // listSlice = listSlice.filter(x => {
+            //     const actSub = x.subreddit.display_name.toLowerCase();
+            //     return !excludes.includes(actSub);
+            // });
         }
 
         if (!keepRemoved) {
@@ -251,12 +293,77 @@ export async function getAuthorActivities(user: RedditUser, options: AuthorTyped
     }
 }
 
-export const getAuthorComments = async (user: RedditUser, options: AuthorActivitiesOptions): Promise<Comment[]> => {
-    return await getAuthorActivities(user, {...options, type: 'comment'}) as unknown as Promise<Comment[]>;
-}
+export const isSubreddit = async (subreddit: Subreddit, stateCriteria: SubredditState | StrongSubredditState, logger?: Logger) => {
+    delete stateCriteria.stateDescription;
 
-export const getAuthorSubmissions = async (user: RedditUser, options: AuthorActivitiesOptions): Promise<Submission[]> => {
-    return await getAuthorActivities(user, {...options, type: 'submission'}) as unknown as Promise<Submission[]>;
+    if (Object.keys(stateCriteria).length === 0) {
+        return true;
+    }
+
+    const crit = isStrongSubredditState(stateCriteria) ? stateCriteria : toStrongSubredditState(stateCriteria, {defaultFlags: 'i'});
+
+    const log: Logger | undefined = logger !== undefined ? logger.child({leaf: 'Subreddit Check'}, mergeArr) : undefined;
+
+    return await (async () => {
+        for (const k of Object.keys(crit)) {
+            // @ts-ignore
+            if (crit[k] !== undefined) {
+                switch (k) {
+                    case 'name':
+                        const nameReg = crit[k] as RegExp;
+                        if(!nameReg.test(subreddit.display_name)) {
+                            return false;
+                        }
+                        break;
+                    case 'isUserProfile':
+                        const entity = parseRedditEntity(subreddit.display_name);
+                        const entityIsUserProfile = entity.type === 'user';
+                        if(crit[k] !== entityIsUserProfile) {
+
+                            if(log !== undefined) {
+                                log.debug(`Failed: Expected => ${k}:${crit[k]} | Found => ${k}:${entityIsUserProfile}`)
+                            }
+                            return false
+                        }
+                        break;
+                    case 'over18':
+                    case 'over_18':
+                        // handling an edge case where user may have confused Comment/Submission state "over_18" with SubredditState "over18"
+
+                        // @ts-ignore
+                        if (crit[k] !== subreddit.over18) {
+                            if(log !== undefined) {
+                                // @ts-ignore
+                                log.debug(`Failed: Expected => ${k}:${crit[k]} | Found => ${k}:${subreddit.over18}`)
+                            }
+                            return false
+                        }
+                        break;
+                    default:
+                        // @ts-ignore
+                        if (subreddit[k] !== undefined) {
+                            // @ts-ignore
+                            if (crit[k] !== subreddit[k]) {
+                                if(log !== undefined) {
+                                    // @ts-ignore
+                                    log.debug(`Failed: Expected => ${k}:${crit[k]} | Found => ${k}:${subreddit[k]}`)
+                                }
+                                return false
+                            }
+                        } else {
+                            if(log !== undefined) {
+                                log.warn(`Tried to test for Subreddit property '${k}' but it did not exist`);
+                            }
+                        }
+                        break;
+                }
+            }
+        }
+        if(log !== undefined) {
+            log.debug(`Passed: ${JSON.stringify(stateCriteria)}`);
+        }
+        return true;
+    })() as boolean;
 }
 
 export const renderContent = async (template: string, data: (Submission | Comment), ruleResults: RuleResultEntity[] = [], usernotes: UserNotes) => {

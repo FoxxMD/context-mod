@@ -128,9 +128,10 @@ export class RecentActivityRule extends Rule {
                 exclude = []
             } = {}
         } = strongWindow;
-        if (include.length > 0 && !include.some(x => x.toLocaleLowerCase() === item.subreddit.display_name.toLocaleLowerCase())) {
+        // typeof x === string -- a patch for now...technically this is all it supports but eventually will need to be able to do any SubredditState
+        if (include.length > 0 && !include.some(x => typeof x === 'string' && x.toLocaleLowerCase() === item.subreddit.display_name.toLocaleLowerCase())) {
             shouldIncludeSelf = false;
-        } else if (exclude.length > 0 && exclude.some(x => x.toLocaleLowerCase() === item.subreddit.display_name.toLocaleLowerCase())) {
+        } else if (exclude.length > 0 && exclude.some(x =>typeof x === 'string' && x.toLocaleLowerCase() === item.subreddit.display_name.toLocaleLowerCase())) {
             shouldIncludeSelf = false;
         }
 

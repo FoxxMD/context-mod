@@ -1177,7 +1177,11 @@ export class SubredditResources {
             // @ts-ignore
             user = await this.client.getUser(userName);
         }
-        return await getAuthorActivities(user, options);
+        return await getAuthorActivities(user, {
+            ...options,
+            includeFilter: (items, states) => this.batchTestSubredditCriteria(items, states, user),
+            excludeFilter: (items, states) => this.batchTestSubredditCriteria(items, states, user,false),
+        });
     }
 
     async getAuthorComments(user: RedditUser, options: AuthorActivitiesOptions): Promise<Comment[]> {
@@ -1285,7 +1289,7 @@ export class SubredditResources {
         }
     }
 
-    async batchTestSubredditCriteria(items: (Comment | Submission)[], states: (SubredditState | StrongSubredditState)[], author: RedditUser): Promise<(Comment | Submission)[]> {
+    async batchTestSubredditCriteria(items: (Comment | Submission)[], states: (SubredditState | StrongSubredditState)[], author: RedditUser, isInclude = true): Promise<(Comment | Submission)[]> {
         let passedItems: (Comment | Submission)[] = [];
         let unpassedItems: (Comment | Submission)[] = [];
 
@@ -1301,24 +1305,43 @@ export class SubredditResources {
         } else {
             for(const item of items) {
                 const subName = getActivitySubredditName(item);
+                let matched = false;
                 for(const state of nameOnly) {
                     if(await this.isSubreddit({display_name: subName} as Subreddit, state, author, this.logger)) {
-                        passedItems.push(item);
+                        matched = true;
                         break;
                     }
                 }
-                unpassedItems.push(item);
+                if(matched) {
+                    if(isInclude) {
+                        passedItems.push(item);
+                    } else {
+                        unpassedItems.push(item);
+                    }
+                } else if(!isInclude) {
+                    passedItems.push(item);
+                } else {
+                    unpassedItems.push(item);
+                }
             }
         }
 
         if(unpassedItems.length > 0 && full.length > 0) {
             await this.cacheSubreddits(unpassedItems.map(x => x.subreddit));
             for(const item of unpassedItems) {
+                let matched = false;
                 for(const state of full) {
                     if(await this.isSubreddit(await this.getSubreddit(item), state, author, this.logger)) {
                         passedItems.push(item);
                         break;
                     }
+                }
+                if(matched) {
+                    if(isInclude) {
+                        passedItems.push(item);
+                    }
+                } else if(!isInclude) {
+                    passedItems.push(item);
                 }
             }
         }
@@ -1332,10 +1355,7 @@ export class SubredditResources {
         }
         // optimize for name-only criteria checks
         // -- we don't need to store cache results for this since we know subreddit name is always available from item (no request required)
-        const critCount = Object.entries(state).filter(([key, val]) => {
-            return val !== undefined && !['name','stateDescription'].includes(key);
-        }).length;
-        if(critCount === 0) {
+        if(subredditStateIsNameOnly(state)) {
             const subName = getActivitySubredditName(item);
             return await this.isSubreddit({display_name: subName} as Subreddit, state, author, this.logger);
         }
