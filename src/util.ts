@@ -1500,7 +1500,7 @@ export const defaultStrCompareTransformFuncs = [
     // remove non-alphanumeric characters so that differences in punctuation don't subtract from comparison score
     (str: string) => str.replace(/[^A-Za-z0-9 ]/g, ""),
     // replace all instances of 2 or more whitespace with one whitespace
-    (str: string) => str.replace(/\s{2,}/g, " ")
+    (str: string) => str.replace(/\s{2,}|\n/g, " ")
 ];
 
 const sentenceLengthWeight = (length: number) => {
@@ -1530,7 +1530,8 @@ export const stringSameness = (valA: string, valB: string, options?: StringCompa
     // use shortest sentence for weight
     const weightScore = sentenceLengthWeight(shortest.length);
 
-    const highScore = Math.max(dice, cosine, levenSimilarPercent);
+    // take average score
+    const highScore = (dice + cosine + levenSimilarPercent) / 3;
     // weight score can be a max of 15
     const highScoreWeighted = highScore + Math.min(weightScore, 15);
     return {
