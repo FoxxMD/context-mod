@@ -29,7 +29,7 @@ import {
     RedditEntityType,
     RegExResult, RepostItem, RepostItemResult,
     ResourceStats, SearchAndReplaceRegExp,
-    StatusCodeError,
+    StatusCodeError, StringComparisonOptions,
     StringOperator,
     StrongSubredditState,
     SubredditState
@@ -54,8 +54,10 @@ import ImageData from "./Common/ImageData";
 import {Sharp, SharpOptions} from "sharp";
 // @ts-ignore
 import {blockhashData, hammingDistance} from 'blockhash';
-import leven from "leven";
 import {SetRandomInterval} from "./Common/types";
+import stringSimilarity from 'string-similarity';
+import calculateCosineSimilarity from "./Utils/StringMatching/CosineSimilarity";
+import levenSimilarity from "./Utils/StringMatching/levenSimilarity";
 //import {ResembleSingleCallbackComparisonResult} from "resemblejs";
 
 // want to guess how many concurrent image comparisons we should be doing
@@ -1490,20 +1492,56 @@ export const isRepostItemResult = (val: (RepostItem|RepostItemResult)): val is R
     return 'sameness' in val;
 }
 
-export const stringSameness = (valA: string, valB: string) => {
-    let longer: string;
-    let shorter: string;
-    if (valA.length > valB.length) {
-        longer = valA;
-        shorter = valB;
-    } else {
-        longer = valB;
-        shorter = valA;
-    }
+export const defaultStrCompareTransformFuncs = [
+    // lower case to remove case sensitivity
+    (str: string) => str.toLocaleLowerCase(),
+    // remove excess whitespace
+    (str: string) => str.trim(),
+    // remove non-alphanumeric characters so that differences in punctuation don't subtract from comparison score
+    (str: string) => str.replace(/[^A-Za-z0-9 ]/g, ""),
+    // replace all instances of 2 or more whitespace with one whitespace
+    (str: string) => str.replace(/\s{2,}/g, " ")
+];
 
-    const distance = leven(longer, shorter);
-    const diff = (distance / longer.length) * 100;
-    return [distance, 100 - diff];
+const sentenceLengthWeight = (length: number) => {
+    // thanks jordan :')
+    // constants are black magic
+    return (Math.log(length) / 0.20) - 5;
+}
+
+export const stringSameness = (valA: string, valB: string, options?: StringComparisonOptions) => {
+
+    const {
+        transforms = defaultStrCompareTransformFuncs,
+    } = options || {};
+
+    const cleanA = transforms.reduce((acc, curr) => curr(acc), valA);
+    const cleanB = transforms.reduce((acc, curr) => curr(acc), valB);
+
+    const shortest = cleanA.length > cleanB.length ? cleanB : cleanA;
+
+    // Dice's Coefficient
+    const dice = stringSimilarity.compareTwoStrings(cleanA, cleanB) * 100;
+    // Cosine similarity
+    const cosine = calculateCosineSimilarity(cleanA, cleanB) * 100;
+    // Levenshtein distance
+    const [levenDistance, levenSimilarPercent] = levenSimilarity(cleanA, cleanB);
+
+    // use shortest sentence for weight
+    const weightScore = sentenceLengthWeight(shortest.length);
+
+    const highScore = Math.max(dice, cosine, levenSimilarPercent);
+    // weight score can be a max of 15
+    const highScoreWeighted = highScore + Math.min(weightScore, 15);
+    return {
+        scores: {
+            dice,
+            cosine,
+            leven: levenSimilarPercent
+        },
+        highScore,
+        highScoreWeighted,
+    }
 }
 
 // https://stackoverflow.com/a/18679657/1469797

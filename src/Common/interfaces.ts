@@ -1949,3 +1949,8 @@ export interface RepostItem {
 export interface RepostItemResult extends RepostItem {
     sameness: number
 }
+
+export interface StringComparisonOptions {
+    lengthWeight?: number,
+    transforms?: ((str: string) => string)[]
+}

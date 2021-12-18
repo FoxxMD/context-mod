@@ -231,7 +231,7 @@ export interface CriteriaResult {
 const parentSubmissionSearchFacetDefaults = {
     title: {
         matchScore: 85,
-        minWordCount: 2
+        minWordCount: 3
     },
     url: {
         matchScore: 0, // when looking for submissions to find repost comments on automatically include any with exact same url
@@ -362,7 +362,7 @@ export class RepostRule extends Rule {
 
                     const {
                         matchScore = 85,
-                        minWordCount = 2,
+                        minWordCount = 3,
                         transformations = [],
                     } = sf;
 
@@ -504,11 +504,11 @@ export class RepostRule extends Rule {
                         if (!(sf.caseSensitive ?? false)) {
                             cleanTitle = cleanTitle.toLowerCase();
                         }
-                        const [distance, sameness] = stringSameness(sourceTitle, cleanTitle);
-                        if(sameness >= (x.reqSameness as number)) {
+                        const strMatchResults = stringSameness(sourceTitle, cleanTitle);
+                        if(strMatchResults.highScoreWeighted >= (x.reqSameness as number)) {
                             return acc.concat({
                                 ...x,
-                                sameness,
+                                sameness: strMatchResults.highScoreWeighted,
                             });
                         }
                         return acc;
@@ -537,7 +537,7 @@ export class RepostRule extends Rule {
                     let subs = items.filter(x => x.itemType === 'submission').map(x => x.sourceObj) as Submission[];
                     totalCommentSubs += subs.length;
 
-                    const nonSubItems = items.filter(x => x.itemType !== 'submission');
+                    const nonSubItems = items.filter(x => x.itemType !== 'submission' && wordCount(x.value) > (restCriteria.minWordCount ?? 3));
 
                     subs.sort((a, b) => a.score - b.score).reverse();
                     // take top 10 submissions
@@ -567,7 +567,7 @@ export class RepostRule extends Rule {
                     // sort by highest scores
                     comments.sort((a, b) => a.score - b.score).reverse();
                     // filter out all comments with fewer words than required (prevent false negatives)
-                    comments.filter(x => wordCount(x.body) > (restCriteria.minWordCount ?? 2));
+                    comments.filter(x => wordCount(x.body) > (restCriteria.minWordCount ?? 3));
                     totalComments += Math.min(comments.length, maxRedditItems);
 
                     // and take the user-defined maximum number of items
@@ -632,12 +632,13 @@ export class RepostRule extends Rule {
 
                 for (const i of items) {
                     const itemContent = !caseSensitive ? i.value.toLowerCase() : i.value;
-                    const [distance, sameness] = stringSameness(sourceContent, itemContent);
-                    if(sameness >= matchScore) {
+                    const strMatchResults = stringSameness(sourceContent, itemContent);
+                    if(strMatchResults.highScoreWeighted >= matchScore) {
                         criteriaMatchedResults.push({
                           ...i,
-                          reqSameness: sameness,
-                          sameness
+                            // @ts-ignore
+                          reqSameness: matchScore,
+                          sameness: strMatchResults.highScoreWeighted
                         });
                     }
                 }
