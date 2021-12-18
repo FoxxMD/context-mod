@@ -786,7 +786,7 @@ export class RepostRule extends Rule {
             // make sure we are only accumulating unique reposts
             .reduce((acc, curr) => {
             const hash = `${curr.source}-${curr.itemType}-${curr.id}`;
-            if (acc.has(hash)) {
+            if (!acc.has(hash)) {
                 acc.set(hash, curr);
             }
             return acc;
@@ -797,6 +797,8 @@ export class RepostRule extends Rule {
 
 
         let avgSameness = null;
+        let closestSummary = null;
+        let closestSameness = null;
         let searchCandidateSummary = '';
 
         if(item instanceof Comment) {
@@ -819,6 +821,8 @@ export class RepostRule extends Rule {
             avgSameness = formatNumber(repostItemResults.reduce((acc, curr) => acc + curr.sameness, 0) / criteriaResults.length);
             const closest = repostItemResults[0];
             summary += ` --- Closest Match => >> ${closest.value} << from ${closest.source} (${closest.sourceUrl}) with ${formatNumber(closest.sameness)}% sameness.`
+            closestSummary = `matched a ${closest.itemType} from ${closest.source}`;
+            closestSameness = closest.sameness;
             if(criteriaResults.length > 1) {
                 summary += ` Avg ${formatNumber(avgSameness)}%`;
             }
@@ -849,7 +853,11 @@ export class RepostRule extends Rule {
 
         return [passed, this.getResult(passed, {
             result,
-            data: criteriaResults
+            data: {
+                allResults: criteriaResults,
+                closestSameness: passed ? closestSameness : undefined,
+                closestSummary: passed ? closestSummary : undefined,
+            }
         })];
     }
 }
