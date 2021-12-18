@@ -508,7 +508,7 @@ export class RepostRule extends Rule {
                         if(strMatchResults.highScoreWeighted >= (x.reqSameness as number)) {
                             return acc.concat({
                                 ...x,
-                                sameness: strMatchResults.highScoreWeighted,
+                                sameness: Math.min(strMatchResults.highScoreWeighted, 100),
                             });
                         }
                         return acc;
@@ -638,7 +638,7 @@ export class RepostRule extends Rule {
                           ...i,
                             // @ts-ignore
                           reqSameness: matchScore,
-                          sameness: strMatchResults.highScoreWeighted
+                          sameness: Math.min(strMatchResults.highScoreWeighted, 100)
                         });
                     }
                 }
@@ -856,7 +856,7 @@ export class RepostRule extends Rule {
             result,
             data: {
                 allResults: criteriaResults,
-                closestSameness: passed ? closestSameness : undefined,
+                closestSameness: passed ? formatNumber(closestSameness as number) : undefined,
                 closestSummary: passed ? closestSummary : undefined,
             }
         })];
