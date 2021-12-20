@@ -44,6 +44,7 @@ import {BotInstance, CMInstance} from "../interfaces";
 import { URL } from "url";
 import {MESSAGE} from "triple-beam";
 import Autolinker from "autolinker";
+import path from "path";
 
 const emitter = new EventEmitter();
 
@@ -812,9 +813,22 @@ const webClient = async (options: OperatorConfig) => {
     });
 
     app.getAsync('/config', async (req: express.Request, res: express.Response) => {
-        res.render('config', {
-            title: `Configuration Editor`
-        });
+        const {format} = req.query as any;
+        if(format === 'yaml') {
+            const fullPath = path.normalize(path.join(__dirname, '..', 'assets', 'public','yaml'));
+            return new Promise((resolve, reject) => {
+                res.sendFile('index.html', {root: fullPath }, (err) => {
+                    if(err === null) {
+                        resolve();
+                    }
+                    reject(err);
+                });
+            });
+        } else {
+            res.render('config', {
+                title: `Configuration Editor`
+            });
+        }
     });
 
     app.getAsync('/config/content', [ensureAuthenticatedApi, defaultSession, instanceWithPermissions, botWithPermissions, createUserToken], async (req: express.Request, res: express.Response) => {
