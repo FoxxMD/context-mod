@@ -296,6 +296,7 @@ export class RegexRule extends Rule {
 
         const logSummary: string[] = [];
         let index = 0;
+        let matchSample = undefined;
         for (const c of criteriaResults) {
             index++;
             let msg = `Criteria ${c.criteria.name || `#${index}`} ${triggeredIndicator(c.triggered)}`;
@@ -309,8 +310,8 @@ export class RegexRule extends Rule {
             }
             msg = `${msg} (Window: ${c.criteria.window})`;
             if(c.matches.length > 0) {
-                let matchSample = `-- Matched Values: ${c.matches.slice(0, 3).map(x => `"${x}"`).join(', ')}${c.matches.length > 3 ? `, and ${c.matches.length - 3} more...` : ''}`;
-                logSummary.push(`${msg} ${matchSample}`);
+                matchSample = `${c.matches.slice(0, 3).map(x => `"${x}"`).join(', ')}${c.matches.length > 3 ? `, and ${c.matches.length - 3} more...` : ''}`;
+                logSummary.push(`${msg} -- Matched Values: ${matchSample}`);
             } else {
                 logSummary.push(msg);
             }
@@ -319,7 +320,7 @@ export class RegexRule extends Rule {
         const result = `${triggeredIndicator(criteriaMet)} ${logSummary.join(' || ')}`;
         this.logger.verbose(result);
 
-        return Promise.resolve([criteriaMet, this.getResult(criteriaMet, {result, data: criteriaResults})]);
+        return Promise.resolve([criteriaMet, this.getResult(criteriaMet, {result, data: {results: criteriaResults, matchSample }})]);
     }
 
     protected getMatchesFromActivity(a: (Submission | Comment), testOn: string[], reg: RegExp): string[] {
