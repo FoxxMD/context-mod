@@ -8,6 +8,9 @@
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width,initial-scale=1.0">
+    <% if (format === 'yaml') { %>
+    <link href="/public/yaml/entry.css" rel="stylesheet">
+    <% } %>
     <!--icons from https://heroicons.com -->
 </head>
 <body style="user-select: none;" class="bg-gray-900 text-white font-sans">
@@ -16,7 +19,9 @@
     <div class="container mx-auto">
         <div class="grid">
             <div class="my-3 pl-2">
-                Schema <a href="/config?schema=subreddit" id="subredditSchemaType">Subreddit</a> / <a href="/config?schema=operator" id="operatorSchemaType">Operator</a>  |
+                Schema <a href="#" data-schema="subreddit" class="schemaType" id="subredditSchemaType">Subreddit</a> / <a href="#" data-schema="operator" class="schemaType" id="operatorSchemaType">Operator</a>
+                | Format <a href="#" class="formatType" data-format="json" id="formatJson">JSON</a> / <a href="#" class="formatType" data-format="yaml" id="formatYaml">YAML</a>
+                |
                 <span class="has-tooltip">
                     <span style="z-index:999; margin-top: 30px;" class='tooltip rounded shadow-lg p-3 bg-gray-100 text-black space-y-2'>
                        <div>Copy + paste your configuration here to get:</div>
@@ -51,12 +56,62 @@
                 </span>
                 | <input id="configUrl" class="text-black placeholder-gray-500 rounded mx-2" style="min-width:400px;" placeholder="URL of a config to load"/> <a href="#" id="loadConfig">Load</a>
                 <div id="error" class="font-semibold"></div>
+                <select style="display:none;" id="schema-selection">
+                    <option value="bot.yaml">Bot Configuration</option>
+                </select>
+                <div style="display:none;" id="breadcrumbs"></div>
             </div>
             <div style="min-height: 80vh" id="editor"></div>
+            <div style="user-select: auto" id="problems"></div>
         </div>
     </div>
     <%- include('partials/footer') %>
 </div>
+<script>
+    var searchParams = new URLSearchParams(window.location.search);
+
+    let schemaType;
+    let schemaFile;
+    if(searchParams.get('schema') === 'operator') {
+        window.schemaType = 'operator';
+        window.schemaFile = 'OperatorConfig.json';
+        document.querySelector('#schemaTypeList').innerHTML = 'automatic validation of your OPERATOR configuration (yellow squiggly)';
+        document.querySelector('#operatorSchemaType').classList.add('font-bold', 'no-underline', 'pointer-events-none');
+    } else {
+        window.schemaType = 'subreddit';
+        window.schemaFile = 'App.json';
+        document.querySelector('#schemaTypeList').innerHTML = 'automatic validation of your SUBREDDIT configuration (yellow squiggly)'
+        document.querySelector('#subredditSchemaType').classList.add('font-bold', 'no-underline', 'pointer-events-none');
+    }
+
+    if(searchParams.get('format') === 'yaml') {
+        document.querySelector('#formatYaml').classList.add('font-bold', 'no-underline', 'pointer-events-none');
+    } else {
+        document.querySelector('#formatJson').classList.add('font-bold', 'no-underline', 'pointer-events-none');
+    }
+
+    document.querySelectorAll('.formatType').forEach(el => {
+        el.addEventListener('click', (e) => {
+            var searchParams = new URLSearchParams(window.location.search);
+            searchParams.set('format', e.target.dataset.format);
+            const newUrl = `${window.location.pathname}?${searchParams.toString()}`;
+            window.location.href = newUrl;
+        })
+    });
+
+    window.addNoErrors = function () {
+        const problems = document.getElementById('problems');
+        const wrapper = document.createElement('div');
+        wrapper.setAttribute('role', 'button');
+        const text = document.createElement('div');
+        wrapper.classList.add('problem');
+        text.classList.add('problem-text');
+        text.textContent = 'No errors! :)';
+        wrapper.append(text);
+        problems.append(wrapper);
+    }
+</script>
+<% if (format === 'json') { %>
 <!--Use CDN for loading monaco https://stackoverflow.com/a/63179814/1469797 -->
 <!-- Reduces app size (docker) by a big chunk to not serve it locally AND it's not necessary for essential operation -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.26.1/min/vs/loader.min.js"></script>
@@ -70,23 +125,7 @@
 
     var searchParams = new URLSearchParams(window.location.search);
 
-    let schemaType;
-    let schemaFile;
-    if(searchParams.get('schema') === 'operator') {
-        schemaType = 'operator';
-        schemaFile = 'OperatorConfig.json';
-        preamble.push('// automatic validation of your OPERATOR configuration');
-        document.querySelector('#schemaTypeList').innerHTML = 'automatic validation of your OPERATOR configuration (yellow squiggly)';
-        document.querySelector('#operatorSchemaType').classList.add('font-bold', 'no-underline', 'pointer-events-none');
-    } else {
-        schemaType = 'subreddit';
-        schemaFile = 'App.json';
-        preamble.push('// automatic validation of your SUBREDDIT configuration');
-        document.querySelector('#schemaTypeList').innerHTML = 'automatic validation of your SUBREDDIT configuration (yellow squiggly)'
-        document.querySelector('#subredditSchemaType').classList.add('font-bold', 'no-underline', 'pointer-events-none');
-    }
-
-    const schemaUri = `${document.location.origin}/schemas/${schemaFile}`;
+    const schemaUri = `${document.location.origin}/schemas/${window.schemaFile}`;
 
     require(['vs/editor/editor.main'], function () {
         const modelUri = monaco.Uri.parse("a://b/foo.json");
@@ -114,7 +153,7 @@
                             });
                         } else {
                             var sp = new URLSearchParams();
-                            sp.append('schema', schemaType);
+                            sp.append('schema', window.schemaType);
                             sp.append('url', newUrl);
                             history.pushState(null, '', `${window.location.pathname}?${sp.toString()}`);
                             resp.text().then(data => {
@@ -161,9 +200,165 @@
                     });
                     editor;
                 }
+
+                const markers = monaco.editor.getModelMarkers();
+                if(markers.length === 0) {
+                    window.addNoErrors();
+                }
+
+                monaco.editor.onDidChangeMarkers(([resource]) => {
+                    const problems = document.getElementById('problems');
+                    const markers = monaco.editor.getModelMarkers({ resource });
+                    while (problems.lastChild) {
+                        problems.lastChild.remove();
+                    }
+                    if(markers.length === 0) {
+                        window.addNoErrors();
+                    }
+                    for (const marker of markers) {
+                        const wrapper = document.createElement('div');
+                        wrapper.setAttribute('role', 'button');
+                        const codicon = document.createElement('div');
+                        const text = document.createElement('div');
+                        wrapper.classList.add('problem');
+                        codicon.classList.add('codicon', 'codicon-warning');
+                        text.classList.add('problem-text');
+                        text.textContent = marker.message;
+                        wrapper.append(codicon, text);
+                        wrapper.addEventListener('click', () => {
+                            editor.setPosition({ lineNumber: marker.startLineNumber, column: marker.startColumn });
+                            editor.focus();
+                        });
+                        problems.append(wrapper);
+                    }
+                });
             })
         })
     });
+
+    document.querySelectorAll('.schemaType').forEach(el => {
+        el.addEventListener('click', (e) => {
+            var searchParams = new URLSearchParams(window.location.search);
+            searchParams.set('schema', e.target.dataset.schema);
+            const newUrl = `${window.location.pathname}?${searchParams.toString()}`;
+            window.location.href = newUrl;
+        })
+    });
 </script>
+<% } else { %>
+<script defer="defer" src="/public/yaml/entry.js"></script>
+<script>
+    var searchParams = new URLSearchParams(window.location.search);
+    let dlUrl = searchParams.get('url');
+    if(dlUrl === null && searchParams.get('subreddit') !== null) {
+        dlUrl = `${document.location.origin}/config/content${document.location.search}`
+    }
+
+    if(searchParams.get('schema') === 'operator') {
+        // @ts-ignore
+        document.querySelector('#schema-selection').value = 'app.yaml';
+    }
+
+    if(dlUrl !== null) {
+        // @ts-ignore
+        document.querySelector('#configUrl').value = dlUrl;
+        fetch(dlUrl).then((resp) => {
+            if(!resp.ok) {
+                resp.text().then(data => {
+                    document.querySelector('#error').innerHTML = `Error occurred while fetching configuration => ${data}`
+                });
+            } else {
+                resp.text().then(data => {
+                    const oldModel = window.ed.getModel();
+                    oldModel.dispose();
+                    // @ts-ignore
+                    const newModel = window.meditor.createModel(data, 'yaml', muri.parse(document.querySelector('#schema-selection').value));
+                    window.ed.setModel(newModel);
+                })
+            }
+        });
+    }
+
+    document.querySelector('#loadConfig').addEventListener('click', (e) => {
+        e.preventDefault();
+        // @ts-ignore
+        const newUrl = document.querySelector('#configUrl').value;
+        fetch(newUrl).then((resp) => {
+            if(!resp.ok) {
+                resp.text().then(data => {
+                    document.querySelector('#error').innerHTML = `Error occurred while fetching configuration => ${data}`
+                });
+            } else {
+                var sp = new URLSearchParams();
+                // @ts-ignore
+                sp.append('schema', document.querySelector('#schema-selection').value === 'bot.yaml' ? 'bot' : 'operator' );
+                sp.append('url', newUrl);
+                sp.append('format', 'yaml');
+                history.pushState(null, '', `${window.location.pathname}?${sp.toString()}`);
+                resp.text().then(data => {
+                    const oldModel = window.ed.getModel();
+                    oldModel.dispose();
+                    // @ts-ignore
+                    const newModel = window.meditor.createModel(data, 'yaml', window.muri.parse(document.querySelector('#schema-selection').value));
+                    window.ed.setModel(newModel);
+                })
+            }
+        });
+    });
+
+    document.querySelectorAll('.schemaType').forEach(el => {
+        el.addEventListener('click', (e) => {
+            document.querySelectorAll('.schemaType').forEach(el => {
+                el.classList.remove('font-bold', 'no-underline', 'pointer-events-none');
+            })
+            if(e.target.dataset.schema === 'operator') {
+                window.schemaType = 'operator';
+                window.schemaFile = 'OperatorConfig.json';
+                document.querySelector('#operatorSchemaType').classList.add('font-bold', 'no-underline', 'pointer-events-none');
+            } else {
+                document.querySelector('#subredditSchemaType').classList.add('font-bold', 'no-underline', 'pointer-events-none');
+                window.schemaType = 'subreddit';
+                window.schemaFile = 'App.json';
+            }
+
+            var searchParams = new URLSearchParams(window.location.search);
+            searchParams.set('schema', e.target.dataset.schema === 'operator' ? 'operator' : 'bot')
+            history.pushState(null, '', `${window.location.pathname}?${searchParams.toString()}`);
+            const oldModel = window.ed.getModel();
+            const val = oldModel.getValue();
+            oldModel.dispose();
+            const newModel = window.meditor.createModel(val, 'yaml', window.muri.parse(e.target.dataset.schema === 'operator' ? 'app.yaml' : 'bot.yaml'));
+            window.ed.setModel(newModel);
+        })
+    });
+
+    var addNoErrors = function () {
+        const problems = document.getElementById('problems');
+        const wrapper = document.createElement('div');
+        wrapper.setAttribute('role', 'button');
+        const text = document.createElement('div');
+        wrapper.classList.add('problem');
+        text.classList.add('problem-text');
+        text.textContent = 'No errors! :)';
+        wrapper.append(text);
+        problems.append(wrapper);
+    }
+    window.addEventListener('load', function () {
+
+        const markers = window.meditor.getModelMarkers();
+        if(markers.length === 0) {
+            window.addNoErrors();
+        }
+
+    window.meditor.onDidChangeMarkers(([resource]) => {
+
+        const markers = window.meditor.getModelMarkers({resource});
+        if(markers.length === 0) {
+            window.addNoErrors();
+        }
+    });
+    });
+</script>
+<% } %>
 </body>
 </html>

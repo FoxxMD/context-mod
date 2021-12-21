@@ -813,22 +813,11 @@ const webClient = async (options: OperatorConfig) => {
     });
 
     app.getAsync('/config', async (req: express.Request, res: express.Response) => {
-        const {format} = req.query as any;
-        if(format === 'yaml') {
-            const fullPath = path.normalize(path.join(__dirname, '..', 'assets', 'public','yaml'));
-            return new Promise((resolve, reject) => {
-                res.sendFile('index.html', {root: fullPath }, (err) => {
-                    if(err === null) {
-                        resolve();
-                    }
-                    reject(err);
-                });
-            });
-        } else {
-            res.render('config', {
-                title: `Configuration Editor`
-            });
-        }
+        const {format = 'json'} = req.query as any;
+        res.render('config', {
+            title: `Configuration Editor`,
+            format,
+        });
     });
 
     app.getAsync('/config/content', [ensureAuthenticatedApi, defaultSession, instanceWithPermissions, botWithPermissions, createUserToken], async (req: express.Request, res: express.Response) => {
