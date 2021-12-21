@@ -57,6 +57,25 @@
                     </span>
                 </span>
                 | <input id="configUrl" class="text-black placeholder-gray-500 rounded mx-2" style="min-width:400px;" placeholder="URL of a config to load"/> <a href="#" id="loadConfig">Load</a>
+                <span id="saveTip">
+                    <span style="margin-top:30px; z-index:100" class="tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2 space-y-3 p-2 text-left">
+                        <div>In order to save a configuration to a subreddit's wiki page you must re-authorize ContextMod with Reddit to get the following permissions:</div>
+                        <ul class="list-inside list-disc">
+                            <li><span class="font-mono">wikiedit</span></li>
+                        </ul>
+                        <div>CM will store this permission for one hour after which you must re-authorize again to save.</div>
+                        <div><b><a href="#" id="doAuthorize">Click Here</a></b> to re-authorize</div>
+                    </span>
+                    <span>
+                        | <a id="doSave">Save</a>
+                        <svg id="saveQuestionIcon" xmlns="http://www.w3.org/2000/svg"
+                             class="h-4 w-4 inline-block cursor-help"
+                             fill="none"
+                             viewBox="0 0 24 24" stroke="currentColor">
+                            <use xlink:href="public/questionsymbol.svg#q" />
+                        </svg>
+                    </span>
+                </span>
                 <div id="error" class="font-semibold"></div>
                 <select style="display:none;" id="schema-selection">
                     <option value="bot.yaml">Bot Configuration</option>
@@ -103,6 +122,81 @@
         wrapper.append(text);
         problems.append(wrapper);
     }
+
+    window.canSave = <%= canSave %>;
+
+    if(searchParams.get('subreddit') === null) {
+        document.querySelector('#saveTip').style.display = 'none';
+    } else {
+        document.querySelector('#doSave').textContent = `Save to ${searchParams.get('subreddit')}`;
+    }
+
+    window.setSaveStatus = function() {
+        if(window.canSave) {
+            document.querySelector('#saveTip').classList.remove('has-tooltip');
+            document.querySelector('#saveQuestionIcon').style.display = 'none';
+            const saveLink = document.querySelector('#doSave');
+            saveLink.classList.remove('isDisabled');
+            saveLink.href = '#';
+        } else {
+            document.querySelector('#saveTip').classList.add('has-tooltip');
+            document.querySelector('#saveQuestionIcon').style.display = 'initial';
+            const saveLink = document.querySelector('#doSave');
+            saveLink.classList.add('isDisabled');
+            saveLink.href = '';
+        }
+    }
+
+    window.setSaveStatus();
+
+    //https://stackoverflow.com/a/61404006/1469797
+    function onBeforeUnload(e) {
+        if (window.dirty) {
+            e.preventDefault();
+            e.returnValue = '';
+            return;
+        }
+
+        delete e['returnValue'];
+    }
+
+    window.addEventListener('beforeunload', onBeforeUnload);
+
+    document.querySelector('#doAuthorize').addEventListener('click', (e) => {
+        e.preventDefault();
+        window.open(`${document.location.origin}/login?closeOnSuccess=true&scope=wikiedit`, 'Re-authorize CM', 'popup=1');
+    });
+    document.querySelector('#doSave').addEventListener('click', (e) => {
+        e.preventDefault();
+        if(window.wikiLocation === undefined || window.wikiLocation === null || window.canSave === false) {
+            return;
+        }
+
+        fetch(`${document.location.origin}/config${document.location.search}`, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                //...data,
+                location: window.wikiLocation,
+                data: window.ed.getModel().getValue()
+            })
+        }).then((resp) => {
+            if (!resp.ok) {
+                resp.text().then(data => {
+                    document.querySelector('#error').innerHTML = `Error occurred while fetching configuration => ${data}`
+                });
+            } else {
+                document.querySelector('#error').innerHTML = `Wiki saved!`;
+                window.dirty = false;
+                setTimeout(() => {
+                    document.querySelector('#error').innerHTML = ``;
+                }, 3000);
+            }
+        })
+    });
 </script>
 <script defer="defer" src="/public/yaml/entry.js"></script>
 <script>
@@ -137,9 +231,27 @@
                         // @ts-ignore
                         const newModel = window.meditor.createModel(data, currentFormat, window.muri.parse(getFileName()));
                         window.ed.setModel(newModel);
+                        newModel.onDidChangeContent((e) => {
+                           window.dirty = true;
+                        });
+                        window.dirty = false;
                     })
                 }
             });
+            if(searchParams.get('subreddit') !== null) {
+                const wikiLocationUrl = `${document.location.origin}/config/content/location${document.location.search}`
+                fetch(wikiLocationUrl).then((resp) => {
+                    if (!resp.ok) {
+                        resp.text().then(data => {
+                            document.querySelector('#error').innerHTML = `Error occurred while fetching wiki location => ${data}`
+                        });
+                    } else {
+                        resp.text().then(data => {
+                            window.wikiLocation = data;
+                        })
+                    }
+                });
+            }
         } else {
             const preamble = currentFormat === 'yaml' ? [
                 '# Copy + paste your configuration here to get',
@@ -154,6 +266,10 @@
             // @ts-ignore
             const newModel = window.meditor.createModel(preamble.join('\r\n'), currentFormat, window.muri.parse(getFileName()));
             window.ed.setModel(newModel);
+            newModel.onDidChangeContent((e) => {
+                window.dirty = true;
+            });
+            window.dirty = false;
         }
 
         document.querySelector('#loadConfig').addEventListener('click', (e) => {
@@ -178,6 +294,10 @@
                         // @ts-ignore
                         const newModel = window.meditor.createModel(data, currentFormat, window.muri.parse(getFileName()));
                         window.ed.setModel(newModel);
+                        newModel.onDidChangeContent((e) => {
+                            window.dirty = true;
+                        });
+                        window.dirty = false;
                     })
                 }
             });
@@ -208,6 +328,10 @@
                 oldModel.dispose();
                 const newModel = window.meditor.createModel(val, currentFormat, window.muri.parse(getFileName()));
                 window.ed.setModel(newModel);
+                newModel.onDidChangeContent((e) => {
+                    window.dirty = true;
+                });
+                window.dirty = false;
             })
         });
 
@@ -234,6 +358,10 @@
                 oldModel.dispose();
                 const newModel = window.meditor.createModel(val, currentFormat, window.muri.parse(getFileName()));
                 window.ed.setModel(newModel);
+                newModel.onDidChangeContent((e) => {
+                    window.dirty = true;
+                });
+                window.dirty = false;
             })
         });
 
@@ -250,6 +378,21 @@
                 if (markers.length === 0) {
                     window.addNoErrors();
                 }
+            });
+        });
+    });
+</script>
+<script id="iojs" src="https://cdn.socket.io/4.1.2/socket.io.min.js" integrity="sha384-toS6mmwu70G0fw54EGlWWeA4z3dyJ+dlXBtSURSKN4vyRFOcxd3Bzjj/AoOwY+Rg" crossorigin="anonymous"></script>
+<script>
+    window.addEventListener('load', function () {
+        let socket = io({
+            reconnectionAttempts: 5, // bail after 5 attempts
+        });
+        socket.on("connect", () => {
+            socket.on("authStatus", data => {
+                console.log(data);
+                window.canSave = data.canSaveWiki;
+                window.setSaveStatus();
             });
         });
     });

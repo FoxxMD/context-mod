@@ -59,6 +59,8 @@ app.use('/public', express.static(`${__dirname}/../assets/public`));
 app.use('/monaco', express.static(`${__dirname}/../../../node_modules/monaco-editor/`));
 app.use('/schemas', express.static(`${__dirname}/../../Schema/`));
 
+const userAgent = `web:contextBot:web`;
+
 const proxy = httpProxy.createProxyServer({
     ws: true,
     //hostRewrite: true,
@@ -185,9 +187,9 @@ const webClient = async (options: OperatorConfig) => {
     * */
 
     passport.serializeUser(async function (data: any, done) {
-        const {user, subreddits, scope} = data;
+        const {user, subreddits, scope, token} = data;
         //await webCache.set(`userSession-${user}`, { subreddits: subreddits.map((x: Subreddit) => x.display_name), isOperator: webOps.includes(user.toLowerCase()) }, {ttl: provider.ttl as number});
-        done(null, { subreddits: subreddits.map((x: Subreddit) => x.display_name), isOperator: webOps.includes(user.toLowerCase()), name: user, scope });
+        done(null, { subreddits: subreddits.map((x: Subreddit) => x.display_name), isOperator: webOps.includes(user.toLowerCase()), name: user, scope, token, tokenExpiresAt: dayjs().unix() + (60 * 60) });
     });
 
     passport.deserializeUser(async function (obj, done) {
@@ -217,7 +219,7 @@ const webClient = async (options: OperatorConfig) => {
                 return done('Unexpected <b>state</b> value returned');
             }
             const client = await ExtendedSnoowrap.fromAuthCode({
-                userAgent: `web:contextBot:web`,
+                userAgent,
                 clientId,
                 clientSecret,
                 redirectUri: redirectUri as string,
@@ -225,7 +227,8 @@ const webClient = async (options: OperatorConfig) => {
             });
             const user = await client.getMe().name as string;
             const subs = await client.getModeratedSubreddits();
-            return done(null, {user, subreddits: subs, scope: req.session.scope});
+            io.to(req.session.id).emit('authStatus', {canSaveWiki: req.session.scope?.includes('wikiedit')});
+            return done(null, {user, subreddits: subs, scope: req.session.scope, token: client.accessToken});
         }
     ));
 
@@ -259,14 +262,20 @@ const webClient = async (options: OperatorConfig) => {
     }
 
     const scopeMiddle = arrayMiddle(['scope']);
-    app.getAsync('/login', scopeMiddle, async (req, res, next) => {
+    const successMiddle = booleanMiddle([{name: 'closeOnSuccess', defaultVal: undefined, required: false}]);
+    app.getAsync('/login', scopeMiddle, successMiddle, async (req, res, next) => {
         if (redirectUri === undefined) {
             return res.render('error', {error: `No <b>redirectUri</b> was specified through environmental variables or program argument. This must be provided in order to use the web interface.`});
         }
-        const {query: { scope: reqScopes = [] }} = req;
+        const {query: { scope: reqScopes = [], closeOnSuccess } } = req;
         const scope = [...new Set(['identity', 'mysubreddits', ...(reqScopes as string[])])];
         req.session.state = randomId();
         req.session.scope = scope;
+        // @ts-ignore
+        if(closeOnSuccess === true) {
+            // @ts-ignore
+            req.session.closeOnSuccess = closeOnSuccess;
+        }
         const authUrl = Snoowrap.getAuthUrl({
             clientId,
             scope: scope,
@@ -299,7 +308,7 @@ const webClient = async (options: OperatorConfig) => {
             // @ts-ignore
             const invite = await webCache.get(`invite:${req.session.inviteId}`) as InviteData;
             const client = await Snoowrap.fromAuthCode({
-                userAgent: `web:contextBot:web`,
+                userAgent,
                 clientId: invite.clientId,
                 clientSecret: invite.clientSecret,
                 redirectUri: invite.redirectUri,
@@ -351,7 +360,15 @@ const webClient = async (options: OperatorConfig) => {
                 if(e !== undefined) {
                     return res.render('error', {error: err});
                 }
-                return res.redirect('/');
+                // @ts-ignore
+                const useCloseRedir: boolean = req.session.closeOnSuccess as any
+                // @ts-ignore
+                delete req.session.closeOnSuccess;
+                if(useCloseRedir === true) {
+                    return res.render('close');
+                } else {
+                    return res.redirect('/');
+                }
             });
         })(req, res, next);
     });
@@ -823,13 +840,55 @@ const webClient = async (options: OperatorConfig) => {
         res.render('config', {
             title: `Configuration Editor`,
             format,
-            canSave: req.user?.scope?.includes('wikiedit')
+            canSave: req.user?.scope?.includes('wikiedit') && req.user?.tokenExpiresAt !== undefined && dayjs.unix(req.user?.tokenExpiresAt).isAfter(dayjs())
         });
+    });
+
+    app.postAsync('/config', [ensureAuthenticatedApi, defaultSession, instanceWithPermissions, botWithPermissions], async (req: express.Request, res: express.Response) => {
+        const {subreddit} = req.query as any;
+        const {location, data} = req.body as any;
+
+        const client = new ExtendedSnoowrap({
+            userAgent,
+            clientId,
+            clientSecret,
+            accessToken: req.user?.token
+        });
+
+        try {
+            // @ts-ignore
+            const wiki = await client.getSubreddit(subreddit).getWikiPage(location);
+            await wiki.edit({
+                text: data,
+                reason: 'Updated through CM Web'
+            });
+        } catch (err: any) {
+            res.status(500);
+            return res.send(err.message);
+        }
+
+        res.status(200);
+        return res.send();
     });
 
     app.getAsync('/config/content', [ensureAuthenticatedApi, defaultSession, instanceWithPermissions, botWithPermissions, createUserToken], async (req: express.Request, res: express.Response) => {
         const {subreddit} = req.query as any;
         const resp = await got.get(`${(req.instance as CMInstance).normalUrl}/config`, {
+            headers: {
+                'Authorization': `Bearer ${req.token}`,
+            },
+            searchParams: {
+                subreddit,
+                bot: req.bot?.botName
+            }
+        }).text();
+
+        return res.send(resp);
+    });
+
+    app.getAsync('/config/content/location', [ensureAuthenticatedApi, defaultSession, instanceWithPermissions, botWithPermissions, createUserToken], async (req: express.Request, res: express.Response) => {
+        const {subreddit} = req.query as any;
+        const resp = await got.get(`${(req.instance as CMInstance).normalUrl}/config/location`, {
             headers: {
                 'Authorization': `Bearer ${req.token}`,
             },

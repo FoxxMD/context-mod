@@ -23,6 +23,8 @@ declare global {
             realBots?: string[]
             moderatedBots?: string[]
             scope?: string[]
+            token?: string
+            tokenExpiresAt?: number
         }
     }
 }

@@ -20,6 +20,13 @@ const config = async (req: Request, res: Response) => {
 };
 export const configRoute = [authUserCheck(), botRoute(), subredditRoute(), config];
 
+const configLocation = async (req: Request, res: Response) => {
+    const manager = req.manager as Manager;
+    return res.send(manager.wikiLocation);
+};
+
+export const configLocationRoute = [authUserCheck(), botRoute(), subredditRoute(), configLocation];
+
 const actionedEvents = async (req: Request, res: Response) => {
 
     let managers: Manager[] = [];
