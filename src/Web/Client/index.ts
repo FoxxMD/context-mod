@@ -39,12 +39,13 @@ import {prettyPrintJson} from "pretty-print-json";
 import DelimiterStream from 'delimiter-stream';
 import {pipeline} from 'stream/promises';
 import {defaultBotStatus} from "../Common/defaults";
-import {booleanMiddle} from "../Common/middleware";
+import {arrayMiddle, booleanMiddle} from "../Common/middleware";
 import {BotInstance, CMInstance} from "../interfaces";
 import { URL } from "url";
 import {MESSAGE} from "triple-beam";
 import Autolinker from "autolinker";
 import path from "path";
+import {ExtendedSnoowrap} from "../../Utils/SnoowrapClients";
 
 const emitter = new EventEmitter();
 
@@ -70,6 +71,7 @@ declare module 'express-session' {
         sort?: string,
         level?: string,
         state?: string,
+        scope?: string[],
         botId?: string,
         authBotId?: string,
     }
@@ -183,9 +185,9 @@ const webClient = async (options: OperatorConfig) => {
     * */
 
     passport.serializeUser(async function (data: any, done) {
-        const {user, subreddits} = data;
+        const {user, subreddits, scope} = data;
         //await webCache.set(`userSession-${user}`, { subreddits: subreddits.map((x: Subreddit) => x.display_name), isOperator: webOps.includes(user.toLowerCase()) }, {ttl: provider.ttl as number});
-        done(null, { subreddits: subreddits.map((x: Subreddit) => x.display_name), isOperator: webOps.includes(user.toLowerCase()), name: user });
+        done(null, { subreddits: subreddits.map((x: Subreddit) => x.display_name), isOperator: webOps.includes(user.toLowerCase()), name: user, scope });
     });
 
     passport.deserializeUser(async function (obj, done) {
@@ -214,7 +216,7 @@ const webClient = async (options: OperatorConfig) => {
             } else if (req.session.state !== state) {
                 return done('Unexpected <b>state</b> value returned');
             }
-            const client = await Snoowrap.fromAuthCode({
+            const client = await ExtendedSnoowrap.fromAuthCode({
                 userAgent: `web:contextBot:web`,
                 clientId,
                 clientSecret,
@@ -223,7 +225,7 @@ const webClient = async (options: OperatorConfig) => {
             });
             const user = await client.getMe().name as string;
             const subs = await client.getModeratedSubreddits();
-            return done(null, {user, subreddits: subs});
+            return done(null, {user, subreddits: subs, scope: req.session.scope});
         }
     ));
 
@@ -256,14 +258,18 @@ const webClient = async (options: OperatorConfig) => {
         }
     }
 
-    app.getAsync('/login', async (req, res, next) => {
+    const scopeMiddle = arrayMiddle(['scope']);
+    app.getAsync('/login', scopeMiddle, async (req, res, next) => {
         if (redirectUri === undefined) {
             return res.render('error', {error: `No <b>redirectUri</b> was specified through environmental variables or program argument. This must be provided in order to use the web interface.`});
         }
+        const {query: { scope: reqScopes = [] }} = req;
+        const scope = [...new Set(['identity', 'mysubreddits', ...(reqScopes as string[])])];
         req.session.state = randomId();
+        req.session.scope = scope;
         const authUrl = Snoowrap.getAuthUrl({
             clientId,
-            scope: ['identity', 'mysubreddits'],
+            scope: scope,
             redirectUri: redirectUri as string,
             permanent: false,
             state: req.session.state,

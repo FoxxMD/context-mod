@@ -50,7 +50,7 @@ export const actionedEventsRoute = [authUserCheck(), botRoute(), subredditRoute(
 const action = async (req: Request, res: Response) => {
     const bot = req.serverBot;
 
-    const {url, dryRun, subreddit} = req.query as any;
+    const {url, dryRun = false, subreddit} = req.query as any;
     const {name: userName, realManagers = [], isOperator} = req.user as Express.User;
 
     let a;
