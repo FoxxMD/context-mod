@@ -818,11 +818,12 @@ const webClient = async (options: OperatorConfig) => {
         });
     });
 
-    app.getAsync('/config', async (req: express.Request, res: express.Response) => {
+    app.getAsync('/config', defaultSession, async (req: express.Request, res: express.Response) => {
         const {format = 'json'} = req.query as any;
         res.render('config', {
             title: `Configuration Editor`,
             format,
+            canSave: req.user?.scope?.includes('wikiedit')
         });
     });
 

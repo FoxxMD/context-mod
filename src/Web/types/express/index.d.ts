@@ -22,6 +22,7 @@ declare global {
             moderatedManagers?: string[]
             realBots?: string[]
             moderatedBots?: string[]
+            scope?: string[]
         }
     }
 }

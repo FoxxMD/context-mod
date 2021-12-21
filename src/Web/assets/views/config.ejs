@@ -10,6 +10,8 @@
     <meta name="viewport" content="width=device-width,initial-scale=1.0">
     <% if (format === 'yaml') { %>
     <link href="/public/yaml/entry.css" rel="stylesheet">
+    <% } else { %>
+        <link rel="stylesheet" data-name="vs/editor/editor.main" href="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.26.1/min/vs/editor/editor.main.min.css">
     <% } %>
     <!--icons from https://heroicons.com -->
 </head>
@@ -90,15 +92,6 @@
         document.querySelector('#formatJson').classList.add('font-bold', 'no-underline', 'pointer-events-none');
     }
 
-    document.querySelectorAll('.formatType').forEach(el => {
-        el.addEventListener('click', (e) => {
-            var searchParams = new URLSearchParams(window.location.search);
-            searchParams.set('format', e.target.dataset.format);
-            const newUrl = `${window.location.pathname}?${searchParams.toString()}`;
-            window.location.href = newUrl;
-        })
-    });
-
     window.addNoErrors = function () {
         const problems = document.getElementById('problems');
         const wrapper = document.createElement('div');
@@ -111,254 +104,155 @@
         problems.append(wrapper);
     }
 </script>
-<% if (format === 'json') { %>
-<!--Use CDN for loading monaco https://stackoverflow.com/a/63179814/1469797 -->
-<!-- Reduces app size (docker) by a big chunk to not serve it locally AND it's not necessary for essential operation -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.26.1/min/vs/loader.min.js"></script>
-<script>
-    require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.26.1/min/vs' }});
-
-    const preamble = [
-        '// Copy + paste your configuration here to get',
-        '// formatting, JSON syntax, annotated properties and'
-    ];
-
-    var searchParams = new URLSearchParams(window.location.search);
-
-    const schemaUri = `${document.location.origin}/schemas/${window.schemaFile}`;
-
-    require(['vs/editor/editor.main'], function () {
-        const modelUri = monaco.Uri.parse("a://b/foo.json");
-        fetch(schemaUri).then((res) => {
-            res.json().then((schemaData) => {
-                monaco.languages.json.jsonDefaults.setDiagnosticsOptions({
-                    validate: true,
-                    allowComments: true,
-                    trailingCommas: "ignore",
-                    schemas: [{
-                        uri: schemaUri,
-                        fileMatch: [modelUri.toString()],
-                        schema: schemaData
-                    }]
-                });
-                var model = monaco.editor.createModel(preamble.join('\r\n'), "json", modelUri);
-
-                document.querySelector('#loadConfig').addEventListener('click', (e) => {
-                    e.preventDefault();
-                    const newUrl = document.querySelector('#configUrl').value;
-                    fetch(newUrl).then((resp) => {
-                        if(!resp.ok) {
-                            resp.text().then(data => {
-                                document.querySelector('#error').innerHTML = `Error occurred while fetching configuration => ${data}`
-                            });
-                        } else {
-                            var sp = new URLSearchParams();
-                            sp.append('schema', window.schemaType);
-                            sp.append('url', newUrl);
-                            history.pushState(null, '', `${window.location.pathname}?${sp.toString()}`);
-                            resp.text().then(data => {
-                                //model = monaco.editor.createModel(data, "json", modelUri);
-                                model.setValue(data);
-                            })
-                        }
-                    });
-                });
-
-                let dlUrl = searchParams.get('url');
-                if(dlUrl === null && searchParams.get('subreddit') !== null) {
-                    dlUrl = `${document.location.origin}/config/content${document.location.search}`
-                }
-                if(dlUrl !== null) {
-                    document.querySelector('#configUrl').value = dlUrl;
-                    fetch(dlUrl).then((resp) => {
-                        if(!resp.ok) {
-                            resp.text().then(data => {
-                                document.querySelector('#error').innerHTML = `Error occurred while fetching configuration => ${data}`
-                            });
-                        } else {
-                            resp.text().then(data => {
-                                model.setValue(data);
-                                //model = monaco.editor.createModel(data, "json", modelUri);
-                                var editor = monaco.editor.create(document.getElementById('editor'), {
-                                    model,
-                                    theme: 'vs-dark',
-                                    minimap: {
-                                        enabled: false
-                                    }
-                                });
-                                editor;
-                            })
-                        }
-                    });
-                } else {
-                    var editor = monaco.editor.create(document.getElementById('editor'), {
-                        model,
-                        theme: 'vs-dark',
-                        minimap: {
-                            enabled: false
-                        }
-                    });
-                    editor;
-                }
-
-                const markers = monaco.editor.getModelMarkers();
-                if(markers.length === 0) {
-                    window.addNoErrors();
-                }
-
-                monaco.editor.onDidChangeMarkers(([resource]) => {
-                    const problems = document.getElementById('problems');
-                    const markers = monaco.editor.getModelMarkers({ resource });
-                    while (problems.lastChild) {
-                        problems.lastChild.remove();
-                    }
-                    if(markers.length === 0) {
-                        window.addNoErrors();
-                    }
-                    for (const marker of markers) {
-                        const wrapper = document.createElement('div');
-                        wrapper.setAttribute('role', 'button');
-                        const codicon = document.createElement('div');
-                        const text = document.createElement('div');
-                        wrapper.classList.add('problem');
-                        codicon.classList.add('codicon', 'codicon-warning');
-                        text.classList.add('problem-text');
-                        text.textContent = marker.message;
-                        wrapper.append(codicon, text);
-                        wrapper.addEventListener('click', () => {
-                            editor.setPosition({ lineNumber: marker.startLineNumber, column: marker.startColumn });
-                            editor.focus();
-                        });
-                        problems.append(wrapper);
-                    }
-                });
-            })
-        })
-    });
-
-    document.querySelectorAll('.schemaType').forEach(el => {
-        el.addEventListener('click', (e) => {
-            var searchParams = new URLSearchParams(window.location.search);
-            searchParams.set('schema', e.target.dataset.schema);
-            const newUrl = `${window.location.pathname}?${searchParams.toString()}`;
-            window.location.href = newUrl;
-        })
-    });
-</script>
-<% } else { %>
 <script defer="defer" src="/public/yaml/entry.js"></script>
 <script>
-    var searchParams = new URLSearchParams(window.location.search);
-    let dlUrl = searchParams.get('url');
-    if(dlUrl === null && searchParams.get('subreddit') !== null) {
-        dlUrl = `${document.location.origin}/config/content${document.location.search}`
-    }
-
-    if(searchParams.get('schema') === 'operator') {
-        // @ts-ignore
-        document.querySelector('#schema-selection').value = 'app.yaml';
-    }
-
-    if(dlUrl !== null) {
-        // @ts-ignore
-        document.querySelector('#configUrl').value = dlUrl;
-        fetch(dlUrl).then((resp) => {
-            if(!resp.ok) {
-                resp.text().then(data => {
-                    document.querySelector('#error').innerHTML = `Error occurred while fetching configuration => ${data}`
-                });
-            } else {
-                resp.text().then(data => {
-                    const oldModel = window.ed.getModel();
-                    oldModel.dispose();
-                    // @ts-ignore
-                    const newModel = window.meditor.createModel(data, 'yaml', muri.parse(document.querySelector('#schema-selection').value));
-                    window.ed.setModel(newModel);
-                })
-            }
-        });
-    }
-
-    document.querySelector('#loadConfig').addEventListener('click', (e) => {
-        e.preventDefault();
-        // @ts-ignore
-        const newUrl = document.querySelector('#configUrl').value;
-        fetch(newUrl).then((resp) => {
-            if(!resp.ok) {
-                resp.text().then(data => {
-                    document.querySelector('#error').innerHTML = `Error occurred while fetching configuration => ${data}`
-                });
-            } else {
-                var sp = new URLSearchParams();
-                // @ts-ignore
-                sp.append('schema', document.querySelector('#schema-selection').value === 'bot.yaml' ? 'bot' : 'operator' );
-                sp.append('url', newUrl);
-                sp.append('format', 'yaml');
-                history.pushState(null, '', `${window.location.pathname}?${sp.toString()}`);
-                resp.text().then(data => {
-                    const oldModel = window.ed.getModel();
-                    oldModel.dispose();
-                    // @ts-ignore
-                    const newModel = window.meditor.createModel(data, 'yaml', window.muri.parse(document.querySelector('#schema-selection').value));
-                    window.ed.setModel(newModel);
-                })
-            }
-        });
-    });
-
-    document.querySelectorAll('.schemaType').forEach(el => {
-        el.addEventListener('click', (e) => {
-            document.querySelectorAll('.schemaType').forEach(el => {
-                el.classList.remove('font-bold', 'no-underline', 'pointer-events-none');
-            })
-            if(e.target.dataset.schema === 'operator') {
-                window.schemaType = 'operator';
-                window.schemaFile = 'OperatorConfig.json';
-                document.querySelector('#operatorSchemaType').classList.add('font-bold', 'no-underline', 'pointer-events-none');
-            } else {
-                document.querySelector('#subredditSchemaType').classList.add('font-bold', 'no-underline', 'pointer-events-none');
-                window.schemaType = 'subreddit';
-                window.schemaFile = 'App.json';
-            }
-
-            var searchParams = new URLSearchParams(window.location.search);
-            searchParams.set('schema', e.target.dataset.schema === 'operator' ? 'operator' : 'bot')
-            history.pushState(null, '', `${window.location.pathname}?${searchParams.toString()}`);
-            const oldModel = window.ed.getModel();
-            const val = oldModel.getValue();
-            oldModel.dispose();
-            const newModel = window.meditor.createModel(val, 'yaml', window.muri.parse(e.target.dataset.schema === 'operator' ? 'app.yaml' : 'bot.yaml'));
-            window.ed.setModel(newModel);
-        })
-    });
-
-    var addNoErrors = function () {
-        const problems = document.getElementById('problems');
-        const wrapper = document.createElement('div');
-        wrapper.setAttribute('role', 'button');
-        const text = document.createElement('div');
-        wrapper.classList.add('problem');
-        text.classList.add('problem-text');
-        text.textContent = 'No errors! :)';
-        wrapper.append(text);
-        problems.append(wrapper);
-    }
     window.addEventListener('load', function () {
 
-        const markers = window.meditor.getModelMarkers();
-        if(markers.length === 0) {
-            window.addNoErrors();
+        var searchParams = new URLSearchParams(window.location.search);
+        let dlUrl = searchParams.get('url');
+        if (dlUrl === null && searchParams.get('subreddit') !== null) {
+            dlUrl = `${document.location.origin}/config/content${document.location.search}`
         }
 
-    window.meditor.onDidChangeMarkers(([resource]) => {
+        let currentSchema = searchParams.get('schema') === 'operator' ? 'app' : 'bot',
+            currentFormat = searchParams.get('format') === 'yaml' ? 'yaml' : 'json';
 
-        const markers = window.meditor.getModelMarkers({resource});
-        if(markers.length === 0) {
-            window.addNoErrors();
+
+        function getFileName() {
+            return `${currentSchema}.${currentFormat}`;
         }
-    });
+
+        if (dlUrl !== null) {
+            // @ts-ignore
+            document.querySelector('#configUrl').value = dlUrl;
+            fetch(dlUrl).then((resp) => {
+                if (!resp.ok) {
+                    resp.text().then(data => {
+                        document.querySelector('#error').innerHTML = `Error occurred while fetching configuration => ${data}`
+                    });
+                } else {
+                    resp.text().then(data => {
+                        const oldModel = window.ed.getModel();
+                        oldModel.dispose();
+                        // @ts-ignore
+                        const newModel = window.meditor.createModel(data, currentFormat, window.muri.parse(getFileName()));
+                        window.ed.setModel(newModel);
+                    })
+                }
+            });
+        } else {
+            const preamble = currentFormat === 'yaml' ? [
+                '# Copy + paste your configuration here to get',
+                '# formatting, JSON syntax, annotated properties and'
+            ] : [
+                '// Copy + paste your configuration here to get',
+                '// formatting, JSON syntax, annotated properties and'
+            ];
+
+            const oldModel = window.ed.getModel();
+            oldModel.dispose();
+            // @ts-ignore
+            const newModel = window.meditor.createModel(preamble.join('\r\n'), currentFormat, window.muri.parse(getFileName()));
+            window.ed.setModel(newModel);
+        }
+
+        document.querySelector('#loadConfig').addEventListener('click', (e) => {
+            e.preventDefault();
+            // @ts-ignore
+            const newUrl = document.querySelector('#configUrl').value;
+            fetch(newUrl).then((resp) => {
+                if (!resp.ok) {
+                    resp.text().then(data => {
+                        document.querySelector('#error').innerHTML = `Error occurred while fetching configuration => ${data}`
+                    });
+                } else {
+                    var sp = new URLSearchParams();
+                    // @ts-ignore
+                    sp.set('schema', currentSchema === 'app' ? 'operator' : 'bot');
+                    sp.set('format', currentFormat);
+                    sp.set('url', newUrl);
+                    history.pushState(null, '', `${window.location.pathname}?${sp.toString()}`);
+                    resp.text().then(data => {
+                        const oldModel = window.ed.getModel();
+                        oldModel.dispose();
+                        // @ts-ignore
+                        const newModel = window.meditor.createModel(data, currentFormat, window.muri.parse(getFileName()));
+                        window.ed.setModel(newModel);
+                    })
+                }
+            });
+        });
+
+        document.querySelectorAll('.schemaType').forEach(el => {
+            el.addEventListener('click', (e) => {
+                document.querySelectorAll('.schemaType').forEach(el => {
+                    el.classList.remove('font-bold', 'no-underline', 'pointer-events-none');
+                })
+                if (e.target.dataset.schema === 'operator') {
+                    currentSchema = 'app';
+                    window.schemaType = 'operator';
+                    window.schemaFile = 'OperatorConfig.json';
+                    document.querySelector('#operatorSchemaType').classList.add('font-bold', 'no-underline', 'pointer-events-none');
+                } else {
+                    currentSchema = 'bot';
+                    document.querySelector('#subredditSchemaType').classList.add('font-bold', 'no-underline', 'pointer-events-none');
+                    window.schemaType = 'subreddit';
+                    window.schemaFile = 'App.json';
+                }
+
+                var searchParams = new URLSearchParams(window.location.search);
+                searchParams.set('schema', currentSchema === 'app' ? 'operator' : 'bot');
+                history.pushState(null, '', `${window.location.pathname}?${searchParams.toString()}`);
+                const oldModel = window.ed.getModel();
+                const val = oldModel.getValue();
+                oldModel.dispose();
+                const newModel = window.meditor.createModel(val, currentFormat, window.muri.parse(getFileName()));
+                window.ed.setModel(newModel);
+            })
+        });
+
+        document.querySelectorAll('.formatType').forEach(el => {
+            el.addEventListener('click', (e) => {
+                document.querySelectorAll('.formatType').forEach(el => {
+                    el.classList.remove('font-bold', 'no-underline', 'pointer-events-none');
+                });
+
+                if (e.target.dataset.format === 'yaml') {
+                    currentFormat = 'yaml';
+                    document.querySelector('#formatYaml').classList.add('font-bold', 'no-underline', 'pointer-events-none');
+                } else {
+                    currentFormat = 'json';
+                    document.querySelector('#formatJson').classList.add('font-bold', 'no-underline', 'pointer-events-none');
+                }
+
+                var searchParams = new URLSearchParams(window.location.search);
+                searchParams.set('format', e.target.dataset.format);
+                history.pushState(null, '', `${window.location.pathname}?${searchParams.toString()}`);
+
+                const oldModel = window.ed.getModel();
+                const val = oldModel.getValue();
+                oldModel.dispose();
+                const newModel = window.meditor.createModel(val, currentFormat, window.muri.parse(getFileName()));
+                window.ed.setModel(newModel);
+            })
+        });
+
+        window.addEventListener('load', function () {
+
+            const markers = window.meditor.getModelMarkers();
+            if (markers.length === 0) {
+                window.addNoErrors();
+            }
+
+            window.meditor.onDidChangeMarkers(([resource]) => {
+
+                const markers = window.meditor.getModelMarkers({resource});
+                if (markers.length === 0) {
+                    window.addNoErrors();
+                }
+            });
+        });
     });
 </script>
-<% } %>
 </body>
 </html>
