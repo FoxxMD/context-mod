@@ -29,7 +29,8 @@ import * as RuleSetSchema from '../Schema/RuleSet.json';
 import * as ActionSchema from '../Schema/Action.json';
 import {ActionObjectJson, RuleJson, RuleObjectJson, ActionJson as ActionTypeJson} from "../Common/types";
 import {SubredditResources} from "../Subreddit/SubredditResources";
-import {Author, AuthorCriteria, AuthorOptions} from "../Author/Author";
+import {Author, AuthorCriteria, AuthorOptions} from '..';
+import {ExtendedSnoowrap} from '../Utils/SnoowrapClients';
 
 const checkLogName = truncateStringToLength(25);
 
@@ -50,7 +51,7 @@ export abstract class Check implements ICheck {
     dryRun?: boolean;
     notifyOnTrigger: boolean;
     resources: SubredditResources;
-    client: Snoowrap;
+    client: ExtendedSnoowrap;
 
     constructor(options: CheckOptions) {
         const {
@@ -345,13 +346,13 @@ export interface ICheck extends JoinCondition, ChecksActivityState {
 }
 
 export interface CheckOptions extends ICheck {
-    rules: Array<IRuleSet | IRule>
-    actions: ActionConfig[]
-    logger: Logger
-    subredditName: string
-    notifyOnTrigger?: boolean
-    resources: SubredditResources
-    client: Snoowrap
+    rules: Array<IRuleSet | IRule>;
+    actions: ActionConfig[];
+    logger: Logger;
+    subredditName: string;
+    notifyOnTrigger?: boolean;
+    resources: SubredditResources;
+    client: ExtendedSnoowrap;
     cacheUserResult?: UserResultCacheOptions;
 }
 

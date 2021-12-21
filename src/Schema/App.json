@@ -1119,6 +1119,9 @@
                                 "$ref": "#/definitions/FlairActionJson"
                             },
                             {
+                                "$ref": "#/definitions/UserFlairActionJson"
+                            },
+                            {
                                 "$ref": "#/definitions/CommentActionJson"
                             },
                             {
@@ -1420,6 +1423,95 @@
                     "type": "number"
                 }
             },
+            "type": "object"
+        },
+        "UserFlairActionJson": {
+            "description": "Flair User",
+            "properties": {
+                "authorIs": {
+                    "$ref": "#/definitions/AuthorOptions",
+                    "description": "If present then these Author criteria are checked before running the Action. If criteria fails then the Action is not run.",
+                    "examples": [
+                        {
+                            "include": [
+                                {
+                                    "flairText": [
+                                        "Contributor",
+                                        "Veteran"
+                                    ]
+                                },
+                                {
+                                    "isMod": true
+                                }
+                            ]
+                        }
+                    ]
+                },
+                "css": {
+                    "description": "The text of the css class of the flair to apply",
+                    "type": "string"
+                },
+                "dryRun": {
+                    "default": false,
+                    "description": "If `true` the Action will not make the API request to Reddit to perform its action.",
+                    "examples": [
+                        false,
+                        true
+                    ],
+                    "type": "boolean"
+                },
+                "enable": {
+                    "default": true,
+                    "description": "If set to `false` the Action will not be run",
+                    "examples": [
+                        true
+                    ],
+                    "type": "boolean"
+                },
+                "flair_template_id": {
+                    "description": "Flair template ID to apply",
+                    "type": "string"
+                },
+                "itemIs": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "$ref": "#/definitions/SubmissionState"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "items": {
+                                "$ref": "#/definitions/CommentState"
+                            },
+                            "type": "array"
+                        }
+                    ],
+                    "description": "A list of criteria to test the state of the `Activity` against before running the Action.\n\nIf any set of criteria passes the Action will be run."
+                },
+                "kind": {
+                    "description": "The type of action that will be performed",
+                    "enum": [
+                        "userflair"
+                    ],
+                    "type": "string"
+                },
+                "name": {
+                    "description": "An optional, but highly recommended, friendly name for this Action. If not present will default to `kind`.\n\nCan only contain letters, numbers, underscore, spaces, and dashes",
+                    "examples": [
+                        "myDescriptiveAction"
+                    ],
+                    "pattern": "^[a-zA-Z]([\\w -]*[\\w])?$",
+                    "type": "string"
+                },
+                "text": {
+                    "description": "The text of the flair to apply",
+                    "type": "string"
+                }
+            },
+            "required": [
+                "kind"
+            ],
             "type": "object"
         },
         "FlairActionJson": {
@@ -3189,6 +3281,9 @@
                     ],
                     "items": {
                         "anyOf": [
+                            {
+                                "$ref": "#/definitions/UserFlairActionJson"
+                            },
                             {
                                 "$ref": "#/definitions/FlairActionJson"
                             },

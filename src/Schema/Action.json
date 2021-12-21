@@ -387,6 +387,7 @@
                 "ban",
                 "comment",
                 "flair",
+                "userflair",
                 "lock",
                 "message",
                 "remove",
