@@ -46,7 +46,7 @@ const logs = (subLogMap: Map<string, LogEntry[]>) => {
                 console.log('Request closed detected with "close" listener');
                 res.destroy();
                 return;
-            } catch (e) {
+            } catch (e: any) {
                 if (e.code !== 'ECONNRESET') {
                     logger.error(e);
                 }

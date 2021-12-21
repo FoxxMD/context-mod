@@ -98,7 +98,7 @@ export abstract class Action {
             actRes.run = true;
             const results = await this.process(item, ruleResults, runtimeDryrun);
             return {...actRes, ...results};
-        } catch (err) {
+        } catch (err: any) {
             if(!(err instanceof LoggedError)) {
                 this.logger.error(`Encountered error while running`, err);
             }

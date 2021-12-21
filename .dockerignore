@@ -1,8 +1,8 @@
-node_modules
 Dockerfile
 .dockerignore
 .gitignore
 .git
 src/logs
-/docs
 .github
+/docs/
+/node_modules/

@@ -83,7 +83,7 @@ class ImageData {
                 }
 
 
-            } catch (err) {
+            } catch (err: any) {
                 if(!(err instanceof SimpleError)) {
                     throw new Error(`Error occurred while fetching response from URL: ${err.message}`);
                 } else {

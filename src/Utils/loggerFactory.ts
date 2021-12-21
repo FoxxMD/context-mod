@@ -15,7 +15,6 @@ export const getLogger = (options: any, name = 'app'): Logger => {
 
         const consoleTransport = new transports.Console({
             handleExceptions: true,
-            // @ts-expect-error
             handleRejections: true,
         });
 
@@ -31,7 +30,6 @@ export const getLogger = (options: any, name = 'app'): Logger => {
                 name: 'duplex',
                 dump: false,
                 handleExceptions: true,
-                // @ts-expect-error
                 handleRejections: true,
             }),
             ...additionalTransports,

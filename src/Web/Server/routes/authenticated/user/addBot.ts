@@ -32,7 +32,7 @@ const addBot = () => {
                     req.botApp.logger.error(err);
                 }
             });
-        } catch (err) {
+        } catch (err: any) {
             if (newBot.error === undefined) {
                 newBot.error = err.message;
                 result.error = err.message;

@@ -27,6 +27,7 @@ Some feature highlights:
   * Activity state (removed, locked, distinguished, etc.)
 * Rules and Actions support named references (write once, reference anywhere)
 * [**Image Comparisons**](/docs/imageComparison.md) via fingerprinting and/or pixel differences
+* [**Repost detection**](/docs/examples/repost) with support for external services (youtube, etc...)
 * Global/subreddit-level **API caching**
 * Support for [Toolbox User Notes](https://www.reddit.com/r/toolbox/wiki/docs/usernotes) as criteria or Actions (writing notes)
 * Docker container support
@@ -125,7 +126,7 @@ Moderator view/invite and authorization:
 
 A built-in editor using [monaco-editor](https://microsoft.github.io/monaco-editor/) makes editing configurations easy:
 
-* Automatic JSON syntax validation and formatting
+* Automatic JSON or YAML syntax validation and formatting
 * Automatic Schema (subreddit or operator) validation
 * All properties are annotated via hover popups
 * Unauthenticated view via `yourdomain.com/config`

@@ -268,7 +268,7 @@ export abstract class Check implements ICheck {
             // otherwise AND and did not return already so all passed
             this.logger.info(`${PASS} => Rules: ${resultsSummary(allResults, this.condition)}`);
             return [true, allRuleResults];
-        } catch (e) {
+        } catch (e: any) {
             e.logged = true;
             this.logger.warn(`Running rules failed due to uncaught exception`, e);
             throw e;

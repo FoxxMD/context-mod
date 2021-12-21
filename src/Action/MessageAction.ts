@@ -58,13 +58,13 @@ export class MessageAction extends Action {
         if(this.to !== undefined) {
             // parse to value
             try {
-                const entityData = parseRedditEntity(this.to);
+                const entityData = parseRedditEntity(this.to, 'user');
                 if(entityData.type === 'user') {
                     recipient = entityData.name;
                 } else {
                     recipient = `/r/${entityData.name}`;
                 }
-            } catch (err) {
+            } catch (err: any) {
                 this.logger.error(`'to' field for message was not in a valid format. See ${REDDIT_ENTITY_REGEX_URL} for valid examples`);
                 this.logger.error(err);
                 err.logged = true;

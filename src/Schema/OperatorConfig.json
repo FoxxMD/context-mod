@@ -19,6 +19,28 @@
             ],
             "type": "object"
         },
+        "BotCredentialsJsonConfig": {
+            "properties": {
+                "reddit": {
+                    "$ref": "#/definitions/RedditCredentials"
+                },
+                "youtube": {
+                    "properties": {
+                        "apiKey": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "apiKey"
+                    ],
+                    "type": "object"
+                }
+            },
+            "required": [
+                "reddit"
+            ],
+            "type": "object"
+        },
         "BotInstanceJsonConfig": {
             "description": "The configuration for an **individual reddit account** ContextMod will run as a bot.\n\nMultiple bot configs may be specified (one per reddit account).\n\n**NOTE:** If `bots` is not specified in a `FILE` then a default `bot` is generated using `ENV/ARG` values IE `CLIENT_ID`, etc...but if `bots` IS specified the default is not generated.",
             "properties": {
@@ -27,15 +49,12 @@
                     "description": "Settings to configure the default caching behavior for this bot\n\nEvery setting not specified will default to what is specified by the global operator caching config"
                 },
                 "credentials": {
-                    "$ref": "#/definitions/RedditCredentials",
-                    "description": "Credentials required for the bot to interact with Reddit's API\n\nThese credentials will provided to both the API and Web interface unless otherwise specified with the `web.credentials` property\n\nRefer to the [required credentials table](https://github.com/FoxxMD/context-mod/blob/master/docs/operatorConfiguration.md#minimum-required-configuration) to see what is necessary to run the bot.",
-                    "examples": [
+                    "anyOf": [
                         {
-                            "accessToken": "p75_1c467b2",
-                            "clientId": "f4b4df1_9oiu",
-                            "clientSecret": "34v5q1c564_yt7",
-                            "redirectUri": "http://localhost:8085/callback",
-                            "refreshToken": "34_f1w1v4"
+                            "$ref": "#/definitions/RedditCredentials"
+                        },
+                        {
+                            "$ref": "#/definitions/BotCredentialsJsonConfig"
                         }
                     ]
                 },
@@ -510,6 +529,24 @@
             },
             "type": "object"
         },
+        "ThirdPartyCredentialsJsonConfig": {
+            "additionalProperties": {
+            },
+            "properties": {
+                "youtube": {
+                    "properties": {
+                        "apiKey": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "apiKey"
+                    ],
+                    "type": "object"
+                }
+            },
+            "type": "object"
+        },
         "WebCredentials": {
             "description": "Separate credentials for the web interface can be provided when also running the api.\n\nAll properties not specified will default to values given in ENV/ARG credential properties\n\nRefer to the [required credentials table](https://github.com/FoxxMD/context-mod/blob/master/docs/operatorConfiguration.md#minimum-required-configuration) to see what is necessary for the web interface.",
             "examples": [
@@ -578,6 +615,9 @@
         "caching": {
             "$ref": "#/definitions/OperatorCacheConfig",
             "description": "Settings to configure the default caching behavior globally\n\nThese settings will be used by each bot, and subreddit, that does not specify their own"
+        },
+        "credentials": {
+            "$ref": "#/definitions/ThirdPartyCredentialsJsonConfig"
         },
         "logging": {
             "description": "Settings to configure global logging defaults",

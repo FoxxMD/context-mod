@@ -13,9 +13,17 @@ import {ApproveActionJson} from "../Action/ApproveAction";
 import {BanActionJson} from "../Action/BanAction";
 import {RegexRuleJSONConfig} from "../Rule/RegexRule";
 import {MessageActionJson} from "../Action/MessageAction";
+import {RepostRuleJSONConfig} from "../Rule/RepostRule";
 
-export type RuleJson = RecentActivityRuleJSONConfig | RepeatActivityJSONConfig | AuthorRuleJSONConfig | AttributionJSONConfig | HistoryJSONConfig | RegexRuleJSONConfig | string;
+export type RuleJson = RecentActivityRuleJSONConfig | RepeatActivityJSONConfig | AuthorRuleJSONConfig | AttributionJSONConfig | HistoryJSONConfig | RegexRuleJSONConfig | RepostRuleJSONConfig | string;
 export type RuleObjectJson = Exclude<RuleJson, string>
 
 export type ActionJson = CommentActionJson | FlairActionJson | ReportActionJson | LockActionJson | RemoveActionJson | ApproveActionJson | BanActionJson | UserNoteActionJson | MessageActionJson | string;
 export type ActionObjectJson = Exclude<ActionJson, string>;
+
+// borrowed from https://github.com/jabacchetta/set-random-interval/blob/master/src/index.ts
+export type SetRandomInterval = (
+    intervalFunction: () => void,
+    minDelay: number,
+    maxDelay: number,
+) => { clear: () => void };

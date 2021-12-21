@@ -74,7 +74,7 @@ export class App {
                             this.logger.error(err);
                         }
                     });
-                } catch (err) {
+                } catch (err: any) {
                     if (b.error === undefined) {
                         b.error = err.message;
                     }

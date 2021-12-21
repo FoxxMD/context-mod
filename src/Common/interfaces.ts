@@ -832,6 +832,8 @@ export interface ManagerOptions {
     nickname?: string
 
     notifications?: NotificationConfig
+
+    credentials?: ThirdPartyCredentialsJsonConfig
 }
 
 /**
@@ -948,6 +950,14 @@ export interface CommentState extends ActivityState {
      * A list of SubmissionState attributes to test the Submission this comment is in
      * */
     submissionState?: SubmissionState[]
+
+    /**
+     * The (nested) level of a comment.
+     *
+     * * 0 mean the comment is at top-level (replying to submission)
+     * * non-zero, Nth value means the comment has N parent comments
+     * */
+    depth?: DurationComparor
 }
 
 /**
@@ -979,6 +989,8 @@ export interface SubredditState {
      * A friendly description of what this State is trying to parse
      * */
     stateDescription?: string
+
+    isUserProfile?: boolean
 }
 
 export interface StrongSubredditState extends SubredditState {
@@ -1005,6 +1017,28 @@ export type RunState = 'running' | 'paused' | 'stopped';
 export const STOPPED = 'stopped';
 export const RUNNING = 'running';
 export const PAUSED = 'paused';
+
+export interface SearchAndReplaceRegExp {
+    /**
+     * The search value to test for
+     *
+     * Can be a normal string (converted to a case-sensitive literal) or a valid regular expression
+     *
+     * EX `["find this string", "/some string*\/ig"]`
+     *
+     * @examples ["find this string", "/some string*\/ig"]
+     * */
+    search: string
+
+    /**
+     * The replacement string/value to use when search is found
+     *
+     * This can be a literal string like `'replace with this`, an empty string to remove the search value (`''`), or a special regex value
+     *
+     * See replacement here for more information: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/replace
+     * */
+    replace: string
+}
 
 export interface NamedGroup {
     [name: string]: string
@@ -1264,7 +1298,7 @@ export interface WebCredentials {
  *
  * */
 export interface BotInstanceJsonConfig {
-    credentials?: RedditCredentials
+    credentials?: BotCredentialsJsonConfig | RedditCredentials
     /*
     * The name to display for the bot. If not specified will use the name of the reddit account IE `u/TheBotName`
     * */
@@ -1644,6 +1678,8 @@ export interface OperatorJsonConfig {
          * */
         friendly?: string,
     }
+
+    credentials?: ThirdPartyCredentialsJsonConfig
 }
 
 export interface RequiredOperatorRedditCredentials extends RedditCredentials {
@@ -1657,8 +1693,23 @@ export interface RequiredWebRedditCredentials extends RedditCredentials {
     redirectUri: string
 }
 
+export interface ThirdPartyCredentialsJsonConfig {
+    youtube?: {
+        apiKey: string
+    }
+    [key: string]: any
+}
+
+export interface BotCredentialsJsonConfig extends ThirdPartyCredentialsJsonConfig {
+    reddit: RedditCredentials
+}
+
+export interface BotCredentialsConfig extends ThirdPartyCredentialsJsonConfig {
+    reddit: RequiredOperatorRedditCredentials
+}
+
 export interface BotInstanceConfig extends BotInstanceJsonConfig {
-    credentials: RequiredOperatorRedditCredentials
+    credentials: BotCredentialsJsonConfig
     snoowrap: {
         proxy?: string,
         debug?: boolean,
@@ -1720,6 +1771,7 @@ export interface OperatorConfig extends OperatorJsonConfig {
         friendly?: string,
     }
     bots: BotInstanceConfig[]
+    credentials: ThirdPartyCredentialsJsonConfig
 }
 
 //export type OperatorConfig = Required<OperatorJsonConfig>;
@@ -1877,4 +1929,28 @@ export interface HistoricalStatUpdateData {
     rulesRun: string[] | string
     rulesCachedTotal: number
     rulesTriggered: string[] | string
+}
+
+export type SearchFacetType = 'title' | 'url' | 'duplicates' | 'crossposts' | 'external';
+
+export interface RepostItem {
+    value: string
+    createdOn?: number
+    source: string
+    sourceUrl?: string
+    score?: number
+    id: string
+    itemType: string
+    acquisitionType: SearchFacetType | 'comment'
+    sourceObj?: any
+    reqSameness?: number
+}
+
+export interface RepostItemResult extends RepostItem {
+    sameness: number
+}
+
+export interface StringComparisonOptions {
+    lengthWeight?: number,
+    transforms?: ((str: string) => string)[]
 }

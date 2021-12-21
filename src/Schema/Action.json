@@ -167,6 +167,11 @@
                 "deleted": {
                     "type": "boolean"
                 },
+                "depth": {
+                    "description": "The (nested) level of a comment.\n\n* 0 mean the comment is at top-level (replying to submission)\n* non-zero, Nth value means the comment has N parent comments",
+                    "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(days|weeks|months|years|hours|minutes|seconds|milliseconds)\\s*$",
+                    "type": "string"
+                },
                 "distinguished": {
                     "type": "boolean"
                 },

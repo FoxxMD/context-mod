@@ -17,7 +17,7 @@ import {
     cacheStats, compareDurationValue, comparisonTextOp, createCacheManager, createHistoricalStatsDisplay,
     formatNumber, getActivityAuthorName, getActivitySubredditName, isStrongSubredditState,
     mergeArr, parseDurationComparison,
-    parseExternalUrl, parseGenericValueComparison,
+    parseExternalUrl, parseGenericValueComparison, parseRedditEntity,
     parseWikiContext, shouldCacheSubredditStateCriteriaResult, subredditStateIsNameOnly, toStrongSubredditState
 } from "../util";
 import LoggedError from "../Utils/LoggedError";
@@ -40,7 +40,7 @@ import {
     HistoricalStats,
     HistoricalStatUpdateData,
     SubredditHistoricalStats,
-    SubredditHistoricalStatsDisplay,
+    SubredditHistoricalStatsDisplay, ThirdPartyCredentialsJsonConfig,
 } from "../Common/interfaces";
 import UserNotes from "./UserNotes";
 import Mustache from "mustache";
@@ -62,6 +62,7 @@ export interface SubredditResourceConfig extends Footer {
     subreddit: Subreddit,
     logger: Logger;
     client: ExtendedSnoowrap
+    credentials?: ThirdPartyCredentialsJsonConfig
 }
 
 interface SubredditResourceOptions extends Footer {
@@ -74,6 +75,7 @@ interface SubredditResourceOptions extends Footer {
     client: ExtendedSnoowrap;
     prefix?: string;
     actionedEventsMax: number;
+    thirdPartyCredentials: ThirdPartyCredentialsJsonConfig
 }
 
 export interface SubredditResourceSetOptions extends CacheConfig, Footer {
@@ -101,6 +103,7 @@ export class SubredditResources {
     historicalSaveInterval?: any;
     prefix?: string
     actionedEventsMax: number;
+    thirdPartyCredentials: ThirdPartyCredentialsJsonConfig;
 
     stats: {
         cache: ResourceStats
@@ -126,6 +129,7 @@ export class SubredditResources {
             actionedEventsMax,
             cacheSettingsHash,
             client,
+            thirdPartyCredentials,
         } = options || {};
 
         this.cacheSettingsHash = cacheSettingsHash;
@@ -141,6 +145,7 @@ export class SubredditResources {
         this.wikiTTL = wikiTTL === true ? 0 : wikiTTL;
         this.filterCriteriaTTL = filterCriteriaTTL === true ? 0 : filterCriteriaTTL;
         this.subreddit = subreddit;
+        this.thirdPartyCredentials = thirdPartyCredentials;
         this.name = name;
         if (logger === undefined) {
             const alogger = winston.loggers.get('app')
@@ -380,7 +385,7 @@ export class SubredditResources {
                 // @ts-ignore
                 return await item.fetch();
             }
-        } catch (err) {
+        } catch (err: any) {
             this.logger.error('Error while trying to fetch a cached activity', err);
             throw err.logged;
         }
@@ -415,7 +420,7 @@ export class SubredditResources {
 
                 return subreddit as Subreddit;
             }
-        } catch (err) {
+        } catch (err: any) {
             this.logger.error('Error while trying to fetch a cached activity', err);
             throw err.logged;
         }
@@ -527,7 +532,7 @@ export class SubredditResources {
                 // @ts-ignore
                 const wikiPage = sub.getWikiPage(wikiContext.wiki);
                 wikiContent = await wikiPage.content_md;
-            } catch (err) {
+            } catch (err: any) {
                 let msg = `Could not read wiki page for an unknown reason. Please ensure the page 'https://reddit.com${sub.display_name_prefixed}/wiki/${wikiContext.wiki}' exists and is readable`;
                 if(err.statusCode !== undefined) {
                     if(err.statusCode === 404) {
@@ -543,7 +548,7 @@ export class SubredditResources {
             try {
                 const response = await fetch(extUrl as string);
                 wikiContent = await response.text();
-            } catch (err) {
+            } catch (err: any) {
                 const msg = `Error occurred while trying to fetch the url ${extUrl}`;
                 this.logger.error(msg, err);
                 throw new LoggedError(msg);
@@ -648,7 +653,7 @@ export class SubredditResources {
                 this.stats.cache.subredditCrit.miss++;
                 await this.cache.set(hash, itemResult, {ttl: this.filterCriteriaTTL});
                 return itemResult;
-            } catch (err) {
+            } catch (err: any) {
                 if (err.logged !== true) {
                     this.logger.error('Error occurred while testing subreddit criteria', err);
                 }
@@ -718,7 +723,7 @@ export class SubredditResources {
                 this.stats.cache.itemCrit.miss++;
                 await this.cache.set(hash, itemResult, {ttl: this.filterCriteriaTTL});
                 return itemResult;
-            } catch (err) {
+            } catch (err: any) {
                 if (err.logged !== true) {
                     this.logger.error('Error occurred while testing item criteria', err);
                 }
@@ -749,6 +754,15 @@ export class SubredditResources {
                             const nameReg = crit[k] as RegExp;
                             if(!nameReg.test(subreddit.display_name)) {
                                 return false;
+                            }
+                            break;
+                        case 'isUserProfile':
+                            const entity = parseRedditEntity(subreddit.display_name);
+                            const entityIsUserProfile = entity.type === 'user';
+                            if(crit[k] !== entityIsUserProfile) {
+                                // @ts-ignore
+                                log.debug(`Failed: Expected => ${k}:${crit[k]} | Found => ${k}:${entityIsUserProfile}`)
+                                return false
                             }
                             break;
                         case 'over18':
@@ -880,7 +894,7 @@ export class SubredditResources {
                                         log.debug(`Failed to match title as regular expression: ${titleReg}`);
                                         return false;
                                     }
-                                } catch (err) {
+                                } catch (err: any) {
                                     log.error(`An error occurred while attempting to match title against string as regular expression: ${titleReg}. Most likely the string does not make a valid regular expression.`, err);
                                     return false
                                 }
@@ -907,6 +921,19 @@ export class SubredditResources {
                                 if (item.is_submitter !== crit[k]) {
                                     // @ts-ignore
                                     log.debug(`Failed: Expected => ${k}:${crit[k]} | Found => ${k}:${item[k]}`)
+                                    return false
+                                }
+                                break;
+                            case 'depth':
+                                if(item instanceof Submission) {
+                                    log.warn(`Cannot test for 'depth' on a Submission`);
+                                    break;
+                                }
+                                // @ts-ignore
+                                const depthCompare = parseGenericValueComparison(crit[k] as string);
+                                if(!comparisonTextOp(item.score, depthCompare.operator, depthCompare.value)) {
+                                    // @ts-ignore
+                                    log.debug(`Failed: Expected => ${k}:${crit[k]} | Found => ${k}:${item.score}`)
                                     return false
                                 }
                                 break;
@@ -1003,6 +1030,13 @@ export class SubredditResources {
         // }
         // return hash;
     }
+
+    getThirdPartyCredentials(name: string) {
+        if(this.thirdPartyCredentials[name] !== undefined) {
+            return this.thirdPartyCredentials[name];
+        }
+        return undefined;
+    }
 }
 
 export class BotResourcesManager {
@@ -1018,6 +1052,7 @@ export class BotResourcesManager {
     actionedEventsMaxDefault?: number;
     actionedEventsDefault: number;
     pruneInterval: any;
+    defaultThirdPartyCredentials: ThirdPartyCredentialsJsonConfig;
 
     constructor(config: BotInstanceConfig) {
         const {
@@ -1034,13 +1069,17 @@ export class BotResourcesManager {
                 actionedEventsDefault,
             },
             name,
-            credentials,
+            credentials: {
+                reddit,
+                ...thirdParty
+            },
             caching,
         } = config;
         caching.provider.prefix = buildCachePrefix([caching.provider.prefix, 'SHARED']);
         const {actionedEventsMax: eMax, actionedEventsDefault: eDef, ...relevantCacheSettings} = caching;
         this.cacheHash = objectHash.sha1(relevantCacheSettings);
         this.defaultCacheConfig = caching;
+        this.defaultThirdPartyCredentials = thirdParty;
         this.ttlDefaults = {authorTTL, userNotesTTL, wikiTTL, commentTTL, submissionTTL, filterCriteriaTTL, subredditTTL};
 
         const options = provider;
@@ -1073,13 +1112,14 @@ export class BotResourcesManager {
 
     async set(subName: string, initOptions: SubredditResourceConfig): Promise<SubredditResources> {
         let hash = 'default';
-        const { caching, ...init } = initOptions;
+        const { caching, credentials, ...init } = initOptions;
 
         let opts: SubredditResourceOptions = {
             cache: this.defaultCache,
             cacheType: this.cacheType,
             cacheSettingsHash: hash,
             ttl: this.ttlDefaults,
+            thirdPartyCredentials: credentials ?? this.defaultThirdPartyCredentials,
             prefix: this.defaultCacheConfig.provider.prefix,
             actionedEventsMax: this.actionedEventsMaxDefault !== undefined ? Math.min(this.actionedEventsDefault, this.actionedEventsMaxDefault) : this.actionedEventsDefault,
             ...init,
@@ -1107,6 +1147,7 @@ export class BotResourcesManager {
                     actionedEventsMax: eventsMax,
                     cacheType: trueProvider.store,
                     cacheSettingsHash: hash,
+                    thirdPartyCredentials: credentials ?? this.defaultThirdPartyCredentials,
                     prefix: subPrefix,
                     ...init,
                     ...trueRest,

@@ -22,11 +22,12 @@ import {App} from "./App";
 import apiServer from './Web/Server/server';
 import clientServer from './Web/Client';
 import Submission from "snoowrap/dist/objects/Submission";
-import {COMMENT_URL_ID, isScopeError, parseLinkIdentifier, SUBMISSION_URL_ID} from "./util";
+import {COMMENT_URL_ID, parseLinkIdentifier, SUBMISSION_URL_ID} from "./util";
 import LoggedError from "./Utils/LoggedError";
 import {buildOperatorConfigWithDefaults, parseOperatorConfigFromSources} from "./ConfigBuilder";
 import {getLogger} from "./Utils/loggerFactory";
 import Bot from "./Bot";
+import {isScopeError} from "./Utils/Errors";
 
 dayjs.extend(utc);
 dayjs.extend(dduration);
@@ -74,7 +75,7 @@ const program = new Command();
                 if(mode === 'all' || mode === 'server') {
                     await apiServer(config);
                 }
-            } catch (err) {
+            } catch (err: any) {
                 throw err;
             }
         });
@@ -198,7 +199,7 @@ const program = new Command();
 
         await program.parseAsync();
 
-    } catch (err) {
+    } catch (err: any) {
         if (!err.logged && !(err instanceof LoggedError)) {
             const logger = winston.loggers.get('app');
             if(isScopeError(err)) {

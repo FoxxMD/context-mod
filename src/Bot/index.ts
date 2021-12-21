@@ -20,6 +20,8 @@ import {ModQueueStream, UnmoderatedStream} from "../Subreddit/Streams";
 import {BotResourcesManager} from "../Subreddit/SubredditResources";
 import LoggedError from "../Utils/LoggedError";
 import pEvent from "p-event";
+import SimpleError from "../Utils/SimpleError";
+import {isRateLimitError} from "../Utils/Errors";
 
 
 class Bot {
@@ -42,6 +44,7 @@ class Bot {
     nannyRunning: boolean = false;
     nextNannyCheck: Dayjs = dayjs().add(10, 'second');
     nannyRetryHandler: Function;
+    managerRetryHandler: Function;
     nextExpiration: Dayjs = dayjs();
     botName?: string;
     botLink?: string;
@@ -50,6 +53,8 @@ class Bot {
     startedAt: Dayjs = dayjs();
     sharedModqueue: boolean = false;
     streamListedOnce: string[] = [];
+
+    stagger: number;
 
     apiSample: number[] = [];
     apiRollingAvg: number = 0;
@@ -81,10 +86,12 @@ class Bot {
                 heartbeatInterval,
             },
             credentials: {
-                clientId,
-                clientSecret,
-                refreshToken,
-                accessToken,
+                reddit: {
+                    clientId,
+                    clientSecret,
+                    refreshToken,
+                    accessToken,
+                },
             },
             snoowrap: {
                 proxy,
@@ -92,7 +99,7 @@ class Bot {
             },
             polling: {
                 sharedMod,
-                stagger,
+                stagger = 2000,
             },
             queue: {
                 maxWorkers,
@@ -174,9 +181,9 @@ class Bot {
                 maxRetryAttempts: 5,
                 debug,
                 logger: snooLogWrapper(this.logger.child({labels: ['Snoowrap']}, mergeArr)),
-                continueAfterRatelimitError: true,
+                continueAfterRatelimitError: false,
             });
-        } catch (err) {
+        } catch (err: any) {
             if(this.error === undefined) {
                 this.error = err.message;
                 this.logger.error(err);
@@ -185,6 +192,9 @@ class Bot {
 
         const retryHandler = createRetryHandler({maxRequestRetry: 8, maxOtherRetry: 1}, this.logger);
         this.nannyRetryHandler = createRetryHandler({maxRequestRetry: 5, maxOtherRetry: 1}, this.logger);
+        this.managerRetryHandler = createRetryHandler({maxRequestRetry: 5, maxOtherRetry: 10, waitOnRetry: false, clearRetryCountAfter: 2}, this.logger);
+
+        this.stagger = stagger ?? 2000;
 
         const modStreamErrorListener = (name: string) => async (err: any) => {
             this.logger.error('Polling error occurred', err);
@@ -259,19 +269,23 @@ class Bot {
         }
     }
 
-    async testClient() {
+    async testClient(initial = true) {
         try {
             // @ts-ignore
             await this.client.getMe();
             this.logger.info('Test API call successful');
-        } catch (err) {
-            this.logger.error('An error occurred while trying to initialize the Reddit API Client which would prevent the entire application from running.');
-            if(err.name === 'StatusCodeError') {
+        } catch (err: any) {
+            if (initial) {
+                this.logger.error('An error occurred while trying to initialize the Reddit API Client which would prevent the entire application from running.');
+            }
+            if (err.name === 'StatusCodeError') {
                 const authHeader = err.response.headers['www-authenticate'];
                 if (authHeader !== undefined && authHeader.includes('insufficient_scope')) {
                     this.logger.error('Reddit responded with a 403 insufficient_scope. Please ensure you have chosen the correct scopes when authorizing your account.');
-                } else if(err.statusCode === 401) {
+                } else if (err.statusCode === 401) {
                     this.logger.error('It is likely a credential is missing or incorrect. Check clientId, clientSecret, refreshToken, and accessToken');
+                } else if(err.statusCode === 400) {
+                    this.logger.error('Credentials may have been invalidated due to prior behavior. The error message may contain more information.');
                 }
                 this.logger.error(`Error Message: ${err.message}`);
             } else {
@@ -298,10 +312,12 @@ class Bot {
         }
         this.logger.info(`Bot Name${botNameFromConfig ? ' (from config)' : ''}: ${this.botName}`);
 
-        for (const sub of await this.client.getModeratedSubreddits()) {
-            // TODO don't know a way to check permissions yet
-            availSubs.push(sub);
+        let subListing = await this.client.getModeratedSubreddits({count: 100});
+        while(!subListing.isFinished) {
+            subListing = await subListing.fetchMore({amount: 100});
         }
+        availSubs = subListing;
+
         this.logger.info(`u/${user.name} is a moderator of these subreddits: ${availSubs.map(x => x.display_name_prefixed).join(', ')}`);
 
         let subsToRun: Subreddit[] = [];
@@ -335,15 +351,26 @@ class Bot {
             const manager = new Manager(sub, this.client, this.logger, this.cacheManager, {dryRun: this.dryRun, sharedModqueue: this.sharedModqueue, wikiLocation: this.wikiLocation, botName: this.botName, maxWorkers: this.maxWorkers});
             try {
                 await manager.parseConfiguration('system', true, {suppressNotification: true});
-            } catch (err) {
+            } catch (err: any) {
                 if (!(err instanceof LoggedError)) {
                     this.logger.error(`Config was not valid:`, {subreddit: sub.display_name_prefixed});
                     this.logger.error(err, {subreddit: sub.display_name_prefixed});
                 }
             }
+            // all errors from managers will count towards bot-level retry count
+            manager.on('error', async (err) => await this.panicOnRetries(err));
             subSchedule.push(manager);
         }
         this.subManagers = subSchedule;
+    }
+
+    // if the cumulative errors exceeds configured threshold then stop ALL managers as there is most likely something very bad happening
+    async panicOnRetries(err: any) {
+        if(!this.managerRetryHandler(err)) {
+            for(const m of this.subManagers) {
+                await m.stop();
+            }
+        }
     }
 
     async destroy(causedBy: Invokee) {
@@ -382,7 +409,7 @@ class Bot {
         for (const manager of this.subManagers) {
             if (manager.validConfigLoaded && manager.botState.state !== RUNNING) {
                 await manager.start(causedBy, {reason: 'Caused by application startup'});
-                await sleep(2000);
+                await sleep(this.stagger);
             }
         }
 
@@ -404,15 +431,15 @@ class Bot {
                 try {
                     await this.runApiNanny();
                     this.nextNannyCheck = dayjs().add(10, 'second');
-                } catch (err) {
-                    this.logger.info('Delaying next nanny check for 1 minute due to emitted error');
+                } catch (err: any) {
+                    this.logger.info('Delaying next nanny check for 2 minutes due to emitted error');
                     this.nextNannyCheck = dayjs().add(120, 'second');
                 }
             }
             if(dayjs().isSameOrAfter(this.nextHeartbeat)) {
                 try {
                     await this.heartbeat();
-                } catch (err) {
+                } catch (err: any) {
                     this.logger.error(`Error occurred during heartbeat check: ${err.message}`);
                 }
                 this.nextHeartbeat = dayjs().add(this.heartbeatInterval, 'second');
@@ -424,20 +451,39 @@ class Bot {
     async heartbeat() {
         const heartbeat = `HEARTBEAT -- API Remaining: ${this.client.ratelimitRemaining} | Usage Rolling Avg: ~${formatNumber(this.apiRollingAvg)}/s | Est Depletion: ${this.apiEstDepletion === undefined ? 'N/A' : this.apiEstDepletion.humanize()} (${formatNumber(this.depletedInSecs, {toFixed: 0})} seconds)`
         this.logger.info(heartbeat);
+
+        // run sanity check to see if there is a service issue
+        try {
+            await this.testClient(false);
+        } catch (err: any) {
+            throw new SimpleError(`Something isn't right! This could be a Reddit API issue (service is down? buggy??) or an issue with the Bot account. Will not run heartbeat operations and will wait until next heartbeat (${dayjs.duration(this.nextHeartbeat.diff(dayjs())).humanize()}) to try again`);
+        }
+        let startedAny = false;
+
         for (const s of this.subManagers) {
             if(s.botState.state === STOPPED && s.botState.causedBy === USER) {
                 this.logger.debug('Skipping config check/restart on heartbeat due to previously being stopped by user', {subreddit: s.displayLabel});
                 continue;
             }
             try {
+                // ensure calls to wiki page are also staggered so we aren't hitting api hard when bot has a ton of subreddits to check
+                await sleep(this.stagger);
                 const newConfig = await s.parseConfiguration();
-                if(newConfig || (s.queueState.state !== RUNNING && s.queueState.causedBy === SYSTEM))
-                {
-                    await s.startQueue('system', {reason: newConfig ? 'Config updated on heartbeat triggered reload' : 'Heartbeat detected non-running queue'});
-                }
-                if(newConfig || (s.eventsState.state !== RUNNING && s.eventsState.causedBy === SYSTEM))
-                {
-                    await s.startEvents('system', {reason: newConfig ? 'Config updated on heartbeat triggered reload' : 'Heartbeat detected non-running events'});
+                const willStart = newConfig || (s.queueState.state !== RUNNING && s.queueState.causedBy === SYSTEM) || (s.eventsState.state !== RUNNING && s.eventsState.causedBy === SYSTEM);
+                if(willStart) {
+                    // stagger restart
+                    if (startedAny) {
+                        await sleep(this.stagger);
+                    }
+                    startedAny = true;
+                    if(newConfig || (s.queueState.state !== RUNNING && s.queueState.causedBy === SYSTEM))
+                    {
+                        await s.startQueue('system', {reason: newConfig ? 'Config updated on heartbeat triggered reload' : 'Heartbeat detected non-running queue'});
+                    }
+                    if(newConfig || (s.eventsState.state !== RUNNING && s.eventsState.causedBy === SYSTEM))
+                    {
+                        await s.startEvents('system', {reason: newConfig ? 'Config updated on heartbeat triggered reload' : 'Heartbeat detected non-running events'});
+                    }
                 }
                 if(s.botState.state !== RUNNING && s.eventsState.state === RUNNING && s.queueState.state === RUNNING) {
                     s.botState = {
@@ -445,7 +491,7 @@ class Bot {
                         causedBy: 'system',
                     }
                 }
-            } catch (err) {
+            } catch (err: any) {
                 this.logger.info('Stopping event polling to prevent activity processing queue from backing up. Will be restarted when config update succeeds.')
                 await s.stopEvents('system', {reason: 'Invalid config will cause events to pile up in queue. Will be restarted when config update succeeds (next heartbeat).'});
                 if(!(err instanceof LoggedError)) {
@@ -472,7 +518,10 @@ class Bot {
                         // @ts-ignore
                         await this.client.getMe();
                         shouldRetry = false;
-                    } catch (err) {
+                    } catch (err: any) {
+                        if(isRateLimitError(err)) {
+                            throw err;
+                        }
                         shouldRetry = await this.nannyRetryHandler(err);
                         if (!shouldRetry) {
                             throw err;
@@ -590,7 +639,7 @@ class Bot {
                 this.nannyMode = undefined;
             }
 
-        } catch (err) {
+        } catch (err: any) {
             this.logger.error(`Error occurred during nanny loop: ${err.message}`);
             throw err;
         }

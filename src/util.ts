@@ -12,10 +12,10 @@ import {inflateSync, deflateSync} from "zlib";
 import pixelmatch from 'pixelmatch';
 import os from 'os';
 import {
-    ActivityWindowCriteria,
+    ActivityWindowCriteria, ActivityWindowType,
     CacheOptions,
     CacheProvider,
-    DurationComparison,
+    DurationComparison, DurationVal,
     GenericComparison,
     HistoricalStats,
     HistoricalStatsDisplay, ImageComparisonResult,
@@ -27,9 +27,9 @@ import {
     PollingOptionsStrong,
     RedditEntity,
     RedditEntityType,
-    RegExResult,
-    ResourceStats,
-    StatusCodeError,
+    RegExResult, RepostItem, RepostItemResult,
+    ResourceStats, SearchAndReplaceRegExp,
+    StatusCodeError, StringComparisonOptions,
     StringOperator,
     StrongSubredditState,
     SubredditState
@@ -54,6 +54,10 @@ import ImageData from "./Common/ImageData";
 import {Sharp, SharpOptions} from "sharp";
 // @ts-ignore
 import {blockhashData, hammingDistance} from 'blockhash';
+import {SetRandomInterval} from "./Common/types";
+import stringSimilarity from 'string-similarity';
+import calculateCosineSimilarity from "./Utils/StringMatching/CosineSimilarity";
+import levenSimilarity from "./Utils/StringMatching/levenSimilarity";
 //import {ResembleSingleCallbackComparisonResult} from "resemblejs";
 
 // want to guess how many concurrent image comparisons we should be doing
@@ -465,7 +469,7 @@ export const parseFromJsonOrYamlToObject = (content: string): [object?, Error?, 
             jsonErr = new SimpleError(`Parsing as json produced data of type '${oType}' (expected 'object')`);
             obj = undefined;
         }
-    } catch (err) {
+    } catch (err: any) {
         jsonErr = err;
     }
     if (obj === undefined) {
@@ -476,7 +480,7 @@ export const parseFromJsonOrYamlToObject = (content: string): [object?, Error?, 
                 yamlErr = new SimpleError(`Parsing as yaml produced data of type '${oType}' (expected 'object')`);
                 obj = undefined;
             }
-        } catch (err) {
+        } catch (err: any) {
             yamlErr = err;
         }
     }
@@ -607,17 +611,24 @@ export const parseSubredditName = (val:string): string => {
     return matches[1] as string;
 }
 
-export const REDDIT_ENTITY_REGEX: RegExp = /^\s*(?<entityType>\/[ru]\/|[ru]\/)*(?<name>\w+)*\s*$/;
-export const REDDIT_ENTITY_REGEX_URL = 'https://regexr.com/65r9b';
-export const parseRedditEntity = (val:string): RedditEntity => {
+export const REDDIT_ENTITY_REGEX: RegExp = /^\s*(?<entityType>\/[ru]\/|[ru]\/|u_)*(?<name>\w+)*\s*$/;
+export const REDDIT_ENTITY_REGEX_URL = 'https://regexr.com/6bq1g';
+export const parseRedditEntity = (val:string, defaultUndefinedPrefix: RedditEntityType = 'subreddit'): RedditEntity => {
+    if(val.trim().length === 0) {
+        throw new Error('Entity name cannot be empty or only whitespace');
+    }
     const matches = val.match(REDDIT_ENTITY_REGEX);
     if (matches === null) {
         throw new InvalidRegexError(REDDIT_ENTITY_REGEX, val, REDDIT_ENTITY_REGEX_URL)
     }
     const groups = matches.groups as any;
-    let eType: RedditEntityType = 'user';
-    if(groups.entityType !== undefined && typeof groups.entityType === 'string' && groups.entityType.includes('r')) {
+    let eType: RedditEntityType;
+    if(groups.entityType === undefined || groups.entityType === null) {
+        eType = defaultUndefinedPrefix;
+    } else if(groups.entityType.includes('r')) {
         eType = 'subreddit';
+    } else {
+        eType = 'user';
     }
     return {
         name: groups.name,
@@ -653,18 +664,20 @@ export const parseExternalUrl = (val: string) => {
 export interface RetryOptions {
     maxRequestRetry: number,
     maxOtherRetry: number,
+    waitOnRetry?: boolean,
+    clearRetryCountAfter?: number,
 }
 
 export const createRetryHandler = (opts: RetryOptions, logger: Logger) => {
-    const {maxRequestRetry, maxOtherRetry} = opts;
+    const {maxRequestRetry, maxOtherRetry, waitOnRetry = true, clearRetryCountAfter = 3} = opts;
 
     let timeoutCount = 0;
     let otherRetryCount = 0;
     let lastErrorAt: Dayjs | undefined;
 
     return async (err: any): Promise<boolean> => {
-        if (lastErrorAt !== undefined && dayjs().diff(lastErrorAt, 'minute') >= 3) {
-            // if its been longer than 5 minutes since last error clear counters
+        if (lastErrorAt !== undefined && dayjs().diff(lastErrorAt, 'minute') >= clearRetryCountAfter) {
+            // if its been longer than 3 minutes since last error clear counters
             timeoutCount = 0;
             otherRetryCount = 0;
         }
@@ -678,10 +691,12 @@ export const createRetryHandler = (opts: RetryOptions, logger: Logger) => {
                     logger.error(`Reddit request error retries (${timeoutCount}) exceeded max allowed (${maxRequestRetry})`);
                     return false;
                 }
-                // exponential backoff
-                const ms = (Math.pow(2, timeoutCount - 1) + (Math.random() - 0.3) + 1) * 1000;
-                logger.warn(`Error occurred while making a request to Reddit (${timeoutCount} in 3 minutes). Will wait ${formatNumber(ms / 1000)} seconds before retrying`);
-                await sleep(ms);
+                if(waitOnRetry) {
+                    // exponential backoff
+                    const ms = (Math.pow(2, timeoutCount - 1) + (Math.random() - 0.3) + 1) * 1000;
+                    logger.warn(`Error occurred while making a request to Reddit (${timeoutCount} in 3 minutes). Will wait ${formatNumber(ms / 1000)} seconds before retrying`);
+                    await sleep(ms);
+                }
                 return true;
 
             } else {
@@ -693,9 +708,11 @@ export const createRetryHandler = (opts: RetryOptions, logger: Logger) => {
             if (maxOtherRetry < otherRetryCount) {
                 return false;
             }
-            const ms = (4 * 1000) * otherRetryCount;
-            logger.warn(`Non-request error occurred. Will wait ${formatNumber(ms / 1000)} seconds before retrying`);
-            await sleep(ms);
+            if(waitOnRetry) {
+                const ms = (4 * 1000) * otherRetryCount;
+                logger.warn(`Non-request error occurred. Will wait ${formatNumber(ms / 1000)} seconds before retrying`);
+                await sleep(ms);
+            }
             return true;
         }
     }
@@ -935,8 +952,10 @@ export interface StrongSubredditStateOptions {
 }
 
 export const toStrongSubredditState = (s: SubredditState, opts?: StrongSubredditStateOptions): StrongSubredditState => {
-    const {defaultFlags, generateDescription = false} = opts || {};
-    const {name: nameValRaw, stateDescription} = s;
+    const {defaultFlags = 'i', generateDescription = false} = opts || {};
+    const {name: nameValRaw, stateDescription, isUserProfile, ...rest} = s;
+
+    let nameValOriginallyRegex = false;
 
     let nameReg: RegExp | undefined;
     if (nameValRaw !== undefined) {
@@ -944,23 +963,31 @@ export const toStrongSubredditState = (s: SubredditState, opts?: StrongSubreddit
             let nameVal = nameValRaw.trim();
             nameReg = parseStringToRegex(nameVal, defaultFlags);
             if (nameReg === undefined) {
-                try {
-                    const parsedVal = parseSubredditName(nameVal);
-                    nameVal = parsedVal;
-                } catch (err) {
-                    // oh well
-                    const f = 1;
-                }
-                nameReg = parseStringToRegex(`/^${nameVal}$/`, defaultFlags);
+                // if sub state has `isUserProfile=true` and config did not provide a regex then
+                // assume the user wants to use the value in "name" to look for a user profile so we prefix created regex with u_
+                const parsedEntity = parseRedditEntity(nameVal, isUserProfile !== undefined && isUserProfile ? 'user' : 'subreddit');
+                // technically they could provide "u_Username" as the value for "name" and we will then match on it regardless of isUserProfile
+                // but like...why would they do that? There shouldn't be any subreddits that start with u_ that aren't user profiles anyway(?)
+                const regPrefix = parsedEntity.type === 'user' ? 'u_' : '';
+                nameReg = parseStringToRegex(`/^${regPrefix}${nameVal}$/`, defaultFlags);
+            } else {
+                nameValOriginallyRegex = true;
             }
         } else {
+            nameValOriginallyRegex = true;
             nameReg = nameValRaw;
         }
     }
-    const strongState = {
-        ...s,
+    const strongState: StrongSubredditState = {
+        ...rest,
         name: nameReg
     };
+
+    // if user provided a regex for "name" then add isUserProfile so we can do a SEPARATE check on the name specifically for user profile prefix
+    // -- this way user can regex for a specific name but still filter by prefix
+    if(nameValOriginallyRegex) {
+        strongState.isUserProfile = isUserProfile;
+    }
 
     if (generateDescription && stateDescription === undefined) {
         strongState.stateDescription = objectToStringSummary(strongState);
@@ -985,11 +1012,11 @@ export async function readConfigFile(path: string, opts: any) {
         if(configObj !== undefined) {
             return configObj as object;
         }
-        log.error(`Could not parse wiki page contents as JSON or YAML:`);
+        log.error(`Could not parse file contents at ${path} as JSON or YAML:`);
         log.error(jsonErr);
         log.error(yamlErr);
-        throw new SimpleError('Could not parse wiki page contents as JSON or YAML');
-    } catch (e) {
+        throw new SimpleError(`Could not parse file contents at ${path} as JSON or YAML`);
+    } catch (e: any) {
         const {code} = e;
         if (code === 'ENOENT') {
             if (throwOnNotFound) {
@@ -1115,18 +1142,6 @@ export const snooLogWrapper = (logger: Logger) => {
         info: (...args: any[]) => logger.info(args.slice(0, 2).join(' '), [args.slice(2)]),
         trace: (...args: any[]) => logger.debug(args.slice(0, 2).join(' '), [args.slice(2)]),
     }
-}
-
-export const isScopeError = (err: any): boolean => {
-    if(typeof err === 'object' && err.name === 'StatusCodeError' && err.response !== undefined) {
-        const authHeader = err.response.headers['www-authenticate'];
-        return authHeader !== undefined && authHeader.includes('insufficient_scope');
-    }
-    return false;
-}
-
-export const isStatusError = (err: any): err is StatusCodeError => {
-    return typeof err === 'object' && err.name === 'StatusCodeError' && err.response !== undefined;
 }
 
 /**
@@ -1266,7 +1281,7 @@ export const compareImages = async (data1: ImageData, data2: ImageData, threshol
 
     // try {
     //     results = await pixelImageCompare(data1, data2);
-    // } catch (err) {
+    // } catch (err: any) {
     //     if(!(err instanceof SimpleError)) {
     //         errors.push(err.message);
     //     }
@@ -1288,7 +1303,7 @@ export const pixelImageCompare = async (data1: ImageData, data2: ImageData): Pro
 
     try {
         sharpFunc = await getSharpAsync();
-    } catch (err) {
+    } catch (err: any) {
         err.message = `Unable to do image comparison due to an issue importing the comparison library. It is likely sharp is not installed (see ContextMod docs). Error Message: ${err.message}`;
         throw err;
     }
@@ -1316,7 +1331,7 @@ export const pixelImageCompare = async (data1: ImageData, data2: ImageData): Pro
 //
 //     try {
 //         ci = await getCIFunc();
-//     } catch (err) {
+//     } catch (err: any) {
 //         err.message = `Unable to do image comparison due to an issue importing the comparison library. It is likely 'node-canvas' is not installed (see ContextMod docs). Error Message: ${err.message}`;
 //         throw err;
 //     }
@@ -1408,7 +1423,7 @@ export const shouldCacheSubredditStateCriteriaResult = (state: SubredditState | 
 
 export const subredditStateIsNameOnly = (state: SubredditState | StrongSubredditState): boolean => {
     const critCount = Object.entries(state).filter(([key, val]) => {
-        return val !== undefined && !['name','stateDescription'].includes(key);
+        return val !== undefined && !['name','stateDescription', 'isUserProfile'].includes(key);
     }).length;
     return critCount === 0;
 }
@@ -1424,3 +1439,155 @@ export const bitsToHexLength = (bits: number): number => {
 export const escapeRegex = (val: string) => {
     return val.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
 }
+
+export const windowToActivityWindowCriteria = (window: (Duration | ActivityWindowType | ActivityWindowCriteria)): ActivityWindowCriteria => {
+    let crit: ActivityWindowCriteria;
+
+    if (isActivityWindowCriteria(window)) {
+        crit = window;
+    } else if (typeof window === 'number') {
+        crit = {count: window};
+    } else {
+        crit = {duration: window as DurationVal};
+    }
+
+    const {
+        satisfyOn = 'any',
+        count,
+        duration,
+        subreddits: {
+            include = [],
+            exclude = [],
+        } = {},
+    } = crit;
+
+    const includes = include.map(x => parseSubredditName(x).toLowerCase());
+    const excludes = exclude.map(x => parseSubredditName(x).toLowerCase());
+
+    return {
+        satisfyOn,
+        count,
+        duration,
+        subreddits: {
+            include: includes,
+            exclude: excludes
+        }
+    }
+}
+
+export const searchAndReplace = (val: string, ops: SearchAndReplaceRegExp[]) => {
+    if (ops.length === 0) {
+        return val;
+    }
+    return ops.reduce((acc, curr) => {
+        let reg = parseStringToRegex(curr.search, 'ig');
+        if (reg === undefined) {
+            reg = parseStringToRegex(`/.*${escapeRegex(curr.search.trim())}.*/`, 'ig');
+        }
+        return acc.replace(reg ?? val, curr.replace);
+    }, val);
+}
+
+export const isRepostItemResult = (val: (RepostItem|RepostItemResult)): val is RepostItemResult => {
+    return 'sameness' in val;
+}
+
+export const defaultStrCompareTransformFuncs = [
+    // lower case to remove case sensitivity
+    (str: string) => str.toLocaleLowerCase(),
+    // remove excess whitespace
+    (str: string) => str.trim(),
+    // remove non-alphanumeric characters so that differences in punctuation don't subtract from comparison score
+    (str: string) => str.replace(/[^A-Za-z0-9 ]/g, ""),
+    // replace all instances of 2 or more whitespace with one whitespace
+    (str: string) => str.replace(/\s{2,}|\n/g, " ")
+];
+
+const sentenceLengthWeight = (length: number) => {
+    // thanks jordan :')
+    // constants are black magic
+    return (Math.log(length) / 0.20) - 5;
+}
+
+export const stringSameness = (valA: string, valB: string, options?: StringComparisonOptions) => {
+
+    const {
+        transforms = defaultStrCompareTransformFuncs,
+    } = options || {};
+
+    const cleanA = transforms.reduce((acc, curr) => curr(acc), valA);
+    const cleanB = transforms.reduce((acc, curr) => curr(acc), valB);
+
+    const shortest = cleanA.length > cleanB.length ? cleanB : cleanA;
+
+    // Dice's Coefficient
+    const dice = stringSimilarity.compareTwoStrings(cleanA, cleanB) * 100;
+    // Cosine similarity
+    const cosine = calculateCosineSimilarity(cleanA, cleanB) * 100;
+    // Levenshtein distance
+    const [levenDistance, levenSimilarPercent] = levenSimilarity(cleanA, cleanB);
+
+    // use shortest sentence for weight
+    const weightScore = sentenceLengthWeight(shortest.length);
+
+    // take average score
+    const highScore = (dice + cosine + levenSimilarPercent) / 3;
+    // weight score can be a max of 15
+    const highScoreWeighted = highScore + Math.min(weightScore, 15);
+    return {
+        scores: {
+            dice,
+            cosine,
+            leven: levenSimilarPercent
+        },
+        highScore,
+        highScoreWeighted,
+    }
+}
+
+// https://stackoverflow.com/a/18679657/1469797
+export const wordCount = (str: string): number => {
+    return str.split(' ')
+        .filter(function (n) {
+            return n != ''
+        })
+        .length;
+}
+
+export const random = (min: number, max: number): number => (
+    Math.floor(Math.random() * (max - min + 1)) + min
+);
+
+
+// copy-pasting interval function from this project because bad tooling on the author's side means A WHOLE OTHER typescript lib is always downloaded just for this one function
+
+/**
+ * Repeatedly calls a function with a random time delay between each call.
+ *
+ * @param intervalFunction - A function to be executed at random times between `minDelay` and
+ * `maxDelay`. The function is not passed any arguments, and no return value is expected.
+ * @param minDelay - The minimum amount of time, in milliseconds (thousandths of a second), the
+ * timer should delay in between executions of `intervalFunction`.
+ * @param maxDelay - The maximum amount of time, in milliseconds (thousandths of a second), the
+ * timer should delay in between executions of `intervalFunction`.
+ *
+ * Borrowed from https://github.com/jabacchetta/set-random-interval/blob/master/src/index.ts
+ */
+export const setRandomInterval: SetRandomInterval = (intervalFunction, minDelay = 0, maxDelay = 0) => {
+    let timeout: ReturnType<typeof setTimeout>;
+
+    const runInterval = (): void => {
+        timeout = globalThis.setTimeout(() => {
+            intervalFunction();
+            runInterval();
+        }, random(minDelay, maxDelay));
+    };
+
+    runInterval();
+
+    return {
+        clear(): void {
+            clearTimeout(timeout);
+        },
+    };
+};

@@ -102,6 +102,7 @@ Find detailed descriptions of all the Rules, with examples, below:
 * [History](/docs/examples/history)
 * [Author](/docs/examples/author)
 * [Regex](/docs/examples/regex)
+* [Repost](/docs/examples/repost)
 
 ### Rule Set
 

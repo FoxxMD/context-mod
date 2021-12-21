@@ -26,12 +26,24 @@ export class ExtendedSnoowrap extends Snoowrap {
             }
             try {
                 return parseSubredditName(x);
-            } catch (err) {
+            } catch (err: any) {
                 return x;
             }
         });
 
         return await this.oauthRequest({uri: '/api/info', method: 'get', qs: { sr_name: names.join(',')}}) as Listing<Subreddit>;
+    }
+
+    async assignUserFlairByTemplateId(options: { flairTemplateId: string, username: string, subredditName: string }): Promise<any> {
+        return await this.oauthRequest({
+            uri: `/r/${options.subredditName}/api/selectflair`,
+            method: 'post',
+            form: {
+                api_type: 'json',
+                name: options.username,
+                flair_template_id: options.flairTemplateId,
+            }
+        });
     }
 }
 
