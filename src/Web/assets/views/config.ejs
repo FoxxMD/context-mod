@@ -8,6 +8,11 @@
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width,initial-scale=1.0">
+    <% if (format === 'yaml') { %>
+    <link href="/public/yaml/entry.css" rel="stylesheet">
+    <% } else { %>
+        <link rel="stylesheet" data-name="vs/editor/editor.main" href="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.26.1/min/vs/editor/editor.main.min.css">
+    <% } %>
     <!--icons from https://heroicons.com -->
 </head>
 <body style="user-select: none;" class="bg-gray-900 text-white font-sans">
@@ -16,7 +21,9 @@
     <div class="container mx-auto">
         <div class="grid">
             <div class="my-3 pl-2">
-                Schema <a href="/config?schema=subreddit" id="subredditSchemaType">Subreddit</a> / <a href="/config?schema=operator" id="operatorSchemaType">Operator</a>  |
+                Schema <a href="#" data-schema="subreddit" class="schemaType" id="subredditSchemaType">Subreddit</a> / <a href="#" data-schema="operator" class="schemaType" id="operatorSchemaType">Operator</a>
+                | Format <a href="#" class="formatType" data-format="json" id="formatJson">JSON</a> / <a href="#" class="formatType" data-format="yaml" id="formatYaml">YAML</a>
+                |
                 <span class="has-tooltip">
                     <span style="z-index:999; margin-top: 30px;" class='tooltip rounded shadow-lg p-3 bg-gray-100 text-black space-y-2'>
                        <div>Copy + paste your configuration here to get:</div>
@@ -50,119 +57,344 @@
                     </span>
                 </span>
                 | <input id="configUrl" class="text-black placeholder-gray-500 rounded mx-2" style="min-width:400px;" placeholder="URL of a config to load"/> <a href="#" id="loadConfig">Load</a>
+                <span id="saveTip">
+                    <span style="margin-top:30px; z-index:100" class="tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2 space-y-3 p-2 text-left">
+                        <div>In order to save a configuration to a subreddit's wiki page you must re-authorize ContextMod with Reddit to get the following permissions:</div>
+                        <ul class="list-inside list-disc">
+                            <li><span class="font-mono">wikiedit</span></li>
+                        </ul>
+                        <div>CM will store this permission for one hour after which you must re-authorize again to save.</div>
+                        <div><b><a href="#" id="doAuthorize">Click Here</a></b> to re-authorize</div>
+                    </span>
+                    <span>
+                        | <a id="doSave">Save</a>
+                        <svg id="saveQuestionIcon" xmlns="http://www.w3.org/2000/svg"
+                             class="h-4 w-4 inline-block cursor-help"
+                             fill="none"
+                             viewBox="0 0 24 24" stroke="currentColor">
+                            <use xlink:href="public/questionsymbol.svg#q" />
+                        </svg>
+                    </span>
+                </span>
                 <div id="error" class="font-semibold"></div>
+                <select style="display:none;" id="schema-selection">
+                    <option value="bot.yaml">Bot Configuration</option>
+                </select>
+                <div style="display:none;" id="breadcrumbs"></div>
             </div>
             <div style="min-height: 80vh" id="editor"></div>
+            <div style="user-select: auto" id="problems"></div>
         </div>
     </div>
     <%- include('partials/footer') %>
 </div>
-<!--Use CDN for loading monaco https://stackoverflow.com/a/63179814/1469797 -->
-<!-- Reduces app size (docker) by a big chunk to not serve it locally AND it's not necessary for essential operation -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.26.1/min/vs/loader.min.js"></script>
 <script>
-    require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.26.1/min/vs' }});
-
-    const preamble = [
-        '// Copy + paste your configuration here to get',
-        '// formatting, JSON syntax, annotated properties and'
-    ];
-
     var searchParams = new URLSearchParams(window.location.search);
 
     let schemaType;
     let schemaFile;
     if(searchParams.get('schema') === 'operator') {
-        schemaType = 'operator';
-        schemaFile = 'OperatorConfig.json';
-        preamble.push('// automatic validation of your OPERATOR configuration');
+        window.schemaType = 'operator';
+        window.schemaFile = 'OperatorConfig.json';
         document.querySelector('#schemaTypeList').innerHTML = 'automatic validation of your OPERATOR configuration (yellow squiggly)';
         document.querySelector('#operatorSchemaType').classList.add('font-bold', 'no-underline', 'pointer-events-none');
     } else {
-        schemaType = 'subreddit';
-        schemaFile = 'App.json';
-        preamble.push('// automatic validation of your SUBREDDIT configuration');
+        window.schemaType = 'subreddit';
+        window.schemaFile = 'App.json';
         document.querySelector('#schemaTypeList').innerHTML = 'automatic validation of your SUBREDDIT configuration (yellow squiggly)'
         document.querySelector('#subredditSchemaType').classList.add('font-bold', 'no-underline', 'pointer-events-none');
     }
 
-    const schemaUri = `${document.location.origin}/schemas/${schemaFile}`;
+    if(searchParams.get('format') === 'yaml') {
+        document.querySelector('#formatYaml').classList.add('font-bold', 'no-underline', 'pointer-events-none');
+    } else {
+        document.querySelector('#formatJson').classList.add('font-bold', 'no-underline', 'pointer-events-none');
+    }
 
-    require(['vs/editor/editor.main'], function () {
-        const modelUri = monaco.Uri.parse("a://b/foo.json");
-        fetch(schemaUri).then((res) => {
-            res.json().then((schemaData) => {
-                monaco.languages.json.jsonDefaults.setDiagnosticsOptions({
-                    validate: true,
-                    allowComments: true,
-                    trailingCommas: "ignore",
-                    schemas: [{
-                        uri: schemaUri,
-                        fileMatch: [modelUri.toString()],
-                        schema: schemaData
-                    }]
+    window.addNoErrors = function () {
+        const problems = document.getElementById('problems');
+        const wrapper = document.createElement('div');
+        wrapper.setAttribute('role', 'button');
+        const text = document.createElement('div');
+        wrapper.classList.add('problem');
+        text.classList.add('problem-text');
+        text.textContent = 'No errors! :)';
+        wrapper.append(text);
+        problems.append(wrapper);
+    }
+
+    window.canSave = <%= canSave %>;
+
+    if(searchParams.get('subreddit') === null) {
+        document.querySelector('#saveTip').style.display = 'none';
+    } else {
+        document.querySelector('#doSave').textContent = `Save to ${searchParams.get('subreddit')}`;
+    }
+
+    window.setSaveStatus = function() {
+        if(window.canSave) {
+            document.querySelector('#saveTip').classList.remove('has-tooltip');
+            document.querySelector('#saveQuestionIcon').style.display = 'none';
+            const saveLink = document.querySelector('#doSave');
+            saveLink.classList.remove('isDisabled');
+            saveLink.href = '#';
+        } else {
+            document.querySelector('#saveTip').classList.add('has-tooltip');
+            document.querySelector('#saveQuestionIcon').style.display = 'initial';
+            const saveLink = document.querySelector('#doSave');
+            saveLink.classList.add('isDisabled');
+            saveLink.href = '';
+        }
+    }
+
+    window.setSaveStatus();
+
+    //https://stackoverflow.com/a/61404006/1469797
+    function onBeforeUnload(e) {
+        if (window.dirty) {
+            e.preventDefault();
+            e.returnValue = '';
+            return;
+        }
+
+        delete e['returnValue'];
+    }
+
+    window.addEventListener('beforeunload', onBeforeUnload);
+
+    document.querySelector('#doAuthorize').addEventListener('click', (e) => {
+        e.preventDefault();
+        window.open(`${document.location.origin}/login?closeOnSuccess=true&scope=wikiedit`, 'Re-authorize CM', 'popup=1');
+    });
+    document.querySelector('#doSave').addEventListener('click', (e) => {
+        e.preventDefault();
+        if(window.wikiLocation === undefined || window.wikiLocation === null || window.canSave === false) {
+            return;
+        }
+
+        fetch(`${document.location.origin}/config${document.location.search}`, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                //...data,
+                location: window.wikiLocation,
+                data: window.ed.getModel().getValue()
+            })
+        }).then((resp) => {
+            if (!resp.ok) {
+                resp.text().then(data => {
+                    document.querySelector('#error').innerHTML = `Error occurred while fetching configuration => ${data}`
                 });
-                var model = monaco.editor.createModel(preamble.join('\r\n'), "json", modelUri);
+            } else {
+                document.querySelector('#error').innerHTML = `Wiki saved!`;
+                window.dirty = false;
+                setTimeout(() => {
+                    document.querySelector('#error').innerHTML = ``;
+                }, 3000);
+            }
+        })
+    });
+</script>
+<script defer="defer" src="/public/yaml/entry.js"></script>
+<script>
+    window.addEventListener('load', function () {
 
-                document.querySelector('#loadConfig').addEventListener('click', (e) => {
-                    e.preventDefault();
-                    const newUrl = document.querySelector('#configUrl').value;
-                    fetch(newUrl).then((resp) => {
-                        if(!resp.ok) {
-                            resp.text().then(data => {
-                                document.querySelector('#error').innerHTML = `Error occurred while fetching configuration => ${data}`
-                            });
-                        } else {
-                            var sp = new URLSearchParams();
-                            sp.append('schema', schemaType);
-                            sp.append('url', newUrl);
-                            history.pushState(null, '', `${window.location.pathname}?${sp.toString()}`);
-                            resp.text().then(data => {
-                                //model = monaco.editor.createModel(data, "json", modelUri);
-                                model.setValue(data);
-                            })
-                        }
-                    });
-                });
+        var searchParams = new URLSearchParams(window.location.search);
+        let dlUrl = searchParams.get('url');
+        if (dlUrl === null && searchParams.get('subreddit') !== null) {
+            dlUrl = `${document.location.origin}/config/content${document.location.search}`
+        }
 
-                let dlUrl = searchParams.get('url');
-                if(dlUrl === null && searchParams.get('subreddit') !== null) {
-                    dlUrl = `${document.location.origin}/config/content${document.location.search}`
-                }
-                if(dlUrl !== null) {
-                    document.querySelector('#configUrl').value = dlUrl;
-                    fetch(dlUrl).then((resp) => {
-                        if(!resp.ok) {
-                            resp.text().then(data => {
-                                document.querySelector('#error').innerHTML = `Error occurred while fetching configuration => ${data}`
-                            });
-                        } else {
-                            resp.text().then(data => {
-                                model.setValue(data);
-                                //model = monaco.editor.createModel(data, "json", modelUri);
-                                var editor = monaco.editor.create(document.getElementById('editor'), {
-                                    model,
-                                    theme: 'vs-dark',
-                                    minimap: {
-                                        enabled: false
-                                    }
-                                });
-                                editor;
-                            })
-                        }
+        let currentSchema = searchParams.get('schema') === 'operator' ? 'app' : 'bot',
+            currentFormat = searchParams.get('format') === 'yaml' ? 'yaml' : 'json';
+
+
+        function getFileName() {
+            return `${currentSchema}.${currentFormat}`;
+        }
+
+        if (dlUrl !== null) {
+            // @ts-ignore
+            document.querySelector('#configUrl').value = dlUrl;
+            fetch(dlUrl).then((resp) => {
+                if (!resp.ok) {
+                    resp.text().then(data => {
+                        document.querySelector('#error').innerHTML = `Error occurred while fetching configuration => ${data}`
                     });
                 } else {
-                    var editor = monaco.editor.create(document.getElementById('editor'), {
-                        model,
-                        theme: 'vs-dark',
-                        minimap: {
-                            enabled: false
-                        }
-                    });
-                    editor;
+                    resp.text().then(data => {
+                        const oldModel = window.ed.getModel();
+                        oldModel.dispose();
+                        // @ts-ignore
+                        const newModel = window.meditor.createModel(data, currentFormat, window.muri.parse(getFileName()));
+                        window.ed.setModel(newModel);
+                        newModel.onDidChangeContent((e) => {
+                           window.dirty = true;
+                        });
+                        window.dirty = false;
+                    })
                 }
+            });
+            if(searchParams.get('subreddit') !== null) {
+                const wikiLocationUrl = `${document.location.origin}/config/content/location${document.location.search}`
+                fetch(wikiLocationUrl).then((resp) => {
+                    if (!resp.ok) {
+                        resp.text().then(data => {
+                            document.querySelector('#error').innerHTML = `Error occurred while fetching wiki location => ${data}`
+                        });
+                    } else {
+                        resp.text().then(data => {
+                            window.wikiLocation = data;
+                        })
+                    }
+                });
+            }
+        } else {
+            const preamble = currentFormat === 'yaml' ? [
+                '# Copy + paste your configuration here to get',
+                '# formatting, JSON syntax, annotated properties and'
+            ] : [
+                '// Copy + paste your configuration here to get',
+                '// formatting, JSON syntax, annotated properties and'
+            ];
+
+            const oldModel = window.ed.getModel();
+            oldModel.dispose();
+            // @ts-ignore
+            const newModel = window.meditor.createModel(preamble.join('\r\n'), currentFormat, window.muri.parse(getFileName()));
+            window.ed.setModel(newModel);
+            newModel.onDidChangeContent((e) => {
+                window.dirty = true;
+            });
+            window.dirty = false;
+        }
+
+        document.querySelector('#loadConfig').addEventListener('click', (e) => {
+            e.preventDefault();
+            // @ts-ignore
+            const newUrl = document.querySelector('#configUrl').value;
+            fetch(newUrl).then((resp) => {
+                if (!resp.ok) {
+                    resp.text().then(data => {
+                        document.querySelector('#error').innerHTML = `Error occurred while fetching configuration => ${data}`
+                    });
+                } else {
+                    var sp = new URLSearchParams();
+                    // @ts-ignore
+                    sp.set('schema', currentSchema === 'app' ? 'operator' : 'bot');
+                    sp.set('format', currentFormat);
+                    sp.set('url', newUrl);
+                    history.pushState(null, '', `${window.location.pathname}?${sp.toString()}`);
+                    resp.text().then(data => {
+                        const oldModel = window.ed.getModel();
+                        oldModel.dispose();
+                        // @ts-ignore
+                        const newModel = window.meditor.createModel(data, currentFormat, window.muri.parse(getFileName()));
+                        window.ed.setModel(newModel);
+                        newModel.onDidChangeContent((e) => {
+                            window.dirty = true;
+                        });
+                        window.dirty = false;
+                    })
+                }
+            });
+        });
+
+        document.querySelectorAll('.schemaType').forEach(el => {
+            el.addEventListener('click', (e) => {
+                document.querySelectorAll('.schemaType').forEach(el => {
+                    el.classList.remove('font-bold', 'no-underline', 'pointer-events-none');
+                })
+                if (e.target.dataset.schema === 'operator') {
+                    currentSchema = 'app';
+                    window.schemaType = 'operator';
+                    window.schemaFile = 'OperatorConfig.json';
+                    document.querySelector('#operatorSchemaType').classList.add('font-bold', 'no-underline', 'pointer-events-none');
+                } else {
+                    currentSchema = 'bot';
+                    document.querySelector('#subredditSchemaType').classList.add('font-bold', 'no-underline', 'pointer-events-none');
+                    window.schemaType = 'subreddit';
+                    window.schemaFile = 'App.json';
+                }
+
+                var searchParams = new URLSearchParams(window.location.search);
+                searchParams.set('schema', currentSchema === 'app' ? 'operator' : 'bot');
+                history.pushState(null, '', `${window.location.pathname}?${searchParams.toString()}`);
+                const oldModel = window.ed.getModel();
+                const val = oldModel.getValue();
+                oldModel.dispose();
+                const newModel = window.meditor.createModel(val, currentFormat, window.muri.parse(getFileName()));
+                window.ed.setModel(newModel);
+                newModel.onDidChangeContent((e) => {
+                    window.dirty = true;
+                });
+                window.dirty = false;
             })
-        })
+        });
+
+        document.querySelectorAll('.formatType').forEach(el => {
+            el.addEventListener('click', (e) => {
+                document.querySelectorAll('.formatType').forEach(el => {
+                    el.classList.remove('font-bold', 'no-underline', 'pointer-events-none');
+                });
+
+                if (e.target.dataset.format === 'yaml') {
+                    currentFormat = 'yaml';
+                    document.querySelector('#formatYaml').classList.add('font-bold', 'no-underline', 'pointer-events-none');
+                } else {
+                    currentFormat = 'json';
+                    document.querySelector('#formatJson').classList.add('font-bold', 'no-underline', 'pointer-events-none');
+                }
+
+                var searchParams = new URLSearchParams(window.location.search);
+                searchParams.set('format', e.target.dataset.format);
+                history.pushState(null, '', `${window.location.pathname}?${searchParams.toString()}`);
+
+                const oldModel = window.ed.getModel();
+                const val = oldModel.getValue();
+                oldModel.dispose();
+                const newModel = window.meditor.createModel(val, currentFormat, window.muri.parse(getFileName()));
+                window.ed.setModel(newModel);
+                newModel.onDidChangeContent((e) => {
+                    window.dirty = true;
+                });
+                window.dirty = false;
+            })
+        });
+
+        window.addEventListener('load', function () {
+
+            const markers = window.meditor.getModelMarkers();
+            if (markers.length === 0) {
+                window.addNoErrors();
+            }
+
+            window.meditor.onDidChangeMarkers(([resource]) => {
+
+                const markers = window.meditor.getModelMarkers({resource});
+                if (markers.length === 0) {
+                    window.addNoErrors();
+                }
+            });
+        });
+    });
+</script>
+<script id="iojs" src="https://cdn.socket.io/4.1.2/socket.io.min.js" integrity="sha384-toS6mmwu70G0fw54EGlWWeA4z3dyJ+dlXBtSURSKN4vyRFOcxd3Bzjj/AoOwY+Rg" crossorigin="anonymous"></script>
+<script>
+    window.addEventListener('load', function () {
+        let socket = io({
+            reconnectionAttempts: 5, // bail after 5 attempts
+        });
+        socket.on("connect", () => {
+            socket.on("authStatus", data => {
+                console.log(data);
+                window.canSave = data.canSaveWiki;
+                window.setSaveStatus();
+            });
+        });
     });
 </script>
 </body>

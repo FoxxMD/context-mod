@@ -34,7 +34,6 @@ export class ExtendedSnoowrap extends Snoowrap {
         return await this.oauthRequest({uri: '/api/info', method: 'get', qs: { sr_name: names.join(',')}}) as Listing<Subreddit>;
     }
 
-
     async assignUserFlairByTemplateId(options: { flairTemplateId: string, username: string, subredditName: string }): Promise<any> {
         return await this.oauthRequest({
             uri: `/r/${options.subredditName}/api/selectflair`,

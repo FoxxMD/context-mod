@@ -90,6 +90,7 @@ Specify one or more types of facets as a string to use their default configurati
 * **external** -- get items from the Submission's link source that may be reposted (currently implemented for **Comment Checks** only)
   * When the Submission link is for...
     * **Youtube** -- get top comments on video by replies/like count
+      * **NOTE:** An **API Key** for the [Youtube Data API](https://developers.google.com/youtube/v3) must be provided for this facet to work. This can be provided by the operator alongside [bot credentials](/docs/operatorConfiguration.md) or in the top-level `credentials` property for a [subreddit configuration.](https://json-schema.app/view/%23?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Freddit-context-bot%2Fmaster%2Fsrc%2FSchema%2FApp.json)
 
 ### Facet Modifiers
 

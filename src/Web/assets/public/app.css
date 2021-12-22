@@ -103,3 +103,52 @@ a {
 .yellow {
     color: rgb(253 198 94);
 }
+
+.breadcrumb {
+    cursor: pointer;
+}
+
+#breadcrumbs::before,
+.breadcrumb:not(:last-child)::after {
+    content: '›';
+    margin: 0 0.2rem;
+}
+
+.breadcrumb.array::before {
+    content: '[]';
+}
+
+.breadcrumb.object::before {
+    content: '{}';
+}
+
+#problems {
+    background-color: #474646;
+    padding: 10px;
+    user-select: text;
+}
+
+.problem {
+    align-items: center;
+    cursor: pointer;
+    display: flex;
+    padding: 0.25rem;
+}
+
+.problem-text {
+    margin-left: 0.5rem;
+}
+
+.problem .codicon-warning {
+    color: orange;
+}
+
+.isDisabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+    text-decoration: none;
+}
+
+#saveTip .tooltip:hover {
+    transition-delay: 1s;
+}

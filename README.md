@@ -126,7 +126,7 @@ Moderator view/invite and authorization:
 
 A built-in editor using [monaco-editor](https://microsoft.github.io/monaco-editor/) makes editing configurations easy:
 
-* Automatic JSON syntax validation and formatting
+* Automatic JSON or YAML syntax validation and formatting
 * Automatic Schema (subreddit or operator) validation
 * All properties are annotated via hover popups
 * Unauthenticated view via `yourdomain.com/config`

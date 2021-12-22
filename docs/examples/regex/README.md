@@ -18,3 +18,5 @@ Which can then be used in conjunction with a [`window`](https://github.com/FoxxM
 * [Trigger if regex matches at least 3 of Author's last 10 activities](/docs/examples/regex/matchActivityThresholdHistory.json5)
 * [Trigger if there are 5 regex matches in the Author's last 10 activities](/docs/examples/regex/matchTotalHistoryActivity.json5)
 * [Trigger if there are 5 regex matches in the Author's last 10 comments](/docs/examples/regex/matchSubsetHistoryActivity.json5)
+* [Remove comments that are spamming discord links](/docs/examples/regex/removeDiscordSpam.json5)
+  * Differs from just using automod because this config can allow one-off/organic links from users who DO NOT spam discord links but will still remove the comment if the user is spamming them
