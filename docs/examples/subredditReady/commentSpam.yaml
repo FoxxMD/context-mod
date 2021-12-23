@@ -1,0 +1,25 @@
+polling:
+  - newComm
+checks:
+    # Stop users who spam the same comment many times
+  - name: low xp comment spam
+    description: X-posted comment >=4x
+    kind: comment
+    condition: AND
+    rules:
+      - name: xPostLow
+        kind: repeatActivity
+        # number of "non-repeat" comments allowed between "repeat comments"
+        gapAllowance: 2
+        # greater or more than 4 repeat comments triggers this rule
+        threshold: '>= 4'
+        # retrieve either last 50 comments or 6 months' of history, whichever is less
+        window:
+          count: 50
+          duration: 6 months
+    actions:
+      - kind: report
+        enable: true
+        content: 'Remove => Posted same comment {{rules.xpostlow.largestRepeat}}x times'
+      - kind: remove
+        enable: true
