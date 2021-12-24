@@ -31,6 +31,17 @@ Specify one or more types of facets as a string to use their default configurati
 
 <details>
 
+YAML
+```yaml
+kind: repost
+criteria:
+  - searchOn:
+      - title
+      - url
+      - crossposts
+```
+
+JSON
 ```json5
 {
   "kind": "repost",
@@ -52,6 +63,16 @@ Specify one or more types of facets as a string to use their default configurati
 **string** and object configurations can be mixed
 
 <details>
+
+```yaml
+kind: repost
+criteria:
+  - searchOn:
+      - title
+      - kind: url
+        matchScore: 90
+      - external
+```
 
 ```json5
 {
@@ -129,6 +150,22 @@ Define a set of criteria to test against the **number of reposts**, **time repos
 
 <details>
 
+```yaml
+kind: repost
+criteria:
+  - searchOn:
+      - title
+      - url
+      - crossposts
+    occurrences:
+      criteria:
+        - count:
+            condition: AND
+            test:
+              - '> 3'
+              - <= 5
+```
+
 ```json5
 {
   "kind": "repost",
@@ -162,6 +199,22 @@ Define a set of criteria to test against the **number of reposts**, **time repos
 Define a test or array of tests to run against **when reposts were created**
 
 <details>
+
+```yaml
+kind: repost
+criteria:
+  - searchOn:
+      - title
+      - url
+      - crossposts
+    occurrences:
+      criteria:
+        - time:
+            condition: AND
+            test:
+              - testOn: all
+                condition: '> 3 months'
+```
 
 ```json5
 {
@@ -233,6 +286,21 @@ This is the same behavior described in the [TLDR](#TLDR) section above -- find a
 
 <details>
 
+```yaml
+polling:
+  - unmoderated
+checks:
+  - name: subRepost
+    description: Check if submission has been reposted
+    kind: submission
+    condition: AND
+    rules:
+      - kind: repost
+    actions:
+      - kind: report
+        content: This submission was reposted
+```
+
 ```json5
 {
   "polling": [
@@ -275,6 +343,24 @@ Find any submissions with:
 * a very similar title (85% or more the same)
 
 <details>
+
+```yaml
+polling:
+  - unmoderated
+checks:
+  - name: subRepost
+    description: Check if submission has been reposted
+    kind: submission
+    condition: AND
+    rules:
+      - kind: repost
+        criteria:
+          - searchOn:
+              - title
+    actions:
+      - kind: report
+        content: This submission was reposted
+```
 
 ```json5
 {
@@ -324,6 +410,25 @@ Find any submissions with:
 * a very similar title (95% or more the same)
 
 <details>
+
+```yaml
+polling:
+  - unmoderated
+checks:
+  - name: subRepost
+    description: Check if submission has been reposted
+    kind: submission
+    condition: AND
+    rules:
+      - kind: repost
+        criteria:
+          - searchOn:
+              - kind: title
+                matchScore: '95'
+    actions:
+      - kind: report
+        content: This submission was reposted
+```
 
 ```json5
 {
@@ -376,6 +481,26 @@ Find any submissions with:
 
 <details>
 
+```yaml
+polling:
+  - unmoderated
+checks:
+  - name: subRepost
+    description: Check if submission has been reposted
+    kind: submission
+    condition: AND
+    rules:
+      - kind: repost
+        criteria:
+          - searchOn:
+              - duplicates
+              - kind: title
+                matchScore: '95'
+    actions:
+      - kind: report
+        content: This submission was reposted
+```
+
 ```json5
 {
   "polling": [
@@ -420,7 +545,6 @@ Find any submissions with:
     }
   ]
 }
-
 ```
 
 </details>
@@ -428,6 +552,33 @@ Find any submissions with:
 ### Approve Submission if not reposted in the last month, by title
 
 <details>
+
+```yaml
+polling:
+  - unmoderated
+checks:
+  - name: subRepost
+    description: Check there are no reposts with same title in the last month
+    kind: submission
+    condition: AND
+    rules:
+      - kind: repost
+        criteria:
+          - searchOn:
+              - title
+            occurrences:
+              condition: OR
+              criteria:
+                - count:
+                    test:
+                      - < 1
+                - time:
+                    test:
+                      - testOn: newest
+                        condition: '> 1 month'
+    actions:
+      - kind: approve
+```
 
 ```json5
 {
@@ -522,6 +673,21 @@ FINALLY
 
 <details>
 
+```yaml
+polling:
+  - newComm
+checks:
+  - name: commRepost
+    description: Check if comment has been reposted
+    kind: common
+    condition: AND
+    rules:
+      - kind: repost
+    actions:
+      - kind: report
+        content: This comment was reposted
+```
+
 ```json5
 {
   "polling": [
@@ -560,6 +726,24 @@ FINALLY
 ### Search by external (youtube) comments only
 
 <details>
+
+```yaml
+polling:
+  - newComm
+checks:
+  - name: commRepost
+    description: Check if comment has been reposted from youtube
+    kind: comment
+    condition: AND
+    rules:
+      - kind: repost
+        criteria:
+          - searchOn:
+              - external
+    actions:
+      - kind: report
+        content: This comment was reposted from youtube
+```
 
 ```json5
 {
@@ -607,6 +791,25 @@ FINALLY
 ### Search by external (youtube) comments only, with higher comment match percentage
 
 <details>
+
+```yaml
+polling:
+  - newComm
+checks:
+  - name: commRepost
+    description: Check if comment has been reposted from youtube
+    kind: comment
+    condition: AND
+    rules:
+      - kind: repost
+        criteria:
+          - searchOn:
+              - external
+            matchScore: 95
+    actions:
+      - kind: report
+        content: This comment was reposted from youtube
+```
 
 ```json5
 {
@@ -656,6 +859,28 @@ FINALLY
 
 <details>
 
+```yaml
+polling:
+  - newComm
+checks:
+  - name: commRepost
+    description: Check if comment has been reposted
+    kind: comment
+    condition: AND
+    rules:
+      - kind: repost
+        criteria:
+          - searchOn:
+              - external
+              - url
+            matchScore: 95
+    actions:
+      - kind: report
+        content: >-
+          This comment was reposted from youtube or from submission with the
+          same URL
+```
+
 ```json5
 {
   "polling": [
@@ -697,7 +922,6 @@ FINALLY
     }
   ]
 }
-
 ```
 
 </details>

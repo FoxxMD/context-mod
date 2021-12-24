@@ -1,0 +1,19 @@
+checks:
+  - name: Crosspost Spam
+    description: Check if Author is spamming Submissions across subreddits
+    # check will run on a new submission in your subreddit and look at the Author of that submission
+    kind: submission
+    rules:
+      - name: xpostspam
+        kind: repeatActivity
+        # will only look at Submissions in Author's history that contain the same content (link) as the Submission this check was initiated by
+        useSubmissionAsReference: true
+        # if the Author has posted this Submission 5 times consecutively then this rule will trigger
+        threshold: '>= 5'
+        # look at all of the Author's submissions in the last 7 days
+        window: 7 days
+    actions:
+      - kind: report
+        content: >-
+          Author has posted this link {{rules.xpostspam.largestRepeat}} times
+          over {{rules.xpostspam.window}}
