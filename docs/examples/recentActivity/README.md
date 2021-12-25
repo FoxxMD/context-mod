@@ -6,5 +6,5 @@ Consult the [schema](https://json-schema.app/view/%23%2Fdefinitions%2FRecentActi
 
 ### Examples
 
-* [Free Karma Subreddits](/docs/examples/recentActivity/freeKarma.json5) - Check if the Author has recently posted in any "free karma" subreddits
-* [Submission in Free Karma Subreddits](/docs/examples/recentActivity/freeKarmaOnSubmission.json5) - Check if the Author has posted the Submission this check is running on in any "free karma" subreddits recently
+* Free Karma Subreddits [YAML](/docs/examples/recentActivity/freeKarma.yaml) | [JSON](/docs/examples/recentActivity/freeKarma.json5) - Check if the Author has recently posted in any "free karma" subreddits
+* Submission in Free Karma Subreddits [YAML](/docs/examples/recentActivity/freeKarmaOnSubmission.yaml) | [JSON](/docs/examples/recentActivity/freeKarmaOnSubmission.json5) - Check if the Author has posted the Submission this check is running on in any "free karma" subreddits recently
