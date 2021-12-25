@@ -11,12 +11,12 @@ Which can then be used in conjunction with a [`window`](https://github.com/FoxxM
 
 ### Examples
 
-* [Trigger if regex matches against the current activity](/docs/examples/regex/matchAnyCurrentActivity.json5)
-* [Trigger if regex matches 5 times against the current activity](/docs/examples/regex/matchThresholdCurrentActivity.json5)
-* [Trigger if regex matches against any part of a Submission](/docs/examples/regex/matchSubmissionParts.json5)
-* [Trigger if regex matches any of Author's last 10 activities](/docs/examples/regex/matchHistoryActivity.json5)
-* [Trigger if regex matches at least 3 of Author's last 10 activities](/docs/examples/regex/matchActivityThresholdHistory.json5)
-* [Trigger if there are 5 regex matches in the Author's last 10 activities](/docs/examples/regex/matchTotalHistoryActivity.json5)
-* [Trigger if there are 5 regex matches in the Author's last 10 comments](/docs/examples/regex/matchSubsetHistoryActivity.json5)
-* [Remove comments that are spamming discord links](/docs/examples/regex/removeDiscordSpam.json5)
+* Trigger if regex matches against the current activity - [YAML](/docs/examples/regex/matchAnyCurrentActivity.yaml) | [JSON](/docs/examples/regex/matchAnyCurrentActivity.json5)
+* Trigger if regex matches 5 times against the current activity - [YAML](/docs/examples/regex/matchThresholdCurrentActivity.yaml) | [JSON](/docs/examples/regex/matchThresholdCurrentActivity.json5)
+* Trigger if regex matches against any part of a Submission - [YAML](/docs/examples/regex/matchSubmissionParts.yaml) | [JSON](/docs/examples/regex/matchSubmissionParts.json5)
+* Trigger if regex matches any of Author's last 10 activities - [YAML](/docs/examples/regex/matchHistoryActivity.yaml) | [JSON](/docs/examples/regex/matchHistoryActivity.json5)
+* Trigger if regex matches at least 3 of Author's last 10 activities - [YAML](/docs/examples/regex/matchActivityThresholdHistory.json5) | [JSON](/docs/examples/regex/matchActivityThresholdHistory.json5)
+* Trigger if there are 5 regex matches in the Author's last 10 activities - [YAML](/docs/examples/regex/matchTotalHistoryActivity.yaml) | [JSON](/docs/examples/regex/matchTotalHistoryActivity.json5) 
+* Trigger if there are 5 regex matches in the Author's last 10 comments - [YAML](/docs/examples/regex/matchSubsetHistoryActivity.yaml) | [JSON](/docs/examples/regex/matchSubsetHistoryActivity.json5)
+* Remove comments that are spamming discord links - [YAML](/docs/examples/regex/removeDiscordSpam.yaml) | [JSON](/docs/examples/regex/removeDiscordSpam.json5)
   * Differs from just using automod because this config can allow one-off/organic links from users who DO NOT spam discord links but will still remove the comment if the user is spamming them

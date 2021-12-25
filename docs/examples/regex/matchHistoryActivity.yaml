@@ -2,7 +2,7 @@ name: swear
 kind: regex
 criteria:
     # triggers if any activity in the last 10 (including current activity) match the regex
-  - regex: /fuck|shit|damn/
+  - regex: '/fuck|shit|damn/'
     # if `window` is specified it tells the rule to check the current activity as well as the activities returned from `window`
     # learn more about `window` here https://github.com/FoxxMD/context-mod/blob/master/docs/activitiesWindow.md
     window: 10

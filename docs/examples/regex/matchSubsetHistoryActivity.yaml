@@ -2,7 +2,7 @@ name: swear
 kind: regex
 criteria:
     # triggers if there are more than 5 regex matches in the last 10 activities (comments only)
-  - regex: /fuck|shit|damn/
+  - regex: '/fuck|shit|damn/'
     # this differs from "activityMatchThreshold"
     #
     # activityMatchThreshold => # of activities from window must match regex
