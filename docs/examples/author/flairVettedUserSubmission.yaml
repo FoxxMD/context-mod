@@ -1,0 +1,16 @@
+checks:
+  - name: Flair Vetted User Submission
+    description: Flair submission as Approved if user has vet flair
+    # check will run on a new submission in your subreddit and look at the Author of that submission
+    kind: submission
+    rules:
+      - name: newflair
+        kind: author
+        # rule will trigger if Author has "vet" flair text
+        include:
+          - flairText:
+              - vet
+    actions:
+      - kind: flair
+        text: Vetted
+        css: green

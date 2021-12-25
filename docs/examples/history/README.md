@@ -9,5 +9,5 @@ Consult the [schema](https://json-schema.app/view/%23%2Fdefinitions%2FHistoryJSO
 
 ### Examples
 
-* [Low Comment Engagement](/docs/examples/history/lowEngagement.json5) - Check if Author is submitting much more than they comment.
-* [OP Comment Engagement](/docs/examples/history/opOnlyEngagement.json5) - Check if Author is mostly engaging only in their own content
+* Low Comment Engagement [YAML](/docs/examples/history/lowEngagement.yaml) | [JSON](/docs/examples/history/lowEngagement.json5) - Check if Author is submitting much more than they comment.
+* OP Comment Engagement [YAML](/docs/examples/history/opOnlyEngagement.yaml) | [JSON](/docs/examples/history/opOnlyEngagement.json5) - Check if Author is mostly engaging only in their own content

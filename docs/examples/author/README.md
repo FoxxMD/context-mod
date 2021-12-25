@@ -18,10 +18,10 @@ Consult the [schema](https://json-schema.app/view/%23%2Fdefinitions%2FAuthorRule
 ### Examples
 
 * Basic examples
-    * [Flair new user Submission](/docs/examples/author/flairNewUserSubmission.json5) - If the Author does not have the `vet` flair then flair the Submission with `New User`
-    * [Flair vetted user Submission](/docs/examples/author/flairNewUserSubmission.json5) - If the Author does have the `vet` flair then flair the Submission with `Vetted`
+    * Flair new user Submission [YAML](/docs/examples/author/flairNewUserSubmission.yaml) | [JSON](/docs/examples/author/flairNewUserSubmission.json5) - If the Author does not have the `vet` flair then flair the Submission with `New User`
+    * Flair vetted user Submission [YAML](/docs/examples/author/flairNewUserSubmission.yaml) | [JSON](/docs/examples/author/flairNewUserSubmission.json5) - If the Author does have the `vet` flair then flair the Submission with `Vetted`
 * Used with other Rules
-    * [Ignore vetted user](/docs/examples/author/flairNewUserSubmission.json5) - Short-circuit the Check if the Author has the `vet` flair
+    * Ignore vetted user [YAML](/docs/examples/author/flairNewUserSubmission.yaml) | [JSON](/docs/examples/author/flairNewUserSubmission.json5) - Short-circuit the Check if the Author has the `vet` flair
     
 ## Filter
 
@@ -35,4 +35,4 @@ All **Rules** and **Checks** have an optional `authorIs` property that takes an 
 
 ### Examples
 
-* [Skip recent activity check based on author](/docs/examples/author/authorFilter.json5) - Skip a Recent Activity check for a set of subreddits if the Author of the Submission has any set of flairs.
+* Skip recent activity check based on author [YAML](/docs/examples/author/authorFilter.yaml) | [JSON](/docs/examples/author/authorFilter.json5) - Skip a Recent Activity check for a set of subreddits if the Author of the Submission has any set of flairs.
