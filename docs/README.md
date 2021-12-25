@@ -120,6 +120,15 @@ It consists of:
 * **rules** -- The **Rules** for the Rule Set.
 
 Example
+
+YAML
+```yaml
+condition: AND
+# rules are an array
+rules:
+ - aRule
+```
+JSON
 ```json5
 {
   "condition": "AND",

@@ -7,6 +7,7 @@ ContextMod supports comparing image content, for the purpose of detecting duplic
 
 To enable comparisons reference the example below (at the top-level of your rule) and configure as needed:
 
+JSON
 ```json5
 {
   "name": "ruleWithImageDetection",
@@ -31,8 +32,17 @@ To enable comparisons reference the example below (at the top-level of your rule
   },
   //
   // And above ^^^
-  ...
+  //...
 }
+```
+YAML
+```yaml
+name: ruleWithImageDetection
+kind: recentActivity
+  enable: true
+  threshold: 5
+  fetchBehavior: extension
+
 ```
 
 **Perceptual Hashing** (`hash`) and **Pixel Comparisons** (`pixel`) may be used at the same time. Refer to the documentation below to see how they interact.
@@ -114,10 +124,12 @@ To further configure hashing refer to this code block:
       // the higher the bits the more accurate the comparison
       //
       // NOTE: Hashes of different sizes (bits) cannot be compared. If you are caching hashes make sure all rules where results may be shared use the same bit count to ensure hashes can be compared. Otherwise hashes will be recomputed.
-      "bits": 32, // default is 32 if not defined
+      "bits": 32,
+      // default is 32 if not defined
       //
       // number of seconds to cache an image hash
-      "ttl": 60, // default is 60 if not defined
+      "ttl": 60,
+      // default is 60 if not defined
       //
       // "High Confidence" Threshold
       // If the difference in comparison is equal to or less than this number the images are considered the same and pixel comparison WILL NOT occur
@@ -139,8 +151,22 @@ To further configure hashing refer to this code block:
     //
     // And above ^^^
     //"pixel": {...}
-  },
+  }
   //...
+}
+```
+YAML
+```yaml
+name: ruleWithImageDetectionAndConfiguredHashing
+kind: recentActivity
+imageDetection:
+  enable: true
+  hash:
+    enable: true
+    bits: 32
+    ttl: 60
+    hardThreshold: 5
+    softThreshold: 0
 ```
 
 ## Pixel Comparison
@@ -184,18 +210,28 @@ To configure pixel comparisons refer to this code block:
 
 ```json5
 {
-    "name": "ruleWithImageDetectionAndPixelEnabled",
-    "kind": "recentActivity",
-    "imageDetection": {
-      //"hash": {...}
-      "pixel": {
-        // enable or disable pixel comparisons (disabled by default)
-        "enable": true,
-        // if the comparison difference percentage is equal to or less than this value the images are considered the same
-        //
-        // if not defined the value from imageDetection.threshold will be used
-        "threshold": 5
-      }
-    },
-    //...
+  "name": "ruleWithImageDetectionAndPixelEnabled",
+  "kind": "recentActivity",
+  "imageDetection": {
+    //"hash": {...}
+    "pixel": {
+      // enable or disable pixel comparisons (disabled by default)
+      "enable": true,
+      // if the comparison difference percentage is equal to or less than this value the images are considered the same
+      //
+      // if not defined the value from imageDetection.threshold will be used
+      "threshold": 5
+    }
+  },
+  //...
+}
+```
+YAML
+```yaml
+name: ruleWithImageDetectionAndPixelEnabled
+kind: recentActivity
+imageDetection:
+  pixel:
+    enable: true
+    threshold: 5
 ```
