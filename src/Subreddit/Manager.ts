@@ -1,12 +1,22 @@
-import Snoowrap, {Comment, Subreddit} from "snoowrap";
+import Snoowrap, {Comment, Subreddit, WikiPage} from "snoowrap";
 import {Logger} from "winston";
 import {SubmissionCheck} from "../Check/SubmissionCheck";
 import {CommentCheck} from "../Check/CommentCheck";
 import {
-    cacheStats, createHistoricalStatsDisplay,
+    cacheStats,
+    createHistoricalStatsDisplay,
     createRetryHandler,
-    determineNewResults, findLastIndex, formatNumber,
-    mergeArr, parseFromJsonOrYamlToObject, pollingInfo, resultsSummary, sleep, totalFromMapStats, triggeredIndicator,
+    determineNewResults,
+    findLastIndex,
+    formatNumber,
+    mergeArr,
+    parseFromJsonOrYamlToObject,
+    parseRedditEntity,
+    pollingInfo,
+    resultsSummary,
+    sleep,
+    totalFromMapStats,
+    triggeredIndicator,
 } from "../util";
 import {Poll} from "snoostorm";
 import pEvent from "p-event";
@@ -129,6 +139,8 @@ export class Manager extends EventEmitter {
     }
 
     notificationManager: NotificationManager;
+
+    modPermissions?: string[]
 
     // use by api nanny to slow event consumption
     delayBy?: number;
@@ -255,6 +267,17 @@ export class Manager extends EventEmitter {
         })(this), 10000);
     }
 
+    protected async getModPermissions(): Promise<string[]> {
+        if(this.modPermissions !== undefined) {
+            return this.modPermissions as string[];
+        }
+        const userInfo = parseRedditEntity(this.botName, 'user');
+        const mods = this.subreddit.getModerators({name: userInfo.name});
+        // @ts-ignore
+        this.modPermissions = mods[0].mod_permissions;
+        return this.modPermissions as string[];
+    }
+
     protected getMaxWorkers(subMaxWorkers?: number) {
         let maxWorkers = this.globalMaxWorkers;
 
@@ -334,6 +357,8 @@ export class Manager extends EventEmitter {
     }
 
     protected async parseConfigurationFromObject(configObj: object) {
+        debugger;
+        await this.getModPermissions();
         try {
             const configBuilder = new ConfigBuilder({logger: this.logger});
             const validJson = configBuilder.validateJson(configObj);
@@ -436,9 +461,37 @@ export class Manager extends EventEmitter {
 
         try {
             let sourceData: string;
+            let wiki: WikiPage;
             try {
-                // @ts-ignore
-                const wiki = await this.subreddit.getWikiPage(this.wikiLocation).fetch();
+                try {
+                    // @ts-ignore
+                    wiki = await this.subreddit.getWikiPage(this.wikiLocation).fetch();
+                } catch (err: any) {
+                    // see if we can create the page
+                    if (!this.client.scope.includes('wikiedit')) {
+                        throw new Error('Page does not exist and could not create because Bot does not have oauth permission "wikiedit"');
+                    }
+                    const modPermissions = await this.getModPermissions();
+                    if (!modPermissions.includes('all') && !modPermissions.includes('wiki')) {
+                        throw new Error('Page does not exist and could not create because Bot not have mod permissions for creating wiki pages');
+                    }
+                    // @ts-ignore
+                    wiki = await this.subreddit.getWikiPage(this.wikiLocation).edit({
+                        text: '',
+                        reason: 'Created for ContextMod configuration'
+                    });
+                    this.logger.info(`Wiki page at ${this.wikiLocation} did not exist, but bot created it!`);
+                    if (this.client.scope.includes('modwiki')) {
+                        // @ts-ignore
+                        await this.subreddit.getWikiPage(this.wikiLocation).editSettings({
+                            permissionLevel: 2,
+                            listed: false,
+                        });
+                        this.logger.info('Bot set wiki page visibility to MODS ONLY');
+                    } else {
+                        this.logger.warn(`Bot does not have the 'modwiki' oauth scope so cannot change visibility of the created wiki page. Make sure you check on it!`);
+                    }
+                }
                 const revisionDate = dayjs.unix(wiki.revision_date);
                 if (!force && this.validConfigLoaded && (this.lastWikiRevision !== undefined && this.lastWikiRevision.isSame(revisionDate))) {
                     // nothing to do, we already have this revision
