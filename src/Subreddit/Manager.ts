@@ -357,7 +357,6 @@ export class Manager extends EventEmitter {
     }
 
     protected async parseConfigurationFromObject(configObj: object) {
-        debugger;
         await this.getModPermissions();
         try {
             const configBuilder = new ConfigBuilder({logger: this.logger});
