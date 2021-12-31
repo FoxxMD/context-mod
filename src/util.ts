@@ -881,6 +881,7 @@ export const permissions = [
     'privatemessages',
     'modposts',
     'modself',
+    'modwiki',
     'mysubreddits',
     'report',
     'submit',
