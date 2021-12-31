@@ -611,7 +611,7 @@ export const parseSubredditName = (val:string): string => {
     return matches[1] as string;
 }
 
-export const REDDIT_ENTITY_REGEX: RegExp = /^\s*(?<entityType>\/[ru]\/|[ru]\/|u_)*(?<name>\w+)*\s*$/;
+export const REDDIT_ENTITY_REGEX: RegExp = /^\s*(?<entityType>\/[ru]\/|[ru]\/|u_)*(?<name>[\w-]+)*\s*$/;
 export const REDDIT_ENTITY_REGEX_URL = 'https://regexr.com/6bq1g';
 export const parseRedditEntity = (val:string, defaultUndefinedPrefix: RedditEntityType = 'subreddit'): RedditEntity => {
     if(val.trim().length === 0) {
