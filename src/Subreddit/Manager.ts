@@ -51,7 +51,7 @@ import NotificationManager from "../Notification/NotificationManager";
 import action from "../Web/Server/routes/authenticated/user/action";
 import {createHistoricalDefaults, historicalDefaults} from "../Common/defaults";
 import {ExtendedSnoowrap} from "../Utils/SnoowrapClients";
-import {isRateLimitError} from "../Utils/Errors";
+import {isRateLimitError, isStatusError} from "../Utils/Errors";
 
 export interface RunningState {
     state: RunState,
@@ -466,29 +466,37 @@ export class Manager extends EventEmitter {
                     // @ts-ignore
                     wiki = await this.subreddit.getWikiPage(this.wikiLocation).fetch();
                 } catch (err: any) {
-                    // see if we can create the page
-                    if (!this.client.scope.includes('wikiedit')) {
-                        throw new Error('Page does not exist and could not create because Bot does not have oauth permission "wikiedit"');
-                    }
-                    const modPermissions = await this.getModPermissions();
-                    if (!modPermissions.includes('all') && !modPermissions.includes('wiki')) {
-                        throw new Error('Page does not exist and could not create because Bot not have mod permissions for creating wiki pages');
-                    }
-                    // @ts-ignore
-                    wiki = await this.subreddit.getWikiPage(this.wikiLocation).edit({
-                        text: '',
-                        reason: 'Created for ContextMod configuration'
-                    });
-                    this.logger.info(`Wiki page at ${this.wikiLocation} did not exist, but bot created it!`);
-                    if (this.client.scope.includes('modwiki')) {
+                    if(isStatusError(err) && err.statusCode === 404) {
+                        // see if we can create the page
+                        if (!this.client.scope.includes('wikiedit')) {
+                            throw new Error(`Page does not exist and could not be created because Bot does not have oauth permission 'wikiedit'`);
+                        }
+                        const modPermissions = await this.getModPermissions();
+                        if (!modPermissions.includes('all') && !modPermissions.includes('wiki')) {
+                            throw new Error(`Page does not exist and could not be created because Bot not have mod permissions for creating wiki pages. Must have 'all' or 'wiki'`);
+                        }
+                        if(!this.client.scope.includes('modwiki')) {
+                            throw new Error(`Bot COULD create wiki config page but WILL NOT because it does not have the oauth permissions 'modwiki' which is required to set page visibility and editing permissions. Safety first!`);
+                        }
+                        // @ts-ignore
+                        wiki = await this.subreddit.getWikiPage(this.wikiLocation).edit({
+                            text: '# Configuration for ContextMod should go here',
+                            reason: 'Empty configuration created for ContextMod'
+                        });
+                        this.logger.info(`Wiki page at ${this.wikiLocation} did not exist, but bot created it!`);
+
+                        // 0 = use subreddit wiki permissions
+                        // 1 = only approved wiki contributors
+                        // 2 = only mods may edit and view
                         // @ts-ignore
                         await this.subreddit.getWikiPage(this.wikiLocation).editSettings({
                             permissionLevel: 2,
+                            // don't list this page on r/[subreddit]/wiki/pages
                             listed: false,
                         });
                         this.logger.info('Bot set wiki page visibility to MODS ONLY');
                     } else {
-                        this.logger.warn(`Bot does not have the 'modwiki' oauth scope so cannot change visibility of the created wiki page. Make sure you check on it!`);
+                        throw err;
                     }
                 }
                 const revisionDate = dayjs.unix(wiki.revision_date);
@@ -517,7 +525,11 @@ export class Manager extends EventEmitter {
                 this.lastWikiRevision = revisionDate;
                 sourceData = await wiki.content_md;
             } catch (err: any) {
-                const msg = `Could not read wiki configuration. Please ensure the page https://reddit.com${this.subreddit.url}wiki/${this.wikiLocation} exists and is readable -- error: ${err.message}`;
+                let hint = '';
+                if(isStatusError(err) && err.statusCode === 403) {
+                    hint = `\r\nHINT: Either the page is restricted to mods only and the bot's reddit account does have the mod permission 'all' or 'wiki' OR the bot does not have the 'wikiread' oauth permission`;
+                }
+                const msg = `Could not read wiki configuration. Please ensure the page https://reddit.com${this.subreddit.url}wiki/${this.wikiLocation} exists and is readable${hint} -- error: ${err.message}`;
                 this.logger.error(msg);
                 throw new ConfigParseError(msg);
             }
