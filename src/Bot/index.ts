@@ -481,6 +481,7 @@ class Bot {
             if(dayjs().isSameOrAfter(this.nextHeartbeat)) {
                 try {
                     await this.heartbeat();
+                    await this.checkModInvites();
                 } catch (err: any) {
                     this.logger.error(`Error occurred during heartbeat check: ${err.message}`);
                 }
