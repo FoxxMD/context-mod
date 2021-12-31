@@ -1,0 +1,108 @@
+<html lang="en">
+<%- include('partials/head', {title: 'CM Accept Moderator Invitations From'}) %>
+<body class="bg-gray-900 text-white">
+<div class="min-w-screen min-h-screen font-sans">
+    <%- include('partials/title', {title: 'Accept Moderator Invitations From'}) %>
+    <div class="container mx-auto">
+        <div class="grid">
+            <div class="bg-gray-600">
+                <div class="p-6 md:px-10 md:py-6">
+                    <div id="error" class="font-semibold"></div>
+                    <ul id="sublist" class="list-inside list-disc">
+                        <li id="noSubs">Not accepting any invitations...</li>
+                    </ul>
+                    <input id="subName" style="min-width:500px;"
+                           class="text-black placeholder-gray-500 rounded ml-3 mt-2 mb-3 mt-3 p-2"
+                           placeholder="Subreddit to accept invite from..."> <a id="addSub" class="ml-3" href="">Add</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</body>
+<script>
+    window.addEventListener('load', function () {
+        const sl = document.querySelector('#sublist');
+
+        fetch(`/api/bot/invite${document.location.search}`, {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json',
+            }
+        }).then((resp) => {
+            if (!resp.ok) {
+                resp.text().then(data => {
+                    document.querySelector('#error').innerHTML = `Error occurred while fetching configuration => ${data}`
+                });
+            } else {
+                resp.json().then(data => {
+                    if (data.length > 0) {
+                        document.querySelector('#noSubs').style = 'display: none;';
+                        sl.removeChild(sl.childNodes[1]);
+                    }
+                    for (const sub of data) {
+                        addSubredditElement(sub);
+                    }
+                });
+            }
+        });
+
+        document.querySelector('#addSub').addEventListener('click', e => {
+            e.preventDefault();
+
+            const subNameElm = document.querySelector('#subName');
+            subName = subNameElm.value;
+
+            fetch(`/api/bot/invite${document.location.search}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify({
+                    subreddit: document.querySelector('#subName').value,
+                })
+            }).then((resp) => {
+                if (!resp.ok) {
+                    document.querySelector("#errorWrapper").classList.remove('hidden');
+                    resp.text().then(t => {
+                        document.querySelector("#error").innerHTML = t;
+                    });
+                } else {
+                    document.querySelector('#noSubs').style = 'display: none;';
+                    addSubredditElement(subName);
+                    subNameElm.value = '';
+                }
+            });
+        });
+
+        function addSubredditElement(sub) {
+            var node = document.createElement("LI");
+            node.id = `subInvite-${sub}`;
+            var textNode = document.createTextNode(sub);
+            node.appendChild(textNode);
+            node.insertAdjacentHTML('beforeend', `<a href="" class="removeSub" id="removeSub-${sub}" data-subreddit="${sub}"><span style="display:inline; margin-left: 10px" class="iconify-inline" data-icon="icons8:cancel"></span><a/>`);
+            sl.appendChild(node);
+            document.querySelector(`#removeSub-${sub}`).addEventListener('click', e => {
+                e.preventDefault();
+
+                fetch(`/api/bot/invite${document.location.search}&subreddit=${sub}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                    }
+                }).then((resp) => {
+                    if (!resp.ok) {
+                        resp.text().then(t => {
+                            document.querySelector("#error").innerHTML = t;
+                        });
+                    } else {
+                        document.querySelector(`#subInvite-${sub}`).remove();
+                    }
+                });
+            });
+        }
+    });
+</script>
+</html>

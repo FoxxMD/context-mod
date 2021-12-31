@@ -480,7 +480,7 @@ export class Manager extends EventEmitter {
                         }
                         // @ts-ignore
                         wiki = await this.subreddit.getWikiPage(this.wikiLocation).edit({
-                            text: '# Configuration for ContextMod should go here',
+                            text: '',
                             reason: 'Empty configuration created for ContextMod'
                         });
                         this.logger.info(`Wiki page at ${this.wikiLocation} did not exist, but bot created it!`);

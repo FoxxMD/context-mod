@@ -50,7 +50,17 @@ import {ExtendedSnoowrap} from "../../Utils/SnoowrapClients";
 const emitter = new EventEmitter();
 
 const app = addAsync(express());
-app.use(bodyParser.json());
+const jsonParser = bodyParser.json();
+
+// do not modify body if we are proxying it to server
+app.use((req, res, next) => {
+    if(req.url.indexOf('/api') !== 0) {
+        jsonParser(req, res, next);
+    } else {
+        next();
+    }
+});
+
 app.use(bodyParser.urlencoded({extended: false}));
 //app.use(cookieParser());
 app.set('views', `${__dirname}/../assets/views`);
@@ -832,6 +842,12 @@ const webClient = async (options: OperatorConfig) => {
                 sortSelect: ['ascending', 'descending'].map(x => `<option ${sort === x ? 'selected' : ''} class="capitalize ${sort === x ? 'font-bold' : ''}" data-value="${x}">${x}</option>`).join(' '),
                 levelSelect: availableLevels.map(x => `<option ${level === x ? 'selected' : ''} class="capitalize log-${x} ${level === x ? `font-bold` : ''}" data-value="${x}">${x}</option>`).join(' '),
             },
+        });
+    });
+
+    app.getAsync('/bot/invites', defaultSession, async (req: express.Request, res: express.Response) => {
+        res.render('modInvites', {
+            title: `Pending Moderation Invites`,
         });
     });
 
