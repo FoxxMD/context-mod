@@ -1,0 +1,26 @@
+checks:
+  - name: Free Karma On Submission Alert
+    description: Check if author has posted this submission in 'freekarma' subreddits
+    kind: submission
+    rules:
+      - name: freekarmasub
+        kind: recentActivity
+        # rule will only look at Author's submissions in these subreddits
+        lookAt: submissions
+        # rule will only look at Author's submissions in these subreddits that have the same content (link) as the submission this event was made on
+        # In simpler terms -- rule will only check to see if the same link the author just posted is also posted in these subreddits
+        useSubmissionAsReference: true
+        thresholds:
+          - threshold: '>= 1'
+            subreddits:
+              - DeFreeKarma
+              - FreeKarma4U
+              - FreeKarma4You
+              - upvote
+        window: 7 days
+    actions:
+      - kind: report
+        content: >-
+          Submission posted {{rules.freekarmasub.totalCount}} times in karma
+          {{rules.freekarmasub.subCount}} subs over
+          {{rules.freekarmasub.window}}: {{rules.freekarmasub.subSummary}}

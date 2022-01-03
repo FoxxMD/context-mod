@@ -63,6 +63,7 @@ const sub: SubredditDataResponse = {
     stats: managerStats,
     subMaxWorkers: 0,
     validConfig: false,
+    configFormat: 'yaml',
     wikiHref: "-",
     wikiLastCheck: "-",
     wikiLastCheckHuman: "-",

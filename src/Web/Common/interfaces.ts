@@ -26,6 +26,7 @@ export interface SubredditDataResponse {
     subMaxWorkers: number
     globalMaxWorkers: number
     validConfig: string | boolean
+    configFormat: 'yaml' | 'json'
     dryRun: string | boolean
     pollingInfo: string[]
     checks: {

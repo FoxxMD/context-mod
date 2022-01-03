@@ -121,6 +121,16 @@ Below are examples of the minimum required config to run the application using a
 Using **FILE**
 <details>
 
+YAML
+```yaml
+bots:
+  - credentials:
+      clientId: f4b4df1c7b2
+      clientSecret: 34v5q1c56ub
+      refreshToken: 34_f1w1v4
+      accessToken: p75_1c467b2
+```
+JSON
 ```json5
 {
   "bots": [
@@ -175,6 +185,11 @@ An example of using multiple configuration levels together IE all are provided t
   }
 }
 ```
+YAML
+```yaml
+logging:
+  level: debug
+```
 
 </details>
 
@@ -220,6 +235,30 @@ See the [Architecture Docs](/docs/serverClientArchitecture.md) for more informat
 
 <details>
 
+YAML
+```yaml
+bots:
+  - credentials:
+      clientId: f4b4df1c7b2
+      clientSecret: 34v5q1c56ub
+      refreshToken: 34_f1w1v4
+      accessToken: p75_1c467b2
+web:
+  credentials:
+    clientId: f4b4df1c7b2
+    clientSecret: 34v5q1c56ub
+    redirectUri: 'http://localhost:8085/callback'
+  clients:
+      # server application running on this same CM instance
+    - host: 'localhost:8095'
+      secret: localSecret
+      # a server application running somewhere else
+    - host: 'mySecondContextMod.com:8095'
+      secret: anotherSecret
+api:
+  secret: localSecret
+```
+JSON
 ```json5
 {
   "bots": [
@@ -288,4 +327,15 @@ A caching object in the json configuration:
    "db": 0,
  }
 }
+```
+YAML
+```yaml
+provider:
+  store: memory
+  ttl: 60
+  max: 500
+  host: localhost
+  port: 6379
+  auth_pass: null
+  db: 0
 ```

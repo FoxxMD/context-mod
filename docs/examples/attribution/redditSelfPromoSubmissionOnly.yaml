@@ -1,0 +1,24 @@
+checks:
+  - name: Self Promo Submissions
+    description: >-
+      Check if any of Author's aggregated submission origins are >10% of their
+      submissions
+    # check will run on a new submission in your subreddit and look at the Author of that submission
+    kind: submission
+    rules:
+      - name: attr10sub
+        kind: attribution
+        # criteria defaults to OR -- so either of these criteria will trigger the rule
+        criteria:
+          - threshold: '> 10%' # threshold can be a percent or an absolute number
+            thresholdOn: submissions # calculate percentage of submissions, rather than entire history (submissions & comments)
+            window: 90 days # look at last 90 days of Author's activities (comments and submissions)
+          - threshold: '> 10%'
+            thresholdOn: submissions
+            window: 100 # look at Author's last 100 activities (comments and submissions)
+    actions:
+      - kind: report
+        content: >-
+          {{rules.attr10sub.largestPercent}}% of
+          {{rules.attr10sub.activityTotal}} items over
+          {{rules.attr10sub.window}}

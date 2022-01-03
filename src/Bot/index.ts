@@ -21,7 +21,7 @@ import {BotResourcesManager} from "../Subreddit/SubredditResources";
 import LoggedError from "../Utils/LoggedError";
 import pEvent from "p-event";
 import SimpleError from "../Utils/SimpleError";
-import {isRateLimitError} from "../Utils/Errors";
+import {isRateLimitError, isStatusError} from "../Utils/Errors";
 
 
 class Bot {
@@ -345,23 +345,30 @@ class Bot {
             }
         }
 
-        let subSchedule: Manager[] = [];
         // get configs for subs we want to run on and build/validate them
         for (const sub of subsToRun) {
-            const manager = new Manager(sub, this.client, this.logger, this.cacheManager, {dryRun: this.dryRun, sharedModqueue: this.sharedModqueue, wikiLocation: this.wikiLocation, botName: this.botName, maxWorkers: this.maxWorkers});
             try {
-                await manager.parseConfiguration('system', true, {suppressNotification: true});
+                this.subManagers.push(await this.createManager(sub));
             } catch (err: any) {
-                if (!(err instanceof LoggedError)) {
-                    this.logger.error(`Config was not valid:`, {subreddit: sub.display_name_prefixed});
-                    this.logger.error(err, {subreddit: sub.display_name_prefixed});
-                }
+
             }
-            // all errors from managers will count towards bot-level retry count
-            manager.on('error', async (err) => await this.panicOnRetries(err));
-            subSchedule.push(manager);
         }
-        this.subManagers = subSchedule;
+    }
+
+    async createManager(sub: Subreddit): Promise<Manager> {
+        const manager = new Manager(sub, this.client, this.logger, this.cacheManager, {dryRun: this.dryRun, sharedModqueue: this.sharedModqueue, wikiLocation: this.wikiLocation, botName: this.botName as string, maxWorkers: this.maxWorkers});
+        try {
+            await manager.parseConfiguration('system', true, {suppressNotification: true});
+        } catch (err: any) {
+            if (!(err instanceof LoggedError)) {
+                this.logger.error(`Config was not valid:`, {subreddit: sub.display_name_prefixed});
+                this.logger.error(err, {subreddit: sub.display_name_prefixed});
+                err.logged = true;
+            }
+        }
+        // all errors from managers will count towards bot-level retry count
+        manager.on('error', async (err) => await this.panicOnRetries(err));
+        return manager;
     }
 
     // if the cumulative errors exceeds configured threshold then stop ALL managers as there is most likely something very bad happening
@@ -382,6 +389,40 @@ class Bot {
             await manager.stop(causedBy, {reason: 'App rebuild'});
         }
         this.logger.info('Bot is stopped.');
+    }
+
+    async checkModInvites() {
+        const subs: string[] = await this.cacheManager.getPendingSubredditInvites();
+        for (const name of subs) {
+            try {
+                // @ts-ignore
+                await this.client.getSubreddit(name).acceptModeratorInvite();
+                this.logger.info(`Accepted moderator invite for r/${name}!`);
+                await this.cacheManager.deletePendingSubredditInvite(name);
+                // @ts-ignore
+                const sub = await this.client.getSubreddit(name);
+                this.logger.info(`Attempting to add manager for r/${name}`);
+                try {
+                    const manager = await this.createManager(sub);
+                    this.logger.info(`Starting manager for r/${name}`);
+                    this.subManagers.push(manager);
+                    await manager.start('system', {reason: 'Caused by creation due to moderator invite'});
+                    await this.runModStreams();
+                } catch (err: any) {
+                    if (!(err instanceof LoggedError)) {
+                        this.logger.error(err);
+                    }
+                }
+            } catch (err: any) {
+                if (err.message.includes('NO_INVITE_FOUND')) {
+                    this.logger.warn(`No pending moderation invite for r/${name} was found`);
+                } else if (isStatusError(err) && err.statusCode === 403) {
+                    this.logger.error(`Error occurred while checking r/${name} for a pending moderation invite. It is likely that this bot does not have the 'modself' oauth permission. Error: ${err.message}`);
+                } else {
+                    this.logger.error(`Error occurred while checking r/${name} for a pending moderation invite. Error: ${err.message}`);
+                }
+            }
+        }
     }
 
     async runModStreams(notify = false) {
@@ -418,6 +459,7 @@ class Bot {
         this.running = true;
         this.nextNannyCheck = dayjs().add(10, 'second');
         this.nextHeartbeat = dayjs().add(this.heartbeatInterval, 'second');
+        await this.checkModInvites();
         await this.healthLoop();
     }
 
@@ -439,6 +481,7 @@ class Bot {
             if(dayjs().isSameOrAfter(this.nextHeartbeat)) {
                 try {
                     await this.heartbeat();
+                    await this.checkModInvites();
                 } catch (err: any) {
                     this.logger.error(`Error occurred during heartbeat check: ${err.message}`);
                 }

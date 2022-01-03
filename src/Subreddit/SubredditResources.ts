@@ -1178,4 +1178,37 @@ export class BotResourcesManager {
 
         return resource;
     }
+
+    async getPendingSubredditInvites(): Promise<(string[])> {
+        const subredditNames = await this.defaultCache.get(`modInvites`);
+        if (subredditNames !== undefined && subredditNames !== null) {
+            return subredditNames as string[];
+        }
+        return [];
+    }
+
+    async addPendingSubredditInvite(subreddit: string): Promise<void> {
+        let subredditNames = await this.defaultCache.get(`modInvites`) as (string[] | undefined | null);
+        if (subredditNames === undefined || subredditNames === null) {
+            subredditNames = [];
+        }
+        subredditNames.push(subreddit);
+        await this.defaultCache.set(`modInvites`, subredditNames, {ttl: 0});
+        return;
+    }
+
+    async deletePendingSubredditInvite(subreddit: string): Promise<void> {
+        let subredditNames = await this.defaultCache.get(`modInvites`) as (string[] | undefined | null);
+        if (subredditNames === undefined || subredditNames === null) {
+            subredditNames = [];
+        }
+        subredditNames = subredditNames.filter(x => x !== subreddit);
+        await this.defaultCache.set(`modInvites`, subredditNames, {ttl: 0});
+        return;
+    }
+
+    async clearPendingSubredditInvites(): Promise<void> {
+        await this.defaultCache.del(`modInvites`);
+        return;
+    }
 }

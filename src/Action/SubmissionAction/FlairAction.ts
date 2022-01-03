@@ -1,20 +1,23 @@
 import {SubmissionActionConfig} from "./index";
 import Action, {ActionJson, ActionOptions} from "../index";
-import Snoowrap, {Comment, Submission} from "snoowrap";
 import {RuleResult} from "../../Rule";
 import {ActionProcessResult} from "../../Common/interfaces";
+import Submission from 'snoowrap/dist/objects/Submission';
+import Comment from 'snoowrap/dist/objects/Comment';
 
 export class FlairAction extends Action {
     text: string;
     css: string;
+    flair_template_id: string;
 
     constructor(options: FlairActionOptions) {
         super(options);
-        if (options.text === undefined && options.css === undefined) {
-            throw new Error('Must define either text or css on FlairAction');
+        if (options.text === undefined && options.css === undefined && options.flair_template_id === undefined) {
+            throw new Error('Must define either text+css or flair_template_id on FlairAction');
         }
         this.text = options.text || '';
         this.css = options.css || '';
+        this.flair_template_id = options.flair_template_id || '';
     }
 
     getKind() {
@@ -34,8 +37,12 @@ export class FlairAction extends Action {
         this.logger.verbose(flairSummary);
         if (item instanceof Submission) {
             if(!this.dryRun) {
-                // @ts-ignore
-                await item.assignFlair({text: this.text, cssClass: this.css})
+                if (this.flair_template_id) {
+                    await item.selectFlair({flair_template_id: this.flair_template_id}).then(() => {});
+                } else {
+                    await item.assignFlair({text: this.text, cssClass: this.css}).then(() => {});
+                }
+
             }
         } else {
             this.logger.warn('Cannot flair Comment');
@@ -60,12 +67,16 @@ export class FlairAction extends Action {
 export interface FlairActionConfig extends SubmissionActionConfig {
     /**
      * The text of the flair to apply
-    * */
+     * */
     text?: string,
     /**
      * The text of the css class of the flair to apply
      * */
     css?: string,
+    /**
+     * Flair template ID to assign
+     * */
+    flair_template_id?: string,
 }
 
 export interface FlairActionOptions extends FlairActionConfig,ActionOptions {
@@ -76,5 +87,5 @@ export interface FlairActionOptions extends FlairActionConfig,ActionOptions {
  * Flair the Submission
  * */
 export interface FlairActionJson extends FlairActionConfig, ActionJson {
-kind: 'flair'
+    kind: 'flair'
 }

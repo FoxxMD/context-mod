@@ -1,0 +1,6 @@
+name: swear
+kind: regex
+criteria:
+  - regex: '/fuck|shit|damn/'
+    # triggers if current activity has greater than 5 matches
+    matchThreshold: '> 5'

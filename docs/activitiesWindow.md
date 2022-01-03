@@ -17,7 +17,28 @@ Examples of all of the above
 
 <details>
 
+```yaml
+# count, last 100 activities
+window: 100
+
+# duration, last 10 days
+window: 10 days
+
+# duration object, last 2 months and 5 days
+window:
+  months: 2
+  days: 5
+
+# iso 8601 string, last 15 minutes
+window: PT15M
+
+# ActivityWindowCriteria, last 100 activities or 6 weeks of activities (whichever is found first)
+window:
+  count: 100
+  duration: 6 weeks
 ```
+
+```json5
 // count, last 100 activities
 {
   "window": 100
@@ -49,6 +70,7 @@ Examples of all of the above
   }
 }
 ```
+
 </details>
 
 ## Types of Ranges
@@ -95,12 +117,20 @@ If you need to specify multiple units of time for your duration you can instead 
 
 Example
 
+JSON
 ```json
 {
   "days": 4,
   "hours": 6,
   "minutes": 20
 }
+```
+YAML
+```yaml
+window:
+  days: 4
+  hours: 6
+  minutes: 20
 ```
 
 ##### An ISO 8601 duration string
@@ -119,6 +149,7 @@ This is an object that lets you specify more granular conditions for your range.
 
 The full object looks like this:
 
+JSON
 ```json
 {
   "count": 100,
@@ -129,6 +160,19 @@ The full object looks like this:
     "exclude": ["videos"]
   }
 }
+```
+YAML
+```yaml
+window:
+  count: 100
+  duration: 10 days
+  satisfyOn: any
+  subreddits:
+    include:
+      - mealtimevideos
+      - pooptimevideos
+    exclude:
+      - videos
 ```
 
 ### Specifying Range
@@ -142,13 +186,22 @@ If both range properties are specified then the value `satisfyOn` determines how
 
 If **any** then Activities will be retrieved until one of the range properties is met, **whichever occurs first.**
 
-Example 
+Example
+
+JSON
 ```json
 {
   "count": 80,
   "duration": "90 days",
   "satisfyOn": "any"
 }
+```
+YAML
+```yaml
+window:
+  count: 80
+  duration: 90 days
+  satisfyOn: any
 ```
 Activities are retrieved in chunks of 100 (or `count`, whichever is smaller)
 
@@ -160,12 +213,21 @@ Activities are retrieved in chunks of 100 (or `count`, whichever is smaller)
 If **all** then both ranges must be satisfied. Effectively, whichever range produces the most Activities will be the one that is used.
 
 Example
+
+JSON
 ```json
 {
   "count": 100,
   "duration": "90 days",
   "satisfyOn": "all"
 }
+```
+YAML
+```yaml
+window:
+  count: 100
+  duration: 90 days
+  satisfyOn: all
 ```
 Activities are retrieved in chunks of 100 (or `count`, whichever is smaller)
 
@@ -187,6 +249,8 @@ You may filter retrieved Activities using an array of subreddits.
 Use **include** to specify which subreddits should be included from results
 
 Example where only activities from /r/mealtimevideos and /r/modsupport will be returned
+
+JSON
 ```json
 {
   "count": 100,
@@ -196,7 +260,17 @@ Example where only activities from /r/mealtimevideos and /r/modsupport will be r
     "include": ["mealtimevideos","modsupport"]
   }
 }
-
+```
+YAML
+```yaml
+window:
+  count: 100
+  duruation: 90 days
+  satisfyOn: any
+  subreddits:
+    include:
+      - mealtimevideos
+      - modsupport
 ```
 
 #### Exclude
@@ -204,6 +278,8 @@ Example where only activities from /r/mealtimevideos and /r/modsupport will be r
 Use **exclude** to specify which subreddits should NOT be in the results
 
 Example where activities from /r/mealtimevideos and /r/modsupport will not be returned in results
+
+JSON
 ```json
 {
   "count": 100,
@@ -213,5 +289,16 @@ Example where activities from /r/mealtimevideos and /r/modsupport will not be re
     "exclude": ["mealtimevideos","modsupport"]
   }
 }
+```
+YAML
+```yaml
+window:
+  count: 100
+  duruation: 90 days
+  satisfyOn: any
+  subreddits:
+    exclude:
+      - mealtimevideos
+      - modsupport
 ```
 **Note:** `exclude` will be ignored if `include` is also present.

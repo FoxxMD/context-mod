@@ -19,8 +19,8 @@ Some feature highlights:
   * Default/no configuration runs "All In One" behavior
   * Additional configuration allows web interface to connect to multiple servers
   * Each server instance can run multiple reddit accounts as bots
-* **Per-subreddit configuration** is handled by JSON stored in the subreddit wiki
-* Any text-based actions (comment, submission, message, usernotes, ban, etc...) can be configured via a wiki page or raw text in JSON and support [mustache](https://mustache.github.io) [templating](/docs/actionTemplating.md)
+* **Per-subreddit configuration** is handled by YAML (**like automoderator!**) or JSON stored in the subreddit wiki
+* Any text-based actions (comment, submission, message, usernotes, ban, etc...) can be configured via a wiki page or raw text and supports [mustache](https://mustache.github.io) [templating](/docs/actionTemplating.md)
 * History-based rules support multiple "valid window" types -- [ISO 8601 Durations](https://en.wikipedia.org/wiki/ISO_8601#Durations), [Day.js Durations](https://day.js.org/docs/en/durations/creating), and submission/comment count limits.
 * Support Activity skipping based on:
   * Author criteria (name, css flair/text, age, karma, moderator status, and [Toolbox User Notes](https://www.reddit.com/r/toolbox/wiki/docs/usernotes))
@@ -85,7 +85,7 @@ See the [Moderator's Getting Started Guide](/docs/gettingStartedMod.md)
 
 ## Configuration and Documentation
 
-Context Bot's configuration can be written in JSON, [JSON5](https://json5.org/) or YAML. Its schema conforms to [JSON Schema Draft 7](https://json-schema.org/). Additionally, many **operator** settings can be passed via command line or environmental variables.
+Context Bot's configuration can be written in YAML (like automoderator) or [JSON5](https://json5.org/). Its schema conforms to [JSON Schema Draft 7](https://json-schema.org/). Additionally, many **operator** settings can be passed via command line or environmental variables.
 
 * For **operators** (running the bot instance) see the [Operator Configuration](/docs/operatorConfiguration.md) guide
 * For **moderators** consult the [app schema and examples folder](/docs/#configuration-and-usage)

@@ -154,11 +154,19 @@
                                 </div>
                             </div>
                             <div>
-                                <input class="permissionToggle" type="checkbox" id="wikiedit" name="wikiedit">
+                                <input class="permissionToggle" type="checkbox" id="modwiki" name="modwiki" checked>
+                                <label for="modwiki"><span class="font-mono font-semibold">modwiki</span> for the bot
+                                    to be able to set the visibility for its own config page</label>
+                            </div>
+                            <div>
+                                <input class="permissionToggle" type="checkbox" id="wikiedit" name="wikiedit" checked>
                                 <label for="wikiedit"><span class="font-mono font-semibold">wikiedit</span> for the bot
-                                    to be able to create/edit
-                                    Toolbox
-                                    User Notes</label>
+                                    to be able to create/edit it own config page and Toolbox User Notes</label>
+                            </div>
+                            <div>
+                                <input class="permissionToggle" type="checkbox" id="modself" name="modself" checked>
+                                <label for="modself"><span class="font-mono font-semibold">modself</span> for the bot
+                                    to be able to accept moderator invitations programmatically</label>
                             </div>
                             <div>
                                 <input class="permissionToggle" type="checkbox" id="modlog" name="modlog">

@@ -1,6 +1,6 @@
 ### Named Rules
 
-See [ruleNameReuse.json5](/docs/examples/advancedConcepts/ruleNameReuse.json5)
+See **Rule Name Reuse Examples [YAML](/docs/examples/advancedConcepts/ruleNameReuse.yaml) | [JSON](/docs/examples/advancedConcepts/ruleNameReuse.json5)**
 
 ### Check Order
 
@@ -23,7 +23,7 @@ The `rules` array on a `Checks` can contain both `Rule` objects and `RuleSet` ob
 
 A **Rule Set** is a "nested" set of `Rule` objects with a passing condition specified. These allow you to create more complex trigger behavior by combining multiple rules. 
 
-See **[ruleSets.json5](/docs/examples/advancedConcepts/ruleSets.json5)** for a complete example as well as consulting the [schema](https://json-schema.app/view/%23%2Fdefinitions%2FRuleSetJson?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Fcontext-mod%2Fmaster%2Fsrc%2FSchema%2FApp.json).
+See **ruleSets [YAML](/docs/examples/advancedConcepts/ruleSets.yaml) | [JSON](/docs/examples/advancedConcepts/ruleSets.json5)** for a complete example as well as consulting the [schema](https://json-schema.app/view/%23%2Fdefinitions%2FRuleSetJson?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Fcontext-mod%2Fmaster%2Fsrc%2FSchema%2FApp.json).
 
 ### Rule Order
 

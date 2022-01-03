@@ -11,21 +11,31 @@ All actions for these configurations are non-destructive in that:
 
 **You will have to remove the `report` action and `dryRun` settings yourself.** This is to ensure that you understand the behavior the bot will be performing. If you are unsure of this you should leave them in place until you are certain the behavior the bot is performing is acceptable.
 
+**YAML** is the same format as **automoderator**
+
 ## Submission-based Behavior
 
-### [Remove submissions from users who have used 'freekarma' subs to bypass karma checks](/docs/examples/subredditReady/freekarma.json5)
+### Remove submissions from users who have used 'freekarma' subs to bypass karma checks
+
+[YAML](/docs/examples/subredditReady/freekarma.yaml) | [JSON](/docs/examples/subredditReady/freekarma.json5)
 
 If the user has any activity (comment/submission) in known freekarma subreddits in the past (50 activities or 6 months) then remove the submission.
 
-### [Remove submissions from users who have crossposted the same submission 4 or more times](/docs/examples/subredditReady/crosspostSpam.json5)
+### Remove submissions from users who have crossposted the same submission 4 or more times
+
+[YAML](/docs/examples/subredditReady/crosspostSpam.yaml) | [JSON](/docs/examples/subredditReady/crosspostSpam.yaml)
 
 If the user has crossposted the same submission in the past (50 activities or 6 months) 4 or more times in a row then remove the submission.
 
-### [Remove submissions from users who have crossposted or used 'freekarma' subs](/docs/examples/subredditReady/freeKarmaOrCrosspostSpam.json5)
+### Remove submissions from users who have crossposted or used 'freekarma' subs
+
+[YAML](/docs/examples/subredditReady/freeKarmaOrCrosspostSpam.yaml) | [JSON](/docs/examples/subredditReady/freeKarmaOrCrosspostSpam.json5)
 
 Will remove submission if either of the above two behaviors is detected
 
-### [Remove link submissions where the user's history is comprised of 10% or more of the same link](/docs/examples/subredditReady/selfPromo.json5)
+### Remove link submissions where the user's history is comprised of 10% or more of the same link
+
+[YAML](/docs/examples/subredditReady/selfPromo.yaml) | [JSON](/docs/examples/subredditReady/selfPromo.json5)
 
 If the link origin (youtube author, twitter author, etc. or regular domain for non-media links)
 
@@ -36,11 +46,15 @@ then remove the submission
 
 ## Comment-based behavior
 
-### [Remove comment if the user has posted the same comment 4 or more times in a row](/docs/examples/subredditReady/commentSpam.json5)
+### Remove comment if the user has posted the same comment 4 or more times in a row
+
+[YAML](/docs/examples/subredditReady/commentSpam.yaml) | [JSON](/docs/examples/subredditReady/commentSpam.json5)
 
 If the user made the same comment (with some fuzzy matching) 4 or more times in a row in the past (50 activities or 6 months) then remove the comment.
 
-### [Remove comment if it is discord invite link spam](/docs/examples/subredditReady/discordSpam.json5)
+### Remove comment if it is discord invite link spam
+
+[YAML](/docs/examples/subredditReady/discordSpam.yaml) | [JSON](/docs/examples/subredditReady/discordSpam.json5)
 
 This rule goes a step further than automod can by being more discretionary about how it handles this type of spam. 
 

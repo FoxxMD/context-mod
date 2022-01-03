@@ -22,7 +22,7 @@ import SimpleError from "../../Utils/SimpleError";
 import {heartbeat} from "./routes/authenticated/applicationRoutes";
 import logs from "./routes/authenticated/user/logs";
 import status from './routes/authenticated/user/status';
-import {actionedEventsRoute, actionRoute, configRoute} from "./routes/authenticated/user";
+import {actionedEventsRoute, actionRoute, configRoute, configLocationRoute, deleteInviteRoute, addInviteRoute, getInvitesRoute} from "./routes/authenticated/user";
 import action from "./routes/authenticated/user/action";
 import {authUserCheck, botRoute} from "./middleware";
 import {opStats} from "../Common/util";
@@ -189,6 +189,8 @@ const rcbServer = async function (options: OperatorConfig) {
 
     server.getAsync('/config', ...configRoute);
 
+    server.getAsync('/config/location', ...configLocationRoute);
+
     server.getAsync('/events', ...actionedEventsRoute);
 
     server.getAsync('/action', ...action);
@@ -196,6 +198,12 @@ const rcbServer = async function (options: OperatorConfig) {
     server.getAsync('/check', ...actionRoute);
 
     server.getAsync('/addBot', ...addBot());
+
+    server.getAsync('/bot/invite', ...getInvitesRoute);
+
+    server.postAsync('/bot/invite', ...addInviteRoute);
+
+    server.deleteAsync('/bot/invite', ...deleteInviteRoute);
 
     const initBot = async (causedBy: Invokee = 'system') => {
         if(app !== undefined) {

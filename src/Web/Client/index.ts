@@ -39,17 +39,28 @@ import {prettyPrintJson} from "pretty-print-json";
 import DelimiterStream from 'delimiter-stream';
 import {pipeline} from 'stream/promises';
 import {defaultBotStatus} from "../Common/defaults";
-import {booleanMiddle} from "../Common/middleware";
+import {arrayMiddle, booleanMiddle} from "../Common/middleware";
 import {BotInstance, CMInstance} from "../interfaces";
 import { URL } from "url";
 import {MESSAGE} from "triple-beam";
 import Autolinker from "autolinker";
 import path from "path";
+import {ExtendedSnoowrap} from "../../Utils/SnoowrapClients";
 
 const emitter = new EventEmitter();
 
 const app = addAsync(express());
-app.use(bodyParser.json());
+const jsonParser = bodyParser.json();
+
+// do not modify body if we are proxying it to server
+app.use((req, res, next) => {
+    if(req.url.indexOf('/api') !== 0) {
+        jsonParser(req, res, next);
+    } else {
+        next();
+    }
+});
+
 app.use(bodyParser.urlencoded({extended: false}));
 //app.use(cookieParser());
 app.set('views', `${__dirname}/../assets/views`);
@@ -57,6 +68,8 @@ app.set('view engine', 'ejs');
 app.use('/public', express.static(`${__dirname}/../assets/public`));
 app.use('/monaco', express.static(`${__dirname}/../../../node_modules/monaco-editor/`));
 app.use('/schemas', express.static(`${__dirname}/../../Schema/`));
+
+const userAgent = `web:contextBot:web`;
 
 const proxy = httpProxy.createProxyServer({
     ws: true,
@@ -70,6 +83,7 @@ declare module 'express-session' {
         sort?: string,
         level?: string,
         state?: string,
+        scope?: string[],
         botId?: string,
         authBotId?: string,
     }
@@ -183,9 +197,9 @@ const webClient = async (options: OperatorConfig) => {
     * */
 
     passport.serializeUser(async function (data: any, done) {
-        const {user, subreddits} = data;
+        const {user, subreddits, scope, token} = data;
         //await webCache.set(`userSession-${user}`, { subreddits: subreddits.map((x: Subreddit) => x.display_name), isOperator: webOps.includes(user.toLowerCase()) }, {ttl: provider.ttl as number});
-        done(null, { subreddits: subreddits.map((x: Subreddit) => x.display_name), isOperator: webOps.includes(user.toLowerCase()), name: user });
+        done(null, { subreddits: subreddits.map((x: Subreddit) => x.display_name), isOperator: webOps.includes(user.toLowerCase()), name: user, scope, token, tokenExpiresAt: dayjs().unix() + (60 * 60) });
     });
 
     passport.deserializeUser(async function (obj, done) {
@@ -214,8 +228,8 @@ const webClient = async (options: OperatorConfig) => {
             } else if (req.session.state !== state) {
                 return done('Unexpected <b>state</b> value returned');
             }
-            const client = await Snoowrap.fromAuthCode({
-                userAgent: `web:contextBot:web`,
+            const client = await ExtendedSnoowrap.fromAuthCode({
+                userAgent,
                 clientId,
                 clientSecret,
                 redirectUri: redirectUri as string,
@@ -223,7 +237,8 @@ const webClient = async (options: OperatorConfig) => {
             });
             const user = await client.getMe().name as string;
             const subs = await client.getModeratedSubreddits();
-            return done(null, {user, subreddits: subs});
+            io.to(req.session.id).emit('authStatus', {canSaveWiki: req.session.scope?.includes('wikiedit')});
+            return done(null, {user, subreddits: subs, scope: req.session.scope, token: client.accessToken});
         }
     ));
 
@@ -256,14 +271,24 @@ const webClient = async (options: OperatorConfig) => {
         }
     }
 
-    app.getAsync('/login', async (req, res, next) => {
+    const scopeMiddle = arrayMiddle(['scope']);
+    const successMiddle = booleanMiddle([{name: 'closeOnSuccess', defaultVal: undefined, required: false}]);
+    app.getAsync('/login', scopeMiddle, successMiddle, async (req, res, next) => {
         if (redirectUri === undefined) {
             return res.render('error', {error: `No <b>redirectUri</b> was specified through environmental variables or program argument. This must be provided in order to use the web interface.`});
         }
+        const {query: { scope: reqScopes = [], closeOnSuccess } } = req;
+        const scope = [...new Set(['identity', 'mysubreddits', ...(reqScopes as string[])])];
         req.session.state = randomId();
+        req.session.scope = scope;
+        // @ts-ignore
+        if(closeOnSuccess === true) {
+            // @ts-ignore
+            req.session.closeOnSuccess = closeOnSuccess;
+        }
         const authUrl = Snoowrap.getAuthUrl({
             clientId,
-            scope: ['identity', 'mysubreddits'],
+            scope: scope,
             redirectUri: redirectUri as string,
             permanent: false,
             state: req.session.state,
@@ -293,7 +318,7 @@ const webClient = async (options: OperatorConfig) => {
             // @ts-ignore
             const invite = await webCache.get(`invite:${req.session.inviteId}`) as InviteData;
             const client = await Snoowrap.fromAuthCode({
-                userAgent: `web:contextBot:web`,
+                userAgent,
                 clientId: invite.clientId,
                 clientSecret: invite.clientSecret,
                 redirectUri: invite.redirectUri,
@@ -345,7 +370,15 @@ const webClient = async (options: OperatorConfig) => {
                 if(e !== undefined) {
                     return res.render('error', {error: err});
                 }
-                return res.redirect('/');
+                // @ts-ignore
+                const useCloseRedir: boolean = req.session.closeOnSuccess as any
+                // @ts-ignore
+                delete req.session.closeOnSuccess;
+                if(useCloseRedir === true) {
+                    return res.render('close');
+                } else {
+                    return res.redirect('/');
+                }
             });
         })(req, res, next);
     });
@@ -812,27 +845,60 @@ const webClient = async (options: OperatorConfig) => {
         });
     });
 
-    app.getAsync('/config', async (req: express.Request, res: express.Response) => {
+    app.getAsync('/bot/invites', defaultSession, async (req: express.Request, res: express.Response) => {
+        res.render('modInvites', {
+            title: `Pending Moderation Invites`,
+        });
+    });
+
+    app.getAsync('/config', defaultSession, async (req: express.Request, res: express.Response) => {
         const {format = 'json'} = req.query as any;
         res.render('config', {
             title: `Configuration Editor`,
             format,
+            canSave: req.user?.scope?.includes('wikiedit') && req.user?.tokenExpiresAt !== undefined && dayjs.unix(req.user?.tokenExpiresAt).isAfter(dayjs())
         });
     });
 
-    app.getAsync('/config/content', [ensureAuthenticatedApi, defaultSession, instanceWithPermissions, botWithPermissions, createUserToken], async (req: express.Request, res: express.Response) => {
+    app.postAsync('/config', [ensureAuthenticatedApi, defaultSession, instanceWithPermissions, botWithPermissions], async (req: express.Request, res: express.Response) => {
         const {subreddit} = req.query as any;
-        const resp = await got.get(`${(req.instance as CMInstance).normalUrl}/config`, {
-            headers: {
-                'Authorization': `Bearer ${req.token}`,
-            },
-            searchParams: {
-                subreddit,
-                bot: req.bot?.botName
-            }
-        }).text();
+        const {location, data, create = false} = req.body as any;
 
-        return res.send(resp);
+        const client = new ExtendedSnoowrap({
+            userAgent,
+            clientId,
+            clientSecret,
+            accessToken: req.user?.token
+        });
+
+        try {
+            // @ts-ignore
+            const wiki = await client.getSubreddit(subreddit).getWikiPage(location);
+            await wiki.edit({
+                text: data,
+                reason: create ? 'Created Config through CM Web' : 'Updated through CM Web'
+            });
+        } catch (err: any) {
+            res.status(500);
+            return res.send(err.message);
+        }
+
+        if(create) {
+            try {
+                // @ts-ignore
+                await client.getSubreddit(subreddit).getWikiPage(location).editSettings({
+                    permissionLevel: 2,
+                    // don't list this page on r/[subreddit]/wiki/pages
+                    listed: false,
+                });
+            } catch (err: any) {
+                res.status(500);
+                return res.send(`Successfully created wiki page for configuration but encountered error while setting visibility. You should manually set the wiki page visibility on reddit. \r\n Error: ${err.message}`);
+            }
+        }
+
+        res.status(200);
+        return res.send();
     });
 
     app.getAsync('/events', [ensureAuthenticatedApi, defaultSession, instanceWithPermissions, botWithPermissions, createUserToken], async (req: express.Request, res: express.Response) => {

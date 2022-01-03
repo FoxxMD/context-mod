@@ -1,0 +1,16 @@
+name: swear
+kind: regex
+criteria:
+    # triggers if there are more than 5 regex matches in the last 10 activities (comments only)
+  - regex: '/fuck|shit|damn/'
+    # this differs from "activityMatchThreshold"
+    #
+    # activityMatchThreshold => # of activities from window must match regex
+    # totalMatchThreshold => # of matches across all activities from window must match regex
+    totalMatchThreshold: '> 5'
+    # if `window` is specified it tells the rule to check the current activity as well as the activities returned from `window`
+    # learn more about `window` here https://github.com/FoxxMD/context-mod/blob/master/docs/activitiesWindow.md
+    window: 10
+    # determines which activities from window to consider
+    # defaults to "all" (submissions and comments)
+    lookAt: comments

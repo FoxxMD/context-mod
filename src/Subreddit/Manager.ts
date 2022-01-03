@@ -1,12 +1,22 @@
-import Snoowrap, {Comment, Subreddit} from "snoowrap";
+import Snoowrap, {Comment, Subreddit, WikiPage} from "snoowrap";
 import {Logger} from "winston";
 import {SubmissionCheck} from "../Check/SubmissionCheck";
 import {CommentCheck} from "../Check/CommentCheck";
 import {
-    cacheStats, createHistoricalStatsDisplay,
+    cacheStats,
+    createHistoricalStatsDisplay,
     createRetryHandler,
-    determineNewResults, findLastIndex, formatNumber,
-    mergeArr, parseFromJsonOrYamlToObject, pollingInfo, resultsSummary, sleep, totalFromMapStats, triggeredIndicator,
+    determineNewResults,
+    findLastIndex,
+    formatNumber, likelyJson5,
+    mergeArr,
+    parseFromJsonOrYamlToObject,
+    parseRedditEntity,
+    pollingInfo,
+    resultsSummary,
+    sleep,
+    totalFromMapStats,
+    triggeredIndicator,
 } from "../util";
 import {Poll} from "snoostorm";
 import pEvent from "p-event";
@@ -41,7 +51,7 @@ import NotificationManager from "../Notification/NotificationManager";
 import action from "../Web/Server/routes/authenticated/user/action";
 import {createHistoricalDefaults, historicalDefaults} from "../Common/defaults";
 import {ExtendedSnoowrap} from "../Utils/SnoowrapClients";
-import {isRateLimitError} from "../Utils/Errors";
+import {isRateLimitError, isStatusError} from "../Utils/Errors";
 
 export interface RunningState {
     state: RunState,
@@ -86,6 +96,7 @@ export class Manager extends EventEmitter {
     wikiLocation: string;
     lastWikiRevision?: DayjsObj
     lastWikiCheck: DayjsObj = dayjs();
+    wikiFormat: ('yaml' | 'json') = 'yaml';
     //wikiUpdateRunning: boolean = false;
 
     streamListedOnce: string[] = [];
@@ -129,6 +140,8 @@ export class Manager extends EventEmitter {
     }
 
     notificationManager: NotificationManager;
+
+    modPermissions?: string[]
 
     // use by api nanny to slow event consumption
     delayBy?: number;
@@ -255,6 +268,17 @@ export class Manager extends EventEmitter {
         })(this), 10000);
     }
 
+    protected async getModPermissions(): Promise<string[]> {
+        if(this.modPermissions !== undefined) {
+            return this.modPermissions as string[];
+        }
+        const userInfo = parseRedditEntity(this.botName, 'user');
+        const mods = this.subreddit.getModerators({name: userInfo.name});
+        // @ts-ignore
+        this.modPermissions = mods[0].mod_permissions;
+        return this.modPermissions as string[];
+    }
+
     protected getMaxWorkers(subMaxWorkers?: number) {
         let maxWorkers = this.globalMaxWorkers;
 
@@ -334,6 +358,7 @@ export class Manager extends EventEmitter {
     }
 
     protected async parseConfigurationFromObject(configObj: object) {
+        await this.getModPermissions();
         try {
             const configBuilder = new ConfigBuilder({logger: this.logger});
             const validJson = configBuilder.validateJson(configObj);
@@ -436,9 +461,45 @@ export class Manager extends EventEmitter {
 
         try {
             let sourceData: string;
+            let wiki: WikiPage;
             try {
-                // @ts-ignore
-                const wiki = await this.subreddit.getWikiPage(this.wikiLocation).fetch();
+                try {
+                    // @ts-ignore
+                    wiki = await this.subreddit.getWikiPage(this.wikiLocation).fetch();
+                } catch (err: any) {
+                    if(isStatusError(err) && err.statusCode === 404) {
+                        // see if we can create the page
+                        if (!this.client.scope.includes('wikiedit')) {
+                            throw new Error(`Page does not exist and could not be created because Bot does not have oauth permission 'wikiedit'`);
+                        }
+                        const modPermissions = await this.getModPermissions();
+                        if (!modPermissions.includes('all') && !modPermissions.includes('wiki')) {
+                            throw new Error(`Page does not exist and could not be created because Bot not have mod permissions for creating wiki pages. Must have 'all' or 'wiki'`);
+                        }
+                        if(!this.client.scope.includes('modwiki')) {
+                            throw new Error(`Bot COULD create wiki config page but WILL NOT because it does not have the oauth permissions 'modwiki' which is required to set page visibility and editing permissions. Safety first!`);
+                        }
+                        // @ts-ignore
+                        wiki = await this.subreddit.getWikiPage(this.wikiLocation).edit({
+                            text: '',
+                            reason: 'Empty configuration created for ContextMod'
+                        });
+                        this.logger.info(`Wiki page at ${this.wikiLocation} did not exist, but bot created it!`);
+
+                        // 0 = use subreddit wiki permissions
+                        // 1 = only approved wiki contributors
+                        // 2 = only mods may edit and view
+                        // @ts-ignore
+                        await this.subreddit.getWikiPage(this.wikiLocation).editSettings({
+                            permissionLevel: 2,
+                            // don't list this page on r/[subreddit]/wiki/pages
+                            listed: false,
+                        });
+                        this.logger.info('Bot set wiki page visibility to MODS ONLY');
+                    } else {
+                        throw err;
+                    }
+                }
                 const revisionDate = dayjs.unix(wiki.revision_date);
                 if (!force && this.validConfigLoaded && (this.lastWikiRevision !== undefined && this.lastWikiRevision.isSame(revisionDate))) {
                     // nothing to do, we already have this revision
@@ -465,22 +526,40 @@ export class Manager extends EventEmitter {
                 this.lastWikiRevision = revisionDate;
                 sourceData = await wiki.content_md;
             } catch (err: any) {
-                const msg = `Could not read wiki configuration. Please ensure the page https://reddit.com${this.subreddit.url}wiki/${this.wikiLocation} exists and is readable -- error: ${err.message}`;
+                let hint = '';
+                if(isStatusError(err) && err.statusCode === 403) {
+                    hint = `\r\nHINT: Either the page is restricted to mods only and the bot's reddit account does have the mod permission 'all' or 'wiki' OR the bot does not have the 'wikiread' oauth permission`;
+                }
+                const msg = `Could not read wiki configuration. Please ensure the page https://reddit.com${this.subreddit.url}wiki/${this.wikiLocation} exists and is readable${hint} -- error: ${err.message}`;
                 this.logger.error(msg);
                 throw new ConfigParseError(msg);
             }
 
-            if (sourceData === '') {
+            if (sourceData.replace('\r\n', '').trim() === '') {
                 this.logger.error(`Wiki page contents was empty`);
                 throw new ConfigParseError('Wiki page contents was empty');
             }
 
             const [configObj, jsonErr, yamlErr] = parseFromJsonOrYamlToObject(sourceData);
+            if (jsonErr === undefined) {
+                this.wikiFormat = 'json';
+            } else if (yamlErr === undefined) {
+                this.wikiFormat = 'yaml';
+            } else {
+                this.wikiFormat = likelyJson5(sourceData) ? 'json' : 'yaml';
+            }
 
             if (configObj === undefined) {
-                this.logger.error(`Could not parse wiki page contents as JSON or YAML:`);
-                this.logger.error(jsonErr);
-                this.logger.error(yamlErr);
+                this.logger.error(`Could not parse wiki page contents as JSON or YAML. Looks like it should be ${this.wikiFormat}?`);
+                if (this.wikiFormat === 'json') {
+                    this.logger.error(jsonErr);
+                    this.logger.error('Check DEBUG output for yaml error');
+                    this.logger.debug(yamlErr);
+                } else {
+                    this.logger.error(yamlErr);
+                    this.logger.error('Check DEBUG output for json error');
+                    this.logger.debug(jsonErr);
+                }
                 throw new ConfigParseError('Could not parse wiki page contents as JSON or YAML')
             }
 

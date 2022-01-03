@@ -1,0 +1,11 @@
+name: swear
+kind: regex
+criteria:
+  - regex: '/fuck|shit|damn/'
+    # triggers if the current activity has more than 0 matches
+    # if the activity is a submission then matches against title, body, and url
+    # if "testOn" is not provided then `title, body` are the defaults
+    testOn:
+      - title
+      - body
+      - url

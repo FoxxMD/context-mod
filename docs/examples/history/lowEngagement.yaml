@@ -1,0 +1,21 @@
+checks:
+  - name: Low Comment Engagement
+    description: Check if Author is submitting much more than they comment
+    # check will run on a new submission in your subreddit and look at the Author of that submission
+    kind: submission
+    rules:
+      - name: lowComm
+        kind: history
+        criteria:
+          - comment: '< 30%'
+            window:
+             # get author's last 90 days of activities or 100 activities, whichever is less
+             duration: 90 days
+             count: 100
+            # trigger if less than 30% of their activities in this time period are comments
+
+    actions:
+      - kind: report
+        content: >-
+          Low engagement: comments were {{rules.lowcomm.commentPercent}} of
+          {{rules.lowcomm.activityTotal}} over {{rules.lowcomm.window}}

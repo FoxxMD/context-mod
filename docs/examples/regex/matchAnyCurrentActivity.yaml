@@ -1,0 +1,6 @@
+name: swear
+kind: regex
+criteria:
+  - regex: '/fuck|shit|damn/'
+    # if "matchThreshold" is not specified it defaults to this -- default behavior is to trigger if there are any matches
+    #matchThreshold: "> 0"

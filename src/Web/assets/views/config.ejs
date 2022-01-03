@@ -10,6 +10,8 @@
     <meta name="viewport" content="width=device-width,initial-scale=1.0">
     <% if (format === 'yaml') { %>
     <link href="/public/yaml/entry.css" rel="stylesheet">
+    <% } else { %>
+        <link rel="stylesheet" data-name="vs/editor/editor.main" href="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.26.1/min/vs/editor/editor.main.min.css">
     <% } %>
     <!--icons from https://heroicons.com -->
 </head>
@@ -55,6 +57,25 @@
                     </span>
                 </span>
                 | <input id="configUrl" class="text-black placeholder-gray-500 rounded mx-2" style="min-width:400px;" placeholder="URL of a config to load"/> <a href="#" id="loadConfig">Load</a>
+                <span id="saveTip">
+                    <span style="margin-top:30px; z-index:100" class="tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2 space-y-3 p-2 text-left">
+                        <div>In order to <strong id="configPageActionType">save</strong> a configuration to a subreddit's wiki page you must re-authorize ContextMod with Reddit to get the following permissions:</div>
+                        <ul class="list-inside list-disc" id="reauthPermissions">
+                            <li><span class="font-mono">wikiedit</span></li>
+                        </ul>
+                        <div>CM will store this permission for one hour after which you must re-authorize again to save.</div>
+                        <div><b><a href="#" id="doAuthorize">Click Here to re-authorize</a></b></div>
+                    </span>
+                    <span>
+                        | <a id="doSave">Save</a>
+                        <svg id="saveQuestionIcon" xmlns="http://www.w3.org/2000/svg"
+                             class="h-4 w-4 inline-block cursor-help"
+                             fill="none"
+                             viewBox="0 0 24 24" stroke="currentColor">
+                            <use xlink:href="public/questionsymbol.svg#q" />
+                        </svg>
+                    </span>
+                </span>
                 <div id="error" class="font-semibold"></div>
                 <select style="display:none;" id="schema-selection">
                     <option value="bot.yaml">Bot Configuration</option>
@@ -72,7 +93,7 @@
 
     let schemaType;
     let schemaFile;
-    if(searchParams.get('schema') === 'operator') {
+    if (searchParams.get('schema') === 'operator') {
         window.schemaType = 'operator';
         window.schemaFile = 'OperatorConfig.json';
         document.querySelector('#schemaTypeList').innerHTML = 'automatic validation of your OPERATOR configuration (yellow squiggly)';
@@ -84,20 +105,11 @@
         document.querySelector('#subredditSchemaType').classList.add('font-bold', 'no-underline', 'pointer-events-none');
     }
 
-    if(searchParams.get('format') === 'yaml') {
+    if (searchParams.get('format') === 'yaml') {
         document.querySelector('#formatYaml').classList.add('font-bold', 'no-underline', 'pointer-events-none');
     } else {
         document.querySelector('#formatJson').classList.add('font-bold', 'no-underline', 'pointer-events-none');
     }
-
-    document.querySelectorAll('.formatType').forEach(el => {
-        el.addEventListener('click', (e) => {
-            var searchParams = new URLSearchParams(window.location.search);
-            searchParams.set('format', e.target.dataset.format);
-            const newUrl = `${window.location.pathname}?${searchParams.toString()}`;
-            window.location.href = newUrl;
-        })
-    });
 
     window.addNoErrors = function () {
         const problems = document.getElementById('problems');
@@ -110,255 +122,371 @@
         wrapper.append(text);
         problems.append(wrapper);
     }
-</script>
-<% if (format === 'json') { %>
-<!--Use CDN for loading monaco https://stackoverflow.com/a/63179814/1469797 -->
-<!-- Reduces app size (docker) by a big chunk to not serve it locally AND it's not necessary for essential operation -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.26.1/min/vs/loader.min.js"></script>
-<script>
-    require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.26.1/min/vs' }});
 
-    const preamble = [
-        '// Copy + paste your configuration here to get',
-        '// formatting, JSON syntax, annotated properties and'
-    ];
+    window.canSave = <%= canSave %>;
 
-    var searchParams = new URLSearchParams(window.location.search);
+    if (searchParams.get('subreddit') === null) {
+        document.querySelector('#saveTip').style.display = 'none';
+    } else {
+        document.querySelector('#doSave').textContent = `Save to ${searchParams.get('subreddit')}`;
+    }
 
-    const schemaUri = `${document.location.origin}/schemas/${window.schemaFile}`;
+    window.setSaveStatus = function () {
+        if (window.canSave) {
+            document.querySelector('#saveTip').classList.remove('has-tooltip');
+            document.querySelector('#saveQuestionIcon').style.display = 'none';
+            const saveLink = document.querySelector('#doSave');
+            saveLink.classList.remove('isDisabled');
+            saveLink.href = '#';
+        } else {
+            document.querySelector('#saveTip').classList.add('has-tooltip');
+            document.querySelector('#saveQuestionIcon').style.display = 'initial';
+            const saveLink = document.querySelector('#doSave');
+            saveLink.classList.add('isDisabled');
+            saveLink.href = '';
+        }
+    }
 
-    require(['vs/editor/editor.main'], function () {
-        const modelUri = monaco.Uri.parse("a://b/foo.json");
-        fetch(schemaUri).then((res) => {
-            res.json().then((schemaData) => {
-                monaco.languages.json.jsonDefaults.setDiagnosticsOptions({
-                    validate: true,
-                    allowComments: true,
-                    trailingCommas: "ignore",
-                    schemas: [{
-                        uri: schemaUri,
-                        fileMatch: [modelUri.toString()],
-                        schema: schemaData
-                    }]
-                });
-                var model = monaco.editor.createModel(preamble.join('\r\n'), "json", modelUri);
+    window.setSaveStatus();
 
-                document.querySelector('#loadConfig').addEventListener('click', (e) => {
-                    e.preventDefault();
-                    const newUrl = document.querySelector('#configUrl').value;
-                    fetch(newUrl).then((resp) => {
-                        if(!resp.ok) {
-                            resp.text().then(data => {
-                                document.querySelector('#error').innerHTML = `Error occurred while fetching configuration => ${data}`
-                            });
-                        } else {
-                            var sp = new URLSearchParams();
-                            sp.append('schema', window.schemaType);
-                            sp.append('url', newUrl);
-                            history.pushState(null, '', `${window.location.pathname}?${sp.toString()}`);
-                            resp.text().then(data => {
-                                //model = monaco.editor.createModel(data, "json", modelUri);
-                                model.setValue(data);
-                            })
-                        }
-                    });
-                });
+    window.creatingWikiPage = false;
+    window.isCreatingWikiPage = (val) => {
+        window.creatingWikiPage = val;
+        if(val) {
+            document.querySelector('#doSave').textContent = `Create config for ${searchParams.get('subreddit')}`;
+            if(document.querySelector('#createPerm') === null) {
+                const node = document.querySelector('#reauthPermissions');
+                node.insertAdjacentHTML('beforeend', '<li id="createPerm"><span class="font-mono">modwiki</span> -- used to set config page visibility to mod-only upon creation</li>');
+            }
+            document.querySelector('#configPageActionType').textContent = 'create';
+        } else {
+            const node = document.querySelector('#createPerm');
+            if(node !== null) {
+                node.style ='display:none;';
+            }
+            document.querySelector('#doSave').textContent = `Save to ${searchParams.get('subreddit')}`;
+            document.querySelector('#configPageActionType').textContent = 'save';
+        }
+    }
 
-                let dlUrl = searchParams.get('url');
-                if(dlUrl === null && searchParams.get('subreddit') !== null) {
-                    dlUrl = `${document.location.origin}/config/content${document.location.search}`
-                }
-                if(dlUrl !== null) {
-                    document.querySelector('#configUrl').value = dlUrl;
-                    fetch(dlUrl).then((resp) => {
-                        if(!resp.ok) {
-                            resp.text().then(data => {
-                                document.querySelector('#error').innerHTML = `Error occurred while fetching configuration => ${data}`
-                            });
-                        } else {
-                            resp.text().then(data => {
-                                model.setValue(data);
-                                //model = monaco.editor.createModel(data, "json", modelUri);
-                                var editor = monaco.editor.create(document.getElementById('editor'), {
-                                    model,
-                                    theme: 'vs-dark',
-                                    minimap: {
-                                        enabled: false
-                                    }
-                                });
-                                editor;
-                            })
-                        }
-                    });
-                } else {
-                    var editor = monaco.editor.create(document.getElementById('editor'), {
-                        model,
-                        theme: 'vs-dark',
-                        minimap: {
-                            enabled: false
-                        }
-                    });
-                    editor;
-                }
+    //https://stackoverflow.com/a/61404006/1469797
+    function onBeforeUnload(e) {
+        if (window.dirty) {
+            e.preventDefault();
+            e.returnValue = '';
+            return;
+        }
 
-                const markers = monaco.editor.getModelMarkers();
-                if(markers.length === 0) {
-                    window.addNoErrors();
-                }
+        delete e['returnValue'];
+    }
 
-                monaco.editor.onDidChangeMarkers(([resource]) => {
-                    const problems = document.getElementById('problems');
-                    const markers = monaco.editor.getModelMarkers({ resource });
-                    while (problems.lastChild) {
-                        problems.lastChild.remove();
-                    }
-                    if(markers.length === 0) {
-                        window.addNoErrors();
-                    }
-                    for (const marker of markers) {
-                        const wrapper = document.createElement('div');
-                        wrapper.setAttribute('role', 'button');
-                        const codicon = document.createElement('div');
-                        const text = document.createElement('div');
-                        wrapper.classList.add('problem');
-                        codicon.classList.add('codicon', 'codicon-warning');
-                        text.classList.add('problem-text');
-                        text.textContent = marker.message;
-                        wrapper.append(codicon, text);
-                        wrapper.addEventListener('click', () => {
-                            editor.setPosition({ lineNumber: marker.startLineNumber, column: marker.startColumn });
-                            editor.focus();
-                        });
-                        problems.append(wrapper);
-                    }
-                });
+    window.addEventListener('beforeunload', onBeforeUnload);
+
+    document.querySelector('#doAuthorize').addEventListener('click', (e) => {
+        e.preventDefault();
+        const scopes = ['wikiedit'];
+        if(window.creatingWikiPage) {
+            scopes.push('modwiki');
+        }
+        window.open(`${document.location.origin}/login?closeOnSuccess=true&scope=${scopes.join(',')}`, 'Re-authorize CM', 'popup=1');
+    });
+    document.querySelector('#doSave').addEventListener('click', (e) => {
+        e.preventDefault();
+        if (window.wikiLocation === undefined || window.wikiLocation === null || window.canSave === false) {
+            return;
+        }
+
+        fetch(`${document.location.origin}/config${document.location.search}`, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                //...data,
+                location: window.wikiLocation,
+                create: window.creatingWikiPage,
+                data: window.ed.getModel().getValue()
             })
-        })
-    });
-
-    document.querySelectorAll('.schemaType').forEach(el => {
-        el.addEventListener('click', (e) => {
-            var searchParams = new URLSearchParams(window.location.search);
-            searchParams.set('schema', e.target.dataset.schema);
-            const newUrl = `${window.location.pathname}?${searchParams.toString()}`;
-            window.location.href = newUrl;
+        }).then((resp) => {
+            if (!resp.ok) {
+                resp.text().then(data => {
+                    document.querySelector('#error').innerHTML = `Error occurred while fetching configuration => ${data}`
+                });
+            } else {
+                if(window.creatingWikiPage) {
+                    window.isCreatingWikiPage(false);
+                }
+                document.querySelector('#error').innerHTML = `Wiki saved!`;
+                window.dirty = false;
+                setTimeout(() => {
+                    document.querySelector('#error').innerHTML = ``;
+                }, 3000);
+            }
         })
     });
 </script>
-<% } else { %>
 <script defer="defer" src="/public/yaml/entry.js"></script>
 <script>
-    var searchParams = new URLSearchParams(window.location.search);
-    let dlUrl = searchParams.get('url');
-    if(dlUrl === null && searchParams.get('subreddit') !== null) {
-        dlUrl = `${document.location.origin}/config/content${document.location.search}`
-    }
+    const gistReg = new RegExp(/.*gist.github.com\/.+\/(.+)/i)
+    const blobReg = new RegExp(/.*github.com\/(.+)\/(.+)\/blob\/(.+)/i);
 
-    if(searchParams.get('schema') === 'operator') {
-        // @ts-ignore
-        document.querySelector('#schema-selection').value = 'app.yaml';
-    }
+    function getPayloadUrl(url) {
+        console.debug(`Attempting to detect resolvable URL for ${url}`);
+        let match = url.match(gistReg);
+        if (match !== null) {
+            const gistApiUrl = `https://api.github.com/gists/${match[1]}`;
+            console.debug(`Looks like a non-raw gist URL! Trying to resolve ${gistApiUrl}`);
 
-    if(dlUrl !== null) {
-        // @ts-ignore
-        document.querySelector('#configUrl').value = dlUrl;
-        fetch(dlUrl).then((resp) => {
-            if(!resp.ok) {
-                resp.text().then(data => {
-                    document.querySelector('#error').innerHTML = `Error occurred while fetching configuration => ${data}`
-                });
-            } else {
-                resp.text().then(data => {
-                    const oldModel = window.ed.getModel();
-                    oldModel.dispose();
-                    // @ts-ignore
-                    const newModel = window.meditor.createModel(data, 'yaml', muri.parse(document.querySelector('#schema-selection').value));
-                    window.ed.setModel(newModel);
+            return new Promise((resolve, reject) => {
+                fetch(gistApiUrl).then((resp) => {
+                    if (!resp.ok) {
+                        console.error('Response was not OK from Gist API');
+                        resolve(url);
+                    } else {
+                        resp.json().then((data) => {
+                            // get first found file
+                            const fileKeys = Object.keys(data.files);
+                            if (fileKeys.length === 0) {
+                                console.error(`No files found in gist!`);
+                            } else {
+                                if (fileKeys.length > 1) {
+                                    console.warn(`More than one file found in gist! Using first found: ${fileKeys[0]}`);
+                                }
+                                const rawUrl = data.files[fileKeys[0]].raw_url;
+                                console.debug(`Resolving raw gist url for first file found (${fileKeys[0]}) to ${rawUrl}`);
+                                resolve(rawUrl);
+                            }
+                        });
+                    }
                 })
-            }
-        });
+            });
+        }
+
+        match = url.match(blobReg);
+        if(match !== null) {
+            const rawUrl = `https://raw.githubusercontent.com/${match[1]}/${match[2]}/${match[3]}`
+            console.debug(`Looks like a single file github URL! Resolving to ${rawUrl}`);
+            return new Promise((resolve, reject) => resolve(rawUrl));
+        }
+
+        console.debug('Resolving with original URL');
+        return new Promise((resolve, reject) => resolve(url));
     }
 
-    document.querySelector('#loadConfig').addEventListener('click', (e) => {
-        e.preventDefault();
-        // @ts-ignore
-        const newUrl = document.querySelector('#configUrl').value;
-        fetch(newUrl).then((resp) => {
-            if(!resp.ok) {
-                resp.text().then(data => {
-                    document.querySelector('#error').innerHTML = `Error occurred while fetching configuration => ${data}`
-                });
-            } else {
-                var sp = new URLSearchParams();
-                // @ts-ignore
-                sp.append('schema', document.querySelector('#schema-selection').value === 'bot.yaml' ? 'bot' : 'operator' );
-                sp.append('url', newUrl);
-                sp.append('format', 'yaml');
-                history.pushState(null, '', `${window.location.pathname}?${sp.toString()}`);
-                resp.text().then(data => {
-                    const oldModel = window.ed.getModel();
-                    oldModel.dispose();
-                    // @ts-ignore
-                    const newModel = window.meditor.createModel(data, 'yaml', window.muri.parse(document.querySelector('#schema-selection').value));
-                    window.ed.setModel(newModel);
-                })
-            }
-        });
-    });
-
-    document.querySelectorAll('.schemaType').forEach(el => {
-        el.addEventListener('click', (e) => {
-            document.querySelectorAll('.schemaType').forEach(el => {
-                el.classList.remove('font-bold', 'no-underline', 'pointer-events-none');
-            })
-            if(e.target.dataset.schema === 'operator') {
-                window.schemaType = 'operator';
-                window.schemaFile = 'OperatorConfig.json';
-                document.querySelector('#operatorSchemaType').classList.add('font-bold', 'no-underline', 'pointer-events-none');
-            } else {
-                document.querySelector('#subredditSchemaType').classList.add('font-bold', 'no-underline', 'pointer-events-none');
-                window.schemaType = 'subreddit';
-                window.schemaFile = 'App.json';
-            }
-
-            var searchParams = new URLSearchParams(window.location.search);
-            searchParams.set('schema', e.target.dataset.schema === 'operator' ? 'operator' : 'bot')
-            history.pushState(null, '', `${window.location.pathname}?${searchParams.toString()}`);
-            const oldModel = window.ed.getModel();
-            const val = oldModel.getValue();
-            oldModel.dispose();
-            const newModel = window.meditor.createModel(val, 'yaml', window.muri.parse(e.target.dataset.schema === 'operator' ? 'app.yaml' : 'bot.yaml'));
-            window.ed.setModel(newModel);
-        })
-    });
-
-    var addNoErrors = function () {
-        const problems = document.getElementById('problems');
-        const wrapper = document.createElement('div');
-        wrapper.setAttribute('role', 'button');
-        const text = document.createElement('div');
-        wrapper.classList.add('problem');
-        text.classList.add('problem-text');
-        text.textContent = 'No errors! :)';
-        wrapper.append(text);
-        problems.append(wrapper);
-    }
     window.addEventListener('load', function () {
 
-        const markers = window.meditor.getModelMarkers();
-        if(markers.length === 0) {
-            window.addNoErrors();
+        var searchParams = new URLSearchParams(window.location.search);
+        let isSubreddit = false;
+        let dlUrl = searchParams.get('url');
+        if (dlUrl === null && searchParams.get('subreddit') !== null) {
+            isSubreddit = true;
+            dlUrl = `${document.location.origin}/api/config${document.location.search}`
         }
 
-    window.meditor.onDidChangeMarkers(([resource]) => {
+        let currentSchema = searchParams.get('schema') === 'operator' ? 'app' : 'bot',
+            currentFormat = searchParams.get('format') === 'yaml' ? 'yaml' : 'json';
 
-        const markers = window.meditor.getModelMarkers({resource});
-        if(markers.length === 0) {
-            window.addNoErrors();
+        const preamble = currentFormat === 'yaml' ? [
+            '# Edit, or copy-paste, your configuration here to get',
+            '# formatting, YAML syntax, and annotated properties'
+        ] : [
+            '// Edit, or copy-paste, your configuration here to get',
+            '// formatting, JSON syntax, and annotated properties'
+        ];
+
+        function getFileName() {
+            return `${currentSchema}.${currentFormat}`;
         }
-    });
+
+        if (dlUrl !== null) {
+            // @ts-ignore
+            document.querySelector('#configUrl').value = dlUrl;
+            getPayloadUrl(dlUrl).then((url) => {
+                fetch(url).then((resp) => {
+                    if (!resp.ok) {
+                        resp.text().then(data => {
+                            if(isSubreddit && data.includes('PAGE_NOT_CREATED')) {
+                                window.isCreatingWikiPage(true);
+                                window.ed.getModel().setValue(preamble.join('\r\n'))
+                            } else {
+                                document.querySelector('#error').innerHTML = `Error occurred while fetching configuration => ${data}`
+                            }
+                        });
+                    } else {
+                        if(isSubreddit) {
+                            window.isCreatingWikiPage(false);
+                        }
+                        resp.text().then(data => {
+                            const oldModel = window.ed.getModel();
+                            oldModel.dispose();
+                            // @ts-ignore
+                            const newModel = window.meditor.createModel('', currentFormat, window.muri.parse(getFileName()));
+                            window.ed.setModel(newModel);
+                            window.ed.getModel().setValue(data);
+                            newModel.onDidChangeContent((e) => {
+                                window.dirty = true;
+                            });
+                            window.dirty = false;
+                        })
+                    }
+                });
+            })
+            if (searchParams.get('subreddit') !== null) {
+                const wikiLocationUrl = `${document.location.origin}/api/config/location${document.location.search}`
+                fetch(wikiLocationUrl).then((resp) => {
+                    if (!resp.ok) {
+                        resp.text().then(data => {
+                            document.querySelector('#error').innerHTML = `Error occurred while fetching wiki location => ${data}`
+                        });
+                    } else {
+                        resp.text().then(data => {
+                            window.wikiLocation = data;
+                        })
+                    }
+                });
+            }
+        } else {
+            const oldModel = window.ed.getModel();
+            oldModel.dispose();
+            // @ts-ignore
+            const newModel = window.meditor.createModel(preamble.join('\r\n'), currentFormat, window.muri.parse(getFileName()));
+            window.ed.setModel(newModel);
+            newModel.onDidChangeContent((e) => {
+                window.dirty = true;
+            });
+            window.dirty = false;
+        }
+
+        document.querySelector('#loadConfig').addEventListener('click', (e) => {
+            e.preventDefault();
+            // @ts-ignore
+            const newUrl = document.querySelector('#configUrl').value;
+            getPayloadUrl(newUrl).then((url) => {
+                fetch(url).then((resp) => {
+                    if (!resp.ok) {
+                        resp.text().then(data => {
+                            document.querySelector('#error').innerHTML = `Error occurred while fetching configuration => ${data}`
+                        });
+                    } else {
+                        var sp = new URLSearchParams();
+                        // @ts-ignore
+                        sp.set('schema', currentSchema === 'app' ? 'operator' : 'bot');
+                        sp.set('format', currentFormat);
+                        sp.set('url', newUrl);
+                        history.pushState(null, '', `${window.location.pathname}?${sp.toString()}`);
+                        resp.text().then(data => {
+                            const oldModel = window.ed.getModel();
+                            oldModel.dispose();
+                            // @ts-ignore
+                            const newModel = window.meditor.createModel('', currentFormat, window.muri.parse(getFileName()));
+                            window.ed.setModel(newModel);
+                            window.ed.getModel().setValue(data);
+                            newModel.onDidChangeContent((e) => {
+                                window.dirty = true;
+                            });
+                            window.dirty = false;
+                        })
+                    }
+                });
+            });
+        });
+
+        document.querySelectorAll('.schemaType').forEach(el => {
+            el.addEventListener('click', (e) => {
+                document.querySelectorAll('.schemaType').forEach(el => {
+                    el.classList.remove('font-bold', 'no-underline', 'pointer-events-none');
+                })
+                if (e.target.dataset.schema === 'operator') {
+                    currentSchema = 'app';
+                    window.schemaType = 'operator';
+                    window.schemaFile = 'OperatorConfig.json';
+                    document.querySelector('#operatorSchemaType').classList.add('font-bold', 'no-underline', 'pointer-events-none');
+                } else {
+                    currentSchema = 'bot';
+                    document.querySelector('#subredditSchemaType').classList.add('font-bold', 'no-underline', 'pointer-events-none');
+                    window.schemaType = 'subreddit';
+                    window.schemaFile = 'App.json';
+                }
+
+                var searchParams = new URLSearchParams(window.location.search);
+                searchParams.set('schema', currentSchema === 'app' ? 'operator' : 'bot');
+                history.pushState(null, '', `${window.location.pathname}?${searchParams.toString()}`);
+                const oldModel = window.ed.getModel();
+                const val = oldModel.getValue();
+                oldModel.dispose();
+                const newModel = window.meditor.createModel('', currentFormat, window.muri.parse(getFileName()));
+                window.ed.setModel(newModel);
+                window.ed.getModel().setValue(val);
+                newModel.onDidChangeContent((e) => {
+                    window.dirty = true;
+                });
+                window.dirty = false;
+            })
+        });
+
+        document.querySelectorAll('.formatType').forEach(el => {
+            el.addEventListener('click', (e) => {
+                document.querySelectorAll('.formatType').forEach(el => {
+                    el.classList.remove('font-bold', 'no-underline', 'pointer-events-none');
+                });
+
+                if (e.target.dataset.format === 'yaml') {
+                    currentFormat = 'yaml';
+                    document.querySelector('#formatYaml').classList.add('font-bold', 'no-underline', 'pointer-events-none');
+                } else {
+                    currentFormat = 'json';
+                    document.querySelector('#formatJson').classList.add('font-bold', 'no-underline', 'pointer-events-none');
+                }
+
+                var searchParams = new URLSearchParams(window.location.search);
+                searchParams.set('format', e.target.dataset.format);
+                history.pushState(null, '', `${window.location.pathname}?${searchParams.toString()}`);
+
+                const oldModel = window.ed.getModel();
+                const val = oldModel.getValue();
+                oldModel.dispose();
+                const newModel = window.meditor.createModel('', currentFormat, window.muri.parse(getFileName()));
+                window.ed.setModel(newModel);
+                window.ed.getModel().setValue(val);
+                newModel.onDidChangeContent((e) => {
+                    window.dirty = true;
+                });
+                window.dirty = false;
+            })
+        });
+
+        window.addEventListener('load', function () {
+
+            const markers = window.meditor.getModelMarkers();
+            if (markers.length === 0) {
+                window.addNoErrors();
+            }
+
+            window.meditor.onDidChangeMarkers(([resource]) => {
+
+                const markers = window.meditor.getModelMarkers({resource});
+                if (markers.length === 0) {
+                    window.addNoErrors();
+                }
+            });
+        });
     });
 </script>
-<% } %>
+<script id="iojs" src="https://cdn.socket.io/4.1.2/socket.io.min.js" integrity="sha384-toS6mmwu70G0fw54EGlWWeA4z3dyJ+dlXBtSURSKN4vyRFOcxd3Bzjj/AoOwY+Rg" crossorigin="anonymous"></script>
+<script>
+    window.addEventListener('load', function () {
+        let socket = io({
+            reconnectionAttempts: 5, // bail after 5 attempts
+        });
+        socket.on("connect", () => {
+            socket.on("authStatus", data => {
+                console.log(data);
+                window.canSave = data.canSaveWiki;
+                window.setSaveStatus();
+            });
+        });
+    });
+</script>
 </body>
 </html>

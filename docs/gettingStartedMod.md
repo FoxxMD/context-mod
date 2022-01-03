@@ -14,8 +14,8 @@ This getting started guide is for **reddit moderators** -- that is, someone who 
 
 Before continuing with this guide you should first make sure you understand how a ContextMod works. Please review this documentation:
 
-* [How It Works](/docs#how-it-works)
-* [Core Concepts](/docs#concepts)
+* [How It Works](/docs/README.md#how-it-works)
+* [Core Concepts](/docs/README.md#concepts)
 
 # Choose A Bot
 
@@ -36,15 +36,16 @@ If the Operator has communicated that **you should add a bot they control as a m
 
 ___
 
-Ensure that you are in communication with the **operator** for this bot. The bot **will not automatically accept a moderator invitation,** it must be manually done by the bot operator. This is an intentional barrier to ensure moderators and the operator are familiar with their respective needs and have some form of trust.
+Ensure that you are in communication with the **operator** of this bot. The bot **will only accept a moderator invitation if your subreddit has been whitelisted by the operator.** This is an intentional barrier to ensure moderators and the operator are familiar with their respective needs and have some form of trust.
 
 Now invite the bot to moderate your subreddit. The bot should have at least these permissions:
 
 * Manage Users
 * Manage Posts and Comments
 * Manage Flair
-
-Additionally, the bot must have the **Manage Wiki Pages** permission if you plan to use [Toolbox User Notes](https://www.reddit.com/r/toolbox/wiki/docs/usernotes). If you are not planning on using this feature and do not want the bot to have this permission then you **must** ensure the bot has visibility to the configuration wiki page (detailed below).
+* Manage Wiki Pages
+  * Required to read the moderator-only visible wiki page used to configure the bot
+  * Required to read/write to [Toolbox User Notes](https://www.reddit.com/r/toolbox/wiki/docs/usernotes)
 
 ## Bring Your Own Bot (BYOB)
 
@@ -60,7 +61,7 @@ If the operator has communicated that **they want to use a bot you control** thi
 
 **Cons:**
 
-* More setup required for both moderators and operators
+* You must have access to the credentials for the reddit account (bot)
 
 ___
 
@@ -72,7 +73,19 @@ Review the information shown on the invite link webpage and then follow the dire
 
 # Configuring the Bot
 
+The bot's behavior is defined using a configuration, like automoderator, that is stored in the **wiki** of each subreddit it moderates.
+
+The default location for this page is at `https://old.reddit.com/r/YOURSUBERDDIT/wiki/botconfig/contextbot`
+
 ## Setup wiki page
+
+The bot automatically tries to create its configuration wiki page. You can find the result of this in the log for your subreddit in the web interface.
+
+If this fails for some reason you can create the wiki page through the web interface by navigating to your subreddit's tab, opening the [built-in editor (click **View**)](/docs/screenshots/configBox.png), and following the directions in **Create configuration for...** link found there.
+
+If neither of the above approaches work, or you do not wish to use the web interface, expand the section below for directions on how to manually setup the wiki page:
+
+<details>
 
 * Visit the wiki page of the subreddit you want the bot to moderate
   * The default location the bot checks for a configuration is at `https://old.reddit.com/r/YOURSUBERDDIT/wiki/botconfig/contextbot`
@@ -80,7 +93,8 @@ Review the information shown on the invite link webpage and then follow the dire
 * Ensure the wiki page visibility is restricted
   * On the wiki page click **settings** (**Page settings** in new reddit)
   * Check the box for **Only mods may edit and view** and then **save**
-    * Alternatively, if you did not give the bot the **Manage Wiki Pages** permission then add it to the **allow users to edit page** setting
+
+</details>
 
 ## Procure a configuration
 
@@ -94,24 +108,45 @@ Visit the [Examples](https://github.com/FoxxMD/context-mod/tree/master/docs/exam
 
 After you have found a configuration to use as a starting point:
 
-* In a new tab open the github page for the configuration you want ([example](/docs/examples/repeatActivity/crosspostSpamming.json5))
-* Click the **Raw** button, then select all and copy all of the text to your clipboard.
+* Copy the URL for the configuration file EX `https://github.com/FoxxMD/context-mod/blob/master/docs/examples/subredditReady/freekarma.json5` and either:
+  * (Easiest) **Load** it into your [subreddit's built-in editor](#using-the-built-in-editor) and **Save**
+  * or on the file's page, click the **Raw** button, select all and copy to your clipboard, and [manually save to your wiki page](#manually-saving)
 
 ### Build Your Own Config
 
-Additionally, you can use [this schema editor](https://json-schema.app/view/%23?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Fcontext-mod%2Fmaster%2Fsrc%2FSchema%2FApp.json) to build your configuration. The editor features a ton of handy features:
+CM comes equipped with a [configuration explorer](https://json-schema.app/view/%23?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Fcontext-mod%2Fmaster%2Fsrc%2FSchema%2FApp.json) to help you see all available options, with descriptions and examples, that can be used in your configuration.
 
-* fully annotated configuration data/structure
-* generated examples in json/yaml
-* built-in editor that automatically validates your config
+To create or edit a configuration you should use **CM's buit-in editor** which features:
+* syntax validation and formatting
+* full configuration validation with error highlighting, hints, and fixes
+* hover over properties to see documentation and examples
 
-PROTIP: Find an example config to use as a starting point and then build on it using the editor.
+To use the editor either:
+* [use your subreddit's built-in editor](#using-the-built-in-editor)
+* or use the public editor at https://cm.foxxmd.dev/config
+
+PROTIP: Find an [example config](#using-an-example-config) to use as a starting point and then build on it using the editor.
 
 ## Saving Your Configuration
 
-* Open the wiki page you created in the [previous step](#setup-wiki-page) and click **edit**
+### Using the built-in Editor
+
+In the web interface each subreddit's tab has access to the built-in editor. Use this built-in editor to automatically create, load, or save the configuration for that subreddit's wiki.
+
+* Visit the tab for the subreddit you want to edit the configuration of
+* Open the [built-in editor by click **View**](/docs/screenshots/configBox.png)
+* Edit your configuration
+* Follow the directions on the **Save to r/..** link found at the top of the editor to automatically save your configuration
+
+### Manually Saving
+
+<details>
+
+* Open the wiki page you created in the [wiki setup step](#setup-wiki-page) and click **edit**
   * Copy-paste your configuration into the wiki text box
   * Save the edited wiki page
+
+</details>
 
 ___
 
