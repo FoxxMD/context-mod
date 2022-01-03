@@ -229,10 +229,11 @@
 <script defer="defer" src="/public/yaml/entry.js"></script>
 <script>
     const gistReg = new RegExp(/.*gist.github.com\/.+\/(.+)/i)
+    const blobReg = new RegExp(/.*github.com\/(.+)\/(.+)\/blob\/(.+)/i);
 
     function getPayloadUrl(url) {
         console.debug(`Attempting to detect resolvable URL for ${url}`);
-        const match = url.match(gistReg);
+        let match = url.match(gistReg);
         if (match !== null) {
             const gistApiUrl = `https://api.github.com/gists/${match[1]}`;
             console.debug(`Looks like a non-raw gist URL! Trying to resolve ${gistApiUrl}`);
@@ -260,9 +261,16 @@
                     }
                 })
             });
-        } else {
-            console.debug('Resolving with original URL');
         }
+
+        match = url.match(blobReg);
+        if(match !== null) {
+            const rawUrl = `https://raw.githubusercontent.com/${match[1]}/${match[2]}/${match[3]}`
+            console.debug(`Looks like a single file github URL! Resolving to ${rawUrl}`);
+            return new Promise((resolve, reject) => resolve(rawUrl));
+        }
+
+        console.debug('Resolving with original URL');
         return new Promise((resolve, reject) => resolve(url));
     }
 
