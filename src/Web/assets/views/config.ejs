@@ -93,7 +93,7 @@
 
     let schemaType;
     let schemaFile;
-    if(searchParams.get('schema') === 'operator') {
+    if (searchParams.get('schema') === 'operator') {
         window.schemaType = 'operator';
         window.schemaFile = 'OperatorConfig.json';
         document.querySelector('#schemaTypeList').innerHTML = 'automatic validation of your OPERATOR configuration (yellow squiggly)';
@@ -105,7 +105,7 @@
         document.querySelector('#subredditSchemaType').classList.add('font-bold', 'no-underline', 'pointer-events-none');
     }
 
-    if(searchParams.get('format') === 'yaml') {
+    if (searchParams.get('format') === 'yaml') {
         document.querySelector('#formatYaml').classList.add('font-bold', 'no-underline', 'pointer-events-none');
     } else {
         document.querySelector('#formatJson').classList.add('font-bold', 'no-underline', 'pointer-events-none');
@@ -125,14 +125,14 @@
 
     window.canSave = <%= canSave %>;
 
-    if(searchParams.get('subreddit') === null) {
+    if (searchParams.get('subreddit') === null) {
         document.querySelector('#saveTip').style.display = 'none';
     } else {
         document.querySelector('#doSave').textContent = `Save to ${searchParams.get('subreddit')}`;
     }
 
-    window.setSaveStatus = function() {
-        if(window.canSave) {
+    window.setSaveStatus = function () {
+        if (window.canSave) {
             document.querySelector('#saveTip').classList.remove('has-tooltip');
             document.querySelector('#saveQuestionIcon').style.display = 'none';
             const saveLink = document.querySelector('#doSave');
@@ -168,7 +168,7 @@
     });
     document.querySelector('#doSave').addEventListener('click', (e) => {
         e.preventDefault();
-        if(window.wikiLocation === undefined || window.wikiLocation === null || window.canSave === false) {
+        if (window.wikiLocation === undefined || window.wikiLocation === null || window.canSave === false) {
             return;
         }
 
@@ -200,6 +200,44 @@
 </script>
 <script defer="defer" src="/public/yaml/entry.js"></script>
 <script>
+    const gistReg = new RegExp(/.*gist.github.com\/.+\/(.+)/i)
+
+    function getPayloadUrl(url) {
+        console.debug(`Attempting to detect resolvable URL for ${url}`);
+        const match = url.match(gistReg);
+        if (match !== null) {
+            const gistApiUrl = `https://api.github.com/gists/${match[1]}`;
+            console.debug(`Looks like a non-raw gist URL! Trying to resolve ${gistApiUrl}`);
+
+            return new Promise((resolve, reject) => {
+                fetch(gistApiUrl).then((resp) => {
+                    if (!resp.ok) {
+                        console.error('Response was not OK from Gist API');
+                        resolve(url);
+                    } else {
+                        resp.json().then((data) => {
+                            // get first found file
+                            const fileKeys = Object.keys(data.files);
+                            if (fileKeys.length === 0) {
+                                console.error(`No files found in gist!`);
+                            } else {
+                                if (fileKeys.length > 1) {
+                                    console.warn(`More than one file found in gist! Using first found: ${fileKeys[0]}`);
+                                }
+                                const rawUrl = data.files[fileKeys[0]].raw_url;
+                                console.debug(`Resolving raw gist url for first file found (${fileKeys[0]}) to ${rawUrl}`);
+                                resolve(rawUrl);
+                            }
+                        });
+                    }
+                })
+            });
+        } else {
+            console.debug('Resolving with original URL');
+        }
+        return new Promise((resolve, reject) => resolve(url));
+    }
+
     window.addEventListener('load', function () {
 
         var searchParams = new URLSearchParams(window.location.search);
@@ -219,27 +257,29 @@
         if (dlUrl !== null) {
             // @ts-ignore
             document.querySelector('#configUrl').value = dlUrl;
-            fetch(dlUrl).then((resp) => {
-                if (!resp.ok) {
-                    resp.text().then(data => {
-                        document.querySelector('#error').innerHTML = `Error occurred while fetching configuration => ${data}`
-                    });
-                } else {
-                    resp.text().then(data => {
-                        const oldModel = window.ed.getModel();
-                        oldModel.dispose();
-                        // @ts-ignore
-                        const newModel = window.meditor.createModel('', currentFormat, window.muri.parse(getFileName()));
-                        window.ed.setModel(newModel);
-                        window.ed.getModel().setValue(data);
-                        newModel.onDidChangeContent((e) => {
-                           window.dirty = true;
+            getPayloadUrl(dlUrl).then((url) => {
+                fetch(url).then((resp) => {
+                    if (!resp.ok) {
+                        resp.text().then(data => {
+                            document.querySelector('#error').innerHTML = `Error occurred while fetching configuration => ${data}`
                         });
-                        window.dirty = false;
-                    })
-                }
-            });
-            if(searchParams.get('subreddit') !== null) {
+                    } else {
+                        resp.text().then(data => {
+                            const oldModel = window.ed.getModel();
+                            oldModel.dispose();
+                            // @ts-ignore
+                            const newModel = window.meditor.createModel('', currentFormat, window.muri.parse(getFileName()));
+                            window.ed.setModel(newModel);
+                            window.ed.getModel().setValue(data);
+                            newModel.onDidChangeContent((e) => {
+                                window.dirty = true;
+                            });
+                            window.dirty = false;
+                        })
+                    }
+                });
+            })
+            if (searchParams.get('subreddit') !== null) {
                 const wikiLocationUrl = `${document.location.origin}/config/content/location${document.location.search}`
                 fetch(wikiLocationUrl).then((resp) => {
                     if (!resp.ok) {
@@ -277,31 +317,33 @@
             e.preventDefault();
             // @ts-ignore
             const newUrl = document.querySelector('#configUrl').value;
-            fetch(newUrl).then((resp) => {
-                if (!resp.ok) {
-                    resp.text().then(data => {
-                        document.querySelector('#error').innerHTML = `Error occurred while fetching configuration => ${data}`
-                    });
-                } else {
-                    var sp = new URLSearchParams();
-                    // @ts-ignore
-                    sp.set('schema', currentSchema === 'app' ? 'operator' : 'bot');
-                    sp.set('format', currentFormat);
-                    sp.set('url', newUrl);
-                    history.pushState(null, '', `${window.location.pathname}?${sp.toString()}`);
-                    resp.text().then(data => {
-                        const oldModel = window.ed.getModel();
-                        oldModel.dispose();
-                        // @ts-ignore
-                        const newModel = window.meditor.createModel('', currentFormat, window.muri.parse(getFileName()));
-                        window.ed.setModel(newModel);
-                        window.ed.getModel().setValue(data);
-                        newModel.onDidChangeContent((e) => {
-                            window.dirty = true;
+            getPayloadUrl(newUrl).then((url) => {
+                fetch(url).then((resp) => {
+                    if (!resp.ok) {
+                        resp.text().then(data => {
+                            document.querySelector('#error').innerHTML = `Error occurred while fetching configuration => ${data}`
                         });
-                        window.dirty = false;
-                    })
-                }
+                    } else {
+                        var sp = new URLSearchParams();
+                        // @ts-ignore
+                        sp.set('schema', currentSchema === 'app' ? 'operator' : 'bot');
+                        sp.set('format', currentFormat);
+                        sp.set('url', newUrl);
+                        history.pushState(null, '', `${window.location.pathname}?${sp.toString()}`);
+                        resp.text().then(data => {
+                            const oldModel = window.ed.getModel();
+                            oldModel.dispose();
+                            // @ts-ignore
+                            const newModel = window.meditor.createModel('', currentFormat, window.muri.parse(getFileName()));
+                            window.ed.setModel(newModel);
+                            window.ed.getModel().setValue(data);
+                            newModel.onDidChangeContent((e) => {
+                                window.dirty = true;
+                            });
+                            window.dirty = false;
+                        })
+                    }
+                });
             });
         });
 
