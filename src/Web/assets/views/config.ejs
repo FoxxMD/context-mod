@@ -229,8 +229,9 @@
                         const oldModel = window.ed.getModel();
                         oldModel.dispose();
                         // @ts-ignore
-                        const newModel = window.meditor.createModel(data, currentFormat, window.muri.parse(getFileName()));
+                        const newModel = window.meditor.createModel('', currentFormat, window.muri.parse(getFileName()));
                         window.ed.setModel(newModel);
+                        window.ed.getModel().setValue(data);
                         newModel.onDidChangeContent((e) => {
                            window.dirty = true;
                         });
@@ -292,8 +293,9 @@
                         const oldModel = window.ed.getModel();
                         oldModel.dispose();
                         // @ts-ignore
-                        const newModel = window.meditor.createModel(data, currentFormat, window.muri.parse(getFileName()));
+                        const newModel = window.meditor.createModel('', currentFormat, window.muri.parse(getFileName()));
                         window.ed.setModel(newModel);
+                        window.ed.getModel().setValue(data);
                         newModel.onDidChangeContent((e) => {
                             window.dirty = true;
                         });
@@ -326,8 +328,9 @@
                 const oldModel = window.ed.getModel();
                 const val = oldModel.getValue();
                 oldModel.dispose();
-                const newModel = window.meditor.createModel(val, currentFormat, window.muri.parse(getFileName()));
+                const newModel = window.meditor.createModel('', currentFormat, window.muri.parse(getFileName()));
                 window.ed.setModel(newModel);
+                window.ed.getModel().setValue(val);
                 newModel.onDidChangeContent((e) => {
                     window.dirty = true;
                 });
@@ -356,8 +359,9 @@
                 const oldModel = window.ed.getModel();
                 const val = oldModel.getValue();
                 oldModel.dispose();
-                const newModel = window.meditor.createModel(val, currentFormat, window.muri.parse(getFileName()));
+                const newModel = window.meditor.createModel('', currentFormat, window.muri.parse(getFileName()));
                 window.ed.setModel(newModel);
+                window.ed.getModel().setValue(val);
                 newModel.onDidChangeContent((e) => {
                     window.dirty = true;
                 });
