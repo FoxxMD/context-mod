@@ -8,7 +8,7 @@ import {
     createRetryHandler,
     determineNewResults,
     findLastIndex,
-    formatNumber,
+    formatNumber, likelyJson5,
     mergeArr,
     parseFromJsonOrYamlToObject,
     parseRedditEntity,
@@ -96,6 +96,7 @@ export class Manager extends EventEmitter {
     wikiLocation: string;
     lastWikiRevision?: DayjsObj
     lastWikiCheck: DayjsObj = dayjs();
+    wikiFormat: ('yaml' | 'json') = 'yaml';
     //wikiUpdateRunning: boolean = false;
 
     streamListedOnce: string[] = [];
@@ -534,17 +535,31 @@ export class Manager extends EventEmitter {
                 throw new ConfigParseError(msg);
             }
 
-            if (sourceData === '') {
+            if (sourceData.replace('\r\n', '').trim() === '') {
                 this.logger.error(`Wiki page contents was empty`);
                 throw new ConfigParseError('Wiki page contents was empty');
             }
 
             const [configObj, jsonErr, yamlErr] = parseFromJsonOrYamlToObject(sourceData);
+            if (jsonErr === undefined) {
+                this.wikiFormat = 'json';
+            } else if (yamlErr === undefined) {
+                this.wikiFormat = 'yaml';
+            } else {
+                this.wikiFormat = likelyJson5(sourceData) ? 'json' : 'yaml';
+            }
 
             if (configObj === undefined) {
-                this.logger.error(`Could not parse wiki page contents as JSON or YAML:`);
-                this.logger.error(jsonErr);
-                this.logger.error(yamlErr);
+                this.logger.error(`Could not parse wiki page contents as JSON or YAML. Looks like it should be ${this.wikiFormat}?`);
+                if (this.wikiFormat === 'json') {
+                    this.logger.error(jsonErr);
+                    this.logger.error('Check DEBUG output for yaml error');
+                    this.logger.debug(yamlErr);
+                } else {
+                    this.logger.error(yamlErr);
+                    this.logger.error('Check DEBUG output for json error');
+                    this.logger.debug(jsonErr);
+                }
                 throw new ConfigParseError('Could not parse wiki page contents as JSON or YAML')
             }
 

@@ -1592,3 +1592,25 @@ export const setRandomInterval: SetRandomInterval = (intervalFunction, minDelay 
         },
     };
 };
+
+/**
+ * Naively detect if a string is most likely json5
+ *
+ * Check if string begins with comments, opening bracket, or opening curly brace.
+ * */
+export const likelyJson5 = (str: string): boolean => {
+    let validStart = false;
+    const lines = str.split('\r\n');
+    for(const line of lines) {
+        const trimmedLine = line.trim();
+        if(trimmedLine.indexOf('//') === 0) {
+            // skip line if it starts with a comment
+            continue;
+        }
+        // if the first non-comment line starts with an opening curly brace or bracket its ~probably~ json...
+        const startChar = trimmedLine.charAt(0);
+        validStart = ['{','['].some(x => x === startChar);
+        break;
+    }
+    return validStart;
+}
