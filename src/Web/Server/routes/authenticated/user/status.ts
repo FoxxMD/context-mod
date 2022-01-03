@@ -103,6 +103,7 @@ const status = () => {
                 subMaxWorkers: m.subMaxWorkers || bot.maxWorkers,
                 globalMaxWorkers: bot.maxWorkers,
                 validConfig: boolToString(m.validConfigLoaded),
+                configFormat: m.wikiFormat,
                 dryRun: boolToString(m.dryRun === true),
                 pollingInfo: m.pollOptions.length === 0 ? ['nothing :('] : m.pollOptions.map(pollingInfo),
                 checks: {
