@@ -862,7 +862,7 @@ const webClient = async (options: OperatorConfig) => {
 
     app.postAsync('/config', [ensureAuthenticatedApi, defaultSession, instanceWithPermissions, botWithPermissions], async (req: express.Request, res: express.Response) => {
         const {subreddit} = req.query as any;
-        const {location, data} = req.body as any;
+        const {location, data, create = false} = req.body as any;
 
         const client = new ExtendedSnoowrap({
             userAgent,
@@ -876,45 +876,29 @@ const webClient = async (options: OperatorConfig) => {
             const wiki = await client.getSubreddit(subreddit).getWikiPage(location);
             await wiki.edit({
                 text: data,
-                reason: 'Updated through CM Web'
+                reason: create ? 'Created Config through CM Web' : 'Updated through CM Web'
             });
         } catch (err: any) {
             res.status(500);
             return res.send(err.message);
         }
 
+        if(create) {
+            try {
+                // @ts-ignore
+                await client.getSubreddit(subreddit).getWikiPage(location).editSettings({
+                    permissionLevel: 2,
+                    // don't list this page on r/[subreddit]/wiki/pages
+                    listed: false,
+                });
+            } catch (err: any) {
+                res.status(500);
+                return res.send(`Successfully created wiki page for configuration but encountered error while setting visibility. You should manually set the wiki page visibility on reddit. \r\n Error: ${err.message}`);
+            }
+        }
+
         res.status(200);
         return res.send();
-    });
-
-    app.getAsync('/config/content', [ensureAuthenticatedApi, defaultSession, instanceWithPermissions, botWithPermissions, createUserToken], async (req: express.Request, res: express.Response) => {
-        const {subreddit} = req.query as any;
-        const resp = await got.get(`${(req.instance as CMInstance).normalUrl}/config`, {
-            headers: {
-                'Authorization': `Bearer ${req.token}`,
-            },
-            searchParams: {
-                subreddit,
-                bot: req.bot?.botName
-            }
-        }).text();
-
-        return res.send(resp);
-    });
-
-    app.getAsync('/config/content/location', [ensureAuthenticatedApi, defaultSession, instanceWithPermissions, botWithPermissions, createUserToken], async (req: express.Request, res: express.Response) => {
-        const {subreddit} = req.query as any;
-        const resp = await got.get(`${(req.instance as CMInstance).normalUrl}/config/location`, {
-            headers: {
-                'Authorization': `Bearer ${req.token}`,
-            },
-            searchParams: {
-                subreddit,
-                bot: req.bot?.botName
-            }
-        }).text();
-
-        return res.send(resp);
     });
 
     app.getAsync('/events', [ensureAuthenticatedApi, defaultSession, instanceWithPermissions, botWithPermissions, createUserToken], async (req: express.Request, res: express.Response) => {

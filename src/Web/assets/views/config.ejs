@@ -59,12 +59,12 @@
                 | <input id="configUrl" class="text-black placeholder-gray-500 rounded mx-2" style="min-width:400px;" placeholder="URL of a config to load"/> <a href="#" id="loadConfig">Load</a>
                 <span id="saveTip">
                     <span style="margin-top:30px; z-index:100" class="tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2 space-y-3 p-2 text-left">
-                        <div>In order to save a configuration to a subreddit's wiki page you must re-authorize ContextMod with Reddit to get the following permissions:</div>
-                        <ul class="list-inside list-disc">
+                        <div>In order to <strong id="configPageActionType">save</strong> a configuration to a subreddit's wiki page you must re-authorize ContextMod with Reddit to get the following permissions:</div>
+                        <ul class="list-inside list-disc" id="reauthPermissions">
                             <li><span class="font-mono">wikiedit</span></li>
                         </ul>
                         <div>CM will store this permission for one hour after which you must re-authorize again to save.</div>
-                        <div><b><a href="#" id="doAuthorize">Click Here</a></b> to re-authorize</div>
+                        <div><b><a href="#" id="doAuthorize">Click Here to re-authorize</a></b></div>
                     </span>
                     <span>
                         | <a id="doSave">Save</a>
@@ -149,6 +149,26 @@
 
     window.setSaveStatus();
 
+    window.creatingWikiPage = false;
+    window.isCreatingWikiPage = (val) => {
+        window.creatingWikiPage = val;
+        if(val) {
+            document.querySelector('#doSave').textContent = `Create config for ${searchParams.get('subreddit')}`;
+            if(document.querySelector('#createPerm') === null) {
+                const node = document.querySelector('#reauthPermissions');
+                node.insertAdjacentHTML('beforeend', '<li id="createPerm"><span class="font-mono">modwiki</span> -- used to set config page visibility to mod-only upon creation</li>');
+            }
+            document.querySelector('#configPageActionType').textContent = 'create';
+        } else {
+            const node = document.querySelector('#createPerm');
+            if(node !== null) {
+                node.style ='display:none;';
+            }
+            document.querySelector('#doSave').textContent = `Save to ${searchParams.get('subreddit')}`;
+            document.querySelector('#configPageActionType').textContent = 'save';
+        }
+    }
+
     //https://stackoverflow.com/a/61404006/1469797
     function onBeforeUnload(e) {
         if (window.dirty) {
@@ -164,7 +184,11 @@
 
     document.querySelector('#doAuthorize').addEventListener('click', (e) => {
         e.preventDefault();
-        window.open(`${document.location.origin}/login?closeOnSuccess=true&scope=wikiedit`, 'Re-authorize CM', 'popup=1');
+        const scopes = ['wikiedit'];
+        if(window.creatingWikiPage) {
+            scopes.push('modwiki');
+        }
+        window.open(`${document.location.origin}/login?closeOnSuccess=true&scope=${scopes.join(',')}`, 'Re-authorize CM', 'popup=1');
     });
     document.querySelector('#doSave').addEventListener('click', (e) => {
         e.preventDefault();
@@ -181,6 +205,7 @@
             body: JSON.stringify({
                 //...data,
                 location: window.wikiLocation,
+                create: window.creatingWikiPage,
                 data: window.ed.getModel().getValue()
             })
         }).then((resp) => {
@@ -189,6 +214,9 @@
                     document.querySelector('#error').innerHTML = `Error occurred while fetching configuration => ${data}`
                 });
             } else {
+                if(window.creatingWikiPage) {
+                    window.isCreatingWikiPage(false);
+                }
                 document.querySelector('#error').innerHTML = `Wiki saved!`;
                 window.dirty = false;
                 setTimeout(() => {
@@ -241,14 +269,23 @@
     window.addEventListener('load', function () {
 
         var searchParams = new URLSearchParams(window.location.search);
+        let isSubreddit = false;
         let dlUrl = searchParams.get('url');
         if (dlUrl === null && searchParams.get('subreddit') !== null) {
-            dlUrl = `${document.location.origin}/config/content${document.location.search}`
+            isSubreddit = true;
+            dlUrl = `${document.location.origin}/api/config${document.location.search}`
         }
 
         let currentSchema = searchParams.get('schema') === 'operator' ? 'app' : 'bot',
             currentFormat = searchParams.get('format') === 'yaml' ? 'yaml' : 'json';
 
+        const preamble = currentFormat === 'yaml' ? [
+            '# Edit, or copy-paste, your configuration here to get',
+            '# formatting, YAML syntax, and annotated properties'
+        ] : [
+            '// Edit, or copy-paste, your configuration here to get',
+            '// formatting, JSON syntax, and annotated properties'
+        ];
 
         function getFileName() {
             return `${currentSchema}.${currentFormat}`;
@@ -261,9 +298,17 @@
                 fetch(url).then((resp) => {
                     if (!resp.ok) {
                         resp.text().then(data => {
-                            document.querySelector('#error').innerHTML = `Error occurred while fetching configuration => ${data}`
+                            if(isSubreddit && data.includes('PAGE_NOT_CREATED')) {
+                                window.isCreatingWikiPage(true);
+                                window.ed.getModel().setValue(preamble.join('\r\n'))
+                            } else {
+                                document.querySelector('#error').innerHTML = `Error occurred while fetching configuration => ${data}`
+                            }
                         });
                     } else {
+                        if(isSubreddit) {
+                            window.isCreatingWikiPage(false);
+                        }
                         resp.text().then(data => {
                             const oldModel = window.ed.getModel();
                             oldModel.dispose();
@@ -280,7 +325,7 @@
                 });
             })
             if (searchParams.get('subreddit') !== null) {
-                const wikiLocationUrl = `${document.location.origin}/config/content/location${document.location.search}`
+                const wikiLocationUrl = `${document.location.origin}/api/config/location${document.location.search}`
                 fetch(wikiLocationUrl).then((resp) => {
                     if (!resp.ok) {
                         resp.text().then(data => {
@@ -294,14 +339,6 @@
                 });
             }
         } else {
-            const preamble = currentFormat === 'yaml' ? [
-                '# Copy + paste your configuration here to get',
-                '# formatting, JSON syntax, annotated properties and'
-            ] : [
-                '// Copy + paste your configuration here to get',
-                '// formatting, JSON syntax, annotated properties and'
-            ];
-
             const oldModel = window.ed.getModel();
             oldModel.dispose();
             // @ts-ignore
