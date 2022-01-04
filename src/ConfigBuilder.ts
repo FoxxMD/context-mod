@@ -44,6 +44,7 @@ import merge from 'deepmerge';
 import * as process from "process";
 import {cacheOptDefaults, cacheTTLDefaults} from "./Common/defaults";
 import objectHash from "object-hash";
+import {createDatabaseConfig, createDatabaseConnection} from "./Utils/databaseUtils";
 
 export interface ConfigBuilderOptions {
     logger: Logger,
@@ -541,7 +542,7 @@ export const parseOperatorConfigFromSources = async (args: any): Promise<Operato
     return removeUndefinedKeys({...mergedConfig, bots: botInstances}) as OperatorJsonConfig;
 }
 
-export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): OperatorConfig => {
+export const buildOperatorConfigWithDefaults = async (data: OperatorJsonConfig): Promise<OperatorConfig> => {
     const {
         mode = 'all',
         operator: {
@@ -553,6 +554,7 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
             path,
         } = {},
         caching: opCache,
+        databaseConfig = 'sqljs',
         web: {
             port = 8085,
             maxLogs = 200,
@@ -773,17 +775,25 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
 
     const defaultOperators = typeof name === 'string' ? [name] : name;
 
+    const loggingOptions = {
+        level,
+        path
+    };
+
+    const logger = getLogger(loggingOptions);
+
+    const dbConfig = createDatabaseConfig(databaseConfig);
+
     const config: OperatorConfig = {
         mode,
         operator: {
             name: defaultOperators,
             display,
         },
-        logging: {
-            level,
-            path
-        },
+        logging: loggingOptions,
         caching: cache,
+        databaseConfig: dbConfig,
+        database: await createDatabaseConnection(dbConfig),
         web: {
             port,
             caching: {

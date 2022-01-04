@@ -3,7 +3,9 @@
   "compilerOptions": {
     "sourceMap": true,
     "resolveJsonModule": true,
-    "typeRoots": ["./src/Web/types"]
+    "typeRoots": ["./src/Web/types"],
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true
   },
 //  "compilerOptions": {
 //    "module": "es6",

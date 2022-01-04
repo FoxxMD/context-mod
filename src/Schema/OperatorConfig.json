@@ -288,6 +288,1291 @@
             ],
             "type": "object"
         },
+        "EntitySchema<any>": {
+            "description": "Interface for entity metadata mappings stored inside \"schemas\" instead of models decorated by decorators.",
+            "properties": {
+                "options": {
+                    "$ref": "#/definitions/EntitySchemaOptions<any>"
+                }
+            },
+            "required": [
+                "options"
+            ],
+            "type": "object"
+        },
+        "EntitySchemaCheckOptions": {
+            "properties": {
+                "expression": {
+                    "description": "Check expression.",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "Check constraint name.",
+                    "type": "string"
+                }
+            },
+            "required": [
+                "expression"
+            ],
+            "type": "object"
+        },
+        "EntitySchemaExclusionOptions": {
+            "properties": {
+                "expression": {
+                    "description": "Exclusion expression.",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "Exclusion constraint name.",
+                    "type": "string"
+                }
+            },
+            "required": [
+                "expression"
+            ],
+            "type": "object"
+        },
+        "EntitySchemaIndexOptions": {
+            "properties": {
+                "columns": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "object"
+                        }
+                    ],
+                    "description": "Index column names."
+                },
+                "fulltext": {
+                    "description": "The FULLTEXT modifier indexes the entire column and does not allow prefixing.\nWorks only in MySQL.",
+                    "type": "boolean"
+                },
+                "name": {
+                    "description": "Index name.",
+                    "type": "string"
+                },
+                "parser": {
+                    "description": "Fulltext parser.\nWorks only in MySQL.",
+                    "type": "string"
+                },
+                "sparse": {
+                    "description": "If true, the index only references documents with the specified field.\nThese indexes use less space but behave differently in some situations (particularly sorts).\nThis option is only supported for mongodb database.",
+                    "type": "boolean"
+                },
+                "spatial": {
+                    "description": "The SPATIAL modifier indexes the entire column and does not allow indexed columns to contain NULL values.\nWorks only in MySQL and PostgreSQL.",
+                    "type": "boolean"
+                },
+                "synchronize": {
+                    "description": "Indicates if index must sync with database index.",
+                    "type": "boolean"
+                },
+                "unique": {
+                    "description": "Indicates if this index must be unique or not.",
+                    "type": "boolean"
+                },
+                "where": {
+                    "description": "Index filter condition.",
+                    "type": "string"
+                }
+            },
+            "type": "object"
+        },
+        "EntitySchemaOptions<any>": {
+            "description": "Interface for entity metadata mappings stored inside \"schemas\" instead of models decorated by decorators.",
+            "properties": {
+                "checks": {
+                    "description": "Entity check options.",
+                    "items": {
+                        "$ref": "#/definitions/EntitySchemaCheckOptions"
+                    },
+                    "type": "array"
+                },
+                "columns": {
+                    "$ref": "#/definitions/{[x:string]:EntitySchemaColumnOptions|undefined;}",
+                    "description": "Entity column's options."
+                },
+                "database": {
+                    "description": "Database name. Used in MySql and Sql Server.",
+                    "type": "string"
+                },
+                "exclusions": {
+                    "description": "Entity exclusion options.",
+                    "items": {
+                        "$ref": "#/definitions/EntitySchemaExclusionOptions"
+                    },
+                    "type": "array"
+                },
+                "expression": {
+                    "description": "View expression.",
+                    "type": [
+                        "string",
+                        "object"
+                    ]
+                },
+                "extends": {
+                    "description": "Name of the schema it extends.",
+                    "type": "string"
+                },
+                "indices": {
+                    "description": "Entity indices options.",
+                    "items": {
+                        "$ref": "#/definitions/EntitySchemaIndexOptions"
+                    },
+                    "type": "array"
+                },
+                "name": {
+                    "description": "Entity name.",
+                    "type": "string"
+                },
+                "orderBy": {
+                    "additionalProperties": {
+                        "anyOf": [
+                            {
+                                "properties": {
+                                    "nulls": {
+                                        "enum": [
+                                            "NULLS FIRST",
+                                            "NULLS LAST"
+                                        ],
+                                        "type": "string"
+                                    },
+                                    "order": {
+                                        "enum": [
+                                            "ASC",
+                                            "DESC"
+                                        ],
+                                        "type": "string"
+                                    }
+                                },
+                                "required": [
+                                    "order"
+                                ],
+                                "type": "object"
+                            },
+                            {
+                                "enum": [
+                                    "ASC",
+                                    "DESC"
+                                ],
+                                "type": "string"
+                            }
+                        ]
+                    },
+                    "description": "Special object that defines order condition for ORDER BY in sql.\n\nExample:\n{\n \"name\": \"ASC\",\n \"id\": \"DESC\"\n}",
+                    "type": "object"
+                },
+                "relations": {
+                    "$ref": "#/definitions/{[x:string]:EntitySchemaRelationOptions|undefined;}",
+                    "description": "Entity relation's options."
+                },
+                "schema": {
+                    "description": "Schema name. Used in Postgres and Sql Server.",
+                    "type": "string"
+                },
+                "synchronize": {
+                    "description": "Indicates if schema synchronization is enabled or disabled for this entity.\nIf it will be set to false then schema sync will and migrations ignore this entity.\nBy default schema synchronization is enabled for all entities.",
+                    "type": "boolean"
+                },
+                "tableName": {
+                    "description": "Table name.",
+                    "type": "string"
+                },
+                "target": {
+                    "$ref": "#/definitions/Function",
+                    "description": "Target bind to this entity schema. Optional."
+                },
+                "type": {
+                    "description": "Table type.",
+                    "enum": [
+                        "closure",
+                        "closure-junction",
+                        "entity-child",
+                        "junction",
+                        "regular",
+                        "view"
+                    ],
+                    "type": "string"
+                },
+                "uniques": {
+                    "description": "Entity uniques options.",
+                    "items": {
+                        "$ref": "#/definitions/EntitySchemaUniqueOptions"
+                    },
+                    "type": "array"
+                }
+            },
+            "required": [
+                "columns",
+                "name"
+            ],
+            "type": "object"
+        },
+        "EntitySchemaUniqueOptions": {
+            "properties": {
+                "columns": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "object"
+                        }
+                    ],
+                    "description": "Unique column names."
+                },
+                "name": {
+                    "description": "Unique constraint name.",
+                    "type": "string"
+                }
+            },
+            "type": "object"
+        },
+        "Function": {
+            "properties": {
+                "arguments": {
+                },
+                "caller": {
+                    "$ref": "#/definitions/Function"
+                },
+                "length": {
+                    "type": "number"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "prototype": {
+                }
+            },
+            "required": [
+                "arguments",
+                "caller",
+                "length",
+                "name",
+                "prototype"
+            ],
+            "type": "object"
+        },
+        "KeyObject": {
+            "properties": {
+                "passphrase": {
+                    "description": "Optional passphrase.",
+                    "type": "string"
+                },
+                "pem": {
+                    "anyOf": [
+                        {
+                            "description": "Raw data is stored in instances of the Buffer class.\nA Buffer is similar to an array of integers but corresponds to a raw memory allocation outside the V8 heap.  A Buffer cannot be resized.\nValid string encodings: 'ascii'|'utf8'|'utf16le'|'ucs2'(alias of 'utf16le')|'base64'|'binary'(deprecated)|'hex'",
+                            "items": {
+                                "type": "number"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "string"
+                        }
+                    ],
+                    "description": "Private keys in PEM format."
+                }
+            },
+            "required": [
+                "pem"
+            ],
+            "type": "object"
+        },
+        "Logger": {
+            "description": "Performs logging of the events in TypeORM.",
+            "type": "object"
+        },
+        "MongoConnectionOptions": {
+            "description": "MongoDB specific connection options.\nSynced with http://mongodb.github.io/node-mongodb-native/3.1/api/MongoClient.html",
+            "properties": {
+                "acceptableLatencyMS": {
+                    "description": "Sets the range of servers to pick when using NEAREST (lowest ping ms + the latency fence, ex: range of 1 to (1 + 15) ms).\nDefault: 15",
+                    "type": "number"
+                },
+                "appname": {
+                    "description": "The name of the application that created this MongoClient instance. MongoDB 3.4 and newer will print this value in the server log upon establishing each connection. It is also recorded in the slow query log and profile collections",
+                    "type": "string"
+                },
+                "authMechanism": {
+                    "description": "Sets the authentication mechanism that MongoDB will use to authenticate the connection",
+                    "type": "string"
+                },
+                "authSource": {
+                    "description": "If the database authentication is dependent on another databaseName.",
+                    "type": "string"
+                },
+                "autoEncryption": {
+                    "description": "Automatic Client-Side Field Level Encryption configuration."
+                },
+                "autoReconnect": {
+                    "description": "Reconnect on error. Default: true",
+                    "type": "boolean"
+                },
+                "auto_reconnect": {
+                    "description": "Enable auto reconnecting for single server instances. Default: true",
+                    "type": "boolean"
+                },
+                "bufferMaxEntries": {
+                    "description": "Sets a cap on how many operations the driver will buffer up before giving up on getting a working connection,\ndefault is -1 which is unlimited.",
+                    "type": "number"
+                },
+                "cache": {
+                    "anyOf": [
+                        {
+                            "properties": {
+                                "alwaysEnabled": {
+                                    "description": "If set to true then queries (using find methods and QueryBuilder's methods) will always be cached.",
+                                    "type": "boolean"
+                                },
+                                "duration": {
+                                    "description": "Time in milliseconds in which cache will expire.\nThis can be setup per-query.\nDefault value is 1000 which is equivalent to 1 second.",
+                                    "type": "number"
+                                },
+                                "ignoreErrors": {
+                                    "description": "Used to specify if cache errors should be ignored, and pass through the call to the Database.",
+                                    "type": "boolean"
+                                },
+                                "options": {
+                                    "description": "Used to provide redis connection options."
+                                },
+                                "provider": {
+                                    "description": "Factory function for custom cache providers that implement QueryResultCache.",
+                                    "type": "object"
+                                },
+                                "tableName": {
+                                    "description": "Configurable table name for \"database\" type cache.\nDefault value is \"query-result-cache\"",
+                                    "type": "string"
+                                },
+                                "type": {
+                                    "description": "Type of caching.\n\n- \"database\" means cached values will be stored in the separate table in database. This is default value.\n- \"redis\" means cached values will be stored inside redis. You must provide redis connection options.",
+                                    "enum": [
+                                        "database",
+                                        "ioredis",
+                                        "ioredis/cluster",
+                                        "redis"
+                                    ],
+                                    "type": "string"
+                                }
+                            },
+                            "type": "object"
+                        },
+                        {
+                            "type": "boolean"
+                        }
+                    ],
+                    "description": "Allows to setup cache options."
+                },
+                "checkServerIdentity": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/definitions/Function"
+                        },
+                        {
+                            "type": "boolean"
+                        }
+                    ],
+                    "description": "Ensure we check server identify during SSL, set to false to disable checking. Only works for Node 0.12.x or higher. You can pass in a boolean or your own checkServerIdentity override function\nDefault: true"
+                },
+                "cli": {
+                    "description": "CLI settings.",
+                    "properties": {
+                        "entitiesDir": {
+                            "description": "Directory where entities should be created by default.",
+                            "type": "string"
+                        },
+                        "migrationsDir": {
+                            "description": "Directory where migrations should be created by default.",
+                            "type": "string"
+                        },
+                        "subscribersDir": {
+                            "description": "Directory where subscribers should be created by default.",
+                            "type": "string"
+                        }
+                    },
+                    "type": "object"
+                },
+                "compression": {
+                    "description": "Type of compression to use: snappy or zlib"
+                },
+                "connectTimeoutMS": {
+                    "description": "TCP Connection timeout setting. Default: 30000",
+                    "type": "number"
+                },
+                "connectWithNoPrimary": {
+                    "description": "Sets if the driver should connect even if no primary is available. Default: false",
+                    "type": "boolean"
+                },
+                "database": {
+                    "description": "Database name to connect to.",
+                    "type": "string"
+                },
+                "domainsEnabled": {
+                    "description": "Enable the wrapping of the callback in the current domain, disabled by default to avoid perf hit. Default: false",
+                    "type": "boolean"
+                },
+                "driver": {
+                    "description": "The driver object\nThis defaults to require(\"mongodb\")"
+                },
+                "dropSchema": {
+                    "description": "Drops the schema each time connection is being established.\nBe careful with this option and don't use this in production - otherwise you'll lose all production data.\nThis option is useful during debug and development.",
+                    "type": "boolean"
+                },
+                "entities": {
+                    "description": "Entities to be loaded for this connection.\nAccepts both entity classes and directories where from entities need to be loaded.\nDirectories support glob patterns.",
+                    "items": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/definitions/Function"
+                            },
+                            {
+                                "$ref": "#/definitions/EntitySchema<any>"
+                            },
+                            {
+                                "type": "string"
+                            }
+                        ]
+                    },
+                    "type": "array"
+                },
+                "entityPrefix": {
+                    "description": "Prefix to use on all tables (collections) of this connection in the database.",
+                    "type": "string"
+                },
+                "entitySkipConstructor": {
+                    "description": "When creating new Entity instances, skip all constructors when true.",
+                    "type": "boolean"
+                },
+                "extra": {
+                    "description": "Extra connection options to be passed to the underlying driver.\n\ntodo: deprecate this and move all database-specific types into hts own connection options object."
+                },
+                "family": {
+                    "description": "Version of IP stack. Can be 4, 6.\nIf undefined, will attempt to connect with IPv6, and will fall back to IPv4 on failure",
+                    "type": "number"
+                },
+                "forceServerObjectId": {
+                    "description": "Force server to assign _id values instead of driver. Default: false",
+                    "type": "boolean"
+                },
+                "fsync": {
+                    "description": "Specify a file sync write concern. Default: false",
+                    "type": "boolean"
+                },
+                "ha": {
+                    "description": "Control if high availability monitoring runs for Replicaset or Mongos proxies. Default true",
+                    "type": "boolean"
+                },
+                "haInterval": {
+                    "description": "The High availability period for replicaset inquiry. Default: 10000",
+                    "type": "number"
+                },
+                "host": {
+                    "description": "Database host.",
+                    "type": "string"
+                },
+                "hostReplicaSet": {
+                    "description": "Database host replica set.",
+                    "type": "string"
+                },
+                "ignoreUndefined": {
+                    "description": "Specify if the BSON serializer should ignore undefined fields. Default: false",
+                    "type": "boolean"
+                },
+                "j": {
+                    "description": "Specify a journal write concern. Default: false",
+                    "type": "boolean"
+                },
+                "keepAlive": {
+                    "description": "The number of milliseconds to wait before initiating keepAlive on the TCP socket. Default: 30000",
+                    "type": "number"
+                },
+                "logger": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/definitions/Logger"
+                        },
+                        {
+                            "enum": [
+                                "advanced-console",
+                                "debug",
+                                "file",
+                                "simple-console"
+                            ],
+                            "type": "string"
+                        }
+                    ],
+                    "description": "Logger instance used to log queries and events in the ORM."
+                },
+                "loggerLevel": {
+                    "description": "Specify the log level used by the driver logger (error/warn/info/debug).",
+                    "enum": [
+                        "debug",
+                        "error",
+                        "info",
+                        "warn"
+                    ],
+                    "type": "string"
+                },
+                "logging": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "enum": [
+                                    "error",
+                                    "info",
+                                    "log",
+                                    "migration",
+                                    "query",
+                                    "schema",
+                                    "warn"
+                                ],
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "enum": [
+                                "all",
+                                false,
+                                true
+                            ]
+                        }
+                    ],
+                    "description": "Logging options."
+                },
+                "maxQueryExecutionTime": {
+                    "description": "Maximum number of milliseconds query should be executed before logger log a warning.",
+                    "type": "number"
+                },
+                "maxStalenessSeconds": {
+                    "description": "Specify a maxStalenessSeconds value for secondary reads, minimum is 90 seconds",
+                    "type": "number"
+                },
+                "migrations": {
+                    "description": "Migrations to be loaded for this connection.\nAccepts both migration classes and directories where from migrations need to be loaded.\nDirectories support glob patterns.",
+                    "items": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/definitions/Function"
+                            },
+                            {
+                                "type": "string"
+                            }
+                        ]
+                    },
+                    "type": "array"
+                },
+                "migrationsRun": {
+                    "description": "Indicates if migrations should be auto run on every application launch.\nAlternative to it, you can use CLI and run migrations:run command.",
+                    "type": "boolean"
+                },
+                "migrationsTableName": {
+                    "description": "Migrations table name, in case of different name from \"migrations\".\nAccepts single string name.",
+                    "type": "string"
+                },
+                "migrationsTransactionMode": {
+                    "description": "Transaction mode for migrations to run in",
+                    "enum": [
+                        "all",
+                        "each",
+                        "none"
+                    ],
+                    "type": "string"
+                },
+                "minSize": {
+                    "description": "If present, the connection pool will be initialized with minSize connections, and will never dip below minSize connections",
+                    "type": "number"
+                },
+                "monitorCommands": {
+                    "description": "Enable command monitoring for this client. Default: false",
+                    "type": "boolean"
+                },
+                "name": {
+                    "description": "Connection name. If connection name is not given then it will be called \"default\".\nDifferent connections must have different names.",
+                    "type": "string"
+                },
+                "namingStrategy": {
+                    "$ref": "#/definitions/NamingStrategyInterface",
+                    "description": "Naming strategy to be used to name tables and columns in the database."
+                },
+                "noDelay": {
+                    "description": "TCP Socket NoDelay option. Default: true",
+                    "type": "boolean"
+                },
+                "numberOfRetries": {
+                    "description": "The number of retries for a tailable cursor. Default: 5",
+                    "type": "number"
+                },
+                "password": {
+                    "description": "Database password.",
+                    "type": "string"
+                },
+                "pkFactory": {
+                    "description": "A primary key factory object for generation of custom _id keys."
+                },
+                "poolSize": {
+                    "description": "Set the maximum poolSize for each individual server or proxy connection.",
+                    "type": "number"
+                },
+                "port": {
+                    "description": "Database host port.",
+                    "type": "number"
+                },
+                "promiseLibrary": {
+                    "description": "A Promise library class the application wishes to use such as Bluebird, must be ES6 compatible."
+                },
+                "promoteBuffers": {
+                    "description": "Promotes Binary BSON values to native Node Buffers. Default: false",
+                    "type": "boolean"
+                },
+                "promoteLongs": {
+                    "description": "Promotes Long values to number if they fit inside the 53 bits resolution. Default: true",
+                    "type": "boolean"
+                },
+                "promoteValues": {
+                    "description": "Promotes BSON values to native types where possible, set to false to only receive wrapper types. Default: true",
+                    "type": "boolean"
+                },
+                "raw": {
+                    "description": "Return document results as raw BSON buffers. Default: false",
+                    "type": "boolean"
+                },
+                "readConcern": {
+                    "description": "Specify a read concern for the collection. (only MongoDB 3.2 or higher supported)."
+                },
+                "readPreference": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/definitions/ReadPreference"
+                        },
+                        {
+                            "type": "string"
+                        }
+                    ],
+                    "description": "The preferred read preference (ReadPreference.PRIMARY, ReadPreference.PRIMARY_PREFERRED, ReadPreference.SECONDARY,\nReadPreference.SECONDARY_PREFERRED, ReadPreference.NEAREST)."
+                },
+                "readPreferenceTags": {
+                    "description": "Read preference tags",
+                    "items": {
+                    },
+                    "type": "array"
+                },
+                "reconnectInterval": {
+                    "description": "Server will wait #milliseconds between retries. Default 1000",
+                    "type": "number"
+                },
+                "reconnectTries": {
+                    "description": "Server attempt to reconnect #times. Default 30",
+                    "type": "number"
+                },
+                "replicaSet": {
+                    "description": "The name of the replicaset to connect to",
+                    "type": "string"
+                },
+                "retryWrites": {
+                    "description": "Enables or disables the ability to retry writes upon encountering transient network errors.",
+                    "type": "boolean"
+                },
+                "secondaryAcceptableLatencyMS": {
+                    "description": "Sets the range of servers to pick when using NEAREST (lowest ping ms + the latency fence, ex: range of 1 to (1 + 15) ms).\nDefault: 15",
+                    "type": "number"
+                },
+                "serializeFunctions": {
+                    "description": "Serialize functions on any object. Default: false",
+                    "type": "boolean"
+                },
+                "socketTimeoutMS": {
+                    "description": "TCP Socket timeout setting. Default: 360000",
+                    "type": "number"
+                },
+                "ssl": {
+                    "description": "Use ssl connection (needs to have a mongod server with ssl support). Default: false",
+                    "type": "boolean"
+                },
+                "sslCA": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "items": {
+                                "description": "Raw data is stored in instances of the Buffer class.\nA Buffer is similar to an array of integers but corresponds to a raw memory allocation outside the V8 heap.  A Buffer cannot be resized.\nValid string encodings: 'ascii'|'utf8'|'utf16le'|'ucs2'(alias of 'utf16le')|'base64'|'binary'(deprecated)|'hex'",
+                                "items": {
+                                    "type": "number"
+                                },
+                                "type": "array"
+                            },
+                            "type": "array"
+                        }
+                    ],
+                    "description": "Array of valid certificates either as Buffers or Strings\n(needs to have a mongod server with ssl support, 2.4 or higher)."
+                },
+                "sslCRL": {
+                    "anyOf": [
+                        {
+                            "description": "Raw data is stored in instances of the Buffer class.\nA Buffer is similar to an array of integers but corresponds to a raw memory allocation outside the V8 heap.  A Buffer cannot be resized.\nValid string encodings: 'ascii'|'utf8'|'utf16le'|'ucs2'(alias of 'utf16le')|'base64'|'binary'(deprecated)|'hex'",
+                            "items": {
+                                "type": "number"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "string"
+                        }
+                    ],
+                    "description": "SSL Certificate revocation list binary buffer\n(needs to have a mongod server with ssl support, 2.4 or higher)"
+                },
+                "sslCert": {
+                    "anyOf": [
+                        {
+                            "description": "Raw data is stored in instances of the Buffer class.\nA Buffer is similar to an array of integers but corresponds to a raw memory allocation outside the V8 heap.  A Buffer cannot be resized.\nValid string encodings: 'ascii'|'utf8'|'utf16le'|'ucs2'(alias of 'utf16le')|'base64'|'binary'(deprecated)|'hex'",
+                            "items": {
+                                "type": "number"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "string"
+                        }
+                    ],
+                    "description": "String or buffer containing the certificate we wish to present\n(needs to have a mongod server with ssl support, 2.4 or higher)"
+                },
+                "sslKey": {
+                    "description": "String or buffer containing the certificate private key we wish to present\n(needs to have a mongod server with ssl support, 2.4 or higher)",
+                    "type": "string"
+                },
+                "sslPass": {
+                    "anyOf": [
+                        {
+                            "description": "Raw data is stored in instances of the Buffer class.\nA Buffer is similar to an array of integers but corresponds to a raw memory allocation outside the V8 heap.  A Buffer cannot be resized.\nValid string encodings: 'ascii'|'utf8'|'utf16le'|'ucs2'(alias of 'utf16le')|'base64'|'binary'(deprecated)|'hex'",
+                            "items": {
+                                "type": "number"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "string"
+                        }
+                    ],
+                    "description": "String or buffer containing the certificate password\n(needs to have a mongod server with ssl support, 2.4 or higher)"
+                },
+                "sslValidate": {
+                    "description": "Validate mongod server certificate against ca (needs to have a mongod server with ssl support, 2.4 or higher).\nDefault: true",
+                    "type": "boolean"
+                },
+                "subscribers": {
+                    "description": "Subscribers to be loaded for this connection.\nAccepts both subscriber classes and directories where from subscribers need to be loaded.\nDirectories support glob patterns.",
+                    "items": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/definitions/Function"
+                            },
+                            {
+                                "type": "string"
+                            }
+                        ]
+                    },
+                    "type": "array"
+                },
+                "synchronize": {
+                    "description": "Indicates if database schema should be auto created on every application launch.\nBe careful with this option and don't use this in production - otherwise you can lose production data.\nThis option is useful during debug and development.\nAlternative to it, you can use CLI and run schema:sync command.\n\nNote that for MongoDB database it does not create schema, because MongoDB is schemaless.\nInstead, it syncs just by creating indices.",
+                    "type": "boolean"
+                },
+                "type": {
+                    "description": "Database type.",
+                    "enum": [
+                        "mongodb"
+                    ],
+                    "type": "string"
+                },
+                "url": {
+                    "description": "Connection url where perform connection to.",
+                    "type": "string"
+                },
+                "useNewUrlParser": {
+                    "description": "Determines whether or not to use the new url parser. Default: false",
+                    "type": "boolean"
+                },
+                "useUnifiedTopology": {
+                    "description": "Determines whether or not to use the new Server Discovery and Monitoring engine. Default: false\nhttps://github.com/mongodb/node-mongodb-native/releases/tag/v3.2.1",
+                    "type": "boolean"
+                },
+                "username": {
+                    "description": "Database username.",
+                    "type": "string"
+                },
+                "validateOptions": {
+                    "description": "Validate MongoClient passed in options for correctness. Default: false"
+                },
+                "w": {
+                    "description": "The write concern.",
+                    "type": [
+                        "string",
+                        "number"
+                    ]
+                },
+                "wtimeout": {
+                    "description": "The write concern timeout value.",
+                    "type": "number"
+                }
+            },
+            "required": [
+                "type"
+            ],
+            "type": "object"
+        },
+        "MysqlConnectionCredentialsOptions": {
+            "description": "MySQL specific connection credential options.",
+            "properties": {
+                "database": {
+                    "description": "Database name to connect to.",
+                    "type": "string"
+                },
+                "host": {
+                    "description": "Database host.",
+                    "type": "string"
+                },
+                "password": {
+                    "description": "Database password.",
+                    "type": "string"
+                },
+                "port": {
+                    "description": "Database host port.",
+                    "type": "number"
+                },
+                "socketPath": {
+                    "description": "Database socket path",
+                    "type": "string"
+                },
+                "ssl": {
+                    "description": "Object with ssl parameters or a string containing name of ssl profile."
+                },
+                "url": {
+                    "description": "Connection url where perform connection to.",
+                    "type": "string"
+                },
+                "username": {
+                    "description": "Database username.",
+                    "type": "string"
+                }
+            },
+            "type": "object"
+        },
+        "MysqlConnectionOptions": {
+            "description": "MySQL specific connection options.",
+            "properties": {
+                "acquireTimeout": {
+                    "description": "The milliseconds before a timeout occurs during the initial connection to the MySQL server. (Default: 10000)\nThis difference between connectTimeout and acquireTimeout is subtle and is described in the mysqljs/mysql docs\nhttps://github.com/mysqljs/mysql/tree/master#pool-options",
+                    "type": "number"
+                },
+                "bigNumberStrings": {
+                    "description": "Enabling both supportBigNumbers and bigNumberStrings forces big numbers (BIGINT and DECIMAL columns) to be always\nreturned as JavaScript String objects (Default: false). Enabling supportBigNumbers but leaving bigNumberStrings\ndisabled will return big numbers as String objects only when they cannot be accurately represented with\n[JavaScript Number objects](http://ecma262-5.com/ELS5_HTML.htm#Section_8.5) (which happens when they exceed the [-2^53, +2^53] range),\notherwise they will be returned as Number objects. This option is ignored if supportBigNumbers is disabled.",
+                    "type": "boolean"
+                },
+                "cache": {
+                    "anyOf": [
+                        {
+                            "properties": {
+                                "alwaysEnabled": {
+                                    "description": "If set to true then queries (using find methods and QueryBuilder's methods) will always be cached.",
+                                    "type": "boolean"
+                                },
+                                "duration": {
+                                    "description": "Time in milliseconds in which cache will expire.\nThis can be setup per-query.\nDefault value is 1000 which is equivalent to 1 second.",
+                                    "type": "number"
+                                },
+                                "ignoreErrors": {
+                                    "description": "Used to specify if cache errors should be ignored, and pass through the call to the Database.",
+                                    "type": "boolean"
+                                },
+                                "options": {
+                                    "description": "Used to provide redis connection options."
+                                },
+                                "provider": {
+                                    "description": "Factory function for custom cache providers that implement QueryResultCache.",
+                                    "type": "object"
+                                },
+                                "tableName": {
+                                    "description": "Configurable table name for \"database\" type cache.\nDefault value is \"query-result-cache\"",
+                                    "type": "string"
+                                },
+                                "type": {
+                                    "description": "Type of caching.\n\n- \"database\" means cached values will be stored in the separate table in database. This is default value.\n- \"redis\" means cached values will be stored inside redis. You must provide redis connection options.",
+                                    "enum": [
+                                        "database",
+                                        "ioredis",
+                                        "ioredis/cluster",
+                                        "redis"
+                                    ],
+                                    "type": "string"
+                                }
+                            },
+                            "type": "object"
+                        },
+                        {
+                            "type": "boolean"
+                        }
+                    ],
+                    "description": "Allows to setup cache options."
+                },
+                "charset": {
+                    "description": "The charset for the connection. This is called \"collation\" in the SQL-level of MySQL (like utf8_general_ci).\nIf a SQL-level charset is specified (like utf8mb4) then the default collation for that charset is used.\nDefault: 'UTF8_GENERAL_CI'",
+                    "type": "string"
+                },
+                "cli": {
+                    "description": "CLI settings.",
+                    "properties": {
+                        "entitiesDir": {
+                            "description": "Directory where entities should be created by default.",
+                            "type": "string"
+                        },
+                        "migrationsDir": {
+                            "description": "Directory where migrations should be created by default.",
+                            "type": "string"
+                        },
+                        "subscribersDir": {
+                            "description": "Directory where subscribers should be created by default.",
+                            "type": "string"
+                        }
+                    },
+                    "type": "object"
+                },
+                "connectTimeout": {
+                    "description": "The milliseconds before a timeout occurs during the initial connection to the MySQL server. (Default: 10000)",
+                    "type": "number"
+                },
+                "database": {
+                    "description": "Database name to connect to.",
+                    "type": "string"
+                },
+                "dateStrings": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "boolean"
+                        }
+                    ],
+                    "description": "Force date types (TIMESTAMP, DATETIME, DATE) to be returned as strings rather then inflated into JavaScript Date objects.\nCan be true/false or an array of type names to keep as strings."
+                },
+                "debug": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "boolean"
+                        }
+                    ],
+                    "description": "Prints protocol details to stdout. Can be true/false or an array of packet type names that should be printed.\n(Default: false)"
+                },
+                "driver": {
+                    "description": "The driver object\nThis defaults to require(\"mysql\").\nFalls back to require(\"mysql2\")"
+                },
+                "dropSchema": {
+                    "description": "Drops the schema each time connection is being established.\nBe careful with this option and don't use this in production - otherwise you'll lose all production data.\nThis option is useful during debug and development.",
+                    "type": "boolean"
+                },
+                "entities": {
+                    "description": "Entities to be loaded for this connection.\nAccepts both entity classes and directories where from entities need to be loaded.\nDirectories support glob patterns.",
+                    "items": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/definitions/Function"
+                            },
+                            {
+                                "$ref": "#/definitions/EntitySchema<any>"
+                            },
+                            {
+                                "type": "string"
+                            }
+                        ]
+                    },
+                    "type": "array"
+                },
+                "entityPrefix": {
+                    "description": "Prefix to use on all tables (collections) of this connection in the database.",
+                    "type": "string"
+                },
+                "entitySkipConstructor": {
+                    "description": "When creating new Entity instances, skip all constructors when true.",
+                    "type": "boolean"
+                },
+                "extra": {
+                    "description": "Extra connection options to be passed to the underlying driver.\n\ntodo: deprecate this and move all database-specific types into hts own connection options object."
+                },
+                "flags": {
+                    "description": "List of connection flags to use other than the default ones. It is also possible to blacklist default ones.\nFor more information, check https://github.com/mysqljs/mysql#connection-flags.",
+                    "items": {
+                        "type": "string"
+                    },
+                    "type": "array"
+                },
+                "host": {
+                    "description": "Database host.",
+                    "type": "string"
+                },
+                "insecureAuth": {
+                    "description": "Allow connecting to MySQL instances that ask for the old (insecure) authentication method. (Default: false)",
+                    "type": "boolean"
+                },
+                "legacySpatialSupport": {
+                    "description": "Use spatial functions like GeomFromText and AsText which are removed in MySQL 8.\n(Default: true)",
+                    "type": "boolean"
+                },
+                "logger": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/definitions/Logger"
+                        },
+                        {
+                            "enum": [
+                                "advanced-console",
+                                "debug",
+                                "file",
+                                "simple-console"
+                            ],
+                            "type": "string"
+                        }
+                    ],
+                    "description": "Logger instance used to log queries and events in the ORM."
+                },
+                "logging": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "enum": [
+                                    "error",
+                                    "info",
+                                    "log",
+                                    "migration",
+                                    "query",
+                                    "schema",
+                                    "warn"
+                                ],
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "enum": [
+                                "all",
+                                false,
+                                true
+                            ]
+                        }
+                    ],
+                    "description": "Logging options."
+                },
+                "maxQueryExecutionTime": {
+                    "description": "Maximum number of milliseconds query should be executed before logger log a warning.",
+                    "type": "number"
+                },
+                "migrations": {
+                    "description": "Migrations to be loaded for this connection.\nAccepts both migration classes and directories where from migrations need to be loaded.\nDirectories support glob patterns.",
+                    "items": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/definitions/Function"
+                            },
+                            {
+                                "type": "string"
+                            }
+                        ]
+                    },
+                    "type": "array"
+                },
+                "migrationsRun": {
+                    "description": "Indicates if migrations should be auto run on every application launch.\nAlternative to it, you can use CLI and run migrations:run command.",
+                    "type": "boolean"
+                },
+                "migrationsTableName": {
+                    "description": "Migrations table name, in case of different name from \"migrations\".\nAccepts single string name.",
+                    "type": "string"
+                },
+                "migrationsTransactionMode": {
+                    "description": "Transaction mode for migrations to run in",
+                    "enum": [
+                        "all",
+                        "each",
+                        "none"
+                    ],
+                    "type": "string"
+                },
+                "multipleStatements": {
+                    "description": "Allow multiple mysql statements per query. Be careful with this, it could increase the scope of SQL injection attacks.\n(Default: false)",
+                    "type": "boolean"
+                },
+                "name": {
+                    "description": "Connection name. If connection name is not given then it will be called \"default\".\nDifferent connections must have different names.",
+                    "type": "string"
+                },
+                "namingStrategy": {
+                    "$ref": "#/definitions/NamingStrategyInterface",
+                    "description": "Naming strategy to be used to name tables and columns in the database."
+                },
+                "password": {
+                    "description": "Database password.",
+                    "type": "string"
+                },
+                "port": {
+                    "description": "Database host port.",
+                    "type": "number"
+                },
+                "replication": {
+                    "description": "Replication setup.",
+                    "properties": {
+                        "canRetry": {
+                            "description": "If true, PoolCluster will attempt to reconnect when connection fails. (Default: true)",
+                            "type": "boolean"
+                        },
+                        "master": {
+                            "$ref": "#/definitions/MysqlConnectionCredentialsOptions",
+                            "description": "Master server used by orm to perform writes."
+                        },
+                        "removeNodeErrorCount": {
+                            "description": "If connection fails, node's errorCount increases.\nWhen errorCount is greater than removeNodeErrorCount, remove a node in the PoolCluster. (Default: 5)",
+                            "type": "number"
+                        },
+                        "restoreNodeTimeout": {
+                            "description": "If connection fails, specifies the number of milliseconds before another connection attempt will be made.\nIf set to 0, then node will be removed instead and never re-used. (Default: 0)",
+                            "type": "number"
+                        },
+                        "selector": {
+                            "description": "Determines how slaves are selected:\nRR: Select one alternately (Round-Robin).\nRANDOM: Select the node by random function.\nORDER: Select the first node available unconditionally.",
+                            "enum": [
+                                "ORDER",
+                                "RANDOM",
+                                "RR"
+                            ],
+                            "type": "string"
+                        },
+                        "slaves": {
+                            "description": "List of read-from severs (slaves).",
+                            "items": {
+                                "$ref": "#/definitions/MysqlConnectionCredentialsOptions"
+                            },
+                            "type": "array"
+                        }
+                    },
+                    "required": [
+                        "master",
+                        "slaves"
+                    ],
+                    "type": "object"
+                },
+                "socketPath": {
+                    "description": "Database socket path",
+                    "type": "string"
+                },
+                "ssl": {
+                    "description": "Object with ssl parameters or a string containing name of ssl profile."
+                },
+                "subscribers": {
+                    "description": "Subscribers to be loaded for this connection.\nAccepts both subscriber classes and directories where from subscribers need to be loaded.\nDirectories support glob patterns.",
+                    "items": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/definitions/Function"
+                            },
+                            {
+                                "type": "string"
+                            }
+                        ]
+                    },
+                    "type": "array"
+                },
+                "supportBigNumbers": {
+                    "description": "When dealing with big numbers (BIGINT and DECIMAL columns) in the database, you should enable this option (Default: false)",
+                    "type": "boolean"
+                },
+                "synchronize": {
+                    "description": "Indicates if database schema should be auto created on every application launch.\nBe careful with this option and don't use this in production - otherwise you can lose production data.\nThis option is useful during debug and development.\nAlternative to it, you can use CLI and run schema:sync command.\n\nNote that for MongoDB database it does not create schema, because MongoDB is schemaless.\nInstead, it syncs just by creating indices.",
+                    "type": "boolean"
+                },
+                "timezone": {
+                    "description": "The timezone configured on the MySQL server.\nThis is used to type cast server date/time values to JavaScript Date object and vice versa.\nThis can be 'local', 'Z', or an offset in the form +HH:MM or -HH:MM. (Default: 'local')",
+                    "type": "string"
+                },
+                "trace": {
+                    "description": "Generates stack traces on Error to include call site of library entrance (\"long stack traces\").\nSlight performance penalty for most calls. (Default: true)",
+                    "type": "boolean"
+                },
+                "type": {
+                    "description": "Database type.",
+                    "enum": [
+                        "mariadb",
+                        "mysql"
+                    ],
+                    "type": "string"
+                },
+                "url": {
+                    "description": "Connection url where perform connection to.",
+                    "type": "string"
+                },
+                "username": {
+                    "description": "Database username.",
+                    "type": "string"
+                }
+            },
+            "required": [
+                "type"
+            ],
+            "type": "object"
+        },
+        "NamingStrategyInterface": {
+            "description": "Naming strategy defines how auto-generated names for such things like table name, or table column gonna be\ngenerated.",
+            "properties": {
+                "materializedPathColumnName": {
+                    "description": "Column name for materialized paths.",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "Naming strategy name.",
+                    "type": "string"
+                },
+                "nestedSetColumnNames": {
+                    "description": "Column names for nested sets.",
+                    "properties": {
+                        "left": {
+                            "type": "string"
+                        },
+                        "right": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "left",
+                        "right"
+                    ],
+                    "type": "object"
+                }
+            },
+            "required": [
+                "materializedPathColumnName",
+                "nestedSetColumnNames"
+            ],
+            "type": "object"
+        },
         "NotificationConfig": {
             "properties": {
                 "events": {
@@ -486,6 +1771,411 @@
             },
             "type": "object"
         },
+        "PostgresConnectionCredentialsOptions": {
+            "description": "Postgres specific connection credential options.",
+            "properties": {
+                "database": {
+                    "description": "Database name to connect to.",
+                    "type": "string"
+                },
+                "host": {
+                    "description": "Database host.",
+                    "type": "string"
+                },
+                "password": {
+                    "description": "Database password.",
+                    "type": [
+                        "string",
+                        "object"
+                    ]
+                },
+                "port": {
+                    "description": "Database host port.",
+                    "type": "number"
+                },
+                "ssl": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/definitions/TlsOptions"
+                        },
+                        {
+                            "type": "boolean"
+                        }
+                    ],
+                    "description": "Object with ssl parameters"
+                },
+                "url": {
+                    "description": "Connection url where perform connection to.",
+                    "type": "string"
+                },
+                "username": {
+                    "description": "Database username.",
+                    "type": "string"
+                }
+            },
+            "type": "object"
+        },
+        "PostgresConnectionOptions": {
+            "description": "Postgres-specific connection options.",
+            "properties": {
+                "applicationName": {
+                    "description": "sets the application_name var to help db administrators identify\nthe service using this connection. Defaults to 'undefined'",
+                    "type": "string"
+                },
+                "cache": {
+                    "anyOf": [
+                        {
+                            "properties": {
+                                "alwaysEnabled": {
+                                    "description": "If set to true then queries (using find methods and QueryBuilder's methods) will always be cached.",
+                                    "type": "boolean"
+                                },
+                                "duration": {
+                                    "description": "Time in milliseconds in which cache will expire.\nThis can be setup per-query.\nDefault value is 1000 which is equivalent to 1 second.",
+                                    "type": "number"
+                                },
+                                "ignoreErrors": {
+                                    "description": "Used to specify if cache errors should be ignored, and pass through the call to the Database.",
+                                    "type": "boolean"
+                                },
+                                "options": {
+                                    "description": "Used to provide redis connection options."
+                                },
+                                "provider": {
+                                    "description": "Factory function for custom cache providers that implement QueryResultCache.",
+                                    "type": "object"
+                                },
+                                "tableName": {
+                                    "description": "Configurable table name for \"database\" type cache.\nDefault value is \"query-result-cache\"",
+                                    "type": "string"
+                                },
+                                "type": {
+                                    "description": "Type of caching.\n\n- \"database\" means cached values will be stored in the separate table in database. This is default value.\n- \"redis\" means cached values will be stored inside redis. You must provide redis connection options.",
+                                    "enum": [
+                                        "database",
+                                        "ioredis",
+                                        "ioredis/cluster",
+                                        "redis"
+                                    ],
+                                    "type": "string"
+                                }
+                            },
+                            "type": "object"
+                        },
+                        {
+                            "type": "boolean"
+                        }
+                    ],
+                    "description": "Allows to setup cache options."
+                },
+                "cli": {
+                    "description": "CLI settings.",
+                    "properties": {
+                        "entitiesDir": {
+                            "description": "Directory where entities should be created by default.",
+                            "type": "string"
+                        },
+                        "migrationsDir": {
+                            "description": "Directory where migrations should be created by default.",
+                            "type": "string"
+                        },
+                        "subscribersDir": {
+                            "description": "Directory where subscribers should be created by default.",
+                            "type": "string"
+                        }
+                    },
+                    "type": "object"
+                },
+                "connectTimeoutMS": {
+                    "description": "The milliseconds before a timeout occurs during the initial connection to the postgres\nserver. If undefined, or set to 0, there is no timeout. Defaults to undefined.",
+                    "type": "number"
+                },
+                "database": {
+                    "description": "Database name to connect to.",
+                    "type": "string"
+                },
+                "driver": {
+                    "description": "The driver object\nThis defaults to `require(\"pg\")`."
+                },
+                "dropSchema": {
+                    "description": "Drops the schema each time connection is being established.\nBe careful with this option and don't use this in production - otherwise you'll lose all production data.\nThis option is useful during debug and development.",
+                    "type": "boolean"
+                },
+                "entities": {
+                    "description": "Entities to be loaded for this connection.\nAccepts both entity classes and directories where from entities need to be loaded.\nDirectories support glob patterns.",
+                    "items": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/definitions/Function"
+                            },
+                            {
+                                "$ref": "#/definitions/EntitySchema<any>"
+                            },
+                            {
+                                "type": "string"
+                            }
+                        ]
+                    },
+                    "type": "array"
+                },
+                "entityPrefix": {
+                    "description": "Prefix to use on all tables (collections) of this connection in the database.",
+                    "type": "string"
+                },
+                "entitySkipConstructor": {
+                    "description": "When creating new Entity instances, skip all constructors when true.",
+                    "type": "boolean"
+                },
+                "extra": {
+                    "description": "Extra connection options to be passed to the underlying driver.\n\ntodo: deprecate this and move all database-specific types into hts own connection options object."
+                },
+                "host": {
+                    "description": "Database host.",
+                    "type": "string"
+                },
+                "installExtensions": {
+                    "description": "Automatically install postgres extensions",
+                    "type": "boolean"
+                },
+                "logNotifications": {
+                    "description": "Include notification messages from Postgres server in client logs",
+                    "type": "boolean"
+                },
+                "logger": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/definitions/Logger"
+                        },
+                        {
+                            "enum": [
+                                "advanced-console",
+                                "debug",
+                                "file",
+                                "simple-console"
+                            ],
+                            "type": "string"
+                        }
+                    ],
+                    "description": "Logger instance used to log queries and events in the ORM."
+                },
+                "logging": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "enum": [
+                                    "error",
+                                    "info",
+                                    "log",
+                                    "migration",
+                                    "query",
+                                    "schema",
+                                    "warn"
+                                ],
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "enum": [
+                                "all",
+                                false,
+                                true
+                            ]
+                        }
+                    ],
+                    "description": "Logging options."
+                },
+                "maxQueryExecutionTime": {
+                    "description": "Maximum number of milliseconds query should be executed before logger log a warning.",
+                    "type": "number"
+                },
+                "migrations": {
+                    "description": "Migrations to be loaded for this connection.\nAccepts both migration classes and directories where from migrations need to be loaded.\nDirectories support glob patterns.",
+                    "items": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/definitions/Function"
+                            },
+                            {
+                                "type": "string"
+                            }
+                        ]
+                    },
+                    "type": "array"
+                },
+                "migrationsRun": {
+                    "description": "Indicates if migrations should be auto run on every application launch.\nAlternative to it, you can use CLI and run migrations:run command.",
+                    "type": "boolean"
+                },
+                "migrationsTableName": {
+                    "description": "Migrations table name, in case of different name from \"migrations\".\nAccepts single string name.",
+                    "type": "string"
+                },
+                "migrationsTransactionMode": {
+                    "description": "Transaction mode for migrations to run in",
+                    "enum": [
+                        "all",
+                        "each",
+                        "none"
+                    ],
+                    "type": "string"
+                },
+                "name": {
+                    "description": "Connection name. If connection name is not given then it will be called \"default\".\nDifferent connections must have different names.",
+                    "type": "string"
+                },
+                "namingStrategy": {
+                    "$ref": "#/definitions/NamingStrategyInterface",
+                    "description": "Naming strategy to be used to name tables and columns in the database."
+                },
+                "nativeDriver": {
+                    "description": "The driver object\nThis defaults to `require(\"pg-native\")`."
+                },
+                "password": {
+                    "description": "Database password.",
+                    "type": [
+                        "string",
+                        "object"
+                    ]
+                },
+                "poolErrorHandler": {
+                    "type": "object"
+                },
+                "port": {
+                    "description": "Database host port.",
+                    "type": "number"
+                },
+                "replication": {
+                    "description": "Replication setup.",
+                    "properties": {
+                        "master": {
+                            "$ref": "#/definitions/PostgresConnectionCredentialsOptions",
+                            "description": "Master server used by orm to perform writes."
+                        },
+                        "slaves": {
+                            "description": "List of read-from severs (slaves).",
+                            "items": {
+                                "$ref": "#/definitions/PostgresConnectionCredentialsOptions"
+                            },
+                            "type": "array"
+                        }
+                    },
+                    "required": [
+                        "master",
+                        "slaves"
+                    ],
+                    "type": "object"
+                },
+                "schema": {
+                    "description": "Schema name.",
+                    "type": "string"
+                },
+                "ssl": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/definitions/TlsOptions"
+                        },
+                        {
+                            "type": "boolean"
+                        }
+                    ],
+                    "description": "Object with ssl parameters"
+                },
+                "subscribers": {
+                    "description": "Subscribers to be loaded for this connection.\nAccepts both subscriber classes and directories where from subscribers need to be loaded.\nDirectories support glob patterns.",
+                    "items": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/definitions/Function"
+                            },
+                            {
+                                "type": "string"
+                            }
+                        ]
+                    },
+                    "type": "array"
+                },
+                "synchronize": {
+                    "description": "Indicates if database schema should be auto created on every application launch.\nBe careful with this option and don't use this in production - otherwise you can lose production data.\nThis option is useful during debug and development.\nAlternative to it, you can use CLI and run schema:sync command.\n\nNote that for MongoDB database it does not create schema, because MongoDB is schemaless.\nInstead, it syncs just by creating indices.",
+                    "type": "boolean"
+                },
+                "type": {
+                    "description": "Database type.",
+                    "enum": [
+                        "postgres"
+                    ],
+                    "type": "string"
+                },
+                "url": {
+                    "description": "Connection url where perform connection to.",
+                    "type": "string"
+                },
+                "useUTC": {
+                    "description": "A boolean determining whether to pass time values in UTC or local time. (default: true).",
+                    "type": "boolean"
+                },
+                "username": {
+                    "description": "Database username.",
+                    "type": "string"
+                },
+                "uuidExtension": {
+                    "description": "The Postgres extension to use to generate UUID columns. Defaults to uuid-ossp.\nIf pgcrypto is selected, TypeORM will use the gen_random_uuid() function from this extension.\nIf uuid-ossp is selected, TypeORM will use the uuid_generate_v4() function from this extension.",
+                    "enum": [
+                        "pgcrypto",
+                        "uuid-ossp"
+                    ],
+                    "type": "string"
+                }
+            },
+            "required": [
+                "type"
+            ],
+            "type": "object"
+        },
+        "PxfObject": {
+            "properties": {
+                "buf": {
+                    "anyOf": [
+                        {
+                            "description": "Raw data is stored in instances of the Buffer class.\nA Buffer is similar to an array of integers but corresponds to a raw memory allocation outside the V8 heap.  A Buffer cannot be resized.\nValid string encodings: 'ascii'|'utf8'|'utf16le'|'ucs2'(alias of 'utf16le')|'base64'|'binary'(deprecated)|'hex'",
+                            "items": {
+                                "type": "number"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "string"
+                        }
+                    ],
+                    "description": "PFX or PKCS12 encoded private key and certificate chain."
+                },
+                "passphrase": {
+                    "description": "Optional passphrase.",
+                    "type": "string"
+                }
+            },
+            "required": [
+                "buf"
+            ],
+            "type": "object"
+        },
+        "ReadPreference": {
+            "description": "Creates a new ReadPreference instance.",
+            "properties": {
+                "mode": {
+                    "description": "The ReadPreference mode as listed above.",
+                    "type": "string"
+                },
+                "tags": {
+                    "description": "An object representing read preference tags."
+                }
+            },
+            "required": [
+                "mode",
+                "tags"
+            ],
+            "type": "object"
+        },
         "RedditCredentials": {
             "description": "Credentials required for the bot to interact with Reddit's API\n\nThese credentials will provided to both the API and Web interface unless otherwise specified with the `web.credentials` property\n\nRefer to the [required credentials table](https://github.com/FoxxMD/context-mod/blob/master/docs/operatorConfiguration.md#minimum-required-configuration) to see what is necessary to run the bot.",
             "examples": [
@@ -529,6 +2219,265 @@
             },
             "type": "object"
         },
+        "SecureContext": {
+            "properties": {
+                "context": {
+                }
+            },
+            "required": [
+                "context"
+            ],
+            "type": "object"
+        },
+        "SqljsConnectionOptions": {
+            "description": "Sql.js-specific connection options.",
+            "properties": {
+                "autoSave": {
+                    "description": "Enables the autoSave mechanism which either saves to location\nor calls autoSaveCallback every time a change to the database is made.",
+                    "type": "boolean"
+                },
+                "autoSaveCallback": {
+                    "$ref": "#/definitions/Function",
+                    "description": "A function that gets called on every change instead of the internal autoSave function.\nautoSave has to be enabled for this to work."
+                },
+                "cache": {
+                    "anyOf": [
+                        {
+                            "properties": {
+                                "alwaysEnabled": {
+                                    "description": "If set to true then queries (using find methods and QueryBuilder's methods) will always be cached.",
+                                    "type": "boolean"
+                                },
+                                "duration": {
+                                    "description": "Time in milliseconds in which cache will expire.\nThis can be setup per-query.\nDefault value is 1000 which is equivalent to 1 second.",
+                                    "type": "number"
+                                },
+                                "ignoreErrors": {
+                                    "description": "Used to specify if cache errors should be ignored, and pass through the call to the Database.",
+                                    "type": "boolean"
+                                },
+                                "options": {
+                                    "description": "Used to provide redis connection options."
+                                },
+                                "provider": {
+                                    "description": "Factory function for custom cache providers that implement QueryResultCache.",
+                                    "type": "object"
+                                },
+                                "tableName": {
+                                    "description": "Configurable table name for \"database\" type cache.\nDefault value is \"query-result-cache\"",
+                                    "type": "string"
+                                },
+                                "type": {
+                                    "description": "Type of caching.\n\n- \"database\" means cached values will be stored in the separate table in database. This is default value.\n- \"redis\" means cached values will be stored inside redis. You must provide redis connection options.",
+                                    "enum": [
+                                        "database",
+                                        "ioredis",
+                                        "ioredis/cluster",
+                                        "redis"
+                                    ],
+                                    "type": "string"
+                                }
+                            },
+                            "type": "object"
+                        },
+                        {
+                            "type": "boolean"
+                        }
+                    ],
+                    "description": "Allows to setup cache options."
+                },
+                "cli": {
+                    "description": "CLI settings.",
+                    "properties": {
+                        "entitiesDir": {
+                            "description": "Directory where entities should be created by default.",
+                            "type": "string"
+                        },
+                        "migrationsDir": {
+                            "description": "Directory where migrations should be created by default.",
+                            "type": "string"
+                        },
+                        "subscribersDir": {
+                            "description": "Directory where subscribers should be created by default.",
+                            "type": "string"
+                        }
+                    },
+                    "type": "object"
+                },
+                "database": {
+                    "additionalProperties": false,
+                    "description": "A Uint8Array that gets imported when the connection is opened.",
+                    "patternProperties": {
+                        "^[0-9]+$": {
+                            "type": "number"
+                        }
+                    },
+                    "type": "object"
+                },
+                "driver": {
+                    "description": "The driver object\nThis defaults to require(\"sql.js\")"
+                },
+                "dropSchema": {
+                    "description": "Drops the schema each time connection is being established.\nBe careful with this option and don't use this in production - otherwise you'll lose all production data.\nThis option is useful during debug and development.",
+                    "type": "boolean"
+                },
+                "entities": {
+                    "description": "Entities to be loaded for this connection.\nAccepts both entity classes and directories where from entities need to be loaded.\nDirectories support glob patterns.",
+                    "items": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/definitions/Function"
+                            },
+                            {
+                                "$ref": "#/definitions/EntitySchema<any>"
+                            },
+                            {
+                                "type": "string"
+                            }
+                        ]
+                    },
+                    "type": "array"
+                },
+                "entityPrefix": {
+                    "description": "Prefix to use on all tables (collections) of this connection in the database.",
+                    "type": "string"
+                },
+                "entitySkipConstructor": {
+                    "description": "When creating new Entity instances, skip all constructors when true.",
+                    "type": "boolean"
+                },
+                "extra": {
+                    "description": "Extra connection options to be passed to the underlying driver.\n\ntodo: deprecate this and move all database-specific types into hts own connection options object."
+                },
+                "location": {
+                    "description": "File path (Node.js) or local storage key (browser) to load and save database from.\nIf this is specified without autoSave, the database is loaded from the location\nand can be saved manually via the SqljsEntityManager. If autoSave is enabled,\nlocation is used to automatically save the database.",
+                    "type": "string"
+                },
+                "logger": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/definitions/Logger"
+                        },
+                        {
+                            "enum": [
+                                "advanced-console",
+                                "debug",
+                                "file",
+                                "simple-console"
+                            ],
+                            "type": "string"
+                        }
+                    ],
+                    "description": "Logger instance used to log queries and events in the ORM."
+                },
+                "logging": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "enum": [
+                                    "error",
+                                    "info",
+                                    "log",
+                                    "migration",
+                                    "query",
+                                    "schema",
+                                    "warn"
+                                ],
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "enum": [
+                                "all",
+                                false,
+                                true
+                            ]
+                        }
+                    ],
+                    "description": "Logging options."
+                },
+                "maxQueryExecutionTime": {
+                    "description": "Maximum number of milliseconds query should be executed before logger log a warning.",
+                    "type": "number"
+                },
+                "migrations": {
+                    "description": "Migrations to be loaded for this connection.\nAccepts both migration classes and directories where from migrations need to be loaded.\nDirectories support glob patterns.",
+                    "items": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/definitions/Function"
+                            },
+                            {
+                                "type": "string"
+                            }
+                        ]
+                    },
+                    "type": "array"
+                },
+                "migrationsRun": {
+                    "description": "Indicates if migrations should be auto run on every application launch.\nAlternative to it, you can use CLI and run migrations:run command.",
+                    "type": "boolean"
+                },
+                "migrationsTableName": {
+                    "description": "Migrations table name, in case of different name from \"migrations\".\nAccepts single string name.",
+                    "type": "string"
+                },
+                "migrationsTransactionMode": {
+                    "description": "Transaction mode for migrations to run in",
+                    "enum": [
+                        "all",
+                        "each",
+                        "none"
+                    ],
+                    "type": "string"
+                },
+                "name": {
+                    "description": "Connection name. If connection name is not given then it will be called \"default\".\nDifferent connections must have different names.",
+                    "type": "string"
+                },
+                "namingStrategy": {
+                    "$ref": "#/definitions/NamingStrategyInterface",
+                    "description": "Naming strategy to be used to name tables and columns in the database."
+                },
+                "sqlJsConfig": {
+                    "description": "Config that's used to initialize sql.js."
+                },
+                "subscribers": {
+                    "description": "Subscribers to be loaded for this connection.\nAccepts both subscriber classes and directories where from subscribers need to be loaded.\nDirectories support glob patterns.",
+                    "items": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/definitions/Function"
+                            },
+                            {
+                                "type": "string"
+                            }
+                        ]
+                    },
+                    "type": "array"
+                },
+                "synchronize": {
+                    "description": "Indicates if database schema should be auto created on every application launch.\nBe careful with this option and don't use this in production - otherwise you can lose production data.\nThis option is useful during debug and development.\nAlternative to it, you can use CLI and run schema:sync command.\n\nNote that for MongoDB database it does not create schema, because MongoDB is schemaless.\nInstead, it syncs just by creating indices.",
+                    "type": "boolean"
+                },
+                "type": {
+                    "description": "Database type.",
+                    "enum": [
+                        "sqljs"
+                    ],
+                    "type": "string"
+                },
+                "useLocalForage": {
+                    "description": "Enables the usage of the localforage library to save & load the database asynchronously from the\nindexedDB instead of using the synchron local storage methods in a browser environment.",
+                    "type": "boolean"
+                }
+            },
+            "required": [
+                "type"
+            ],
+            "type": "object"
+        },
         "ThirdPartyCredentialsJsonConfig": {
             "additionalProperties": {
             },
@@ -543,6 +2492,336 @@
                         "apiKey"
                     ],
                     "type": "object"
+                }
+            },
+            "type": "object"
+        },
+        "TlsOptions": {
+            "properties": {
+                "ALPNProtocols": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "additionalProperties": false,
+                            "patternProperties": {
+                                "^[0-9]+$": {
+                                    "type": "number"
+                                }
+                            },
+                            "type": "object"
+                        },
+                        {
+                            "items": {
+                                "additionalProperties": false,
+                                "patternProperties": {
+                                    "^[0-9]+$": {
+                                        "type": "number"
+                                    }
+                                },
+                                "type": "object"
+                            },
+                            "type": "array"
+                        }
+                    ],
+                    "description": "An array of strings or a Buffer naming possible ALPN protocols.\n(Protocols should be ordered by their priority.)"
+                },
+                "SNICallback": {
+                    "description": "SNICallback(servername, cb) <Function> A function that will be\ncalled if the client supports SNI TLS extension. Two arguments\nwill be passed when called: servername and cb. SNICallback should\ninvoke cb(null, ctx), where ctx is a SecureContext instance.\n(tls.createSecureContext(...) can be used to get a proper\nSecureContext.) If SNICallback wasn't provided the default callback\nwith high-level API will be used (see below).",
+                    "type": "object"
+                },
+                "allowHalfOpen": {
+                    "default": false,
+                    "description": "Indicates whether half-opened TCP connections are allowed.",
+                    "type": "boolean"
+                },
+                "ca": {
+                    "anyOf": [
+                        {
+                            "description": "Raw data is stored in instances of the Buffer class.\nA Buffer is similar to an array of integers but corresponds to a raw memory allocation outside the V8 heap.  A Buffer cannot be resized.\nValid string encodings: 'ascii'|'utf8'|'utf16le'|'ucs2'(alias of 'utf16le')|'base64'|'binary'(deprecated)|'hex'",
+                            "items": {
+                                "type": "number"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "items": {
+                                "anyOf": [
+                                    {
+                                        "description": "Raw data is stored in instances of the Buffer class.\nA Buffer is similar to an array of integers but corresponds to a raw memory allocation outside the V8 heap.  A Buffer cannot be resized.\nValid string encodings: 'ascii'|'utf8'|'utf16le'|'ucs2'(alias of 'utf16le')|'base64'|'binary'(deprecated)|'hex'",
+                                        "items": {
+                                            "type": "number"
+                                        },
+                                        "type": "array"
+                                    },
+                                    {
+                                        "type": "string"
+                                    }
+                                ]
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "string"
+                        }
+                    ],
+                    "description": "Optionally override the trusted CA certificates. Default is to trust\nthe well-known CAs curated by Mozilla. Mozilla's CAs are completely\nreplaced when CAs are explicitly specified using this option."
+                },
+                "cert": {
+                    "anyOf": [
+                        {
+                            "description": "Raw data is stored in instances of the Buffer class.\nA Buffer is similar to an array of integers but corresponds to a raw memory allocation outside the V8 heap.  A Buffer cannot be resized.\nValid string encodings: 'ascii'|'utf8'|'utf16le'|'ucs2'(alias of 'utf16le')|'base64'|'binary'(deprecated)|'hex'",
+                            "items": {
+                                "type": "number"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "items": {
+                                "anyOf": [
+                                    {
+                                        "description": "Raw data is stored in instances of the Buffer class.\nA Buffer is similar to an array of integers but corresponds to a raw memory allocation outside the V8 heap.  A Buffer cannot be resized.\nValid string encodings: 'ascii'|'utf8'|'utf16le'|'ucs2'(alias of 'utf16le')|'base64'|'binary'(deprecated)|'hex'",
+                                        "items": {
+                                            "type": "number"
+                                        },
+                                        "type": "array"
+                                    },
+                                    {
+                                        "type": "string"
+                                    }
+                                ]
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "string"
+                        }
+                    ],
+                    "description": "Cert chains in PEM format. One cert chain should be provided per\nprivate key. Each cert chain should consist of the PEM formatted\ncertificate for a provided private key, followed by the PEM\nformatted intermediate certificates (if any), in order, and not\nincluding the root CA (the root CA must be pre-known to the peer,\nsee ca). When providing multiple cert chains, they do not have to\nbe in the same order as their private keys in key. If the\nintermediate certificates are not provided, the peer will not be\nable to validate the certificate, and the handshake will fail."
+                },
+                "ciphers": {
+                    "description": "Cipher suite specification, replacing the default. For more\ninformation, see modifying the default cipher suite. Permitted\nciphers can be obtained via tls.getCiphers(). Cipher names must be\nuppercased in order for OpenSSL to accept them.",
+                    "type": "string"
+                },
+                "clientCertEngine": {
+                    "description": "Name of an OpenSSL engine which can provide the client certificate.",
+                    "type": "string"
+                },
+                "crl": {
+                    "anyOf": [
+                        {
+                            "description": "Raw data is stored in instances of the Buffer class.\nA Buffer is similar to an array of integers but corresponds to a raw memory allocation outside the V8 heap.  A Buffer cannot be resized.\nValid string encodings: 'ascii'|'utf8'|'utf16le'|'ucs2'(alias of 'utf16le')|'base64'|'binary'(deprecated)|'hex'",
+                            "items": {
+                                "type": "number"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "items": {
+                                "anyOf": [
+                                    {
+                                        "description": "Raw data is stored in instances of the Buffer class.\nA Buffer is similar to an array of integers but corresponds to a raw memory allocation outside the V8 heap.  A Buffer cannot be resized.\nValid string encodings: 'ascii'|'utf8'|'utf16le'|'ucs2'(alias of 'utf16le')|'base64'|'binary'(deprecated)|'hex'",
+                                        "items": {
+                                            "type": "number"
+                                        },
+                                        "type": "array"
+                                    },
+                                    {
+                                        "type": "string"
+                                    }
+                                ]
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "string"
+                        }
+                    ],
+                    "description": "PEM formatted CRLs (Certificate Revocation Lists)."
+                },
+                "dhparam": {
+                    "anyOf": [
+                        {
+                            "description": "Raw data is stored in instances of the Buffer class.\nA Buffer is similar to an array of integers but corresponds to a raw memory allocation outside the V8 heap.  A Buffer cannot be resized.\nValid string encodings: 'ascii'|'utf8'|'utf16le'|'ucs2'(alias of 'utf16le')|'base64'|'binary'(deprecated)|'hex'",
+                            "items": {
+                                "type": "number"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "string"
+                        }
+                    ],
+                    "description": "Diffie Hellman parameters, required for Perfect Forward Secrecy. Use\nopenssl dhparam to create the parameters. The key length must be\ngreater than or equal to 1024 bits or else an error will be thrown.\nAlthough 1024 bits is permissible, use 2048 bits or larger for\nstronger security. If omitted or invalid, the parameters are\nsilently discarded and DHE ciphers will not be available."
+                },
+                "ecdhCurve": {
+                    "description": "A string describing a named curve or a colon separated list of curve\nNIDs or names, for example P-521:P-384:P-256, to use for ECDH key\nagreement. Set to auto to select the curve automatically. Use\ncrypto.getCurves() to obtain a list of available curve names. On\nrecent releases, openssl ecparam -list_curves will also display the\nname and description of each available elliptic curve. Default:\ntls.DEFAULT_ECDH_CURVE.",
+                    "type": "string"
+                },
+                "enableTrace": {
+                    "default": false,
+                    "description": "When enabled, TLS packet trace information is written to `stderr`. This can be\nused to debug TLS connection problems.",
+                    "type": "boolean"
+                },
+                "handshakeTimeout": {
+                    "description": "Abort the connection if the SSL/TLS handshake does not finish in the\nspecified number of milliseconds. A 'tlsClientError' is emitted on\nthe tls.Server object whenever a handshake times out. Default:\n120000 (120 seconds).",
+                    "type": "number"
+                },
+                "honorCipherOrder": {
+                    "description": "Attempt to use the server's cipher suite preferences instead of the\nclient's. When true, causes SSL_OP_CIPHER_SERVER_PREFERENCE to be\nset in secureOptions",
+                    "type": "boolean"
+                },
+                "key": {
+                    "anyOf": [
+                        {
+                            "description": "Raw data is stored in instances of the Buffer class.\nA Buffer is similar to an array of integers but corresponds to a raw memory allocation outside the V8 heap.  A Buffer cannot be resized.\nValid string encodings: 'ascii'|'utf8'|'utf16le'|'ucs2'(alias of 'utf16le')|'base64'|'binary'(deprecated)|'hex'",
+                            "items": {
+                                "type": "number"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "items": {
+                                "anyOf": [
+                                    {
+                                        "description": "Raw data is stored in instances of the Buffer class.\nA Buffer is similar to an array of integers but corresponds to a raw memory allocation outside the V8 heap.  A Buffer cannot be resized.\nValid string encodings: 'ascii'|'utf8'|'utf16le'|'ucs2'(alias of 'utf16le')|'base64'|'binary'(deprecated)|'hex'",
+                                        "items": {
+                                            "type": "number"
+                                        },
+                                        "type": "array"
+                                    },
+                                    {
+                                        "$ref": "#/definitions/KeyObject"
+                                    }
+                                ]
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "string"
+                        }
+                    ],
+                    "description": "Private keys in PEM format. PEM allows the option of private keys\nbeing encrypted. Encrypted keys will be decrypted with\noptions.passphrase. Multiple keys using different algorithms can be\nprovided either as an array of unencrypted key strings or buffers,\nor an array of objects in the form {pem: <string|buffer>[,\npassphrase: <string>]}. The object form can only occur in an array.\nobject.passphrase is optional. Encrypted keys will be decrypted with\nobject.passphrase if provided, or options.passphrase if it is not."
+                },
+                "maxVersion": {
+                    "description": "Optionally set the maximum TLS version to allow. One\nof `'TLSv1.3'`, `'TLSv1.2'`, `'TLSv1.1'`, or `'TLSv1'`. Cannot be specified along with the\n`secureProtocol` option, use one or the other.\n**Default:** `'TLSv1.3'`, unless changed using CLI options. Using\n`--tls-max-v1.2` sets the default to `'TLSv1.2'`. Using `--tls-max-v1.3` sets the default to\n`'TLSv1.3'`. If multiple of the options are provided, the highest maximum is used.",
+                    "enum": [
+                        "TLSv1",
+                        "TLSv1.1",
+                        "TLSv1.2",
+                        "TLSv1.3"
+                    ],
+                    "type": "string"
+                },
+                "minVersion": {
+                    "description": "Optionally set the minimum TLS version to allow. One\nof `'TLSv1.3'`, `'TLSv1.2'`, `'TLSv1.1'`, or `'TLSv1'`. Cannot be specified along with the\n`secureProtocol` option, use one or the other.  It is not recommended to use\nless than TLSv1.2, but it may be required for interoperability.\n**Default:** `'TLSv1.2'`, unless changed using CLI options. Using\n`--tls-v1.0` sets the default to `'TLSv1'`. Using `--tls-v1.1` sets the default to\n`'TLSv1.1'`. Using `--tls-min-v1.3` sets the default to\n'TLSv1.3'. If multiple of the options are provided, the lowest minimum is used.",
+                    "enum": [
+                        "TLSv1",
+                        "TLSv1.1",
+                        "TLSv1.2",
+                        "TLSv1.3"
+                    ],
+                    "type": "string"
+                },
+                "passphrase": {
+                    "description": "Shared passphrase used for a single private key and/or a PFX.",
+                    "type": "string"
+                },
+                "pauseOnConnect": {
+                    "default": false,
+                    "description": "Indicates whether the socket should be paused on incoming connections.",
+                    "type": "boolean"
+                },
+                "pfx": {
+                    "anyOf": [
+                        {
+                            "description": "Raw data is stored in instances of the Buffer class.\nA Buffer is similar to an array of integers but corresponds to a raw memory allocation outside the V8 heap.  A Buffer cannot be resized.\nValid string encodings: 'ascii'|'utf8'|'utf16le'|'ucs2'(alias of 'utf16le')|'base64'|'binary'(deprecated)|'hex'",
+                            "items": {
+                                "type": "number"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "items": {
+                                "anyOf": [
+                                    {
+                                        "description": "Raw data is stored in instances of the Buffer class.\nA Buffer is similar to an array of integers but corresponds to a raw memory allocation outside the V8 heap.  A Buffer cannot be resized.\nValid string encodings: 'ascii'|'utf8'|'utf16le'|'ucs2'(alias of 'utf16le')|'base64'|'binary'(deprecated)|'hex'",
+                                        "items": {
+                                            "type": "number"
+                                        },
+                                        "type": "array"
+                                    },
+                                    {
+                                        "$ref": "#/definitions/PxfObject"
+                                    },
+                                    {
+                                        "type": "string"
+                                    }
+                                ]
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "string"
+                        }
+                    ],
+                    "description": "PFX or PKCS12 encoded private key and certificate chain. pfx is an\nalternative to providing key and cert individually. PFX is usually\nencrypted, if it is, passphrase will be used to decrypt it. Multiple\nPFX can be provided either as an array of unencrypted PFX buffers,\nor an array of objects in the form {buf: <string|buffer>[,\npassphrase: <string>]}. The object form can only occur in an array.\nobject.passphrase is optional. Encrypted PFX will be decrypted with\nobject.passphrase if provided, or options.passphrase if it is not."
+                },
+                "privateKeyEngine": {
+                    "description": "Name of an OpenSSL engine to get private key from. Should be used\ntogether with privateKeyIdentifier.",
+                    "type": "string"
+                },
+                "privateKeyIdentifier": {
+                    "description": "Identifier of a private key managed by an OpenSSL engine. Should be\nused together with privateKeyEngine. Should not be set together with\nkey, because both options define a private key in different ways.",
+                    "type": "string"
+                },
+                "pskIdentityHint": {
+                    "description": "hint to send to a client to help\nwith selecting the identity during TLS-PSK negotiation. Will be ignored\nin TLS 1.3. Upon failing to set pskIdentityHint `tlsClientError` will be\nemitted with `ERR_TLS_PSK_SET_IDENTIY_HINT_FAILED` code.",
+                    "type": "string"
+                },
+                "rejectUnauthorized": {
+                    "default": true,
+                    "description": "If true the server will reject any connection which is not\nauthorized with the list of supplied CAs. This option only has an\neffect if requestCert is true.",
+                    "type": "boolean"
+                },
+                "requestCert": {
+                    "description": "If true the server will request a certificate from clients that\nconnect and attempt to verify that certificate. Defaults to\nfalse.",
+                    "type": "boolean"
+                },
+                "secureContext": {
+                    "$ref": "#/definitions/SecureContext",
+                    "description": "An optional TLS context object from tls.createSecureContext()"
+                },
+                "secureOptions": {
+                    "description": "Optionally affect the OpenSSL protocol behavior, which is not\nusually necessary. This should be used carefully if at all! Value is\na numeric bitmask of the SSL_OP_* options from OpenSSL Options",
+                    "type": "number"
+                },
+                "secureProtocol": {
+                    "description": "Legacy mechanism to select the TLS protocol version to use, it does\nnot support independent control of the minimum and maximum version,\nand does not support limiting the protocol to TLSv1.3. Use\nminVersion and maxVersion instead. The possible values are listed as\nSSL_METHODS, use the function names as strings. For example, use\n'TLSv1_1_method' to force TLS version 1.1, or 'TLS_method' to allow\nany TLS protocol version up to TLSv1.3. It is not recommended to use\nTLS versions less than 1.2, but it may be required for\ninteroperability. Default: none, see minVersion.",
+                    "type": "string"
+                },
+                "sessionIdContext": {
+                    "description": "Opaque identifier used by servers to ensure session state is not\nshared between applications. Unused by clients.",
+                    "type": "string"
+                },
+                "sessionTimeout": {
+                    "description": "The number of seconds after which a TLS session created by the\nserver will no longer be resumable. See Session Resumption for more\ninformation. Default: 300.",
+                    "type": "number"
+                },
+                "sigalgs": {
+                    "description": "Colon-separated list of supported signature algorithms. The list\ncan contain digest algorithms (SHA256, MD5 etc.), public key\nalgorithms (RSA-PSS, ECDSA etc.), combination of both (e.g\n'RSA+SHA384') or TLS v1.3 scheme names (e.g. rsa_pss_pss_sha512).",
+                    "type": "string"
+                },
+                "ticketKeys": {
+                    "description": "Raw data is stored in instances of the Buffer class.\nA Buffer is similar to an array of integers but corresponds to a raw memory allocation outside the V8 heap.  A Buffer cannot be resized.\nValid string encodings: 'ascii'|'utf8'|'utf16le'|'ucs2'(alias of 'utf16le')|'base64'|'binary'(deprecated)|'hex'",
+                    "items": {
+                        "type": "number"
+                    },
+                    "type": "array"
                 }
             },
             "type": "object"
@@ -579,6 +2858,14 @@
                     "type": "string"
                 }
             },
+            "type": "object"
+        },
+        "{[x:string]:EntitySchemaColumnOptions|undefined;}": {
+            "description": "Entity column's options.",
+            "type": "object"
+        },
+        "{[x:string]:EntitySchemaRelationOptions|undefined;}": {
+            "description": "Entity relation's options.",
             "type": "object"
         }
     },
@@ -618,6 +2905,33 @@
         },
         "credentials": {
             "$ref": "#/definitions/ThirdPartyCredentialsJsonConfig"
+        },
+        "databaseConfig": {
+            "anyOf": [
+                {
+                    "$ref": "#/definitions/MysqlConnectionOptions"
+                },
+                {
+                    "$ref": "#/definitions/PostgresConnectionOptions"
+                },
+                {
+                    "$ref": "#/definitions/MongoConnectionOptions"
+                },
+                {
+                    "$ref": "#/definitions/SqljsConnectionOptions"
+                },
+                {
+                    "enum": [
+                        "mariadb",
+                        "mongodb",
+                        "mysql",
+                        "postgres",
+                        "sqljs"
+                    ],
+                    "type": "string"
+                }
+            ],
+            "description": "Database backend to use for persistent data\n\nDefaults to 'sqljs' which stores data in a file"
         },
         "logging": {
             "description": "Settings to configure global logging defaults",

@@ -383,3 +383,6 @@ dist
 **/src/**/*.js
 !src/Web/assets/public/yaml/*
 **/src/**/*.map
+
+#ignore sqlite databases created by sqljs driver
+**/*.sqlite

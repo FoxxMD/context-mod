@@ -5,6 +5,11 @@ import Poll from "snoostorm/out/util/Poll";
 import Snoowrap from "snoowrap";
 import {RuleResult} from "../Rule";
 import {IncomingMessage} from "http";
+import {SqljsConnectionOptions} from "typeorm/driver/sqljs/SqljsConnectionOptions";
+import {MysqlConnectionOptions} from "typeorm/driver/mysql/MysqlConnectionOptions";
+import {MongoConnectionOptions} from "typeorm/driver/mongodb/MongoConnectionOptions";
+import {PostgresConnectionOptions} from "typeorm/driver/postgres/PostgresConnectionOptions";
+import {Connection} from "typeorm";
 
 /**
  * An ISO 8601 Duration
@@ -708,6 +713,9 @@ export interface OperatorCacheConfig extends CacheConfig {
      * */
     actionedEventsDefault?: number
 }
+
+export type DatabaseDriver = 'sqljs' | 'mysql' | 'mariadb' | 'mongodb' | 'postgres';
+export type DatabaseConfig = SqljsConnectionOptions | MysqlConnectionOptions | MongoConnectionOptions | PostgresConnectionOptions;
 
 export interface Footer {
     /**
@@ -1558,6 +1566,13 @@ export interface OperatorJsonConfig {
      * */
     caching?: OperatorCacheConfig
 
+    /**
+     * Database backend to use for persistent data
+     *
+     * Defaults to 'sqljs' which stores data in a file
+     * */
+    databaseConfig?: DatabaseDriver | DatabaseConfig
+
     bots?: BotInstanceJsonConfig[]
 
     /**
@@ -1749,6 +1764,8 @@ export interface OperatorConfig extends OperatorJsonConfig {
         path?: string,
     },
     caching: StrongCache,
+    databaseConfig: DatabaseConfig
+    database: Connection
     web: {
         port: number,
         caching: CacheOptions,
