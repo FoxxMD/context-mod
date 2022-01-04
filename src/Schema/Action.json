@@ -387,11 +387,11 @@
                 "ban",
                 "comment",
                 "flair",
-                "userflair",
                 "lock",
                 "message",
                 "remove",
                 "report",
+                "userflair",
                 "usernote"
             ],
             "type": "string"

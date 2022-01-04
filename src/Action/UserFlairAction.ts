@@ -4,20 +4,16 @@ import {RuleResult} from '../Rule';
 import {ActionProcessResult} from '../Common/interfaces';
 
 export class UserFlairAction extends Action {
-  text: string;
-  css: string;
-  flair_template_id: string;
+  text?: string;
+  css?: string;
+  flair_template_id?: string;
 
   constructor(options: UserFlairActionOptions) {
     super(options);
 
-    if (options.text === undefined && options.css === undefined && options.flair_template_id === undefined) {
-      throw new Error('Must define either text, css or flair_template_id on UserFlairAction');
-    }
-
-    this.text = options.text || '';
-    this.css = options.css || '';
-    this.flair_template_id = options.flair_template_id || '';
+    this.text = options.text === null || options.text === '' ? undefined : options.text;
+    this.css = options.css === null || options.text === '' ? undefined : options.text;
+    this.flair_template_id = options.flair_template_id === null || options.flair_template_id === '' ? undefined : options.flair_template_id;
   }
 
   getKind() {
@@ -28,51 +24,49 @@ export class UserFlairAction extends Action {
     const dryRun = runtimeDryrun || this.dryRun;
     let flairParts = [];
 
-    if (this.flair_template_id !== '') {
+    if (this.flair_template_id !== undefined) {
       flairParts.push(`Flair template ID: ${this.flair_template_id}`)
+      if(this.text !== undefined || this.css !== undefined) {
+        this.logger.warn('Text/CSS properties will be ignored since a flair template is specified');
+      }
     } else {
-      if (this.text !== '') {
+      if (this.text !== undefined) {
         flairParts.push(`Text: ${this.text}`);
       }
-      if (this.css !== '') {
+      if (this.css !== undefined) {
         flairParts.push(`CSS: ${this.css}`);
       }
     }
 
-    const flairSummary = flairParts.length === 0 ? 'No user flair (unflaired)' : flairParts.join(' | ');
+    const flairSummary = flairParts.length === 0 ? 'Unflair user' : flairParts.join(' | ');
     this.logger.verbose(flairSummary);
-    if (item && item?.author) {
-      if (!this.dryRun) {
-        if (this.flair_template_id !== '') {
+
+    if (!this.dryRun) {
+      if (this.flair_template_id !== undefined) {
+        try {
           // @ts-ignore
           await this.client.assignUserFlairByTemplateId({
             subredditName: item.subreddit.display_name,
             flairTemplateId: this.flair_template_id,
             username: item.author.name,
-          })
-            .then((e: any) => {
-              this.logger.verbose(JSON.stringify(e));
-            })
-            .catch((e: any) => {
-              this.logger.verbose(JSON.stringify(e));
-            })
+          });
+        } catch (err: any) {
+          this.logger.error('Either the flair template ID is incorrect or you do not have permission to access it.');
+          throw err;
         }
+      } else if (this.text === undefined && this.css === undefined) {
+        // @ts-ignore
+        await item.subreddit.deleteUserFlair(item.author.name);
       } else {
         // @ts-ignore
-        await (item.author as RedditUser).assignFlair({
+        await item.author.assignFlair({
           subredditName: item.subreddit.display_name,
           cssClass: this.css,
           text: this.text,
-        })
-      }
-    } else {
-      this.logger.warn('Cannot flair Comment');
-      return {
-        dryRun,
-        success: false,
-        result: 'Cannot flair Comment',
+        });
       }
     }
+
     return {
       dryRun,
       success: true,
@@ -81,6 +75,11 @@ export class UserFlairAction extends Action {
   }
 }
 
+/**
+ * Flair the Author of an Activity
+ *
+ * Leave all properties blank or null to remove a User's existing flair
+ * */
 export interface UserFlairActionConfig extends ActionConfig {
   /**
    * The text of the flair to apply
@@ -91,7 +90,9 @@ export interface UserFlairActionConfig extends ActionConfig {
    * */
   css?: string,
   /**
-   * Flair template it to pick
+   * Flair template to pick.
+   *
+   * **Note:** If this template is used text/css are ignored
    * */
   flair_template_id?: string;
 }
