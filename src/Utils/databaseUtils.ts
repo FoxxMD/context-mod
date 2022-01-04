@@ -98,5 +98,9 @@ export const createDatabaseConnection = async (rawConfig: DatabaseConfig): Promi
         config = {...rawConfig, location: realLocation};
     }
 
-    return await createConnection({...config, synchronize: true});
+    return await createConnection({
+        ...config,
+        synchronize: true,
+        entities: [`${resolve(__dirname, '../Common/Entities')}/*.js`]
+    });
 }
