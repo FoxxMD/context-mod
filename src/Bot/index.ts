@@ -301,6 +301,7 @@ class Bot {
         let availSubs = [];
         // @ts-ignore
         const user = await this.client.getMe().fetch();
+        this.cacheManager.botName = user.name;
         this.botLink = `https://reddit.com/user/${user.name}`;
         this.botAccount = `u/${user.name}`;
         this.logger.info(`Reddit API Limit Remaining: ${this.client.ratelimitRemaining}`);

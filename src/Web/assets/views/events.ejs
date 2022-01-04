@@ -29,11 +29,9 @@
                     <div class="shadow-lg">
                         <div class="space-x-4 px-4 p-2 leading-2 font-semibold bg-gray-700">
                             <div class="flex items-center justify-between">
-                                <div>
-                                <span class="peek"><%- eRes.activity.peek %></span><a target="_blank" href="https://reddit.com<%= eRes.activity.link%>">(Link)</a>
-                                </div>
-                                <div class="flex items-center flex-end">
-                                    <%= eRes.subreddit %> @ <%= eRes.timestamp %>
+                                <div><%- eRes.peek %></div>
+                                <div class="flex self-start flex-end">
+                                    r/<%= eRes.activity.subreddit.name %> @ <%= eRes.timestamp %>
                                 </div>
                             </div>
                         </div>
@@ -43,7 +41,7 @@
                                 <span class="font-semibold">Rules:</span>
                                 <ul class="list-inside list-disc">
                                     <% eRes.ruleResults.forEach(function (ruleResult) { %>
-                                        <li><%= ruleResult.name %> - <%= ruleResult.triggered%> - <%= ruleResult.result %></li>
+                                        <li><%= ruleResult.premise.name %> (<%= ruleResult.premise.kind %>) - <%= ruleResult.triggered%> - <%= ruleResult.result %></li>
                                     <% }) %>
                                 </ul>
                             </div>

@@ -52,6 +52,16 @@ const emitter = new EventEmitter();
 const app = addAsync(express());
 const jsonParser = bodyParser.json();
 
+const contentLinkingOptions = {
+    urls: false,
+    email: false,
+    phone: false,
+    mention: false,
+    hashtag: false,
+    stripPrefix: false,
+    sanitizeHtml: true,
+};
+
 // do not modify body if we are proxying it to server
 app.use((req, res, next) => {
     if(req.url.indexOf('/api') !== 0) {
@@ -915,16 +925,18 @@ const webClient = async (options: OperatorConfig) => {
 
         return res.render('events', {
             data: resp.map((x) => {
-                const {timestamp, activity: {peek, link}, ruleResults = [], actionResults = [], ...rest} = x;
+                const {timestamp, activity: {title, type, author}, activity, ruleResults = [], actionResults = [], ...rest} = x;
                 const time = dayjs(timestamp).local().format('YY-MM-DD HH:mm:ss z');
-                const formattedPeek = Autolinker.link(peek, {
-                    email: false,
-                    phone: false,
-                    mention: false,
-                    hashtag: false,
-                    stripPrefix: false,
-                    sanitizeHtml: true,
-                });
+                // @ts-ignore
+                const formattedContent = Autolinker.link(title, contentLinkingOptions);
+                let overview = '';
+                if(type === 'submission') {
+                    overview = `<div><a target="_blank" href="https://reddit.com${activity.permalink}">${formattedContent}</a> by <a target="_blank" href="https://reddit.com/u/${author.name}">u/${author.name}</a></div>`;
+                } else {
+                    // @ts-ignore
+                    const subContent = Autolinker.link(activity.submission.title, contentLinkingOptions);
+                    overview = `<div>A <a target="_blank" href="https://reddit.com${activity.permalink}">Comment</a> by <a target="_blank" href="https://reddit.com/u/${author.name}">u/${author.name}</a> on <a target="_blank" href="https://reddit.com${activity.submission.permalink}">${subContent}</a> by <a target="_blank" href="https://reddit.com/u/${activity.submission.author.name}">u/${activity.submission.author.name}</a> : <div class="font-mono mt-2">${formattedContent}</div></div>`;
+                }
                 const formattedRuleResults = ruleResults.map((y: any) => {
                     const {triggered, result, ...restY} = y;
                     let t = triggeredIndicator(false);
@@ -956,10 +968,8 @@ const webClient = async (options: OperatorConfig) => {
                 return {
                     ...rest,
                     timestamp: time,
-                    activity: {
-                        link,
-                        peek: formattedPeek,
-                    },
+                    peek: overview,
+                    activity,
                     ruleResults: formattedRuleResults,
                     actionResults: formattedActionResults
                 }

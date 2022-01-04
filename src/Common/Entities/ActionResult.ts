@@ -11,8 +11,8 @@ export class ActionResult {
     @Column("varchar", {length: 50})
     kind!: string;
 
-    @Column("varchar", {length: 200})
-    name!: string;
+    @Column("varchar", {length: 200, nullable: true})
+    name!: string | undefined;
 
     @Column("boolean")
     run!: boolean;
@@ -23,11 +23,11 @@ export class ActionResult {
     @Column("boolean")
     success!: boolean;
 
-    @Column("text")
-    runReason!: string
+    @Column("text", {nullable: true})
+    runReason!: string | undefined
 
-    @Column("text")
-    result!: string
+    @Column("text", {nullable: true})
+    result!: string | undefined
 
     @ManyToOne(type => ActionedEvent, act => act.actionResults)
     actionedEvent!: ActionedEvent;

@@ -31,7 +31,7 @@ import {
     PollingOptionsStrong, ResourceStats, RUNNING, RunState, STOPPED, SYSTEM, USER
 } from "../Common/interfaces";
 import Submission from "snoowrap/dist/objects/Submission";
-import {activityIsRemoved, itemContentPeek} from "../Utils/SnoowrapUtils";
+import {activityIsRemoved, ItemContent, itemContentPeek} from "../Utils/SnoowrapUtils";
 import LoggedError from "../Utils/LoggedError";
 import {
     BotResourcesManager,
@@ -585,8 +585,10 @@ export class Manager extends EventEmitter {
         const itemIdentifier = `${checkType === 'Submission' ? 'SUB' : 'COM'} ${itemId}`;
         this.currentLabels = [itemIdentifier];
         let ePeek = '';
+        let peekParts: ItemContent;
         try {
-            const [peek, _] = await itemContentPeek(item);
+            const [peek, parts] = await itemContentPeek(item);
+            peekParts = parts;
             ePeek = peek;
             this.logger.info(`<EVENT> ${peek}`);
         } catch (err: any) {
@@ -598,12 +600,17 @@ export class Manager extends EventEmitter {
         let totalRulesRun = 0;
         let runActions: ActionResult[] = [];
         let actionedEvent: ActionedEvent = {
-            subreddit: this.subreddit.display_name_prefixed,
+            subreddit: this.subreddit,
             activity: {
                 peek: ePeek,
-                link: item.permalink
+                link: item.permalink,
+                // @ts-ignore
+                title: peekParts !== undefined ? peekParts.content : '',
+                id: activity.id,
+                type: activity instanceof Submission ? 'submission' : 'comment',
+                submission: activity instanceof Submission ? undefined: activity.link_id,
             },
-            author: item.author.name,
+            author: item.author,
             timestamp: Date.now(),
             check: '',
             ruleSummary: '',

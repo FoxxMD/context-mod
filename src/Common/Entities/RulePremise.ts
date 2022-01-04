@@ -13,6 +13,12 @@ export class RulePremise  {
     @Column("simple-json")
     config!: any
 
+    @Column("varchar", {length: 200})
+    name!: string;
+
+    @Column("varchar", {length: 300})
+    configHash!: string;
+
     @OneToMany(type => RuleResult, obj => obj.premise) // note: we will create author property in the Photo class below
     ruleResults!: RuleResult[]
 }

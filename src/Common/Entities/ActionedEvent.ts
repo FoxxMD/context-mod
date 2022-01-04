@@ -15,8 +15,11 @@ export class ActionedEvent {
     @Column("text")
     ruleSummary!: string;
 
-    @Column("date")
+    @Column("integer")
     timestamp!: number;
+
+    @Column("varchar", {length: 300})
+    bot!: string
 
     @ManyToOne(type => Activity, act => act.actionedEvents, {cascade: ['insert']})
     activity!: Activity;

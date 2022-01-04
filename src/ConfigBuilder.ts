@@ -625,6 +625,17 @@ export const buildOperatorConfigWithDefaults = async (data: OperatorJsonConfig):
         }
     }
 
+    const loggingOptions = {
+        level,
+        path
+    };
+
+    const logger = getLogger(loggingOptions);
+
+    const dbConfig = createDatabaseConfig(databaseConfig);
+
+    const database = await createDatabaseConnection(dbConfig);
+
     let hydratedBots: BotInstanceConfig[] = bots.map(x => {
         const {
             name: botName,
@@ -755,6 +766,7 @@ export const buildOperatorConfigWithDefaults = async (data: OperatorJsonConfig):
                 dryRun,
             },
             credentials: botCreds,
+            database,
             caching: botCache,
             polling: {
                 sharedMod,
@@ -775,15 +787,6 @@ export const buildOperatorConfigWithDefaults = async (data: OperatorJsonConfig):
 
     const defaultOperators = typeof name === 'string' ? [name] : name;
 
-    const loggingOptions = {
-        level,
-        path
-    };
-
-    const logger = getLogger(loggingOptions);
-
-    const dbConfig = createDatabaseConfig(databaseConfig);
-
     const config: OperatorConfig = {
         mode,
         operator: {
@@ -793,7 +796,7 @@ export const buildOperatorConfigWithDefaults = async (data: OperatorJsonConfig):
         logging: loggingOptions,
         caching: cache,
         databaseConfig: dbConfig,
-        database: await createDatabaseConnection(dbConfig),
+        database,
         web: {
             port,
             caching: {

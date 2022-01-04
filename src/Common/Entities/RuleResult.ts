@@ -8,19 +8,13 @@ export class RuleResult {
     @PrimaryGeneratedColumn()
     id!: number;
 
-    @Column("varchar", {length: 50})
-    kind!: string;
+    @Column("boolean", {nullable: true})
+    triggered!: boolean | null;
 
-    @Column("varchar", {length: 200})
-    name!: string;
+    @Column("text", {nullable: true})
+    result!: string | undefined
 
-    @Column("boolean")
-    triggered!: boolean;
-
-    @Column("text")
-    result!: string
-
-    @Column("simple-json")
+    @Column("simple-json", {nullable: true})
     data!: any
 
     @ManyToOne(type => ActionedEvent, act => act.ruleResults)

@@ -2,7 +2,7 @@ import {Duration} from "dayjs/plugin/duration";
 import {Cache} from 'cache-manager';
 import {MESSAGE} from 'triple-beam';
 import Poll from "snoostorm/out/util/Poll";
-import Snoowrap from "snoowrap";
+import Snoowrap, {RedditUser, Submission, Subreddit} from "snoowrap";
 import {RuleResult} from "../Rule";
 import {IncomingMessage} from "http";
 import {SqljsConnectionOptions} from "typeorm/driver/sqljs/SqljsConnectionOptions";
@@ -1729,6 +1729,7 @@ export interface BotInstanceConfig extends BotInstanceJsonConfig {
         proxy?: string,
         debug?: boolean,
     }
+    database: Connection
     subreddits: {
         names?: string[],
         exclude?: string[],
@@ -1838,12 +1839,16 @@ export interface ActionedEvent {
     activity: {
         peek: string
         link: string
+        id: string,
+        title: string,
+        type: string,
+        submission: string | undefined
     }
-    author: string
+    author: RedditUser
     timestamp: number
     check: string
     ruleSummary: string,
-    subreddit: string,
+    subreddit: Subreddit,
     ruleResults: RuleResult[]
     actionResults: ActionResult[]
 }

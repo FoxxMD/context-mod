@@ -5,7 +5,7 @@ import {
     activityIsRemoved,
     AuthorActivitiesOptions,
     AuthorTypedActivitiesOptions, BOT_LINK,
-    getAuthorActivities,
+    getAuthorActivities, itemContentPeek,
     testAuthorCriteria
 } from "../Utils/SnoowrapUtils";
 import winston, {Logger} from "winston";
@@ -15,7 +15,7 @@ import {
     asSubmission,
     buildCacheOptionsFromProvider, buildCachePrefix,
     cacheStats, compareDurationValue, comparisonTextOp, createCacheManager, createHistoricalStatsDisplay,
-    formatNumber, getActivityAuthorName, getActivitySubredditName, isStrongSubredditState,
+    formatNumber, getActivityAuthorName, getActivitySubredditName, hashString, isStrongSubredditState,
     mergeArr, parseDurationComparison,
     parseExternalUrl, parseGenericValueComparison, parseRedditEntity,
     parseWikiContext, shouldCacheSubredditStateCriteriaResult, subredditStateIsNameOnly, toStrongSubredditState
@@ -54,6 +54,14 @@ import {check} from "tcp-port-used";
 import {ExtendedSnoowrap} from "../Utils/SnoowrapClients";
 import dayjs from "dayjs";
 import ImageData from "../Common/ImageData";
+import {Connection} from "typeorm";
+import {Activity} from "../Common/Entities/Activity";
+import {Subreddit as SubredditEntity} from "../Common/Entities/Subreddit";
+import {Author} from "../Common/Entities/Author";
+import {RulePremise} from "../Common/Entities/RulePremise";
+import {ActionedEvent as ActionedEventEntity } from "../Common/Entities/ActionedEvent";
+import {RuleResult} from "../Common/Entities/RuleResult";
+import {ActionResult} from "../Common/Entities/ActionResult";
 
 export const DEFAULT_FOOTER = '\r\n*****\r\nThis action was performed by [a bot.]({{botLink}}) Mention a moderator or [send a modmail]({{modmailLink}}) if you any ideas, questions, or concerns about this action.';
 
@@ -71,11 +79,13 @@ interface SubredditResourceOptions extends Footer {
     cacheType: string;
     cacheSettingsHash: string
     subreddit: Subreddit,
+    database: Connection
     logger: Logger;
     client: ExtendedSnoowrap;
     prefix?: string;
     actionedEventsMax: number;
     thirdPartyCredentials: ThirdPartyCredentialsJsonConfig
+    botName: string
 }
 
 export interface SubredditResourceSetOptions extends CacheConfig, Footer {
@@ -91,10 +101,12 @@ export class SubredditResources {
     protected commentTTL: number | false = cacheTTLDefaults.commentTTL;
     protected filterCriteriaTTL: number | false = cacheTTLDefaults.filterCriteriaTTL;
     name: string;
+    botName: string;
     protected logger: Logger;
     userNotes: UserNotes;
     footer: false | string = DEFAULT_FOOTER;
     subreddit: Subreddit
+    database: Connection
     client: ExtendedSnoowrap
     cache: Cache
     cacheType: string
@@ -123,6 +135,8 @@ export class SubredditResources {
                 commentTTL,
                 subredditTTL,
             },
+            botName,
+            database,
             cache,
             prefix,
             cacheType,
@@ -132,8 +146,10 @@ export class SubredditResources {
             thirdPartyCredentials,
         } = options || {};
 
+        this.botName = botName;
         this.cacheSettingsHash = cacheSettingsHash;
         this.cache = cache;
+        this.database = database;
         this.prefix = prefix;
         this.client = client;
         this.cacheType = cacheType;
@@ -338,14 +354,135 @@ export class SubredditResources {
         this.logger = logger.child({labels: ['Resource Cache']}, mergeArr);
     }
 
-    async getActionedEvents(): Promise<ActionedEvent[]> {
-        return await this.cache.wrap(`actionedEvents-${this.subreddit.display_name}`, () => []);
+    async getActionedEvents(): Promise<ActionedEventEntity[]> {
+        const eventRepo = this.database.getRepository(ActionedEventEntity);
+        const events = await eventRepo.find({
+            where: {
+                bot: this.botName,
+                activity: {
+                    subreddit: {
+                        id: this.subreddit.id
+                    }
+                }
+            },
+            relations: ['activity', 'activity.subreddit', 'activity.author', 'activity.submission', 'activity.submission.author', 'ruleResults', 'ruleResults.premise', 'actionResults']
+        })
+        return events;
     }
 
     async addActionedEvent(ae: ActionedEvent) {
-        const events = await this.cache.wrap(`actionedEvents-${this.subreddit.display_name}`, () => []) as ActionedEvent[];
-        events.unshift(ae);
-        await this.cache.set(`actionedEvents-${this.subreddit.display_name}`, events.slice(0, this.actionedEventsMax), {ttl: 0});
+
+        // find any existing entities
+        const actRepo = this.database.getRepository(Activity);
+        const subRepo = this.database.getRepository(SubredditEntity);
+        const authorRepo = this.database.getRepository(Author);
+        const premRepo = this.database.getRepository(RulePremise);
+
+        let sub = await subRepo.findOne(ae.subreddit.id);
+        if(sub === undefined) {
+            sub = new SubredditEntity();
+            sub.id = ae.subreddit.id;
+            sub.name = ae.subreddit.display_name;
+            await subRepo.save(sub);
+        }
+
+        let author = await authorRepo.findOne({name: ae.author.name});
+        if(author === undefined) {
+            // @ts-ignore
+            const redditAuthor = await ae.author.fetch();
+            author = new Author();
+            author.id = redditAuthor.id;
+            author.name = redditAuthor.name;
+            await authorRepo.save(author);
+        }
+
+        let act = await actRepo.findOne({permalink: ae.activity.link});
+        if(act === undefined) {
+            act = new Activity();
+            act.id = ae.activity.id;
+            act.permalink = ae.activity.link;
+            act.title = ae.activity.title;
+            act.type = ae.activity.type as ('submission' | 'comment');
+            act.subreddit = sub;
+            act.author = author;
+            if(act.type === 'comment') {
+                let subAct = await actRepo.findOne({id: ae.activity.submission});
+                if(subAct === undefined) {
+                    const dummySub = new Submission({name: ae.activity.submission}, this.client, false);
+                    const sub = await this.getActivity(dummySub) as Submission;
+                    subAct = new Activity();
+                    subAct.id = sub.id;
+                    subAct.permalink = sub.permalink;
+                    subAct.title = sub.title;
+                    subAct.type = 'submission';
+                    let subAuthor = await authorRepo.findOne({name: sub.author.name});
+                    if(subAuthor === undefined) {
+                        // @ts-ignore
+                        const redditAuthor = await ae.author.fetch();
+                        subAuthor = new Author();
+                        subAuthor.id = redditAuthor.id;
+                        subAuthor.name = redditAuthor.name;
+                        await authorRepo.save(subAuthor);
+                    }
+                    subAct.author = subAuthor;
+                    await actRepo.save(subAct);
+                }
+                act.submission = subAct;
+            }
+            await actRepo.save(act);
+        }
+
+        const actionedEvent = new ActionedEventEntity();
+        actionedEvent.check = ae.check;
+        actionedEvent.ruleSummary = ae.ruleSummary;
+        actionedEvent.timestamp = ae.timestamp;
+        actionedEvent.activity = act;
+        actionedEvent.bot = this.botName;
+        const ruleResults: RuleResult[] = [];
+        for(const x of ae.ruleResults) {
+            const rr = new RuleResult();
+            rr.triggered = x.triggered;
+            rr.result = x.result;
+            rr.data = x.data;
+            let prem: RulePremise | undefined;
+            if(x.name !== undefined) {
+                prem = await premRepo.findOne({name: x.name, kind: x.kind});
+            }
+            if(prem === undefined) {
+                const hash = hashString(`${x.premise.kind}-${JSON.stringify(x.premise.config)}`);
+                prem = await premRepo.findOne({configHash: hash});
+                if(prem === undefined) {
+                    prem = new RulePremise();
+                    prem.name = x.name;
+                    prem.kind = x.kind;
+                    prem.configHash = hash;
+                    prem.config = x.premise.config;
+                    await premRepo.save(prem);
+                }
+            }
+            rr.premise = prem;
+            ruleResults.push(rr);
+        }
+        actionedEvent.ruleResults = ruleResults;
+
+        actionedEvent.actionResults = ae.actionResults.map(x => {
+            const ar = new ActionResult();
+            ar.kind = x.kind;
+            ar.name = x.name;
+            ar.run = x.run;
+            ar.runReason = x.runReason;
+            ar.dryRun = x.dryRun;
+            ar.result = x.result;
+            ar.success = x.success;
+            ar.actionedEvent = actionedEvent;
+            return ar;
+        })
+
+        await this.database.manager.save(actionedEvent);
+
+        //const events = await this.cache.wrap(`actionedEvents-${this.subreddit.display_name}`, () => []) as ActionedEvent[];
+        //events.unshift(ae);
+        //await this.cache.set(`actionedEvents-${this.subreddit.display_name}`, events.slice(0, this.actionedEventsMax), {ttl: 0});
     }
 
     async getActivity(item: Submission | Comment) {
@@ -1053,6 +1190,8 @@ export class BotResourcesManager {
     actionedEventsDefault: number;
     pruneInterval: any;
     defaultThirdPartyCredentials: ThirdPartyCredentialsJsonConfig;
+    defaultDatabase: Connection
+    botName!: string
 
     constructor(config: BotInstanceConfig) {
         const {
@@ -1073,6 +1212,7 @@ export class BotResourcesManager {
                 reddit,
                 ...thirdParty
             },
+            database,
             caching,
         } = config;
         caching.provider.prefix = buildCachePrefix([caching.provider.prefix, 'SHARED']);
@@ -1080,7 +1220,9 @@ export class BotResourcesManager {
         this.cacheHash = objectHash.sha1(relevantCacheSettings);
         this.defaultCacheConfig = caching;
         this.defaultThirdPartyCredentials = thirdParty;
+        this.defaultDatabase = database;
         this.ttlDefaults = {authorTTL, userNotesTTL, wikiTTL, commentTTL, submissionTTL, filterCriteriaTTL, subredditTTL};
+        this.botName = name as string;
 
         const options = provider;
         this.cacheType = options.store;
@@ -1122,6 +1264,8 @@ export class BotResourcesManager {
             thirdPartyCredentials: credentials ?? this.defaultThirdPartyCredentials,
             prefix: this.defaultCacheConfig.provider.prefix,
             actionedEventsMax: this.actionedEventsMaxDefault !== undefined ? Math.min(this.actionedEventsDefault, this.actionedEventsMaxDefault) : this.actionedEventsDefault,
+            database: this.defaultDatabase,
+            botName: this.botName,
             ...init,
         };
 
@@ -1149,6 +1293,8 @@ export class BotResourcesManager {
                     cacheSettingsHash: hash,
                     thirdPartyCredentials: credentials ?? this.defaultThirdPartyCredentials,
                     prefix: subPrefix,
+                    botName: this.botName,
+                    database: this.defaultDatabase,
                     ...init,
                     ...trueRest,
                 };

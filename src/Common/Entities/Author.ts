@@ -5,7 +5,7 @@ import {Activity} from "./Activity";
 export class Author {
 
     @PrimaryColumn()
-    id!: number;
+    id!: string;
 
     @Column("varchar", {length: 200})
     name!: string;

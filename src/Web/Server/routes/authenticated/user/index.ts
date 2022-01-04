@@ -6,6 +6,7 @@ import {COMMENT_URL_ID, parseLinkIdentifier, SUBMISSION_URL_ID} from "../../../.
 import {booleanMiddle} from "../../../../Common/middleware";
 import {Manager} from "../../../../../Subreddit/Manager";
 import {ActionedEvent} from "../../../../../Common/interfaces";
+import {ActionedEvent as ActionedEventEntity} from "../../../../../Common/Entities/ActionedEvent";
 
 const commentReg = parseLinkIdentifier([COMMENT_URL_ID]);
 const submissionReg = parseLinkIdentifier([SUBMISSION_URL_ID]);
@@ -72,7 +73,7 @@ const actionedEvents = async (req: Request, res: Response) => {
         }
     }
 
-    let events: ActionedEvent[] = [];
+    let events: ActionedEventEntity[] = [];
     for(const m of managers) {
         if(m.resources !== undefined) {
             events = events.concat(await m.resources.getActionedEvents());

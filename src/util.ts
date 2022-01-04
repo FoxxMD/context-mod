@@ -11,6 +11,7 @@ import {Comment} from "snoowrap";
 import {inflateSync, deflateSync} from "zlib";
 import pixelmatch from 'pixelmatch';
 import os from 'os';
+import {createHash} from 'crypto';
 import {
     ActivityWindowCriteria, ActivityWindowType,
     CacheOptions,
@@ -1613,4 +1614,14 @@ export const likelyJson5 = (str: string): boolean => {
         break;
     }
     return validStart;
+}
+
+export const hashString = (val: any): string => {
+    const hash = createHash('sha256');
+    if (typeof val !== 'string') {
+        hash.update(JSON.stringify(val));
+    } else {
+        hash.update(val);
+    }
+    return hash.digest('hex');
 }
