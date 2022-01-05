@@ -421,6 +421,7 @@ export class RecentActivityRule extends Rule {
                 threshold,
                 testValue,
                 karmaThreshold,
+                combinedKarma,
             }
         };
     }
