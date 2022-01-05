@@ -1,4 +1,4 @@
-import {StatusCodeError} from "../Common/interfaces";
+import {StatusCodeError, RequestError} from "../Common/interfaces";
 
 
 export const isRateLimitError = (err: any) => {
@@ -15,4 +15,8 @@ export const isScopeError = (err: any): boolean => {
 
 export const isStatusError = (err: any): err is StatusCodeError => {
     return typeof err === 'object' && err.name === 'StatusCodeError' && err.response !== undefined;
+}
+
+export const isRequestError = (err: any): err is RequestError => {
+    return typeof err === 'object' && err.name === 'RequestError' && err.response !== undefined;
 }

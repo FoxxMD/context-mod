@@ -190,14 +190,14 @@ class Bot {
             }
         }
 
-        const retryHandler = createRetryHandler({maxRequestRetry: 8, maxOtherRetry: 1}, this.logger);
+        const retryHandler = createRetryHandler({maxRequestRetry: 8, maxOtherRetry: 2}, this.logger);
         this.nannyRetryHandler = createRetryHandler({maxRequestRetry: 5, maxOtherRetry: 1}, this.logger);
-        this.managerRetryHandler = createRetryHandler({maxRequestRetry: 5, maxOtherRetry: 10, waitOnRetry: false, clearRetryCountAfter: 2}, this.logger);
+        this.managerRetryHandler = createRetryHandler({maxRequestRetry: 10, maxOtherRetry: 10, waitOnRetry: false, clearRetryCountAfter: 2}, this.logger);
 
         this.stagger = stagger ?? 2000;
 
         const modStreamErrorListener = (name: string) => async (err: any) => {
-            this.logger.error('Polling error occurred', err);
+            this.logger.error(`Polling error occurred on stream ${name.toUpperCase()}`, err);
             const shouldRetry = await retryHandler(err);
             if(shouldRetry) {
                 defaultUnmoderatedStream.startInterval();
@@ -373,9 +373,10 @@ class Bot {
 
     // if the cumulative errors exceeds configured threshold then stop ALL managers as there is most likely something very bad happening
     async panicOnRetries(err: any) {
-        if(!this.managerRetryHandler(err)) {
+        if(!await this.managerRetryHandler(err)) {
+            this.logger.warn('Bot detected too many errors from managers within a short time. Stopping all managers and will try to restart on next heartbeat.');
             for(const m of this.subManagers) {
-                await m.stop();
+                await m.stop('system',{reason: 'Bot detected too many errors from all managers. Stopping all manager as a failsafe.'});
             }
         }
     }
@@ -443,6 +444,8 @@ class Bot {
     }
 
     async runManagers(causedBy: Invokee = 'system') {
+        this.running = true;
+
         if(this.subManagers.every(x => !x.validConfigLoaded)) {
             this.logger.warn('All managers have invalid configs!');
             this.error = 'All managers have invalid configs';
@@ -456,7 +459,6 @@ class Bot {
 
         await this.runModStreams();
 
-        this.running = true;
         this.nextNannyCheck = dayjs().add(10, 'second');
         this.nextHeartbeat = dayjs().add(this.heartbeatInterval, 'second');
         await this.checkModInvites();
@@ -474,8 +476,8 @@ class Bot {
                     await this.runApiNanny();
                     this.nextNannyCheck = dayjs().add(10, 'second');
                 } catch (err: any) {
-                    this.logger.info('Delaying next nanny check for 2 minutes due to emitted error');
-                    this.nextNannyCheck = dayjs().add(120, 'second');
+                    this.logger.info('Delaying next nanny check for 4 minutes due to emitted error');
+                    this.nextNannyCheck = dayjs().add(240, 'second');
                 }
             }
             if(dayjs().isSameOrAfter(this.nextHeartbeat)) {

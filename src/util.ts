@@ -58,6 +58,7 @@ import {SetRandomInterval} from "./Common/types";
 import stringSimilarity from 'string-similarity';
 import calculateCosineSimilarity from "./Utils/StringMatching/CosineSimilarity";
 import levenSimilarity from "./Utils/StringMatching/levenSimilarity";
+import {isRequestError, isStatusError} from "./Utils/Errors";
 //import {ResembleSingleCallbackComparisonResult} from "resemblejs";
 
 // want to guess how many concurrent image comparisons we should be doing
@@ -684,37 +685,40 @@ export const createRetryHandler = (opts: RetryOptions, logger: Logger) => {
 
         lastErrorAt = dayjs();
 
-        if(err.name === 'RequestError' || err.name === 'StatusCodeError') {
+        const redditApiError = isRequestError(err) || isStatusError(err);
+
+        if(redditApiError) {
             if (err.statusCode === undefined || ([401, 500, 503, 502, 504, 522].includes(err.statusCode))) {
                 timeoutCount++;
+                let msg = `Error occurred while making a request to Reddit (${timeoutCount}/${maxRequestRetry+1} in ${clearRetryCountAfter} minutes).`;
                 if (timeoutCount > maxRequestRetry) {
-                    logger.error(`Reddit request error retries (${timeoutCount}) exceeded max allowed (${maxRequestRetry})`);
+                    logger.error(`${msg} Exceeded max allowed.`);
                     return false;
                 }
                 if(waitOnRetry) {
                     // exponential backoff
                     const ms = (Math.pow(2, timeoutCount - 1) + (Math.random() - 0.3) + 1) * 1000;
-                    logger.warn(`Error occurred while making a request to Reddit (${timeoutCount} in 3 minutes). Will wait ${formatNumber(ms / 1000)} seconds before retrying`);
+                    logger.warn(`${msg} Will wait ${formatNumber(ms / 1000)} seconds before retrying.`);
                     await sleep(ms);
                 }
                 return true;
-
-            } else {
-                return false;
             }
-        } else {
-            // linear backoff
-            otherRetryCount++;
-            if (maxOtherRetry < otherRetryCount) {
-                return false;
-            }
-            if(waitOnRetry) {
-                const ms = (4 * 1000) * otherRetryCount;
-                logger.warn(`Non-request error occurred. Will wait ${formatNumber(ms / 1000)} seconds before retrying`);
-                await sleep(ms);
-            }
-            return true;
+            // if it's a request error but not a known "oh probably just a reddit blip" status code treat it as other, which should usually have a lower retry max
         }
+
+        // linear backoff
+        otherRetryCount++;
+        let msg = redditApiError ? `Error occurred while making a request to Reddit (${otherRetryCount}/${maxOtherRetry} in ${clearRetryCountAfter} minutes) but it was NOT a well-known "reddit blip" error.` : `Non-request error occurred (${otherRetryCount}/${maxOtherRetry} in ${clearRetryCountAfter} minutes).`;
+        if (maxOtherRetry < otherRetryCount) {
+            logger.warn(`${msg} Exceeded max allowed.`);
+            return false;
+        }
+        if(waitOnRetry) {
+            const ms = (4 * 1000) * otherRetryCount;
+            logger.warn(`${msg} Will wait ${formatNumber(ms / 1000)} seconds before retrying`);
+            await sleep(ms);
+        }
+        return true;
     }
 }
 
@@ -1558,40 +1562,6 @@ export const wordCount = (str: string): number => {
 export const random = (min: number, max: number): number => (
     Math.floor(Math.random() * (max - min + 1)) + min
 );
-
-
-// copy-pasting interval function from this project because bad tooling on the author's side means A WHOLE OTHER typescript lib is always downloaded just for this one function
-
-/**
- * Repeatedly calls a function with a random time delay between each call.
- *
- * @param intervalFunction - A function to be executed at random times between `minDelay` and
- * `maxDelay`. The function is not passed any arguments, and no return value is expected.
- * @param minDelay - The minimum amount of time, in milliseconds (thousandths of a second), the
- * timer should delay in between executions of `intervalFunction`.
- * @param maxDelay - The maximum amount of time, in milliseconds (thousandths of a second), the
- * timer should delay in between executions of `intervalFunction`.
- *
- * Borrowed from https://github.com/jabacchetta/set-random-interval/blob/master/src/index.ts
- */
-export const setRandomInterval: SetRandomInterval = (intervalFunction, minDelay = 0, maxDelay = 0) => {
-    let timeout: ReturnType<typeof setTimeout>;
-
-    const runInterval = (): void => {
-        timeout = globalThis.setTimeout(() => {
-            intervalFunction();
-            runInterval();
-        }, random(minDelay, maxDelay));
-    };
-
-    runInterval();
-
-    return {
-        clear(): void {
-            clearTimeout(timeout);
-        },
-    };
-};
 
 /**
  * Naively detect if a string is most likely json5

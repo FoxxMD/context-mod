@@ -272,6 +272,7 @@ export class Manager extends EventEmitter {
         if(this.modPermissions !== undefined) {
             return this.modPermissions as string[];
         }
+        this.logger.debug('Retrieving mod permissions for bot');
         const userInfo = parseRedditEntity(this.botName, 'user');
         const mods = this.subreddit.getModerators({name: userInfo.name});
         // @ts-ignore
@@ -358,7 +359,6 @@ export class Manager extends EventEmitter {
     }
 
     protected async parseConfigurationFromObject(configObj: object) {
-        await this.getModPermissions();
         try {
             const configBuilder = new ConfigBuilder({logger: this.logger});
             const validJson = configBuilder.validateJson(configObj);
@@ -690,6 +690,7 @@ export class Manager extends EventEmitter {
                     if (e.logged !== true) {
                         this.logger.warn(`Running rules for Check ${check.name} failed due to uncaught exception`, e);
                     }
+                    this.emit('error', e);
                 }
 
                 if (triggered) {
