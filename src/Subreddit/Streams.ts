@@ -5,7 +5,7 @@ import {PollConfiguration} from "snoostorm/out/util/Poll";
 import {ClearProcessedOptions, DEFAULT_POLLING_INTERVAL} from "../Common/interfaces";
 import dayjs, {Dayjs} from "dayjs";
 import { Duration } from "dayjs/plugin/duration";
-import {parseDuration} from "../util";
+import {parseDuration, random} from "../util";
 
 type Awaitable<T> = Promise<T> | T;
 
@@ -75,7 +75,7 @@ export class SPoll<T extends object> extends Poll<T> {
                     self.emit('error', err);
                 }
             }
-        })(this), this.frequency - 1, this.frequency + 1);
+        })(this), random(this.frequency - 1, this.frequency + 1));
     }
 
     startInterval = () => {
