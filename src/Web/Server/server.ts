@@ -206,24 +206,20 @@ const rcbServer = async function (options: OperatorConfig) {
     server.deleteAsync('/bot/invite', ...deleteInviteRoute);
 
     const initBot = async (causedBy: Invokee = 'system') => {
-        if(app !== undefined) {
+        if (app !== undefined) {
             logger.info('A bot instance already exists. Attempting to stop event/queue processing first before building new bot.');
             await app.destroy(causedBy);
         }
         const newApp = new App(options);
-        if(newApp.error === undefined) {
-            try {
-                await newApp.initBots(causedBy);
-            } catch (err: any) {
-                if(newApp.error === undefined) {
-                    newApp.error = err.message;
-                }
-                logger.error('Server is still ONLINE but bot cannot recover from this error and must be re-built');
-                if(!err.logged || !(err instanceof LoggedError)) {
-                    logger.error(err);
-                }
+        newApp.initBots(causedBy).catch((err: any) => {
+            if (newApp.error === undefined) {
+                newApp.error = err.message;
             }
-        }
+            logger.error('Server is still ONLINE but bot cannot recover from this error and must be re-built');
+            if (!err.logged || !(err instanceof LoggedError)) {
+                logger.error(err);
+            }
+        });
         return newApp;
     }
 
