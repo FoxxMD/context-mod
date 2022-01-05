@@ -124,21 +124,8 @@
                     "type": "object"
                 },
                 "snoowrap": {
-                    "description": "Settings to control some [Snoowrap](https://github.com/not-an-aardvark/snoowrap) behavior",
-                    "properties": {
-                        "debug": {
-                            "description": "Manually set the debug status for snoowrap\n\nWhen snoowrap has `debug: true` it will log the http status response of reddit api requests to at the `debug` level\n\n* Set to `true` to always output\n* Set to `false` to never output\n\nIf not present or `null` will be set based on `logLevel`\n\n* ENV => `SNOO_DEBUG`\n* ARG => `--snooDebug`",
-                            "type": "boolean"
-                        },
-                        "proxy": {
-                            "description": "Proxy all requests to Reddit's API through this endpoint\n\n* ENV => `PROXY`\n* ARG => `--proxy <proxyEndpoint>`",
-                            "examples": [
-                                "http://localhost:4443"
-                            ],
-                            "type": "string"
-                        }
-                    },
-                    "type": "object"
+                    "$ref": "#/definitions/SnoowrapOptions",
+                    "description": "Settings to control some [Snoowrap](https://github.com/not-an-aardvark/snoowrap) behavior.\n\nOverrides any defaults provided at top-level operator config.\n\nSet to an empty object to \"ignore\" any top-level config"
                 },
                 "subreddits": {
                     "description": "Settings related to bot behavior for subreddits it is managing",
@@ -529,6 +516,22 @@
             },
             "type": "object"
         },
+        "SnoowrapOptions": {
+            "properties": {
+                "debug": {
+                    "description": "Manually set the debug status for snoowrap\n\nWhen snoowrap has `debug: true` it will log the http status response of reddit api requests to at the `debug` level\n\n* Set to `true` to always output\n* Set to `false` to never output\n\nIf not present or `null` will be set based on `logLevel`\n\n* ENV => `SNOO_DEBUG`\n* ARG => `--snooDebug`",
+                    "type": "boolean"
+                },
+                "proxy": {
+                    "description": "Proxy all requests to Reddit's API through this endpoint\n\n* ENV => `PROXY`\n* ARG => `--proxy <proxyEndpoint>`",
+                    "examples": [
+                        "http://localhost:4443"
+                    ],
+                    "type": "string"
+                }
+            },
+            "type": "object"
+        },
         "ThirdPartyCredentialsJsonConfig": {
             "additionalProperties": {
             },
@@ -693,6 +696,10 @@
                 }
             },
             "type": "object"
+        },
+        "snoowrap": {
+            "$ref": "#/definitions/SnoowrapOptions",
+            "description": "Set global snoowrap options as well as default snoowrap config for all bots that don't specify their own"
         },
         "web": {
             "description": "Settings for the web interface",

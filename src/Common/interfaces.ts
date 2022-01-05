@@ -1289,6 +1289,32 @@ export interface WebCredentials {
     redirectUri?: string,
 }
 
+export interface SnoowrapOptions {
+    /**
+     * Proxy all requests to Reddit's API through this endpoint
+     *
+     * * ENV => `PROXY`
+     * * ARG => `--proxy <proxyEndpoint>`
+     *
+     * @examples ["http://localhost:4443"]
+     * */
+    proxy?: string,
+    /**
+     * Manually set the debug status for snoowrap
+     *
+     * When snoowrap has `debug: true` it will log the http status response of reddit api requests to at the `debug` level
+     *
+     * * Set to `true` to always output
+     * * Set to `false` to never output
+     *
+     * If not present or `null` will be set based on `logLevel`
+     *
+     * * ENV => `SNOO_DEBUG`
+     * * ARG => `--snooDebug`
+     * */
+    debug?: boolean,
+}
+
 /**
  * The configuration for an **individual reddit account** ContextMod will run as a bot.
  *
@@ -1309,33 +1335,13 @@ export interface BotInstanceJsonConfig {
     notifications?: NotificationConfig
 
     /**
-     * Settings to control some [Snoowrap](https://github.com/not-an-aardvark/snoowrap) behavior
+     * Settings to control some [Snoowrap](https://github.com/not-an-aardvark/snoowrap) behavior.
+     *
+     * Overrides any defaults provided at top-level operator config.
+     *
+     * Set to an empty object to "ignore" any top-level config
      * */
-    snoowrap?: {
-        /**
-         * Proxy all requests to Reddit's API through this endpoint
-         *
-         * * ENV => `PROXY`
-         * * ARG => `--proxy <proxyEndpoint>`
-         *
-         * @examples ["http://localhost:4443"]
-         * */
-        proxy?: string,
-        /**
-         * Manually set the debug status for snoowrap
-         *
-         * When snoowrap has `debug: true` it will log the http status response of reddit api requests to at the `debug` level
-         *
-         * * Set to `true` to always output
-         * * Set to `false` to never output
-         *
-         * If not present or `null` will be set based on `logLevel`
-         *
-         * * ENV => `SNOO_DEBUG`
-         * * ARG => `--snooDebug`
-         * */
-        debug?: boolean,
-    }
+    snoowrap?: SnoowrapOptions
 
     /**
      * Settings related to bot behavior for subreddits it is managing
@@ -1557,6 +1563,11 @@ export interface OperatorJsonConfig {
      * These settings will be used by each bot, and subreddit, that does not specify their own
      * */
     caching?: OperatorCacheConfig
+
+    /**
+     * Set global snoowrap options as well as default snoowrap config for all bots that don't specify their own
+     * */
+    snoowrap?: SnoowrapOptions
 
     bots?: BotInstanceJsonConfig[]
 
