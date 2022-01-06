@@ -664,7 +664,7 @@ const webClient = async (options: OperatorConfig) => {
         const user = req.user as Express.User;
 
         const isOperator = instance.operators.includes(user.name);
-        const canAccessBot = isOperator || intersect(user.subreddits, botInstance.subreddits).length > 0;
+        const canAccessBot = isOperator || intersect(user.subreddits, botInstance.subreddits.map(x => x.replace(/\\*r\/*/,''))).length > 0;
         if (!user.isOperator && !canAccessBot) {
             return res.status(404).render('error', {error: msg});
         }
