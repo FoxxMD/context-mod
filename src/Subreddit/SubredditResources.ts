@@ -836,13 +836,30 @@ export class SubredditResources {
                                 break;
                             case 'reports':
                                 if (!item.can_mod_post) {
-                                    log.debug(`Cannot test for reports on Activity in a subreddit bot account is not a moderato Activist. Skipping criteria...`);
+                                    log.debug(`Cannot test for reports on Activity in a subreddit bot account is not a moderator of. Skipping criteria...`);
                                     break;
                                 }
                                 const reportCompare = parseGenericValueComparison(crit[k] as string);
-                                if(!comparisonTextOp(item.num_reports, reportCompare.operator, reportCompare.value)) {
+                                let reportType = 'total';
+                                if(reportCompare.extra !== undefined && reportCompare.extra.trim() !== '') {
+                                    const requestedType = reportCompare.extra.toLocaleLowerCase().trim();
+                                    if(requestedType.includes('mod')) {
+                                        reportType = 'mod';
+                                    } else if(requestedType.includes('user')) {
+                                        reportType = 'user';
+                                    } else {
+                                        log.warn(`Did not recognize the report type "${requestedType}" -- can only use "mod" or "user". Will default to TOTAL reports`);
+                                    }
+                                }
+                                let reportNum = item.num_reports;
+                                if(reportType === 'user') {
+                                    reportNum = item.user_reports.length;
+                                } else {
+                                    reportNum = item.mod_reports.length;
+                                }
+                                if(!comparisonTextOp(reportNum, reportCompare.operator, reportCompare.value)) {
                                     // @ts-ignore
-                                    log.debug(`Failed: Expected => ${k}:${crit[k]} | Found => ${k}:${item.num_reports}`)
+                                    log.debug(`Failed: Expected => ${k}:${crit[k]} ${reportType} reports | Found => ${k}:${reportNum} ${reportType} reports`)
                                     return false
                                 }
                                 break;

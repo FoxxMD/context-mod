@@ -909,6 +909,20 @@ export interface ActivityState {
     distinguished?: boolean
     approved?: boolean
     score?: CompareValue
+    /**
+     * A string containing a comparison operator and a value to compare against
+     *
+     * The syntax is `(< OR > OR <= OR >=) <number>`
+     *
+     * * EX `> 2`  => greater than 2 total reports
+     *
+     * Defaults to TOTAL reports on an Activity. Suffix the value with the report type to check that type:
+     *
+     * * EX `> 3 mod` => greater than 3 mod reports
+     * * EX `>= 1 user` => greater than 1 user report
+     *
+     * @pattern ^\s*(>|>=|<|<=)\s*(\d+)\s*(%?)(.*)$
+     * */
     reports?: CompareValue
     age?: DurationComparor
 }

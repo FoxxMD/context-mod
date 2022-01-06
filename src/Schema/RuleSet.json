@@ -640,7 +640,7 @@
                     "type": "boolean"
                 },
                 "reports": {
-                    "description": "A string containing a comparison operator and a value to compare against\n\nThe syntax is `(< OR > OR <= OR >=) <number>`\n\n* EX `> 100`  => greater than 100",
+                    "description": "A string containing a comparison operator and a value to compare against\n\nThe syntax is `(< OR > OR <= OR >=) <number>`\n\n* EX `> 2`  => greater than 2 total reports\n\nDefaults to TOTAL reports on an Activity. Suffix the value with the report type to check that type:\n\n* EX `> 3 mod` => greater than 3 mod reports\n* EX `>= 1 user` => greater than 1 user report",
                     "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
                     "type": "string"
                 },
@@ -1121,6 +1121,7 @@
                     "type": "array"
                 },
                 "useSubmissionAsReference": {
+                    "default": true,
                     "description": "When Activity is a submission should we only include activities that are other submissions with the same content?\n\n* When the Activity is a submission this defaults to **true**\n* When the Activity is a comment it is ignored (not relevant)",
                     "type": "boolean"
                 },
@@ -1909,7 +1910,7 @@
                     "type": "boolean"
                 },
                 "reports": {
-                    "description": "A string containing a comparison operator and a value to compare against\n\nThe syntax is `(< OR > OR <= OR >=) <number>`\n\n* EX `> 100`  => greater than 100",
+                    "description": "A string containing a comparison operator and a value to compare against\n\nThe syntax is `(< OR > OR <= OR >=) <number>`\n\n* EX `> 2`  => greater than 2 total reports\n\nDefaults to TOTAL reports on an Activity. Suffix the value with the report type to check that type:\n\n* EX `> 3 mod` => greater than 3 mod reports\n* EX `>= 1 user` => greater than 1 user report",
                     "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
                     "type": "string"
                 },
