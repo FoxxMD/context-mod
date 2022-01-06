@@ -127,7 +127,7 @@ const action = async (req: Request, res: Response) => {
         // will run dryrun if specified or if running activity on subreddit it does not belong to
         const dr: boolean | undefined = (dryRun || manager.subreddit.display_name !== sub) ? true : undefined;
         manager.logger.info(`/u/${userName} running${dr === true ? ' DRY RUN ' : ' '}check on${manager.subreddit.display_name !== sub ? ' FOREIGN ACTIVITY ' : ' '}${url}`);
-        await manager.runChecks(activity instanceof Submission ? 'Submission' : 'Comment', activity, {dryRun: dr})
+        await manager.runChecks(activity instanceof Submission ? 'Submission' : 'Comment', activity, {dryRun: dr, force: true})
     }
     res.send('OK');
 };

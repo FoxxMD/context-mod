@@ -12,6 +12,7 @@ export class RemoveAction extends Action {
 
     async process(item: Comment | Submission, ruleResults: RuleResult[], runtimeDryrun?: boolean): Promise<ActionProcessResult> {
         const dryRun = runtimeDryrun || this.dryRun;
+        const touchedEntities = [];
         // issue with snoowrap typings, doesn't think prop exists on Submission
         // @ts-ignore
         if (activityIsRemoved(item)) {
@@ -24,11 +25,13 @@ export class RemoveAction extends Action {
         if (!dryRun) {
             // @ts-ignore
             await item.remove();
+            touchedEntities.push(item);
         }
 
         return {
             dryRun,
             success: true,
+            touchedEntities
         }
     }
 }

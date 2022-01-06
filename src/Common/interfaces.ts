@@ -5,6 +5,9 @@ import Poll from "snoostorm/out/util/Poll";
 import Snoowrap from "snoowrap";
 import {RuleResult} from "../Rule";
 import {IncomingMessage} from "http";
+import Submission from "snoowrap/dist/objects/Submission";
+import Comment from "snoowrap/dist/objects/Comment";
+import RedditUser from "snoowrap/dist/objects/RedditUser";
 
 /**
  * An ISO 8601 Duration
@@ -670,6 +673,24 @@ export interface TTLConfig {
      * @default 60
      * */
     filterCriteriaTTL?: number | boolean;
+
+    /**
+     * Amount of time, in seconds, an Activity that the bot has acted on or created will be ignored if found during polling
+     *
+     * This is useful to prevent the bot from checking Activities it *just* worked on or a product of the checks. Examples:
+     *
+     * * Ignore comments created through an Action
+     * * Ignore Activity polled from modqueue that the bot just reported
+     *
+     * This value should be at least as long as the longest polling interval for modqueue/newComm
+     *
+     * * If `0` or `true` will cache indefinitely (not recommended)
+     * * If `false` will not cache
+     *
+     * @examples [50]
+     * @default 50
+     * */
+    selfTTL?: number | boolean
 }
 
 export interface CacheConfig extends TTLConfig {
@@ -1086,6 +1107,7 @@ export type StrongCache = {
     submissionTTL: number | boolean,
     commentTTL: number | boolean,
     subredditTTL: number | boolean,
+    selfTTL: number | boolean,
     filterCriteriaTTL: number | boolean,
     provider: CacheOptions
     actionedEventsMax?: number,
@@ -1826,20 +1848,18 @@ export interface LogInfo {
     bot?: string
 }
 
-export interface ActionResult {
+export interface ActionResult extends ActionProcessResult {
     kind: string,
     name: string,
     run: boolean,
     runReason?: string,
-    dryRun: boolean,
-    success: boolean,
-    result?: string,
 }
 
 export interface ActionProcessResult {
     success: boolean,
     dryRun: boolean,
     result?: string
+    touchedEntities?: (Submission | Comment | RedditUser | string)[]
 }
 
 export interface ActionedEvent {

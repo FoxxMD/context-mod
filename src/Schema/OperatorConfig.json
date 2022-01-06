@@ -401,6 +401,17 @@
                     ],
                     "description": "The cache provider and, optionally, a custom configuration for that provider\n\nIf not present or `null` provider will be `memory`.\n\nTo specify another `provider` but use its default configuration set this property to a string of one of the available providers: `memory`, `redis`, or `none`"
                 },
+                "selfTTL": {
+                    "default": 50,
+                    "description": "Amount of time, in seconds, an Activity that the bot has acted on or created will be ignored if found during polling\n\nThis is useful to prevent the bot from checking Activities it *just* worked on or a product of the checks. Examples:\n\n* Ignore comments created through an Action\n* Ignore Activity polled from modqueue that the bot just reported\n\nThis value should be at least as long as the longest polling interval for modqueue/newComm\n\n* If `0` or `true` will cache indefinitely (not recommended)\n* If `false` will not cache",
+                    "examples": [
+                        50
+                    ],
+                    "type": [
+                        "number",
+                        "boolean"
+                    ]
+                },
                 "submissionTTL": {
                     "default": 60,
                     "description": "Amount of time, in seconds, a submission should be cached\n\n* If `0` or `true` will cache indefinitely (not recommended)\n* If `false` will not cache",
