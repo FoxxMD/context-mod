@@ -178,7 +178,7 @@ class Bot {
             this.client = proxy === undefined ? new ExtendedSnoowrap(creds) : new ProxiedSnoowrap({...creds, proxy});
             this.client.config({
                 warnings: true,
-                maxRetryAttempts: 5,
+                maxRetryAttempts: 2,
                 debug,
                 logger: snooLogWrapper(this.logger.child({labels: ['Snoowrap']}, mergeArr)),
                 continueAfterRatelimitError: false,
@@ -192,7 +192,7 @@ class Bot {
 
         const retryHandler = createRetryHandler({maxRequestRetry: 8, maxOtherRetry: 2}, this.logger);
         this.nannyRetryHandler = createRetryHandler({maxRequestRetry: 5, maxOtherRetry: 1}, this.logger);
-        this.managerRetryHandler = createRetryHandler({maxRequestRetry: 10, maxOtherRetry: 10, waitOnRetry: false, clearRetryCountAfter: 2}, this.logger);
+        this.managerRetryHandler = createRetryHandler({maxRequestRetry: 8, maxOtherRetry: 8, waitOnRetry: false, clearRetryCountAfter: 2}, this.logger);
 
         this.stagger = stagger ?? 2000;
 
