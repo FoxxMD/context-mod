@@ -391,6 +391,7 @@
                 "message",
                 "remove",
                 "report",
+                "userflair",
                 "usernote"
             ],
             "type": "string"

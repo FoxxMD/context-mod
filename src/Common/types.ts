@@ -3,6 +3,7 @@ import {RepeatActivityJSONConfig} from "../Rule/RepeatActivityRule";
 import {AuthorRuleJSONConfig} from "../Rule/AuthorRule";
 import {AttributionJSONConfig} from "../Rule/AttributionRule";
 import {FlairActionJson} from "../Action/SubmissionAction/FlairAction";
+import {UserFlairActionJson} from "../Action/UserFlairAction";
 import {CommentActionJson} from "../Action/CommentAction";
 import {ReportActionJson} from "../Action/ReportAction";
 import {LockActionJson} from "../Action/LockAction";
@@ -18,7 +19,7 @@ import {RepostRuleJSONConfig} from "../Rule/RepostRule";
 export type RuleJson = RecentActivityRuleJSONConfig | RepeatActivityJSONConfig | AuthorRuleJSONConfig | AttributionJSONConfig | HistoryJSONConfig | RegexRuleJSONConfig | RepostRuleJSONConfig | string;
 export type RuleObjectJson = Exclude<RuleJson, string>
 
-export type ActionJson = CommentActionJson | FlairActionJson | ReportActionJson | LockActionJson | RemoveActionJson | ApproveActionJson | BanActionJson | UserNoteActionJson | MessageActionJson | string;
+export type ActionJson = CommentActionJson | FlairActionJson | ReportActionJson | LockActionJson | RemoveActionJson | ApproveActionJson | BanActionJson | UserNoteActionJson | MessageActionJson | UserFlairActionJson | string;
 export type ActionObjectJson = Exclude<ActionJson, string>;
 
 // borrowed from https://github.com/jabacchetta/set-random-interval/blob/master/src/index.ts
