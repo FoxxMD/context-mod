@@ -51,16 +51,19 @@ export class CommentAction extends Action {
                 result: 'Cannot comment because Item is archived'
             };
         }
+        const touchedEntities = [];
         let reply: Comment;
         if(!dryRun) {
             // @ts-ignore
            reply = await item.reply(renderedContent);
+           touchedEntities.push(reply);
         }
         if (this.lock) {
             if (!dryRun) {
                 // snoopwrap typing issue, thinks comments can't be locked
                 // @ts-ignore
                 await item.lock();
+                touchedEntities.push(item);
             }
         }
         if (this.distinguish && !dryRun) {
@@ -78,7 +81,8 @@ export class CommentAction extends Action {
         return {
             dryRun,
             success: true,
-            result: `${modifierStr}${this.lock ? ' - Locked Author\'s Activity - ' : ''}${truncateStringToLength(100)(body)}`
+            result: `${modifierStr}${this.lock ? ' - Locked Author\'s Activity - ' : ''}${truncateStringToLength(100)(body)}`,
+            touchedEntities,
         };
     }
 }

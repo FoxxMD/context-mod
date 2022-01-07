@@ -90,6 +90,7 @@ export class SubredditResources {
     protected submissionTTL: number | false = cacheTTLDefaults.submissionTTL;
     protected commentTTL: number | false = cacheTTLDefaults.commentTTL;
     protected filterCriteriaTTL: number | false = cacheTTLDefaults.filterCriteriaTTL;
+    public selfTTL: number | false = cacheTTLDefaults.selfTTL;
     name: string;
     protected logger: Logger;
     userNotes: UserNotes;
@@ -119,6 +120,7 @@ export class SubredditResources {
                 authorTTL,
                 wikiTTL,
                 filterCriteriaTTL,
+                selfTTL,
                 submissionTTL,
                 commentTTL,
                 subredditTTL,
@@ -144,6 +146,7 @@ export class SubredditResources {
         this.subredditTTL = subredditTTL === true ? 0 : subredditTTL;
         this.wikiTTL = wikiTTL === true ? 0 : wikiTTL;
         this.filterCriteriaTTL = filterCriteriaTTL === true ? 0 : filterCriteriaTTL;
+        this.selfTTL = selfTTL === true ? 0 : selfTTL;
         this.subreddit = subreddit;
         this.thirdPartyCredentials = thirdPartyCredentials;
         this.name = name;
@@ -389,6 +392,50 @@ export class SubredditResources {
             this.logger.error('Error while trying to fetch a cached activity', err);
             throw err.logged;
         }
+    }
+
+    async hasActivity(item: Submission | Comment) {
+        const hash = asSubmission(item) ? `sub-${item.name}` : `comm-${item.name}`;
+        const res = await this.cache.get(hash);
+        return res !== undefined && res !== null;
+    }
+
+    // @ts-ignore
+    async getRecentSelf(item: Submission | Comment): Promise<(Submission | Comment | undefined)> {
+        const hash = asSubmission(item) ? `sub-recentSelf-${item.name}` : `comm-recentSelf-${item.name}`;
+        const res = await this.cache.get(hash);
+        if(res === null) {
+            return undefined;
+        }
+        return res as (Submission | Comment | undefined);
+    }
+
+    async setRecentSelf(item: Submission | Comment) {
+        if(this.selfTTL !== false) {
+            const hash = asSubmission(item) ? `sub-recentSelf-${item.name}` : `comm-recentSelf-${item.name}`;
+            // @ts-ignore
+            await this.cache.set(hash, item, {ttl: this.selfTTL});
+        }
+        return;
+    }
+    /**
+    * Returns true if the activity being checked was recently acted on/created by the bot and has not changed since that time
+    * */
+    async hasRecentSelf(item: Submission | Comment) {
+        const recent = await this.getRecentSelf(item) as (Submission | Comment | undefined);
+        if (recent !== undefined) {
+            return item.num_reports === recent.num_reports;
+
+            // can't really used edited since its only ever updated once with no timestamp
+            // if(item.num_reports !== recent.num_reports) {
+            //     return false;
+            // }
+            // if(!asSubmission(item)) {
+            //     return item.edited === recent.edited;
+            // }
+            // return true;
+        }
+        return false;
     }
 
     // @ts-ignore
@@ -836,13 +883,30 @@ export class SubredditResources {
                                 break;
                             case 'reports':
                                 if (!item.can_mod_post) {
-                                    log.debug(`Cannot test for reports on Activity in a subreddit bot account is not a moderato Activist. Skipping criteria...`);
+                                    log.debug(`Cannot test for reports on Activity in a subreddit bot account is not a moderator of. Skipping criteria...`);
                                     break;
                                 }
                                 const reportCompare = parseGenericValueComparison(crit[k] as string);
-                                if(!comparisonTextOp(item.num_reports, reportCompare.operator, reportCompare.value)) {
+                                let reportType = 'total';
+                                if(reportCompare.extra !== undefined && reportCompare.extra.trim() !== '') {
+                                    const requestedType = reportCompare.extra.toLocaleLowerCase().trim();
+                                    if(requestedType.includes('mod')) {
+                                        reportType = 'mod';
+                                    } else if(requestedType.includes('user')) {
+                                        reportType = 'user';
+                                    } else {
+                                        log.warn(`Did not recognize the report type "${requestedType}" -- can only use "mod" or "user". Will default to TOTAL reports`);
+                                    }
+                                }
+                                let reportNum = item.num_reports;
+                                if(reportType === 'user') {
+                                    reportNum = item.user_reports.length;
+                                } else {
+                                    reportNum = item.mod_reports.length;
+                                }
+                                if(!comparisonTextOp(reportNum, reportCompare.operator, reportCompare.value)) {
                                     // @ts-ignore
-                                    log.debug(`Failed: Expected => ${k}:${crit[k]} | Found => ${k}:${item.num_reports}`)
+                                    log.debug(`Failed: Expected => ${k}:${crit[k]} ${reportType} reports | Found => ${k}:${reportNum} ${reportType} reports`)
                                     return false
                                 }
                                 break;
@@ -1064,6 +1128,7 @@ export class BotResourcesManager {
                 submissionTTL,
                 subredditTTL,
                 filterCriteriaTTL,
+                selfTTL,
                 provider,
                 actionedEventsMax,
                 actionedEventsDefault,
@@ -1080,7 +1145,7 @@ export class BotResourcesManager {
         this.cacheHash = objectHash.sha1(relevantCacheSettings);
         this.defaultCacheConfig = caching;
         this.defaultThirdPartyCredentials = thirdParty;
-        this.ttlDefaults = {authorTTL, userNotesTTL, wikiTTL, commentTTL, submissionTTL, filterCriteriaTTL, subredditTTL};
+        this.ttlDefaults = {authorTTL, userNotesTTL, wikiTTL, commentTTL, submissionTTL, filterCriteriaTTL, subredditTTL, selfTTL};
 
         const options = provider;
         this.cacheType = options.store;

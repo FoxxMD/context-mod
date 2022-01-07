@@ -281,8 +281,6 @@ export const parseDefaultBotInstanceFromArgs = (args: any): BotInstanceJsonConfi
         heartbeat,
         hardLimit,
         authorTTL,
-        snooProxy,
-        snooDebug,
         sharedMod,
         caching,
     } = args || {};
@@ -293,10 +291,6 @@ export const parseDefaultBotInstanceFromArgs = (args: any): BotInstanceJsonConfi
             clientSecret,
             accessToken,
             refreshToken,
-        },
-        snoowrap: {
-            proxy: snooProxy,
-            debug: snooDebug,
         },
         subreddits: {
             names: subreddits,
@@ -330,6 +324,8 @@ export const parseOpConfigFromArgs = (args: any): OperatorJsonConfig => {
         mode,
         caching,
         authorTTL,
+        snooProxy,
+        snooDebug,
     } = args || {};
 
     const data = {
@@ -345,6 +341,10 @@ export const parseOpConfigFromArgs = (args: any): OperatorJsonConfig => {
         caching: {
             provider: caching,
             authorTTL
+        },
+        snoowrap: {
+            proxy: snooProxy,
+            debug: snooDebug,
         },
         web: {
             enabled: web,
@@ -401,10 +401,6 @@ export const parseDefaultBotInstanceFromEnv = (): BotInstanceJsonConfig => {
             dryRun: parseBool(process.env.DRYRUN, undefined),
             heartbeatInterval: process.env.HEARTBEAT !== undefined ? parseInt(process.env.HEARTBEAT) : undefined,
         },
-        snoowrap: {
-            proxy: process.env.PROXY,
-            debug: parseBool(process.env.SNOO_DEBUG, undefined),
-        },
         polling: {
             sharedMod: parseBool(process.env.SHARE_MOD),
         },
@@ -434,6 +430,10 @@ export const parseOpConfigFromEnv = (): OperatorJsonConfig => {
                 store: process.env.CACHING as (CacheProvider | undefined)
             },
             authorTTL: process.env.AUTHOR_TTL !== undefined ? parseInt(process.env.AUTHOR_TTL) : undefined
+        },
+        snoowrap: {
+            proxy: process.env.PROXY,
+            debug: parseBool(process.env.SNOO_DEBUG, undefined),
         },
         web: {
             port: process.env.PORT !== undefined ? parseInt(process.env.PORT) : undefined,
@@ -568,6 +568,7 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
             credentials: webCredentials,
             operators,
         } = {},
+        snoowrap: snoowrapOp = {},
         api: {
             port: apiPort = 8095,
             secret: apiSecret = randomId(),
@@ -640,7 +641,7 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
                 softLimit = 250,
                 hardLimit = 50
             } = {},
-            snoowrap = {},
+            snoowrap = snoowrapOp,
             credentials = {},
             subreddits: {
                 names = [],

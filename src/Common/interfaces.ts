@@ -5,6 +5,9 @@ import Poll from "snoostorm/out/util/Poll";
 import Snoowrap from "snoowrap";
 import {RuleResult} from "../Rule";
 import {IncomingMessage} from "http";
+import Submission from "snoowrap/dist/objects/Submission";
+import Comment from "snoowrap/dist/objects/Comment";
+import RedditUser from "snoowrap/dist/objects/RedditUser";
 
 /**
  * An ISO 8601 Duration
@@ -670,6 +673,24 @@ export interface TTLConfig {
      * @default 60
      * */
     filterCriteriaTTL?: number | boolean;
+
+    /**
+     * Amount of time, in seconds, an Activity that the bot has acted on or created will be ignored if found during polling
+     *
+     * This is useful to prevent the bot from checking Activities it *just* worked on or a product of the checks. Examples:
+     *
+     * * Ignore comments created through an Action
+     * * Ignore Activity polled from modqueue that the bot just reported
+     *
+     * This value should be at least as long as the longest polling interval for modqueue/newComm
+     *
+     * * If `0` or `true` will cache indefinitely (not recommended)
+     * * If `false` will not cache
+     *
+     * @examples [50]
+     * @default 50
+     * */
+    selfTTL?: number | boolean
 }
 
 export interface CacheConfig extends TTLConfig {
@@ -909,6 +930,20 @@ export interface ActivityState {
     distinguished?: boolean
     approved?: boolean
     score?: CompareValue
+    /**
+     * A string containing a comparison operator and a value to compare against
+     *
+     * The syntax is `(< OR > OR <= OR >=) <number>`
+     *
+     * * EX `> 2`  => greater than 2 total reports
+     *
+     * Defaults to TOTAL reports on an Activity. Suffix the value with the report type to check that type:
+     *
+     * * EX `> 3 mod` => greater than 3 mod reports
+     * * EX `>= 1 user` => greater than 1 user report
+     *
+     * @pattern ^\s*(>|>=|<|<=)\s*(\d+)\s*(%?)(.*)$
+     * */
     reports?: CompareValue
     age?: DurationComparor
 }
@@ -1072,6 +1107,7 @@ export type StrongCache = {
     submissionTTL: number | boolean,
     commentTTL: number | boolean,
     subredditTTL: number | boolean,
+    selfTTL: number | boolean,
     filterCriteriaTTL: number | boolean,
     provider: CacheOptions
     actionedEventsMax?: number,
@@ -1289,6 +1325,32 @@ export interface WebCredentials {
     redirectUri?: string,
 }
 
+export interface SnoowrapOptions {
+    /**
+     * Proxy all requests to Reddit's API through this endpoint
+     *
+     * * ENV => `PROXY`
+     * * ARG => `--proxy <proxyEndpoint>`
+     *
+     * @examples ["http://localhost:4443"]
+     * */
+    proxy?: string,
+    /**
+     * Manually set the debug status for snoowrap
+     *
+     * When snoowrap has `debug: true` it will log the http status response of reddit api requests to at the `debug` level
+     *
+     * * Set to `true` to always output
+     * * Set to `false` to never output
+     *
+     * If not present or `null` will be set based on `logLevel`
+     *
+     * * ENV => `SNOO_DEBUG`
+     * * ARG => `--snooDebug`
+     * */
+    debug?: boolean,
+}
+
 /**
  * The configuration for an **individual reddit account** ContextMod will run as a bot.
  *
@@ -1309,33 +1371,13 @@ export interface BotInstanceJsonConfig {
     notifications?: NotificationConfig
 
     /**
-     * Settings to control some [Snoowrap](https://github.com/not-an-aardvark/snoowrap) behavior
+     * Settings to control some [Snoowrap](https://github.com/not-an-aardvark/snoowrap) behavior.
+     *
+     * Overrides any defaults provided at top-level operator config.
+     *
+     * Set to an empty object to "ignore" any top-level config
      * */
-    snoowrap?: {
-        /**
-         * Proxy all requests to Reddit's API through this endpoint
-         *
-         * * ENV => `PROXY`
-         * * ARG => `--proxy <proxyEndpoint>`
-         *
-         * @examples ["http://localhost:4443"]
-         * */
-        proxy?: string,
-        /**
-         * Manually set the debug status for snoowrap
-         *
-         * When snoowrap has `debug: true` it will log the http status response of reddit api requests to at the `debug` level
-         *
-         * * Set to `true` to always output
-         * * Set to `false` to never output
-         *
-         * If not present or `null` will be set based on `logLevel`
-         *
-         * * ENV => `SNOO_DEBUG`
-         * * ARG => `--snooDebug`
-         * */
-        debug?: boolean,
-    }
+    snoowrap?: SnoowrapOptions
 
     /**
      * Settings related to bot behavior for subreddits it is managing
@@ -1557,6 +1599,11 @@ export interface OperatorJsonConfig {
      * These settings will be used by each bot, and subreddit, that does not specify their own
      * */
     caching?: OperatorCacheConfig
+
+    /**
+     * Set global snoowrap options as well as default snoowrap config for all bots that don't specify their own
+     * */
+    snoowrap?: SnoowrapOptions
 
     bots?: BotInstanceJsonConfig[]
 
@@ -1801,20 +1848,18 @@ export interface LogInfo {
     bot?: string
 }
 
-export interface ActionResult {
+export interface ActionResult extends ActionProcessResult {
     kind: string,
     name: string,
     run: boolean,
     runReason?: string,
-    dryRun: boolean,
-    success: boolean,
-    result?: string,
 }
 
 export interface ActionProcessResult {
     success: boolean,
     dryRun: boolean,
     result?: string
+    touchedEntities?: (Submission | Comment | RedditUser | string)[]
 }
 
 export interface ActionedEvent {
@@ -1845,6 +1890,14 @@ export interface RedditEntity {
 
 export interface StatusCodeError extends Error {
     name: 'StatusCodeError',
+    statusCode: number,
+    message: string,
+    response: IncomingMessage,
+    error: Error
+}
+
+export interface RequestError extends Error {
+    name: 'RequestError',
     statusCode: number,
     message: string,
     response: IncomingMessage,

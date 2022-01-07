@@ -70,6 +70,9 @@ const action = async (req: express.Request, res: express.Response) => {
                             await manager.firehose.push({
                                 checkType: a instanceof Submission ? 'Submission' : 'Comment',
                                 activity: a,
+                                options: {
+                                    force: true,
+                                }
                             });
                         }
                     } else {
@@ -78,6 +81,9 @@ const action = async (req: express.Request, res: express.Response) => {
                             await manager.firehose.push({
                                 checkType: a instanceof Submission ? 'Submission' : 'Comment',
                                 activity: a,
+                                options: {
+                                    force: true
+                                }
                             });
                         }
                     }

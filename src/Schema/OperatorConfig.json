@@ -124,21 +124,8 @@
                     "type": "object"
                 },
                 "snoowrap": {
-                    "description": "Settings to control some [Snoowrap](https://github.com/not-an-aardvark/snoowrap) behavior",
-                    "properties": {
-                        "debug": {
-                            "description": "Manually set the debug status for snoowrap\n\nWhen snoowrap has `debug: true` it will log the http status response of reddit api requests to at the `debug` level\n\n* Set to `true` to always output\n* Set to `false` to never output\n\nIf not present or `null` will be set based on `logLevel`\n\n* ENV => `SNOO_DEBUG`\n* ARG => `--snooDebug`",
-                            "type": "boolean"
-                        },
-                        "proxy": {
-                            "description": "Proxy all requests to Reddit's API through this endpoint\n\n* ENV => `PROXY`\n* ARG => `--proxy <proxyEndpoint>`",
-                            "examples": [
-                                "http://localhost:4443"
-                            ],
-                            "type": "string"
-                        }
-                    },
-                    "type": "object"
+                    "$ref": "#/definitions/SnoowrapOptions",
+                    "description": "Settings to control some [Snoowrap](https://github.com/not-an-aardvark/snoowrap) behavior.\n\nOverrides any defaults provided at top-level operator config.\n\nSet to an empty object to \"ignore\" any top-level config"
                 },
                 "subreddits": {
                     "description": "Settings related to bot behavior for subreddits it is managing",
@@ -414,6 +401,17 @@
                     ],
                     "description": "The cache provider and, optionally, a custom configuration for that provider\n\nIf not present or `null` provider will be `memory`.\n\nTo specify another `provider` but use its default configuration set this property to a string of one of the available providers: `memory`, `redis`, or `none`"
                 },
+                "selfTTL": {
+                    "default": 50,
+                    "description": "Amount of time, in seconds, an Activity that the bot has acted on or created will be ignored if found during polling\n\nThis is useful to prevent the bot from checking Activities it *just* worked on or a product of the checks. Examples:\n\n* Ignore comments created through an Action\n* Ignore Activity polled from modqueue that the bot just reported\n\nThis value should be at least as long as the longest polling interval for modqueue/newComm\n\n* If `0` or `true` will cache indefinitely (not recommended)\n* If `false` will not cache",
+                    "examples": [
+                        50
+                    ],
+                    "type": [
+                        "number",
+                        "boolean"
+                    ]
+                },
                 "submissionTTL": {
                     "default": 60,
                     "description": "Amount of time, in seconds, a submission should be cached\n\n* If `0` or `true` will cache indefinitely (not recommended)\n* If `false` will not cache",
@@ -523,6 +521,22 @@
                     "description": "Refresh token retrieved from authenticating an account with your Reddit Application\n\n* ENV => `REFRESH_TOKEN`\n* ARG => `--refreshToken <token>`",
                     "examples": [
                         "34_f1w1v4"
+                    ],
+                    "type": "string"
+                }
+            },
+            "type": "object"
+        },
+        "SnoowrapOptions": {
+            "properties": {
+                "debug": {
+                    "description": "Manually set the debug status for snoowrap\n\nWhen snoowrap has `debug: true` it will log the http status response of reddit api requests to at the `debug` level\n\n* Set to `true` to always output\n* Set to `false` to never output\n\nIf not present or `null` will be set based on `logLevel`\n\n* ENV => `SNOO_DEBUG`\n* ARG => `--snooDebug`",
+                    "type": "boolean"
+                },
+                "proxy": {
+                    "description": "Proxy all requests to Reddit's API through this endpoint\n\n* ENV => `PROXY`\n* ARG => `--proxy <proxyEndpoint>`",
+                    "examples": [
+                        "http://localhost:4443"
                     ],
                     "type": "string"
                 }
@@ -693,6 +707,10 @@
                 }
             },
             "type": "object"
+        },
+        "snoowrap": {
+            "$ref": "#/definitions/SnoowrapOptions",
+            "description": "Set global snoowrap options as well as default snoowrap config for all bots that don't specify their own"
         },
         "web": {
             "description": "Settings for the web interface",

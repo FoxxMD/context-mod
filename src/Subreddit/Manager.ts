@@ -63,6 +63,7 @@ export interface runCheckOptions {
     delayUntil?: number,
     dryRun?: boolean,
     refresh?: boolean,
+    force?: boolean,
 }
 
 export interface CheckTask {
@@ -272,6 +273,7 @@ export class Manager extends EventEmitter {
         if(this.modPermissions !== undefined) {
             return this.modPermissions as string[];
         }
+        this.logger.debug('Retrieving mod permissions for bot');
         const userInfo = parseRedditEntity(this.botName, 'user');
         const mods = this.subreddit.getModerators({name: userInfo.name});
         // @ts-ignore
@@ -358,7 +360,6 @@ export class Manager extends EventEmitter {
     }
 
     protected async parseConfigurationFromObject(configObj: object) {
-        await this.getModPermissions();
         try {
             const configBuilder = new ConfigBuilder({logger: this.logger});
             const validJson = configBuilder.validateJson(configObj);
@@ -581,6 +582,18 @@ export class Manager extends EventEmitter {
         const checks = checkType === 'Comment' ? this.commentChecks : this.submissionChecks;
         let item = activity;
         const itemId = await item.id;
+
+        if(await this.resources.hasRecentSelf(item)) {
+            const {force = false} = options || {};
+            let recentMsg = `Found in Activities recently (last ${this.resources.selfTTL} seconds) modified/created by this bot`;
+            if(force) {
+                this.logger.debug(`${recentMsg} but will run anyway because "force" option was true.`);
+            } else {
+                this.logger.debug(`${recentMsg} so will skip running.`);
+                return;
+            }
+        }
+
         let allRuleResults: RuleResult[] = [];
         const itemIdentifier = `${checkType === 'Submission' ? 'SUB' : 'COM'} ${itemId}`;
         this.currentLabels = [itemIdentifier];
@@ -690,6 +703,7 @@ export class Manager extends EventEmitter {
                     if (e.logged !== true) {
                         this.logger.warn(`Running rules for Check ${check.name} failed due to uncaught exception`, e);
                     }
+                    this.emit('error', e);
                 }
 
                 if (triggered) {
@@ -702,6 +716,11 @@ export class Manager extends EventEmitter {
                         actionedEvent.ruleSummary = resultsSummary(currentResults, check.condition);
                     }
                     runActions = await check.runActions(item, currentResults.filter(x => x.triggered), dryRun);
+                    // we only can about report and comment actions since those can produce items for newComm and modqueue
+                    const recentCandidates = runActions.filter(x => ['report','comment'].includes(x.kind.toLocaleLowerCase())).map(x => x.touchedEntities === undefined ? [] : x.touchedEntities).flat();
+                    for(const recent of recentCandidates) {
+                        await this.resources.setRecentSelf(recent as (Submission|Comment));
+                    }
                     actionsRun = runActions.length;
 
                     if(check.notifyOnTrigger) {

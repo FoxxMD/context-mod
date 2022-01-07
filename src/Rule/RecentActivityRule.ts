@@ -43,7 +43,7 @@ const parseLink = parseUsableLinkIdentifier();
 export class RecentActivityRule extends Rule {
     window: ActivityWindowType;
     thresholds: ActivityThreshold[];
-    useSubmissionAsReference: boolean;
+    useSubmissionAsReference: boolean | undefined;
     imageDetection: StrongImageDetection
     lookAt?: 'comments' | 'submissions';
 
@@ -51,7 +51,7 @@ export class RecentActivityRule extends Rule {
         super(options);
         const {
             window = 15,
-            useSubmissionAsReference = true,
+            useSubmissionAsReference,
             imageDetection,
             lookAt,
         } = options || {};
@@ -128,7 +128,13 @@ export class RecentActivityRule extends Rule {
         }
 
         let viableActivity = activities;
-        if (this.useSubmissionAsReference) {
+        // if config does not specify reference then we set the default based on whether the item is a submission or not
+        // -- this is essentially the same as defaulting reference to true BUT eliminates noisy "can't use comment as reference" log statement when item is a comment
+        let inferredSubmissionAsRef = this.useSubmissionAsReference;
+        if(inferredSubmissionAsRef === undefined) {
+            inferredSubmissionAsRef = isSubmission(item);
+        }
+        if (inferredSubmissionAsRef) {
             if (!asSubmission(item)) {
                 this.logger.warn('Cannot use post as reference because triggered item is not a Submission');
             } else if (item.is_self) {
@@ -421,6 +427,7 @@ export class RecentActivityRule extends Rule {
                 threshold,
                 testValue,
                 karmaThreshold,
+                combinedKarma,
             }
         };
     }
@@ -501,6 +508,16 @@ interface RecentActivityConfig extends ActivityWindow, ReferenceSubmission {
     thresholds: ActivityThreshold[],
 
     imageDetection?: ImageDetection
+
+    /**
+     * When Activity is a submission should we only include activities that are other submissions with the same content?
+     *
+     * * When the Activity is a submission this defaults to **true**
+     * * When the Activity is a comment it is ignored (not relevant)
+     *
+     * @default true
+     * */
+    useSubmissionAsReference?: boolean
 }
 
 export interface RecentActivityRuleOptions extends RecentActivityConfig, RuleOptions {

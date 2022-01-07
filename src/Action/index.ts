@@ -1,4 +1,4 @@
-import Snoowrap, {Comment, Submission} from "snoowrap";
+import {Comment, Submission} from "snoowrap";
 import {Logger} from "winston";
 import {RuleResult} from "../Rule";
 import {SubredditResources} from "../Subreddit/SubredditResources";
@@ -6,12 +6,13 @@ import {ActionProcessResult, ActionResult, ChecksActivityState, TypedActivitySta
 import Author, {AuthorOptions} from "../Author/Author";
 import {mergeArr} from "../util";
 import LoggedError from "../Utils/LoggedError";
+import {ExtendedSnoowrap} from '../Utils/SnoowrapClients';
 
 export abstract class Action {
     name?: string;
     logger: Logger;
     resources: SubredditResources;
-    client: Snoowrap
+    client: ExtendedSnoowrap;
     authorIs: AuthorOptions;
     itemIs: TypedActivityStates;
     dryRun: boolean;
@@ -114,8 +115,8 @@ export abstract class Action {
 export interface ActionOptions extends ActionConfig {
     logger: Logger;
     subredditName: string;
-    resources: SubredditResources
-    client: Snoowrap
+    resources: SubredditResources;
+    client: ExtendedSnoowrap;
 }
 
 export interface ActionConfig extends ChecksActivityState {
@@ -162,7 +163,7 @@ export interface ActionJson extends ActionConfig {
     /**
      * The type of action that will be performed
      */
-    kind: 'comment' | 'lock' | 'remove' | 'report' | 'approve' | 'ban' | 'flair' | 'usernote' | 'message'
+    kind: 'comment' | 'lock' | 'remove' | 'report' | 'approve' | 'ban' | 'flair' | 'usernote' | 'message' | 'userflair'
 }
 
 export const isActionJson = (obj: object): obj is ActionJson => {

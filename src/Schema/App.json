@@ -856,6 +856,17 @@
                     ],
                     "description": "The cache provider and, optionally, a custom configuration for that provider\n\nIf not present or `null` provider will be `memory`.\n\nTo specify another `provider` but use its default configuration set this property to a string of one of the available providers: `memory`, `redis`, or `none`"
                 },
+                "selfTTL": {
+                    "default": 50,
+                    "description": "Amount of time, in seconds, an Activity that the bot has acted on or created will be ignored if found during polling\n\nThis is useful to prevent the bot from checking Activities it *just* worked on or a product of the checks. Examples:\n\n* Ignore comments created through an Action\n* Ignore Activity polled from modqueue that the bot just reported\n\nThis value should be at least as long as the longest polling interval for modqueue/newComm\n\n* If `0` or `true` will cache indefinitely (not recommended)\n* If `false` will not cache",
+                    "examples": [
+                        50
+                    ],
+                    "type": [
+                        "number",
+                        "boolean"
+                    ]
+                },
                 "submissionTTL": {
                     "default": 60,
                     "description": "Amount of time, in seconds, a submission should be cached\n\n* If `0` or `true` will cache indefinitely (not recommended)\n* If `false` will not cache",
@@ -1119,6 +1130,9 @@
                                 "$ref": "#/definitions/FlairActionJson"
                             },
                             {
+                                "$ref": "#/definitions/UserFlairActionJson"
+                            },
+                            {
                                 "$ref": "#/definitions/CommentActionJson"
                             },
                             {
@@ -1319,7 +1333,7 @@
                     "type": "boolean"
                 },
                 "reports": {
-                    "description": "A string containing a comparison operator and a value to compare against\n\nThe syntax is `(< OR > OR <= OR >=) <number>`\n\n* EX `> 100`  => greater than 100",
+                    "description": "A string containing a comparison operator and a value to compare against\n\nThe syntax is `(< OR > OR <= OR >=) <number>`\n\n* EX `> 2`  => greater than 2 total reports\n\nDefaults to TOTAL reports on an Activity. Suffix the value with the report type to check that type:\n\n* EX `> 3 mod` => greater than 3 mod reports\n* EX `>= 1 user` => greater than 1 user report",
                     "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
                     "type": "string"
                 },
@@ -1464,6 +1478,10 @@
                         true
                     ],
                     "type": "boolean"
+                },
+                "flair_template_id": {
+                    "description": "Flair template ID to assign",
+                    "type": "string"
                 },
                 "itemIs": {
                     "anyOf": [
@@ -2215,7 +2233,7 @@
                 },
                 "useSubmissionAsReference": {
                     "default": true,
-                    "description": "If activity is a Submission and is a link (not self-post) then only look at Submissions that contain this link, otherwise consider all activities.",
+                    "description": "When Activity is a submission should we only include activities that are other submissions with the same content?\n\n* When the Activity is a submission this defaults to **true**\n* When the Activity is a comment it is ignored (not relevant)",
                     "type": "boolean"
                 },
                 "window": {
@@ -3193,6 +3211,9 @@
                                 "$ref": "#/definitions/FlairActionJson"
                             },
                             {
+                                "$ref": "#/definitions/UserFlairActionJson"
+                            },
+                            {
                                 "$ref": "#/definitions/CommentActionJson"
                             },
                             {
@@ -3400,7 +3421,7 @@
                     "type": "boolean"
                 },
                 "reports": {
-                    "description": "A string containing a comparison operator and a value to compare against\n\nThe syntax is `(< OR > OR <= OR >=) <number>`\n\n* EX `> 100`  => greater than 100",
+                    "description": "A string containing a comparison operator and a value to compare against\n\nThe syntax is `(< OR > OR <= OR >=) <number>`\n\n* EX `> 2`  => greater than 2 total reports\n\nDefaults to TOTAL reports on an Activity. Suffix the value with the report type to check that type:\n\n* EX `> 3 mod` => greater than 3 mod reports\n* EX `>= 1 user` => greater than 1 user report",
                     "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
                     "type": "string"
                 },
@@ -3492,6 +3513,95 @@
                 "oldest"
             ],
             "type": "string"
+        },
+        "UserFlairActionJson": {
+            "description": "Flair the Submission",
+            "properties": {
+                "authorIs": {
+                    "$ref": "#/definitions/AuthorOptions",
+                    "description": "If present then these Author criteria are checked before running the Action. If criteria fails then the Action is not run.",
+                    "examples": [
+                        {
+                            "include": [
+                                {
+                                    "flairText": [
+                                        "Contributor",
+                                        "Veteran"
+                                    ]
+                                },
+                                {
+                                    "isMod": true
+                                }
+                            ]
+                        }
+                    ]
+                },
+                "css": {
+                    "description": "The text of the css class of the flair to apply",
+                    "type": "string"
+                },
+                "dryRun": {
+                    "default": false,
+                    "description": "If `true` the Action will not make the API request to Reddit to perform its action.",
+                    "examples": [
+                        false,
+                        true
+                    ],
+                    "type": "boolean"
+                },
+                "enable": {
+                    "default": true,
+                    "description": "If set to `false` the Action will not be run",
+                    "examples": [
+                        true
+                    ],
+                    "type": "boolean"
+                },
+                "flair_template_id": {
+                    "description": "Flair template to pick.\n\n**Note:** If this template is used text/css are ignored",
+                    "type": "string"
+                },
+                "itemIs": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "$ref": "#/definitions/SubmissionState"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "items": {
+                                "$ref": "#/definitions/CommentState"
+                            },
+                            "type": "array"
+                        }
+                    ],
+                    "description": "A list of criteria to test the state of the `Activity` against before running the Action.\n\nIf any set of criteria passes the Action will be run."
+                },
+                "kind": {
+                    "description": "The type of action that will be performed",
+                    "enum": [
+                        "userflair"
+                    ],
+                    "type": "string"
+                },
+                "name": {
+                    "description": "An optional, but highly recommended, friendly name for this Action. If not present will default to `kind`.\n\nCan only contain letters, numbers, underscore, spaces, and dashes",
+                    "examples": [
+                        "myDescriptiveAction"
+                    ],
+                    "pattern": "^[a-zA-Z]([\\w -]*[\\w])?$",
+                    "type": "string"
+                },
+                "text": {
+                    "description": "The text of the flair to apply",
+                    "type": "string"
+                }
+            },
+            "required": [
+                "kind"
+            ],
+            "type": "object"
         },
         "UserNoteActionJson": {
             "description": "Add a Toolbox User Note to the Author of this Activity",
