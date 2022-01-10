@@ -236,7 +236,10 @@ const webClient = async (options: OperatorConfig) => {
                 code: code as string,
             });
             const user = await client.getMe().name as string;
-            const subs = await client.getModeratedSubreddits();
+            let subs = await client.getModeratedSubreddits({count: 100});
+            while(!subs.isFinished) {
+                subs = await subs.fetchMore({amount: 100});
+            }
             io.to(req.session.id).emit('authStatus', {canSaveWiki: req.session.scope?.includes('wikiedit')});
             return done(null, {user, subreddits: subs, scope: req.session.scope, token: client.accessToken});
         }
