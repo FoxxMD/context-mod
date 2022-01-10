@@ -18,6 +18,7 @@ This directory contains example of valid, ready-to-go configurations for Context
   * [Author](/docs/examples/author)
   * [Regex](/docs/examples/regex)
   * [Repost](/docs/examples/repost)
+  * [Author and post flairs](/docs/examples/onlyfansFlair)
 * [Toolbox User Notes](/docs/examples/userNotes)
 * [Advanced Concepts](/docs/examples/advancedConcepts)
   * [Rule Sets](/docs/examples/advancedConcepts/ruleSets.json5)

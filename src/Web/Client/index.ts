@@ -352,6 +352,9 @@ const webClient = async (options: OperatorConfig) => {
                         msg = `${msg}. ${botAddResult.stored === false ? 'Additionally, the bot was not stored in config so the operator will need to add it manually to persist after a restart.' : ''}`;
                     }
                     data.addResult = msg;
+                    // @ts-ignore
+                    req.session.destroy();
+                    req.logout();
                 }
             }
             return res.render('callback', data);

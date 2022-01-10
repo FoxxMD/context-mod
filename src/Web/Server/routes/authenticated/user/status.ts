@@ -41,7 +41,10 @@ const status = () => {
         if(req.serverBot !== undefined) {
             bots = [req.serverBot];
         } else {
-            bots = (req.user as Express.User).isOperator ? req.botApp.bots : req.botApp.bots.filter(x => intersect(req.user?.subreddits as string[], x.subManagers.map(y => y.subreddit.display_name)));
+            bots = (req.user as Express.User).isOperator ? req.botApp.bots : req.botApp.bots.filter(x => {
+                const i = intersect(req.user?.subreddits as string[], x.subManagers.map(y => y.subreddit.display_name));
+                return i.length > 0;
+            });
         }
         const botResponses: BotStatusResponse[] = [];
         for(const b of bots) {
@@ -87,6 +90,9 @@ const status = () => {
         for (const s of subreddits) {
             const m = bot.subManagers.find(x => x.displayLabel === s) as Manager;
             if(m === undefined) {
+                continue;
+            }
+            if(!(req.user as Express.User).isOperator && !(req.user?.subreddits as string[]).includes(m.subreddit.display_name)) {
                 continue;
             }
             const sd = {
