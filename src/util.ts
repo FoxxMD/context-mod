@@ -996,6 +996,8 @@ export const toStrongSubredditState = (s: SubredditState, opts?: StrongSubreddit
 
     if (generateDescription && stateDescription === undefined) {
         strongState.stateDescription = objectToStringSummary(strongState);
+    } else {
+        strongState.stateDescription = stateDescription;
     }
 
     return strongState;
