@@ -1,6 +1,7 @@
 import {Rule, RuleJSONConfig, RuleOptions, RulePremise, RuleResult} from "./index";
-import {Comment, VoteableContent} from "snoowrap";
+import {VoteableContent} from "snoowrap";
 import Submission from "snoowrap/dist/objects/Submission";
+import Comment from "snoowrap/dist/objects/Comment";
 import as from 'async';
 import pMap from 'p-map';
 // @ts-ignore
@@ -23,7 +24,7 @@ import {
     parseSubredditName,
     parseUsableLinkIdentifier,
     PASS, sleep,
-    toStrongSubredditState
+    toStrongSubredditState, windowToActivityWindowCriteria
 } from "../util";
 import {
     ActivityWindow,
@@ -115,15 +116,42 @@ export class RecentActivityRule extends Rule {
     async process(item: Submission | Comment): Promise<[boolean, RuleResult]> {
         let activities;
 
+        // ACID is a bitch
+        // reddit may not return the activity being checked in the author's recent history due to availability/consistency issues or *something*
+        // so make sure we add it in if config is checking the same type and it isn't included
+        // TODO refactor this for SubredditState everywhere branch
+        let shouldIncludeSelf = true;
+        const strongWindow = windowToActivityWindowCriteria(this.window);
+        const {
+            subreddits: {
+                include = [],
+                exclude = []
+            } = {}
+        } = strongWindow;
+        if (include.length > 0 && !include.some(x => x.toLocaleLowerCase() === item.subreddit.display_name.toLocaleLowerCase())) {
+            shouldIncludeSelf = false;
+        } else if (exclude.length > 0 && exclude.some(x => x.toLocaleLowerCase() === item.subreddit.display_name.toLocaleLowerCase())) {
+            shouldIncludeSelf = false;
+        }
+
         switch (this.lookAt) {
             case 'comments':
                 activities = await this.resources.getAuthorComments(item.author, {window: this.window});
+                if (shouldIncludeSelf && item instanceof Comment && !activities.some(x => x.name === item.name)) {
+                    activities.unshift(item);
+                }
                 break;
             case 'submissions':
                 activities = await this.resources.getAuthorSubmissions(item.author, {window: this.window});
+                if (shouldIncludeSelf && item instanceof Submission && !activities.some(x => x.name === item.name)) {
+                    activities.unshift(item);
+                }
                 break;
             default:
                 activities = await this.resources.getAuthorActivities(item.author, {window: this.window});
+                if (shouldIncludeSelf && !activities.some(x => x.name === item.name)) {
+                    activities.unshift(item);
+                }
                 break;
         }
 
