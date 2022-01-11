@@ -87,7 +87,7 @@ const rcbServer = async function (options: OperatorConfig) {
                 botLog.set('app', appLogs.slice(0, 200 + 1));
             } else {
                 let botSubs = botSubreddits.get(botName) || [];
-                if(botSubs.length === 0 && app !== undefined) {
+                if(app !== undefined && (botSubs.length === 0 || !botSubs.includes(subName))) {
                     const b = app.bots.find(x => x.botName === botName);
                     if(b !== undefined) {
                         botSubs = b.subManagers.map(x => x.displayLabel);

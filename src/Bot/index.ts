@@ -348,24 +348,40 @@ class Bot {
         // get configs for subs we want to run on and build/validate them
         for (const sub of subsToRun) {
             try {
-                this.subManagers.push(await this.createManager(sub));
+                this.subManagers.push(this.createManager(sub));
+            } catch (err: any) {
+
+            }
+        }
+        for(const m of this.subManagers) {
+            try {
+                await this.initManager(m);
             } catch (err: any) {
 
             }
         }
     }
 
-    async createManager(sub: Subreddit): Promise<Manager> {
-        const manager = new Manager(sub, this.client, this.logger, this.cacheManager, {dryRun: this.dryRun, sharedModqueue: this.sharedModqueue, wikiLocation: this.wikiLocation, botName: this.botName as string, maxWorkers: this.maxWorkers});
+    async initManager(manager: Manager) {
         try {
             await manager.parseConfiguration('system', true, {suppressNotification: true});
         } catch (err: any) {
             if (!(err instanceof LoggedError)) {
-                this.logger.error(`Config was not valid:`, {subreddit: sub.display_name_prefixed});
-                this.logger.error(err, {subreddit: sub.display_name_prefixed});
+                this.logger.error(`Config was not valid:`, {subreddit: manager.subreddit.display_name_prefixed});
+                this.logger.error(err, {subreddit: manager.subreddit.display_name_prefixed});
                 err.logged = true;
             }
         }
+    }
+
+    createManager(sub: Subreddit): Manager {
+        const manager = new Manager(sub, this.client, this.logger, this.cacheManager, {
+            dryRun: this.dryRun,
+            sharedModqueue: this.sharedModqueue,
+            wikiLocation: this.wikiLocation,
+            botName: this.botName as string,
+            maxWorkers: this.maxWorkers
+        });
         // all errors from managers will count towards bot-level retry count
         manager.on('error', async (err) => await this.panicOnRetries(err));
         return manager;
@@ -404,9 +420,10 @@ class Bot {
                 const sub = await this.client.getSubreddit(name);
                 this.logger.info(`Attempting to add manager for r/${name}`);
                 try {
-                    const manager = await this.createManager(sub);
+                    const manager = this.createManager(sub);
                     this.logger.info(`Starting manager for r/${name}`);
                     this.subManagers.push(manager);
+                    await this.initManager(manager);
                     await manager.start('system', {reason: 'Caused by creation due to moderator invite'});
                     await this.runModStreams();
                 } catch (err: any) {
