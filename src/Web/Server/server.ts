@@ -136,9 +136,9 @@ const rcbServer = async function (options: OperatorConfig) {
         let realBots: string[] = [];
         let realManagers: string[] = [];
         if(app !== undefined) {
-            const modBots =  app.bots.filter(x => intersect(subreddits, x.subManagers.map(y => y.subreddit.display_name)));
+            const modBots =  app.bots.filter(x => intersect(subreddits, x.subManagers.map(y => y.subreddit.display_name)).length > 0);
             moderatedBots = modBots.map(x => x.botName as string);
-            moderatedManagers = [...new Set(modBots.map(x => x.subManagers.map(y => y.displayLabel)).flat())];
+            moderatedManagers = [...new Set(modBots.map(x => x.subManagers).flat().filter(x => subreddits.includes(x.subreddit.display_name)).map(x => x.displayLabel))];
             realBots = isOperator ? app.bots.map(x => x.botName as string) : moderatedBots;
             realManagers = isOperator ? [...new Set(app.bots.map(x => x.subManagers.map(y => y.displayLabel)).flat())] : moderatedManagers
         }
