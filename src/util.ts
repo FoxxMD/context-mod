@@ -662,6 +662,126 @@ export const parseExternalUrl = (val: string) => {
     return (matches.groups as any).url as string;
 }
 
+export const dummyLogger = {
+    debug: (v: any) => null,
+    error: (v: any) => null,
+    warn: (v: any) => null,
+    info: (v: any) => null
+}
+
+const GIST_REGEX = new RegExp(/.*gist\.github\.com\/.+\/(.+)/i)
+const GH_BLOB_REGEX = new RegExp(/.*github\.com\/(.+)\/(.+)\/blob\/(.+)/i);
+const REGEXR_REGEX = new RegExp(/^.*((regexr\.com)\/[\w\d]+).*$/i);
+const REGEXR_PAGE_REGEX = new RegExp(/(.|[\n\r])+"expression":"(.+)","text"/g);
+export const fetchExternalUrl = async (url: string, logger: (any) = dummyLogger): Promise<string> => {
+    let hadError = false;
+    logger.debug(`Attempting to detect resolvable URL for ${url}`);
+    let match = url.match(GIST_REGEX);
+    if (match !== null) {
+        const gistApiUrl = `https://api.github.com/gists/${match[1]}`;
+        logger.debug(`Looks like a non-raw gist URL! Trying to resolve ${gistApiUrl}`);
+
+        try {
+            const response = await fetch(gistApiUrl);
+            if (!response.ok) {
+                logger.error(`Response was not OK from Gist API (${response.statusText}) -- will return response from original URL instead`);
+                if (response.size > 0) {
+                    logger.error(await response.text())
+                }
+                hadError = true;
+            } else {
+                const data = await response.json();
+                // get first found file
+                const fileKeys = Object.keys(data.files);
+                if (fileKeys.length === 0) {
+                    logger.error(`No files found in gist!`);
+                } else {
+                    if (fileKeys.length > 1) {
+                        logger.warn(`More than one file found in gist! Using first found: ${fileKeys[0]}`);
+                    } else {
+                        logger.debug(`Using file ${fileKeys[0]}`);
+                    }
+                    const file = data.files[fileKeys[0]];
+                    if (file.truncated === false) {
+                        return file.content;
+                    }
+                    const rawUrl = file.raw_url;
+                    logger.debug(`File contents was truncated, retrieving full contents from ${rawUrl}`);
+                    try {
+                        const rawUrlResponse = await fetch(rawUrl);
+                        return await rawUrlResponse.text();
+                    } catch (err: any) {
+                        logger.error('Gist Raw URL Response returned an error, will return response from original URL instead');
+                        logger.error(err);
+                    }
+                }
+            }
+        } catch (err: any) {
+            logger.error('Response returned an error, will return response from original URL instead');
+            logger.error(err);
+        }
+    }
+    match = url.match(GH_BLOB_REGEX);
+
+    if (match !== null) {
+        const rawUrl = `https://raw.githubusercontent.com/${match[1]}/${match[2]}/${match[3]}`
+        logger.debug(`Looks like a single file github URL! Resolving to ${rawUrl}`);
+        try {
+            const response = await fetch(rawUrl);
+            if (!response.ok) {
+                logger.error(`Response was not OK (${response.statusText}) -- will return response from original URL instead`);
+                if (response.size > 0) {
+                    logger.error(await response.text())
+                }
+                hadError = true;
+            } else {
+                return await response.text();
+            }
+        } catch (err: any) {
+            logger.error('Response returned an error, will return response from original URL instead');
+            logger.error(err);
+        }
+    }
+
+    match = url.match(REGEXR_REGEX);
+    if(match !== null) {
+        logger.debug(`Looks like a Regexr URL! Trying to get expression from page HTML`);
+        try {
+            const response = await fetch(url);
+            if (!response.ok) {
+                if (response.size > 0) {
+                    logger.error(await response.text())
+                }
+                throw new Error(`Response was not OK: ${response.statusText}`);
+            } else {
+                const page = await response.text();
+                const pageMatch = [...page.matchAll(REGEXR_PAGE_REGEX)];
+                if(pageMatch.length > 0) {
+                    const unescaped = JSON.parse(`{"value": "${pageMatch[0][2]}"}`)
+                    return unescaped.value;
+                } else {
+                    throw new Error('Could not parse regex expression from page HTML');
+                }
+            }
+        } catch (err: any) {
+            logger.error('Response returned an error');
+            throw err;
+        }
+    }
+
+    if(!hadError) {
+        logger.debug('URL was not special (gist, github blob, etc...) so will retrieve plain contents');
+    }
+    const response = await fetch(url);
+    if(!response.ok) {
+        if (response.size > 0) {
+            logger.error(await response.text())
+        }
+        throw new Error(`Response was not OK: ${response.statusText}`);
+    }
+    return await response.text();
+}
+
 export interface RetryOptions {
     maxRequestRetry: number,
     maxOtherRetry: number,
