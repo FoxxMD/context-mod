@@ -781,8 +781,8 @@ export class SubredditResources {
         return await this.isItem(i, activityStates, this.logger);
     }
 
-    async isSubreddit (subreddit: Subreddit, stateCriteria: SubredditState | StrongSubredditState, logger: Logger) {
-        delete stateCriteria.stateDescription;
+    async isSubreddit (subreddit: Subreddit, stateCriteriaRaw: SubredditState | StrongSubredditState, logger: Logger) {
+        const {stateDescription, ...stateCriteria} = stateCriteriaRaw;
 
         if (Object.keys(stateCriteria).length === 0) {
             return true;
