@@ -316,7 +316,7 @@ class Bot {
         while(!subListing.isFinished) {
             subListing = await subListing.fetchMore({amount: 100});
         }
-        availSubs = subListing;
+        availSubs = subListing.filter(x => x.display_name !== `u_${user.name}`);
 
         this.logger.info(`u/${user.name} is a moderator of these subreddits: ${availSubs.map(x => x.display_name_prefixed).join(', ')}`);
 
@@ -336,12 +336,12 @@ class Bot {
             }
         } else {
             if(this.excludeSubreddits.length > 0) {
-                this.logger.info(`Will run on all moderated subreddits but user-defined excluded: ${this.excludeSubreddits.join(', ')}`);
+                this.logger.info(`Will run on all moderated subreddits but own profile and user-defined excluded: ${this.excludeSubreddits.join(', ')}`);
                 const normalExcludes = this.excludeSubreddits.map(x => x.toLowerCase());
                 subsToRun = availSubs.filter(x => !normalExcludes.includes(x.display_name.toLowerCase()));
             } else {
                 this.logger.info(`No user-defined subreddit constraints detected, will run on all moderated subreddits EXCEPT own profile (${this.botAccount})`);
-                subsToRun = availSubs.filter(x => x.display_name_prefixed !== this.botAccount);
+                subsToRun = availSubs;
             }
         }
 
