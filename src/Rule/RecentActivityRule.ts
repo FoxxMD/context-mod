@@ -316,34 +316,6 @@ export class RecentActivityRule extends Rule {
                 }
             }
 
-            for (const activity of viableActivity) {
-                if (asSubmission(activity) && submissionState !== undefined) {
-                    if (!(await this.resources.testItemCriteria(activity, [submissionState]))) {
-                        continue;
-                    }
-                } else if (commentState !== undefined) {
-                    if (!(await this.resources.testItemCriteria(activity, [commentState]))) {
-                        continue;
-                    }
-                }
-                let inSubreddits = false;
-                for (const ss of subStates) {
-                    const res = await this.resources.testSubredditCriteria(activity, ss);
-                    if (res) {
-                        inSubreddits = true;
-                        break;
-                    }
-                }
-                if (inSubreddits) {
-                    currCount++;
-                    combinedKarma += activity.score;
-                    const pSub = getActivitySubredditName(activity);
-                    if (!presentSubs.includes(pSub)) {
-                        presentSubs.push(pSub);
-                    }
-                }
-            }
-
             const {operator, value, isPercent} = parseGenericValueOrPercentComparison(threshold);
             let sum = {
                 subsWithActivity: presentSubs,
