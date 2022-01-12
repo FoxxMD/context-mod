@@ -94,13 +94,36 @@
                         },
                         {
                             "properties": {
+                                "shared": {
+                                    "anyOf": [
+                                        {
+                                            "items": {
+                                                "enum": [
+                                                    "modqueue",
+                                                    "newComm",
+                                                    "newSub",
+                                                    "unmoderated"
+                                                ],
+                                                "type": "string"
+                                            },
+                                            "type": "array"
+                                        },
+                                        {
+                                            "enum": [
+                                                true
+                                            ],
+                                            "type": "boolean"
+                                        }
+                                    ],
+                                    "description": "Set which polling sources should be shared among subreddits using default polling settings for that source\n\n* For `unmoderated and `modqueue` the bot will poll on **r/mod** for new activities\n* For `newSub` and `newComm` all subreddits sharing the source will be combined to poll like **r/subreddit1+subreddit2/new**\n\nIf set to `true` all polling sources will be shared,  otherwise specify which sourcs should be shared as a list"
+                                },
                                 "sharedMod": {
                                     "default": false,
-                                    "description": "If set to `true` all subreddits polling unmoderated/modqueue with default polling settings will share a request to \"r/mod\"\notherwise each subreddit will poll its own mod view\n\n* ENV => `SHARE_MOD`\n* ARG => `--shareMod`",
+                                    "description": "DEPRECATED: See `shared`\n\n Using the ENV or ARG will sett `unmoderated` and `modqueue` on `shared`\n\n* ENV => `SHARE_MOD`\n* ARG => `--shareMod`",
                                     "type": "boolean"
                                 },
                                 "stagger": {
-                                    "description": "If sharing a mod stream stagger pushing relevant Activities to individual subreddits.\n\nUseful when running many subreddits and rules are potentially cpu/memory/traffic heavy -- allows spreading out load",
+                                    "description": "If sharing a stream staggers pushing relevant Activities to individual subreddits.\n\nUseful when running many subreddits and rules are potentially cpu/memory/traffic heavy -- allows spreading out load",
                                     "type": "number"
                                 }
                             },

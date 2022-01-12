@@ -28,7 +28,7 @@ import {
     DEFAULT_POLLING_INTERVAL,
     DEFAULT_POLLING_LIMIT, Invokee,
     ManagerOptions, ManagerStateChangeOption, ManagerStats, PAUSED,
-    PollingOptionsStrong, ResourceStats, RUNNING, RunState, STOPPED, SYSTEM, USER
+    PollingOptionsStrong, PollOn, RUNNING, RunState, STOPPED, SYSTEM, USER
 } from "../Common/interfaces";
 import Submission from "snoowrap/dist/objects/Submission";
 import {activityIsRemoved, itemContentPeek} from "../Utils/SnoowrapUtils";
@@ -73,7 +73,7 @@ export interface CheckTask {
 }
 
 export interface RuntimeManagerOptions extends ManagerOptions {
-    sharedModqueue?: boolean;
+    sharedStreams?: PollOn[];
     wikiLocation?: string;
     botName: string;
     maxWorkers: number;
@@ -104,7 +104,7 @@ export class Manager extends EventEmitter {
     streams: SPoll<Snoowrap.Submission | Snoowrap.Comment>[] = [];
     modStreamCallbacks: Map<string, any> = new Map();
     dryRun?: boolean;
-    sharedModqueue: boolean;
+    sharedStreams: PollOn[];
     cacheManager: BotResourcesManager;
     globalDryRun?: boolean;
     queue: QueueObject<CheckTask>;
@@ -198,7 +198,7 @@ export class Manager extends EventEmitter {
     constructor(sub: Subreddit, client: ExtendedSnoowrap, logger: Logger, cacheManager: BotResourcesManager, opts: RuntimeManagerOptions = {botName: 'ContextMod', maxWorkers: 1}) {
         super();
 
-        const {dryRun, sharedModqueue = false, wikiLocation = 'botconfig/contextbot', botName, maxWorkers} = opts;
+        const {dryRun, sharedStreams = [], wikiLocation = 'botconfig/contextbot', botName, maxWorkers} = opts;
         this.displayLabel = opts.nickname || `${sub.display_name_prefixed}`;
         const getLabels = this.getCurrentLabels;
         const getDisplay = this.getDisplay;
@@ -214,7 +214,7 @@ export class Manager extends EventEmitter {
         }, mergeArr);
         this.globalDryRun = dryRun;
         this.wikiLocation = wikiLocation;
-        this.sharedModqueue = sharedModqueue;
+        this.sharedStreams = sharedStreams;
         this.subreddit = sub;
         this.client = client;
         this.botName = botName;
@@ -768,6 +768,11 @@ export class Manager extends EventEmitter {
         }
     }
 
+    isPollingShared(streamName: string): boolean {
+        const pollOption = this.pollOptions.find(x => x.pollOn === streamName);
+        return pollOption !== undefined && pollOption.limit === DEFAULT_POLLING_LIMIT && pollOption.interval === DEFAULT_POLLING_INTERVAL && this.sharedStreams.includes(streamName as PollOn);
+    }
+
     async buildPolling() {
         // give current handle() time to stop
         //await sleep(1000);
@@ -789,7 +794,7 @@ export class Manager extends EventEmitter {
 
             switch (pollOn) {
                 case 'unmoderated':
-                    if (limit === DEFAULT_POLLING_LIMIT && interval === DEFAULT_POLLING_INTERVAL && this.sharedModqueue) {
+                    if (limit === DEFAULT_POLLING_LIMIT && interval === DEFAULT_POLLING_INTERVAL && this.sharedStreams.includes(pollOn)) {
                         modStreamType = 'unmoderated';
                         // use default mod stream from resources
                         stream = this.cacheManager.modStreams.get('unmoderated') as SPoll<Snoowrap.Submission | Snoowrap.Comment>;
@@ -799,11 +804,12 @@ export class Manager extends EventEmitter {
                             limit: limit,
                             pollTime: interval * 1000,
                             clearProcessed,
+                            logger: this.logger,
                         });
                     }
                     break;
                 case 'modqueue':
-                    if (limit === DEFAULT_POLLING_LIMIT && interval === DEFAULT_POLLING_INTERVAL) {
+                    if (limit === DEFAULT_POLLING_LIMIT && interval === DEFAULT_POLLING_INTERVAL && this.sharedStreams.includes(pollOn)) {
                         modStreamType = 'modqueue';
                         // use default mod stream from resources
                         stream = this.cacheManager.modStreams.get('modqueue') as SPoll<Snoowrap.Submission | Snoowrap.Comment>;
@@ -812,26 +818,49 @@ export class Manager extends EventEmitter {
                             subreddit: this.subreddit.display_name,
                             limit: limit,
                             pollTime: interval * 1000,
-                            clearProcessed
+                            clearProcessed,
+                            logger: this.logger,
                         });
                     }
                     break;
                 case 'newSub':
-                    stream = new SubmissionStream(this.client, {
-                        subreddit: this.subreddit.display_name,
-                        limit: limit,
-                        pollTime: interval * 1000,
-                        clearProcessed
-                    });
+                    if (limit === DEFAULT_POLLING_LIMIT && interval === DEFAULT_POLLING_INTERVAL && this.sharedStreams.includes(pollOn)) {
+                        modStreamType = 'newSub';
+                        // use default mod stream from resources
+                        stream = this.cacheManager.modStreams.get('newSub') as SPoll<Snoowrap.Submission | Snoowrap.Comment>;
+                    } else {
+                        stream = new SubmissionStream(this.client, {
+                            subreddit: this.subreddit.display_name,
+                            limit: limit,
+                            pollTime: interval * 1000,
+                            clearProcessed,
+                            logger: this.logger,
+                        });
+                    }
                     break;
                 case 'newComm':
-                    stream = new CommentStream(this.client, {
-                        subreddit: this.subreddit.display_name,
-                        limit: limit,
-                        pollTime: interval * 1000,
-                        clearProcessed
-                    });
+                    if (limit === DEFAULT_POLLING_LIMIT && interval === DEFAULT_POLLING_INTERVAL && this.sharedStreams.includes(pollOn)) {
+                        modStreamType = 'newComm';
+                        // use default mod stream from resources
+                        stream = this.cacheManager.modStreams.get('newComm') as SPoll<Snoowrap.Submission | Snoowrap.Comment>;
+                    } else {
+                        stream = new CommentStream(this.client, {
+                            subreddit: this.subreddit.display_name,
+                            limit: limit,
+                            pollTime: interval * 1000,
+                            clearProcessed,
+                            logger: this.logger,
+                        });
+                    }
                     break;
+                default:
+                    this.logger.error(`The polling source '${pollOn}' does not exist. Valid sources: unmoderated | modqueue | newComm | newSub`);
+                    continue;
+            }
+
+            if(stream === undefined) {
+                this.logger.error(`Should have found polling source for '${pollOn}' but it did not exist for some reason!`);
+                continue;
             }
 
             stream.once('listing', async (listing) => {
@@ -1019,6 +1048,9 @@ export class Manager extends EventEmitter {
                 this.logger.warn('No submission or comment checks found!');
             }
 
+            if (this.streams.length > 0) {
+                this.logger.debug(`Starting own streams => ${this.streams.map(x => `${x.name.toUpperCase()} ${x.frequency / 1000}s interval`).join(' | ')}`)
+            }
             for (const s of this.streams) {
                 s.startInterval();
             }

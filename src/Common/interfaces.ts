@@ -1446,18 +1446,31 @@ export interface BotInstanceJsonConfig {
      * */
     polling?: PollingDefaults & {
         /**
-         * If set to `true` all subreddits polling unmoderated/modqueue with default polling settings will share a request to "r/mod"
-         * otherwise each subreddit will poll its own mod view
+         * DEPRECATED: See `shared`
+         *
+         *  Using the ENV or ARG will sett `unmoderated` and `modqueue` on `shared`
          *
          * * ENV => `SHARE_MOD`
          * * ARG => `--shareMod`
          *
          * @default false
+         * @deprecated
          * */
         sharedMod?: boolean,
 
         /**
-         * If sharing a mod stream stagger pushing relevant Activities to individual subreddits.
+         * Set which polling sources should be shared among subreddits using default polling settings for that source
+         *
+         * * For `unmoderated and `modqueue` the bot will poll on **r/mod** for new activities
+         * * For `newSub` and `newComm` all subreddits sharing the source will be combined to poll like **r/subreddit1+subreddit2/new**
+         *
+         * If set to `true` all polling sources will be shared,  otherwise specify which sourcs should be shared as a list
+         *
+         * */
+        shared?: PollOn[] | true,
+
+        /**
+         * If sharing a stream staggers pushing relevant Activities to individual subreddits.
          *
          * Useful when running many subreddits and rules are potentially cpu/memory/traffic heavy -- allows spreading out load
          * */
@@ -1769,7 +1782,7 @@ export interface BotInstanceConfig extends BotInstanceJsonConfig {
         heartbeatInterval: number,
     },
     polling: {
-        sharedMod: boolean,
+        shared: PollOn[],
         stagger?: number,
         limit: number,
         interval: number,

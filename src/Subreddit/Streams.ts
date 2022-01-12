@@ -5,17 +5,24 @@ import {PollConfiguration} from "snoostorm/out/util/Poll";
 import {ClearProcessedOptions, DEFAULT_POLLING_INTERVAL} from "../Common/interfaces";
 import dayjs, {Dayjs} from "dayjs";
 import { Duration } from "dayjs/plugin/duration";
-import {parseDuration, random} from "../util";
+import {mergeArr, parseDuration, random} from "../util";
+import { Logger } from "winston";
 
 type Awaitable<T> = Promise<T> | T;
 
 interface RCBPollingOptions extends SnooStormOptions {
     subreddit: string,
     clearProcessed?: ClearProcessedOptions
+    enforceContinuity?: boolean
+    logger: Logger
+    name?: string
 }
 
 interface RCBPollConfiguration<T> extends PollConfiguration<T> {
     clearProcessed?: ClearProcessedOptions
+    enforceContinuity?: boolean
+    logger: Logger
+    name?: string
 }
 
 export class SPoll<T extends object> extends Poll<T> {
@@ -23,22 +30,38 @@ export class SPoll<T extends object> extends Poll<T> {
     getter: () => Awaitable<T[]>;
     frequency;
     running: boolean = false;
+    newStart: boolean = true;
+    enforceContinuity: boolean;
     clearProcessedDuration?: Duration;
     clearProcessedSize?: number;
     clearProcessedAfter?: Dayjs;
     retainProcessed: number = 0;
     randInterval?: { clear: () => void };
+    name: string = 'Reddit Stream';
+    logger: Logger;
 
     constructor(options: RCBPollConfiguration<T>) {
         super(options);
-        this.identifier = options.identifier;
-        this.getter = options.get;
-        this.frequency = options.frequency;
+        const {
+            identifier,
+            get,
+            frequency,
+            clearProcessed = {},
+            enforceContinuity = false,
+            logger,
+            name,
+        } = options;
+        this.name = name !== undefined ? name : this.name;
+        this.logger = logger.child({labels: [`Polling`, this.name]}, mergeArr)
+        this.identifier = identifier;
+        this.getter = get;
+        this.frequency = frequency;
+        this.enforceContinuity = enforceContinuity;
         const {
             after,
             size,
             retain = 0,
-        } = options.clearProcessed || {};
+        } = clearProcessed || {};
         if(after !== undefined) {
             this.clearProcessedDuration = parseDuration(after);
         }
@@ -54,18 +77,33 @@ export class SPoll<T extends object> extends Poll<T> {
         this.interval = setTimeout((function (self) {
             return async () => {
                 try {
-                    const batch = await self.getter();
+                    self.logger.debug('Polling...');
+                    let batch = await self.getter();
                     const newItems: T[] = [];
-                    for (const item of batch) {
-                        const id = item[self.identifier];
-                        if (self.processed.has(id)) continue;
+                    let anyAlreadySeen = false;
+                    let page = 1;
+                    while(page === 1 || (self.enforceContinuity && !self.newStart && !anyAlreadySeen)) {
+                        if(page !== 1) {
+                            self.logger.debug(`Did not find any already seen activities and continuity is enforced. This probably means there were more new items than 1 api call can return. Fetching next page (${page})...`);
+                            // @ts-ignore
+                            batch = await batch.fetchMore({amount: 100});
+                        }
+                        for (const item of batch) {
+                            const id = item[self.identifier];
+                            if (self.processed.has(id)) {
+                                anyAlreadySeen = true;
+                                continue;
+                            }
 
-                        // Emit for new items and add it to the list
-                        newItems.push(item);
-                        self.processed.add(id);
-                        self.emit("item", item);
+                            // Emit for new items and add it to the list
+                            newItems.push(item);
+                            self.processed.add(id);
+                            self.emit("item", item);
+                        }
+                        page++;
                     }
-
+                    self.newStart = false;
+                    self.logger.debug(`Found ${newItems.length} new items`);
                     // Emit the new listing of all new items
                     self.emit("listing", newItems);
 
@@ -85,6 +123,7 @@ export class SPoll<T extends object> extends Poll<T> {
 
     end = () => {
         this.running = false;
+        this.newStart = true;
         super.end();
     }
 }
@@ -97,7 +136,10 @@ export class UnmoderatedStream extends SPoll<Snoowrap.Submission | Snoowrap.Comm
             frequency: options.pollTime || DEFAULT_POLLING_INTERVAL * 1000,
             get: async () => client.getSubreddit(options.subreddit).getUnmoderated(options),
             identifier: "id",
-            clearProcessed: options.clearProcessed
+            clearProcessed: options.clearProcessed,
+            enforceContinuity: options.enforceContinuity,
+            logger: options.logger,
+            name: 'Unmoderated',
         });
     }
 }
@@ -110,7 +152,10 @@ export class ModQueueStream extends SPoll<Snoowrap.Submission | Snoowrap.Comment
             frequency: options.pollTime || DEFAULT_POLLING_INTERVAL * 1000,
             get: async () => client.getSubreddit(options.subreddit).getModqueue(options),
             identifier: "id",
-            clearProcessed: options.clearProcessed
+            clearProcessed: options.clearProcessed,
+            enforceContinuity: options.enforceContinuity,
+            logger: options.logger,
+            name: 'Modqueue'
         });
     }
 }
@@ -123,7 +168,10 @@ export class SubmissionStream extends SPoll<Snoowrap.Submission | Snoowrap.Comme
             frequency: options.pollTime || DEFAULT_POLLING_INTERVAL * 1000,
             get: async () => client.getNew(options.subreddit, options),
             identifier: "id",
-            clearProcessed: options.clearProcessed
+            clearProcessed: options.clearProcessed,
+            enforceContinuity: options.enforceContinuity,
+            logger: options.logger,
+            name: 'Submission'
         });
     }
 }
@@ -136,7 +184,10 @@ export class CommentStream extends SPoll<Snoowrap.Submission | Snoowrap.Comment>
             frequency: options.pollTime || DEFAULT_POLLING_INTERVAL * 1000,
             get: async () => client.getNewComments(options.subreddit, options),
             identifier: "id",
-            clearProcessed: options.clearProcessed
+            clearProcessed: options.clearProcessed,
+            enforceContinuity: options.enforceContinuity,
+            logger: options.logger,
+            name: 'Comment'
         });
     }
 }
