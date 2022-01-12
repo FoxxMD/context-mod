@@ -41,17 +41,14 @@ const status = () => {
         if(req.serverBot !== undefined) {
             bots = [req.serverBot];
         } else {
-            bots = (req.user as Express.User).isOperator ? req.botApp.bots : req.botApp.bots.filter(x => {
-                const i = intersect(req.user?.subreddits as string[], x.subManagers.map(y => y.subreddit.display_name));
-                return i.length > 0;
-            });
+            bots = req.user?.accessibleBots(req.botApp.bots) as Bot[];
         }
         const botResponses: BotStatusResponse[] = [];
         for(const b of bots) {
             botResponses.push(await botStatResponse(b, req, botLogMap));
         }
         const system: any = {};
-        if((req.user as Express.User).isOperator) {
+        if(req.user?.isInstanceOperator(req.botApp)) {
             // @ts-ignore
             system.logs = filterLogBySubreddit(new Map([['app', systemLogs]]), [], {level, sort, limit, operator: true}).get('app');
         }
@@ -72,14 +69,11 @@ const status = () => {
             lastCheck
         } = req.query;
 
-        const {name: userName, realManagers = [], isOperator} = req.user as Express.User;
-        const user = userName as string;
-        const subreddits = realManagers;
-        //const isOperator = opNames.includes(user.toLowerCase())
+        const user = req.user?.name as string;
 
-        const logs = filterLogBySubreddit(botLogMap.get(bot.botName as string) || new Map(), realManagers, {
+        const logs = filterLogBySubreddit(botLogMap.get(bot.botName as string) || new Map(), req.user?.accessibleSubreddits(bot).map(x => x.displayLabel) as string[], {
             level: (level as string),
-            operator: isOperator,
+            operator: req.user?.isInstanceOperator(req.botApp),
             user,
             // @ts-ignore
             sort,
@@ -87,18 +81,11 @@ const status = () => {
         });
 
         const subManagerData = [];
-        for (const s of subreddits) {
-            const m = bot.subManagers.find(x => x.displayLabel === s) as Manager;
-            if(m === undefined) {
-                continue;
-            }
-            if(!(req.user as Express.User).isOperator && !(req.user?.subreddits as string[]).includes(m.subreddit.display_name)) {
-                continue;
-            }
+        for (const m of req.user?.accessibleSubreddits(bot) as Manager[]) {
             const sd = {
-                name: s,
+                name: m.displayLabel,
                 //linkName: s.replace(/\W/g, ''),
-                logs: logs.get(s) || [], // provide a default empty value in case we truly have not logged anything for this subreddit yet
+                logs: logs.get(m.displayLabel) || [], // provide a default empty value in case we truly have not logged anything for this subreddit yet
                 botState: m.botState,
                 eventsState: m.eventsState,
                 queueState: m.queueState,

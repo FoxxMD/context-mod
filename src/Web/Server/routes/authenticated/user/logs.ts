@@ -24,7 +24,9 @@ const logs = (subLogMap: Map<string, LogEntry[]>) => {
 
         const logger = winston.loggers.get('app');
 
-        const {name: userName, realManagers = [], isOperator} = req.user as Express.User;
+        const userName = req.user?.name as string;
+        const isOperator = req.user?.isInstanceOperator(req.botApp);
+        const realManagers = req.botApp.bots.map(x => req.user?.accessibleSubreddits(x).map(x => x.displayLabel)).flat() as string[];
         const {level = 'verbose', stream, limit = 200, sort = 'descending', streamObjects = false} = req.query;
         if (stream) {
             const origin = req.header('X-Forwarded-For') ?? req.header('host');

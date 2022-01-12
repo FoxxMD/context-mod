@@ -3,7 +3,10 @@
   "compilerOptions": {
     "sourceMap": true,
     "resolveJsonModule": true,
-    "typeRoots": ["./src/Web/types"]
+    "typeRoots": [
+      "./node_modules/@types",
+      "./src/Web/types"
+    ]
   },
 //  "compilerOptions": {
 //    "module": "es6",
