@@ -8,6 +8,7 @@ import {IncomingMessage} from "http";
 import Submission from "snoowrap/dist/objects/Submission";
 import Comment from "snoowrap/dist/objects/Comment";
 import RedditUser from "snoowrap/dist/objects/RedditUser";
+import {AuthorOptions} from "../Author/Author";
 
 /**
  * An ISO 8601 Duration
@@ -821,6 +822,13 @@ export interface ManagerOptions {
     notifications?: NotificationConfig
 
     credentials?: ThirdPartyCredentialsJsonConfig
+
+    /**
+     * Set the default filter criteria for all checks. If this property is specified it will override any defaults passed from the bot's config
+     *
+     * Default behavior is to exclude all mods and automoderator from checks
+     * */
+    filterCriteriaDefaults?: FilterCriteriaDefaults
 }
 
 /**
@@ -1318,6 +1326,27 @@ export interface SnoowrapOptions {
     debug?: boolean,
 }
 
+export type FilterCriteriaDefaultBehavior = 'replace' | 'merge';
+
+export interface FilterCriteriaDefaults {
+    itemIs?: TypedActivityStates
+    /**
+     * Determine how itemIs defaults behave when itemIs is present on the check
+     *
+     * * merge => adds defaults to check's itemIs
+     * * replace => check itemIs will replace defaults (no defaults used)
+     * */
+    itemIsBehavior?: FilterCriteriaDefaultBehavior
+    /**
+     * Determine how authorIs defaults behave when authorIs is present on the check
+     *
+     * * merge => merges defaults with check's authorIs
+     * * replace => check authorIs will replace defaults (no defaults used)
+     * */
+    authorIs?: AuthorOptions
+    authorIsBehavior?: FilterCriteriaDefaultBehavior
+}
+
 /**
  * The configuration for an **individual reddit account** ContextMod will run as a bot.
  *
@@ -1345,6 +1374,13 @@ export interface BotInstanceJsonConfig {
      * Set to an empty object to "ignore" any top-level config
      * */
     snoowrap?: SnoowrapOptions
+
+    /**
+     * Define the default behavior for all filter criteria on all checks in all subreddits
+     *
+     * Defaults to exclude mods and automoderator from checks
+     * */
+    filterCriteriaDefaults?: FilterCriteriaDefaults
 
     /**
      * Settings related to bot behavior for subreddits it is managing

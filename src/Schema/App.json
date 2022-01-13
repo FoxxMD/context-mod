@@ -981,25 +981,6 @@
             ],
             "type": "string"
         },
-        "ClearProcessedOptions": {
-            "description": "For very long-running, high-volume subreddits clearing the list of processed activities helps manage memory bloat\n\nAll of these options have default values based on the limit and/or interval set for polling options on each subreddit stream. They only need to modified if the defaults are not sufficient.\n\nIf both `after` and `size` are defined whichever is hit first will trigger the list to clear. `after` will be reset after ever clear.",
-            "properties": {
-                "after": {
-                    "description": "An interval the processed list should be cleared after.\n\n* EX `9 days`\n* EX `3 months`\n* EX `5 minutes`",
-                    "pattern": "^\\s*(?<time>\\d+)\\s*(?<unit>days?|weeks?|months?|years?|hours?|minutes?|seconds?|milliseconds?)\\s*$",
-                    "type": "string"
-                },
-                "retain": {
-                    "description": "The number of activities to retain in processed list after clearing.\n\nDefaults to `limit` value from `PollingOptions`",
-                    "type": "number"
-                },
-                "size": {
-                    "description": "Number of activities found in processed list after which the list should be cleared.\n\nDefaults to the `limit` value from `PollingOptions`",
-                    "type": "number"
-                }
-            },
-            "type": "object"
-        },
         "CommentActionJson": {
             "description": "Reply to the Activity. For a submission the reply will be a top-level comment.",
             "properties": {
@@ -1432,6 +1413,61 @@
                         0
                     ],
                     "type": "number"
+                }
+            },
+            "type": "object"
+        },
+        "FilterCriteriaDefaults": {
+            "properties": {
+                "authorIs": {
+                    "$ref": "#/definitions/AuthorOptions",
+                    "description": "Determine how authorIs defaults behave when authorIs is present on the check\n\n* merge => merges defaults with check's authorIs\n* replace => check authorIs will replace defaults (no defaults used)",
+                    "examples": [
+                        {
+                            "include": [
+                                {
+                                    "flairText": [
+                                        "Contributor",
+                                        "Veteran"
+                                    ]
+                                },
+                                {
+                                    "isMod": true
+                                }
+                            ]
+                        }
+                    ]
+                },
+                "authorIsBehavior": {
+                    "enum": [
+                        "merge",
+                        "replace"
+                    ],
+                    "type": "string"
+                },
+                "itemIs": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "$ref": "#/definitions/SubmissionState"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "items": {
+                                "$ref": "#/definitions/CommentState"
+                            },
+                            "type": "array"
+                        }
+                    ]
+                },
+                "itemIsBehavior": {
+                    "description": "Determine how itemIs defaults behave when itemIs is present on the check\n\n* merge => adds defaults to check's itemIs\n* replace => check itemIs will replace defaults (no defaults used)",
+                    "enum": [
+                        "merge",
+                        "replace"
+                    ],
+                    "type": "string"
                 }
             },
             "type": "object"
@@ -2110,10 +2146,6 @@
                 }
             ],
             "properties": {
-                "clearProcessed": {
-                    "$ref": "#/definitions/ClearProcessedOptions",
-                    "description": "For very long-running, high-volume subreddits clearing the list of processed activities helps manage memory bloat\n\nAll of these options have default values based on the limit and/or interval set for polling options on each subreddit stream. They only need to modified if the defaults are not sufficient.\n\nIf both `after` and `size` are defined whichever is hit first will trigger the list to clear. `after` will be reset after ever clear."
-                },
                 "delayUntil": {
                     "description": "Delay processing Activity until it is `N` seconds old\n\nUseful if there are other bots that may process an Activity and you want this bot to run first/last/etc.\n\nIf the Activity is already `N` seconds old when it is initially retrieved no refresh of the Activity occurs (no API request is made) and it is immediately processed.",
                     "type": "number"
@@ -3797,6 +3829,10 @@
                 true
             ],
             "type": "boolean"
+        },
+        "filterCriteriaDefaults": {
+            "$ref": "#/definitions/FilterCriteriaDefaults",
+            "description": "Set the default filter criteria for all checks. If this property is specified it will override any defaults passed from the bot's config\n\nDefault behavior is to exclude all mods and automoderator from checks"
         },
         "footer": {
             "anyOf": [

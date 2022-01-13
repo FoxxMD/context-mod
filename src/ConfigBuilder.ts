@@ -31,7 +31,11 @@ import {
     CacheOptions,
     BotInstanceJsonConfig,
     BotInstanceConfig,
-    RequiredWebRedditCredentials, RedditCredentials, BotCredentialsJsonConfig, BotCredentialsConfig
+    RequiredWebRedditCredentials,
+    RedditCredentials,
+    BotCredentialsJsonConfig,
+    BotCredentialsConfig,
+    FilterCriteriaDefaults, TypedActivityStates
 } from "./Common/interfaces";
 import {isRuleSetJSON, RuleSetJson, RuleSetObjectJson} from "./Rule/RuleSet";
 import deepEqual from "fast-deep-equal";
@@ -42,8 +46,9 @@ import {GetEnvVars} from 'env-cmd';
 import {operatorConfig} from "./Utils/CommandConfig";
 import merge from 'deepmerge';
 import * as process from "process";
-import {cacheOptDefaults, cacheTTLDefaults} from "./Common/defaults";
+import {cacheOptDefaults, cacheTTLDefaults, filterCriteriaDefault} from "./Common/defaults";
 import objectHash from "object-hash";
+import {AuthorCriteria, AuthorOptions} from "./Author/Author";
 
 export interface ConfigBuilderOptions {
     logger: Logger,
@@ -115,22 +120,45 @@ export class ConfigBuilder {
         return validConfig as JSONConfig;
     }
 
-    parseToStructured(config: JSONConfig): CheckStructuredJson[] {
+    parseToStructured(config: JSONConfig, filterCriteriaDefaultsFromBot?: FilterCriteriaDefaults): CheckStructuredJson[] {
         let namedRules: Map<string, RuleObjectJson> = new Map();
         let namedActions: Map<string, ActionObjectJson> = new Map();
-        const {checks = []} = config;
+        const {checks = [], filterCriteriaDefaults} = config;
         for (const c of checks) {
             const {rules = []} = c;
             namedRules = extractNamedRules(rules, namedRules);
             namedActions = extractNamedActions(c.actions, namedActions);
         }
 
+        const filterDefs = filterCriteriaDefaults ?? filterCriteriaDefaultsFromBot;
+        const {
+            authorIsBehavior = 'merge',
+            itemIsBehavior = 'merge',
+            authorIs: authorIsDefault = {},
+            itemIs: itemIsDefault = []
+        } = filterDefs || {};
+
         const structuredChecks: CheckStructuredJson[] = [];
         for (const c of checks) {
-            const {rules = []} = c;
+            const {rules = [], authorIs = {}, itemIs = []} = c;
             const strongRules = insertNamedRules(rules, namedRules);
             const strongActions = insertNamedActions(c.actions, namedActions);
-            const strongCheck = {...c, rules: strongRules, actions: strongActions} as CheckStructuredJson;
+
+            let derivedAuthorIs: AuthorOptions = authorIsDefault;
+            if(authorIsBehavior === 'merge') {
+                derivedAuthorIs = merge.all([authorIs, authorIsDefault], {arrayMerge: overwriteMerge});
+            } else if(Object.keys(authorIs).length > 0) {
+                derivedAuthorIs = authorIs;
+            }
+
+            let derivedItemIs: TypedActivityStates = itemIsDefault;
+            if(itemIsBehavior === 'merge') {
+                derivedItemIs = [...itemIs, ...itemIsDefault];
+            } else if(itemIs.length > 0) {
+                derivedItemIs = itemIs;
+            }
+
+            const strongCheck = {...c, authorIs: derivedAuthorIs, itemIs: derivedItemIs, rules: strongRules, actions: strongActions} as CheckStructuredJson;
             structuredChecks.push(strongCheck);
         }
 
@@ -631,6 +659,7 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
     let hydratedBots: BotInstanceConfig[] = bots.map(x => {
         const {
             name: botName,
+            filterCriteriaDefaults = filterCriteriaDefault,
             polling: {
                 sharedMod,
                 shared = [],
@@ -757,6 +786,7 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
         return {
             name: botName,
             snoowrap,
+            filterCriteriaDefaults,
             subreddits: {
                 names,
                 exclude,

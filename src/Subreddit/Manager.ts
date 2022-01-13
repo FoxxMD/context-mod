@@ -24,7 +24,7 @@ import {
     ActionedEvent,
     ActionResult,
     DEFAULT_POLLING_INTERVAL,
-    DEFAULT_POLLING_LIMIT, Invokee,
+    DEFAULT_POLLING_LIMIT, FilterCriteriaDefaults, Invokee,
     ManagerOptions, ManagerStateChangeOption, ManagerStats, PAUSED,
     PollingOptionsStrong, PollOn, RUNNING, RunState, STOPPED, SYSTEM, USER
 } from "../Common/interfaces";
@@ -95,6 +95,7 @@ export class Manager extends EventEmitter {
     lastWikiRevision?: DayjsObj
     lastWikiCheck: DayjsObj = dayjs();
     wikiFormat: ('yaml' | 'json') = 'yaml';
+    filterCriteriaDefaults?: FilterCriteriaDefaults
     //wikiUpdateRunning: boolean = false;
 
     streams: Map<string, SPoll<Snoowrap.Submission | Snoowrap.Comment>> = new Map();
@@ -195,7 +196,7 @@ export class Manager extends EventEmitter {
     constructor(sub: Subreddit, client: ExtendedSnoowrap, logger: Logger, cacheManager: BotResourcesManager, opts: RuntimeManagerOptions = {botName: 'ContextMod', maxWorkers: 1}) {
         super();
 
-        const {dryRun, sharedStreams = [], wikiLocation = 'botconfig/contextbot', botName, maxWorkers} = opts;
+        const {dryRun, sharedStreams = [], wikiLocation = 'botconfig/contextbot', botName, maxWorkers, filterCriteriaDefaults} = opts;
         this.displayLabel = opts.nickname || `${sub.display_name_prefixed}`;
         const getLabels = this.getCurrentLabels;
         const getDisplay = this.getDisplay;
@@ -211,6 +212,7 @@ export class Manager extends EventEmitter {
         }, mergeArr);
         this.globalDryRun = dryRun;
         this.wikiLocation = wikiLocation;
+        this.filterCriteriaDefaults = filterCriteriaDefaults;
         this.sharedStreams = sharedStreams;
         this.pollingRetryHandler = createRetryHandler({maxRequestRetry: 3, maxOtherRetry: 2}, this.logger);
         this.subreddit = sub;
@@ -417,7 +419,7 @@ export class Manager extends EventEmitter {
 
             const commentChecks: Array<CommentCheck> = [];
             const subChecks: Array<SubmissionCheck> = [];
-            const structuredChecks = configBuilder.parseToStructured(validJson);
+            const structuredChecks = configBuilder.parseToStructured(validJson, this.filterCriteriaDefaults);
 
             // TODO check that bot has permissions for subreddit for all specified actions
             // can find permissions in this.subreddit.mod_permissions

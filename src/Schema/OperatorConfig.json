@@ -1,6 +1,152 @@
 {
     "$schema": "http://json-schema.org/draft-07/schema#",
     "definitions": {
+        "AuthorCriteria": {
+            "additionalProperties": false,
+            "description": "Criteria with which to test against the author of an Activity. The outcome of the test is based on:\n\n1. All present properties passing and\n2. If a property is a list then any value from the list matching",
+            "examples": [
+                {
+                    "flairText": [
+                        "Contributor",
+                        "Veteran"
+                    ],
+                    "isMod": true,
+                    "name": [
+                        "FoxxMD",
+                        "AnotherUser"
+                    ]
+                }
+            ],
+            "minProperties": 1,
+            "properties": {
+                "age": {
+                    "description": "Test the age of the Author's account (when it was created) against this comparison\n\nThe syntax is `(< OR > OR <= OR >=) <number> <unit>`\n\n* EX `> 100 days` => Passes if Author's account is older than 100 days\n* EX `<= 2 months` => Passes if Author's account is younger than or equal to 2 months\n\nUnit must be one of [DayJS Duration units](https://day.js.org/docs/en/durations/creating)\n\n[See] https://regexr.com/609n8 for example",
+                    "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(days?|weeks?|months?|years?|hours?|minutes?|seconds?|milliseconds?)\\s*$",
+                    "type": "string"
+                },
+                "commentKarma": {
+                    "description": "A string containing a comparison operator and a value to compare karma against\n\nThe syntax is `(< OR > OR <= OR >=) <number>[percent sign]`\n\n* EX `> 100`  => greater than 100 comment karma\n* EX `<= 75%` => comment karma is less than or equal to 75% of **all karma**",
+                    "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
+                    "type": "string"
+                },
+                "description": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "string"
+                        }
+                    ],
+                    "description": "An (array of) string/regular expression to test contents of an Author's profile description against\n\nIf no flags are specified then the **insensitive** flag is used by default\n\nIf using an array then if **any** value in the array passes the description test passes",
+                    "examples": [
+                        [
+                            "/test$/i",
+                            "look for this string literal"
+                        ]
+                    ]
+                },
+                "flairCssClass": {
+                    "description": "A list of (user) flair css class values from the subreddit to match against",
+                    "examples": [
+                        "red"
+                    ],
+                    "items": {
+                        "type": "string"
+                    },
+                    "type": "array"
+                },
+                "flairText": {
+                    "description": "A list of (user) flair text values from the subreddit to match against",
+                    "examples": [
+                        "Approved"
+                    ],
+                    "items": {
+                        "type": "string"
+                    },
+                    "type": "array"
+                },
+                "isMod": {
+                    "description": "Is the author a moderator?",
+                    "type": "boolean"
+                },
+                "linkKarma": {
+                    "description": "A string containing a comparison operator and a value to compare link karma against\n\nThe syntax is `(< OR > OR <= OR >=) <number>[percent sign]`\n\n* EX `> 100`  => greater than 100 link karma\n* EX `<= 75%` => link karma is less than or equal to 75% of **all karma**",
+                    "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "A list of reddit usernames (case-insensitive) to match against. Do not include the \"u/\" prefix\n\n EX to match against /u/FoxxMD and /u/AnotherUser use [\"FoxxMD\",\"AnotherUser\"]",
+                    "examples": [
+                        "FoxxMD",
+                        "AnotherUser"
+                    ],
+                    "items": {
+                        "type": "string"
+                    },
+                    "type": "array"
+                },
+                "shadowBanned": {
+                    "description": "Is the author shadowbanned?\n\nThis is determined by trying to retrieve the author's profile. If a 404 is returned it is likely they are shadowbanned",
+                    "type": "boolean"
+                },
+                "totalKarma": {
+                    "description": "A string containing a comparison operator and a value to compare against\n\nThe syntax is `(< OR > OR <= OR >=) <number>`\n\n* EX `> 100`  => greater than 100",
+                    "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
+                    "type": "string"
+                },
+                "userNotes": {
+                    "description": "A list of UserNote properties to check against the User Notes attached to this Author in this Subreddit (must have Toolbox enabled and used User Notes at least once)",
+                    "items": {
+                        "$ref": "#/definitions/UserNoteCriteria"
+                    },
+                    "type": "array"
+                },
+                "verified": {
+                    "description": "Does Author's account have a verified email?",
+                    "type": "boolean"
+                }
+            },
+            "type": "object"
+        },
+        "AuthorOptions": {
+            "description": "If present then these Author criteria are checked before running the rule. If criteria fails then the rule is skipped.",
+            "examples": [
+                {
+                    "include": [
+                        {
+                            "flairText": [
+                                "Contributor",
+                                "Veteran"
+                            ]
+                        },
+                        {
+                            "isMod": true
+                        }
+                    ]
+                }
+            ],
+            "properties": {
+                "exclude": {
+                    "description": "Only runs if `include` is not present. Will \"pass\" if any of set of the AuthorCriteria **does not** pass",
+                    "items": {
+                        "$ref": "#/definitions/AuthorCriteria"
+                    },
+                    "type": "array"
+                },
+                "include": {
+                    "description": "Will \"pass\" if any set of AuthorCriteria passes",
+                    "items": {
+                        "$ref": "#/definitions/AuthorCriteria"
+                    },
+                    "type": "array"
+                }
+            },
+            "type": "object"
+        },
         "BotConnection": {
             "description": "Configuration required to connect to a CM Server",
             "properties": {
@@ -57,6 +203,10 @@
                             "$ref": "#/definitions/BotCredentialsJsonConfig"
                         }
                     ]
+                },
+                "filterCriteriaDefaults": {
+                    "$ref": "#/definitions/FilterCriteriaDefaults",
+                    "description": "Define the default behavior for all filter criteria on all checks in all subreddits\n\nDefaults to exclude mods and automoderator from checks"
                 },
                 "name": {
                     "type": "string"
@@ -276,6 +426,73 @@
             ],
             "type": "string"
         },
+        "CommentState": {
+            "description": "Different attributes a `Comment` can be in. Only include a property if you want to check it.",
+            "examples": [
+                {
+                    "op": true,
+                    "removed": false
+                }
+            ],
+            "properties": {
+                "age": {
+                    "description": "A duration and how to compare it against a value\n\nThe syntax is `(< OR > OR <= OR >=) <number> <unit>` EX `> 100 days`, `<= 2 months`\n\n* EX `> 100 days` => Passes if the date being compared is before 100 days ago\n* EX `<= 2 months` => Passes if the date being compared is after or equal to 2 months\n\nUnit must be one of [DayJS Duration units](https://day.js.org/docs/en/durations/creating)\n\n[See] https://regexr.com/609n8 for example",
+                    "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(days|weeks|months|years|hours|minutes|seconds|milliseconds)\\s*$",
+                    "type": "string"
+                },
+                "approved": {
+                    "type": "boolean"
+                },
+                "deleted": {
+                    "type": "boolean"
+                },
+                "depth": {
+                    "description": "The (nested) level of a comment.\n\n* 0 mean the comment is at top-level (replying to submission)\n* non-zero, Nth value means the comment has N parent comments",
+                    "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(days|weeks|months|years|hours|minutes|seconds|milliseconds)\\s*$",
+                    "type": "string"
+                },
+                "distinguished": {
+                    "type": "boolean"
+                },
+                "filtered": {
+                    "type": "boolean"
+                },
+                "locked": {
+                    "type": "boolean"
+                },
+                "op": {
+                    "description": "Is this Comment Author also the Author of the Submission this comment is in?",
+                    "type": "boolean"
+                },
+                "removed": {
+                    "type": "boolean"
+                },
+                "reports": {
+                    "description": "A string containing a comparison operator and a value to compare against\n\nThe syntax is `(< OR > OR <= OR >=) <number>`\n\n* EX `> 2`  => greater than 2 total reports\n\nDefaults to TOTAL reports on an Activity. Suffix the value with the report type to check that type:\n\n* EX `> 3 mod` => greater than 3 mod reports\n* EX `>= 1 user` => greater than 1 user report",
+                    "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
+                    "type": "string"
+                },
+                "score": {
+                    "description": "A string containing a comparison operator and a value to compare against\n\nThe syntax is `(< OR > OR <= OR >=) <number>`\n\n* EX `> 100`  => greater than 100",
+                    "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
+                    "type": "string"
+                },
+                "spam": {
+                    "type": "boolean"
+                },
+                "stickied": {
+                    "type": "boolean"
+                },
+                "submissionState": {
+                    "description": "A list of SubmissionState attributes to test the Submission this comment is in",
+                    "items": {
+                        "$ref": "#/definitions/SubmissionState"
+                    },
+                    "type": "array"
+                }
+            },
+            "type": "object"
+        },
         "DiscordProviderConfig": {
             "properties": {
                 "name": {
@@ -296,6 +513,61 @@
                 "type",
                 "url"
             ],
+            "type": "object"
+        },
+        "FilterCriteriaDefaults": {
+            "properties": {
+                "authorIs": {
+                    "$ref": "#/definitions/AuthorOptions",
+                    "description": "Determine how authorIs defaults behave when authorIs is present on the check\n\n* merge => merges defaults with check's authorIs\n* replace => check authorIs will replace defaults (no defaults used)",
+                    "examples": [
+                        {
+                            "include": [
+                                {
+                                    "flairText": [
+                                        "Contributor",
+                                        "Veteran"
+                                    ]
+                                },
+                                {
+                                    "isMod": true
+                                }
+                            ]
+                        }
+                    ]
+                },
+                "authorIsBehavior": {
+                    "enum": [
+                        "merge",
+                        "replace"
+                    ],
+                    "type": "string"
+                },
+                "itemIs": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "$ref": "#/definitions/SubmissionState"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "items": {
+                                "$ref": "#/definitions/CommentState"
+                            },
+                            "type": "array"
+                        }
+                    ]
+                },
+                "itemIsBehavior": {
+                    "description": "Determine how itemIs defaults behave when itemIs is present on the check\n\n* merge => adds defaults to check's itemIs\n* replace => check itemIs will replace defaults (no defaults used)",
+                    "enum": [
+                        "merge",
+                        "replace"
+                    ],
+                    "type": "string"
+                }
+            },
             "type": "object"
         },
         "NotificationConfig": {
@@ -566,6 +838,80 @@
             },
             "type": "object"
         },
+        "SubmissionState": {
+            "description": "Different attributes a `Submission` can be in. Only include a property if you want to check it.",
+            "examples": [
+                {
+                    "over_18": true,
+                    "removed": false
+                }
+            ],
+            "properties": {
+                "age": {
+                    "description": "A duration and how to compare it against a value\n\nThe syntax is `(< OR > OR <= OR >=) <number> <unit>` EX `> 100 days`, `<= 2 months`\n\n* EX `> 100 days` => Passes if the date being compared is before 100 days ago\n* EX `<= 2 months` => Passes if the date being compared is after or equal to 2 months\n\nUnit must be one of [DayJS Duration units](https://day.js.org/docs/en/durations/creating)\n\n[See] https://regexr.com/609n8 for example",
+                    "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(days|weeks|months|years|hours|minutes|seconds|milliseconds)\\s*$",
+                    "type": "string"
+                },
+                "approved": {
+                    "type": "boolean"
+                },
+                "deleted": {
+                    "type": "boolean"
+                },
+                "distinguished": {
+                    "type": "boolean"
+                },
+                "filtered": {
+                    "type": "boolean"
+                },
+                "is_self": {
+                    "type": "boolean"
+                },
+                "link_flair_css_class": {
+                    "type": "string"
+                },
+                "link_flair_text": {
+                    "type": "string"
+                },
+                "locked": {
+                    "type": "boolean"
+                },
+                "over_18": {
+                    "description": "NSFW",
+                    "type": "boolean"
+                },
+                "pinned": {
+                    "type": "boolean"
+                },
+                "removed": {
+                    "type": "boolean"
+                },
+                "reports": {
+                    "description": "A string containing a comparison operator and a value to compare against\n\nThe syntax is `(< OR > OR <= OR >=) <number>`\n\n* EX `> 2`  => greater than 2 total reports\n\nDefaults to TOTAL reports on an Activity. Suffix the value with the report type to check that type:\n\n* EX `> 3 mod` => greater than 3 mod reports\n* EX `>= 1 user` => greater than 1 user report",
+                    "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
+                    "type": "string"
+                },
+                "score": {
+                    "description": "A string containing a comparison operator and a value to compare against\n\nThe syntax is `(< OR > OR <= OR >=) <number>`\n\n* EX `> 100`  => greater than 100",
+                    "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
+                    "type": "string"
+                },
+                "spam": {
+                    "type": "boolean"
+                },
+                "spoiler": {
+                    "type": "boolean"
+                },
+                "stickied": {
+                    "type": "boolean"
+                },
+                "title": {
+                    "description": "A valid regular expression to match against the title of the submission",
+                    "type": "string"
+                }
+            },
+            "type": "object"
+        },
         "ThirdPartyCredentialsJsonConfig": {
             "additionalProperties": {
             },
@@ -582,6 +928,43 @@
                     "type": "object"
                 }
             },
+            "type": "object"
+        },
+        "UserNoteCriteria": {
+            "properties": {
+                "count": {
+                    "default": ">= 1",
+                    "description": "Number of occurrences of this type. Ignored if `search` is `current`\n\nA string containing a comparison operator and/or a value to compare number of occurrences against\n\nThe syntax is `(< OR > OR <= OR >=) <number>[percent sign] [ascending|descending]`",
+                    "examples": [
+                        ">= 1"
+                    ],
+                    "pattern": "^\\s*(?<opStr>>|>=|<|<=)\\s*(?<value>\\d+)\\s*(?<percent>%?)\\s*(?<extra>asc.*|desc.*)*$",
+                    "type": "string"
+                },
+                "search": {
+                    "default": "current",
+                    "description": "How to test the notes for this Author:\n\n### current\n\nOnly the most recent note is checked for `type`\n\n### total\n\nThe `count` comparison of `type` must be found within all notes\n\n* EX `count: > 3`   => Must have more than 3 notes of `type`, total\n* EX `count: <= 25%` => Must have 25% or less of notes of `type`, total\n\n### consecutive\n\nThe `count` **number** of `type` notes must be found in a row.\n\nYou may also specify the time-based order in which to search the notes by specifying `ascending (asc)` or `descending (desc)` in the `count` value. Default is `descending`\n\n* EX `count: >= 3` => Must have 3 or more notes of `type` consecutively, in descending order\n* EX `count: < 2`  => Must have less than 2 notes of `type` consecutively, in descending order\n* EX `count: > 4 asc` => Must have greater than 4 notes of `type` consecutively, in ascending order",
+                    "enum": [
+                        "consecutive",
+                        "current",
+                        "total"
+                    ],
+                    "examples": [
+                        "current"
+                    ],
+                    "type": "string"
+                },
+                "type": {
+                    "description": "User Note type key to search for",
+                    "examples": [
+                        "spamwarn"
+                    ],
+                    "type": "string"
+                }
+            },
+            "required": [
+                "type"
+            ],
             "type": "object"
         },
         "WebCredentials": {

@@ -3,7 +3,17 @@ import {Logger} from "winston";
 import dayjs, {Dayjs} from "dayjs";
 import {Duration} from "dayjs/plugin/duration";
 import EventEmitter from "events";
-import {BotInstanceConfig, Invokee, PAUSED, PollOn, RUNNING, STOPPED, SYSTEM, USER} from "../Common/interfaces";
+import {
+    BotInstanceConfig,
+    FilterCriteriaDefaults,
+    Invokee,
+    PAUSED,
+    PollOn,
+    RUNNING,
+    STOPPED,
+    SYSTEM,
+    USER
+} from "../Common/interfaces";
 import {
     createRetryHandler,
     formatNumber,
@@ -33,6 +43,7 @@ class Bot {
     running: boolean = false;
     subreddits: string[];
     excludeSubreddits: string[];
+    filterCriteriaDefaults?: FilterCriteriaDefaults
     subManagers: Manager[] = [];
     heartbeatInterval: number;
     nextHeartbeat: Dayjs = dayjs();
@@ -79,6 +90,7 @@ class Bot {
         const {
             notifications,
             name,
+            filterCriteriaDefaults,
             subreddits: {
                 names = [],
                 exclude = [],
@@ -124,6 +136,7 @@ class Bot {
         this.hardLimit = hardLimit;
         this.wikiLocation = wikiConfig;
         this.heartbeatInterval = heartbeatInterval;
+        this.filterCriteriaDefaults = filterCriteriaDefaults;
         this.sharedStreams = shared;
         if(name !== undefined) {
             this.botName = name;
@@ -474,7 +487,8 @@ class Bot {
             sharedStreams: this.sharedStreams,
             wikiLocation: this.wikiLocation,
             botName: this.botName as string,
-            maxWorkers: this.maxWorkers
+            maxWorkers: this.maxWorkers,
+            filterCriteriaDefaults: this.filterCriteriaDefaults,
         });
         // all errors from managers will count towards bot-level retry count
         manager.on('error', async (err) => await this.panicOnRetries(err));
