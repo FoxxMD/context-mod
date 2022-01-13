@@ -18,8 +18,6 @@ import {
     totalFromMapStats,
     triggeredIndicator,
 } from "../util";
-import {Poll} from "snoostorm";
-import pEvent from "p-event";
 import {RuleResult} from "../Rule";
 import {ConfigBuilder, buildPollingOptions} from "../ConfigBuilder";
 import {
@@ -48,7 +46,6 @@ import {queue, QueueObject} from 'async';
 import {JSONConfig} from "../JsonConfig";
 import {CheckStructuredJson} from "../Check";
 import NotificationManager from "../Notification/NotificationManager";
-import action from "../Web/Server/routes/authenticated/user/action";
 import {createHistoricalDefaults, historicalDefaults} from "../Common/defaults";
 import {ExtendedSnoowrap} from "../Utils/SnoowrapClients";
 import {isRateLimitError, isStatusError} from "../Utils/Errors";
@@ -100,9 +97,9 @@ export class Manager extends EventEmitter {
     wikiFormat: ('yaml' | 'json') = 'yaml';
     //wikiUpdateRunning: boolean = false;
 
-    streamListedOnce: string[] = [];
-    streams: SPoll<Snoowrap.Submission | Snoowrap.Comment>[] = [];
-    modStreamCallbacks: Map<string, any> = new Map();
+    streams: Map<string, SPoll<Snoowrap.Submission | Snoowrap.Comment>> = new Map();
+    sharedStreamCallbacks: Map<string, any> = new Map();
+    pollingRetryHandler: Function;
     dryRun?: boolean;
     sharedStreams: PollOn[];
     cacheManager: BotResourcesManager;
@@ -215,6 +212,7 @@ export class Manager extends EventEmitter {
         this.globalDryRun = dryRun;
         this.wikiLocation = wikiLocation;
         this.sharedStreams = sharedStreams;
+        this.pollingRetryHandler = createRetryHandler({maxRequestRetry: 3, maxOtherRetry: 2}, this.logger);
         this.subreddit = sub;
         this.client = client;
         this.botName = botName;
@@ -359,7 +357,7 @@ export class Manager extends EventEmitter {
         return q;
     }
 
-    protected async parseConfigurationFromObject(configObj: object) {
+    protected async parseConfigurationFromObject(configObj: object, suppressChangeEvent: boolean = false) {
         try {
             const configBuilder = new ConfigBuilder({logger: this.logger});
             const validJson = configBuilder.validateJson(configObj);
@@ -449,6 +447,19 @@ export class Manager extends EventEmitter {
                 this.logger.info(checkSummary);
             }
             this.validConfigLoaded = true;
+            if(!suppressChangeEvent) {
+                this.emit('configChange');
+            }
+            if(this.eventsState.state === RUNNING) {
+                // need to update polling, potentially
+                await this.buildPolling();
+                for(const stream of this.streams.values()) {
+                    if(!stream.running) {
+                        this.logger.debug(`Starting Polling for ${stream.name.toUpperCase()} ${stream.frequency / 1000}s interval`);
+                        stream.startInterval();
+                    }
+                }
+            }
         } catch (err: any) {
             this.validConfigLoaded = false;
             throw err;
@@ -456,7 +467,7 @@ export class Manager extends EventEmitter {
     }
 
     async parseConfiguration(causedBy: Invokee = 'system', force: boolean = false, options?: ManagerStateChangeOption) {
-        const {reason, suppressNotification = false} = options || {};
+        const {reason, suppressNotification = false, suppressChangeEvent = false} = options || {};
         //this.wikiUpdateRunning = true;
         this.lastWikiCheck = dayjs();
 
@@ -564,7 +575,7 @@ export class Manager extends EventEmitter {
                 throw new ConfigParseError('Could not parse wiki page contents as JSON or YAML')
             }
 
-            await this.parseConfigurationFromObject(configObj);
+            await this.parseConfigurationFromObject(configObj, suppressChangeEvent);
             this.logger.info('Checks updated');
 
             if(!suppressNotification) {
@@ -774,152 +785,188 @@ export class Manager extends EventEmitter {
     }
 
     async buildPolling() {
-        // give current handle() time to stop
-        //await sleep(1000);
 
-        const retryHandler = createRetryHandler({maxRequestRetry: 3, maxOtherRetry: 1}, this.logger);
+        const sources: PollOn[] = ['unmoderated', 'modqueue', 'newComm', 'newSub'];
 
         const subName = this.subreddit.display_name;
 
-        for (const pollOpt of this.pollOptions) {
-            const {
-                pollOn,
-                limit,
-                interval,
-                delayUntil,
-                clearProcessed,
-            } = pollOpt;
-            let stream: SPoll<Snoowrap.Submission | Snoowrap.Comment>;
-            let modStreamType: string | undefined;
+        for (const source of sources) {
 
-            switch (pollOn) {
-                case 'unmoderated':
-                    if (limit === DEFAULT_POLLING_LIMIT && interval === DEFAULT_POLLING_INTERVAL && this.sharedStreams.includes(pollOn)) {
-                        modStreamType = 'unmoderated';
-                        // use default mod stream from resources
-                        stream = this.cacheManager.modStreams.get('unmoderated') as SPoll<Snoowrap.Submission | Snoowrap.Comment>;
-                    } else {
-                        stream = new UnmoderatedStream(this.client, {
-                            subreddit: this.subreddit.display_name,
-                            limit: limit,
-                            pollTime: interval * 1000,
-                            clearProcessed,
-                            logger: this.logger,
-                        });
-                    }
-                    break;
-                case 'modqueue':
-                    if (limit === DEFAULT_POLLING_LIMIT && interval === DEFAULT_POLLING_INTERVAL && this.sharedStreams.includes(pollOn)) {
-                        modStreamType = 'modqueue';
-                        // use default mod stream from resources
-                        stream = this.cacheManager.modStreams.get('modqueue') as SPoll<Snoowrap.Submission | Snoowrap.Comment>;
-                    } else {
-                        stream = new ModQueueStream(this.client, {
-                            subreddit: this.subreddit.display_name,
-                            limit: limit,
-                            pollTime: interval * 1000,
-                            clearProcessed,
-                            logger: this.logger,
-                        });
-                    }
-                    break;
-                case 'newSub':
-                    if (limit === DEFAULT_POLLING_LIMIT && interval === DEFAULT_POLLING_INTERVAL && this.sharedStreams.includes(pollOn)) {
-                        modStreamType = 'newSub';
-                        // use default mod stream from resources
-                        stream = this.cacheManager.modStreams.get('newSub') as SPoll<Snoowrap.Submission | Snoowrap.Comment>;
-                    } else {
-                        stream = new SubmissionStream(this.client, {
-                            subreddit: this.subreddit.display_name,
-                            limit: limit,
-                            pollTime: interval * 1000,
-                            clearProcessed,
-                            logger: this.logger,
-                        });
-                    }
-                    break;
-                case 'newComm':
-                    if (limit === DEFAULT_POLLING_LIMIT && interval === DEFAULT_POLLING_INTERVAL && this.sharedStreams.includes(pollOn)) {
-                        modStreamType = 'newComm';
-                        // use default mod stream from resources
-                        stream = this.cacheManager.modStreams.get('newComm') as SPoll<Snoowrap.Submission | Snoowrap.Comment>;
-                    } else {
-                        stream = new CommentStream(this.client, {
-                            subreddit: this.subreddit.display_name,
-                            limit: limit,
-                            pollTime: interval * 1000,
-                            clearProcessed,
-                            logger: this.logger,
-                        });
-                    }
-                    break;
-                default:
-                    this.logger.error(`The polling source '${pollOn}' does not exist. Valid sources: unmoderated | modqueue | newComm | newSub`);
-                    continue;
-            }
-
-            if(stream === undefined) {
-                this.logger.error(`Should have found polling source for '${pollOn}' but it did not exist for some reason!`);
+            if (!sources.includes(source)) {
+                this.logger.error(`'${source}' is not a valid polling source. Valid sources: unmoderated | modqueue | newComm | newSub`);
                 continue;
             }
 
-            stream.once('listing', async (listing) => {
-                if (!this.streamListedOnce.includes(pollOn)) {
-                    // warning if poll event could potentially miss activities
-                    if (this.commentChecks.length === 0 && ['unmoderated', 'modqueue', 'newComm'].some(x => x === pollOn)) {
-                        this.logger.warn(`Polling '${pollOn}' may return Comments but no comments checks were configured.`);
-                    }
-                    if (this.submissionChecks.length === 0 && ['unmoderated', 'modqueue', 'newSub'].some(x => x === pollOn)) {
-                        this.logger.warn(`Polling '${pollOn}' may return Submissions but no submission checks were configured.`);
-                    }
-                    this.streamListedOnce.push(pollOn);
+            const pollOpt = this.pollOptions.find(x => x.pollOn.toLowerCase() === source.toLowerCase());
+            if (pollOpt === undefined) {
+                if(this.sharedStreamCallbacks.has(source)) {
+                    this.logger.debug(`Removing listener for shared polling on ${source.toUpperCase()} because it no longer exists in config`);
+                    this.sharedStreamCallbacks.delete(source);
                 }
-            });
-
-            const onItem = async (item: Comment | Submission) => {
-                if (!this.streamListedOnce.includes(pollOn)) {
-                    return;
+                const existingStream = this.streams.get(source);
+                if (existingStream !== undefined) {
+                    this.logger.debug(`Stopping polling on ${source.toUpperCase()} because it no longer exists in config`);
+                    existingStream.end();
+                    this.streams.delete(source);
                 }
-                if (item.subreddit.display_name !== subName || this.eventsState.state !== RUNNING) {
-                    return;
-                }
-                let checkType: 'Submission' | 'Comment' | undefined;
-                if (item instanceof Submission) {
-                    if (this.submissionChecks.length > 0) {
-                        checkType = 'Submission';
-                    }
-                } else if (this.commentChecks.length > 0) {
-                    checkType = 'Comment';
-                }
-                if (checkType !== undefined) {
-                    this.firehose.push({checkType, activity: item, options: {delayUntil}})
-                }
-            };
-
-            if (modStreamType !== undefined) {
-                this.modStreamCallbacks.set(pollOn, onItem);
             } else {
-                stream.on('item', onItem);
-                // @ts-ignore
-                stream.on('error', async (err: any) => {
 
-                    this.emit('error', err);
+                const {
+                    limit,
+                    interval,
+                    delayUntil,
+                } = pollOpt;
+                let stream: SPoll<Snoowrap.Submission | Snoowrap.Comment>;
+                let modStreamType: string | undefined;
 
-                    if(isRateLimitError(err)) {
-                        this.logger.error('Encountered rate limit while polling! Bot is all out of requests :( Stopping subreddit queue and polling.');
-                        await this.stop();
+                switch (source) {
+                    case 'unmoderated':
+                        if (limit === DEFAULT_POLLING_LIMIT && interval === DEFAULT_POLLING_INTERVAL && this.sharedStreams.includes(source)) {
+                            modStreamType = 'unmoderated';
+                            // use default mod stream from resources
+                            stream = this.cacheManager.modStreams.get('unmoderated') as SPoll<Snoowrap.Submission | Snoowrap.Comment>;
+                        } else {
+                            stream = new UnmoderatedStream(this.client, {
+                                subreddit: this.subreddit.display_name,
+                                limit: limit,
+                                pollTime: interval * 1000,
+                                logger: this.logger,
+                            });
+                        }
+                        break;
+                    case 'modqueue':
+                        if (limit === DEFAULT_POLLING_LIMIT && interval === DEFAULT_POLLING_INTERVAL && this.sharedStreams.includes(source)) {
+                            modStreamType = 'modqueue';
+                            // use default mod stream from resources
+                            stream = this.cacheManager.modStreams.get('modqueue') as SPoll<Snoowrap.Submission | Snoowrap.Comment>;
+                        } else {
+                            stream = new ModQueueStream(this.client, {
+                                subreddit: this.subreddit.display_name,
+                                limit: limit,
+                                pollTime: interval * 1000,
+                                logger: this.logger,
+                            });
+                        }
+                        break;
+                    case 'newSub':
+                        if (limit === DEFAULT_POLLING_LIMIT && interval === DEFAULT_POLLING_INTERVAL && this.sharedStreams.includes(source)) {
+                            modStreamType = 'newSub';
+                            // use default mod stream from resources
+                            stream = this.cacheManager.modStreams.get('newSub') as SPoll<Snoowrap.Submission | Snoowrap.Comment>;
+                        } else {
+                            stream = new SubmissionStream(this.client, {
+                                subreddit: this.subreddit.display_name,
+                                limit: limit,
+                                pollTime: interval * 1000,
+                                logger: this.logger,
+                            });
+                        }
+                        break;
+                    case 'newComm':
+                        if (limit === DEFAULT_POLLING_LIMIT && interval === DEFAULT_POLLING_INTERVAL && this.sharedStreams.includes(source)) {
+                            modStreamType = 'newComm';
+                            // use default mod stream from resources
+                            stream = this.cacheManager.modStreams.get('newComm') as SPoll<Snoowrap.Submission | Snoowrap.Comment>;
+                        } else {
+                            stream = new CommentStream(this.client, {
+                                subreddit: this.subreddit.display_name,
+                                limit: limit,
+                                pollTime: interval * 1000,
+                                logger: this.logger,
+                            });
+                        }
+                        break;
+                }
+
+                if (stream === undefined) {
+                    this.logger.error(`Should have found polling source for '${source}' but it did not exist for some reason!`);
+                    continue;
+                }
+
+                const onItem = async (item: Comment | Submission) => {
+                    if (item.subreddit.display_name !== subName || this.eventsState.state !== RUNNING) {
+                        return;
                     }
-                    this.logger.error('Polling error occurred', err);
-                    const shouldRetry = await retryHandler(err);
-                    if (shouldRetry) {
-                        stream.startInterval();
+                    let checkType: 'Submission' | 'Comment' | undefined;
+                    if (item instanceof Submission) {
+                        if (this.submissionChecks.length > 0) {
+                            checkType = 'Submission';
+                        }
+                    } else if (this.commentChecks.length > 0) {
+                        checkType = 'Comment';
+                    }
+                    if (checkType !== undefined) {
+                        this.firehose.push({checkType, activity: item, options: {delayUntil}})
+                    }
+                };
+
+                if (modStreamType !== undefined) {
+                    let removedOwn = false;
+                    const existingStream = this.streams.get(source);
+                    if(existingStream !== undefined) {
+                        existingStream.end();
+                        this.streams.delete(source);
+                        removedOwn = true;
+                    }
+                    if(!this.sharedStreamCallbacks.has(source)) {
+                        stream.once('listing', this.noChecksWarning(source));
+                        this.sharedStreamCallbacks.set(source, onItem);
+                        this.logger.debug(`${removedOwn ? 'Stopped own polling and replace with ' : 'Set '}listener on shared polling ${source}`);
+                    }
+                } else {
+                    let ownPollingMsgParts: string[] = [];
+                    let removedShared = false;
+                    if(this.sharedStreamCallbacks.has(source)) {
+                        removedShared = true;
+                        this.sharedStreamCallbacks.delete(source);
+                        ownPollingMsgParts.push('removed shared polling listener');
+                    }
+
+                    const existingStream = this.streams.get(source);
+                    let processed;
+                    if (existingStream !== undefined) {
+                        ownPollingMsgParts.push('replaced existing');
+                        processed = existingStream.processed;
+                        existingStream.end();
                     } else {
-                        this.logger.warn('Stopping subreddit processing/polling due to too many errors');
-                        await this.stop();
+                        ownPollingMsgParts.push('create new');
+                        stream.once('listing', this.noChecksWarning(source));
                     }
-                });
-                this.streams.push(stream);
+
+                    this.logger.debug(`Polling ${source.toUpperCase()} => ${ownPollingMsgParts.join('and')} dedicated stream`);
+
+                    stream.on('item', onItem);
+                    // @ts-ignore
+                    stream.on('error', async (err: any) => {
+
+                        this.emit('error', err);
+
+                        if (isRateLimitError(err)) {
+                            this.logger.error('Encountered rate limit while polling! Bot is all out of requests :( Stopping subreddit queue and polling.');
+                            await this.stop();
+                        }
+                        this.logger.error('Polling error occurred', err);
+                        const shouldRetry = await this.pollingRetryHandler(err);
+                        if (shouldRetry) {
+                            stream.startInterval(false);
+                        } else {
+                            this.logger.warn('Stopping subreddit processing/polling due to too many errors');
+                            await this.stop();
+                        }
+                    });
+
+                    this.streams.set(source, stream);
+                }
             }
+        }
+    }
+
+    noChecksWarning = (source: PollOn) => (listing: any) => {
+        if (this.commentChecks.length === 0 && ['modqueue', 'newComm'].some(x => x === source)) {
+            this.logger.warn(`Polling '${source.toUpperCase()}' may return Comments but no comments checks were configured.`);
+        }
+        if (this.submissionChecks.length === 0 && ['unmoderated', 'modqueue', 'newSub'].some(x => x === source)) {
+            this.logger.warn(`Polling '${source.toUpperCase()}' may return Submissions but no submission checks were configured.`);
         }
     }
 
@@ -1048,10 +1095,10 @@ export class Manager extends EventEmitter {
                 this.logger.warn('No submission or comment checks found!');
             }
 
-            if (this.streams.length > 0) {
-                this.logger.debug(`Starting own streams => ${this.streams.map(x => `${x.name.toUpperCase()} ${x.frequency / 1000}s interval`).join(' | ')}`)
+            if (this.streams.size > 0) {
+                this.logger.debug(`Starting own streams => ${[...this.streams.values()].map(x => `${x.name.toUpperCase()} ${x.frequency / 1000}s interval`).join(' | ')}`)
             }
-            for (const s of this.streams) {
+            for (const s of this.streams.values()) {
                 s.startInterval();
             }
             this.startedAt = dayjs();
@@ -1076,7 +1123,7 @@ export class Manager extends EventEmitter {
                 state: PAUSED,
                 causedBy
             };
-            for(const s of this.streams) {
+            for(const s of this.streams.values()) {
                 s.end();
             }
             if(causedBy === USER) {
@@ -1093,15 +1140,11 @@ export class Manager extends EventEmitter {
     stopEvents(causedBy: Invokee = 'system', options?: ManagerStateChangeOption) {
         const {reason, suppressNotification = false} = options || {};
         if(this.eventsState.state !== STOPPED) {
-            for (const s of this.streams) {
+            for (const s of this.streams.values()) {
                 s.end();
             }
-            this.streams = [];
-            // for (const [k, v] of this.modStreamCallbacks) {
-            //     const stream = this.cacheManager.modStreams.get(k) as Poll<Snoowrap.Submission | Snoowrap.Comment>;
-            //     stream.removeListener('item', v);
-            // }
-            this.modStreamCallbacks = new Map();
+            this.streams = new Map();
+            this.sharedStreamCallbacks = new Map();
             this.startedAt = undefined;
             this.logger.info(`Events STOPPED by ${causedBy}`);
             this.eventsState = {

@@ -146,10 +146,6 @@ export const buildPollingOptions = (values: (string | PollingOptions)[]): Pollin
                 pollOn: v as PollOn,
                 interval: DEFAULT_POLLING_INTERVAL,
                 limit: DEFAULT_POLLING_LIMIT,
-                clearProcessed: {
-                    size: DEFAULT_POLLING_LIMIT,
-                    retain: DEFAULT_POLLING_LIMIT,
-                }
             });
         } else {
             const {
@@ -157,14 +153,12 @@ export const buildPollingOptions = (values: (string | PollingOptions)[]): Pollin
                 interval = DEFAULT_POLLING_INTERVAL,
                 limit = DEFAULT_POLLING_LIMIT,
                 delayUntil,
-                clearProcessed = {size: limit, retain: limit},
             } = v;
             opts.push({
                 pollOn: p as PollOn,
                 interval,
                 limit,
                 delayUntil,
-                clearProcessed
             });
         }
     }

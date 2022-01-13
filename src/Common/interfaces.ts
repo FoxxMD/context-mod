@@ -489,38 +489,6 @@ export type PollOn = 'unmoderated' | 'modqueue' | 'newSub' | 'newComm';
 export interface PollingOptionsStrong extends PollingOptions {
     limit: number,
     interval: number,
-    clearProcessed: ClearProcessedOptions
-}
-
-/**
- * For very long-running, high-volume subreddits clearing the list of processed activities helps manage memory bloat
- *
- * All of these options have default values based on the limit and/or interval set for polling options on each subreddit stream. They only need to modified if the defaults are not sufficient.
- *
- * If both `after` and `size` are defined whichever is hit first will trigger the list to clear. `after` will be reset after ever clear.
- * */
-export interface ClearProcessedOptions {
-    /**
-     * An interval the processed list should be cleared after.
-     *
-     * * EX `9 days`
-     * * EX `3 months`
-     * * EX `5 minutes`
-     * @pattern ^\s*(?<time>\d+)\s*(?<unit>days?|weeks?|months?|years?|hours?|minutes?|seconds?|milliseconds?)\s*$
-     * */
-    after?: string,
-    /**
-     * Number of activities found in processed list after which the list should be cleared.
-     *
-     * Defaults to the `limit` value from `PollingOptions`
-     * */
-    size?: number,
-    /**
-     * The number of activities to retain in processed list after clearing.
-     *
-     * Defaults to `limit` value from `PollingOptions`
-     * */
-    retain?: number,
 }
 
 export interface PollingDefaults {
@@ -594,8 +562,6 @@ export interface PollingOptions extends PollingDefaults {
      *
      * */
     pollOn: 'unmoderated' | 'modqueue' | 'newSub' | 'newComm'
-
-    clearProcessed?: ClearProcessedOptions
 }
 
 export interface TTLConfig {
@@ -1220,6 +1186,7 @@ export interface Notifier {
 export interface ManagerStateChangeOption {
     reason?: string
     suppressNotification?: boolean
+    suppressChangeEvent?: boolean
 }
 
 /**

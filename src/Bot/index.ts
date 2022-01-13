@@ -224,10 +224,10 @@ class Bot {
         this.logger.error(`Polling error occurred on stream ${name.toUpperCase()}`, err);
         const shouldRetry = await this.sharedStreamRetryHandler(err);
         if(shouldRetry) {
-            (this.cacheManager.modStreams.get(name) as SPoll<any>).startInterval();
+            (this.cacheManager.modStreams.get(name) as SPoll<any>).startInterval(false);
         } else {
             for(const m of this.subManagers) {
-                if(m.modStreamCallbacks.size > 0) {
+                if(m.sharedStreamCallbacks.size > 0) {
                     m.notificationManager.handle('runStateChanged', `${name.toUpperCase()} Polling Stopped`, 'Encountered too many errors from Reddit while polling. Will try to restart on next heartbeat.');
                 }
             }
@@ -242,9 +242,9 @@ class Bot {
             return;
         }
         for(const i of listing) {
-            const foundManager = this.subManagers.find(x => x.subreddit.display_name === i.subreddit.display_name && x.modStreamCallbacks.get(name) !== undefined);
+            const foundManager = this.subManagers.find(x => x.subreddit.display_name === i.subreddit.display_name && x.sharedStreamCallbacks.get(name) !== undefined);
             if(foundManager !== undefined) {
-                foundManager.modStreamCallbacks.get(name)(i);
+                foundManager.sharedStreamCallbacks.get(name)(i);
                 if(this.stagger !== undefined) {
                     await sleep(this.stagger);
                 }
@@ -350,52 +350,115 @@ class Bot {
             }
         }
 
+        this.parseSharedStreams();
+    }
+
+    parseSharedStreams() {
+
         const sharedCommentsSubreddits = !this.sharedStreams.includes('newComm') ? [] : this.subManagers.filter(x => x.isPollingShared('newComm')).map(x => x.subreddit.display_name);
-        if(sharedCommentsSubreddits.length > 0) {
-            if(sharedCommentsSubreddits.length > 100) {
-                this.logger.warn(`SHARED COMMENT STREAM => Reddit can only combine 100 subreddits for getting new Comments but this bot has ${sharedCommentsSubreddits.length}`);
+        if (sharedCommentsSubreddits.length > 0) {
+            const stream = this.cacheManager.modStreams.get('newComm');
+            if (stream === undefined || stream.subreddit !== sharedCommentsSubreddits.join('+')) {
+                let processed;
+                if (stream !== undefined) {
+                    this.logger.info('Restarting SHARED COMMENT STREAM due to a subreddit config change');
+                    stream.end();
+                    processed = stream.processed;
+                }
+                if (sharedCommentsSubreddits.length > 100) {
+                    this.logger.warn(`SHARED COMMENT STREAM => Reddit can only combine 100 subreddits for getting new Comments but this bot has ${sharedCommentsSubreddits.length}`);
+                }
+                const defaultCommentStream = new CommentStream(this.client, {
+                    subreddit: sharedCommentsSubreddits.join('+'),
+                    limit: 100,
+                    enforceContinuity: true,
+                    logger: this.logger,
+                    processed,
+                    label: 'Shared Polling'
+                });
+                // @ts-ignore
+                defaultCommentStream.on('error', this.createSharedStreamErrorListener('newComm'));
+                defaultCommentStream.on('listing', this.createSharedStreamListingListener('newComm'));
+                this.cacheManager.modStreams.set('newComm', defaultCommentStream);
             }
-            const defaultCommentStream = new CommentStream(this.client, {subreddit: sharedCommentsSubreddits.join('+'), limit: 100, enforceContinuity: true, logger: this.logger});
-            // @ts-ignore
-            defaultCommentStream.on('error', this.createSharedStreamErrorListener('newComm'));
-            defaultCommentStream.on('listing', this.createSharedStreamListingListener('newComm'));
-            this.cacheManager.modStreams.set('newComm', defaultCommentStream);
+        } else {
+            const stream = this.cacheManager.modStreams.get('newComm');
+            if (stream !== undefined) {
+                stream.end();
+            }
         }
 
         const sharedSubmissionsSubreddits = !this.sharedStreams.includes('newSub') ? [] : this.subManagers.filter(x => x.isPollingShared('newSub')).map(x => x.subreddit.display_name);
-        if(sharedSubmissionsSubreddits.length > 0) {
-            if(sharedSubmissionsSubreddits.length > 100) {
-                this.logger.warn(`SHARED SUBMISSION STREAM => Reddit can only combine 100 subreddits for getting new Submissions but this bot has ${sharedSubmissionsSubreddits.length}`);
+        if (sharedSubmissionsSubreddits.length > 0) {
+            const stream = this.cacheManager.modStreams.get('newSub');
+            if (stream === undefined || stream.subreddit !== sharedSubmissionsSubreddits.join('+')) {
+                let processed;
+                if (stream !== undefined) {
+                    this.logger.info('Restarting SHARED SUBMISSION STREAM due to a subreddit config change');
+                    stream.end();
+                    processed = stream.processed;
+                }
+                if (sharedSubmissionsSubreddits.length > 100) {
+                    this.logger.warn(`SHARED SUBMISSION STREAM => Reddit can only combine 100 subreddits for getting new Submissions but this bot has ${sharedSubmissionsSubreddits.length}`);
+                }
+                const defaultSubStream = new SubmissionStream(this.client, {
+                    subreddit: sharedSubmissionsSubreddits.join('+'),
+                    limit: 100,
+                    enforceContinuity: true,
+                    logger: this.logger,
+                    processed,
+                    label: 'Shared Polling'
+                });
+                // @ts-ignore
+                defaultSubStream.on('error', this.createSharedStreamErrorListener('newSub'));
+                defaultSubStream.on('listing', this.createSharedStreamListingListener('newSub'));
+                this.cacheManager.modStreams.set('newSub', defaultSubStream);
             }
-            const defaultSubStream = new SubmissionStream(this.client, {subreddit: sharedSubmissionsSubreddits.join('+'), limit: 100, enforceContinuity: true, logger: this.logger});
-            // @ts-ignore
-            defaultSubStream.on('error', this.createSharedStreamErrorListener('newSub'));
-            defaultSubStream.on('listing', this.createSharedStreamListingListener('newSub'));
-            this.cacheManager.modStreams.set('newSub', defaultSubStream);
+        } else {
+            const stream = this.cacheManager.modStreams.get('newSub');
+            if (stream !== undefined) {
+                stream.end();
+            }
         }
 
         const isUnmoderatedShared = !this.sharedStreams.includes('unmoderated') ? false : this.subManagers.some(x => x.isPollingShared('unmoderated'));
-        if(isUnmoderatedShared) {
-            const defaultUnmoderatedStream = new UnmoderatedStream(this.client, {subreddit: 'mod', limit: 100, logger: this.logger});
+        const unmoderatedstream = this.cacheManager.modStreams.get('unmoderated');
+        if (isUnmoderatedShared && unmoderatedstream === undefined) {
+            const defaultUnmoderatedStream = new UnmoderatedStream(this.client, {
+                subreddit: 'mod',
+                limit: 100,
+                logger: this.logger,
+                label: 'Shared Polling'
+            });
             // @ts-ignore
             defaultUnmoderatedStream.on('error', this.createSharedStreamErrorListener('unmoderated'));
             defaultUnmoderatedStream.on('listing', this.createSharedStreamListingListener('unmoderated'));
             this.cacheManager.modStreams.set('unmoderated', defaultUnmoderatedStream);
+        } else if (!isUnmoderatedShared && unmoderatedstream !== undefined) {
+            unmoderatedstream.end();
         }
 
         const isModqueueShared = !this.sharedStreams.includes('modqueue') ? false : this.subManagers.some(x => x.isPollingShared('modqueue'));
-        if(isModqueueShared) {
-            const defaultModqueueStream = new ModQueueStream(this.client, {subreddit: 'mod', limit: 100, logger: this.logger});
+        const modqueuestream = this.cacheManager.modStreams.get('modqueue');
+        if (isModqueueShared && modqueuestream === undefined) {
+            const defaultModqueueStream = new ModQueueStream(this.client, {
+                subreddit: 'mod',
+                limit: 100,
+                logger: this.logger,
+                label: 'Shared Polling'
+            });
             // @ts-ignore
             defaultModqueueStream.on('error', this.createSharedStreamErrorListener('modqueue'));
             defaultModqueueStream.on('listing', this.createSharedStreamListingListener('modqueue'));
             this.cacheManager.modStreams.set('modqueue', defaultModqueueStream);
+        } else if (isModqueueShared && modqueuestream !== undefined) {
+            modqueuestream.end();
         }
     }
 
     async initManager(manager: Manager) {
         try {
-            await manager.parseConfiguration('system', true, {suppressNotification: true});
+            await manager.parseConfiguration('system', true, {suppressNotification: true, suppressChangeEvent: true});
         } catch (err: any) {
             if (!(err instanceof LoggedError)) {
                 this.logger.error(`Config was not valid:`, {subreddit: manager.subreddit.display_name_prefixed});
@@ -415,6 +478,10 @@ class Bot {
         });
         // all errors from managers will count towards bot-level retry count
         manager.on('error', async (err) => await this.panicOnRetries(err));
+        manager.on('configChange', async () => {
+           this.parseSharedStreams();
+           await this.runSharedStreams(false);
+        });
         return manager;
     }
 
@@ -456,7 +523,7 @@ class Bot {
                     this.subManagers.push(manager);
                     await this.initManager(manager);
                     await manager.start('system', {reason: 'Caused by creation due to moderator invite'});
-                    await this.runModStreams();
+                    await this.runSharedStreams();
                 } catch (err: any) {
                     if (!(err instanceof LoggedError)) {
                         this.logger.error(err);
@@ -474,14 +541,14 @@ class Bot {
         }
     }
 
-    async runModStreams(notify = false) {
+    async runSharedStreams(notify = false) {
         for(const [k,v] of this.cacheManager.modStreams) {
-            if(!v.running && this.subManagers.some(x => x.modStreamCallbacks.get(k) !== undefined)) {
+            if(!v.running && this.subManagers.some(x => x.sharedStreamCallbacks.get(k) !== undefined)) {
                 v.startInterval();
-                this.logger.info(`Starting default ${k.toUpperCase()} mod stream`);
+                this.logger.info(`Starting ${k.toUpperCase()} shared polling`);
                 if(notify) {
                     for(const m of this.subManagers) {
-                        if(m.modStreamCallbacks.size > 0) {
+                        if(m.sharedStreamCallbacks.size > 0) {
                             await m.notificationManager.handle('runStateChanged', `${k.toUpperCase()} Polling Started`, 'Polling was successfully restarted on heartbeat.');
                         }
                     }
@@ -505,7 +572,7 @@ class Bot {
             }
         }
 
-        await this.runModStreams();
+        await this.runSharedStreams();
 
         this.nextNannyCheck = dayjs().add(10, 'second');
         this.nextHeartbeat = dayjs().add(this.heartbeatInterval, 'second');
@@ -595,7 +662,7 @@ class Bot {
                 }
             }
         }
-        await this.runModStreams(true);
+        await this.runSharedStreams(true);
     }
 
     async runApiNanny() {
