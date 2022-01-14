@@ -1630,7 +1630,10 @@ export interface OperatorJsonConfig {
      *
      * Defaults to 'sqljs' which stores data in a file
      * */
-    databaseConfig?: DatabaseDriver | DatabaseConfig
+    databaseConfig?: {
+        connection?: DatabaseDriver | DatabaseConfig,
+        migrations?: DatabaseMigrationOptions
+    }
 
     /**
      * Set global snoowrap options as well as default snoowrap config for all bots that don't specify their own
@@ -1829,7 +1832,10 @@ export interface OperatorConfig extends OperatorJsonConfig {
         path?: string,
     },
     caching: StrongCache,
-    databaseConfig: DatabaseConfig
+    databaseConfig: {
+        connection: DatabaseConfig,
+        migrations: DatabaseMigrationOptions
+    }
     database: Connection
     web: {
         port: number,
@@ -2045,4 +2051,8 @@ export interface RepostItemResult extends RepostItem {
 export interface StringComparisonOptions {
     lengthWeight?: number,
     transforms?: ((str: string) => string)[]
+}
+
+export interface DatabaseMigrationOptions {
+    force?: boolean
 }

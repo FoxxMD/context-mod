@@ -1,21 +1,31 @@
 import winston, {Logger} from "winston";
 import dayjs, {Dayjs} from "dayjs";
 import {getLogger} from "./Utils/loggerFactory";
-import {Invokee, OperatorConfig} from "./Common/interfaces";
+import {DatabaseConfig, DatabaseMigrationOptions, Invokee, OperatorConfig} from "./Common/interfaces";
 import Bot from "./Bot";
 import LoggedError from "./Utils/LoggedError";
-import {sleep} from "./util";
+import {mergeArr, sleep} from "./util";
+import {copyFile} from "fs/promises";
+import {constants} from "fs";
+import {Connection} from "typeorm";
 
 export class App {
 
-    bots: Bot[]
+    bots: Bot[] = [];
     logger: Logger;
+    dbLogger: Logger;
+    database: Connection
     startedAt: Dayjs = dayjs();
+    ranMigrations: boolean = false;
+    migrationBlocker?: string;
+
+    config: OperatorConfig;
 
     error: any;
 
     constructor(config: OperatorConfig) {
         const {
+            database,
             operator: {
                 name,
             },
@@ -23,11 +33,12 @@ export class App {
             bots = [],
         } = config;
 
+        this.config = config;
         this.logger = getLogger(config.logging);
+        this.dbLogger = this.logger.child({leaf: 'Database'}, mergeArr);
+        this.database = database;
 
         this.logger.info(`Operators: ${name.length === 0 ? 'None Specified' : name.join(', ')}`)
-
-        this.bots = bots.map(x => new Bot(x, this.logger));
 
         process.on('uncaughtException', (e) => {
             this.error = e;
@@ -61,7 +72,83 @@ export class App {
         }
     }
 
+    async doMigration() {
+        if (this.database.options.type === 'sqljs' && this.database.options.location !== undefined) {
+            const ts = Date.now();
+            const backupLocation = `${this.database.options.location}.${ts}.bak`
+            this.dbLogger.info(`Detected sqljs (sqlite) database. Will try to make a backup at ${backupLocation} before migrating.`);
+            try {
+                await copyFile(this.database.options.location, backupLocation, constants.COPYFILE_EXCL);
+                this.dbLogger.info('Successfully created backup!');
+            } catch (e: any) {
+                this.dbLogger.error(`Could not create a backup but will continue with migration: ${e.message}`);
+            }
+        }
+        this.dbLogger.info('Beginning migrations...');
+        await this.database.runMigrations();
+        this.migrationBlocker = undefined;
+        this.ranMigrations = true;
+    }
+
+    async initDatabase(confirm: boolean = false) {
+        const {
+            databaseConfig: {
+                migrations: {
+                    force = false,
+                } = {}
+            } = {},
+        } = this.config;
+
+        this.dbLogger.info('Checking if migrations are required...');
+
+        const runner = this.database.createQueryRunner();
+        const tables = await runner.getTables();
+        if (tables.length === 0 || (tables.length === 1 && tables.map(x => x.name).includes('migrations'))) {
+            this.dbLogger.info('Detected a new database! Starting migrations...');
+            await this.database.showMigrations();
+            await this.doMigration();
+            return true;
+        } else if (!tables.map(x => x.name).includes('migrations') && !force && !confirm) {
+            this.dbLogger.warn(`DANGER! Your database has existing tables but none of them include a 'migrations' table. 
+            Are you sure this is the correct database? Continuing with migrations will most likely drop any existing data and recreate all tables.`);
+            this.migrationBlocker = 'unknownTables';
+            return false;
+        } else if (await this.database.showMigrations()) {
+            this.dbLogger.info('Detected pending migrations.');
+            if (!force && !confirm) {
+                this.dbLogger.error(`You must confirm migrations. Either set 'force: true' in database config or confirm migrations from web interface.
+YOU SHOULD BACKUP YOUR EXISTING DATABASE BEFORE CONTINUING WITH MIGRATIONS.`);
+                this.migrationBlocker = 'pending';
+                return false;
+            }
+            if (force && !confirm) {
+                this.dbLogger.info('Migration was forced');
+            }
+            await this.doMigration();
+            return true;
+        } else {
+            this.dbLogger.info('No migrations required!');
+            this.ranMigrations = true;
+            return true;
+        }
+    }
+
     async initBots(causedBy: Invokee = 'system') {
+        if(!this.ranMigrations) {
+            this.logger.error('Must run migrations before starting bots');
+            return;
+        }
+
+        if(this.bots.length > 0) {
+            this.logger.info('Bots already exist, will stop and destroy these before building new ones.');
+            await this.destroy(causedBy);
+        }
+        const {
+            bots = [],
+        } = this.config;
+
+        this.bots = bots.map(x => new Bot(x, this.logger));
+
         for (const b of this.bots) {
             if (b.error === undefined) {
                 try {

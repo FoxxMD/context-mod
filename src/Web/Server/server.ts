@@ -10,9 +10,7 @@ import passport from 'passport';
 import tcpUsed from 'tcp-port-used';
 
 import {
-    intersect,
-    LogEntry, parseBotLogName,
-    parseSubredditLogName
+    LogEntry
 } from "../../util";
 import {getLogger} from "../../Utils/loggerFactory";
 import LoggedError from "../../Utils/LoggedError";
@@ -210,31 +208,34 @@ const rcbServer = async function (options: OperatorConfig) {
 
     server.deleteAsync('/bot/invite', ...deleteInviteRoute);
 
+    app = new App(options);
+
     const initBot = async (causedBy: Invokee = 'system') => {
-        if (app !== undefined) {
-            logger.info('A bot instance already exists. Attempting to stop event/queue processing first before building new bot.');
-            await app.destroy(causedBy);
-        }
-        const newApp = new App(options);
-        newApp.initBots(causedBy).catch((err: any) => {
-            if (newApp.error === undefined) {
-                newApp.error = err.message;
+        app.initBots(causedBy).catch((err: any) => {
+            if (app.error === undefined) {
+                app.error = err.message;
             }
             logger.error('Server is still ONLINE but bot cannot recover from this error and must be re-built');
             if (!err.logged || !(err instanceof LoggedError)) {
                 logger.error(err);
             }
         });
-        return newApp;
     }
 
     server.postAsync('/init', authUserCheck(), async (req, res) => {
         logger.info(`${(req.user as Express.User).name} requested the app to be re-built. Starting rebuild now...`, {subreddit: (req.user as Express.User).name});
-        app = await initBot('user');
+        await initBot('user');
     });
 
-    logger.info('Beginning bot init on startup...');
-    app = await initBot();
+    logger.info('Beginning bot init...');
+    try {
+        const dbReady = await app.initDatabase();
+        if(dbReady) {
+            await initBot();
+        }
+    } catch (e: any) {
+        logger.error('Error occurred during database connection or migration. Cannot continue with starting bots.');
+    }
 };
 
 export default rcbServer;

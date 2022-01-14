@@ -586,7 +586,10 @@ export const buildOperatorConfigWithDefaults = async (data: OperatorJsonConfig):
             path,
         } = {},
         caching: opCache,
-        databaseConfig = 'sqljs',
+        databaseConfig: {
+            connection: dbConnection = 'sqljs',
+            migrations = {},
+        } = {},
         web: {
             port = 8085,
             maxLogs = 200,
@@ -665,7 +668,7 @@ export const buildOperatorConfigWithDefaults = async (data: OperatorJsonConfig):
 
     const logger = getLogger(loggingOptions);
 
-    const dbConfig = createDatabaseConfig(databaseConfig);
+    const dbConfig = createDatabaseConfig(dbConnection);
 
     const database = await createDatabaseConnection(dbConfig);
 
@@ -837,7 +840,10 @@ export const buildOperatorConfigWithDefaults = async (data: OperatorJsonConfig):
         },
         logging: loggingOptions,
         caching: cache,
-        databaseConfig: dbConfig,
+        databaseConfig: {
+            connection: dbConfig,
+            migrations,
+        },
         database,
         web: {
             port,

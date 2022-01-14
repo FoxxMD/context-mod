@@ -8,7 +8,7 @@ import "reflect-metadata";
 import {Connection, createConnection} from "typeorm";
 import fs, {promises, constants} from "fs";
 import {parse} from 'path';
-import {getLogger} from "./loggerFactory";
+import {getDatabaseLogger, getLogger} from "./loggerFactory";
 import SimpleError from "./SimpleError";
 
 export const isDatabaseDriver = (val: any): val is DatabaseDriver => {
@@ -100,7 +100,11 @@ export const createDatabaseConnection = async (rawConfig: DatabaseConfig): Promi
 
     return await createConnection({
         ...config,
-        synchronize: true,
-        entities: [`${resolve(__dirname, '../Common/Entities')}/*.js`]
+        synchronize: false,
+        entities: [`${resolve(__dirname, '../Common/Entities')}/*.js`],
+        migrations: [`${resolve(__dirname, '../Common/Migrations')}/*.js`],
+        migrationsRun: false,
+        logging: ['error','warn','migration'],
+        logger: getDatabaseLogger({}, 'app', ['error','warn','migration', 'schema'])
     });
 }
