@@ -39,6 +39,7 @@ export class BanAction extends Action {
         const renderedBody = content === undefined ? undefined : await renderContent(content, item, ruleResults, this.resources.userNotes);
         const renderedContent = renderedBody === undefined ? undefined : `${renderedBody}${await this.resources.generateFooter(item, this.footer)}`;
 
+        const touchedEntities = [];
         let banPieces = [];
         banPieces.push(`Message: ${renderedContent === undefined ? 'None' : `${renderedContent.length > 100 ? `\r\n${renderedContent}` : renderedContent}`}`);
         banPieces.push(`Reason:  ${this.reason || 'None'}`);
@@ -50,18 +51,20 @@ export class BanAction extends Action {
             // @ts-ignore
             const fetchedSub = await item.subreddit.fetch();
             const fetchedName = await item.author.name;
-            await fetchedSub.banUser({
+            const bannedUser = await fetchedSub.banUser({
                 name: fetchedName,
                 banMessage: renderedContent === undefined ? undefined : renderedContent,
                 banReason: this.reason,
                 banNote: this.note,
                 duration: this.duration
             });
+            touchedEntities.push(bannedUser);
         }
         return {
             dryRun,
             success: true,
-            result: `Banned ${item.author.name} ${durText}${this.reason !== undefined ? ` (${this.reason})` : ''}`
+            result: `Banned ${item.author.name} ${durText}${this.reason !== undefined ? ` (${this.reason})` : ''}`,
+            touchedEntities
         };
     }
 }

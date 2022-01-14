@@ -11,6 +11,7 @@ export class ApproveAction extends Action {
 
     async process(item: Comment | Submission, ruleResults: RuleResult[], runtimeDryrun?: boolean): Promise<ActionProcessResult> {
         const dryRun = runtimeDryrun || this.dryRun;
+        const touchedEntities = [];
         //snoowrap typing issue, thinks comments can't be locked
         // @ts-ignore
         if (item.approved) {
@@ -23,11 +24,12 @@ export class ApproveAction extends Action {
         }
         if (!dryRun) {
             // @ts-ignore
-            await item.approve();
+            touchedEntities.push(await item.approve());
         }
         return {
             dryRun,
             success: true,
+            touchedEntities
         }
     }
 }

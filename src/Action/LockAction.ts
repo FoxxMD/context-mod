@@ -11,6 +11,7 @@ export class LockAction extends Action {
 
     async process(item: Comment | Submission, ruleResults: RuleResult[], runtimeDryrun?: boolean): Promise<ActionProcessResult> {
         const dryRun = runtimeDryrun || this.dryRun;
+        const touchedEntities = [];
         //snoowrap typing issue, thinks comments can't be locked
         // @ts-ignore
         if (item.locked) {
@@ -25,10 +26,12 @@ export class LockAction extends Action {
             //snoowrap typing issue, thinks comments can't be locked
             // @ts-ignore
             await item.lock();
+            touchedEntities.push(item);
         }
         return {
             dryRun,
-            success: true
+            success: true,
+            touchedEntities
         }
     }
 }

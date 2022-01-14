@@ -1,17 +1,18 @@
-import Snoowrap, {Comment, Submission} from "snoowrap";
+import {Comment, Submission} from "snoowrap";
 import {Logger} from "winston";
 import {RuleResult} from "../Rule";
-import {SubredditResources} from "../Subreddit/SubredditResources";
+import {checkAuthorFilter, SubredditResources} from "../Subreddit/SubredditResources";
 import {ActionProcessResult, ActionResult, ChecksActivityState, TypedActivityStates} from "../Common/interfaces";
 import Author, {AuthorOptions} from "../Author/Author";
 import {mergeArr} from "../util";
 import LoggedError from "../Utils/LoggedError";
+import {ExtendedSnoowrap} from '../Utils/SnoowrapClients';
 
 export abstract class Action {
     name?: string;
     logger: Logger;
     resources: SubredditResources;
-    client: Snoowrap
+    client: ExtendedSnoowrap;
     authorIs: AuthorOptions;
     itemIs: TypedActivityStates;
     dryRun: boolean;
@@ -27,6 +28,7 @@ export abstract class Action {
             subredditName,
             dryRun = false,
             authorIs: {
+                excludeCondition = 'OR',
                 include = [],
                 exclude = [],
             } = {},
@@ -41,6 +43,7 @@ export abstract class Action {
         this.logger = logger.child({labels: [`Action ${this.getActionUniqueName()}`]}, mergeArr);
 
         this.authorIs = {
+            excludeCondition,
             exclude: exclude.map(x => new Author(x)),
             include: include.map(x => new Author(x)),
         }
@@ -71,27 +74,10 @@ export abstract class Action {
                 actRes.runReason = `Activity did not pass 'itemIs' test, Action not run`;
                 return actRes;
             }
-            if (this.authorIs.include !== undefined && this.authorIs.include.length > 0) {
-                for (const auth of this.authorIs.include) {
-                    if (await this.resources.testAuthorCriteria(item, auth)) {
-                        actRes.run = true;
-                        const results = await this.process(item, ruleResults, runtimeDryrun);
-                        return {...actRes, ...results};
-                    }
-                }
-                this.logger.verbose('Inclusive author criteria not matched, Action not run');
-                actRes.runReason = 'Inclusive author criteria not matched';
-                return actRes;
-            } else if (this.authorIs.exclude !== undefined && this.authorIs.exclude.length > 0) {
-                for (const auth of this.authorIs.exclude) {
-                    if (await this.resources.testAuthorCriteria(item, auth, false)) {
-                        actRes.run = true;
-                        const results = await this.process(item, ruleResults, runtimeDryrun);
-                        return {...actRes, ...results};
-                    }
-                }
-                this.logger.verbose('Exclusive author criteria not matched, Action not run');
-                actRes.runReason = 'Exclusive author criteria not matched';
+            const [authFilterResult, authFilterType] = await checkAuthorFilter(item, this.authorIs, this.resources, this.logger);
+            if(!authFilterResult) {
+                this.logger.verbose(`${authFilterType} author criteria not matched, Action not run`);
+                actRes.runReason = `${authFilterType} author criteria not matched`;
                 return actRes;
             }
 
@@ -114,8 +100,8 @@ export abstract class Action {
 export interface ActionOptions extends ActionConfig {
     logger: Logger;
     subredditName: string;
-    resources: SubredditResources
-    client: Snoowrap
+    resources: SubredditResources;
+    client: ExtendedSnoowrap;
 }
 
 export interface ActionConfig extends ChecksActivityState {
@@ -162,7 +148,7 @@ export interface ActionJson extends ActionConfig {
     /**
      * The type of action that will be performed
      */
-    kind: 'comment' | 'lock' | 'remove' | 'report' | 'approve' | 'ban' | 'flair' | 'usernote' | 'message'
+    kind: 'comment' | 'lock' | 'remove' | 'report' | 'approve' | 'ban' | 'flair' | 'usernote' | 'message' | 'userflair'
 }
 
 export const isActionJson = (obj: object): obj is ActionJson => {

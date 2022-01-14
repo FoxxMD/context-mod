@@ -59,6 +59,7 @@ import {SetRandomInterval} from "./Common/types";
 import stringSimilarity from 'string-similarity';
 import calculateCosineSimilarity from "./Utils/StringMatching/CosineSimilarity";
 import levenSimilarity from "./Utils/StringMatching/levenSimilarity";
+import {isRequestError, isStatusError} from "./Utils/Errors";
 //import {ResembleSingleCallbackComparisonResult} from "resemblejs";
 
 // want to guess how many concurrent image comparisons we should be doing
@@ -662,6 +663,126 @@ export const parseExternalUrl = (val: string) => {
     return (matches.groups as any).url as string;
 }
 
+export const dummyLogger = {
+    debug: (v: any) => null,
+    error: (v: any) => null,
+    warn: (v: any) => null,
+    info: (v: any) => null
+}
+
+const GIST_REGEX = new RegExp(/.*gist\.github\.com\/.+\/(.+)/i)
+const GH_BLOB_REGEX = new RegExp(/.*github\.com\/(.+)\/(.+)\/blob\/(.+)/i);
+const REGEXR_REGEX = new RegExp(/^.*((regexr\.com)\/[\w\d]+).*$/i);
+const REGEXR_PAGE_REGEX = new RegExp(/(.|[\n\r])+"expression":"(.+)","text"/g);
+export const fetchExternalUrl = async (url: string, logger: (any) = dummyLogger): Promise<string> => {
+    let hadError = false;
+    logger.debug(`Attempting to detect resolvable URL for ${url}`);
+    let match = url.match(GIST_REGEX);
+    if (match !== null) {
+        const gistApiUrl = `https://api.github.com/gists/${match[1]}`;
+        logger.debug(`Looks like a non-raw gist URL! Trying to resolve ${gistApiUrl}`);
+
+        try {
+            const response = await fetch(gistApiUrl);
+            if (!response.ok) {
+                logger.error(`Response was not OK from Gist API (${response.statusText}) -- will return response from original URL instead`);
+                if (response.size > 0) {
+                    logger.error(await response.text())
+                }
+                hadError = true;
+            } else {
+                const data = await response.json();
+                // get first found file
+                const fileKeys = Object.keys(data.files);
+                if (fileKeys.length === 0) {
+                    logger.error(`No files found in gist!`);
+                } else {
+                    if (fileKeys.length > 1) {
+                        logger.warn(`More than one file found in gist! Using first found: ${fileKeys[0]}`);
+                    } else {
+                        logger.debug(`Using file ${fileKeys[0]}`);
+                    }
+                    const file = data.files[fileKeys[0]];
+                    if (file.truncated === false) {
+                        return file.content;
+                    }
+                    const rawUrl = file.raw_url;
+                    logger.debug(`File contents was truncated, retrieving full contents from ${rawUrl}`);
+                    try {
+                        const rawUrlResponse = await fetch(rawUrl);
+                        return await rawUrlResponse.text();
+                    } catch (err: any) {
+                        logger.error('Gist Raw URL Response returned an error, will return response from original URL instead');
+                        logger.error(err);
+                    }
+                }
+            }
+        } catch (err: any) {
+            logger.error('Response returned an error, will return response from original URL instead');
+            logger.error(err);
+        }
+    }
+    match = url.match(GH_BLOB_REGEX);
+
+    if (match !== null) {
+        const rawUrl = `https://raw.githubusercontent.com/${match[1]}/${match[2]}/${match[3]}`
+        logger.debug(`Looks like a single file github URL! Resolving to ${rawUrl}`);
+        try {
+            const response = await fetch(rawUrl);
+            if (!response.ok) {
+                logger.error(`Response was not OK (${response.statusText}) -- will return response from original URL instead`);
+                if (response.size > 0) {
+                    logger.error(await response.text())
+                }
+                hadError = true;
+            } else {
+                return await response.text();
+            }
+        } catch (err: any) {
+            logger.error('Response returned an error, will return response from original URL instead');
+            logger.error(err);
+        }
+    }
+
+    match = url.match(REGEXR_REGEX);
+    if(match !== null) {
+        logger.debug(`Looks like a Regexr URL! Trying to get expression from page HTML`);
+        try {
+            const response = await fetch(url);
+            if (!response.ok) {
+                if (response.size > 0) {
+                    logger.error(await response.text())
+                }
+                throw new Error(`Response was not OK: ${response.statusText}`);
+            } else {
+                const page = await response.text();
+                const pageMatch = [...page.matchAll(REGEXR_PAGE_REGEX)];
+                if(pageMatch.length > 0) {
+                    const unescaped = JSON.parse(`{"value": "${pageMatch[0][2]}"}`)
+                    return unescaped.value;
+                } else {
+                    throw new Error('Could not parse regex expression from page HTML');
+                }
+            }
+        } catch (err: any) {
+            logger.error('Response returned an error');
+            throw err;
+        }
+    }
+
+    if(!hadError) {
+        logger.debug('URL was not special (gist, github blob, etc...) so will retrieve plain contents');
+    }
+    const response = await fetch(url);
+    if(!response.ok) {
+        if (response.size > 0) {
+            logger.error(await response.text())
+        }
+        throw new Error(`Response was not OK: ${response.statusText}`);
+    }
+    return await response.text();
+}
+
 export interface RetryOptions {
     maxRequestRetry: number,
     maxOtherRetry: number,
@@ -685,37 +806,40 @@ export const createRetryHandler = (opts: RetryOptions, logger: Logger) => {
 
         lastErrorAt = dayjs();
 
-        if(err.name === 'RequestError' || err.name === 'StatusCodeError') {
+        const redditApiError = isRequestError(err) || isStatusError(err);
+
+        if(redditApiError) {
             if (err.statusCode === undefined || ([401, 500, 503, 502, 504, 522].includes(err.statusCode))) {
                 timeoutCount++;
+                let msg = `Error occurred while making a request to Reddit (${timeoutCount}/${maxRequestRetry+1} in ${clearRetryCountAfter} minutes).`;
                 if (timeoutCount > maxRequestRetry) {
-                    logger.error(`Reddit request error retries (${timeoutCount}) exceeded max allowed (${maxRequestRetry})`);
+                    logger.error(`${msg} Exceeded max allowed.`);
                     return false;
                 }
                 if(waitOnRetry) {
                     // exponential backoff
                     const ms = (Math.pow(2, timeoutCount - 1) + (Math.random() - 0.3) + 1) * 1000;
-                    logger.warn(`Error occurred while making a request to Reddit (${timeoutCount} in 3 minutes). Will wait ${formatNumber(ms / 1000)} seconds before retrying`);
+                    logger.warn(`${msg} Will wait ${formatNumber(ms / 1000)} seconds before retrying.`);
                     await sleep(ms);
                 }
                 return true;
-
-            } else {
-                return false;
             }
-        } else {
-            // linear backoff
-            otherRetryCount++;
-            if (maxOtherRetry < otherRetryCount) {
-                return false;
-            }
-            if(waitOnRetry) {
-                const ms = (4 * 1000) * otherRetryCount;
-                logger.warn(`Non-request error occurred. Will wait ${formatNumber(ms / 1000)} seconds before retrying`);
-                await sleep(ms);
-            }
-            return true;
+            // if it's a request error but not a known "oh probably just a reddit blip" status code treat it as other, which should usually have a lower retry max
         }
+
+        // linear backoff
+        otherRetryCount++;
+        let msg = redditApiError ? `Error occurred while making a request to Reddit (${otherRetryCount}/${maxOtherRetry} in ${clearRetryCountAfter} minutes) but it was NOT a well-known "reddit blip" error.` : `Non-request error occurred (${otherRetryCount}/${maxOtherRetry} in ${clearRetryCountAfter} minutes).`;
+        if (maxOtherRetry < otherRetryCount) {
+            logger.warn(`${msg} Exceeded max allowed.`);
+            return false;
+        }
+        if(waitOnRetry) {
+            const ms = (4 * 1000) * otherRetryCount;
+            logger.warn(`${msg} Will wait ${formatNumber(ms / 1000)} seconds before retrying`);
+            await sleep(ms);
+        }
+        return true;
     }
 }
 
@@ -993,6 +1117,8 @@ export const toStrongSubredditState = (s: SubredditState, opts?: StrongSubreddit
 
     if (generateDescription && stateDescription === undefined) {
         strongState.stateDescription = objectToStringSummary(strongState);
+    } else {
+        strongState.stateDescription = stateDescription;
     }
 
     return strongState;
@@ -1559,40 +1685,6 @@ export const wordCount = (str: string): number => {
 export const random = (min: number, max: number): number => (
     Math.floor(Math.random() * (max - min + 1)) + min
 );
-
-
-// copy-pasting interval function from this project because bad tooling on the author's side means A WHOLE OTHER typescript lib is always downloaded just for this one function
-
-/**
- * Repeatedly calls a function with a random time delay between each call.
- *
- * @param intervalFunction - A function to be executed at random times between `minDelay` and
- * `maxDelay`. The function is not passed any arguments, and no return value is expected.
- * @param minDelay - The minimum amount of time, in milliseconds (thousandths of a second), the
- * timer should delay in between executions of `intervalFunction`.
- * @param maxDelay - The maximum amount of time, in milliseconds (thousandths of a second), the
- * timer should delay in between executions of `intervalFunction`.
- *
- * Borrowed from https://github.com/jabacchetta/set-random-interval/blob/master/src/index.ts
- */
-export const setRandomInterval: SetRandomInterval = (intervalFunction, minDelay = 0, maxDelay = 0) => {
-    let timeout: ReturnType<typeof setTimeout>;
-
-    const runInterval = (): void => {
-        timeout = globalThis.setTimeout(() => {
-            intervalFunction();
-            runInterval();
-        }, random(minDelay, maxDelay));
-    };
-
-    runInterval();
-
-    return {
-        clear(): void {
-            clearTimeout(timeout);
-        },
-    };
-};
 
 /**
  * Naively detect if a string is most likely json5

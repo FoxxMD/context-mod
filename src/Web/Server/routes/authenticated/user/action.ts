@@ -1,29 +1,23 @@
-import express, {Request, Response} from 'express';
+import {Request, Response} from 'express';
 import {RUNNING, USER} from "../../../../../Common/interfaces";
 import Submission from "snoowrap/dist/objects/Submission";
 import LoggedError from "../../../../../Utils/LoggedError";
-import winston from "winston";
 import {authUserCheck, botRoute} from "../../../middleware";
 import {booleanMiddle} from "../../../../Common/middleware";
+import {Manager} from "../../../../../Subreddit/Manager";
+import {parseRedditEntity} from "../../../../../util";
 
-const action = async (req: express.Request, res: express.Response) => {
+const action = async (req: Request, res: Response) => {
     const bot = req.serverBot;
 
     const {type, action, subreddit, force = false} = req.query as any;
-    const {name: userName, realManagers = [], isOperator} = req.user as Express.User;
-    let subreddits: string[] = [];
-    if (subreddit === 'All') {
-        subreddits = realManagers;
-    } else if (realManagers.includes(subreddit)) {
-        subreddits = [subreddit];
+    const userName = req.user?.name;
+    let subreddits: Manager[] = req.user?.accessibleSubreddits(bot) as Manager[];
+    if (subreddit !== 'All') {
+        subreddits = subreddits.filter(x => x.subreddit.display_name === parseRedditEntity(subreddit).name);
     }
 
-    for (const s of subreddits) {
-        const manager = bot.subManagers.find(x => x.displayLabel === s);
-        if (manager === undefined) {
-            winston.loggers.get('app').warn(`Manager for ${s} does not exist`, {subreddit: `/u/${userName}`});
-            continue;
-        }
+    for (const manager of subreddits) {
         const mLogger = manager.logger;
         mLogger.info(`/u/${userName} invoked '${action}' action for ${type} on ${manager.displayLabel}`);
         try {
@@ -70,6 +64,9 @@ const action = async (req: express.Request, res: express.Response) => {
                             await manager.firehose.push({
                                 checkType: a instanceof Submission ? 'Submission' : 'Comment',
                                 activity: a,
+                                options: {
+                                    force: true,
+                                }
                             });
                         }
                     } else {
@@ -78,6 +75,9 @@ const action = async (req: express.Request, res: express.Response) => {
                             await manager.firehose.push({
                                 checkType: a instanceof Submission ? 'Submission' : 'Comment',
                                 activity: a,
+                                options: {
+                                    force: true
+                                }
                             });
                         }
                     }

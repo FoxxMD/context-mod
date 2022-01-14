@@ -31,7 +31,11 @@ import {
     CacheOptions,
     BotInstanceJsonConfig,
     BotInstanceConfig,
-    RequiredWebRedditCredentials, RedditCredentials, BotCredentialsJsonConfig, BotCredentialsConfig
+    RequiredWebRedditCredentials,
+    RedditCredentials,
+    BotCredentialsJsonConfig,
+    BotCredentialsConfig,
+    FilterCriteriaDefaults, TypedActivityStates
 } from "./Common/interfaces";
 import {isRuleSetJSON, RuleSetJson, RuleSetObjectJson} from "./Rule/RuleSet";
 import deepEqual from "fast-deep-equal";
@@ -42,8 +46,9 @@ import {GetEnvVars} from 'env-cmd';
 import {operatorConfig} from "./Utils/CommandConfig";
 import merge from 'deepmerge';
 import * as process from "process";
-import {cacheOptDefaults, cacheTTLDefaults} from "./Common/defaults";
+import {cacheOptDefaults, cacheTTLDefaults, filterCriteriaDefault} from "./Common/defaults";
 import objectHash from "object-hash";
+import {AuthorCriteria, AuthorOptions} from "./Author/Author";
 import {createDatabaseConfig, createDatabaseConnection} from "./Utils/databaseUtils";
 
 export interface ConfigBuilderOptions {
@@ -116,22 +121,45 @@ export class ConfigBuilder {
         return validConfig as JSONConfig;
     }
 
-    parseToStructured(config: JSONConfig): CheckStructuredJson[] {
+    parseToStructured(config: JSONConfig, filterCriteriaDefaultsFromBot?: FilterCriteriaDefaults): CheckStructuredJson[] {
         let namedRules: Map<string, RuleObjectJson> = new Map();
         let namedActions: Map<string, ActionObjectJson> = new Map();
-        const {checks = []} = config;
+        const {checks = [], filterCriteriaDefaults} = config;
         for (const c of checks) {
             const {rules = []} = c;
             namedRules = extractNamedRules(rules, namedRules);
             namedActions = extractNamedActions(c.actions, namedActions);
         }
 
+        const filterDefs = filterCriteriaDefaults ?? filterCriteriaDefaultsFromBot;
+        const {
+            authorIsBehavior = 'merge',
+            itemIsBehavior = 'merge',
+            authorIs: authorIsDefault = {},
+            itemIs: itemIsDefault = []
+        } = filterDefs || {};
+
         const structuredChecks: CheckStructuredJson[] = [];
         for (const c of checks) {
-            const {rules = []} = c;
+            const {rules = [], authorIs = {}, itemIs = []} = c;
             const strongRules = insertNamedRules(rules, namedRules);
             const strongActions = insertNamedActions(c.actions, namedActions);
-            const strongCheck = {...c, rules: strongRules, actions: strongActions} as CheckStructuredJson;
+
+            let derivedAuthorIs: AuthorOptions = authorIsDefault;
+            if(authorIsBehavior === 'merge') {
+                derivedAuthorIs = merge.all([authorIs, authorIsDefault], {arrayMerge: overwriteMerge});
+            } else if(Object.keys(authorIs).length > 0) {
+                derivedAuthorIs = authorIs;
+            }
+
+            let derivedItemIs: TypedActivityStates = itemIsDefault;
+            if(itemIsBehavior === 'merge') {
+                derivedItemIs = [...itemIs, ...itemIsDefault];
+            } else if(itemIs.length > 0) {
+                derivedItemIs = itemIs;
+            }
+
+            const strongCheck = {...c, authorIs: derivedAuthorIs, itemIs: derivedItemIs, rules: strongRules, actions: strongActions} as CheckStructuredJson;
             structuredChecks.push(strongCheck);
         }
 
@@ -147,10 +175,6 @@ export const buildPollingOptions = (values: (string | PollingOptions)[]): Pollin
                 pollOn: v as PollOn,
                 interval: DEFAULT_POLLING_INTERVAL,
                 limit: DEFAULT_POLLING_LIMIT,
-                clearProcessed: {
-                    size: DEFAULT_POLLING_LIMIT,
-                    retain: DEFAULT_POLLING_LIMIT,
-                }
             });
         } else {
             const {
@@ -158,14 +182,12 @@ export const buildPollingOptions = (values: (string | PollingOptions)[]): Pollin
                 interval = DEFAULT_POLLING_INTERVAL,
                 limit = DEFAULT_POLLING_LIMIT,
                 delayUntil,
-                clearProcessed = {size: limit, retain: limit},
             } = v;
             opts.push({
                 pollOn: p as PollOn,
                 interval,
                 limit,
                 delayUntil,
-                clearProcessed
             });
         }
     }
@@ -282,8 +304,6 @@ export const parseDefaultBotInstanceFromArgs = (args: any): BotInstanceJsonConfi
         heartbeat,
         hardLimit,
         authorTTL,
-        snooProxy,
-        snooDebug,
         sharedMod,
         caching,
     } = args || {};
@@ -295,10 +315,6 @@ export const parseDefaultBotInstanceFromArgs = (args: any): BotInstanceJsonConfi
             accessToken,
             refreshToken,
         },
-        snoowrap: {
-            proxy: snooProxy,
-            debug: snooDebug,
-        },
         subreddits: {
             names: subreddits,
             wikiConfig,
@@ -306,7 +322,7 @@ export const parseDefaultBotInstanceFromArgs = (args: any): BotInstanceJsonConfi
             heartbeatInterval: heartbeat,
         },
         polling: {
-            sharedMod,
+            shared: sharedMod ? ['unmoderated','modqueue'] : undefined,
         },
         nanny: {
             softLimit,
@@ -331,6 +347,8 @@ export const parseOpConfigFromArgs = (args: any): OperatorJsonConfig => {
         mode,
         caching,
         authorTTL,
+        snooProxy,
+        snooDebug,
     } = args || {};
 
     const data = {
@@ -346,6 +364,10 @@ export const parseOpConfigFromArgs = (args: any): OperatorJsonConfig => {
         caching: {
             provider: caching,
             authorTTL
+        },
+        snoowrap: {
+            proxy: snooProxy,
+            debug: snooDebug,
         },
         web: {
             enabled: web,
@@ -402,12 +424,8 @@ export const parseDefaultBotInstanceFromEnv = (): BotInstanceJsonConfig => {
             dryRun: parseBool(process.env.DRYRUN, undefined),
             heartbeatInterval: process.env.HEARTBEAT !== undefined ? parseInt(process.env.HEARTBEAT) : undefined,
         },
-        snoowrap: {
-            proxy: process.env.PROXY,
-            debug: parseBool(process.env.SNOO_DEBUG, undefined),
-        },
         polling: {
-            sharedMod: parseBool(process.env.SHARE_MOD),
+            shared: parseBool(process.env.SHARE_MOD) ? ['unmoderated','modqueue'] : undefined,
         },
         nanny: {
             softLimit: process.env.SOFT_LIMIT !== undefined ? parseInt(process.env.SOFT_LIMIT) : undefined,
@@ -435,6 +453,10 @@ export const parseOpConfigFromEnv = (): OperatorJsonConfig => {
                 store: process.env.CACHING as (CacheProvider | undefined)
             },
             authorTTL: process.env.AUTHOR_TTL !== undefined ? parseInt(process.env.AUTHOR_TTL) : undefined
+        },
+        snoowrap: {
+            proxy: process.env.PROXY,
+            debug: parseBool(process.env.SNOO_DEBUG, undefined),
         },
         web: {
             port: process.env.PORT !== undefined ? parseInt(process.env.PORT) : undefined,
@@ -508,6 +530,16 @@ export const parseOperatorConfigFromSources = async (args: any): Promise<Operato
         }
         try {
             configFromFile = validateJson(rawConfig, operatorSchema, initLogger) as OperatorJsonConfig;
+            const {bots = []} = configFromFile || {};
+            for(const b of bots) {
+                const {polling: {
+                    sharedMod
+                } = {}} = b;
+                if(sharedMod !== undefined) {
+                    initLogger.warn(`'sharedMod' bot config property is DEPRECATED and will be removed in next minor version. Use 'shared' property instead (see docs)`);
+                    break;
+                }
+            }
         } catch (err: any) {
             initLogger.error('Cannot continue app startup because operator config file was not valid.');
             throw err;
@@ -570,6 +602,7 @@ export const buildOperatorConfigWithDefaults = async (data: OperatorJsonConfig):
             credentials: webCredentials,
             operators,
         } = {},
+        snoowrap: snoowrapOp = {},
         api: {
             port: apiPort = 8095,
             secret: apiSecret = randomId(),
@@ -639,8 +672,10 @@ export const buildOperatorConfigWithDefaults = async (data: OperatorJsonConfig):
     let hydratedBots: BotInstanceConfig[] = bots.map(x => {
         const {
             name: botName,
+            filterCriteriaDefaults = filterCriteriaDefault,
             polling: {
-                sharedMod = false,
+                sharedMod,
+                shared = [],
                 stagger,
                 limit = 100,
                 interval = 30,
@@ -653,7 +688,7 @@ export const buildOperatorConfigWithDefaults = async (data: OperatorJsonConfig):
                 softLimit = 250,
                 hardLimit = 50
             } = {},
-            snoowrap = {},
+            snoowrap = snoowrapOp,
             credentials = {},
             subreddits: {
                 names = [],
@@ -755,9 +790,16 @@ export const buildOperatorConfigWithDefaults = async (data: OperatorJsonConfig):
             botCache.provider.prefix = buildCachePrefix([botCache.provider.prefix, 'bot', (botName || objectHash.sha1(botCreds))]);
         }
 
+        let realShared = shared === true ? ['unmoderated','modqueue','newComm','newSub'] : shared;
+        if(sharedMod === true) {
+            realShared.push('unmoderated');
+            realShared.push('modqueue');
+        }
+
         return {
             name: botName,
             snoowrap,
+            filterCriteriaDefaults,
             subreddits: {
                 names,
                 exclude,
@@ -769,7 +811,7 @@ export const buildOperatorConfigWithDefaults = async (data: OperatorJsonConfig):
             database,
             caching: botCache,
             polling: {
-                sharedMod,
+                shared: [...new Set(realShared)] as PollOn[],
                 stagger,
                 limit,
                 interval,

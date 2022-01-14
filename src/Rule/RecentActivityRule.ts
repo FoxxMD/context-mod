@@ -1,6 +1,7 @@
 import {Rule, RuleJSONConfig, RuleOptions, RulePremise, RuleResult} from "./index";
-import {Comment, VoteableContent} from "snoowrap";
+import {VoteableContent} from "snoowrap";
 import Submission from "snoowrap/dist/objects/Submission";
+import Comment from "snoowrap/dist/objects/Comment";
 import as from 'async';
 import pMap from 'p-map';
 // @ts-ignore
@@ -23,7 +24,7 @@ import {
     parseSubredditName,
     parseUsableLinkIdentifier,
     PASS, sleep,
-    toStrongSubredditState
+    toStrongSubredditState, windowToActivityWindowCriteria
 } from "../util";
 import {
     ActivityWindow,
@@ -43,7 +44,7 @@ const parseLink = parseUsableLinkIdentifier();
 export class RecentActivityRule extends Rule {
     window: ActivityWindowType;
     thresholds: ActivityThreshold[];
-    useSubmissionAsReference: boolean;
+    useSubmissionAsReference: boolean | undefined;
     imageDetection: StrongImageDetection
     lookAt?: 'comments' | 'submissions';
 
@@ -51,7 +52,7 @@ export class RecentActivityRule extends Rule {
         super(options);
         const {
             window = 15,
-            useSubmissionAsReference = true,
+            useSubmissionAsReference,
             imageDetection,
             lookAt,
         } = options || {};
@@ -115,20 +116,53 @@ export class RecentActivityRule extends Rule {
     async process(item: Submission | Comment): Promise<[boolean, RuleResult]> {
         let activities;
 
+        // ACID is a bitch
+        // reddit may not return the activity being checked in the author's recent history due to availability/consistency issues or *something*
+        // so make sure we add it in if config is checking the same type and it isn't included
+        // TODO refactor this for SubredditState everywhere branch
+        let shouldIncludeSelf = true;
+        const strongWindow = windowToActivityWindowCriteria(this.window);
+        const {
+            subreddits: {
+                include = [],
+                exclude = []
+            } = {}
+        } = strongWindow;
+        if (include.length > 0 && !include.some(x => x.toLocaleLowerCase() === item.subreddit.display_name.toLocaleLowerCase())) {
+            shouldIncludeSelf = false;
+        } else if (exclude.length > 0 && exclude.some(x => x.toLocaleLowerCase() === item.subreddit.display_name.toLocaleLowerCase())) {
+            shouldIncludeSelf = false;
+        }
+
         switch (this.lookAt) {
             case 'comments':
                 activities = await this.resources.getAuthorComments(item.author, {window: this.window});
+                if (shouldIncludeSelf && item instanceof Comment && !activities.some(x => x.name === item.name)) {
+                    activities.unshift(item);
+                }
                 break;
             case 'submissions':
                 activities = await this.resources.getAuthorSubmissions(item.author, {window: this.window});
+                if (shouldIncludeSelf && item instanceof Submission && !activities.some(x => x.name === item.name)) {
+                    activities.unshift(item);
+                }
                 break;
             default:
                 activities = await this.resources.getAuthorActivities(item.author, {window: this.window});
+                if (shouldIncludeSelf && !activities.some(x => x.name === item.name)) {
+                    activities.unshift(item);
+                }
                 break;
         }
 
         let viableActivity = activities;
-        if (this.useSubmissionAsReference) {
+        // if config does not specify reference then we set the default based on whether the item is a submission or not
+        // -- this is essentially the same as defaulting reference to true BUT eliminates noisy "can't use comment as reference" log statement when item is a comment
+        let inferredSubmissionAsRef = this.useSubmissionAsReference;
+        if(inferredSubmissionAsRef === undefined) {
+            inferredSubmissionAsRef = isSubmission(item);
+        }
+        if (inferredSubmissionAsRef) {
             if (!asSubmission(item)) {
                 this.logger.warn('Cannot use post as reference because triggered item is not a Submission');
             } else if (item.is_self) {
@@ -310,34 +344,6 @@ export class RecentActivityRule extends Rule {
                 }
             }
 
-            for (const activity of viableActivity) {
-                if (asSubmission(activity) && submissionState !== undefined) {
-                    if (!(await this.resources.testItemCriteria(activity, [submissionState]))) {
-                        continue;
-                    }
-                } else if (commentState !== undefined) {
-                    if (!(await this.resources.testItemCriteria(activity, [commentState]))) {
-                        continue;
-                    }
-                }
-                let inSubreddits = false;
-                for (const ss of subStates) {
-                    const res = await this.resources.testSubredditCriteria(activity, ss);
-                    if (res) {
-                        inSubreddits = true;
-                        break;
-                    }
-                }
-                if (inSubreddits) {
-                    currCount++;
-                    combinedKarma += activity.score;
-                    const pSub = getActivitySubredditName(activity);
-                    if (!presentSubs.includes(pSub)) {
-                        presentSubs.push(pSub);
-                    }
-                }
-            }
-
             const {operator, value, isPercent} = parseGenericValueOrPercentComparison(threshold);
             let sum = {
                 subsWithActivity: presentSubs,
@@ -421,6 +427,7 @@ export class RecentActivityRule extends Rule {
                 threshold,
                 testValue,
                 karmaThreshold,
+                combinedKarma,
             }
         };
     }
@@ -501,6 +508,16 @@ interface RecentActivityConfig extends ActivityWindow, ReferenceSubmission {
     thresholds: ActivityThreshold[],
 
     imageDetection?: ImageDetection
+
+    /**
+     * When Activity is a submission should we only include activities that are other submissions with the same content?
+     *
+     * * When the Activity is a submission this defaults to **true**
+     * * When the Activity is a comment it is ignored (not relevant)
+     *
+     * @default true
+     * */
+    useSubmissionAsReference?: boolean
 }
 
 export interface RecentActivityRuleOptions extends RecentActivityConfig, RuleOptions {

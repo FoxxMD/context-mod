@@ -2,9 +2,13 @@ import {Duration} from "dayjs/plugin/duration";
 import {Cache} from 'cache-manager';
 import {MESSAGE} from 'triple-beam';
 import Poll from "snoostorm/out/util/Poll";
-import Snoowrap, {RedditUser, Submission, Subreddit} from "snoowrap";
+import Snoowrap from "snoowrap";
 import {RuleResult} from "../Rule";
 import {IncomingMessage} from "http";
+import Submission from "snoowrap/dist/objects/Submission";
+import Comment from "snoowrap/dist/objects/Comment";
+import RedditUser from "snoowrap/dist/objects/RedditUser";
+import {AuthorOptions} from "../Author/Author";
 import {SqljsConnectionOptions} from "typeorm/driver/sqljs/SqljsConnectionOptions";
 import {MysqlConnectionOptions} from "typeorm/driver/mysql/MysqlConnectionOptions";
 import {MongoConnectionOptions} from "typeorm/driver/mongodb/MongoConnectionOptions";
@@ -491,38 +495,6 @@ export type PollOn = 'unmoderated' | 'modqueue' | 'newSub' | 'newComm';
 export interface PollingOptionsStrong extends PollingOptions {
     limit: number,
     interval: number,
-    clearProcessed: ClearProcessedOptions
-}
-
-/**
- * For very long-running, high-volume subreddits clearing the list of processed activities helps manage memory bloat
- *
- * All of these options have default values based on the limit and/or interval set for polling options on each subreddit stream. They only need to modified if the defaults are not sufficient.
- *
- * If both `after` and `size` are defined whichever is hit first will trigger the list to clear. `after` will be reset after ever clear.
- * */
-export interface ClearProcessedOptions {
-    /**
-     * An interval the processed list should be cleared after.
-     *
-     * * EX `9 days`
-     * * EX `3 months`
-     * * EX `5 minutes`
-     * @pattern ^\s*(?<time>\d+)\s*(?<unit>days?|weeks?|months?|years?|hours?|minutes?|seconds?|milliseconds?)\s*$
-     * */
-    after?: string,
-    /**
-     * Number of activities found in processed list after which the list should be cleared.
-     *
-     * Defaults to the `limit` value from `PollingOptions`
-     * */
-    size?: number,
-    /**
-     * The number of activities to retain in processed list after clearing.
-     *
-     * Defaults to `limit` value from `PollingOptions`
-     * */
-    retain?: number,
 }
 
 export interface PollingDefaults {
@@ -596,8 +568,6 @@ export interface PollingOptions extends PollingDefaults {
      *
      * */
     pollOn: 'unmoderated' | 'modqueue' | 'newSub' | 'newComm'
-
-    clearProcessed?: ClearProcessedOptions
 }
 
 export interface TTLConfig {
@@ -675,6 +645,24 @@ export interface TTLConfig {
      * @default 60
      * */
     filterCriteriaTTL?: number | boolean;
+
+    /**
+     * Amount of time, in seconds, an Activity that the bot has acted on or created will be ignored if found during polling
+     *
+     * This is useful to prevent the bot from checking Activities it *just* worked on or a product of the checks. Examples:
+     *
+     * * Ignore comments created through an Action
+     * * Ignore Activity polled from modqueue that the bot just reported
+     *
+     * This value should be at least as long as the longest polling interval for modqueue/newComm
+     *
+     * * If `0` or `true` will cache indefinitely (not recommended)
+     * * If `false` will not cache
+     *
+     * @examples [50]
+     * @default 50
+     * */
+    selfTTL?: number | boolean
 }
 
 export interface CacheConfig extends TTLConfig {
@@ -842,6 +830,13 @@ export interface ManagerOptions {
     notifications?: NotificationConfig
 
     credentials?: ThirdPartyCredentialsJsonConfig
+
+    /**
+     * Set the default filter criteria for all checks. If this property is specified it will override any defaults passed from the bot's config
+     *
+     * Default behavior is to exclude all mods and automoderator from checks
+     * */
+    filterCriteriaDefaults?: FilterCriteriaDefaults
 }
 
 /**
@@ -917,6 +912,20 @@ export interface ActivityState {
     distinguished?: boolean
     approved?: boolean
     score?: CompareValue
+    /**
+     * A string containing a comparison operator and a value to compare against
+     *
+     * The syntax is `(< OR > OR <= OR >=) <number>`
+     *
+     * * EX `> 2`  => greater than 2 total reports
+     *
+     * Defaults to TOTAL reports on an Activity. Suffix the value with the report type to check that type:
+     *
+     * * EX `> 3 mod` => greater than 3 mod reports
+     * * EX `>= 1 user` => greater than 1 user report
+     *
+     * @pattern ^\s*(>|>=|<|<=)\s*(\d+)\s*(%?)(.*)$
+     * */
     reports?: CompareValue
     age?: DurationComparor
 }
@@ -1080,6 +1089,7 @@ export type StrongCache = {
     submissionTTL: number | boolean,
     commentTTL: number | boolean,
     subredditTTL: number | boolean,
+    selfTTL: number | boolean,
     filterCriteriaTTL: number | boolean,
     provider: CacheOptions
     actionedEventsMax?: number,
@@ -1192,6 +1202,7 @@ export interface Notifier {
 export interface ManagerStateChangeOption {
     reason?: string
     suppressNotification?: boolean
+    suppressChangeEvent?: boolean
 }
 
 /**
@@ -1297,6 +1308,53 @@ export interface WebCredentials {
     redirectUri?: string,
 }
 
+export interface SnoowrapOptions {
+    /**
+     * Proxy all requests to Reddit's API through this endpoint
+     *
+     * * ENV => `PROXY`
+     * * ARG => `--proxy <proxyEndpoint>`
+     *
+     * @examples ["http://localhost:4443"]
+     * */
+    proxy?: string,
+    /**
+     * Manually set the debug status for snoowrap
+     *
+     * When snoowrap has `debug: true` it will log the http status response of reddit api requests to at the `debug` level
+     *
+     * * Set to `true` to always output
+     * * Set to `false` to never output
+     *
+     * If not present or `null` will be set based on `logLevel`
+     *
+     * * ENV => `SNOO_DEBUG`
+     * * ARG => `--snooDebug`
+     * */
+    debug?: boolean,
+}
+
+export type FilterCriteriaDefaultBehavior = 'replace' | 'merge';
+
+export interface FilterCriteriaDefaults {
+    itemIs?: TypedActivityStates
+    /**
+     * Determine how itemIs defaults behave when itemIs is present on the check
+     *
+     * * merge => adds defaults to check's itemIs
+     * * replace => check itemIs will replace defaults (no defaults used)
+     * */
+    itemIsBehavior?: FilterCriteriaDefaultBehavior
+    /**
+     * Determine how authorIs defaults behave when authorIs is present on the check
+     *
+     * * merge => merges defaults with check's authorIs
+     * * replace => check authorIs will replace defaults (no defaults used)
+     * */
+    authorIs?: AuthorOptions
+    authorIsBehavior?: FilterCriteriaDefaultBehavior
+}
+
 /**
  * The configuration for an **individual reddit account** ContextMod will run as a bot.
  *
@@ -1317,33 +1375,20 @@ export interface BotInstanceJsonConfig {
     notifications?: NotificationConfig
 
     /**
-     * Settings to control some [Snoowrap](https://github.com/not-an-aardvark/snoowrap) behavior
+     * Settings to control some [Snoowrap](https://github.com/not-an-aardvark/snoowrap) behavior.
+     *
+     * Overrides any defaults provided at top-level operator config.
+     *
+     * Set to an empty object to "ignore" any top-level config
      * */
-    snoowrap?: {
-        /**
-         * Proxy all requests to Reddit's API through this endpoint
-         *
-         * * ENV => `PROXY`
-         * * ARG => `--proxy <proxyEndpoint>`
-         *
-         * @examples ["http://localhost:4443"]
-         * */
-        proxy?: string,
-        /**
-         * Manually set the debug status for snoowrap
-         *
-         * When snoowrap has `debug: true` it will log the http status response of reddit api requests to at the `debug` level
-         *
-         * * Set to `true` to always output
-         * * Set to `false` to never output
-         *
-         * If not present or `null` will be set based on `logLevel`
-         *
-         * * ENV => `SNOO_DEBUG`
-         * * ARG => `--snooDebug`
-         * */
-        debug?: boolean,
-    }
+    snoowrap?: SnoowrapOptions
+
+    /**
+     * Define the default behavior for all filter criteria on all checks in all subreddits
+     *
+     * Defaults to exclude mods and automoderator from checks
+     * */
+    filterCriteriaDefaults?: FilterCriteriaDefaults
 
     /**
      * Settings related to bot behavior for subreddits it is managing
@@ -1412,18 +1457,31 @@ export interface BotInstanceJsonConfig {
      * */
     polling?: PollingDefaults & {
         /**
-         * If set to `true` all subreddits polling unmoderated/modqueue with default polling settings will share a request to "r/mod"
-         * otherwise each subreddit will poll its own mod view
+         * DEPRECATED: See `shared`
+         *
+         *  Using the ENV or ARG will sett `unmoderated` and `modqueue` on `shared`
          *
          * * ENV => `SHARE_MOD`
          * * ARG => `--shareMod`
          *
          * @default false
+         * @deprecated
          * */
         sharedMod?: boolean,
 
         /**
-         * If sharing a mod stream stagger pushing relevant Activities to individual subreddits.
+         * Set which polling sources should be shared among subreddits using default polling settings for that source
+         *
+         * * For `unmoderated and `modqueue` the bot will poll on **r/mod** for new activities
+         * * For `newSub` and `newComm` all subreddits sharing the source will be combined to poll like **r/subreddit1+subreddit2/new**
+         *
+         * If set to `true` all polling sources will be shared,  otherwise specify which sourcs should be shared as a list
+         *
+         * */
+        shared?: PollOn[] | true,
+
+        /**
+         * If sharing a stream staggers pushing relevant Activities to individual subreddits.
          *
          * Useful when running many subreddits and rules are potentially cpu/memory/traffic heavy -- allows spreading out load
          * */
@@ -1572,6 +1630,11 @@ export interface OperatorJsonConfig {
      * Defaults to 'sqljs' which stores data in a file
      * */
     databaseConfig?: DatabaseDriver | DatabaseConfig
+
+    /**
+     * Set global snoowrap options as well as default snoowrap config for all bots that don't specify their own
+     * */
+    snoowrap?: SnoowrapOptions
 
     bots?: BotInstanceJsonConfig[]
 
@@ -1738,7 +1801,7 @@ export interface BotInstanceConfig extends BotInstanceJsonConfig {
         heartbeatInterval: number,
     },
     polling: {
-        sharedMod: boolean,
+        shared: PollOn[],
         stagger?: number,
         limit: number,
         interval: number,
@@ -1819,20 +1882,18 @@ export interface LogInfo {
     bot?: string
 }
 
-export interface ActionResult {
+export interface ActionResult extends ActionProcessResult {
     kind: string,
     name: string,
     run: boolean,
     runReason?: string,
-    dryRun: boolean,
-    success: boolean,
-    result?: string,
 }
 
 export interface ActionProcessResult {
     success: boolean,
     dryRun: boolean,
     result?: string
+    touchedEntities?: (Submission | Comment | RedditUser | string)[]
 }
 
 export interface ActionedEvent {
@@ -1867,6 +1928,14 @@ export interface RedditEntity {
 
 export interface StatusCodeError extends Error {
     name: 'StatusCodeError',
+    statusCode: number,
+    message: string,
+    response: IncomingMessage,
+    error: Error
+}
+
+export interface RequestError extends Error {
+    name: 'RequestError',
     statusCode: number,
     message: string,
     response: IncomingMessage,

@@ -611,12 +611,9 @@
                                     <input data-subreddit="<%= data.name %>" style="min-width: 420px;"
                                            class="border-gray-50 placeholder-gray-500 rounded mt-2 mb-3 p-2 text-black checkUrl"
                                            placeholder="<%= data.name === 'All' ? 'Run Bot on a permalink from any moderated Subreddit' : `Run Bot on a permalink using this Subreddit's config` %>"/>
-                                    <span class="mx-2">
-                                        <input type="checkbox" class="dryrunCheck" data-subreddit="<%= data.name %>"
-                                               name="dryrunCheck">
-                                        <label for="dryrunCheck">Dry Run?</label>
-                                    </span>
-                                    <a class="runCheck" data-subreddit="<%= data.name %>" href="">Run</a>
+
+                                    <a class="hover:bg-gray-700 pointer-events-none opacity-20 no-underline rounded-md mx-4 py-2 px-3 border checkActions dryRunCheck" data-subreddit="<%= data.name %>" href="">Dry Run</a>
+                                    <a class="hover:bg-gray-700 pointer-events-none opacity-20 no-underline rounded-md py-2 px-3 border checkActions runCheck" data-subreddit="<%= data.name %>" href="">Run</a>
                                 </div>
                                 <%- include('partials/logSettings') %>
                             </div>
@@ -658,23 +655,42 @@
         });
     })
 
-    document.querySelectorAll(".runCheck").forEach(el => {
+    document.querySelectorAll(".checkUrl").forEach(el => {
+        const toggleButtons = (e) => {
+            const subFilter = `.sub[data-subreddit="${e.target.dataset.subreddit}"]`;
+            const inputVal = document.querySelector(`${subFilter} .checkUrl`).value;
+            if (inputVal.length > 0) {
+                document.querySelectorAll(`${subFilter} .checkActions`).forEach(el => {
+                    el.classList.remove('pointer-events-none', 'opacity-20');
+                });
+            } else {
+                document.querySelectorAll(`${subFilter} .checkActions`).forEach(el => {
+                    el.classList.add('pointer-events-none', 'opacity-20');
+                });
+            }
+        }
+        el.addEventListener('keyup', toggleButtons, false);
+        el.addEventListener('change', toggleButtons, false);
+    });
+
+    document.querySelectorAll(".checkActions").forEach(el => {
         el.addEventListener('click', e => {
             e.preventDefault();
             const subreddit = e.target.dataset.subreddit;
-            const urlInput = document.querySelector(`[data-subreddit="${subreddit}"].checkUrl`);
-            const dryRunCheck = document.querySelector(`[data-subreddit="${subreddit}"].dryrunCheck`);
+            const subFilter = `.sub[data-subreddit="${subreddit}"]`;
+            const urlInput = document.querySelector(`${subFilter} .checkUrl`);
+
+            const isDryun = e.target.classList.contains('dryRunCheck');
 
             const subSection = e.target.closest('div.sub');
             bot = subSection.dataset.bot;
             const url = urlInput.value;
-            const dryRun = dryRunCheck.checked ? 1 : 0;
 
-            const fetchUrl = `/api/check?instance=<%= instanceId %>&bot=${bot}&url=${url}&dryRun=${dryRun}&subreddit=${subreddit}`;
+            const fetchUrl = `/api/check?instance=<%= instanceId %>&bot=${bot}&url=${url}&dryRun=${isDryun ? 1 : 0}&subreddit=${subreddit}`;
             fetch(fetchUrl);
 
             urlInput.value = '';
-            dryRunCheck.checked = false;
+            urlInput.dispatchEvent(new Event('change'));
         });
     });
 

@@ -2,6 +2,7 @@ import {App} from "../../../App";
 import Bot from "../../../Bot";
 import {BotInstance, CMInstance} from "../../interfaces";
 import {Manager} from "../../../Subreddit/Manager";
+import CMUser from "../../Common/User/CMUser";
 
 declare global {
     declare namespace Express {
@@ -13,18 +14,7 @@ declare global {
             serverBot: Bot,
             manager?: Manager,
         }
-        interface User {
-            name: string
-            subreddits: string[]
-            machine?: boolean
-            isOperator?: boolean
-            realManagers?: string[]
-            moderatedManagers?: string[]
-            realBots?: string[]
-            moderatedBots?: string[]
-            scope?: string[]
-            token?: string
-            tokenExpiresAt?: number
+        class User extends CMUser<any, any, any> {
         }
     }
 }

@@ -29,15 +29,20 @@ export class ReportAction extends Action {
         const renderedContent = await renderContent(content, item, ruleResults, this.resources.userNotes);
         this.logger.verbose(`Contents:\r\n${renderedContent}`);
         const truncatedContent = reportTrunc(renderedContent);
+        const touchedEntities = [];
         if(!dryRun) {
             // @ts-ignore
             await item.report({reason: truncatedContent});
+            // due to reddit not updating this in response (maybe)?? just increment stale activity
+            item.num_reports++;
+            touchedEntities.push(item);
         }
 
         return {
             dryRun,
             success: true,
-            result: truncatedContent
+            result: truncatedContent,
+            touchedEntities
         };
     }
 }

@@ -10,10 +10,11 @@ import ApproveAction, {ApproveActionConfig} from "./ApproveAction";
 import BanAction, {BanActionJson} from "./BanAction";
 import {MessageAction, MessageActionJson} from "./MessageAction";
 import {SubredditResources} from "../Subreddit/SubredditResources";
-import Snoowrap from "snoowrap";
+import {UserFlairAction, UserFlairActionJson} from './UserFlairAction';
+import {ExtendedSnoowrap} from '../Utils/SnoowrapClients';
 
 export function actionFactory
-(config: ActionJson, logger: Logger, subredditName: string, resources: SubredditResources, client: Snoowrap): Action {
+(config: ActionJson, logger: Logger, subredditName: string, resources: SubredditResources, client: ExtendedSnoowrap): Action {
     switch (config.kind) {
         case 'comment':
             return new CommentAction({...config as CommentActionJson, logger, subredditName, resources, client});
@@ -25,6 +26,8 @@ export function actionFactory
             return new ReportAction({...config as ReportActionJson, logger, subredditName, resources, client});
         case 'flair':
             return new FlairAction({...config as FlairActionJson, logger, subredditName, resources, client});
+        case 'userflair':
+            return new UserFlairAction({...config as UserFlairActionJson, logger, subredditName, resources, client});
         case 'approve':
             return new ApproveAction({...config as ApproveActionConfig, logger, subredditName, resources, client});
         case 'usernote':
