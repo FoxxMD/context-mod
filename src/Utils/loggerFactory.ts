@@ -1,6 +1,8 @@
-import {labelledFormat, logLevels} from "../util";
+import {labelledFormat, logLevels, mergeArr} from "../util";
 import winston, {Logger} from "winston";
 import {DuplexTransport} from "winston-duplex";
+import { WinstonAdaptor } from 'typeorm-logger-adaptor/logger/winston';
+import {LoggerOptions} from 'typeorm';
 
 const {transports} = winston;
 
@@ -62,3 +64,9 @@ export const getLogger = (options: any, name = 'app'): Logger => {
 
     return winston.loggers.get(name);
 }
+
+export const getDatabaseLogger = (options: any, name = 'app', typeOptions: LoggerOptions) => {
+    const logger = getLogger(options, name);
+    const dbLogger = logger.child({leaf: 'Database'}, mergeArr);
+    return new WinstonAdaptor(dbLogger, typeOptions)
+};

@@ -1,0 +1,19 @@
+{
+   "type": "sqljs",
+   "autoSave": true,
+   "location": "database.sqlite",
+   "synchronize": true,
+   "logging": false,
+   "entities": [
+      "src/Common/Entities/**/*.js"
+   ],
+   "migrations": [
+      "src/Common/Migrations/**/*.js"
+   ],
+   "subscribers": [],
+   "cli": {
+      "entitiesDir": "src/Common/Entities",
+      "migrationsDir": "src/Common/Migrations",
+      "subscribersDir": "src/Common/Subscriptions"
+   }
+}
