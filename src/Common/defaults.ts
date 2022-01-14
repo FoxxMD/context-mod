@@ -35,9 +35,6 @@ export const filterCriteriaDefault: FilterCriteriaDefaults = {
         exclude: [
             {
                 isMod: true
-            },
-            {
-                name: ['AutoModerator']
             }
         ]
     }

@@ -1,5 +1,5 @@
 import {UserNoteCriteria} from "../Rule";
-import {CompareValue, CompareValueOrPercent, DurationComparor} from "../Common/interfaces";
+import {CompareValue, CompareValueOrPercent, DurationComparor, JoinOperands} from "../Common/interfaces";
 import {parseStringToRegex} from "../util";
 
 /**
@@ -12,7 +12,17 @@ export interface AuthorOptions {
      * */
     include?: AuthorCriteria[];
     /**
-     * Only runs if `include` is not present. Will "pass" if any of set of the AuthorCriteria **does not** pass
+     * * OR => if ANY exclude condition "does not" pass then the exclude test passes
+     * * AND => if ALL exclude conditions "do not" pass then the exclude test passes
+     *
+     * Defaults to OR
+     * @default OR
+     * */
+    excludeCondition?: JoinOperands
+    /**
+     * Only runs if `include` is not present. Each AuthorCriteria is comprised of conditions that the Author being checked must "not" pass. See excludeCondition for set behavior
+     *
+     * EX: `isMod: true, name: Automoderator` => Will pass if the Author IS NOT a mod and IS NOT named Automoderator
      * */
     exclude?: AuthorCriteria[];
 }

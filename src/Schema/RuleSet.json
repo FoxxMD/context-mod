@@ -509,11 +509,20 @@
             ],
             "properties": {
                 "exclude": {
-                    "description": "Only runs if `include` is not present. Will \"pass\" if any of set of the AuthorCriteria **does not** pass",
+                    "description": "Only runs if `include` is not present. Each AuthorCriteria is comprised of conditions that the Author being checked must \"not\" pass. See excludeCondition for set behavior\n\nEX: `isMod: true, name: Automoderator` => Will pass if the Author IS NOT a mod and IS NOT named Automoderator",
                     "items": {
                         "$ref": "#/definitions/AuthorCriteria"
                     },
                     "type": "array"
+                },
+                "excludeCondition": {
+                    "default": "OR",
+                    "description": "* OR => if ANY exclude condition \"does not\" pass then the exclude test passes\n* AND => if ALL exclude conditions \"do not\" pass then the exclude test passes\n\nDefaults to OR",
+                    "enum": [
+                        "AND",
+                        "OR"
+                    ],
+                    "type": "string"
                 },
                 "include": {
                     "description": "Will \"pass\" if any set of AuthorCriteria passes",

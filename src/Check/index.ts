@@ -28,7 +28,7 @@ import * as RuleSchema from '../Schema/Rule.json';
 import * as RuleSetSchema from '../Schema/RuleSet.json';
 import * as ActionSchema from '../Schema/Action.json';
 import {ActionObjectJson, RuleJson, RuleObjectJson, ActionJson as ActionTypeJson} from "../Common/types";
-import {SubredditResources} from "../Subreddit/SubredditResources";
+import {checkAuthorFilter, SubredditResources} from "../Subreddit/SubredditResources";
 import {Author, AuthorCriteria, AuthorOptions} from '..';
 import {ExtendedSnoowrap} from '../Utils/SnoowrapClients';
 
@@ -43,10 +43,7 @@ export abstract class Check implements ICheck {
     rules: Array<RuleSet | Rule> = [];
     logger: Logger;
     itemIs: TypedActivityStates;
-    authorIs: {
-        include: AuthorCriteria[],
-        exclude: AuthorCriteria[]
-    };
+    authorIs: AuthorOptions;
     cacheUserResult: Required<UserResultCacheOptions>;
     dryRun?: boolean;
     notifyOnTrigger: boolean;
@@ -69,6 +66,7 @@ export abstract class Check implements ICheck {
             itemIs = [],
             authorIs: {
                 include = [],
+                excludeCondition = 'OR',
                 exclude = [],
             } = {},
             dryRun,
@@ -89,6 +87,7 @@ export abstract class Check implements ICheck {
         this.condition = condition;
         this.itemIs = itemIs;
         this.authorIs = {
+            excludeCondition,
             exclude: exclude.map(x => new Author(x)),
             include: include.map(x => new Author(x)),
         }
@@ -159,7 +158,7 @@ export abstract class Check implements ICheck {
         runStats.push(`${this.actions.length} Actions`);
         // not sure if this should be info or verbose
         this.logger.info(`=${this.enabled ? 'Enabled' : 'Disabled'}= ${type.toUpperCase()} (${this.condition})${this.notifyOnTrigger ? ' ||Notify on Trigger|| ' : ''} => ${runStats.join(' | ')}${this.description !== undefined ? ` => ${this.description}` : ''}`);
-        if (this.rules.length === 0 && this.itemIs.length === 0 && this.authorIs.exclude.length === 0 && this.authorIs.include.length === 0) {
+        if (this.rules.length === 0 && this.itemIs.length === 0 && this.authorIs.exclude?.length === 0 && this.authorIs.include?.length === 0) {
             this.logger.warn('No rules, item tests, or author test found -- this check will ALWAYS PASS!');
         }
         let ruleSetIndex = 1;
@@ -202,30 +201,9 @@ export abstract class Check implements ICheck {
                 this.logger.verbose(`${FAIL} => Item did not pass 'itemIs' test`);
                 return [false, allRuleResults];
             }
-            let authorPass = null;
-            if (this.authorIs.include !== undefined && this.authorIs.include.length > 0) {
-                for (const auth of this.authorIs.include) {
-                    if (await this.resources.testAuthorCriteria(item, auth)) {
-                        authorPass = true;
-                        break;
-                    }
-                }
-                if (!authorPass) {
-                    this.logger.verbose(`${FAIL} => Inclusive author criteria not matched`);
-                    return Promise.resolve([false, allRuleResults]);
-                }
-            }
-            if (authorPass === null && this.authorIs.exclude !== undefined && this.authorIs.exclude.length > 0) {
-                for (const auth of this.authorIs.exclude) {
-                    if (await this.resources.testAuthorCriteria(item, auth, false)) {
-                        authorPass = true;
-                        break;
-                    }
-                }
-                if (!authorPass) {
-                    this.logger.verbose(`${FAIL} =>  Exclusive author criteria not matched`);
-                    return Promise.resolve([false, allRuleResults]);
-                }
+            const [authFilterResult, authFilterType] = await checkAuthorFilter(item, this.authorIs, this.resources, this.logger);
+            if(!authFilterResult) {
+                return Promise.resolve([false, allRuleResults]);
             }
 
             if (this.rules.length === 0) {
