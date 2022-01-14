@@ -12,7 +12,7 @@ const addBot = () => {
 
     const response = async (req: Request, res: Response) => {
 
-        if (!(req.user as Express.User).isOperator) {
+        if (!req.user?.isInstanceOperator(req.app)) {
             return res.status(401).send("Must be an Operator to use this route");
         }
 

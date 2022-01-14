@@ -152,7 +152,8 @@ export class RegexRule extends Rule {
             }, []);
 
             // check regex
-            const reg = parseStringToRegex(regex, 'g');
+            const regexContent = await this.resources.getContent(regex);
+            const reg = parseStringToRegex(regexContent, 'g');
             if(reg === undefined) {
                 throw new SimpleError(`Value given for regex on Criteria ${name} was not valid: ${regex}`);
             }
@@ -257,7 +258,7 @@ export class RegexRule extends Rule {
             const critResults = {
                 criteria: {
                     name,
-                    regex,
+                    regex: regex !== regexContent ? `${regex} from ${regexContent}` : regex,
                     testOn,
                     matchThreshold,
                     activityMatchThreshold,

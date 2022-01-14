@@ -8,6 +8,7 @@ export interface BotInstance {
     subreddits: string[]
     nanny?: string
     running: boolean
+    instance: CMInstance
 }
 
 export interface CMInstance extends BotConnection {

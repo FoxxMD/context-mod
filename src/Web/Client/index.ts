@@ -46,6 +46,7 @@ import {MESSAGE} from "triple-beam";
 import Autolinker from "autolinker";
 import path from "path";
 import {ExtendedSnoowrap} from "../../Utils/SnoowrapClients";
+import ClientUser from "../Common/User/ClientUser";
 
 const emitter = new EventEmitter();
 
@@ -88,19 +89,6 @@ declare module 'express-session' {
         authBotId?: string,
     }
 }
-
-// declare global {
-//     namespace Express {
-//         interface User {
-//             name: string
-//             subreddits: string[]
-//             machine?: boolean
-//             isOperator?: boolean
-//             realManagers?: string[]
-//             moderatedManagers?: string[]
-//         }
-//     }
-// }
 
 interface ConnectedUserInfo {
     level?: string,
@@ -202,8 +190,9 @@ const webClient = async (options: OperatorConfig) => {
         done(null, { subreddits: subreddits.map((x: Subreddit) => x.display_name), isOperator: webOps.includes(user.toLowerCase()), name: user, scope, token, tokenExpiresAt: dayjs().unix() + (60 * 60) });
     });
 
-    passport.deserializeUser(async function (obj, done) {
-        done(null, obj as Express.User);
+    passport.deserializeUser(async function (obj: any, done) {
+        const user = new ClientUser(obj.name, obj.subreddits, {token: obj.token, scope: obj.scope, webOperator: obj.isOperator, tokenExpiresAt: obj.tokenExpiresAt});
+        done(null, user);
         // const data = await webCache.get(`userSession-${obj}`) as object;
         // if (data === undefined) {
         //     done('Not Found');
@@ -236,7 +225,10 @@ const webClient = async (options: OperatorConfig) => {
                 code: code as string,
             });
             const user = await client.getMe().name as string;
-            const subs = await client.getModeratedSubreddits();
+            let subs = await client.getModeratedSubreddits({count: 100});
+            while(!subs.isFinished) {
+                subs = await subs.fetchMore({amount: 100});
+            }
             io.to(req.session.id).emit('authStatus', {canSaveWiki: req.session.scope?.includes('wikiedit')});
             return done(null, {user, subreddits: subs, scope: req.session.scope, token: client.accessToken});
         }
@@ -417,7 +409,7 @@ const webClient = async (options: OperatorConfig) => {
                     '<div>or as an argument: <span class="font-mono">--operator YourRedditUsername</span></div>'});
         }
         // or if there is an operator and current user is operator
-        if(req.user.isOperator) {
+        if(req.user?.clientData?.webOperator) {
             return next();
         } else {
             return res.render('error', {error: 'You must be an <b>Operator</b> to access this route.'});
@@ -429,7 +421,7 @@ const webClient = async (options: OperatorConfig) => {
             redirectUri,
             clientId,
             clientSecret,
-            token: req.isAuthenticated() && req.user.isOperator ? token : undefined
+            token: req.isAuthenticated() && req.user?.clientData?.webOperator ? token : undefined
         });
     });
 
@@ -626,20 +618,16 @@ const webClient = async (options: OperatorConfig) => {
             return res.status(404).render('error', {error: msg});
         }
 
-        const user = req.user as Express.User;
-
-        const isOperator = instance.operators.includes(user.name);
-        const canAccessBot = isOperator || intersect(user.subreddits, instance.subreddits).length > 0;
-        if (!user.isOperator && !canAccessBot) {
+        if (!req.user?.clientData?.webOperator && !req.user?.canAccessInstance(instance)) {
             return res.status(404).render('error', {error: msg});
         }
 
-        if (req.params.subreddit !== undefined && !isOperator && !user.subreddits.includes(req.params.subreddit)) {
+        if (req.params.subreddit !== undefined && !req.user?.isInstanceOperator(instance) && !req.user?.subreddits.includes(req.params.subreddit)) {
             return res.status(404).render('error', {error: msg});
         }
         req.instance = instance;
         req.session.botId = instance.friendly;
-        if(canAccessBot) {
+        if(req.user?.canAccessInstance(instance)) {
             req.session.authBotId = instance.friendly;
         }
         return next();
@@ -664,15 +652,11 @@ const webClient = async (options: OperatorConfig) => {
             return res.status(404).render('error', {error: msg});
         }
 
-        const user = req.user as Express.User;
-
-        const isOperator = instance.operators.includes(user.name);
-        const canAccessBot = isOperator || intersect(user.subreddits, botInstance.subreddits.map(x => x.replace(/\\*r\/*/,''))).length > 0;
-        if (!user.isOperator && !canAccessBot) {
+        if (!req.user?.clientData?.webOperator && !req.user?.canAccessBot(botInstance)) {
             return res.status(404).render('error', {error: msg});
         }
 
-        if (req.params.subreddit !== undefined && !isOperator && !user.subreddits.includes(req.params.subreddit)) {
+        if (req.params.subreddit !== undefined && !req.user?.isInstanceOperator(instance) && !req.user?.subreddits.includes(req.params.subreddit)) {
             return res.status(404).render('error', {error: msg});
         }
         req.bot = botInstance;
@@ -772,12 +756,12 @@ const webClient = async (options: OperatorConfig) => {
         const level = req.session.level;
 
         const shownInstances = cmInstances.reduce((acc: CMInstance[], curr) => {
-            const isBotOperator = curr.operators.map(x => x.toLowerCase()).includes(user.name.toLowerCase());
-            if(user.isOperator) {
+            const isBotOperator = req.user?.isInstanceOperator(curr);
+            if(user?.clientData?.webOperator) {
                 // @ts-ignore
                 return acc.concat({...curr, canAccessLocation: true, isOperator: isBotOperator});
             }
-            if(!isBotOperator && intersect(user.subreddits, curr.subreddits).length === 0) {
+            if(!isBotOperator && !req.user?.canAccessInstance(curr)) {
                 return acc;
             }
             // @ts-ignore
@@ -804,7 +788,7 @@ const webClient = async (options: OperatorConfig) => {
             return res.render('offline', {
                 instances: shownInstances,
                 instanceId: (req.instance as CMInstance).friendly,
-                isOperator: instance.operators.includes((req.user as Express.User).name),
+                isOperator: req.user?.isInstanceOperator(instance),
                 // @ts-ignore
                 logs: filterLogBySubreddit(instanceLogMap, [instance.friendly], {limit, sort, level, allLogName: 'web', allLogsParser: parseInstanceLogInfoName }).get(instance.friendly),
                 logSettings: {
@@ -837,7 +821,7 @@ const webClient = async (options: OperatorConfig) => {
             bots: resp.bots,
             botId: (req.instance as CMInstance).friendly,
             instanceId: (req.instance as CMInstance).friendly,
-            isOperator: instance.operators.includes((req.user as Express.User).name),
+            isOperator: req.user?.isInstanceOperator(instance),
             operators: instance.operators.join(', '),
             operatorDisplay: instance.operatorDisplay,
             logSettings: {
@@ -859,7 +843,7 @@ const webClient = async (options: OperatorConfig) => {
         res.render('config', {
             title: `Configuration Editor`,
             format,
-            canSave: req.user?.scope?.includes('wikiedit') && req.user?.tokenExpiresAt !== undefined && dayjs.unix(req.user?.tokenExpiresAt).isAfter(dayjs())
+            canSave: req.user?.clientData?.scope?.includes('wikiedit') && req.user?.clientData?.tokenExpiresAt !== undefined && dayjs.unix(req.user?.clientData.tokenExpiresAt).isAfter(dayjs())
         });
     });
 
@@ -871,7 +855,7 @@ const webClient = async (options: OperatorConfig) => {
             userAgent,
             clientId,
             clientSecret,
-            accessToken: req.user?.token
+            accessToken: req.user?.clientData?.token
         });
 
         try {
@@ -1024,7 +1008,7 @@ const webClient = async (options: OperatorConfig) => {
             // setup general web log event
             const webLogListener = (log: string) => {
                 const subName = parseSubredditLogName(log);
-                if((subName === undefined || user.isOperator) && isLogLineMinLevel(log, session.level as string)) {
+                if((subName === undefined || user.clientData?.webOperator === true) && isLogLineMinLevel(log, session.level as string)) {
                     io.to(session.id).emit('webLog', formatLogLineToHtml(log));
                 }
             }
@@ -1120,7 +1104,7 @@ const webClient = async (options: OperatorConfig) => {
                 if(lastCheck > 15) {
                     shouldCheck = true;
                 }
-            } else if(lastCheck > 300) {
+            } else if(lastCheck > 60) {
                 shouldCheck = true;
             }
         }
@@ -1155,7 +1139,9 @@ const webClient = async (options: OperatorConfig) => {
                     }
                 }).json() as CMInstance;
 
-                botStat = {...botStat, ...resp, online: true};
+                const {bots, ...restResp} = resp;
+
+                botStat = {...botStat, ...restResp, bots: bots.map(x => ({...x, instance: botStat})), online: true};
                 const sameNameIndex = cmInstances.findIndex(x => x.friendly === botStat.friendly);
                 if(sameNameIndex > -1 && sameNameIndex !== existingClientIndex) {
                     logger.warn(`Client returned a friendly name that is not unique (${botStat.friendly}), will fallback to host as friendly (${botStat.normalUrl})`);

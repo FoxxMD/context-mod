@@ -8,6 +8,7 @@ import {IncomingMessage} from "http";
 import Submission from "snoowrap/dist/objects/Submission";
 import Comment from "snoowrap/dist/objects/Comment";
 import RedditUser from "snoowrap/dist/objects/RedditUser";
+import {AuthorOptions} from "../Author/Author";
 
 /**
  * An ISO 8601 Duration
@@ -489,38 +490,6 @@ export type PollOn = 'unmoderated' | 'modqueue' | 'newSub' | 'newComm';
 export interface PollingOptionsStrong extends PollingOptions {
     limit: number,
     interval: number,
-    clearProcessed: ClearProcessedOptions
-}
-
-/**
- * For very long-running, high-volume subreddits clearing the list of processed activities helps manage memory bloat
- *
- * All of these options have default values based on the limit and/or interval set for polling options on each subreddit stream. They only need to modified if the defaults are not sufficient.
- *
- * If both `after` and `size` are defined whichever is hit first will trigger the list to clear. `after` will be reset after ever clear.
- * */
-export interface ClearProcessedOptions {
-    /**
-     * An interval the processed list should be cleared after.
-     *
-     * * EX `9 days`
-     * * EX `3 months`
-     * * EX `5 minutes`
-     * @pattern ^\s*(?<time>\d+)\s*(?<unit>days?|weeks?|months?|years?|hours?|minutes?|seconds?|milliseconds?)\s*$
-     * */
-    after?: string,
-    /**
-     * Number of activities found in processed list after which the list should be cleared.
-     *
-     * Defaults to the `limit` value from `PollingOptions`
-     * */
-    size?: number,
-    /**
-     * The number of activities to retain in processed list after clearing.
-     *
-     * Defaults to `limit` value from `PollingOptions`
-     * */
-    retain?: number,
 }
 
 export interface PollingDefaults {
@@ -594,8 +563,6 @@ export interface PollingOptions extends PollingDefaults {
      *
      * */
     pollOn: 'unmoderated' | 'modqueue' | 'newSub' | 'newComm'
-
-    clearProcessed?: ClearProcessedOptions
 }
 
 export interface TTLConfig {
@@ -855,6 +822,13 @@ export interface ManagerOptions {
     notifications?: NotificationConfig
 
     credentials?: ThirdPartyCredentialsJsonConfig
+
+    /**
+     * Set the default filter criteria for all checks. If this property is specified it will override any defaults passed from the bot's config
+     *
+     * Default behavior is to exclude all mods and automoderator from checks
+     * */
+    filterCriteriaDefaults?: FilterCriteriaDefaults
 }
 
 /**
@@ -1220,6 +1194,7 @@ export interface Notifier {
 export interface ManagerStateChangeOption {
     reason?: string
     suppressNotification?: boolean
+    suppressChangeEvent?: boolean
 }
 
 /**
@@ -1351,6 +1326,27 @@ export interface SnoowrapOptions {
     debug?: boolean,
 }
 
+export type FilterCriteriaDefaultBehavior = 'replace' | 'merge';
+
+export interface FilterCriteriaDefaults {
+    itemIs?: TypedActivityStates
+    /**
+     * Determine how itemIs defaults behave when itemIs is present on the check
+     *
+     * * merge => adds defaults to check's itemIs
+     * * replace => check itemIs will replace defaults (no defaults used)
+     * */
+    itemIsBehavior?: FilterCriteriaDefaultBehavior
+    /**
+     * Determine how authorIs defaults behave when authorIs is present on the check
+     *
+     * * merge => merges defaults with check's authorIs
+     * * replace => check authorIs will replace defaults (no defaults used)
+     * */
+    authorIs?: AuthorOptions
+    authorIsBehavior?: FilterCriteriaDefaultBehavior
+}
+
 /**
  * The configuration for an **individual reddit account** ContextMod will run as a bot.
  *
@@ -1378,6 +1374,13 @@ export interface BotInstanceJsonConfig {
      * Set to an empty object to "ignore" any top-level config
      * */
     snoowrap?: SnoowrapOptions
+
+    /**
+     * Define the default behavior for all filter criteria on all checks in all subreddits
+     *
+     * Defaults to exclude mods and automoderator from checks
+     * */
+    filterCriteriaDefaults?: FilterCriteriaDefaults
 
     /**
      * Settings related to bot behavior for subreddits it is managing
@@ -1446,18 +1449,31 @@ export interface BotInstanceJsonConfig {
      * */
     polling?: PollingDefaults & {
         /**
-         * If set to `true` all subreddits polling unmoderated/modqueue with default polling settings will share a request to "r/mod"
-         * otherwise each subreddit will poll its own mod view
+         * DEPRECATED: See `shared`
+         *
+         *  Using the ENV or ARG will sett `unmoderated` and `modqueue` on `shared`
          *
          * * ENV => `SHARE_MOD`
          * * ARG => `--shareMod`
          *
          * @default false
+         * @deprecated
          * */
         sharedMod?: boolean,
 
         /**
-         * If sharing a mod stream stagger pushing relevant Activities to individual subreddits.
+         * Set which polling sources should be shared among subreddits using default polling settings for that source
+         *
+         * * For `unmoderated and `modqueue` the bot will poll on **r/mod** for new activities
+         * * For `newSub` and `newComm` all subreddits sharing the source will be combined to poll like **r/subreddit1+subreddit2/new**
+         *
+         * If set to `true` all polling sources will be shared,  otherwise specify which sourcs should be shared as a list
+         *
+         * */
+        shared?: PollOn[] | true,
+
+        /**
+         * If sharing a stream staggers pushing relevant Activities to individual subreddits.
          *
          * Useful when running many subreddits and rules are potentially cpu/memory/traffic heavy -- allows spreading out load
          * */
@@ -1769,7 +1785,7 @@ export interface BotInstanceConfig extends BotInstanceJsonConfig {
         heartbeatInterval: number,
     },
     polling: {
-        sharedMod: boolean,
+        shared: PollOn[],
         stagger?: number,
         limit: number,
         interval: number,

@@ -13,12 +13,27 @@ import as from 'async';
 import fetch from 'node-fetch';
 import {
     asSubmission,
-    buildCacheOptionsFromProvider, buildCachePrefix,
-    cacheStats, compareDurationValue, comparisonTextOp, createCacheManager, createHistoricalStatsDisplay,
-    formatNumber, getActivityAuthorName, getActivitySubredditName, isStrongSubredditState,
-    mergeArr, parseDurationComparison,
-    parseExternalUrl, parseGenericValueComparison, parseRedditEntity,
-    parseWikiContext, shouldCacheSubredditStateCriteriaResult, subredditStateIsNameOnly, toStrongSubredditState
+    buildCacheOptionsFromProvider,
+    buildCachePrefix,
+    cacheStats,
+    compareDurationValue,
+    comparisonTextOp,
+    createCacheManager,
+    createHistoricalStatsDisplay, FAIL,
+    fetchExternalUrl,
+    formatNumber,
+    getActivityAuthorName,
+    getActivitySubredditName,
+    isStrongSubredditState,
+    mergeArr,
+    parseDurationComparison,
+    parseExternalUrl,
+    parseGenericValueComparison,
+    parseRedditEntity,
+    parseWikiContext, PASS,
+    shouldCacheSubredditStateCriteriaResult,
+    subredditStateIsNameOnly,
+    toStrongSubredditState
 } from "../util";
 import LoggedError from "../Utils/LoggedError";
 import {
@@ -45,7 +60,7 @@ import {
 import UserNotes from "./UserNotes";
 import Mustache from "mustache";
 import he from "he";
-import {AuthorCriteria} from "../Author/Author";
+import {AuthorCriteria, AuthorOptions} from "../Author/Author";
 import {SPoll} from "./Streams";
 import {Cache} from 'cache-manager';
 import {Submission, Comment, Subreddit} from "snoowrap/dist/objects";
@@ -593,8 +608,7 @@ export class SubredditResources {
             }
         } else {
             try {
-                const response = await fetch(extUrl as string);
-                wikiContent = await response.text();
+                wikiContent = await fetchExternalUrl(extUrl as string, this.logger);
             } catch (err: any) {
                 const msg = `Error occurred while trying to fetch the url ${extUrl}`;
                 this.logger.error(msg, err);
@@ -781,8 +795,8 @@ export class SubredditResources {
         return await this.isItem(i, activityStates, this.logger);
     }
 
-    async isSubreddit (subreddit: Subreddit, stateCriteria: SubredditState | StrongSubredditState, logger: Logger) {
-        delete stateCriteria.stateDescription;
+    async isSubreddit (subreddit: Subreddit, stateCriteriaRaw: SubredditState | StrongSubredditState, logger: Logger) {
+        const {stateDescription, ...stateCriteria} = stateCriteriaRaw;
 
         if (Object.keys(stateCriteria).length === 0) {
             return true;
@@ -1276,4 +1290,51 @@ export class BotResourcesManager {
         await this.defaultCache.del(`modInvites`);
         return;
     }
+}
+
+export const checkAuthorFilter = async (item: (Submission | Comment), filter: AuthorOptions, resources: SubredditResources, logger: Logger): Promise<[boolean, ('inclusive' | 'exclusive' | undefined)]> => {
+    const authLogger = logger.child({labels: ['Author Filter']}, mergeArr);
+    const {
+        include = [],
+        excludeCondition = 'OR',
+        exclude = [],
+    } = filter;
+    let authorPass = null;
+    if (include.length > 0) {
+        for (const auth of include) {
+            if (await resources.testAuthorCriteria(item, auth)) {
+                authLogger.verbose(`${PASS} => Inclusive author criteria matched`);
+                authLogger.debug(`Inclusive is always OR => At least one of ${include.length} matched`);
+                return [true, 'inclusive'];
+            }
+        }
+        authLogger.verbose(`${FAIL} => Inclusive author criteria not matched`);
+        authLogger.debug(`Inclusive is always OR => None of ${include.length} criteria matched`);
+        return [false, 'inclusive'];
+    }
+    if (exclude.length > 0) {
+        for (const auth of exclude) {
+            const excludePass = await resources.testAuthorCriteria(item, auth, false);
+            if (excludePass && excludeCondition === 'OR') {
+                authorPass = true;
+                break;
+            } else if (!excludePass && excludeCondition === 'AND') {
+                authorPass = false;
+                break;
+            }
+        }
+        if (authorPass !== true) {
+            authLogger.verbose(`${FAIL} => Exclusive author criteria not matched`);
+            if(exclude.length > 1) {
+                authLogger.debug(excludeCondition === 'OR' ? `Exclusive OR => No criteria from set of ${exclude.length} matched` : `Exclusive AND => At least one of ${exclude.length} criteria did not match`)
+            }
+            return [false, 'exclusive']
+        }
+        authLogger.verbose(`${PASS} => Exclusive author criteria matched`);
+        if(exclude.length > 1) {
+            authLogger.debug(excludeCondition === 'OR' ? `Exclusive OR => At least 1 in set of ${exclude.length} matched` : `Exclusive AND => All ${exclude.length} matched`)
+        }
+        return [true, 'exclusive'];
+    }
+    return [true, undefined];
 }

@@ -1,5 +1,5 @@
 import {addAsync, Router} from '@awaitjs/express';
-import express, {Request, Response} from 'express';
+import express, {Request, Response, NextFunction, RequestHandler} from 'express';
 import bodyParser from 'body-parser';
 import {App} from "../../App";
 import {Transform} from "stream";
@@ -29,6 +29,7 @@ import {opStats} from "../Common/util";
 import Bot from "../../Bot";
 import addBot from "./routes/authenticated/user/addBot";
 import dayjs from "dayjs";
+import ServerUser from "../Common/User/ServerUser";
 
 const server = addAsync(express());
 server.use(bodyParser.json());
@@ -87,7 +88,7 @@ const rcbServer = async function (options: OperatorConfig) {
                 botLog.set('app', appLogs.slice(0, 200 + 1));
             } else {
                 let botSubs = botSubreddits.get(botName) || [];
-                if(botSubs.length === 0 && app !== undefined) {
+                if(app !== undefined && (botSubs.length === 0 || !botSubs.includes(subName))) {
                     const b = app.bots.find(x => x.botName === botName);
                     if(b !== undefined) {
                         botSubs = b.subManagers.map(x => x.displayLabel);
@@ -128,31 +129,35 @@ const rcbServer = async function (options: OperatorConfig) {
     }, function (jwtPayload, done) {
         const {name, subreddits = [], machine = true} = jwtPayload.data;
         if (machine) {
-            return done(null, {machine});
+            const user = new ServerUser(name, subreddits, true, false);
+            return done(null, user);
+            //return done(null, {machine});
         }
         const isOperator = opNames.includes(name.toLowerCase());
-        let moderatedBots: string[] = [];
-        let moderatedManagers: string[] = [];
-        let realBots: string[] = [];
-        let realManagers: string[] = [];
-        if(app !== undefined) {
-            const modBots =  app.bots.filter(x => intersect(subreddits, x.subManagers.map(y => y.subreddit.display_name)));
-            moderatedBots = modBots.map(x => x.botName as string);
-            moderatedManagers = [...new Set(modBots.map(x => x.subManagers.map(y => y.displayLabel)).flat())];
-            realBots = isOperator ? app.bots.map(x => x.botName as string) : moderatedBots;
-            realManagers = isOperator ? [...new Set(app.bots.map(x => x.subManagers.map(y => y.displayLabel)).flat())] : moderatedManagers
-        }
+        // let moderatedBots: string[] = [];
+        // let moderatedManagers: string[] = [];
+        // let realBots: string[] = [];
+        // let realManagers: string[] = [];
+        // if(app !== undefined) {
+        //     const modBots =  app.bots.filter(x => intersect(subreddits, x.subManagers.map(y => y.subreddit.display_name)).length > 0);
+        //     moderatedBots = modBots.map(x => x.botName as string);
+        //     moderatedManagers = [...new Set(modBots.map(x => x.subManagers).flat().filter(x => subreddits.includes(x.subreddit.display_name)).map(x => x.displayLabel))];
+        //     realBots = isOperator ? app.bots.map(x => x.botName as string) : moderatedBots;
+        //     realManagers = isOperator ? [...new Set(app.bots.map(x => x.subManagers.map(y => y.displayLabel)).flat())] : moderatedManagers
+        // }
 
-        return done(null, {
-            name,
-            subreddits,
-            isOperator,
-            machine: false,
-            moderatedManagers,
-            realManagers,
-            moderatedBots,
-            realBots,
-        });
+        const user = new ServerUser(name, subreddits, false, isOperator);
+        return done(null, user);
+        // return done(null, {
+        //     name,
+        //     subreddits,
+        //     isOperator,
+        //     machine: false,
+        //     moderatedManagers,
+        //     realManagers,
+        //     moderatedBots,
+        //     realBots,
+        // });
     }));
 
     server.use(passport.authenticate('jwt', {session: false}));
@@ -169,8 +174,8 @@ const rcbServer = async function (options: OperatorConfig) {
         let bots: Bot[] = [];
         if(req.serverBot !== undefined) {
             bots = [req.serverBot];
-        } else {
-            bots = (req.user as Express.User).isOperator ? req.botApp.bots : req.botApp.bots.filter(x => intersect(req.user?.subreddits as string[], x.subManagers.map(y => y.subreddit.display_name)));
+        } else if(req.user !== undefined) {
+            bots = req.user.accessibleBots(req.botApp.bots);
         }
         const resp = [];
         for(const b of bots) {

@@ -2,7 +2,7 @@ import Snoowrap, {Comment} from "snoowrap";
 import Submission from "snoowrap/dist/objects/Submission";
 import {Logger} from "winston";
 import {findResultByPremise, mergeArr} from "../util";
-import {SubredditResources} from "../Subreddit/SubredditResources";
+import {checkAuthorFilter, SubredditResources} from "../Subreddit/SubredditResources";
 import {ChecksActivityState, TypedActivityStates} from "../Common/interfaces";
 import Author, {AuthorOptions} from "../Author/Author";
 
@@ -65,6 +65,7 @@ export abstract class Rule implements IRule, Triggerable {
             name = this.getKind(),
             logger,
             authorIs: {
+                excludeCondition = 'OR',
                 include = [],
                 exclude = [],
             } = {},
@@ -78,6 +79,7 @@ export abstract class Rule implements IRule, Triggerable {
         this.client = client;
 
         this.authorIs = {
+            excludeCondition,
             exclude: exclude.map(x => new Author(x)),
             include: include.map(x => new Author(x)),
         }
@@ -99,23 +101,10 @@ export abstract class Rule implements IRule, Triggerable {
                 this.logger.verbose(`(Skipped) Item did not pass 'itemIs' test`);
                 return Promise.resolve([null, this.getResult(null, {result: `Item did not pass 'itemIs' test`})]);
             }
-            if (this.authorIs.include !== undefined && this.authorIs.include.length > 0) {
-                for (const auth of this.authorIs.include) {
-                    if (await this.resources.testAuthorCriteria(item, auth)) {
-                        return this.process(item);
-                    }
-                }
-                this.logger.verbose('(Skipped) Inclusive author criteria not matched');
-                return Promise.resolve([null, this.getResult(null, {result: 'Inclusive author criteria not matched'})]);
-            }
-            if (this.authorIs.exclude !== undefined && this.authorIs.exclude.length > 0) {
-                for (const auth of this.authorIs.exclude) {
-                    if (await this.resources.testAuthorCriteria(item, auth, false)) {
-                        return this.process(item);
-                    }
-                }
-                this.logger.verbose('(Skipped) Exclusive author criteria not matched');
-                return Promise.resolve([null, this.getResult(null, {result: 'Exclusive author criteria not matched'})]);
+            const [authFilterResult, authFilterType] = await checkAuthorFilter(item, this.authorIs, this.resources, this.logger);
+            if(!authFilterResult) {
+                this.logger.verbose(`(Skipped) ${authFilterType} Author criteria not matched`);
+                return Promise.resolve([null, this.getResult(null, {result: `${authFilterType} author criteria not matched`})]);
             }
         } catch (err: any) {
             this.logger.error('Error occurred during Rule pre-process checks');

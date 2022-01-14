@@ -66,7 +66,7 @@ const actionedEvents = async (req: Request, res: Response) => {
         managers.push(manager);
     } else {
         for(const manager of req.serverBot.subManagers) {
-            if((req.user?.realManagers as string[]).includes(manager.displayLabel)) {
+            if(req.user?.canAccessSubreddit(req.serverBot, manager.subreddit.display_name)) {
                 managers.push(manager);
             }
         }
@@ -89,7 +89,7 @@ const action = async (req: Request, res: Response) => {
     const bot = req.serverBot;
 
     const {url, dryRun = false, subreddit} = req.query as any;
-    const {name: userName, realManagers = [], isOperator} = req.user as Express.User;
+    const {name: userName} = req.user as Express.User;
 
     let a;
     const commentId = commentReg(url);
@@ -115,7 +115,7 @@ const action = async (req: Request, res: Response) => {
 
         let manager = subreddit === 'All' ? bot.subManagers.find(x => x.subreddit.display_name === sub) : bot.subManagers.find(x => x.displayLabel === subreddit);
 
-        if (manager === undefined || (!realManagers.includes(manager.displayLabel))) {
+        if (manager === undefined || !req.user?.canAccessSubreddit(req.serverBot, manager.subreddit.display_name)) {
             let msg = 'Activity does not belong to a subreddit you moderate or the bot runs on.';
             if (subreddit === 'All') {
                 msg = `${msg} If you want to test an Activity against a Subreddit\'s config it does not belong to then switch to that Subreddit's tab first.`

@@ -59,3 +59,17 @@ export interface BotStatusResponse {
     }
     subreddits: SubredditDataResponse[]
 }
+
+export interface IUser {
+    name: string
+    subreddits: string[]
+    machine?: boolean
+    isOperator?: boolean
+    realManagers?: string[]
+    moderatedManagers?: string[]
+    realBots?: string[]
+    moderatedBots?: string[]
+    scope?: string[]
+    token?: string
+    tokenExpiresAt?: number
+}
