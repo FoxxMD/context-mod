@@ -6,10 +6,8 @@ import {PostgresConnectionOptions} from "typeorm/driver/postgres/PostgresConnect
 import {resolve} from 'path';
 import "reflect-metadata";
 import {Connection, createConnection} from "typeorm";
-import fs, {promises, constants} from "fs";
-import {parse} from 'path';
 import {getDatabaseLogger, getLogger} from "./loggerFactory";
-import SimpleError from "./SimpleError";
+import {fileOrDirectoryIsWriteable} from "../util";
 
 export const isDatabaseDriver = (val: any): val is DatabaseDriver => {
     if (typeof val !== 'string') {
@@ -73,27 +71,12 @@ export const createDatabaseConnection = async (rawConfig: DatabaseConfig): Promi
 
     if (rawConfig.type === 'sqljs') {
         const location = rawConfig.location as string;
-        // check if directory or file is read/writeable
-        const pathInfo = parse(location);
+
         try {
-            await promises.access(location, constants.R_OK | constants.W_OK);
+            await fileOrDirectoryIsWriteable(location);
             realLocation = location;
-        } catch (err: any) {
-            const {code} = err;
-            if (code === 'ENOENT') {
-                // file doesn't exist, see if we can write to directory in which case we are good
-                try {
-                    await promises.access(pathInfo.dir, constants.R_OK | constants.W_OK)
-                    // we can write to dir
-                    realLocation = location;
-                } catch (accessError: any) {
-                    // also can't access directory :(
-                    logger.warn(`Database file at ${location} did not exist and application does not have permission to write to that directory. Falling back to IN-MEMORY database.`);
-                }
-            } else {
-                logger.error(err);
-                throw new SimpleError(`Database file exists at ${location} but application does have permission to write to it!`);
-            }
+        } catch (e: any) {
+            logger.error(`Falling back to IN-MEMORY database due to error while trying to access database file: ${e.message}`);
         }
         config = {...rawConfig, location: realLocation};
     }
