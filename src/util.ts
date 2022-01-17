@@ -59,6 +59,7 @@ import stringSimilarity from 'string-similarity';
 import calculateCosineSimilarity from "./Utils/StringMatching/CosineSimilarity";
 import levenSimilarity from "./Utils/StringMatching/levenSimilarity";
 import {isRequestError, isStatusError} from "./Utils/Errors";
+import {parse} from "path";
 //import {ResembleSingleCallbackComparisonResult} from "resemblejs";
 
 // want to guess how many concurrent image comparisons we should be doing
@@ -1165,6 +1166,29 @@ export async function readConfigFile(path: string, opts: any) {
 // export function isObject(item: any): boolean {
 //     return (item && typeof item === 'object' && !Array.isArray(item));
 // }
+
+export const fileOrDirectoryIsWriteable = async (location: string) => {
+    const pathInfo = parse(location);
+    try {
+        await promises.access(location, constants.R_OK | constants.W_OK);
+        return true;
+    } catch (err: any) {
+        const {code} = err;
+        if (code === 'ENOENT') {
+            // file doesn't exist, see if we can write to directory in which case we are good
+            try {
+                await promises.access(pathInfo.dir, constants.R_OK | constants.W_OK)
+                // we can write to dir
+                return true;
+            } catch (accessError: any) {
+                // also can't access directory :(
+                throw new SimpleError(`No file exists at ${location} and application does not have permission to write to that directory`);
+            }
+        } else {
+            throw new SimpleError(`File exists at ${location} but application does have permission to write to it.`);
+        }
+    }
+}
 
 export const overwriteMerge = (destinationArray: any[], sourceArray: any[], options: any): any[] => sourceArray;
 
