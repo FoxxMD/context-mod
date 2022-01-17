@@ -554,14 +554,8 @@ export class Manager extends EventEmitter {
                 throw new ConfigParseError('Wiki page contents was empty');
             }
 
-            const [configObj, jsonErr, yamlErr] = parseFromJsonOrYamlToObject(sourceData);
-            if (jsonErr === undefined) {
-                this.wikiFormat = 'json';
-            } else if (yamlErr === undefined) {
-                this.wikiFormat = 'yaml';
-            } else {
-                this.wikiFormat = likelyJson5(sourceData) ? 'json' : 'yaml';
-            }
+            const [format, configObj, jsonErr, yamlErr] = parseFromJsonOrYamlToObject(sourceData);
+            this.wikiFormat = format;
 
             if (configObj === undefined) {
                 this.logger.error(`Could not parse wiki page contents as JSON or YAML. Looks like it should be ${this.wikiFormat}?`);
@@ -577,7 +571,7 @@ export class Manager extends EventEmitter {
                 throw new ConfigParseError('Could not parse wiki page contents as JSON or YAML')
             }
 
-            await this.parseConfigurationFromObject(configObj, suppressChangeEvent);
+            await this.parseConfigurationFromObject(configObj.toJS(), suppressChangeEvent);
             this.logger.info('Checks updated');
 
             if(!suppressNotification) {

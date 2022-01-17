@@ -384,4 +384,11 @@ dist
 !src/Web/assets/public/yaml/*
 **/src/**/*.map
 /**/*.sqlite
-/**/*.sqlite.*.bak
+/**/*.bak
+*.yaml
+*.json5
+
+!src/Schema/*.json
+!docs/**/*.json5
+!docs/**/*.yaml
+!docs/**/*.json

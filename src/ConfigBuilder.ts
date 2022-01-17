@@ -1,11 +1,11 @@
 import {Logger} from "winston";
 import {
     buildCacheOptionsFromProvider, buildCachePrefix,
-    createAjvFactory,
+    createAjvFactory, fileOrDirectoryIsWriteable,
     mergeArr,
     normalizeName,
     overwriteMerge,
-    parseBool, randomId,
+    parseBool, parseFromJsonOrYamlToObject, randomId,
     readConfigFile,
     removeUndefinedKeys
 } from "./util";
@@ -35,11 +35,11 @@ import {
     RedditCredentials,
     BotCredentialsJsonConfig,
     BotCredentialsConfig,
-    FilterCriteriaDefaults, TypedActivityStates
+    FilterCriteriaDefaults, TypedActivityStates, OperatorFileConfig
 } from "./Common/interfaces";
 import {isRuleSetJSON, RuleSetJson, RuleSetObjectJson} from "./Rule/RuleSet";
 import deepEqual from "fast-deep-equal";
-import {ActionJson, ActionObjectJson, RuleJson, RuleObjectJson} from "./Common/types";
+import {ActionJson, ActionObjectJson, ConfigFormat, RuleJson, RuleObjectJson} from "./Common/types";
 import {isActionJson} from "./Action";
 import {getLogger} from "./Utils/loggerFactory";
 import {GetEnvVars} from 'env-cmd';
@@ -49,6 +49,15 @@ import * as process from "process";
 import {cacheOptDefaults, cacheTTLDefaults, filterCriteriaDefault} from "./Common/defaults";
 import objectHash from "object-hash";
 import {AuthorCriteria, AuthorOptions} from "./Author/Author";
+import path from 'path';
+import {
+    JsonOperatorConfigDocument,
+    OperatorConfigDocumentInterface,
+    YamlOperatorConfigDocument
+} from "./Common/Config/Operator";
+import SimpleError from "./Utils/SimpleError";
+import {ConfigDocumentInterface} from "./Common/Config/AbstractConfigDocument";
+import {Document as YamlDocument} from "yaml";
 
 export interface ConfigBuilderOptions {
     logger: Logger,
@@ -145,20 +154,26 @@ export class ConfigBuilder {
             const strongActions = insertNamedActions(c.actions, namedActions);
 
             let derivedAuthorIs: AuthorOptions = authorIsDefault;
-            if(authorIsBehavior === 'merge') {
+            if (authorIsBehavior === 'merge') {
                 derivedAuthorIs = merge.all([authorIs, authorIsDefault], {arrayMerge: overwriteMerge});
-            } else if(Object.keys(authorIs).length > 0) {
+            } else if (Object.keys(authorIs).length > 0) {
                 derivedAuthorIs = authorIs;
             }
 
             let derivedItemIs: TypedActivityStates = itemIsDefault;
-            if(itemIsBehavior === 'merge') {
+            if (itemIsBehavior === 'merge') {
                 derivedItemIs = [...itemIs, ...itemIsDefault];
-            } else if(itemIs.length > 0) {
+            } else if (itemIs.length > 0) {
                 derivedItemIs = itemIs;
             }
 
-            const strongCheck = {...c, authorIs: derivedAuthorIs, itemIs: derivedItemIs, rules: strongRules, actions: strongActions} as CheckStructuredJson;
+            const strongCheck = {
+                ...c,
+                authorIs: derivedAuthorIs,
+                itemIs: derivedItemIs,
+                rules: strongRules,
+                actions: strongActions
+            } as CheckStructuredJson;
             structuredChecks.push(strongCheck);
         }
 
@@ -321,7 +336,7 @@ export const parseDefaultBotInstanceFromArgs = (args: any): BotInstanceJsonConfi
             heartbeatInterval: heartbeat,
         },
         polling: {
-            shared: sharedMod ? ['unmoderated','modqueue'] : undefined,
+            shared: sharedMod ? ['unmoderated', 'modqueue'] : undefined,
         },
         nanny: {
             softLimit,
@@ -424,7 +439,7 @@ export const parseDefaultBotInstanceFromEnv = (): BotInstanceJsonConfig => {
             heartbeatInterval: process.env.HEARTBEAT !== undefined ? parseInt(process.env.HEARTBEAT) : undefined,
         },
         polling: {
-            shared: parseBool(process.env.SHARE_MOD) ? ['unmoderated','modqueue'] : undefined,
+            shared: parseBool(process.env.SHARE_MOD) ? ['unmoderated', 'modqueue'] : undefined,
         },
         nanny: {
             softLimit: process.env.SOFT_LIMIT !== undefined ? parseInt(process.env.SOFT_LIMIT) : undefined,
@@ -470,9 +485,9 @@ export const parseOpConfigFromEnv = (): OperatorJsonConfig => {
             },
         },
         credentials: {
-          youtube: {
-              apiKey: process.env.YOUTUBE_API_KEY
-          }
+            youtube: {
+                apiKey: process.env.YOUTUBE_API_KEY
+            }
         }
     }
 
@@ -485,7 +500,7 @@ export const parseOpConfigFromEnv = (): OperatorJsonConfig => {
 // Actual ENVs (from environment)
 // json config
 // args from cli
-export const parseOperatorConfigFromSources = async (args: any): Promise<OperatorJsonConfig> => {
+export const parseOperatorConfigFromSources = async (args: any): Promise<[OperatorJsonConfig, OperatorFileConfig]> => {
     const {logLevel = process.env.LOG_LEVEL, logDir = process.env.LOG_DIR || false} = args || {};
     const envPath = process.env.OPERATOR_ENV;
 
@@ -516,25 +531,69 @@ export const parseOperatorConfigFromSources = async (args: any): Promise<Operato
         //swallow silently for now 😬
     }
 
-    const {operatorConfig = process.env.OPERATOR_CONFIG} = args;
+    const {operatorConfig = (process.env.OPERATOR_CONFIG ?? path.resolve(__dirname, '../config.yaml'))} = args;
     let configFromFile: OperatorJsonConfig = {};
-    if (operatorConfig !== undefined) {
-        let rawConfig;
-        try {
-            rawConfig = await readConfigFile(operatorConfig, {log: initLogger}) as object;
-        } catch (err: any) {
-            initLogger.error('Cannot continue app startup because operator config file was not parseable.');
+    let fileConfigFormat: ConfigFormat | undefined = undefined;
+    let fileConfig: object = {};
+    let rawConfig: string = '';
+    let configDoc: YamlOperatorConfigDocument | JsonOperatorConfigDocument;
+    let writeable = false;
+    try {
+        writeable = await fileOrDirectoryIsWriteable(operatorConfig);
+    } catch (e) {
+        initLogger.warn(`Issue while parsing operator config file location: ${e} \n This is only a problem if you do not have a config file but are planning on adding bots interactively.`);
+    }
+
+    try {
+        const [rawConfigValue, format] = await readConfigFile(operatorConfig, {log: initLogger});
+        rawConfig = rawConfigValue ?? '';
+        fileConfigFormat = format as ConfigFormat;
+    } catch (err: any) {
+        const {code} = err;
+        if (code === 'ENOENT') {
+            initLogger.warn('No operator config file found but will continue');
+            if (err.extension !== undefined) {
+                fileConfigFormat = err.extension
+            }
+        } else {
+            initLogger.error('Cannot continue app startup because operator config file exists but was not parseable.');
             err.logged = true;
             throw err;
         }
+    }
+    const [format, doc, jsonErr, yamlErr] = parseFromJsonOrYamlToObject(rawConfig, {
+        location: operatorConfig,
+        jsonDocFunc: (content, location) => new JsonOperatorConfigDocument(content, location),
+        yamlDocFunc: (content, location) => new YamlOperatorConfigDocument(content, location)
+    });
+
+
+    if (format !== undefined && fileConfigFormat === undefined) {
+        fileConfigFormat = 'yaml';
+    }
+
+    if (doc === undefined && rawConfig !== '') {
+        initLogger.error(`Could not parse file contents at ${operatorConfig} as JSON or YAML (likely it is ${fileConfigFormat}):`);
+        initLogger.error(jsonErr);
+        initLogger.error(yamlErr);
+        throw new SimpleError(`Could not parse file contents at ${operatorConfig} as JSON or YAML`);
+    } else if (doc === undefined && rawConfig === '') {
+        // create an empty doc
+        configDoc = fileConfigFormat === 'json' ? new JsonOperatorConfigDocument('{}', operatorConfig) : new YamlOperatorConfigDocument('', operatorConfig);
+        configFromFile = {};
+    } else {
+        configDoc = doc as (YamlOperatorConfigDocument | JsonOperatorConfigDocument);
+
         try {
-            configFromFile = validateJson(rawConfig, operatorSchema, initLogger) as OperatorJsonConfig;
+            configFromFile = validateJson(configDoc.toJS(), operatorSchema, initLogger) as OperatorJsonConfig;
             const {bots = []} = configFromFile || {};
-            for(const b of bots) {
-                const {polling: {
-                    sharedMod
-                } = {}} = b;
-                if(sharedMod !== undefined) {
+            for (const b of bots) {
+                const {
+                    polling: {
+                        sharedMod
+                    } = {}
+                } = b;
+                if (sharedMod !== undefined) {
                     initLogger.warn(`'sharedMod' bot config property is DEPRECATED and will be removed in next minor version. Use 'shared' property instead (see docs)`);
                     break;
                 }
@@ -544,6 +603,7 @@ export const parseOperatorConfigFromSources = async (args: any): Promise<Operato
             throw err;
         }
     }
+
     const opConfigFromArgs = parseOpConfigFromArgs(args);
     const opConfigFromEnv = parseOpConfigFromEnv();
 
@@ -570,7 +630,10 @@ export const parseOperatorConfigFromSources = async (args: any): Promise<Operato
         botInstances = botInstancesFromFile.map(x => merge.all([defaultBotInstance, x], {arrayMerge: overwriteMerge}));
     }
 
-    return removeUndefinedKeys({...mergedConfig, bots: botInstances}) as OperatorJsonConfig;
+    return [removeUndefinedKeys({...mergedConfig, bots: botInstances}) as OperatorJsonConfig, {
+        document: configDoc,
+        isWriteable: writeable
+    }];
 }
 
 export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): OperatorConfig => {
@@ -738,7 +801,7 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
 
         let botCreds: BotCredentialsConfig;
 
-        if((credentials as any).clientId !== undefined) {
+        if ((credentials as any).clientId !== undefined) {
             const creds = credentials as RedditCredentials;
             const {
                 clientId: ci,
@@ -747,9 +810,9 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
             } = creds;
             botCreds = {
                 reddit: {
-                        clientId: (ci as string),
-                        clientSecret: (cs as string),
-                        ...restCred,
+                    clientId: (ci as string),
+                    clientSecret: (cs as string),
+                    ...restCred,
                 }
             }
         } else {
@@ -777,8 +840,8 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
             botCache.provider.prefix = buildCachePrefix([botCache.provider.prefix, 'bot', (botName || objectHash.sha1(botCreds))]);
         }
 
-        let realShared = shared === true ? ['unmoderated','modqueue','newComm','newSub'] : shared;
-        if(sharedMod === true) {
+        let realShared = shared === true ? ['unmoderated', 'modqueue', 'newComm', 'newSub'] : shared;
+        if (sharedMod === true) {
             realShared.push('unmoderated');
             realShared.push('modqueue');
         }

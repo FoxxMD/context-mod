@@ -56,7 +56,7 @@ export const port = new commander.Option('-p, --port <port>', 'Port for web serv
 export const sharedMod = new commander.Option('-q, --shareMod', `If enabled then all subreddits using the default settings to poll "unmoderated" or "modqueue" will retrieve results from a shared request to /r/mod (default: process.env.SHARE_MOD || false)`)
     .argParser(parseBool);
 
-export const operatorConfig = new commander.Option('-c, --operatorConfig <path>', 'An absolute path to a JSON file to load all parameters from (default: process.env.OPERATOR_CONFIG)');
+export const operatorConfig = new commander.Option('-c, --operatorConfig <path>', 'An absolute path to a YAML/JSON file to load all parameters from (default: process.env.OPERATOR_CONFIG | CWD/config.yaml)');
 
 export const getUniversalWebOptions = (): commander.Option[] => {
     return [

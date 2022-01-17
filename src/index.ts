@@ -64,7 +64,8 @@ const program = new Command();
             .allowUnknownOption();
         runCommand = addOptions(runCommand, getUniversalWebOptions());
         runCommand.action(async (interfaceVal, opts) => {
-            const config = buildOperatorConfigWithDefaults(await parseOperatorConfigFromSources({...opts, mode: interfaceVal}));
+            const [opConfig, fileConfig] = await parseOperatorConfigFromSources({...opts, mode: interfaceVal});
+            const config = buildOperatorConfigWithDefaults(opConfig);
             const {
                 mode,
             } = config;
@@ -73,7 +74,7 @@ const program = new Command();
                     await clientServer(config);
                 }
                 if(mode === 'all' || mode === 'server') {
-                    await apiServer(config);
+                    await apiServer({...config, fileConfig});
                 }
             } catch (err: any) {
                 throw err;
@@ -92,9 +93,10 @@ const program = new Command();
         checkCommand
             .addOption(checks)
             .action(async (activityIdentifier, type, botVal, commandOptions = {}) => {
-                const config = buildOperatorConfigWithDefaults(await parseOperatorConfigFromSources(commandOptions));
+                const [opConfig, fileConfig] = await parseOperatorConfigFromSources(commandOptions);
+                const config = buildOperatorConfigWithDefaults(opConfig);
                 const {checks = []} = commandOptions;
-                app = new App(config);
+                app = new App({...config, fileConfig});
 
                 let a;
                 const commentId = commentReg(activityIdentifier);
@@ -168,7 +170,8 @@ const program = new Command();
         unmodCommand
             .addOption(checks)
             .action(async (subreddits = [], botVal, opts = {}) => {
-                const config = buildOperatorConfigWithDefaults(await parseOperatorConfigFromSources(opts));
+                const [opConfig, fileConfig] = await parseOperatorConfigFromSources(opts);
+                const config = buildOperatorConfigWithDefaults(opConfig);
                 const {checks = []} = opts;
                 const logger = winston.loggers.get('app');
                 let bots: Bot[] = [];
@@ -201,7 +204,7 @@ const program = new Command();
 
     } catch (err: any) {
         if (!err.logged && !(err instanceof LoggedError)) {
-            const logger = winston.loggers.get('app');
+            const logger = winston.loggers.has('app') ? winston.loggers.get('app') : winston.loggers.get('init');
             if(isScopeError(err)) {
                 logger.error('Reddit responded with a 403 insufficient_scope which means the bot is lacking necessary OAUTH scopes to perform general actions.');
             }

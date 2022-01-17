@@ -23,7 +23,7 @@ import {
     ImageDetection,
     //ImageDownloadOptions,
     LogInfo,
-    NamedGroup,
+    NamedGroup, OperatorJsonConfig,
     PollingOptionsStrong,
     RedditEntity,
     RedditEntityType,
@@ -34,8 +34,7 @@ import {
     StrongSubredditState,
     SubredditState
 } from "./Common/interfaces";
-import JSON5 from "json5";
-import yaml, {JSON_SCHEMA} from "js-yaml";
+import { Document as YamlDocument } from 'yaml'
 import SimpleError from "./Utils/SimpleError";
 import InvalidRegexError from "./Utils/InvalidRegexError";
 import {constants, promises} from "fs";
@@ -54,12 +53,17 @@ import ImageData from "./Common/ImageData";
 import {Sharp, SharpOptions} from "sharp";
 // @ts-ignore
 import {blockhashData, hammingDistance} from 'blockhash';
-import {SetRandomInterval} from "./Common/types";
+import {ConfigFormat, SetRandomInterval} from "./Common/types";
 import stringSimilarity from 'string-similarity';
 import calculateCosineSimilarity from "./Utils/StringMatching/CosineSimilarity";
 import levenSimilarity from "./Utils/StringMatching/levenSimilarity";
 import {isRequestError, isStatusError} from "./Utils/Errors";
 import {parse} from "path";
+import JsonConfigDocument from "./Common/Config/JsonConfigDocument";
+import YamlConfigDocument from "./Common/Config/YamlConfigDocument";
+import AbstractConfigDocument, {ConfigDocumentInterface} from "./Common/Config/AbstractConfigDocument";
+
+
 //import {ResembleSingleCallbackComparisonResult} from "resemblejs";
 
 // want to guess how many concurrent image comparisons we should be doing
@@ -459,34 +463,64 @@ export const isActivityWindowCriteria = (val: any): val is ActivityWindowCriteri
     return false;
 }
 
-export const parseFromJsonOrYamlToObject = (content: string): [object?, Error?, Error?] => {
+export interface ConfigToObjectOptions {
+    location?: string,
+    jsonDocFunc?: (content: string, location?: string) => AbstractConfigDocument<OperatorJsonConfig>,
+    yamlDocFunc?: (content: string, location?: string) => AbstractConfigDocument<YamlDocument>
+}
+
+export const parseFromJsonOrYamlToObject = (content: string, options?: ConfigToObjectOptions): [ConfigFormat, ConfigDocumentInterface<YamlDocument | object>?, Error?, Error?] => {
     let obj;
+    let configFormat: ConfigFormat = 'yaml';
     let jsonErr,
         yamlErr;
 
+    const likelyType = likelyJson5(content) ? 'json' : 'yaml';
+
+    const {
+        location,
+        jsonDocFunc = (content: string, location?: string) => new JsonConfigDocument(content, location),
+        yamlDocFunc = (content: string, location?: string) => new YamlConfigDocument(content, location),
+    } = options || {};
+
     try {
-        obj = JSON5.parse(content);
-        const oType = obj === null ? 'null' : typeof obj;
+        const jsonObj = jsonDocFunc(content, location);
+        const output = jsonObj.toJS();
+        const oType = output === null ? 'null' : typeof output;
         if (oType !== 'object') {
             jsonErr = new SimpleError(`Parsing as json produced data of type '${oType}' (expected 'object')`);
             obj = undefined;
+        } else {
+            obj = jsonObj;
+            configFormat = 'json';
         }
     } catch (err: any) {
         jsonErr = err;
     }
-    if (obj === undefined) {
-        try {
-            obj = yaml.load(content, {schema: JSON_SCHEMA, json: true});
-            const oType = obj === null ? 'null' : typeof obj;
-            if (oType !== 'object') {
-                yamlErr = new SimpleError(`Parsing as yaml produced data of type '${oType}' (expected 'object')`);
-                obj = undefined;
+
+    try {
+        const yamlObj = yamlDocFunc(content, location)
+        const output = yamlObj.toJS();
+        const oType = output === null ? 'null' : typeof output;
+        if (oType !== 'object') {
+            yamlErr = new SimpleError(`Parsing as yaml produced data of type '${oType}' (expected 'object')`);
+            obj = undefined;
+        } else if (obj === undefined && (likelyType !== 'json' || yamlObj.parsed.errors.length === 0)) {
+            configFormat = 'yaml';
+            if(yamlObj.parsed.errors.length !== 0) {
+                yamlErr = new Error(yamlObj.parsed.errors.join('\n'))
+            } else {
+                obj = yamlObj;
             }
-        } catch (err: any) {
-            yamlErr = err;
         }
+    } catch (err: any) {
+        yamlErr = err;
     }
-    return [obj, jsonErr, yamlErr];
+
+    if (obj === undefined) {
+        configFormat = likelyType;
+    }
+    return [configFormat, obj, jsonErr, yamlErr];
 }
 
 export const comparisonTextOp = (val1: number, strOp: string, val2: number): boolean => {
@@ -1131,19 +1165,25 @@ export const convertSubredditsRawToStrong = (x: (SubredditState | string), opts:
     return toStrongSubredditState(x, opts);
 }
 
-export async function readConfigFile(path: string, opts: any) {
+export async function readConfigFile(path: string, opts: any): Promise<[string?, ConfigFormat?]> {
     const {log, throwOnNotFound = true} = opts;
+    let extensionHint: ConfigFormat | undefined;
+    const fileInfo = parse(path);
+    if(fileInfo.ext !== undefined) {
+        switch(fileInfo.ext) {
+            case '.json':
+            case '.json5':
+                extensionHint = 'json';
+                break;
+            case '.yaml':
+                extensionHint = 'yaml';
+                break;
+        }
+    }
     try {
         await promises.access(path, constants.R_OK);
         const data = await promises.readFile(path);
-        const [configObj, jsonErr, yamlErr] = parseFromJsonOrYamlToObject(data as unknown as string);
-        if(configObj !== undefined) {
-            return configObj as object;
-        }
-        log.error(`Could not parse file contents at ${path} as JSON or YAML:`);
-        log.error(jsonErr);
-        log.error(yamlErr);
-        throw new SimpleError(`Could not parse file contents at ${path} as JSON or YAML`);
+        return [(data as any).toString(), extensionHint]
     } catch (e: any) {
         const {code} = e;
         if (code === 'ENOENT') {
@@ -1151,14 +1191,16 @@ export async function readConfigFile(path: string, opts: any) {
                 if (log) {
                     log.warn('No file found at given path', {filePath: path});
                 }
+                e.extension = extensionHint;
                 throw e;
             } else {
-                return;
+                return [];
             }
         } else if (log) {
             log.warn(`Encountered error while parsing file`, {filePath: path});
             log.error(e);
         }
+        e.extension = extensionHint;
         throw e;
     }
 }

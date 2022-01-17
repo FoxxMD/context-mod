@@ -9,6 +9,10 @@ import Submission from "snoowrap/dist/objects/Submission";
 import Comment from "snoowrap/dist/objects/Comment";
 import RedditUser from "snoowrap/dist/objects/RedditUser";
 import {AuthorOptions} from "../Author/Author";
+import {ConfigFormat} from "./types";
+import AbstractConfigDocument, {ConfigDocumentInterface} from "./Config/AbstractConfigDocument";
+import {Document as YamlDocument} from 'yaml';
+import {JsonOperatorConfigDocument, YamlOperatorConfigDocument} from "./Config/Operator";
 
 /**
  * An ISO 8601 Duration
@@ -1835,6 +1839,15 @@ export interface OperatorConfig extends OperatorJsonConfig {
     }
     bots: BotInstanceConfig[]
     credentials: ThirdPartyCredentialsJsonConfig
+}
+
+export interface OperatorFileConfig {
+    document: YamlOperatorConfigDocument | JsonOperatorConfigDocument
+    isWriteable?: boolean
+}
+
+export interface OperatorConfigWithFileContext extends OperatorConfig {
+    fileConfig: OperatorFileConfig
 }
 
 //export type OperatorConfig = Required<OperatorJsonConfig>;

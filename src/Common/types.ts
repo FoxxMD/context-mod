@@ -28,3 +28,5 @@ export type SetRandomInterval = (
     minDelay: number,
     maxDelay: number,
 ) => { clear: () => void };
+
+export type ConfigFormat = 'json' | 'yaml';

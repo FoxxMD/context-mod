@@ -16,7 +16,7 @@ import {
 } from "../../util";
 import {getLogger} from "../../Utils/loggerFactory";
 import LoggedError from "../../Utils/LoggedError";
-import {Invokee, LogInfo, OperatorConfig} from "../../Common/interfaces";
+import {Invokee, LogInfo, OperatorConfigWithFileContext} from "../../Common/interfaces";
 import http from "http";
 import SimpleError from "../../Utils/SimpleError";
 import {heartbeat} from "./routes/authenticated/applicationRoutes";
@@ -52,7 +52,7 @@ const botLogMap: Map<string, Map<string, LogEntry[]>> = new Map();
 
 const botSubreddits: Map<string, string[]> = new Map();
 
-const rcbServer = async function (options: OperatorConfig) {
+const rcbServer = async function (options: OperatorConfigWithFileContext) {
 
     const {
         operator: {
