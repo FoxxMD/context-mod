@@ -22,7 +22,7 @@ class JsonConfigDocument extends AbstractConfigDocument<OperatorJsonConfig> {
     }
 
     public toString(): string {
-        return stringify(this.parsed);
+        return stringify(this.parsed, null, 1);
     }
 
 }

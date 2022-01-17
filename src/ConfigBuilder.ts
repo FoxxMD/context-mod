@@ -719,163 +719,6 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
         }
     }
 
-    let hydratedBots: BotInstanceConfig[] = bots.map(x => {
-        const {
-            name: botName,
-            filterCriteriaDefaults = filterCriteriaDefault,
-            polling: {
-                sharedMod,
-                shared = [],
-                stagger,
-                limit = 100,
-                interval = 30,
-            } = {},
-            queue: {
-                maxWorkers = 1,
-            } = {},
-            caching,
-            nanny: {
-                softLimit = 250,
-                hardLimit = 50
-            } = {},
-            snoowrap = snoowrapOp,
-            credentials = {},
-            subreddits: {
-                names = [],
-                exclude = [],
-                wikiConfig = 'botconfig/contextbot',
-                dryRun,
-                heartbeatInterval = 300,
-            } = {},
-        } = x;
-
-        let botCache: StrongCache;
-        let botActionedEventsDefault: number;
-
-        if (caching === undefined) {
-
-            botCache = {
-                ...cacheTTLDefaults,
-                actionedEventsDefault: opActionedEventsDefault,
-                actionedEventsMax: opActionedEventsMax,
-                provider: {...defaultProvider}
-            };
-        } else {
-            const {
-                provider,
-                actionedEventsMax = opActionedEventsMax,
-                actionedEventsDefault = opActionedEventsDefault,
-                ...restConfig
-            } = caching;
-
-            botActionedEventsDefault = actionedEventsDefault;
-            if (actionedEventsMax !== undefined) {
-                botActionedEventsDefault = Math.min(actionedEventsDefault, actionedEventsMax);
-            }
-
-            if (typeof provider === 'string') {
-                botCache = {
-                    ...cacheTTLDefaults,
-                    ...restConfig,
-                    actionedEventsDefault: botActionedEventsDefault,
-                    provider: {
-                        store: provider as CacheProvider,
-                        ...cacheOptDefaults
-                    }
-                }
-            } else {
-                const {ttl = 60, max = 500, store = 'memory', ...rest} = provider || {};
-                botCache = {
-                    ...cacheTTLDefaults,
-                    ...restConfig,
-                    actionedEventsDefault: botActionedEventsDefault,
-                    actionedEventsMax,
-                    provider: {
-                        store,
-                        ...cacheOptDefaults,
-                        ...rest,
-                    },
-                }
-            }
-        }
-
-        let botCreds: BotCredentialsConfig;
-
-        if ((credentials as any).clientId !== undefined) {
-            const creds = credentials as RedditCredentials;
-            const {
-                clientId: ci,
-                clientSecret: cs,
-                ...restCred
-            } = creds;
-            botCreds = {
-                reddit: {
-                    clientId: (ci as string),
-                    clientSecret: (cs as string),
-                    ...restCred,
-                }
-            }
-        } else {
-            const creds = credentials as BotCredentialsJsonConfig;
-            const {
-                reddit: {
-                    clientId: ci,
-                    clientSecret: cs,
-                    ...restRedditCreds
-                },
-                ...rest
-            } = creds;
-            botCreds = {
-                reddit: {
-                    clientId: (ci as string),
-                    clientSecret: (cs as string),
-                    ...restRedditCreds,
-                },
-                ...rest
-            }
-        }
-
-        if (botCache.provider.prefix === undefined || botCache.provider.prefix === defaultProvider.prefix) {
-            // need to provide unique prefix to bot
-            botCache.provider.prefix = buildCachePrefix([botCache.provider.prefix, 'bot', (botName || objectHash.sha1(botCreds))]);
-        }
-
-        let realShared = shared === true ? ['unmoderated', 'modqueue', 'newComm', 'newSub'] : shared;
-        if (sharedMod === true) {
-            realShared.push('unmoderated');
-            realShared.push('modqueue');
-        }
-
-        return {
-            name: botName,
-            snoowrap,
-            filterCriteriaDefaults,
-            subreddits: {
-                names,
-                exclude,
-                wikiConfig,
-                heartbeatInterval,
-                dryRun,
-            },
-            credentials: botCreds,
-            caching: botCache,
-            polling: {
-                shared: [...new Set(realShared)] as PollOn[],
-                stagger,
-                limit,
-                interval,
-            },
-            queue: {
-                maxWorkers,
-            },
-            nanny: {
-                softLimit,
-                hardLimit
-            }
-        }
-
-    });
-
     const defaultOperators = typeof name === 'string' ? [name] : name;
 
     const config: OperatorConfig = {
@@ -912,9 +755,175 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
             secret: apiSecret,
             friendly
         },
-        bots: hydratedBots,
+        bots: [],
         credentials,
     };
 
+    config.bots = bots.map(x => buildBotConfig(x, config));
+
     return config;
+}
+
+export const buildBotConfig = (data: BotInstanceJsonConfig, opConfig: OperatorConfig): BotInstanceConfig => {
+    const {
+        snoowrap: snoowrapOp,
+        caching: {
+            actionedEventsMax: opActionedEventsMax,
+            actionedEventsDefault: opActionedEventsDefault = 25,
+            provider: defaultProvider,
+        } = {}
+    } = opConfig;
+    const {
+        name: botName,
+        filterCriteriaDefaults = filterCriteriaDefault,
+        polling: {
+            sharedMod,
+            shared = [],
+            stagger,
+            limit = 100,
+            interval = 30,
+        } = {},
+        queue: {
+            maxWorkers = 1,
+        } = {},
+        caching,
+        nanny: {
+            softLimit = 250,
+            hardLimit = 50
+        } = {},
+        snoowrap = snoowrapOp,
+        credentials = {},
+        subreddits: {
+            names = [],
+            exclude = [],
+            wikiConfig = 'botconfig/contextbot',
+            dryRun,
+            heartbeatInterval = 300,
+        } = {},
+    } = data;
+
+    let botCache: StrongCache;
+    let botActionedEventsDefault: number;
+
+    if (caching === undefined) {
+
+        botCache = {
+            ...cacheTTLDefaults,
+            actionedEventsDefault: opActionedEventsDefault,
+            actionedEventsMax: opActionedEventsMax,
+            provider: {...defaultProvider as CacheOptions}
+        };
+    } else {
+        const {
+            provider,
+            actionedEventsMax = opActionedEventsMax,
+            actionedEventsDefault = opActionedEventsDefault,
+            ...restConfig
+        } = caching;
+
+        botActionedEventsDefault = actionedEventsDefault;
+        if (actionedEventsMax !== undefined) {
+            botActionedEventsDefault = Math.min(actionedEventsDefault, actionedEventsMax);
+        }
+
+        if (typeof provider === 'string') {
+            botCache = {
+                ...cacheTTLDefaults,
+                ...restConfig,
+                actionedEventsDefault: botActionedEventsDefault,
+                provider: {
+                    store: provider as CacheProvider,
+                    ...cacheOptDefaults
+                }
+            }
+        } else {
+            const {ttl = 60, max = 500, store = 'memory', ...rest} = provider || {};
+            botCache = {
+                ...cacheTTLDefaults,
+                ...restConfig,
+                actionedEventsDefault: botActionedEventsDefault,
+                actionedEventsMax,
+                provider: {
+                    store,
+                    ...cacheOptDefaults,
+                    ...rest,
+                },
+            }
+        }
+    }
+
+    let botCreds: BotCredentialsConfig;
+
+    if ((credentials as any).clientId !== undefined) {
+        const creds = credentials as RedditCredentials;
+        const {
+            clientId: ci,
+            clientSecret: cs,
+            ...restCred
+        } = creds;
+        botCreds = {
+            reddit: {
+                clientId: (ci as string),
+                clientSecret: (cs as string),
+                ...restCred,
+            }
+        }
+    } else {
+        const creds = credentials as BotCredentialsJsonConfig;
+        const {
+            reddit: {
+                clientId: ci,
+                clientSecret: cs,
+                ...restRedditCreds
+            },
+            ...rest
+        } = creds;
+        botCreds = {
+            reddit: {
+                clientId: (ci as string),
+                clientSecret: (cs as string),
+                ...restRedditCreds,
+            },
+            ...rest
+        }
+    }
+
+    if (botCache.provider.prefix === undefined || botCache.provider.prefix === (defaultProvider as CacheOptions).prefix) {
+        // need to provide unique prefix to bot
+        botCache.provider.prefix = buildCachePrefix([botCache.provider.prefix, 'bot', (botName || objectHash.sha1(botCreds))]);
+    }
+
+    let realShared = shared === true ? ['unmoderated', 'modqueue', 'newComm', 'newSub'] : shared;
+    if (sharedMod === true) {
+        realShared.push('unmoderated');
+        realShared.push('modqueue');
+    }
+
+    return {
+        name: botName,
+        snoowrap: snoowrap || {},
+        filterCriteriaDefaults,
+        subreddits: {
+            names,
+            exclude,
+            wikiConfig,
+            heartbeatInterval,
+            dryRun,
+        },
+        credentials: botCreds,
+        caching: botCache,
+        polling: {
+            shared: [...new Set(realShared)] as PollOn[],
+            stagger,
+            limit,
+            interval,
+        },
+        queue: {
+            maxWorkers,
+        },
+        nanny: {
+            softLimit,
+            hardLimit
+        }
+    }
 }

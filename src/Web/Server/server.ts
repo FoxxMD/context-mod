@@ -202,7 +202,7 @@ const rcbServer = async function (options: OperatorConfigWithFileContext) {
 
     server.getAsync('/check', ...actionRoute);
 
-    server.getAsync('/addBot', ...addBot());
+    server.postAsync('/bot', ...addBot());
 
     server.getAsync('/bot/invite', ...getInvitesRoute);
 
