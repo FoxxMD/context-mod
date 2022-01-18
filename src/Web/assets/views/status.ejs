@@ -861,19 +861,6 @@
 
 <script src="https://cdn.socket.io/4.1.2/socket.io.min.js" integrity="sha384-toS6mmwu70G0fw54EGlWWeA4z3dyJ+dlXBtSURSKN4vyRFOcxd3Bzjj/AoOwY+Rg" crossorigin="anonymous"></script>
 <script>
-    const SUBREDDIT_NAME_LOG_REGEX = /{(.+?)}/;
-    const BOT_NAME_LOG_REGEX = /~(.+?)~/;
-    const parseALogName = (reg) => {
-        return (val) => {
-            const matches = val.match(reg);
-            if (matches === null) {
-                return undefined;
-            }
-            return matches[1];
-        }
-    }
-    const parseSubredditLogName = parseALogName(SUBREDDIT_NAME_LOG_REGEX);
-    const parseBotLogName = parseALogName(BOT_NAME_LOG_REGEX);
 
     let socket = io({
         reconnectionAttempts: 5, // bail after 5 attempts
@@ -896,25 +883,29 @@
     socket.on("connect", () => {
         document.body.classList.add('connected')
         socket.on("log", data => {
-            bufferedBot.set('All', bufferedBot.get('All').concat(data));
-
-            const bot = parseBotLogName(data);
+            const {
+                subreddit,
+                bot,
+                subredditMessage,
+                allMessage,
+                formattedMessage
+            } = data;
+            if(bot === undefined && subreddit === undefined) {
+                const sys = bufferedBot.get('system');
+                if(sys !== undefined) {
+                    sys.set('All', sys.get('All').concat(formattedMessage));
+                    bufferedBot.set('system', sys);
+                }
+            }
             if(bot !== undefined) {
+                bufferedBot.set('All', bufferedBot.get('All').concat(allMessage));
+
                 const buffBot = bufferedBot.get(bot) || newBufferedLogs();
-                buffBot.set('All', buffBot.get('All').concat(data));
-                const sub = parseSubredditLogName(data);
-                if (sub !== undefined) {
-                    buffBot.set(sub, (buffBot.get(sub) || []).concat(data));
+                buffBot.set('All', buffBot.get('All').concat(allMessage));
+                if (subreddit !== undefined) {
+                    buffBot.set(subreddit, (buffBot.get(subreddit) || []).concat(subredditMessage));
                 }
                 bufferedBot.set(bot, buffBot);
-            } else {
-                bufferedBot.forEach((logs, botName) => {
-                    if(botName === 'All') {
-                        return;
-                    }
-                    logs.set('All', logs.get('All').concat(data));
-                    bufferedBot.set(botName, logs);
-                });
             }
 
 

@@ -9,7 +9,7 @@ import {Strategy as CustomStrategy} from 'passport-custom';
 import {OperatorConfig, BotConnection, LogInfo} from "../../Common/interfaces";
 import {
     buildCachePrefix,
-    createCacheManager, filterLogBySubreddit,
+    createCacheManager, defaultFormat, filterLogBySubreddit,
     formatLogLineToHtml,
     intersect, isLogLineMinLevel,
     LogEntry, parseInstanceLogInfoName, parseInstanceLogName, parseRedditEntity,
@@ -47,6 +47,8 @@ import Autolinker from "autolinker";
 import path from "path";
 import {ExtendedSnoowrap} from "../../Utils/SnoowrapClients";
 import ClientUser from "../Common/User/ClientUser";
+import {BotStatusResponse} from "../Common/interfaces";
+import {TransformableInfo} from "logform";
 
 const emitter = new EventEmitter();
 
@@ -525,6 +527,8 @@ const webClient = async (options: OperatorConfig) => {
 
     const cmInstances: CMInstance[] = [];
     let init = false;
+    const formatter = defaultFormat();
+    const formatTransform = formatter.transform as (info: TransformableInfo, opts?: any) => TransformableInfo;
 
     let server: http.Server,
         io: SocketServer;
@@ -565,7 +569,9 @@ const webClient = async (options: OperatorConfig) => {
                             limit: sessionData.limit,
                             sort: sessionData.sort,
                             level: sessionData.level,
-                            stream: true
+                            stream: true,
+                            streamObjects: true,
+                            formatted: false,
                         }
                     });
 
@@ -589,8 +595,24 @@ const webClient = async (options: OperatorConfig) => {
                         }
                     });
 
+
                     delim.on('data', (c: any) => {
-                        io.to(sessionId).emit('log', formatLogLineToHtml(c.toString()));
+                        const logObj = JSON.parse(c) as LogInfo;
+                        let subredditMessage;
+                        let allMessage;
+                        if(logObj.subreddit !== undefined) {
+                            const {subreddit, bot, ...rest} = logObj
+                            // @ts-ignore
+                            subredditMessage = formatLogLineToHtml(formatter.transform(rest)[MESSAGE], rest.timestamp);
+                        }
+                        if(logObj.bot !== undefined) {
+                            const {bot, ...rest} = logObj
+                            // @ts-ignore
+                            allMessage = formatLogLineToHtml(formatter.transform(rest)[MESSAGE], rest.timestamp);
+                        }
+                        // @ts-ignore
+                        let formattedMessage = formatLogLineToHtml(formatter.transform(logObj)[MESSAGE], logObj.timestamp);
+                        io.to(sessionId).emit('log', {...logObj, subredditMessage, allMessage, formattedMessage});
                     });
 
                     gotStream.once('retry', retryFn);
@@ -826,7 +848,29 @@ const webClient = async (options: OperatorConfig) => {
 
         res.render('status', {
             instances: shownInstances,
-            bots: resp.bots,
+            bots: resp.bots.map((x: BotStatusResponse) => {
+                const {subreddits = []} = x;
+                const subredditsWithSimpleLogs = subreddits.map(y => {
+                    let transformedLogs: string[];
+                    if(y.name === 'All') {
+                        // only need to remove bot name here
+                        transformedLogs = (y.logs as LogInfo[]).map((z: LogInfo) => {
+                           const {bot, ...rest} = z;
+                           // @ts-ignore
+                           return formatLogLineToHtml(formatter.transform(rest)[MESSAGE] as string, rest.timestamp);
+                        });
+                    } else {
+                        transformedLogs = (y.logs as LogInfo[]).map((z: LogInfo) => {
+                            const {bot, subreddit, ...rest} = z;
+                            // @ts-ignore
+                            return formatLogLineToHtml(formatter.transform(rest)[MESSAGE] as string, rest.timestamp);
+                        });
+                    }
+                    y.logs = transformedLogs;
+                    return y;
+                });
+                return {...x, subreddits: subredditsWithSimpleLogs};
+            }),
             botId: (req.instance as CMInstance).friendly,
             instanceId: (req.instance as CMInstance).friendly,
             isOperator: isOp,

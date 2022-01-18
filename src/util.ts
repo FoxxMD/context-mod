@@ -922,7 +922,8 @@ export const isLogLineMinLevel = (log: string | LogInfo, minLevelText: string): 
 
 // https://regexr.com/3e6m0
 const HYPERLINK_REGEX: RegExp = /(http(s)?:\/\/.)?(www\.)?[-a-zA-Z0-9@:%._\+~#=]{2,256}\.[a-z]{2,6}\b([-a-zA-Z0-9@:%_\+.~#?&//=]*)/;
-export const formatLogLineToHtml = (log: string | LogInfo) => {
+const formattedTime = (short: string, full: string) => `<span class="has-tooltip"><span style="margin-top:35px" class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black space-y-3 p-2 text-left'>${full}</span><span>${short}</span></span>`;
+export const formatLogLineToHtml = (log: string | LogInfo, timestamp?: string) => {
     const val = typeof log === 'string' ? log : log[MESSAGE];
     const logContent = Autolinker.link(val, {
         email: false,
@@ -939,7 +940,14 @@ export const formatLogLineToHtml = (log: string | LogInfo) => {
         .replace(/(\s*verbose\s*):/i, '<span class="error purple">$1</span>:')
         .replaceAll('\n', '<br />');
         //.replace(HYPERLINK_REGEX, '<a target="_blank" href="$&">$&</a>');
-    return `<div class="logLine">${logContent}</div>`
+    let line = `<div class="logLine">${logContent}</div>`
+
+    if(timestamp !== undefined) {
+        line = line.replace(timestamp, (match) => {
+            return formattedTime(dayjs(match).format('hh:mm:ss z'), match);
+        });
+    }
+    return line;
 }
 
 export type LogEntry = [number, LogInfo];
@@ -950,10 +958,11 @@ export interface LogOptions {
     operator?: boolean,
     user?: string,
     allLogsParser?: Function
-    allLogName?: string
+    allLogName?: string,
+    returnType?: 'string' | 'object'
 }
 
-export const filterLogBySubreddit = (logs: Map<string, LogEntry[]>, validLogCategories: string[] = [], options: LogOptions): Map<string, string[]> => {
+export const filterLogBySubreddit = (logs: Map<string, LogEntry[]>, validLogCategories: string[] = [], options: LogOptions): Map<string, (string|LogInfo)[]> => {
     const {
         limit,
         level,
@@ -961,7 +970,8 @@ export const filterLogBySubreddit = (logs: Map<string, LogEntry[]>, validLogCate
         operator = false,
         user,
         allLogsParser = parseSubredditLogInfoName,
-        allLogName = 'app'
+        allLogName = 'app',
+        returnType = 'string',
     } = options;
 
     // get map of valid logs categories
@@ -995,13 +1005,18 @@ export const filterLogBySubreddit = (logs: Map<string, LogEntry[]>, validLogCate
 
     const sortFunc = sort === 'ascending' ? (a: LogEntry, b: LogEntry) => a[0] - b[0] : (a: LogEntry, b: LogEntry) => b[0] - a[0];
 
-    const preparedMap: Map<string, string[]> = new Map();
+    const preparedMap: Map<string, (string|LogInfo)[]> = new Map();
     // iterate each entry and
     // sort, filter by level, slice to limit, then map to html string
     for(const [k,v] of validSubMap.entries()) {
         let preparedEntries = v.filter(([time, l]) => isLogLineMinLevel(l, level));
         preparedEntries.sort(sortFunc);
-        preparedMap.set(k, preparedEntries.slice(0, limit + 1).map(([time, l]) => formatLogLineToHtml(l)));
+        const entriesSlice = preparedEntries.slice(0, limit + 1);
+        if(returnType === 'string') {
+            preparedMap.set(k, entriesSlice.map(([time, l]) => formatLogLineToHtml(l)));
+        } else {
+            preparedMap.set(k, entriesSlice.map(([time, l]) => l));
+        }
     }
 
 

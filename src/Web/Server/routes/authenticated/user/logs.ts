@@ -27,7 +27,7 @@ const logs = (subLogMap: Map<string, LogEntry[]>) => {
         const userName = req.user?.name as string;
         const isOperator = req.user?.isInstanceOperator(req.botApp);
         const realManagers = req.botApp.bots.map(x => req.user?.accessibleSubreddits(x).map(x => x.displayLabel)).flat() as string[];
-        const {level = 'verbose', stream, limit = 200, sort = 'descending', streamObjects = false} = req.query;
+        const {level = 'verbose', stream, limit = 200, sort = 'descending', streamObjects = false, formatted = true} = req.query;
         if (stream) {
             const origin = req.header('X-Forwarded-For') ?? req.header('host');
             try {
@@ -36,9 +36,16 @@ const logs = (subLogMap: Map<string, LogEntry[]>) => {
                         const {subreddit: subName} = log;
                         if (isOperator || (subName !== undefined && (realManagers.includes(subName) || subName.includes(userName)))) {
                             if(streamObjects) {
-                                res.write(`${JSON.stringify(log)}\r\n`);
-                            } else {
+                                let obj: any = log;
+                                if(!formatted) {
+                                    const {[MESSAGE]: fMessage, ...rest} = log;
+                                    obj = rest;
+                                }
+                                res.write(`${JSON.stringify(obj)}\r\n`);
+                            } else if(formatted) {
                                 res.write(`${log[MESSAGE]}\r\n`)
+                            } else {
+                                res.write(`${log.message}\r\n`)
                             }
                         }
                     }
@@ -62,11 +69,17 @@ const logs = (subLogMap: Map<string, LogEntry[]>) => {
                 operator: isOperator,
                 user: userName,
                 sort: sort as 'descending' | 'ascending',
-                limit: Number.parseInt((limit as string))
+                limit: Number.parseInt((limit as string)),
+                returnType: 'object',
             });
             const subArr: any = [];
-            logs.forEach((v: string[], k: string) => {
-                subArr.push({name: k, logs: v.join('')});
+            logs.forEach((v: (string|LogInfo)[], k: string) => {
+                let logs = v as LogInfo[];
+                let output: any[] = formatted ? logs : logs.map((x) => {
+                    const {[MESSAGE]: fMessage, ...rest} = x;
+                    return rest;
+                })
+                subArr.push({name: k, logs: output});
             });
             return res.json(subArr);
         }

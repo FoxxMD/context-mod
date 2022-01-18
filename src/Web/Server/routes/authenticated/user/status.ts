@@ -79,7 +79,8 @@ const status = () => {
             user,
             // @ts-ignore
             sort,
-            limit: Number.parseInt((limit as string))
+            limit: Number.parseInt((limit as string)),
+            returnType: 'object'
         });
 
         const subManagerData = [];
