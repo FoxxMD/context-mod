@@ -944,7 +944,7 @@ export const formatLogLineToHtml = (log: string | LogInfo, timestamp?: string) =
 
     if(timestamp !== undefined) {
         line = line.replace(timestamp, (match) => {
-            return formattedTime(dayjs(match).format('hh:mm:ss z'), match);
+            return formattedTime(dayjs(match).format('HH:mm:ss z'), match);
         });
     }
     return line;
