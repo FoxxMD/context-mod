@@ -222,6 +222,17 @@
                     ],
                     "pattern": "^[a-zA-Z]([\\w -]*[\\w])?$",
                     "type": "string"
+                },
+                "targets": {
+                    "description": "Specify which Activities to approve\n\nThis setting is only applicable if the Activity being acted on is a **comment**. On a **submission** the setting does nothing\n\n* self => approve activity being checked (comment)\n* parent => approve parent (submission) of activity being checked (comment)",
+                    "items": {
+                        "enum": [
+                            "parent",
+                            "self"
+                        ],
+                        "type": "string"
+                    },
+                    "type": "array"
                 }
             },
             "required": [
