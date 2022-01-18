@@ -822,12 +822,17 @@ const webClient = async (options: OperatorConfig) => {
         //     return acc.concat({...curr, isOperator: instanceOperator});
         // },[]);
 
+        const isOp = req.user?.isInstanceOperator(instance);
+
         res.render('status', {
             instances: shownInstances,
             bots: resp.bots,
             botId: (req.instance as CMInstance).friendly,
             instanceId: (req.instance as CMInstance).friendly,
-            isOperator: req.user?.isInstanceOperator(instance),
+            isOperator: isOp,
+            system: isOp ? {
+                logs: resp.system.logs,
+                } : undefined,
             operators: instance.operators.join(', '),
             operatorDisplay: instance.operatorDisplay,
             logSettings: {

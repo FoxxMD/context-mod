@@ -44,13 +44,15 @@ const status = () => {
             bots = req.user?.accessibleBots(req.botApp.bots) as Bot[];
         }
         const botResponses: BotStatusResponse[] = [];
+        let index = 1;
         for(const b of bots) {
-            botResponses.push(await botStatResponse(b, req, botLogMap));
+            botResponses.push(await botStatResponse(b, req, botLogMap, index));
+            index++;
         }
         const system: any = {};
         if(req.user?.isInstanceOperator(req.botApp)) {
             // @ts-ignore
-            system.logs = filterLogBySubreddit(new Map([['app', systemLogs]]), [], {level, sort, limit, operator: true}).get('app');
+            system.logs = filterLogBySubreddit(new Map([['app', systemLogs]]), [], {level, sort, limit, operator: true}).get('all');
         }
         const response = {
             bots: botResponses,
@@ -59,7 +61,7 @@ const status = () => {
         return res.json(response);
     }
 
-    const botStatResponse = async (bot: Bot, req: Request, botLogMap: Map<string, Map<string, LogEntry[]>>) => {
+    const botStatResponse = async (bot: Bot, req: Request, botLogMap: Map<string, Map<string, LogEntry[]>>, index: number) => {
         const {
             //subreddits = [],
             //user: userVal,
@@ -295,8 +297,8 @@ const status = () => {
                 startedAt: bot.startedAt.local().format('MMMM D, YYYY h:mm A Z'),
                 running: bot.running,
                 error: bot.error,
-                account: bot.botAccount as string,
-                name: bot.botName as string,
+                account: (bot.botAccount as string) ?? `Bot ${index}`,
+                name: (bot.botName as string) ?? `Bot ${index}`,
                 ...opStats(bot),
             },
             subreddits: [allManagerData, ...subManagerData],

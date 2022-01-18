@@ -178,8 +178,10 @@ const rcbServer = async function (options: OperatorConfigWithFileContext) {
             bots = req.user.accessibleBots(req.botApp.bots);
         }
         const resp = [];
+        let index = 1;
         for(const b of bots) {
-            resp.push({name: b.botName, data: await opStats(b)});
+            resp.push({name: b.botName ?? `Bot ${index}`, data: await opStats(b)});
+            index++;
         }
         return res.json(resp);
     });

@@ -9,6 +9,19 @@
         <div class="grid">
             <div class="">
                 <div class="pb-6 md:px-7">
+                    <% if(isOperator) { %>
+                        <div class="sub" data-bot="system" data-subreddit="All">
+                            <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-3 gap-5">
+                            </div>
+                            <br/>
+                            <%- include('partials/loadingIcon') %>
+                            <div data-subreddit="All" class="logs font-mono text-sm">
+                                <% system.logs.forEach(function (logEntry){ %>
+                                    <%- logEntry %>
+                                <% }) %>
+                            </div>
+                        </div>
+                    <% } %>
                     <% bots.forEach(function (bot){ %>
                         <% bot.subreddits.forEach(function (data){ %>
                         <div class="sub <%= bot.system.running ? '' : 'offline' %>" data-subreddit="<%= data.name %>" data-bot="<%= bot.system.name %>">
@@ -727,23 +740,31 @@
             const firstSub = document.querySelectorAll(`[data-bot="${bot}"].sub`)[0];
             firstSub.classList.add('active');
 
+            let firstSubWrapper;
             const firstSubTab = document.querySelector(`ul[data-bot="${bot}"] [data-subreddit="${firstSub.dataset.subreddit}"].tabSelect`);
-            firstSubTab.classList.add('font-bold', 'no-underline', 'pointer-events-none');
-            const firstSubWrapper = firstSubTab.closest('.tabSelectWrapper');
-            //document.querySelector(`[data-subreddit="${subreddit}"][data-bot="${bot}"].sub`).classList.add('active');
+            if(firstSubTab !== null) {
+                firstSubTab.classList.add('font-bold', 'no-underline', 'pointer-events-none');
+                firstSubWrapper = firstSubTab.closest('.tabSelectWrapper');
+                //document.querySelector(`[data-subreddit="${subreddit}"][data-bot="${bot}"].sub`).classList.add('active');
+            }
 
             document.querySelectorAll('.tabSelectWrapper').forEach(el => {
                 el.classList.remove('border-2');
                 el.classList.add('border');
             })
 
-            firstSubWrapper.classList.remove('border');
-            firstSubWrapper.classList.add('border-2');
+            if(firstSubWrapper !== undefined) {
+                firstSubWrapper.classList.remove('border');
+                firstSubWrapper.classList.add('border-2');
+            }
 
             document.querySelectorAll('[data-bot].subreddit.nestedTabs').forEach(el => {
                 el.classList.remove('active');
             })
-            document.querySelector(`[data-bot="${bot}"].subreddit.nestedTabs`).classList.add('active');
+            const nested = document.querySelector(`[data-bot="${bot}"].subreddit.nestedTabs`);
+            if(nested !== null) {
+                nested.classList.add('active');
+            }
 
             const wrapper = e.target.closest('.tabSelectWrapper');//document.querySelector(`[data-subreddit="${subreddit}"].tabSelectWrapper`);
             wrapper.classList.remove('border');
@@ -752,7 +773,9 @@
             if ('URLSearchParams' in window) {
                 var searchParams = new URLSearchParams(window.location.search)
                 searchParams.set("bot", bot);
-                searchParams.set("sub", firstSub.dataset.subreddit);
+                if(firstSub.dataset.subreddit !== undefined) {
+                    searchParams.set("sub", firstSub.dataset.subreddit);
+                }
                 var newRelativePathQuery = window.location.pathname + '?' + searchParams.toString();
                 history.pushState(null, '', newRelativePathQuery);
             }
@@ -797,7 +820,10 @@
     let shownBot = searchParams.get('bot');
     if(shownBot === null) {
         // show the first bot listed if none is specified
-        const firstBot = document.querySelector('.tabSelectWrapper[data-bot]');
+        let firstBot = document.querySelector('.real.tabSelectWrapper[data-bot]');
+        if(firstBot === null) {
+
+        }
         if(firstBot !== null) {
             shownBot = firstBot.dataset.bot;
             searchParams.set('bot', shownBot);
@@ -807,17 +833,27 @@
     }
 
     document.querySelector(`[data-bot="${shownBot}"].tabSelect`).classList.add('font-bold', 'no-underline', 'pointer-events-none');
-    document.querySelector(`ul[data-bot="${shownBot}"] [data-subreddit="${shownSub}"].tabSelect`).classList.add('font-bold', 'no-underline', 'pointer-events-none');
+    const tabSelect = document.querySelector(`ul[data-bot="${shownBot}"] [data-subreddit="${shownSub}"].tabSelect`);
+    if(tabSelect !== null) {
+        tabSelect.classList.add('font-bold', 'no-underline', 'pointer-events-none');
+    }
     document.querySelectorAll('.tabSelectWrapper').forEach(el => el.classList.add('border'));
     document.querySelector(`[data-bot="${shownBot}"][data-subreddit="${shownSub}"].sub`).classList.add('active');
     const subWrapper = document.querySelector(`ul[data-bot="${shownBot}"] [data-subreddit="${shownSub}"].tabSelectWrapper`);
-    subWrapper.classList.remove('border');
-    subWrapper.classList.add('border-2');
+    if(subWrapper !== null) {
+        subWrapper.classList.remove('border');
+        subWrapper.classList.add('border-2');
+    }
     const wrapper = document.querySelector(`[data-bot="${shownBot}"].tabSelectWrapper`);
-    wrapper.classList.remove('border');
-    wrapper.classList.add('border-2');
+    if(wrapper !== null) {
+        wrapper.classList.remove('border');
+        wrapper.classList.add('border-2');
+    }
 
-    document.querySelector(`[data-bot="${shownBot}"].subreddit.nestedTabs`).classList.add('active');
+    const nestedTabs = document.querySelector(`[data-bot="${shownBot}"].subreddit.nestedTabs`);
+    if(nestedTabs !== null) {
+        nestedTabs.classList.add('active');
+    }
 
     document.querySelectorAll('.stats.reloadStats').forEach(el => el.classList.add('hidden'));
     document.querySelectorAll('.allStatsToggle').forEach(el => el.classList.add('font-bold', 'no-underline', 'pointer-events-none'));
