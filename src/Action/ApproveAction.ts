@@ -53,7 +53,7 @@ export class ApproveAction extends Action {
                     targetItem = await this.client.getSubmission((item as Comment).link_id).fetch();
                 }
                 // @ts-ignore
-                touchedEntities.push(await item.approve());
+                touchedEntities.push(await targetItem.approve());
             }
         }
 
