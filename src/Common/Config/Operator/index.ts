@@ -13,7 +13,7 @@ export class YamlOperatorConfigDocument extends YamlConfigDocument implements Op
     addBot(botData: BotInstanceJsonConfig) {
         const bots = this.parsed.get('bots') as YAMLSeq;
         if (bots === undefined) {
-            this.parsed.addIn(['bots'], [botData]);
+            this.parsed.add({key: 'bots', value: [botData]});
         } else if (botData.name !== undefined) {
             // overwrite if we find an existing
             const existingIndex = bots.items.findIndex(x => (x as YAMLMap).get('name') === botData.name);

@@ -579,7 +579,12 @@ export const parseOperatorConfigFromSources = async (args: any): Promise<[Operat
         throw new SimpleError(`Could not parse file contents at ${operatorConfig} as JSON or YAML`);
     } else if (doc === undefined && rawConfig === '') {
         // create an empty doc
-        configDoc = fileConfigFormat === 'json' ? new JsonOperatorConfigDocument('{}', operatorConfig) : new YamlOperatorConfigDocument('', operatorConfig);
+        if(fileConfigFormat === 'json') {
+            configDoc = new JsonOperatorConfigDocument('{}', operatorConfig);
+        } else {
+            configDoc = new YamlOperatorConfigDocument('', operatorConfig);
+            configDoc.parsed = new YamlDocument({});
+        }
         configFromFile = {};
     } else {
         configDoc = doc as (YamlOperatorConfigDocument | JsonOperatorConfigDocument);
