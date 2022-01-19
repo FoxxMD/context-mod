@@ -12,7 +12,7 @@ export class UserFlairAction extends Action {
     super(options);
 
     this.text = options.text === null || options.text === '' ? undefined : options.text;
-    this.css = options.css === null || options.text === '' ? undefined : options.text;
+    this.css = options.css === null || options.css === '' ? undefined : options.css;
     this.flair_template_id = options.flair_template_id === null || options.flair_template_id === '' ? undefined : options.flair_template_id;
   }
 
