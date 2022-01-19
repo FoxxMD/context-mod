@@ -66,7 +66,7 @@ export abstract class Check implements ICheck {
             itemIs = [],
             authorIs: {
                 include = [],
-                excludeCondition = 'OR',
+                excludeCondition,
                 exclude = [],
             } = {},
             dryRun,

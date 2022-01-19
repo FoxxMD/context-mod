@@ -1325,7 +1325,7 @@ export const checkAuthorFilter = async (item: (Submission | Comment), filter: Au
     const authLogger = logger.child({labels: ['Author Filter']}, mergeArr);
     const {
         include = [],
-        excludeCondition = 'OR',
+        excludeCondition = 'AND',
         exclude = [],
     } = filter;
     let authorPass = null;
@@ -1351,6 +1351,9 @@ export const checkAuthorFilter = async (item: (Submission | Comment), filter: Au
                 authorPass = false;
                 break;
             }
+        }
+        if(excludeCondition === 'AND' && authorPass === null) {
+            authorPass = true;
         }
         if (authorPass !== true) {
             authLogger.verbose(`${FAIL} => Exclusive author criteria not matched`);
