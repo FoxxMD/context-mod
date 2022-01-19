@@ -1037,7 +1037,8 @@ export class SubredditResources {
                                     };
                                     const valueResult = VALUEPass();
                                     if(!valueResult) {
-                                        log.debug(`Failed: Expected => ${k} ${expectedValues.join(' OR ')} | Found => ${k}:${propertyValue}`)
+                                        log.debug(`Failed: Expected => ${k} ${expectedValues.join(' OR ')} | Found => ${k}:${propertyValue}`);
+                                        return false;
                                     }
                                     break;
                                 } else {
