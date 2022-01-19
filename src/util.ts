@@ -294,6 +294,32 @@ export const mergeArr = (objValue: [], srcValue: []): (any[] | undefined) => {
     }
 }
 
+export const removeFromSourceIfKeysExistsInDestination = (destinationArray: any[], sourceArray: any[], options: any): any[] => {
+    // get all keys from objects in destination
+    const destKeys = destinationArray.reduce((acc: string[], curr) => {
+        // can only get keys for objects, skip for everything else
+        if(curr !== null && typeof curr === 'object') {
+            const keys = Object.keys(curr).map(x => x.toLowerCase());
+            for(const k of keys) {
+                if(!acc.includes(k)) {
+                    acc.push(k);
+                }
+            }
+        }
+        return acc;
+    }, []);
+    const sourceItemsToKeep = sourceArray.filter(x => {
+        if(x !== null && typeof x === 'object') {
+            const sourceKeys = Object.keys(x).map(x => x.toLowerCase());
+            // only keep if keys from this object do not appear anywhere in destination items
+            return intersect(sourceKeys, destKeys).length === 0;
+        }
+        // keep if item is not an object since we can't test for keys anyway
+        return true;
+    });
+    return sourceItemsToKeep.concat(destinationArray);
+}
+
 export const ruleNamesFromResults = (results: RuleResult[]) => {
     return results.map(x => x.name || x.premise.kind).join(' | ')
 }

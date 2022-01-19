@@ -6,7 +6,7 @@ import {
     normalizeName,
     overwriteMerge,
     parseBool, parseFromJsonOrYamlToObject, randomId,
-    readConfigFile,
+    readConfigFile, removeFromSourceIfKeysExistsInDestination,
     removeUndefinedKeys
 } from "./util";
 import {CommentCheck} from "./Check/CommentCheck";
@@ -155,7 +155,7 @@ export class ConfigBuilder {
 
             let derivedAuthorIs: AuthorOptions = authorIsDefault;
             if (authorIsBehavior === 'merge') {
-                derivedAuthorIs = merge.all([authorIs, authorIsDefault], {arrayMerge: overwriteMerge});
+                derivedAuthorIs = merge.all([authorIs, authorIsDefault], {arrayMerge: removeFromSourceIfKeysExistsInDestination});
             } else if (Object.keys(authorIs).length > 0) {
                 derivedAuthorIs = authorIs;
             }
