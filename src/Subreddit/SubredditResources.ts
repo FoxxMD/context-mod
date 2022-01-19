@@ -24,7 +24,7 @@ import {
     formatNumber,
     getActivityAuthorName,
     getActivitySubredditName,
-    isStrongSubredditState,
+    isStrongSubredditState, isSubmission,
     mergeArr,
     parseDurationComparison,
     parseExternalUrl,
@@ -778,7 +778,7 @@ export class SubredditResources {
                 const cachedItem = await this.cache.get(hash);
                 if (cachedItem !== undefined && cachedItem !== null) {
                     this.logger.debug(`Cache Hit: Item Check on ${item.name} (Hash ${hash})`);
-                    return cachedItem as boolean;
+                    //return cachedItem as boolean;
                 }
                 const itemResult = await this.isItem(item, states, this.logger);
                 this.stats.cache.itemCrit.miss++;
@@ -872,7 +872,7 @@ export class SubredditResources {
                     if (crit[k] !== undefined) {
                         switch (k) {
                             case 'submissionState':
-                                if(!(item instanceof Comment)) {
+                                if(isSubmission(item)) {
                                     log.warn('`submissionState` is not allowed in `itemIs` criteria when the main Activity is a Submission');
                                     continue;
                                 }
@@ -991,7 +991,7 @@ export class SubredditResources {
                                 }
                                 break;
                             case 'op':
-                                if(item instanceof Submission) {
+                                if(isSubmission(item)) {
                                     log.warn(`On a Submission the 'op' property will always be true. Did you mean to use this on a comment instead?`);
                                     break;
                                 }
@@ -1003,7 +1003,7 @@ export class SubredditResources {
                                 }
                                 break;
                             case 'depth':
-                                if(item instanceof Submission) {
+                                if(isSubmission(item)) {
                                     log.warn(`Cannot test for 'depth' on a Submission`);
                                     break;
                                 }
@@ -1015,6 +1015,35 @@ export class SubredditResources {
                                     return false
                                 }
                                 break;
+                            case 'flairTemplate':
+                            case 'link_flair_text':
+                            case 'link_flair_css_class':
+                                if(asSubmission(item)) {
+                                    const subCrit = crit as SubmissionState;
+                                    let propertyValue: string | null;
+                                    if(k === 'flairTemplate') {
+                                        propertyValue = await item.link_flair_template_id;
+                                    } else {
+                                        propertyValue = await item[k];
+                                    }
+                                    const expectedValues = typeof subCrit[k] === 'string' ? [subCrit[k]] : (subCrit[k] as string[]);
+                                    const VALUEPass = () => {
+                                        for (const c of expectedValues) {
+                                            if (c === propertyValue) {
+                                                return true;
+                                            }
+                                        }
+                                        return false;
+                                    };
+                                    const valueResult = VALUEPass();
+                                    if(!valueResult) {
+                                        log.debug(`Failed: Expected => ${k} ${expectedValues.join(' OR ')} | Found => ${k}:${propertyValue}`)
+                                    }
+                                    break;
+                                } else {
+                                    log.warn(`Cannot test for ${k} on Comment`);
+                                    break;
+                                }
                             default:
                                 // @ts-ignore
                                 if (item[k] !== undefined) {

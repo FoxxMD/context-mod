@@ -433,6 +433,22 @@ export const testAuthorCriteria = async (item: (Comment | Submission), authorOpt
                             return false;
                         }
                         break;
+                    case 'flairTemplate':
+                        const templateId = await item.author_flair_template_id;
+                        const templatePass = () => {
+                            // @ts-ignore
+                            for (const c of authorOpts[k]) {
+                                if (c === templateId) {
+                                    return true;
+                                }
+                            }
+                            return false;
+                        };
+                        const templateResult = templatePass();
+                        if ((include && !templateResult) || (!include && templateResult)) {
+                            return false;
+                        }
+                        break;
                     case 'isMod':
                         const mods: RedditUser[] = await item.subreddit.getModerators();
                         const isModerator = mods.some(x => x.name === authorName);

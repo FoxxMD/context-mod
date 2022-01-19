@@ -943,8 +943,9 @@ export interface SubmissionState extends ActivityState {
      * */
     title?: string
 
-    link_flair_text?: string
-    link_flair_css_class?: string
+    link_flair_text?: string | string[]
+    link_flair_css_class?: string | string[]
+    flairTemplate?: string | string[]
 }
 
 // properties calculated/derived by CM -- not provided as plain values by reddit

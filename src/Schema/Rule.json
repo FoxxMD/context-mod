@@ -454,24 +454,52 @@
                     ]
                 },
                 "flairCssClass": {
-                    "description": "A list of (user) flair css class values from the subreddit to match against",
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "string"
+                        }
+                    ],
+                    "description": "A (user) flair css class (or list of) from the subreddit to match against",
                     "examples": [
                         "red"
+                    ]
+                },
+                "flairTemplate": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "string"
+                        }
                     ],
-                    "items": {
-                        "type": "string"
-                    },
-                    "type": "array"
+                    "description": "A (user) flair template id (or list of) from the subreddit to match against"
                 },
                 "flairText": {
-                    "description": "A list of (user) flair text values from the subreddit to match against",
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "string"
+                        }
+                    ],
+                    "description": "A (user) flair text value (or list of) from the subreddit to match against",
                     "examples": [
                         "Approved"
-                    ],
-                    "items": {
-                        "type": "string"
-                    },
-                    "type": "array"
+                    ]
                 },
                 "isMod": {
                     "description": "Is the author a moderator?",
@@ -1922,14 +1950,47 @@
                 "filtered": {
                     "type": "boolean"
                 },
+                "flairTemplate": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "string"
+                        }
+                    ]
+                },
                 "is_self": {
                     "type": "boolean"
                 },
                 "link_flair_css_class": {
-                    "type": "string"
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "string"
+                        }
+                    ]
                 },
                 "link_flair_text": {
-                    "type": "string"
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "string"
+                        }
+                    ]
                 },
                 "locked": {
                     "type": "boolean"

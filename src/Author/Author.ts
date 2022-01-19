@@ -46,15 +46,20 @@ export interface AuthorCriteria {
      * */
     name?: string[],
     /**
-     * A list of (user) flair css class values from the subreddit to match against
+     * A (user) flair css class (or list of) from the subreddit to match against
      * @examples ["red"]
      * */
-    flairCssClass?: string[],
+    flairCssClass?: string | string[],
     /**
-     * A list of (user) flair text values from the subreddit to match against
+     * A (user) flair text value (or list of) from the subreddit to match against
      * @examples ["Approved"]
      * */
-    flairText?: string[],
+    flairText?: string | string[],
+
+    /**
+     * A (user) flair template id (or list of) from the subreddit to match against
+     * */
+    flairTemplate?: string | string[]
     /**
      * Is the author a moderator?
      * */
@@ -146,8 +151,12 @@ export class Author implements AuthorCriteria {
 
     constructor(options: AuthorCriteria) {
         this.name = options.name;
-        this.flairCssClass = options.flairCssClass;
-        this.flairText = options.flairText;
+        if(options.flairCssClass !== undefined) {
+            this.flairCssClass = typeof options.flairCssClass === 'string' ? [options.flairCssClass] : options.flairCssClass;
+        }
+        if(options.flairText !== undefined) {
+            this.flairText = typeof options.flairText === 'string' ? [options.flairText] : options.flairText;
+        }
         this.isMod = options.isMod;
         this.userNotes = options.userNotes;
         this.age = options.age;
