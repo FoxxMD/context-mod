@@ -8,7 +8,7 @@ import {IncomingMessage} from "http";
 import Submission from "snoowrap/dist/objects/Submission";
 import Comment from "snoowrap/dist/objects/Comment";
 import RedditUser from "snoowrap/dist/objects/RedditUser";
-import {AuthorOptions} from "../Author/Author";
+import {AuthorCriteria, AuthorOptions} from "../Author/Author";
 import {ConfigFormat} from "./types";
 import AbstractConfigDocument, {ConfigDocumentInterface} from "./Config/AbstractConfigDocument";
 import {Document as YamlDocument} from 'yaml';
@@ -2036,4 +2036,28 @@ export interface RepostItemResult extends RepostItem {
 export interface StringComparisonOptions {
     lengthWeight?: number,
     transforms?: ((str: string) => string)[]
+}
+
+export interface FilterCriteriaPropertyResult<T> {
+    property: keyof T
+    expected: (string | boolean | number)[]
+    found?: string | boolean | number | null
+    passed?: null | boolean
+    reason?: string
+    behavior: FilterBehavior
+}
+
+export interface FilterCriteriaResult<T> {
+    behavior: FilterBehavior
+    criteria: T//AuthorCriteria | TypedActivityStates
+    propertyResults: FilterCriteriaPropertyResult<T>[]
+    passed: boolean
+}
+
+export type FilterBehavior = 'include' | 'exclude'
+
+export interface FilterResult<T> {
+    criteriaResults: FilterCriteriaResult<T>[]
+    join: JoinOperands
+    passed: boolean
 }

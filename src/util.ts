@@ -1,7 +1,7 @@
 import winston, {Logger} from "winston";
 import jsonStringify from 'safe-stable-stringify';
 import dayjs, {Dayjs, OpUnitType} from 'dayjs';
-import {FormattedRuleResult, isRuleSetResult, RulePremise, RuleResult, RuleSetResult} from "./Rule";
+import {FormattedRuleResult, isRuleSetResult, RulePremise, RuleResult, RuleSetResult, UserNoteCriteria} from "./Rule";
 import deepEqual from "fast-deep-equal";
 import {Duration} from 'dayjs/plugin/duration.js';
 import Ajv from "ajv";
@@ -15,7 +15,7 @@ import {
     ActivityWindowCriteria, ActivityWindowType,
     CacheOptions,
     CacheProvider,
-    DurationComparison, DurationVal,
+    DurationComparison, DurationVal, FilterCriteriaPropertyResult, FilterCriteriaResult,
     GenericComparison,
     HistoricalStats,
     HistoricalStatsDisplay, ImageComparisonResult,
@@ -324,9 +324,9 @@ export const ruleNamesFromResults = (results: RuleResult[]) => {
     return results.map(x => x.name || x.premise.kind).join(' | ')
 }
 
-export const triggeredIndicator = (val: boolean | null): string => {
+export const triggeredIndicator = (val: boolean | null, nullResultIndicator = '-'): string => {
     if(val === null) {
-        return '-';
+        return nullResultIndicator;
     }
     return val ? PASS : FAIL;
 }
@@ -341,6 +341,40 @@ export const resultsSummary = (results: (RuleResult|RuleSetResult)[], topLevelCo
     });
     return parts.join(` ${topLevelCondition} `)
     //return results.map(x => x.name || x.premise.kind).join(' | ')
+}
+
+export const filterCriteriaSummary = (val: FilterCriteriaResult<any>): [string, string[]] => {
+    // summarize properties relevant to result
+    const passedProps = {props: val.propertyResults.filter(x => x.passed === true), name: 'Passed'};
+    const failedProps = {props: val.propertyResults.filter(x => x.passed === false), name: 'Failed'};
+    const skippedProps = {props: val.propertyResults.filter(x => x.passed === null), name: 'Skipped'};
+    const dnrProps = {props: val.propertyResults.filter(x => x.passed === undefined), name: 'DNR'};
+
+    const propSummary = [passedProps, failedProps];
+    if (skippedProps.props.length > 0) {
+        propSummary.push(skippedProps);
+    }
+    if (dnrProps.props.length > 0) {
+        propSummary.push(dnrProps);
+    }
+    const propSummaryStrArr = propSummary.map(x => `${x.props.length} ${x.name}${x.props.length > 0 ? ` (${x.props.map(y => y.property as string)})` : ''}`);
+    return [propSummaryStrArr.join(' | '), val.propertyResults.map(filterCriteriaPropertySummary)]
+}
+
+export const filterCriteriaPropertySummary = (val: FilterCriteriaPropertyResult<any>): string => {
+    let passResult: string;
+    switch (val.passed) {
+        case undefined:
+            passResult = 'DNR'
+            break;
+        case null:
+        case true:
+        case false:
+            passResult = triggeredIndicator(val.passed, 'Skipped');
+            break;
+    }
+    const found = val.passed === null || val.passed === undefined ? '' : ` => Found: ${val.found}${val.reason !== undefined ? ` -- ${val.reason}` : ''}${val.behavior === 'exclude' ? ' (Exclude passes when Expected is not Found)' : ''}`;
+    return `${val.property as string} => ${passResult} => Expected: ${val.expected}${found}`;
 }
 
 export const createAjvFactory = (logger: Logger) => {
@@ -1387,6 +1421,18 @@ export const isSubmission = (value: any) => {
 
 export const asSubmission = (value: any): value is Submission => {
     return isSubmission(value);
+}
+
+export const isUserNoteCriteria = (value: any) => {
+    return value !== null && typeof value === 'object' && value.type !== undefined;
+}
+
+export const asUserNoteCriteria = (value: any): value is UserNoteCriteria => {
+    return isUserNoteCriteria(value);
+}
+
+export const userNoteCriteriaSummary = (val: UserNoteCriteria): string => {
+    return `${val.count === undefined ? '>= 1' : val.count} of ${val.search === undefined ? 'current' : val.search} notes is ${val.type}`;
 }
 
 /**

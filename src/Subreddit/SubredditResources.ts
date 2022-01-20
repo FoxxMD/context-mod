@@ -20,7 +20,7 @@ import {
     comparisonTextOp,
     createCacheManager,
     createHistoricalStatsDisplay, FAIL,
-    fetchExternalUrl,
+    fetchExternalUrl, filterCriteriaSummary,
     formatNumber,
     getActivityAuthorName,
     getActivitySubredditName,
@@ -55,7 +55,7 @@ import {
     HistoricalStats,
     HistoricalStatUpdateData,
     SubredditHistoricalStats,
-    SubredditHistoricalStatsDisplay, ThirdPartyCredentialsJsonConfig,
+    SubredditHistoricalStatsDisplay, ThirdPartyCredentialsJsonConfig, FilterCriteriaResult,
 } from "../Common/interfaces";
 import UserNotes from "./UserNotes";
 import Mustache from "mustache";
@@ -725,7 +725,7 @@ export class SubredditResources {
         return await this.isSubreddit(await this.getSubreddit(item), state, this.logger);
     }
 
-    async testAuthorCriteria(item: (Comment | Submission), authorOpts: AuthorCriteria, include = true) {
+    async testAuthorCriteria(item: (Comment | Submission), authorOpts: AuthorCriteria, include = true): Promise<FilterCriteriaResult<AuthorCriteria>> {
         if (this.filterCriteriaTTL !== false) {
             // in the criteria check we only actually use the `item` to get the author flair
             // which will be the same for the entire subreddit
@@ -738,17 +738,18 @@ export class SubredditResources {
             await this.stats.cache.authorCrit.identifierRequestCount.set(hash, (await this.stats.cache.authorCrit.identifierRequestCount.wrap(hash, () => 0) as number) + 1);
             this.stats.cache.authorCrit.requestTimestamps.push(Date.now());
             this.stats.cache.authorCrit.requests++;
-            let miss = false;
-            const cachedAuthorTest = await this.cache.wrap(hash, async () => {
-                miss = true;
-                return await testAuthorCriteria(item, authorOpts, include, this.userNotes);
-            }, {ttl: this.filterCriteriaTTL});
-            if (!miss) {
+
+            // need to check shape of result to invalidate old result type
+            let cachedAuthorTest: FilterCriteriaResult<AuthorCriteria> = await this.cache.get(hash) as FilterCriteriaResult<AuthorCriteria>;
+            if(cachedAuthorTest !== null && cachedAuthorTest !== undefined && typeof cachedAuthorTest === 'object') {
                 this.logger.debug(`Cache Hit: Author Check on ${userName} (Hash ${hash})`);
+                return cachedAuthorTest;
             } else {
                 this.stats.cache.authorCrit.miss++;
+                cachedAuthorTest = await testAuthorCriteria(item, authorOpts, include, this.userNotes);
+                await this.cache.set(hash, cachedAuthorTest, {ttl: this.filterCriteriaTTL});
+                return cachedAuthorTest;
             }
-            return cachedAuthorTest;
         }
 
         return await testAuthorCriteria(item, authorOpts, include, this.userNotes);
@@ -1331,41 +1332,62 @@ export const checkAuthorFilter = async (item: (Submission | Comment), filter: Au
     } = filter;
     let authorPass = null;
     if (include.length > 0) {
+        let index = 1;
         for (const auth of include) {
-            if (await resources.testAuthorCriteria(item, auth)) {
-                authLogger.verbose(`${PASS} => Inclusive author criteria matched`);
-                authLogger.debug(`Inclusive is always OR => At least one of ${include.length} matched`);
+            const critResult = await resources.testAuthorCriteria(item, auth);
+            const [summary, details] = filterCriteriaSummary(critResult);
+            if (critResult.passed) {
+                authLogger.verbose(`${PASS} => Inclusive Author Criteria ${index} => ${summary}`);
+                authLogger.debug(`Criteria Details: \n${details.join('\n')}`);
                 return [true, 'inclusive'];
+            } else {
+                authLogger.debug(`${FAIL} => Inclusive Author Criteria ${index} => ${summary}`);
+                authLogger.debug(`Criteria Details: \n${details.join('\n')}`);
             }
+            index++;
         }
-        authLogger.verbose(`${FAIL} => Inclusive author criteria not matched`);
-        authLogger.debug(`Inclusive is always OR => None of ${include.length} criteria matched`);
+        authLogger.verbose(`${FAIL} => No Inclusive Author Criteria matched`);
         return [false, 'inclusive'];
     }
     if (exclude.length > 0) {
+        let index = 1;
+        const summaries: string[] = [];
         for (const auth of exclude) {
-            const excludePass = await resources.testAuthorCriteria(item, auth, false);
-            if (excludePass && excludeCondition === 'OR') {
-                authorPass = true;
-                break;
-            } else if (!excludePass && excludeCondition === 'AND') {
-                authorPass = false;
-                break;
+            const critResult = await resources.testAuthorCriteria(item, auth, false);
+            const [summary, details] = filterCriteriaSummary(critResult);
+            if (critResult.passed) {
+                if(excludeCondition === 'OR') {
+                    authLogger.verbose(`${PASS} (OR) => Exclusive Author Criteria ${index} => ${summary}`);
+                    authLogger.debug(`Criteria Details: \n${details.join('\n')}`);
+                    authorPass = true;
+                    break;
+                }
+                summaries.push(summary);
+                authLogger.debug(`${PASS} (AND) => Exclusive Author Criteria ${index} => ${summary}`);
+                authLogger.debug(`Criteria Details: \n${details.join('\n')}`);
+            } else if (!critResult.passed) {
+                if(excludeCondition === 'AND') {
+                    authLogger.verbose(`${FAIL} (AND) => Exclusive Author Criteria ${index} => ${summary}`);
+                    authLogger.debug(`Criteria Details: \n${details.join('\n')}`);
+                    authorPass = false;
+                    break;
+                }
+                summaries.push(summary);
+                authLogger.debug(`${FAIL} (OR) => Exclusive Author Criteria ${index} => ${summary}`);
+                authLogger.debug(`Criteria Details: \n${details.join('\n')}`);
             }
+            index++;
         }
         if(excludeCondition === 'AND' && authorPass === null) {
             authorPass = true;
         }
         if (authorPass !== true) {
-            authLogger.verbose(`${FAIL} => Exclusive author criteria not matched`);
-            if(exclude.length > 1) {
-                authLogger.debug(excludeCondition === 'OR' ? `Exclusive OR => No criteria from set of ${exclude.length} matched` : `Exclusive AND => At least one of ${exclude.length} criteria did not match`)
+            if(excludeCondition === 'OR') {
+                authLogger.verbose(`${FAIL} => Exclusive author criteria not matched => ${summaries.length === 1 ? `${summaries[0]}` : '(many, see debug)'}`);
             }
             return [false, 'exclusive']
-        }
-        authLogger.verbose(`${PASS} => Exclusive author criteria matched`);
-        if(exclude.length > 1) {
-            authLogger.debug(excludeCondition === 'OR' ? `Exclusive OR => At least 1 in set of ${exclude.length} matched` : `Exclusive AND => All ${exclude.length} matched`)
+        } else if(excludeCondition === 'AND') {
+            authLogger.verbose(`${PASS} => Exclusive author criteria matched => ${summaries.length === 1 ? `${summaries[0]}` : '(many, see debug)'}`);
         }
         return [true, 'exclusive'];
     }

@@ -2,6 +2,7 @@ import {Rule, RuleJSONConfig, RuleOptions, RuleResult} from "./index";
 import {Comment} from "snoowrap";
 import Submission from "snoowrap/dist/objects/Submission";
 import {Author, AuthorCriteria} from "../Author/Author";
+import {checkAuthorFilter} from "../Subreddit/SubredditResources";
 
 /**
  * Checks the author of the Activity against AuthorCriteria. This differs from a Rule's AuthorOptions as this is a full Rule and will only pass/fail, not skip.
@@ -59,20 +60,8 @@ export class AuthorRule extends Rule {
     }
 
     protected async process(item: Comment | Submission): Promise<[boolean, RuleResult]> {
-        if (this.include.length > 0) {
-            for (const auth of this.include) {
-                if (await this.resources.testAuthorCriteria(item, auth)) {
-                    return Promise.resolve([true, this.getResult(true)]);
-                }
-            }
-            return Promise.resolve([false, this.getResult(false)]);
-        }
-        for (const auth of this.exclude) {
-            if (await this.resources.testAuthorCriteria(item, auth, false)) {
-                return Promise.resolve([true, this.getResult(true)]);
-            }
-        }
-        return Promise.resolve([false, this.getResult(false)]);
+        const [result, filterType] = await checkAuthorFilter(item, {include: this.include, exclude: this.exclude}, this.resources, this.logger);
+        return Promise.resolve([result, this.getResult(result)]);
     }
 }
 
