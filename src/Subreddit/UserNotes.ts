@@ -1,5 +1,5 @@
 import dayjs, {Dayjs} from "dayjs";
-import {Comment, RedditUser, WikiPage} from "snoowrap";
+import Snoowrap, {Comment, RedditUser, WikiPage} from "snoowrap";
 import {
     COMMENT_URL_ID,
     deflateUserNotes, getActivityAuthorName,
@@ -57,7 +57,7 @@ export type UserNotesConstants = Pick<any, "users" | "warnings">;
 export class UserNotes {
     notesTTL: number | false;
     subreddit: Subreddit;
-    wiki: WikiPage;
+    client: Snoowrap;
     moderators?: RedditUser[];
     logger: Logger;
     identifier: string;
@@ -70,14 +70,14 @@ export class UserNotes {
     debounceCB: any;
     batchCount: number = 0;
 
-    constructor(ttl: number | boolean, subreddit: Subreddit, logger: Logger, cache: Cache, cacheCB: Function) {
+    constructor(ttl: number | boolean, subreddit: Subreddit, client: Snoowrap, logger: Logger, cache: Cache, cacheCB: Function) {
         this.notesTTL = ttl === true ? 0 : ttl;
         this.subreddit = subreddit;
         this.logger = logger;
-        this.wiki = subreddit.getWikiPage('usernotes');
         this.identifier = `${this.subreddit.display_name}-usernotes`;
         this.cache = cache;
         this.cacheCB = cacheCB;
+        this.client = client;
     }
 
     async getUserNotes(user: RedditUser): Promise<UserNote[]> {
@@ -172,8 +172,8 @@ export class UserNotes {
             //     this.saveDebounce = undefined;
             // }
             // @ts-ignore
-            this.wiki = await this.subreddit.getWikiPage('usernotes').fetch();
-            const wikiContent = this.wiki.content_md;
+            const wiki = this.client.getSubreddit(this.subreddit.display_name).getWikiPage('usernotes');
+            const wikiContent = await wiki.content_md;
             // TODO don't handle for versions lower than 6
             const userNotes = JSON.parse(wikiContent);
 
@@ -197,6 +197,7 @@ export class UserNotes {
         const blob = deflateUserNotes(payload.blob);
         const wikiPayload = {text: JSON.stringify({...payload, blob}), reason: 'ContextBot edited usernotes'};
         try {
+            const wiki = this.client.getSubreddit(this.subreddit.display_name).getWikiPage('usernotes');
             if (this.notesTTL !== false) {
                 // DISABLED for now because if it fails throws an uncaught rejection
                 // and need to figured out how to handle this other than just logging (want to interrupt action flow too?)
@@ -226,12 +227,12 @@ export class UserNotes {
                 // this.logger.debug(`Saving Usernotes has been debounced for 5 seconds (${this.batchCount} batched)`)
 
                 // @ts-ignore
-                await this.subreddit.getWikiPage('usernotes').edit(wikiPayload);
+                await wiki.edit(wikiPayload);
                 await this.cache.set(this.identifier, payload, {ttl: this.notesTTL});
                 this.users = new Map();
             } else {
                 // @ts-ignore
-                this.wiki = await this.subreddit.getWikiPage('usernotes').edit(wikiPayload);
+                await wiki.edit(wikiPayload);
             }
 
             return payload as RawUserNotesPayload;
