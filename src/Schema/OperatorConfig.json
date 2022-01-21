@@ -397,8 +397,7 @@
             "type": "object"
         },
         "CacheOptions": {
-            "additionalProperties": {
-            },
+            "additionalProperties": {},
             "description": "Configure granular settings for a cache provider with this object",
             "properties": {
                 "auth_pass": {
@@ -983,8 +982,7 @@
             "type": "object"
         },
         "ThirdPartyCredentialsJsonConfig": {
-            "additionalProperties": {
-            },
+            "additionalProperties": {},
             "properties": {
                 "youtube": {
                     "properties": {
