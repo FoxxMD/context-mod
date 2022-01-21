@@ -9,10 +9,10 @@ import {Strategy as CustomStrategy} from 'passport-custom';
 import {OperatorConfig, BotConnection, LogInfo} from "../../Common/interfaces";
 import {
     buildCachePrefix,
-    createCacheManager, filterLogBySubreddit,
+    createCacheManager, defaultFormat, filterLogBySubreddit,
     formatLogLineToHtml,
     intersect, isLogLineMinLevel,
-    LogEntry, parseFromJsonOrYamlToObject, parseInstanceLogInfoName, parseInstanceLogName,
+    LogEntry, parseInstanceLogInfoName, parseInstanceLogName, parseRedditEntity,
     parseSubredditLogName, permissions,
     randomId, sleep, triggeredIndicator
 } from "../../util";
@@ -47,6 +47,8 @@ import Autolinker from "autolinker";
 import path from "path";
 import {ExtendedSnoowrap} from "../../Utils/SnoowrapClients";
 import ClientUser from "../Common/User/ClientUser";
+import {BotStatusResponse} from "../Common/interfaces";
+import {TransformableInfo} from "logform";
 
 const emitter = new EventEmitter();
 
@@ -318,32 +320,36 @@ const webClient = async (options: OperatorConfig) => {
             });
             // @ts-ignore
             const user = await client.getMe();
+            const userName = `u/${user.name}`;
             // @ts-ignore
             await webCache.del(`invite:${req.session.inviteId}`);
             let data: any = {
                 accessToken: client.accessToken,
                 refreshToken: client.refreshToken,
+                userName,
             };
             if(invite.instance !== undefined) {
                 const bot = cmInstances.find(x => x.friendly === invite.instance);
                 if(bot !== undefined) {
                     const botPayload: any = {
+                        overwrite: invite.overwrite === true,
+                        name: userName,
                         credentials: {
-                            accessToken: client.accessToken,
-                            refreshToken: client.refreshToken,
-                            clientId: invite.clientId,
-                            clientSecret: invite.clientSecret,
+                            reddit: {
+                                accessToken: client.accessToken,
+                                refreshToken: client.refreshToken,
+                                clientId: invite.clientId,
+                                clientSecret: invite.clientSecret,
+                            }
                         }
                     };
-                    if(invite.subreddit !== undefined) {
-                        botPayload.subreddits =  {names: [invite.subreddit]};
+                    if(invite.subreddits !== undefined && invite.subreddits.length > 0) {
+                        botPayload.subreddits =  {names: invite.subreddits};
                     }
                     const botAddResult: any = await addBot(bot, {name: invite.creator}, botPayload);
-                    let msg = botAddResult.success ? 'Bot successfully added to running instance' : 'An error occurred while adding the bot to the instance';
-                    if(botAddResult.success) {
-                        msg = `${msg}. ${botAddResult.stored === false ? 'Additionally, the bot was not stored in config so the operator will need to add it manually to persist after a restart.' : ''}`;
-                    }
-                    data.addResult = msg;
+                    // stored
+                    // success
+                    data = {...data, ...botAddResult};
                     // @ts-ignore
                     req.session.destroy();
                     req.logout();
@@ -388,12 +394,13 @@ const webClient = async (options: OperatorConfig) => {
     let token = randomId();
     interface InviteData {
         permissions: string[],
-        subreddit?: string,
+        subreddits?: string,
         instance?: string,
         clientId: string
         clientSecret: string
         redirectUri: string
         creator: string
+        overwrite?: boolean
     }
 
     const helperAuthed = async (req: express.Request, res: express.Response, next: Function) => {
@@ -421,7 +428,8 @@ const webClient = async (options: OperatorConfig) => {
             redirectUri,
             clientId,
             clientSecret,
-            token: req.isAuthenticated() && req.user?.clientData?.webOperator ? token : undefined
+            token: req.isAuthenticated() && req.user?.clientData?.webOperator ? token : undefined,
+            instances: cmInstances.filter(x => req.user?.isInstanceOperator(x)).map(x => x.friendly),
         });
     });
 
@@ -449,7 +457,7 @@ const webClient = async (options: OperatorConfig) => {
             clientSecret: ce,
             redirect: redir,
             instance,
-            subreddit,
+            subreddits,
             code,
         } = req.body as any;
 
@@ -474,7 +482,7 @@ const webClient = async (options: OperatorConfig) => {
             clientSecret: (ce || clientSecret).trim(),
             redirectUri: redir.trim(),
             instance,
-            subreddit,
+            subreddits: subreddits.trim() === '' ? [] : subreddits.split(',').map((x: string) => parseRedditEntity(x).name),
             creator: (req.user as Express.User).name,
         }, {ttl: invitesMaxAge * 1000});
         return res.send(inviteId);
@@ -519,6 +527,8 @@ const webClient = async (options: OperatorConfig) => {
 
     const cmInstances: CMInstance[] = [];
     let init = false;
+    const formatter = defaultFormat();
+    const formatTransform = formatter.transform as (info: TransformableInfo, opts?: any) => TransformableInfo;
 
     let server: http.Server,
         io: SocketServer;
@@ -559,7 +569,9 @@ const webClient = async (options: OperatorConfig) => {
                             limit: sessionData.limit,
                             sort: sessionData.sort,
                             level: sessionData.level,
-                            stream: true
+                            stream: true,
+                            streamObjects: true,
+                            formatted: false,
                         }
                     });
 
@@ -583,8 +595,24 @@ const webClient = async (options: OperatorConfig) => {
                         }
                     });
 
+
                     delim.on('data', (c: any) => {
-                        io.to(sessionId).emit('log', formatLogLineToHtml(c.toString()));
+                        const logObj = JSON.parse(c) as LogInfo;
+                        let subredditMessage;
+                        let allMessage;
+                        if(logObj.subreddit !== undefined) {
+                            const {subreddit, bot, ...rest} = logObj
+                            // @ts-ignore
+                            subredditMessage = formatLogLineToHtml(formatter.transform(rest)[MESSAGE], rest.timestamp);
+                        }
+                        if(logObj.bot !== undefined) {
+                            const {bot, ...rest} = logObj
+                            // @ts-ignore
+                            allMessage = formatLogLineToHtml(formatter.transform(rest)[MESSAGE], rest.timestamp);
+                        }
+                        // @ts-ignore
+                        let formattedMessage = formatLogLineToHtml(formatter.transform(logObj)[MESSAGE], logObj.timestamp);
+                        io.to(sessionId).emit('log', {...logObj, subredditMessage, allMessage, formattedMessage});
                     });
 
                     gotStream.once('retry', retryFn);
@@ -816,12 +844,39 @@ const webClient = async (options: OperatorConfig) => {
         //     return acc.concat({...curr, isOperator: instanceOperator});
         // },[]);
 
+        const isOp = req.user?.isInstanceOperator(instance);
+
         res.render('status', {
             instances: shownInstances,
-            bots: resp.bots,
+            bots: resp.bots.map((x: BotStatusResponse) => {
+                const {subreddits = []} = x;
+                const subredditsWithSimpleLogs = subreddits.map(y => {
+                    let transformedLogs: string[];
+                    if(y.name === 'All') {
+                        // only need to remove bot name here
+                        transformedLogs = (y.logs as LogInfo[]).map((z: LogInfo) => {
+                           const {bot, ...rest} = z;
+                           // @ts-ignore
+                           return formatLogLineToHtml(formatter.transform(rest)[MESSAGE] as string, rest.timestamp);
+                        });
+                    } else {
+                        transformedLogs = (y.logs as LogInfo[]).map((z: LogInfo) => {
+                            const {bot, subreddit, ...rest} = z;
+                            // @ts-ignore
+                            return formatLogLineToHtml(formatter.transform(rest)[MESSAGE] as string, rest.timestamp);
+                        });
+                    }
+                    y.logs = transformedLogs;
+                    return y;
+                });
+                return {...x, subreddits: subredditsWithSimpleLogs};
+            }),
             botId: (req.instance as CMInstance).friendly,
             instanceId: (req.instance as CMInstance).friendly,
-            isOperator: req.user?.isInstanceOperator(instance),
+            isOperator: isOp,
+            system: isOp ? {
+                logs: resp.system.logs,
+                } : undefined,
             operators: instance.operators.join(', '),
             operatorDisplay: instance.operatorDisplay,
             logSettings: {
@@ -1077,8 +1132,9 @@ const webClient = async (options: OperatorConfig) => {
         try {
             const token = createToken(bot, userPayload);
             const resp = await got.post(`${bot.normalUrl}/bot`, {
-                body: botPayload,
+                body: JSON.stringify(botPayload),
                 headers: {
+                    'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`,
                 }
             }).json() as object;

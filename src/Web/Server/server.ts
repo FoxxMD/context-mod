@@ -16,7 +16,7 @@ import {
 } from "../../util";
 import {getLogger} from "../../Utils/loggerFactory";
 import LoggedError from "../../Utils/LoggedError";
-import {Invokee, LogInfo, OperatorConfig} from "../../Common/interfaces";
+import {Invokee, LogInfo, OperatorConfigWithFileContext} from "../../Common/interfaces";
 import http from "http";
 import SimpleError from "../../Utils/SimpleError";
 import {heartbeat} from "./routes/authenticated/applicationRoutes";
@@ -52,7 +52,7 @@ const botLogMap: Map<string, Map<string, LogEntry[]>> = new Map();
 
 const botSubreddits: Map<string, string[]> = new Map();
 
-const rcbServer = async function (options: OperatorConfig) {
+const rcbServer = async function (options: OperatorConfigWithFileContext) {
 
     const {
         operator: {
@@ -178,8 +178,10 @@ const rcbServer = async function (options: OperatorConfig) {
             bots = req.user.accessibleBots(req.botApp.bots);
         }
         const resp = [];
+        let index = 1;
         for(const b of bots) {
-            resp.push({name: b.botName, data: await opStats(b)});
+            resp.push({name: b.botName ?? `Bot ${index}`, data: await opStats(b)});
+            index++;
         }
         return res.json(resp);
     });
@@ -202,7 +204,7 @@ const rcbServer = async function (options: OperatorConfig) {
 
     server.getAsync('/check', ...actionRoute);
 
-    server.getAsync('/addBot', ...addBot());
+    server.postAsync('/bot', ...addBot());
 
     server.getAsync('/bot/invite', ...getInvitesRoute);
 

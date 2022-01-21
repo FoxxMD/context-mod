@@ -8,7 +8,11 @@ import {IncomingMessage} from "http";
 import Submission from "snoowrap/dist/objects/Submission";
 import Comment from "snoowrap/dist/objects/Comment";
 import RedditUser from "snoowrap/dist/objects/RedditUser";
-import {AuthorOptions} from "../Author/Author";
+import {AuthorCriteria, AuthorOptions} from "../Author/Author";
+import {ConfigFormat} from "./types";
+import AbstractConfigDocument, {ConfigDocumentInterface} from "./Config/AbstractConfigDocument";
+import {Document as YamlDocument} from 'yaml';
+import {JsonOperatorConfigDocument, YamlOperatorConfigDocument} from "./Config/Operator";
 
 /**
  * An ISO 8601 Duration
@@ -939,8 +943,9 @@ export interface SubmissionState extends ActivityState {
      * */
     title?: string
 
-    link_flair_text?: string
-    link_flair_css_class?: string
+    link_flair_text?: string | string[]
+    link_flair_css_class?: string | string[]
+    flairTemplate?: string | string[]
 }
 
 // properties calculated/derived by CM -- not provided as plain values by reddit
@@ -1837,6 +1842,15 @@ export interface OperatorConfig extends OperatorJsonConfig {
     credentials: ThirdPartyCredentialsJsonConfig
 }
 
+export interface OperatorFileConfig {
+    document: YamlOperatorConfigDocument | JsonOperatorConfigDocument
+    isWriteable?: boolean
+}
+
+export interface OperatorConfigWithFileContext extends OperatorConfig {
+    fileConfig: OperatorFileConfig
+}
+
 //export type OperatorConfig = Required<OperatorJsonConfig>;
 
 interface CacheTypeStat {
@@ -2022,4 +2036,28 @@ export interface RepostItemResult extends RepostItem {
 export interface StringComparisonOptions {
     lengthWeight?: number,
     transforms?: ((str: string) => string)[]
+}
+
+export interface FilterCriteriaPropertyResult<T> {
+    property: keyof T
+    expected: (string | boolean | number)[]
+    found?: string | boolean | number | null
+    passed?: null | boolean
+    reason?: string
+    behavior: FilterBehavior
+}
+
+export interface FilterCriteriaResult<T> {
+    behavior: FilterBehavior
+    criteria: T//AuthorCriteria | TypedActivityStates
+    propertyResults: FilterCriteriaPropertyResult<T>[]
+    passed: boolean
+}
+
+export type FilterBehavior = 'include' | 'exclude'
+
+export interface FilterResult<T> {
+    criteriaResults: FilterCriteriaResult<T>[]
+    join: JoinOperands
+    passed: boolean
 }

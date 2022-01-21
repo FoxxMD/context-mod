@@ -1,5 +1,5 @@
 import {RunningState} from "../../Subreddit/Manager";
-import {ManagerStats} from "../../Common/interfaces";
+import {LogInfo, ManagerStats} from "../../Common/interfaces";
 
 export interface BotStats {
     startedAtHuman: string,
@@ -15,7 +15,7 @@ export interface BotStats {
 
 export interface SubredditDataResponse {
     name: string
-    logs: string[]
+    logs: (string|LogInfo)[]
     botState: RunningState
     eventsState: RunningState
     queueState: RunningState

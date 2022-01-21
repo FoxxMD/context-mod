@@ -1,7 +1,7 @@
 import winston, {Logger} from "winston";
 import dayjs, {Dayjs} from "dayjs";
 import {getLogger} from "./Utils/loggerFactory";
-import {Invokee, OperatorConfig} from "./Common/interfaces";
+import {Invokee, OperatorConfig, OperatorConfigWithFileContext, OperatorFileConfig} from "./Common/interfaces";
 import Bot from "./Bot";
 import LoggedError from "./Utils/LoggedError";
 import {sleep} from "./util";
@@ -14,7 +14,10 @@ export class App {
 
     error: any;
 
-    constructor(config: OperatorConfig) {
+    config: OperatorConfig;
+    fileConfig: OperatorFileConfig;
+
+    constructor(config: OperatorConfigWithFileContext) {
         const {
             operator: {
                 name,
@@ -22,6 +25,11 @@ export class App {
             notifications,
             bots = [],
         } = config;
+
+        const {fileConfig, ...rest} = config;
+
+        this.config = rest;
+        this.fileConfig = fileConfig;
 
         this.logger = getLogger(config.logging);
 

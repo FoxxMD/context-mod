@@ -1,7 +1,7 @@
 import winston, {Logger} from "winston";
 import jsonStringify from 'safe-stable-stringify';
 import dayjs, {Dayjs, OpUnitType} from 'dayjs';
-import {FormattedRuleResult, isRuleSetResult, RulePremise, RuleResult, RuleSetResult} from "./Rule";
+import {FormattedRuleResult, isRuleSetResult, RulePremise, RuleResult, RuleSetResult, UserNoteCriteria} from "./Rule";
 import deepEqual from "fast-deep-equal";
 import {Duration} from 'dayjs/plugin/duration.js';
 import Ajv from "ajv";
@@ -15,7 +15,7 @@ import {
     ActivityWindowCriteria, ActivityWindowType,
     CacheOptions,
     CacheProvider,
-    DurationComparison, DurationVal,
+    DurationComparison, DurationVal, FilterCriteriaPropertyResult, FilterCriteriaResult,
     GenericComparison,
     HistoricalStats,
     HistoricalStatsDisplay, ImageComparisonResult,
@@ -23,7 +23,7 @@ import {
     ImageDetection,
     //ImageDownloadOptions,
     LogInfo,
-    NamedGroup,
+    NamedGroup, OperatorJsonConfig,
     PollingOptionsStrong,
     RedditEntity,
     RedditEntityType,
@@ -34,8 +34,7 @@ import {
     StrongSubredditState,
     SubredditState
 } from "./Common/interfaces";
-import JSON5 from "json5";
-import yaml, {JSON_SCHEMA} from "js-yaml";
+import { Document as YamlDocument } from 'yaml'
 import SimpleError from "./Utils/SimpleError";
 import InvalidRegexError from "./Utils/InvalidRegexError";
 import {constants, promises} from "fs";
@@ -54,11 +53,17 @@ import ImageData from "./Common/ImageData";
 import {Sharp, SharpOptions} from "sharp";
 // @ts-ignore
 import {blockhashData, hammingDistance} from 'blockhash';
-import {SetRandomInterval} from "./Common/types";
+import {ConfigFormat, SetRandomInterval} from "./Common/types";
 import stringSimilarity from 'string-similarity';
 import calculateCosineSimilarity from "./Utils/StringMatching/CosineSimilarity";
 import levenSimilarity from "./Utils/StringMatching/levenSimilarity";
 import {isRequestError, isStatusError} from "./Utils/Errors";
+import {parse} from "path";
+import JsonConfigDocument from "./Common/Config/JsonConfigDocument";
+import YamlConfigDocument from "./Common/Config/YamlConfigDocument";
+import AbstractConfigDocument, {ConfigDocumentInterface} from "./Common/Config/AbstractConfigDocument";
+
+
 //import {ResembleSingleCallbackComparisonResult} from "resemblejs";
 
 // want to guess how many concurrent image comparisons we should be doing
@@ -289,13 +294,39 @@ export const mergeArr = (objValue: [], srcValue: []): (any[] | undefined) => {
     }
 }
 
+export const removeFromSourceIfKeysExistsInDestination = (destinationArray: any[], sourceArray: any[], options: any): any[] => {
+    // get all keys from objects in destination
+    const destKeys = destinationArray.reduce((acc: string[], curr) => {
+        // can only get keys for objects, skip for everything else
+        if(curr !== null && typeof curr === 'object') {
+            const keys = Object.keys(curr).map(x => x.toLowerCase());
+            for(const k of keys) {
+                if(!acc.includes(k)) {
+                    acc.push(k);
+                }
+            }
+        }
+        return acc;
+    }, []);
+    const sourceItemsToKeep = sourceArray.filter(x => {
+        if(x !== null && typeof x === 'object') {
+            const sourceKeys = Object.keys(x).map(x => x.toLowerCase());
+            // only keep if keys from this object do not appear anywhere in destination items
+            return intersect(sourceKeys, destKeys).length === 0;
+        }
+        // keep if item is not an object since we can't test for keys anyway
+        return true;
+    });
+    return sourceItemsToKeep.concat(destinationArray);
+}
+
 export const ruleNamesFromResults = (results: RuleResult[]) => {
     return results.map(x => x.name || x.premise.kind).join(' | ')
 }
 
-export const triggeredIndicator = (val: boolean | null): string => {
+export const triggeredIndicator = (val: boolean | null, nullResultIndicator = '-'): string => {
     if(val === null) {
-        return '-';
+        return nullResultIndicator;
     }
     return val ? PASS : FAIL;
 }
@@ -310,6 +341,40 @@ export const resultsSummary = (results: (RuleResult|RuleSetResult)[], topLevelCo
     });
     return parts.join(` ${topLevelCondition} `)
     //return results.map(x => x.name || x.premise.kind).join(' | ')
+}
+
+export const filterCriteriaSummary = (val: FilterCriteriaResult<any>): [string, string[]] => {
+    // summarize properties relevant to result
+    const passedProps = {props: val.propertyResults.filter(x => x.passed === true), name: 'Passed'};
+    const failedProps = {props: val.propertyResults.filter(x => x.passed === false), name: 'Failed'};
+    const skippedProps = {props: val.propertyResults.filter(x => x.passed === null), name: 'Skipped'};
+    const dnrProps = {props: val.propertyResults.filter(x => x.passed === undefined), name: 'DNR'};
+
+    const propSummary = [passedProps, failedProps];
+    if (skippedProps.props.length > 0) {
+        propSummary.push(skippedProps);
+    }
+    if (dnrProps.props.length > 0) {
+        propSummary.push(dnrProps);
+    }
+    const propSummaryStrArr = propSummary.map(x => `${x.props.length} ${x.name}${x.props.length > 0 ? ` (${x.props.map(y => y.property as string)})` : ''}`);
+    return [propSummaryStrArr.join(' | '), val.propertyResults.map(filterCriteriaPropertySummary)]
+}
+
+export const filterCriteriaPropertySummary = (val: FilterCriteriaPropertyResult<any>): string => {
+    let passResult: string;
+    switch (val.passed) {
+        case undefined:
+            passResult = 'DNR'
+            break;
+        case null:
+        case true:
+        case false:
+            passResult = triggeredIndicator(val.passed, 'Skipped');
+            break;
+    }
+    const found = val.passed === null || val.passed === undefined ? '' : ` => Found: ${val.found}${val.reason !== undefined ? ` -- ${val.reason}` : ''}${val.behavior === 'exclude' ? ' (Exclude passes when Expected is not Found)' : ''}`;
+    return `${val.property as string} => ${passResult} => Expected: ${val.expected}${found}`;
 }
 
 export const createAjvFactory = (logger: Logger) => {
@@ -458,34 +523,64 @@ export const isActivityWindowCriteria = (val: any): val is ActivityWindowCriteri
     return false;
 }
 
-export const parseFromJsonOrYamlToObject = (content: string): [object?, Error?, Error?] => {
+export interface ConfigToObjectOptions {
+    location?: string,
+    jsonDocFunc?: (content: string, location?: string) => AbstractConfigDocument<OperatorJsonConfig>,
+    yamlDocFunc?: (content: string, location?: string) => AbstractConfigDocument<YamlDocument>
+}
+
+export const parseFromJsonOrYamlToObject = (content: string, options?: ConfigToObjectOptions): [ConfigFormat, ConfigDocumentInterface<YamlDocument | object>?, Error?, Error?] => {
     let obj;
+    let configFormat: ConfigFormat = 'yaml';
     let jsonErr,
         yamlErr;
 
+    const likelyType = likelyJson5(content) ? 'json' : 'yaml';
+
+    const {
+        location,
+        jsonDocFunc = (content: string, location?: string) => new JsonConfigDocument(content, location),
+        yamlDocFunc = (content: string, location?: string) => new YamlConfigDocument(content, location),
+    } = options || {};
+
     try {
-        obj = JSON5.parse(content);
-        const oType = obj === null ? 'null' : typeof obj;
+        const jsonObj = jsonDocFunc(content, location);
+        const output = jsonObj.toJS();
+        const oType = output === null ? 'null' : typeof output;
         if (oType !== 'object') {
             jsonErr = new SimpleError(`Parsing as json produced data of type '${oType}' (expected 'object')`);
             obj = undefined;
+        } else {
+            obj = jsonObj;
+            configFormat = 'json';
         }
     } catch (err: any) {
         jsonErr = err;
     }
-    if (obj === undefined) {
-        try {
-            obj = yaml.load(content, {schema: JSON_SCHEMA, json: true});
-            const oType = obj === null ? 'null' : typeof obj;
-            if (oType !== 'object') {
-                yamlErr = new SimpleError(`Parsing as yaml produced data of type '${oType}' (expected 'object')`);
-                obj = undefined;
+
+    try {
+        const yamlObj = yamlDocFunc(content, location)
+        const output = yamlObj.toJS();
+        const oType = output === null ? 'null' : typeof output;
+        if (oType !== 'object') {
+            yamlErr = new SimpleError(`Parsing as yaml produced data of type '${oType}' (expected 'object')`);
+            obj = undefined;
+        } else if (obj === undefined && (likelyType !== 'json' || yamlObj.parsed.errors.length === 0)) {
+            configFormat = 'yaml';
+            if(yamlObj.parsed.errors.length !== 0) {
+                yamlErr = new Error(yamlObj.parsed.errors.join('\n'))
+            } else {
+                obj = yamlObj;
             }
-        } catch (err: any) {
-            yamlErr = err;
         }
+    } catch (err: any) {
+        yamlErr = err;
     }
-    return [obj, jsonErr, yamlErr];
+
+    if (obj === undefined) {
+        configFormat = likelyType;
+    }
+    return [configFormat, obj, jsonErr, yamlErr];
 }
 
 export const comparisonTextOp = (val1: number, strOp: string, val2: number): boolean => {
@@ -887,7 +982,8 @@ export const isLogLineMinLevel = (log: string | LogInfo, minLevelText: string): 
 
 // https://regexr.com/3e6m0
 const HYPERLINK_REGEX: RegExp = /(http(s)?:\/\/.)?(www\.)?[-a-zA-Z0-9@:%._\+~#=]{2,256}\.[a-z]{2,6}\b([-a-zA-Z0-9@:%_\+.~#?&//=]*)/;
-export const formatLogLineToHtml = (log: string | LogInfo) => {
+const formattedTime = (short: string, full: string) => `<span class="has-tooltip"><span style="margin-top:35px" class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black space-y-3 p-2 text-left'>${full}</span><span>${short}</span></span>`;
+export const formatLogLineToHtml = (log: string | LogInfo, timestamp?: string) => {
     const val = typeof log === 'string' ? log : log[MESSAGE];
     const logContent = Autolinker.link(val, {
         email: false,
@@ -904,7 +1000,14 @@ export const formatLogLineToHtml = (log: string | LogInfo) => {
         .replace(/(\s*verbose\s*):/i, '<span class="error purple">$1</span>:')
         .replaceAll('\n', '<br />');
         //.replace(HYPERLINK_REGEX, '<a target="_blank" href="$&">$&</a>');
-    return `<div class="logLine">${logContent}</div>`
+    let line = `<div class="logLine">${logContent}</div>`
+
+    if(timestamp !== undefined) {
+        line = line.replace(timestamp, (match) => {
+            return formattedTime(dayjs(match).format('HH:mm:ss z'), match);
+        });
+    }
+    return line;
 }
 
 export type LogEntry = [number, LogInfo];
@@ -915,10 +1018,11 @@ export interface LogOptions {
     operator?: boolean,
     user?: string,
     allLogsParser?: Function
-    allLogName?: string
+    allLogName?: string,
+    returnType?: 'string' | 'object'
 }
 
-export const filterLogBySubreddit = (logs: Map<string, LogEntry[]>, validLogCategories: string[] = [], options: LogOptions): Map<string, string[]> => {
+export const filterLogBySubreddit = (logs: Map<string, LogEntry[]>, validLogCategories: string[] = [], options: LogOptions): Map<string, (string|LogInfo)[]> => {
     const {
         limit,
         level,
@@ -926,7 +1030,8 @@ export const filterLogBySubreddit = (logs: Map<string, LogEntry[]>, validLogCate
         operator = false,
         user,
         allLogsParser = parseSubredditLogInfoName,
-        allLogName = 'app'
+        allLogName = 'app',
+        returnType = 'string',
     } = options;
 
     // get map of valid logs categories
@@ -960,13 +1065,18 @@ export const filterLogBySubreddit = (logs: Map<string, LogEntry[]>, validLogCate
 
     const sortFunc = sort === 'ascending' ? (a: LogEntry, b: LogEntry) => a[0] - b[0] : (a: LogEntry, b: LogEntry) => b[0] - a[0];
 
-    const preparedMap: Map<string, string[]> = new Map();
+    const preparedMap: Map<string, (string|LogInfo)[]> = new Map();
     // iterate each entry and
     // sort, filter by level, slice to limit, then map to html string
     for(const [k,v] of validSubMap.entries()) {
         let preparedEntries = v.filter(([time, l]) => isLogLineMinLevel(l, level));
         preparedEntries.sort(sortFunc);
-        preparedMap.set(k, preparedEntries.slice(0, limit + 1).map(([time, l]) => formatLogLineToHtml(l)));
+        const entriesSlice = preparedEntries.slice(0, limit + 1);
+        if(returnType === 'string') {
+            preparedMap.set(k, entriesSlice.map(([time, l]) => formatLogLineToHtml(l)));
+        } else {
+            preparedMap.set(k, entriesSlice.map(([time, l]) => l));
+        }
     }
 
 
@@ -1130,19 +1240,25 @@ export const convertSubredditsRawToStrong = (x: (SubredditState | string), opts:
     return toStrongSubredditState(x, opts);
 }
 
-export async function readConfigFile(path: string, opts: any) {
+export async function readConfigFile(path: string, opts: any): Promise<[string?, ConfigFormat?]> {
     const {log, throwOnNotFound = true} = opts;
+    let extensionHint: ConfigFormat | undefined;
+    const fileInfo = parse(path);
+    if(fileInfo.ext !== undefined) {
+        switch(fileInfo.ext) {
+            case '.json':
+            case '.json5':
+                extensionHint = 'json';
+                break;
+            case '.yaml':
+                extensionHint = 'yaml';
+                break;
+        }
+    }
     try {
         await promises.access(path, constants.R_OK);
         const data = await promises.readFile(path);
-        const [configObj, jsonErr, yamlErr] = parseFromJsonOrYamlToObject(data as unknown as string);
-        if(configObj !== undefined) {
-            return configObj as object;
-        }
-        log.error(`Could not parse file contents at ${path} as JSON or YAML:`);
-        log.error(jsonErr);
-        log.error(yamlErr);
-        throw new SimpleError(`Could not parse file contents at ${path} as JSON or YAML`);
+        return [(data as any).toString(), extensionHint]
     } catch (e: any) {
         const {code} = e;
         if (code === 'ENOENT') {
@@ -1150,14 +1266,16 @@ export async function readConfigFile(path: string, opts: any) {
                 if (log) {
                     log.warn('No file found at given path', {filePath: path});
                 }
+                e.extension = extensionHint;
                 throw e;
             } else {
-                return;
+                return [];
             }
         } else if (log) {
             log.warn(`Encountered error while parsing file`, {filePath: path});
             log.error(e);
         }
+        e.extension = extensionHint;
         throw e;
     }
 }
@@ -1165,6 +1283,29 @@ export async function readConfigFile(path: string, opts: any) {
 // export function isObject(item: any): boolean {
 //     return (item && typeof item === 'object' && !Array.isArray(item));
 // }
+
+export const fileOrDirectoryIsWriteable = async (location: string) => {
+    const pathInfo = parse(location);
+    try {
+        await promises.access(location, constants.R_OK | constants.W_OK);
+        return true;
+    } catch (err: any) {
+        const {code} = err;
+        if (code === 'ENOENT') {
+            // file doesn't exist, see if we can write to directory in which case we are good
+            try {
+                await promises.access(pathInfo.dir, constants.R_OK | constants.W_OK)
+                // we can write to dir
+                return true;
+            } catch (accessError: any) {
+                // also can't access directory :(
+                throw new SimpleError(`No file exists at ${location} and application does not have permission to write to that directory`);
+            }
+        } else {
+            throw new SimpleError(`File exists at ${location} but application does have permission to write to it.`);
+        }
+    }
+}
 
 export const overwriteMerge = (destinationArray: any[], sourceArray: any[], options: any): any[] => sourceArray;
 
@@ -1280,6 +1421,18 @@ export const isSubmission = (value: any) => {
 
 export const asSubmission = (value: any): value is Submission => {
     return isSubmission(value);
+}
+
+export const isUserNoteCriteria = (value: any) => {
+    return value !== null && typeof value === 'object' && value.type !== undefined;
+}
+
+export const asUserNoteCriteria = (value: any): value is UserNoteCriteria => {
+    return isUserNoteCriteria(value);
+}
+
+export const userNoteCriteriaSummary = (val: UserNoteCriteria): string => {
+    return `${val.count === undefined ? '>= 1' : val.count} of ${val.search === undefined ? 'current' : val.search} notes is ${val.type}`;
 }
 
 /**

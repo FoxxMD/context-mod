@@ -383,3 +383,12 @@ dist
 **/src/**/*.js
 !src/Web/assets/public/yaml/*
 **/src/**/*.map
+/**/*.sqlite
+/**/*.bak
+*.yaml
+*.json5
+
+!src/Schema/*.json
+!docs/**/*.json5
+!docs/**/*.yaml
+!docs/**/*.json

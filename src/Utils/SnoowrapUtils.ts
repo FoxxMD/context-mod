@@ -8,22 +8,23 @@ import he from "he";
 import {RuleResult, UserNoteCriteria} from "../Rule";
 import {
     ActivityWindowType, CommentState, DomainInfo,
-    DurationVal,
+    DurationVal, FilterCriteriaPropertyResult, FilterCriteriaResult,
     SubmissionState,
     TypedActivityStates
 } from "../Common/interfaces";
 import {
+    asUserNoteCriteria,
     compareDurationValue,
-    comparisonTextOp, escapeRegex, getActivityAuthorName,
-    isActivityWindowCriteria,
+    comparisonTextOp, escapeRegex, formatNumber, getActivityAuthorName,
+    isActivityWindowCriteria, isUserNoteCriteria,
     normalizeName,
     parseDuration,
     parseDurationComparison,
     parseGenericValueComparison,
     parseGenericValueOrPercentComparison,
     parseRuleResultsToMarkdownSummary, parseStringToRegex,
-    parseSubredditName,
-    truncateStringToLength, windowToActivityWindowCriteria
+    parseSubredditName, removeUndefinedKeys,
+    truncateStringToLength, userNoteCriteriaSummary, windowToActivityWindowCriteria
 } from "../util";
 import UserNotes from "../Subreddit/UserNotes";
 import {Logger} from "winston";
@@ -32,6 +33,7 @@ import SimpleError from "./SimpleError";
 import {AuthorCriteria} from "../Author/Author";
 import {URL} from "url";
 import {isStatusError} from "./Errors";
+import {Dictionary, ElementOf, SafeDictionary} from "ts-essentials";
 
 export const BOT_LINK = 'https://www.reddit.com/r/ContextModBot/comments/otz396/introduction_to_contextmodbot';
 
@@ -354,24 +356,54 @@ export const renderContent = async (template: string, data: (Submission | Commen
     return he.decode(rendered);
 }
 
-export const testAuthorCriteria = async (item: (Comment | Submission), authorOpts: AuthorCriteria, include = true, userNotes: UserNotes) => {
-    const {shadowBanned, ...rest} = authorOpts;
+type AuthorCritPropHelper = SafeDictionary<FilterCriteriaPropertyResult<AuthorCriteria>, keyof AuthorCriteria>;
+type RequiredAuthorCrit = Required<AuthorCriteria>;
 
-    if(shadowBanned !== undefined) {
+export const testAuthorCriteria = async (item: (Comment | Submission), authorOpts: AuthorCriteria, include = true, userNotes: UserNotes): Promise<FilterCriteriaResult<AuthorCriteria>> => {
+
+
+    const definedAuthorOpts = (removeUndefinedKeys(authorOpts) as RequiredAuthorCrit);
+
+    const propResultsMap = Object.entries(definedAuthorOpts).reduce((acc: AuthorCritPropHelper, [k, v]) => {
+        const key = (k as keyof AuthorCriteria);
+        let ex;
+        if (Array.isArray(v)) {
+            ex = v.map(x => {
+                if (asUserNoteCriteria(x)) {
+                    return userNoteCriteriaSummary(x);
+                }
+                return x;
+            });
+        } else {
+            ex = [v];
+        }
+        acc[key] = {
+            property: key,
+            expected: ex,
+            behavior: include ? 'include' : 'exclude',
+        };
+        return acc;
+    }, {});
+
+    const {shadowBanned} = authorOpts;
+
+    if (shadowBanned !== undefined) {
         try {
             // @ts-ignore
             await item.author.fetch();
             // user is not shadowbanned
             // if criteria specifies they SHOULD be shadowbanned then return false now
-            if(shadowBanned) {
-                return false;
+            if (shadowBanned) {
+                propResultsMap.shadowBanned!.found = false;
+                propResultsMap.shadowBanned!.passed = false;
             }
         } catch (err: any) {
-            if(isStatusError(err) && err.statusCode === 404) {
+            if (isStatusError(err) && err.statusCode === 404) {
                 // user is shadowbanned
                 // if criteria specifies they should not be shadowbanned then return false now
-                if(!shadowBanned) {
-                    return false;
+                if (!shadowBanned) {
+                    propResultsMap.shadowBanned!.found = true;
+                    propResultsMap.shadowBanned!.passed = false;
                 }
             } else {
                 throw err;
@@ -379,17 +411,30 @@ export const testAuthorCriteria = async (item: (Comment | Submission), authorOpt
         }
     }
 
-    try {
-        const authorName = getActivityAuthorName(item.author);
 
-        for (const k of Object.keys(rest)) {
-            // @ts-ignore
-            if (authorOpts[k] !== undefined) {
+
+    if (propResultsMap.shadowBanned === undefined || propResultsMap.shadowBanned.passed === undefined) {
+        try {
+            const authorName = getActivityAuthorName(item.author);
+
+            const keys = Object.keys(propResultsMap) as (keyof AuthorCriteria)[]
+
+            let shouldContinue = true;
+            for (const k of keys) {
+                if (k === 'shadowBanned') {
+                    // we have already taken care of this with shadowban check above
+                    continue;
+                }
+
+                const authorOptVal = definedAuthorOpts[k];
+
+                //if (authorOpts[k] !== undefined) {
                 switch (k) {
                     case 'name':
+                        const nameVal = authorOptVal as RequiredAuthorCrit['name'];
                         const authPass = () => {
-                            // @ts-ignore
-                            for (const n of authorOpts[k]) {
+
+                            for (const n of nameVal) {
                                 if (n.toLowerCase() === authorName.toLowerCase()) {
                                     return true;
                                 }
@@ -397,8 +442,10 @@ export const testAuthorCriteria = async (item: (Comment | Submission), authorOpt
                             return false;
                         }
                         const authResult = authPass();
-                        if ((include && !authResult) || (!include && authResult)) {
-                            return false;
+                        propResultsMap.name!.found = authorName;
+                        propResultsMap.name!.passed = !((include && !authResult) || (!include && authResult));
+                        if (!propResultsMap.name!.passed) {
+                            shouldContinue = false;
                         }
                         break;
                     case 'flairCssClass':
@@ -413,8 +460,10 @@ export const testAuthorCriteria = async (item: (Comment | Submission), authorOpt
                             return false;
                         }
                         const cssResult = cssPass();
-                        if ((include && !cssResult) || (!include && cssResult)) {
-                            return false;
+                        propResultsMap.flairCssClass!.found = css;
+                        propResultsMap.flairCssClass!.passed = !((include && !cssResult) || (!include && cssResult));
+                        if (!propResultsMap.flairCssClass!.passed) {
+                            shouldContinue = false;
                         }
                         break;
                     case 'flairText':
@@ -429,68 +478,103 @@ export const testAuthorCriteria = async (item: (Comment | Submission), authorOpt
                             return false;
                         };
                         const textResult = textPass();
-                        if ((include && !textResult) || (!include && textResult)) {
+                        propResultsMap.flairText!.found = text;
+                        propResultsMap.flairText!.passed = !((include && !textResult) || (!include && textResult));
+                        if (!propResultsMap.flairText!.passed) {
+                            shouldContinue = false;
+                        }
+                        break;
+                    case 'flairTemplate':
+                        const templateId = await item.author_flair_template_id;
+                        const templatePass = () => {
+                            // @ts-ignore
+                            for (const c of authorOpts[k]) {
+                                if (c === templateId) {
+                                    return true;
+                                }
+                            }
                             return false;
+                        };
+                        const templateResult = templatePass();
+                        propResultsMap.flairTemplate!.found = templateId;
+                        propResultsMap.flairTemplate!.passed = !((include && !templateResult) || (!include && templateResult));
+                        if (!propResultsMap.flairTemplate!.passed) {
+                            shouldContinue = false;
                         }
                         break;
                     case 'isMod':
                         const mods: RedditUser[] = await item.subreddit.getModerators();
                         const isModerator = mods.some(x => x.name === authorName);
                         const modMatch = authorOpts.isMod === isModerator;
-                        if ((include && !modMatch) || (!include && modMatch)) {
-                            return false;
+                        propResultsMap.isMod!.found = isModerator;
+                        propResultsMap.isMod!.passed = !((include && !modMatch) || (!include && modMatch));
+                        if (!propResultsMap.isMod!.passed) {
+                            shouldContinue = false;
                         }
                         break;
                     case 'age':
-                        const ageTest = compareDurationValue(parseDurationComparison(await authorOpts.age as string), dayjs.unix(await item.author.created));
-                        if ((include && !ageTest) || (!include && ageTest)) {
-                            return false;
+                        const authorAge = dayjs.unix(await item.author.created);
+                        const ageTest = compareDurationValue(parseDurationComparison(await authorOpts.age as string), authorAge);
+                        propResultsMap.age!.found = authorAge.fromNow(true);
+                        propResultsMap.age!.passed = !((include && !ageTest) || (!include && ageTest));
+                        if (!propResultsMap.age!.passed) {
+                            shouldContinue = false;
                         }
                         break;
                     case 'linkKarma':
+                        // @ts-ignore
+                        const tk = await item.author.total_karma as number;
                         const lkCompare = parseGenericValueOrPercentComparison(await authorOpts.linkKarma as string);
                         let lkMatch;
                         if (lkCompare.isPercent) {
-                            // @ts-ignore
-                            const tk = await item.author.total_karma as number;
+
                             lkMatch = comparisonTextOp(item.author.link_karma / tk, lkCompare.operator, lkCompare.value / 100);
                         } else {
                             lkMatch = comparisonTextOp(item.author.link_karma, lkCompare.operator, lkCompare.value);
                         }
-                        if ((include && !lkMatch) || (!include && lkMatch)) {
-                            return false;
+                        propResultsMap.linkKarma!.found = tk;
+                        propResultsMap.linkKarma!.passed = !((include && !lkMatch) || (!include && lkMatch));
+                        if (!propResultsMap.linkKarma!.passed) {
+                            shouldContinue = false;
                         }
                         break;
                     case 'commentKarma':
+                        // @ts-ignore
+                        const ck = await item.author.total_karma as number;
                         const ckCompare = parseGenericValueOrPercentComparison(await authorOpts.commentKarma as string);
                         let ckMatch;
                         if (ckCompare.isPercent) {
-                            // @ts-ignore
-                            const ck = await item.author.total_karma as number;
                             ckMatch = comparisonTextOp(item.author.comment_karma / ck, ckCompare.operator, ckCompare.value / 100);
                         } else {
                             ckMatch = comparisonTextOp(item.author.comment_karma, ckCompare.operator, ckCompare.value);
                         }
-                        if ((include && !ckMatch) || (!include && ckMatch)) {
-                            return false;
+                        propResultsMap.commentKarma!.found = ck;
+                        propResultsMap.commentKarma!.passed = !((include && !ckMatch) || (!include && ckMatch));
+                        if (!propResultsMap.commentKarma!.passed) {
+                            shouldContinue = false;
                         }
                         break;
                     case 'totalKarma':
+                        // @ts-ignore
+                        const totalKarma = await item.author.total_karma as number;
                         const tkCompare = parseGenericValueComparison(await authorOpts.totalKarma as string);
                         if (tkCompare.isPercent) {
                             throw new SimpleError(`'totalKarma' value on AuthorCriteria cannot be a percentage`);
                         }
-                        // @ts-ignore
-                        const totalKarma = await item.author.total_karma as number;
                         const tkMatch = comparisonTextOp(totalKarma, tkCompare.operator, tkCompare.value);
-                        if ((include && !tkMatch) || (!include && tkMatch)) {
-                            return false;
+                        propResultsMap.totalKarma!.found = totalKarma;
+                        propResultsMap.totalKarma!.passed = !((include && !tkMatch) || (!include && tkMatch));
+                        if (!propResultsMap.totalKarma!.passed) {
+                            shouldContinue = false;
                         }
                         break;
                     case 'verified':
-                        const vMatch = await item.author.has_verified_mail === authorOpts.verified as boolean;
-                        if ((include && !vMatch) || (!include && vMatch)) {
-                            return false;
+                        const verified = await item.author.has_verified_mail;
+                        const vMatch = verified === authorOpts.verified as boolean;
+                        propResultsMap.verified!.found = verified;
+                        propResultsMap.verified!.passed = !((include && !vMatch) || (!include && vMatch));
+                        if (!propResultsMap.verified!.passed) {
+                            shouldContinue = false;
                         }
                         break;
                     case 'description':
@@ -498,25 +582,32 @@ export const testAuthorCriteria = async (item: (Comment | Submission), authorOpt
                         const desc = await item.author.subreddit?.display_name.public_description;
                         const dVals = authorOpts[k] as string[];
                         let passed = false;
-                        for(const val of dVals) {
+                        let passReg;
+                        for (const val of dVals) {
                             let reg = parseStringToRegex(val, 'i');
-                            if(reg === undefined) {
+                            if (reg === undefined) {
                                 reg = parseStringToRegex(`/.*${escapeRegex(val.trim())}.*/`, 'i');
-                                if(reg === undefined) {
+                                if (reg === undefined) {
                                     throw new SimpleError(`Could not convert 'description' value to a valid regex: ${authorOpts[k] as string}`);
                                 }
                             }
-                            if(reg.test(desc)) {
+                            if (reg.test(desc)) {
                                 passed = true;
+                                passReg = reg.toString();
                                 break;
                             }
                         }
-                        if(!passed) {
-                            return false;
+                        propResultsMap.description!.found = typeof desc === 'string' ? truncateStringToLength(50)(desc) : desc;
+                        propResultsMap.description!.passed = !((include && !passed) || (!include && passed));
+                        if (!propResultsMap.description!.passed) {
+                            shouldContinue = false;
+                        } else {
+                            propResultsMap.description!.reason = `Matched with: ${passReg as string}`;
                         }
                         break;
                     case 'userNotes':
                         const notes = await userNotes.getUserNotes(item.author);
+                        let foundNoteResult: string[] = [];
                         const notePass = () => {
                             for (const noteCriteria of authorOpts[k] as UserNoteCriteria[]) {
                                 const {count = '>= 1', search = 'current', type} = noteCriteria;
@@ -529,8 +620,14 @@ export const testAuthorCriteria = async (item: (Comment | Submission), authorOpt
                                 const order = extra.includes('asc') ? 'ascending' : 'descending';
                                 switch (search) {
                                     case 'current':
-                                        if (notes.length > 0 && notes[notes.length - 1].noteType === type) {
-                                            return true;
+                                        if (notes.length > 0) {
+                                            const currentNoteType = notes[notes.length - 1].noteType;
+                                            foundNoteResult.push(`Current => ${currentNoteType}`);
+                                            if (currentNoteType === type) {
+                                                return true;
+                                            }
+                                        } else {
+                                            foundNoteResult.push('No notes present');
                                         }
                                         break;
                                     case 'consecutive':
@@ -549,39 +646,64 @@ export const testAuthorCriteria = async (item: (Comment | Submission), authorOpt
                                             if (isPercent) {
                                                 throw new SimpleError(`When comparing UserNotes with 'consecutive' search 'count' cannot be a percentage. Given: ${count}`);
                                             }
+                                            foundNoteResult.push(`Found ${currCount} ${type} consecutively`);
                                             if (comparisonTextOp(currCount, operator, value)) {
                                                 return true;
                                             }
                                         }
                                         break;
                                     case 'total':
+                                        const filteredNotes = notes.filter(x => x.noteType === type);
                                         if (isPercent) {
-                                            if (comparisonTextOp(notes.filter(x => x.noteType === type).length / notes.length, operator, value / 100)) {
+                                            // avoid divide by zero
+                                            const percent = notes.length === 0 ? 0 : filteredNotes.length / notes.length;
+                                            foundNoteResult.push(`${formatNumber(percent)}% are ${type}`);
+                                            if (comparisonTextOp(percent, operator, value / 100)) {
                                                 return true;
                                             }
-                                        } else if (comparisonTextOp(notes.filter(x => x.noteType === type).length, operator, value)) {
-                                            return true;
+                                        } else {
+                                            foundNoteResult.push(`${filteredNotes.length} are ${type}`);
+                                            if (comparisonTextOp(notes.filter(x => x.noteType === type).length, operator, value)) {
+                                                return true;
+                                            }
                                         }
+                                        break;
                                 }
                             }
                             return false;
                         }
                         const noteResult = notePass();
-                        if ((include && !noteResult) || (!include && noteResult)) {
-                            return false;
+                        propResultsMap.userNotes!.found = foundNoteResult.join(' | ');
+                        propResultsMap.userNotes!.passed = !((include && !noteResult) || (!include && noteResult));
+                        if (!propResultsMap.userNotes!.passed) {
+                            shouldContinue = false;
                         }
                         break;
                 }
+                //}
+                if (!shouldContinue) {
+                    break;
+                }
+            }
+        } catch (err: any) {
+            if (isStatusError(err) && err.statusCode === 404) {
+                throw new SimpleError('Reddit returned a 404 while trying to retrieve User profile. It is likely this user is shadowbanned.');
+            } else {
+                throw err;
             }
         }
-        return true;
-    } catch (err: any) {
-        if(isStatusError(err) && err.statusCode === 404) {
-            throw new SimpleError('Reddit returned a 404 while trying to retrieve User profile. It is likely this user is shadowbanned.');
-        } else {
-            throw err;
-        }
     }
+
+    // gather values and determine overall passed
+    const propResults = Object.values(propResultsMap);
+    const passed = propResults.filter(x => typeof x.passed === 'boolean').every(x => x.passed === true);
+
+    return {
+        behavior: include ? 'include' : 'exclude',
+        criteria: authorOpts,
+        propertyResults: propResults,
+        passed,
+    };
 }
 
 export interface ItemContent {
