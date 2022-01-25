@@ -255,7 +255,7 @@ class Bot {
             return;
         }
         for(const i of listing) {
-            const foundManager = this.subManagers.find(x => x.subreddit.display_name === i.subreddit.display_name && x.sharedStreamCallbacks.get(name) !== undefined);
+            const foundManager = this.subManagers.find(x => x.subreddit.display_name === i.subreddit.display_name && x.sharedStreamCallbacks.get(name) !== undefined && x.eventsState.state === RUNNING);
             if(foundManager !== undefined) {
                 foundManager.sharedStreamCallbacks.get(name)(i);
                 if(this.stagger !== undefined) {

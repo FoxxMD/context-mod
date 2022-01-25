@@ -906,9 +906,9 @@ export class Manager extends EventEmitter {
                     }
                     if(!this.sharedStreamCallbacks.has(source)) {
                         stream.once('listing', this.noChecksWarning(source));
-                        this.sharedStreamCallbacks.set(source, onItem);
                         this.logger.debug(`${removedOwn ? 'Stopped own polling and replace with ' : 'Set '}listener on shared polling ${source}`);
                     }
+                    this.sharedStreamCallbacks.set(source, onItem);
                 } else {
                     let ownPollingMsgParts: string[] = [];
                     let removedShared = false;
@@ -1140,7 +1140,6 @@ export class Manager extends EventEmitter {
                 s.end();
             }
             this.streams = new Map();
-            this.sharedStreamCallbacks = new Map();
             this.startedAt = undefined;
             this.logger.info(`Events STOPPED by ${causedBy}`);
             this.eventsState = {

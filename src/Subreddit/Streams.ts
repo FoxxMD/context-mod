@@ -103,7 +103,7 @@ export class SPoll<T extends object> extends Poll<T> {
                         }
                         page++;
                     }
-                    const newItemMsg = `Found ${newItems.length} new items`;
+                    const newItemMsg = `Found ${newItems.length} new items out of ${batch.length} returned`;
                     if(self.newStart) {
                         self.logger.debug(`${newItemMsg} but will ignore all on first start.`);
                         self.emit("listing", []);
