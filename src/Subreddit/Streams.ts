@@ -82,6 +82,10 @@ export class SPoll<T extends object> extends Poll<T> {
                             // @ts-ignore
                             batch = await batch.fetchMore({amount: 100});
                         }
+                        if(batch.length === 0) {
+                            // if nothing is returned we don't want to end up in an endless loop!
+                            anyAlreadySeen = true;
+                        }
                         for (const item of batch) {
                             const id = item[self.identifier];
                             if (self.processed.has(id)) {
