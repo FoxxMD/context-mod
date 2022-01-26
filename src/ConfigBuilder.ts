@@ -373,7 +373,7 @@ export const parseOpConfigFromArgs = (args: any): OperatorJsonConfig => {
         },
         logging: {
             level: logLevel,
-            path: logDir === true ? `${process.cwd()}/logs` : undefined,
+            path: logDir === true ? `${process.cwd()}/logs` : logDir,
         },
         caching: {
             provider: caching,
@@ -457,9 +457,8 @@ export const parseOpConfigFromEnv = (): OperatorJsonConfig => {
             display: process.env.OPERATOR_DISPLAY
         },
         logging: {
-            // @ts-ignore
             level: process.env.LOG_LEVEL,
-            path: process.env.LOG_DIR === 'true' ? `${process.cwd()}/logs` : undefined,
+            path: process.env.LOG_DIR === 'true' ? `${process.cwd()}/logs` : process.env.LOG_DIR,
         },
         caching: {
             provider: {
@@ -505,7 +504,8 @@ export const parseOperatorConfigFromSources = async (args: any): Promise<[Operat
     const envPath = process.env.OPERATOR_ENV;
 
     // create a pre config logger to help with debugging
-    const initLogger = getLogger({logLevel, logDir: logDir === true ? `${process.cwd()}/logs` : logDir}, 'init');
+    // default to debug if nothing is provided
+    const initLogger = getLogger({level: (logLevel ?? 'debug'), path: logDir === 'true' ? `${process.cwd()}/logs` : logDir}, 'init');
 
     try {
         const vars = await GetEnvVars({
