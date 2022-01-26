@@ -449,9 +449,6 @@ export class Manager extends EventEmitter {
                 this.logger.info(checkSummary);
             }
             this.validConfigLoaded = true;
-            if(!suppressChangeEvent) {
-                this.emit('configChange');
-            }
             if(this.eventsState.state === RUNNING) {
                 // need to update polling, potentially
                 await this.buildPolling();
@@ -461,6 +458,9 @@ export class Manager extends EventEmitter {
                         stream.startInterval();
                     }
                 }
+            }
+            if(!suppressChangeEvent) {
+                this.emit('configChange');
             }
         } catch (err: any) {
             this.validConfigLoaded = false;
