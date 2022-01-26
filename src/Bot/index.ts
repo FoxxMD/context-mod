@@ -375,7 +375,7 @@ class Bot {
                 let processed;
                 if (stream !== undefined) {
                     this.logger.info('Restarting SHARED COMMENT STREAM due to a subreddit config change');
-                    stream.end();
+                    stream.end('Replacing with a new stream with updated subreddits');
                     processed = stream.processed;
                 }
                 if (sharedCommentsSubreddits.length > 100) {
@@ -397,7 +397,7 @@ class Bot {
         } else {
             const stream = this.cacheManager.modStreams.get('newComm');
             if (stream !== undefined) {
-                stream.end();
+                stream.end('Determined no managers are listening on shared stream parsing');
             }
         }
 
@@ -408,7 +408,7 @@ class Bot {
                 let processed;
                 if (stream !== undefined) {
                     this.logger.info('Restarting SHARED SUBMISSION STREAM due to a subreddit config change');
-                    stream.end();
+                    stream.end('Replacing with a new stream with updated subreddits');
                     processed = stream.processed;
                 }
                 if (sharedSubmissionsSubreddits.length > 100) {
@@ -430,7 +430,7 @@ class Bot {
         } else {
             const stream = this.cacheManager.modStreams.get('newSub');
             if (stream !== undefined) {
-                stream.end();
+                stream.end('Determined no managers are listening on shared stream parsing');
             }
         }
 
@@ -448,7 +448,7 @@ class Bot {
             defaultUnmoderatedStream.on('listing', this.createSharedStreamListingListener('unmoderated'));
             this.cacheManager.modStreams.set('unmoderated', defaultUnmoderatedStream);
         } else if (!isUnmoderatedShared && unmoderatedstream !== undefined) {
-            unmoderatedstream.end();
+            unmoderatedstream.end('Determined no managers are listening on shared stream parsing');
         }
 
         const isModqueueShared = !this.sharedStreams.includes('modqueue') ? false : this.subManagers.some(x => x.isPollingShared('modqueue'));
@@ -465,7 +465,7 @@ class Bot {
             defaultModqueueStream.on('listing', this.createSharedStreamListingListener('modqueue'));
             this.cacheManager.modStreams.set('modqueue', defaultModqueueStream);
         } else if (isModqueueShared && modqueuestream !== undefined) {
-            modqueuestream.end();
+            modqueuestream.end('Determined no managers are listening on shared stream parsing');
         }
     }
 

@@ -132,7 +132,12 @@ export class SPoll<T extends object> extends Poll<T> {
         this.createInterval();
     }
 
-    end = () => {
+    end = (reason?: string) => {
+        let msg ='Stopping Polling';
+        if(reason !== undefined) {
+            msg += `: ${reason}`;
+        }
+        this.logger.debug(msg);
         this.running = false;
         this.newStart = true;
         super.end();
