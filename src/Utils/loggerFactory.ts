@@ -47,7 +47,7 @@ export const getLogger = (options: LoggerFactoryOptions, name = 'app'): Logger =
 
         if (dirname !== undefined && dirname !== '' && dirname !== null) {
 
-            let realDir: string | undefined = undefined;
+            let realDir: string | undefined;
             if(typeof dirname === 'boolean') {
                 if(!dirname) {
                     realDir = undefined;
@@ -58,6 +58,8 @@ export const getLogger = (options: LoggerFactoryOptions, name = 'app'): Logger =
                 realDir = path.resolve(__dirname, '../../logs')
             } else if(dirname === 'false') {
                 realDir = undefined;
+            } else {
+                realDir = dirname;
             }
 
             const rotateTransport = new winston.transports.DailyRotateFile({

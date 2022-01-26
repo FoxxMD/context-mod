@@ -375,7 +375,7 @@ export const parseOpConfigFromArgs = (args: any): OperatorJsonConfig => {
             level: logLevel,
             file: {
                 level: logLevel,
-                dirName: logDir === true ? `${process.cwd()}/logs` : logDir,
+                dirName: logDir,
             },
             stream: {
                 level: logLevel,
@@ -469,7 +469,7 @@ export const parseOpConfigFromEnv = (): OperatorJsonConfig => {
             level: process.env.LOG_LEVEL,
             file: {
                 level: process.env.LOG_LEVEL,
-                dirname: process.env.LOG_DIR === 'true' ? `${process.cwd()}/logs` : process.env.LOG_DIR,
+                dirname: process.env.LOG_DIR,
             },
             stream: {
                 level: process.env.LOG_LEVEL,
@@ -518,7 +518,7 @@ export const parseOpConfigFromEnv = (): OperatorJsonConfig => {
 // json config
 // args from cli
 export const parseOperatorConfigFromSources = async (args: any): Promise<[OperatorJsonConfig, OperatorFileConfig]> => {
-    const {logLevel = process.env.LOG_LEVEL ?? 'debug', logDir = process.env.LOG_DIR || false} = args || {};
+    const {logLevel = process.env.LOG_LEVEL ?? 'debug', logDir = process.env.LOG_DIR} = args || {};
     const envPath = process.env.OPERATOR_ENV;
     const initLoggerOptions = {
         level: logLevel,
@@ -772,21 +772,6 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
         dirname = path,
         ...fileRest
     } = file;
-
-    // let realDir: string | undefined = undefined;
-    // if(dirname !== undefined) {
-    //     if(dirname === null) {
-    //         realDir = undefined;
-    //     } else if(typeof dirname === 'boolean') {
-    //         if(dirname === false) {
-    //             realDir = undefined;
-    //         } else {
-    //             realDir = `${process.cwd()}/logs`
-    //         }
-    //     } else if(dirname === 'true') {
-    //         realDir = `${process.cwd()}/logs`
-    //     }
-    // }
 
 
     const config: OperatorConfig = {
