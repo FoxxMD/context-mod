@@ -606,6 +606,117 @@
             },
             "type": "object"
         },
+        "LoggingOptions": {
+            "properties": {
+                "console": {
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/Pick<Transports.ConsoleTransportOptions,\"silent\"|\"eol\"|\"stderrLevels\"|\"consoleWarnLevels\">"
+                        },
+                        {
+                            "properties": {
+                                "level": {
+                                    "enum": [
+                                        "debug",
+                                        "error",
+                                        "info",
+                                        "verbose",
+                                        "warn"
+                                    ],
+                                    "type": "string"
+                                }
+                            },
+                            "type": "object"
+                        }
+                    ],
+                    "description": "Options for logging to console"
+                },
+                "file": {
+                    "allOf": [
+                        {
+                            "properties": {
+                                "dirname": {
+                                    "description": "The absolute path to a directory where rotating log files should be stored.\n\n* If not present or `null` or `false` no log files will be created\n* If `true` logs will be stored at `[working directory]/logs`\n\n* ENV => `LOG_DIR`\n* ARG => `--logDir [dir]`",
+                                    "examples": [
+                                        "/var/log/contextmod"
+                                    ],
+                                    "type": [
+                                        "null",
+                                        "string",
+                                        "boolean"
+                                    ]
+                                },
+                                "level": {
+                                    "enum": [
+                                        "debug",
+                                        "error",
+                                        "info",
+                                        "verbose",
+                                        "warn"
+                                    ],
+                                    "type": "string"
+                                }
+                            },
+                            "type": "object"
+                        },
+                        {
+                            "$ref": "#/definitions/Omit<DailyRotateFileTransportOptions,\"stream\"|\"dirname\"|\"options\"|\"handleRejections\"|\"format\"|\"handleExceptions\"|\"log\"|\"logv\"|\"close\">"
+                        }
+                    ],
+                    "description": "Options for Rotating File logging"
+                },
+                "level": {
+                    "default": "verbose",
+                    "description": "The minimum log level to output. The log level set will output logs at its level **and all levels above it:**\n\n * `error`\n * `warn`\n * `info`\n * `verbose`\n * `debug`\n\n Note: `verbose` will display *a lot* of information on the status/result of run rules/checks/actions etc. which is very useful for testing configurations. Once your bot is stable changing the level to `info` will reduce log noise.\n\n * ENV => `LOG_LEVEL`\n * ARG => `--logLevel <level>`",
+                    "enum": [
+                        "debug",
+                        "error",
+                        "info",
+                        "verbose",
+                        "warn"
+                    ],
+                    "examples": [
+                        "verbose"
+                    ],
+                    "type": "string"
+                },
+                "path": {
+                    "description": "**DEPRECATED** - Use `file.dirname` instead\nThe absolute path to a directory where rotating log files should be stored.\n\n* If not present or `null` or `false` no log files will be created\n* If `true` logs will be stored at `[working directory]/logs`\n\n* ENV => `LOG_DIR`\n* ARG => `--logDir [dir]`",
+                    "examples": [
+                        "/var/log/contextmod"
+                    ],
+                    "type": [
+                        "null",
+                        "string",
+                        "boolean"
+                    ]
+                },
+                "stream": {
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/Omit<DuplexTransportOptions,\"name\"|\"stream\"|\"handleRejections\"|\"format\"|\"handleExceptions\"|\"log\"|\"logv\"|\"close\">"
+                        },
+                        {
+                            "properties": {
+                                "level": {
+                                    "enum": [
+                                        "debug",
+                                        "error",
+                                        "info",
+                                        "verbose",
+                                        "warn"
+                                    ],
+                                    "type": "string"
+                                }
+                            },
+                            "type": "object"
+                        }
+                    ],
+                    "description": "Options for logging to api/web"
+                }
+            },
+            "type": "object"
+        },
         "NotificationConfig": {
             "properties": {
                 "events": {
@@ -669,6 +780,90 @@
                 "providers",
                 "types"
             ],
+            "type": "object"
+        },
+        "Omit<DailyRotateFileTransportOptions,\"stream\"|\"dirname\"|\"options\"|\"handleRejections\"|\"format\"|\"handleExceptions\"|\"log\"|\"logv\"|\"close\">": {
+            "properties": {
+                "auditFile": {
+                    "description": "A string representing the name of the name of the audit file. (default: './hash-audit.json')",
+                    "type": "string"
+                },
+                "createSymlink": {
+                    "description": "Create a tailable symlink to the current active log file. (default: false)",
+                    "type": "boolean"
+                },
+                "datePattern": {
+                    "description": "A string representing the moment.js date format to be used for rotating. The meta characters used in this string will dictate the frequency of the file rotation. For example, if your datePattern is simply 'HH' you will end up with 24 log files that are picked up and appended to every day. (default 'YYYY-MM-DD')",
+                    "type": "string"
+                },
+                "eol": {
+                    "type": "string"
+                },
+                "extension": {
+                    "description": "A string representing an extension to be added to the filename, if not included in the filename property. (default: '')",
+                    "type": "string"
+                },
+                "filename": {
+                    "description": "Filename to be used to log to. This filename can include the %DATE% placeholder which will include the formatted datePattern at that point in the filename. (default: 'winston.log.%DATE%)",
+                    "type": "string"
+                },
+                "frequency": {
+                    "description": "A string representing the frequency of rotation. (default: 'custom')",
+                    "type": "string"
+                },
+                "json": {
+                    "type": "boolean"
+                },
+                "level": {
+                    "type": "string"
+                },
+                "maxFiles": {
+                    "description": "Maximum number of logs to keep. If not set, no logs will be removed. This can be a number of files or number of days. If using days, add 'd' as the suffix. (default: null)",
+                    "type": [
+                        "string",
+                        "number"
+                    ]
+                },
+                "maxSize": {
+                    "description": "Maximum size of the file after which it will rotate. This can be a number of bytes, or units of kb, mb, and gb. If using the units, add 'k', 'm', or 'g' as the suffix. The units need to directly follow the number. (default: null)",
+                    "type": [
+                        "string",
+                        "number"
+                    ]
+                },
+                "silent": {
+                    "type": "boolean"
+                },
+                "symlinkName": {
+                    "description": "The name of the tailable symlink. (default: 'current.log')",
+                    "type": "string"
+                },
+                "utc": {
+                    "description": "A boolean whether or not to generate file name from \"datePattern\" in UTC format. (default: false)",
+                    "type": "boolean"
+                },
+                "zippedArchive": {
+                    "description": "A boolean to define whether or not to gzip archived log files. (default 'false')",
+                    "type": "boolean"
+                }
+            },
+            "type": "object"
+        },
+        "Omit<DuplexTransportOptions,\"name\"|\"stream\"|\"handleRejections\"|\"format\"|\"handleExceptions\"|\"log\"|\"logv\"|\"close\">": {
+            "properties": {
+                "dump": {
+                    "type": "boolean"
+                },
+                "eol": {
+                    "type": "string"
+                },
+                "level": {
+                    "type": "string"
+                },
+                "silent": {
+                    "type": "boolean"
+                }
+            },
             "type": "object"
         },
         "OperatorCacheConfig": {
@@ -786,6 +981,29 @@
                         "number",
                         "boolean"
                     ]
+                }
+            },
+            "type": "object"
+        },
+        "Pick<Transports.ConsoleTransportOptions,\"silent\"|\"eol\"|\"stderrLevels\"|\"consoleWarnLevels\">": {
+            "properties": {
+                "consoleWarnLevels": {
+                    "items": {
+                        "type": "string"
+                    },
+                    "type": "array"
+                },
+                "eol": {
+                    "type": "string"
+                },
+                "silent": {
+                    "type": "boolean"
+                },
+                "stderrLevels": {
+                    "items": {
+                        "type": "string"
+                    },
+                    "type": "array"
                 }
             },
             "type": "object"
@@ -1108,32 +1326,8 @@
             "$ref": "#/definitions/ThirdPartyCredentialsJsonConfig"
         },
         "logging": {
-            "description": "Settings to configure global logging defaults",
-            "properties": {
-                "level": {
-                    "default": "verbose",
-                    "description": "The minimum log level to output. The log level set will output logs at its level **and all levels above it:**\n\n * `error`\n * `warn`\n * `info`\n * `verbose`\n * `debug`\n\n Note: `verbose` will display *a lot* of information on the status/result of run rules/checks/actions etc. which is very useful for testing configurations. Once your bot is stable changing the level to `info` will reduce log noise.\n\n * ENV => `LOG_LEVEL`\n * ARG => `--logLevel <level>`",
-                    "enum": [
-                        "debug",
-                        "error",
-                        "info",
-                        "verbose",
-                        "warn"
-                    ],
-                    "examples": [
-                        "verbose"
-                    ],
-                    "type": "string"
-                },
-                "path": {
-                    "description": "The absolute path to a directory where rotating log files should be stored.\n\n* If not present or `null` no log files will be created\n* If `true` logs will be stored at `[working directory]/logs`\n\n* ENV => `LOG_DIR`\n* ARG => `--logDir [dir]`",
-                    "examples": [
-                        "/var/log/contextmod"
-                    ],
-                    "type": "string"
-                }
-            },
-            "type": "object"
+            "$ref": "#/definitions/LoggingOptions",
+            "description": "Settings to configure global logging defaults"
         },
         "mode": {
             "default": "all",

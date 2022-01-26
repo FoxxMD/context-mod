@@ -1,19 +1,28 @@
 import {labelledFormat, logLevels} from "../util";
 import winston, {Logger} from "winston";
 import {DuplexTransport} from "winston-duplex";
+import {LoggerFactoryOptions} from "../Common/interfaces";
+import process from "process";
+import path from "path";
 
 const {transports} = winston;
 
-export const getLogger = (options: any, name = 'app'): Logger => {
+export const getLogger = (options: LoggerFactoryOptions, name = 'app'): Logger => {
     if(!winston.loggers.has(name)) {
         const {
-            path,
             level,
             additionalTransports = [],
             defaultLabel = 'App',
+            file: {
+                dirname,
+                ...fileRest
+            },
+            console,
+            stream
         } = options || {};
 
         const consoleTransport = new transports.Console({
+            ...console,
             handleExceptions: true,
             handleRejections: true,
         });
@@ -28,21 +37,37 @@ export const getLogger = (options: any, name = 'app'): Logger => {
                     objectMode: true,
                 },
                 name: 'duplex',
-                dump: false,
                 handleExceptions: true,
                 handleRejections: true,
+                ...stream,
+                dump: false,
             }),
             ...additionalTransports,
         ];
 
-        if (path !== undefined && path !== '' && path !== null) {
+        if (dirname !== undefined && dirname !== '' && dirname !== null) {
+
+            let realDir: string | undefined = undefined;
+            if(typeof dirname === 'boolean') {
+                if(!dirname) {
+                    realDir = undefined;
+                } else {
+                    realDir = path.resolve(__dirname, '../../logs')
+                }
+            } else if(dirname === 'true') {
+                realDir = path.resolve(__dirname, '../../logs')
+            } else if(dirname === 'false') {
+                realDir = undefined;
+            }
+
             const rotateTransport = new winston.transports.DailyRotateFile({
-                dirname: path,
                 createSymlink: true,
                 symlinkName: 'contextBot-current.log',
                 filename: 'contextBot-%DATE%.log',
                 datePattern: 'YYYY-MM-DD',
                 maxSize: '5m',
+                dirname: realDir,
+                ...fileRest,
                 handleExceptions: true,
                 handleRejections: true,
             });

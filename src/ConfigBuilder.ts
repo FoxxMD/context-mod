@@ -373,7 +373,16 @@ export const parseOpConfigFromArgs = (args: any): OperatorJsonConfig => {
         },
         logging: {
             level: logLevel,
-            path: logDir === true ? `${process.cwd()}/logs` : logDir,
+            file: {
+                level: logLevel,
+                dirName: logDir === true ? `${process.cwd()}/logs` : logDir,
+            },
+            stream: {
+                level: logLevel,
+            },
+            console: {
+                level: logLevel,
+            }
         },
         caching: {
             provider: caching,
@@ -458,7 +467,16 @@ export const parseOpConfigFromEnv = (): OperatorJsonConfig => {
         },
         logging: {
             level: process.env.LOG_LEVEL,
-            path: process.env.LOG_DIR === 'true' ? `${process.cwd()}/logs` : process.env.LOG_DIR,
+            file: {
+                level: process.env.LOG_LEVEL,
+                dirname: process.env.LOG_DIR === 'true' ? `${process.cwd()}/logs` : process.env.LOG_DIR,
+            },
+            stream: {
+                level: process.env.LOG_LEVEL,
+            },
+            console: {
+                level: process.env.LOG_LEVEL,
+            }
         },
         caching: {
             provider: {
@@ -500,12 +518,25 @@ export const parseOpConfigFromEnv = (): OperatorJsonConfig => {
 // json config
 // args from cli
 export const parseOperatorConfigFromSources = async (args: any): Promise<[OperatorJsonConfig, OperatorFileConfig]> => {
-    const {logLevel = process.env.LOG_LEVEL, logDir = process.env.LOG_DIR || false} = args || {};
+    const {logLevel = process.env.LOG_LEVEL ?? 'debug', logDir = process.env.LOG_DIR || false} = args || {};
     const envPath = process.env.OPERATOR_ENV;
+    const initLoggerOptions = {
+        level: logLevel,
+        console: {
+            level: logLevel
+        },
+        file: {
+            level: logLevel,
+            dirname: logDir,
+        },
+        stream: {
+            level: logLevel
+        }
+    }
 
     // create a pre config logger to help with debugging
     // default to debug if nothing is provided
-    const initLogger = getLogger({level: (logLevel ?? 'debug'), path: logDir === 'true' ? `${process.cwd()}/logs` : logDir}, 'init');
+    const initLogger = getLogger(initLoggerOptions, 'init');
 
     try {
         const vars = await GetEnvVars({
@@ -591,7 +622,15 @@ export const parseOperatorConfigFromSources = async (args: any): Promise<[Operat
 
         try {
             configFromFile = validateJson(configDoc.toJS(), operatorSchema, initLogger) as OperatorJsonConfig;
-            const {bots = []} = configFromFile || {};
+            const {
+                bots = [],
+                logging: {
+                    path = undefined
+                } = {}
+            } = configFromFile || {};
+            if(path !== undefined) {
+                initLogger.warn(`'path' property in top-level 'logging' object is DEPRECATED and will be removed in next minor version. Use 'logging.file.dirname' instead`);
+            }
             for (const b of bots) {
                 const {
                     polling: {
@@ -651,6 +690,9 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
         logging: {
             level = 'verbose',
             path,
+            file = {},
+            console = {},
+            stream = {},
         } = {},
         caching: opCache,
         web: {
@@ -726,6 +768,27 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
 
     const defaultOperators = typeof name === 'string' ? [name] : name;
 
+    const {
+        dirname = path,
+        ...fileRest
+    } = file;
+
+    // let realDir: string | undefined = undefined;
+    // if(dirname !== undefined) {
+    //     if(dirname === null) {
+    //         realDir = undefined;
+    //     } else if(typeof dirname === 'boolean') {
+    //         if(dirname === false) {
+    //             realDir = undefined;
+    //         } else {
+    //             realDir = `${process.cwd()}/logs`
+    //         }
+    //     } else if(dirname === 'true') {
+    //         realDir = `${process.cwd()}/logs`
+    //     }
+    // }
+
+
     const config: OperatorConfig = {
         mode,
         operator: {
@@ -734,7 +797,19 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
         },
         logging: {
             level,
-            path
+            file: {
+                level: level,
+                dirname,
+                ...fileRest,
+            },
+            stream: {
+                level: level,
+                ...stream,
+            },
+            console: {
+                level: level,
+                ...console,
+            }
         },
         caching: cache,
         web: {
