@@ -1,5 +1,5 @@
 import {Poll, SnooStormOptions} from "snoostorm"
-import Snoowrap from "snoowrap";
+import Snoowrap, {Listing} from "snoowrap";
 import {EventEmitter} from "events";
 import {PollConfiguration} from "snoostorm/out/util/Poll";
 import {DEFAULT_POLLING_INTERVAL} from "../Common/interfaces";
@@ -18,11 +18,12 @@ interface RCBPollingOptions<T> extends SnooStormOptions {
 }
 
 interface RCBPollConfiguration<T> extends PollConfiguration<T>,RCBPollingOptions<T> {
+    get: () => Promise<Listing<T>>
 }
 
 export class SPoll<T extends object> extends Poll<T> {
     identifier: keyof T;
-    getter: () => Awaitable<T[]>;
+    getter: () => Promise<Listing<T>>;
     frequency;
     running: boolean = false;
     // intention of newStart is to make polling behavior such that only "new" items AFTER polling has started get emitted
@@ -82,7 +83,7 @@ export class SPoll<T extends object> extends Poll<T> {
                             // @ts-ignore
                             batch = await batch.fetchMore({amount: 100});
                         }
-                        if(batch.length === 0) {
+                        if(batch.length === 0 || batch.isFinished) {
                             // if nothing is returned we don't want to end up in an endless loop!
                             anyAlreadySeen = true;
                         }
