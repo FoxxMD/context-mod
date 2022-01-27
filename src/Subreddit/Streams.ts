@@ -5,6 +5,7 @@ import {PollConfiguration} from "snoostorm/out/util/Poll";
 import {DEFAULT_POLLING_INTERVAL} from "../Common/interfaces";
 import {mergeArr, parseDuration, random} from "../util";
 import { Logger } from "winston";
+import {ErrorWithCause} from "pony-cause";
 
 type Awaitable<T> = Promise<T> | T;
 
@@ -118,6 +119,8 @@ export class SPoll<T extends object> extends Poll<T> {
                     // if everything succeeded then create a new timeout
                     self.createInterval();
                 } catch (err: any) {
+                    self.running = false;
+                    self.logger.error(new ErrorWithCause('Polling Interval stopped due to error encountered', {cause: err}));
                     self.emit('error', err);
                 }
             }
@@ -125,16 +128,18 @@ export class SPoll<T extends object> extends Poll<T> {
     }
 
     // allow controlling newStart state
-    startInterval = (newStartState?: boolean) => {
+    startInterval = (newStartState?: boolean, msg?: string) => {
         this.running = true;
         if(newStartState !== undefined) {
             this.newStart = newStartState;
         }
+        const startMsg = `Polling Interval Started${msg !== undefined ? `: ${msg}` : ''}`;
+        this.logger.debug(startMsg)
         this.createInterval();
     }
 
     end = (reason?: string) => {
-        let msg ='Stopping Polling';
+        let msg ='Stopping Polling Interval';
         if(reason !== undefined) {
             msg += `: ${reason}`;
         }
