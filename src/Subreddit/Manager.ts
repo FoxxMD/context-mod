@@ -941,14 +941,9 @@ export class Manager extends EventEmitter {
 
                         this.emit('error', err);
 
-                        if (isRateLimitError(err)) {
-                            this.logger.error('Encountered rate limit while polling! Bot is all out of requests :( Stopping subreddit queue and polling.');
-                            await this.stop();
-                        }
-                        this.logger.error('Polling error occurred', err);
                         const shouldRetry = await this.pollingRetryHandler(err);
                         if (shouldRetry) {
-                            stream.startInterval(false);
+                            stream.startInterval(false, 'Within retry limits');
                         } else {
                             this.logger.warn('Stopping subreddit processing/polling due to too many errors');
                             await this.stop();

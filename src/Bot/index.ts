@@ -234,10 +234,9 @@ class Bot {
     }
 
     createSharedStreamErrorListener = (name: string) => async (err: any) => {
-        this.logger.error(`Polling error occurred on stream ${name.toUpperCase()}`, err);
         const shouldRetry = await this.sharedStreamRetryHandler(err);
         if(shouldRetry) {
-            (this.cacheManager.modStreams.get(name) as SPoll<any>).startInterval(false);
+            (this.cacheManager.modStreams.get(name) as SPoll<any>).startInterval(false, 'Within retry limits');
         } else {
             for(const m of this.subManagers) {
                 if(m.sharedStreamCallbacks.size > 0) {
@@ -742,6 +741,10 @@ class Bot {
                     m.notificationManager.handle('runStateChanged', 'Hard Limit Triggered', `Hard Limit of ${this.hardLimit} hit (API Remaining: ${this.client.ratelimitRemaining}). Subreddit event polling has been paused.`, 'system', 'warn');
                 }
 
+                for(const [k,v] of this.cacheManager.modStreams) {
+                    v.end('Hard limit cutoff');
+                }
+
                 this.nannyMode = 'hard';
                 return;
             }
@@ -808,6 +811,7 @@ class Bot {
                         await m.startEvents('system', {reason: 'API Nanny has been turned off due to better API conditions'});
                     }
                 }
+                await this.runSharedStreams(true);
                 this.nannyMode = undefined;
             }
 
