@@ -31,6 +31,7 @@ import {ActionObjectJson, RuleJson, RuleObjectJson, ActionJson as ActionTypeJson
 import {checkAuthorFilter, SubredditResources} from "../Subreddit/SubredditResources";
 import {Author, AuthorCriteria, AuthorOptions} from '..';
 import {ExtendedSnoowrap} from '../Utils/SnoowrapClients';
+import {isRateLimitError} from "../Utils/Errors";
 
 const checkLogName = truncateStringToLength(25);
 
@@ -249,7 +250,11 @@ export abstract class Check implements ICheck {
             return [true, allRuleResults];
         } catch (e: any) {
             e.logged = true;
-            this.logger.warn(`Running rules failed due to uncaught exception`, e);
+            if(isRateLimitError(e)) {
+                this.logger.warn(`Running rules failed due to ratelimit exhaustion`);
+            } else {
+                this.logger.warn(`Running rules failed due to uncaught exception`, e);
+            }
             throw e;
         }
     }

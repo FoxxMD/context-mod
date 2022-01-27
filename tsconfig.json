@@ -5,7 +5,8 @@
     "resolveJsonModule": true,
     "typeRoots": [
       "./node_modules/@types",
-      "./src/Web/types"
+      "./src/Web/types",
+      "./src/Common/typings"
     ]
   },
 //  "compilerOptions": {

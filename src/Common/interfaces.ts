@@ -1973,22 +1973,6 @@ export interface RedditEntity {
     type: RedditEntityType
 }
 
-export interface StatusCodeError extends Error {
-    name: 'StatusCodeError',
-    statusCode: number,
-    message: string,
-    response: IncomingMessage,
-    error: Error
-}
-
-export interface RequestError extends Error {
-    name: 'RequestError',
-    statusCode: number,
-    message: string,
-    response: IncomingMessage,
-    error: Error
-}
-
 export interface HistoricalStatsDisplay extends HistoricalStats {
     checksRunTotal: number
     checksFromCacheTotal: number

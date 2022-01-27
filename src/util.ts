@@ -29,7 +29,7 @@ import {
     RedditEntityType,
     RegExResult, RepostItem, RepostItemResult,
     ResourceStats, SearchAndReplaceRegExp,
-    StatusCodeError, StringComparisonOptions,
+    StringComparisonOptions,
     StringOperator,
     StrongSubredditState,
     SubredditState
@@ -57,11 +57,12 @@ import {ConfigFormat, SetRandomInterval} from "./Common/types";
 import stringSimilarity from 'string-similarity';
 import calculateCosineSimilarity from "./Utils/StringMatching/CosineSimilarity";
 import levenSimilarity from "./Utils/StringMatching/levenSimilarity";
-import {isRequestError, isStatusError} from "./Utils/Errors";
+import {isRateLimitError, isRequestError, isScopeError, isStatusError} from "./Utils/Errors";
 import {parse} from "path";
 import JsonConfigDocument from "./Common/Config/JsonConfigDocument";
 import YamlConfigDocument from "./Common/Config/YamlConfigDocument";
 import AbstractConfigDocument, {ConfigDocumentInterface} from "./Common/Config/AbstractConfigDocument";
+import LoggedError from "./Utils/LoggedError";
 
 
 //import {ResembleSingleCallbackComparisonResult} from "resemblejs";
@@ -900,6 +901,11 @@ export const createRetryHandler = (opts: RetryOptions, logger: Logger) => {
 
         lastErrorAt = dayjs();
 
+        if(isRateLimitError(err)) {
+            logger.error('Will not retry because error was due to ratelimit exhaustion');
+            return false;
+        }
+
         const redditApiError = isRequestError(err) || isStatusError(err);
 
         if(redditApiError) {
@@ -934,6 +940,75 @@ export const createRetryHandler = (opts: RetryOptions, logger: Logger) => {
             await sleep(ms);
         }
         return true;
+    }
+}
+
+type StringReturn = (err:any) => string;
+
+export interface LogMatch {
+    [key: string | number]: string | StringReturn
+}
+
+export interface logExceptionOptions {
+    context?: string
+    logIfNotMatched?: boolean
+    logStackTrace?: boolean
+    match?: LogMatch
+}
+
+const parseMatchMessage = (err: any, match: LogMatch, matchTypes: (string | number)[], defaultMatch: string): [string, boolean] => {
+    for(const m of matchTypes) {
+        if(match[m] !== undefined) {
+            if(typeof match[m] === 'string') {
+                return [match[m] as string, true];
+            }
+            return [(match[m] as Function)(err), true];
+        }
+    }
+    return [defaultMatch, false];
+}
+
+export const logException = (logger: Logger, err: any, options: logExceptionOptions = {}): string | undefined => {
+    const {
+        context,
+        logIfNotMatched = true,
+        logStackTrace = true,
+        match = {}
+    } = options;
+
+    let matched = false,
+        matchMsg;
+
+    if (!(err instanceof LoggedError) && err.logged !== true) {
+        const errMsgParts = [];
+        if (context !== undefined) {
+            errMsgParts.push(context);
+        }
+        if (isRequestError(err)) {
+            errMsgParts.push(`Reddit responded with a NOT OK status (${err.statusCode})`);
+            if (isRateLimitError(err)) {
+                ([matchMsg, matched] = parseMatchMessage(err, match, ['ratelimit', err.statusCode], 'Ratelimit Exhausted'));
+                errMsgParts.push(matchMsg);
+            } else if (isScopeError(err)) {
+                ([matchMsg, matched] = parseMatchMessage(err, match, ['scope', err.statusCode], 'Missing OAUTH scope required for this request'));
+                errMsgParts.push(matchMsg);
+            } else {
+                ([matchMsg, matched] = parseMatchMessage(err, match, [err.statusCode], err.message));
+                errMsgParts.push(matchMsg);
+            }
+        } else {
+            errMsgParts.push('An unhandled error occurred');
+            ([matchMsg, matched] = parseMatchMessage(err, match, ['scope', err.statusCode], err.message));
+            errMsgParts.push(matchMsg);
+        }
+
+        const errorMessage = errMsgParts.join(' => ');
+
+        if (matched || (!matched && logIfNotMatched)) {
+            logger.error(errorMessage, (logStackTrace ? err : undefined));
+            err.logged = true;
+        }
+        return errorMessage;
     }
 }
 

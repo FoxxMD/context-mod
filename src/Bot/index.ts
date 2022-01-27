@@ -16,7 +16,7 @@ import {
 } from "../Common/interfaces";
 import {
     createRetryHandler,
-    formatNumber,
+    formatNumber, logException,
     mergeArr,
     parseBool,
     parseDuration,
@@ -31,7 +31,7 @@ import {BotResourcesManager} from "../Subreddit/SubredditResources";
 import LoggedError from "../Utils/LoggedError";
 import pEvent from "p-event";
 import SimpleError from "../Utils/SimpleError";
-import {isRateLimitError, isStatusError} from "../Utils/Errors";
+import {isRateLimitError, isRequestError, isScopeError, isStatusError} from "../Utils/Errors";
 
 
 class Bot {
@@ -280,20 +280,16 @@ class Bot {
             if (initial) {
                 this.logger.error('An error occurred while trying to initialize the Reddit API Client which would prevent the entire application from running.');
             }
-            if (err.name === 'StatusCodeError') {
-                const authHeader = err.response.headers['www-authenticate'];
-                if (authHeader !== undefined && authHeader.includes('insufficient_scope')) {
-                    this.logger.error('Reddit responded with a 403 insufficient_scope. Please ensure you have chosen the correct scopes when authorizing your account.');
-                } else if (err.statusCode === 401) {
-                    this.logger.error('It is likely a credential is missing or incorrect. Check clientId, clientSecret, refreshToken, and accessToken');
-                } else if(err.statusCode === 400) {
-                    this.logger.error('Credentials may have been invalidated due to prior behavior. The error message may contain more information.');
+            const msg = logException(this.logger, err, {
+               context: 'Error occurred while testing Reddit API client',
+                match: {
+                   401: 'Likely a credential is missing or incorrect. Check clientId, clientSecret, refreshToken, and accessToken',
+                    400: (err) => {
+                       return `Credentials may have been invalidated manually or by reddit due to behavior => ${err.message}`;
+                    }
                 }
-                this.logger.error(`Error Message: ${err.message}`);
-            } else {
-                this.logger.error(err);
-            }
-            this.error = `Error occurred while testing Reddit API client: ${err.message}`;
+            });
+            this.error = `${msg ?? `Error occurred while testing Reddit API client: ${err.message}`}`;
             err.logged = true;
             throw err;
         }
