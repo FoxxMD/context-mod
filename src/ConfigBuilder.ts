@@ -55,9 +55,9 @@ import {
     OperatorConfigDocumentInterface,
     YamlOperatorConfigDocument
 } from "./Common/Config/Operator";
-import SimpleError from "./Utils/SimpleError";
 import {ConfigDocumentInterface} from "./Common/Config/AbstractConfigDocument";
 import {Document as YamlDocument} from "yaml";
+import {SimpleError} from "./Utils/Errors";
 
 export interface ConfigBuilderOptions {
     logger: Logger,

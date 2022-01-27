@@ -12,7 +12,7 @@ import {
     REDDIT_ENTITY_REGEX_URL,
     truncateStringToLength
 } from "../util";
-import SimpleError from "../Utils/SimpleError";
+import {SimpleError} from "../Utils/Errors";
 
 export class MessageAction extends Action {
     content: string;

@@ -1,4 +1,5 @@
 import {RateLimitError, RequestError, StatusCodeError} from 'snoowrap/dist/errors';
+import ExtendableError from "es6-error";
 
 
 export const isRateLimitError = (err: any): err is RateLimitError => {
@@ -26,4 +27,8 @@ export const isStatusError = (err: any): err is StatusCodeError => {
 
 export const isRequestError = (err: any): err is RequestError => {
     return typeof err === 'object' && err.response !== undefined;
+}
+
+export class SimpleError extends ExtendableError {
+
 }

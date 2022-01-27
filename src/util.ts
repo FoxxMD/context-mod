@@ -35,7 +35,6 @@ import {
     SubredditState
 } from "./Common/interfaces";
 import { Document as YamlDocument } from 'yaml'
-import SimpleError from "./Utils/SimpleError";
 import InvalidRegexError from "./Utils/InvalidRegexError";
 import {constants, promises} from "fs";
 import {cacheOptDefaults} from "./Common/defaults";
@@ -57,7 +56,7 @@ import {ConfigFormat, SetRandomInterval} from "./Common/types";
 import stringSimilarity from 'string-similarity';
 import calculateCosineSimilarity from "./Utils/StringMatching/CosineSimilarity";
 import levenSimilarity from "./Utils/StringMatching/levenSimilarity";
-import {isRateLimitError, isRequestError, isScopeError, isStatusError} from "./Utils/Errors";
+import {SimpleError, isRateLimitError, isRequestError, isScopeError, isStatusError} from "./Utils/Errors";
 import {parse} from "path";
 import JsonConfigDocument from "./Common/Config/JsonConfigDocument";
 import YamlConfigDocument from "./Common/Config/YamlConfigDocument";

@@ -30,8 +30,7 @@ import {CommentStream, ModQueueStream, SPoll, SubmissionStream, UnmoderatedStrea
 import {BotResourcesManager} from "../Subreddit/SubredditResources";
 import LoggedError from "../Utils/LoggedError";
 import pEvent from "p-event";
-import SimpleError from "../Utils/SimpleError";
-import {isRateLimitError, isRequestError, isScopeError, isStatusError} from "../Utils/Errors";
+import {SimpleError, isRateLimitError, isRequestError, isScopeError, isStatusError} from "../Utils/Errors";
 
 
 class Bot {

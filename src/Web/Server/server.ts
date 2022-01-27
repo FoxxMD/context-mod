@@ -18,7 +18,6 @@ import {getLogger} from "../../Utils/loggerFactory";
 import LoggedError from "../../Utils/LoggedError";
 import {Invokee, LogInfo, OperatorConfigWithFileContext} from "../../Common/interfaces";
 import http from "http";
-import SimpleError from "../../Utils/SimpleError";
 import {heartbeat} from "./routes/authenticated/applicationRoutes";
 import logs from "./routes/authenticated/user/logs";
 import status from './routes/authenticated/user/status';
@@ -30,6 +29,7 @@ import Bot from "../../Bot";
 import addBot from "./routes/authenticated/user/addBot";
 import dayjs from "dayjs";
 import ServerUser from "../Common/User/ServerUser";
+import {SimpleError} from "../../Utils/Errors";
 
 const server = addAsync(express());
 server.use(bodyParser.json());

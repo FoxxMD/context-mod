@@ -24,7 +24,6 @@ import EventEmitter from "events";
 import stream, {Readable, Writable, Transform} from "stream";
 import winston from "winston";
 import tcpUsed from "tcp-port-used";
-import SimpleError from "../../Utils/SimpleError";
 import http from "http";
 import jwt from 'jsonwebtoken';
 import {Server as SocketServer} from "socket.io";
@@ -49,6 +48,7 @@ import {ExtendedSnoowrap} from "../../Utils/SnoowrapClients";
 import ClientUser from "../Common/User/ClientUser";
 import {BotStatusResponse} from "../Common/interfaces";
 import {TransformableInfo} from "logform";
+import {SimpleError} from "../../Utils/Errors";
 
 const emitter = new EventEmitter();
 
