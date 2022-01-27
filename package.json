@@ -68,6 +68,7 @@
     "passport-custom": "^1.1.1",
     "passport-jwt": "^4.0.0",
     "pixelmatch": "^5.2.1",
+    "pony-cause": "^1.1.1",
     "pretty-print-json": "^1.0.3",
     "safe-stable-stringify": "^1.1.1",
     "snoostorm": "^1.5.2",

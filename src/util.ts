@@ -43,20 +43,19 @@ import redisStore from "cache-manager-redis-store";
 import crypto from "crypto";
 import Autolinker from 'autolinker';
 import {create as createMemoryStore} from './Utils/memoryStore';
-import {MESSAGE} from "triple-beam";
+import {MESSAGE, LEVEL} from "triple-beam";
 import {RedditUser} from "snoowrap/dist/objects";
 import reRegExp from '@stdlib/regexp-regexp';
 import fetch, {Response} from "node-fetch";
 import { URL } from "url";
 import ImageData from "./Common/ImageData";
 import {Sharp, SharpOptions} from "sharp";
-// @ts-ignore
-import {blockhashData, hammingDistance} from 'blockhash';
+import {ErrorWithCause, stackWithCauses} from "pony-cause";
 import {ConfigFormat, SetRandomInterval} from "./Common/types";
 import stringSimilarity from 'string-similarity';
 import calculateCosineSimilarity from "./Utils/StringMatching/CosineSimilarity";
 import levenSimilarity from "./Utils/StringMatching/levenSimilarity";
-import {SimpleError, isRateLimitError, isRequestError, isScopeError, isStatusError} from "./Utils/Errors";
+import {SimpleError, isRateLimitError, isRequestError, isScopeError, isStatusError, CMError} from "./Utils/Errors";
 import {parse} from "path";
 import JsonConfigDocument from "./Common/Config/JsonConfigDocument";
 import YamlConfigDocument from "./Common/Config/YamlConfigDocument";
@@ -90,33 +89,75 @@ const CWD = process.cwd();
 //     }
 // }
 const errorAwareFormat = {
-    transform: (info: any, opts: any) => {
-        // don't need to log stack trace if we know the error is just a simple message (we handled it)
-        const stack = !(info instanceof SimpleError) && !(info.message instanceof SimpleError);
-        const {name, response, message, stack: errStack, error, statusCode} = info;
-        if(name === 'StatusCodeError' && response !== undefined && response.headers !== undefined && response.headers['content-type'].includes('html')) {
-            // reddit returns html even when we specify raw_json in the querystring (via snoowrap)
-            // which means the html gets set as the message for the error AND gets added to the stack as the message
-            // and we end up with a h u g e log statement full of noisy html >:(
+    transform: (einfo: any, {stack = true}: any = {}) => {
 
-            const errorSample = error.slice(0, 10);
-            const messageBeforeIndex = message.indexOf(errorSample);
-            let newMessage = `Status Error ${statusCode} from Reddit`;
-            if(messageBeforeIndex > 0) {
-                newMessage = `${message.slice(0, messageBeforeIndex)} - ${newMessage}`;
-            }
-            let cleanStack = errStack;
+        // because winston logger.child() re-assigns its input to an object ALWAYS the object we recieve here will never actually be of type Error
+        const includeStack = stack && (!isProbablyError(einfo, 'simpleerror') && !isProbablyError(einfo.message, 'simpleerror'));
 
-            // try to get just stacktrace by finding beginning of what we assume is the actual trace
-            if(errStack) {
-                cleanStack = `${newMessage}\n${errStack.slice(errStack.indexOf('at new StatusCodeError'))}`;
-            }
-            // now put it all together so its nice and clean
-            info.message = newMessage;
-            info.stack = cleanStack;
+        if (!isProbablyError(einfo.message) && !isProbablyError(einfo)) {
+            return einfo;
         }
-        return errors().transform(info, { stack });
+
+        let info: any = {};
+
+        if (isProbablyError(einfo)) {
+            const tinfo = transformError(einfo);
+            info = Object.assign({}, tinfo, {
+                // @ts-ignore
+                level: einfo.level,
+                // @ts-ignore
+                [LEVEL]: einfo[LEVEL] || einfo.level,
+                message: tinfo.message,
+                // @ts-ignore
+                [MESSAGE]: tinfo[MESSAGE] || tinfo.message
+            });
+            if(includeStack) {
+                // so we have to create a dummy error and re-assign all error properties from our info object to it so we can get a proper stack trace
+                const dummyErr = new ErrorWithCause('');
+                for(const k in tinfo) {
+                    if(dummyErr.hasOwnProperty(k) || k === 'cause') {
+                        // @ts-ignore
+                        dummyErr[k] = tinfo[k];
+                    }
+                }
+                // @ts-ignore
+                info.stack = stackWithCauses(dummyErr);
+            }
+        } else {
+            const err = transformError(einfo.message);
+            info = Object.assign(einfo, err);
+            // @ts-ignore
+            info.message = err.message;
+            // @ts-ignore
+            info[MESSAGE] = err.message;
+
+            if(includeStack) {
+                const dummyErr = new ErrorWithCause('');
+                for(const k in err) {
+                    if(dummyErr.hasOwnProperty(k) || k === 'cause') {
+                        // @ts-ignore
+                        dummyErr[k] = tinfo[k];
+                    }
+                }
+                // @ts-ignore
+                info.stack = stackWithCauses(dummyErr);
+            }
+        }
+
+        // remove redundant message from stack and make stack causes easier to read
+        if(info.stack !== undefined) {
+            let cleanedStack = info.stack.replace(info.message, '');
+            cleanedStack = `${cleanedStack}`;
+            cleanedStack = cleanedStack.replaceAll('caused by:', '\ncaused by:');
+            info.stack = cleanedStack;
+        }
+
+        return info;
     }
+}
+
+const isProbablyError = (val: any, errName = 'error') => {
+    return typeof val === 'object' && val.name !== undefined && val.name.toLowerCase().includes(errName);
 }
 
 export const PASS = '✔';
@@ -955,7 +996,7 @@ export interface logExceptionOptions {
     match?: LogMatch
 }
 
-const parseMatchMessage = (err: any, match: LogMatch, matchTypes: (string | number)[], defaultMatch: string): [string, boolean] => {
+export const parseMatchMessage = (err: any, match: LogMatch, matchTypes: (string | number)[], defaultMatch: string): [string, boolean] => {
     for(const m of matchTypes) {
         if(match[m] !== undefined) {
             if(typeof match[m] === 'string') {
@@ -967,49 +1008,93 @@ const parseMatchMessage = (err: any, match: LogMatch, matchTypes: (string | numb
     return [defaultMatch, false];
 }
 
-export const logException = (logger: Logger, err: any, options: logExceptionOptions = {}): string | undefined => {
-    const {
-        context,
-        logIfNotMatched = true,
-        logStackTrace = true,
-        match = {}
-    } = options;
+export const getExceptionMessage = (err: any, match: LogMatch = {}): string | undefined => {
 
     let matched = false,
         matchMsg;
 
-    if (!(err instanceof LoggedError) && err.logged !== true) {
-        const errMsgParts = [];
-        if (context !== undefined) {
-            errMsgParts.push(context);
-        }
-        if (isRequestError(err)) {
-            errMsgParts.push(`Reddit responded with a NOT OK status (${err.statusCode})`);
-            if (isRateLimitError(err)) {
-                ([matchMsg, matched] = parseMatchMessage(err, match, ['ratelimit', err.statusCode], 'Ratelimit Exhausted'));
-                errMsgParts.push(matchMsg);
-            } else if (isScopeError(err)) {
-                ([matchMsg, matched] = parseMatchMessage(err, match, ['scope', err.statusCode], 'Missing OAUTH scope required for this request'));
-                errMsgParts.push(matchMsg);
-            } else {
-                ([matchMsg, matched] = parseMatchMessage(err, match, [err.statusCode], err.message));
-                errMsgParts.push(matchMsg);
-            }
+    if (isRequestError(err)) {
+        if (isRateLimitError(err)) {
+            ([matchMsg, matched] = parseMatchMessage(err, match, ['ratelimit', err.statusCode], 'Ratelimit Exhausted'));
+        } else if (isScopeError(err)) {
+            ([matchMsg, matched] = parseMatchMessage(err, match, ['scope', err.statusCode], 'Missing OAUTH scope required for this request'));
         } else {
-            errMsgParts.push('An unhandled error occurred');
-            ([matchMsg, matched] = parseMatchMessage(err, match, ['scope', err.statusCode], err.message));
-            errMsgParts.push(matchMsg);
+            ([matchMsg, matched] = parseMatchMessage(err, match, [err.statusCode], err.message));
         }
+    } else {
+        ([matchMsg, matched] = parseMatchMessage(err, match, ['any'], err.message));
+    }
 
-        const errorMessage = errMsgParts.join(' => ');
-
-        if (matched || (!matched && logIfNotMatched)) {
-            logger.error(errorMessage, (logStackTrace ? err : undefined));
-            err.logged = true;
-        }
-        return errorMessage;
+    if (matched) {
+        return matchMsg;
     }
 }
+
+const _transformError = (err: Error, seen: Set<Error>, matchOptions?: LogMatch) => {
+    if (!err || !isProbablyError(err)) {
+        return '';
+    }
+    if (seen.has(err)) {
+        return err;
+    }
+
+    // @ts-ignore
+    let mOpts = err.matchOptions ?? matchOptions;
+
+    if (isRequestError(err)) {
+        const errMsgParts = [`Reddit responded with a NOT OK status (${err.statusCode})`];
+
+        if (err.response.headers['content-type'].includes('html')) {
+            // reddit returns html even when we specify raw_json in the querystring (via snoowrap)
+            // which means the html gets set as the message for the error AND gets added to the stack as the message
+            // and we end up with a h u g e log statement full of noisy html >:(
+
+            const {error, statusCode, message, stack: errStack} = err;
+
+            const errorSample = (error as unknown as string).slice(0, 10);
+            const messageBeforeIndex = message.indexOf(errorSample);
+            let newMessage = `Status Error ${statusCode} from Reddit`;
+            if (messageBeforeIndex > 0) {
+                newMessage = `${message.slice(0, messageBeforeIndex)} - ${newMessage}`;
+            }
+            let cleanStack = errStack;
+
+            // try to get just stacktrace by finding beginning of what we assume is the actual trace
+            if (errStack) {
+                cleanStack = `${newMessage}\n${errStack.slice(errStack.indexOf('at new StatusCodeError'))}`;
+            }
+            // now put it all together so its nice and clean
+            err.message = newMessage;
+            err.stack = cleanStack;
+        }
+
+        const msg = getExceptionMessage(err, mOpts);
+        if (msg !== undefined) {
+            errMsgParts.push(msg);
+        }
+
+        // we don't care about stack trace for this error because we know where it came from so truncate to two lines for now...maybe remove all together later
+        if(err.stack !== undefined) {
+            err.stack = err.stack.split('\n').slice(0, 2).join('\n');
+        }
+
+        const normalizedError = new ErrorWithCause(errMsgParts.join(' => '), {cause: err});
+        normalizedError.stack = normalizedError.message;
+        return normalizedError;
+    }
+
+    // @ts-ignore
+    const cause = err.cause as unknown;
+
+    if (cause !== undefined && cause instanceof Error) {
+        // @ts-ignore
+        err.cause = _transformError(cause, seen, mOpts);
+    }
+
+    return err;
+}
+
+export const transformError = (err: Error): any => _transformError(err, new Set());
 
 const LABELS_REGEX: RegExp = /(\[.+?])*/g;
 export const parseLabels = (log: string): string[] => {
@@ -1074,12 +1159,14 @@ export const formatLogLineToHtml = (log: string | LogInfo, timestamp?: string) =
         .replace(/(\s*verbose\s*):/i, '<span class="error purple">$1</span>:')
         .replaceAll('\n', '<br />');
         //.replace(HYPERLINK_REGEX, '<a target="_blank" href="$&">$&</a>');
-    let line = `<div class="logLine">${logContent}</div>`
+    let line = '';
 
     if(timestamp !== undefined) {
-        line = line.replace(timestamp, (match) => {
-            return formattedTime(dayjs(match).format('HH:mm:ss z'), match);
-        });
+        const timeStampReplacement = formattedTime(dayjs(timestamp).format('HH:mm:ss z'), timestamp);
+        const splitLine = logContent.split(timestamp);
+        line = `<div class="logLine">${splitLine[0]}${timeStampReplacement}<span style="white-space: pre-wrap">${splitLine[1]}</span></div>`;
+    } else {
+        line = `<div style="white-space: pre-wrap" class="logLine">${logContent}</div>`
     }
     return line;
 }

@@ -30,6 +30,7 @@ import addBot from "./routes/authenticated/user/addBot";
 import dayjs from "dayjs";
 import ServerUser from "../Common/User/ServerUser";
 import {SimpleError} from "../../Utils/Errors";
+import {ErrorWithCause} from "pony-cause";
 
 const server = addAsync(express());
 server.use(bodyParser.json());
@@ -116,9 +117,7 @@ const rcbServer = async function (options: OperatorConfigWithFileContext) {
         httpServer = await server.listen(port);
         io = new SocketServer(httpServer);
     } catch (err: any) {
-        logger.error('Error occurred while initializing web or socket.io server', err);
-        err.logged = true;
-        throw err;
+        throw new ErrorWithCause('[Server] Error occurred while initializing web or socket.io server', {cause: err});
     }
 
     logger.info(`API started => localhost:${port}`);

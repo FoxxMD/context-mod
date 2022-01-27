@@ -1,5 +1,6 @@
 import {RateLimitError, RequestError, StatusCodeError} from 'snoowrap/dist/errors';
 import ExtendableError from "es6-error";
+import {ErrorWithCause} from "pony-cause";
 
 
 export const isRateLimitError = (err: any): err is RateLimitError => {
@@ -31,4 +32,8 @@ export const isRequestError = (err: any): err is RequestError => {
 
 export class SimpleError extends ExtendableError {
 
+}
+
+export class CMError extends ErrorWithCause {
+    logged: boolean = false;
 }

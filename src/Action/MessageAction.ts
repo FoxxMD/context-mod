@@ -13,6 +13,7 @@ import {
     truncateStringToLength
 } from "../util";
 import {SimpleError} from "../Utils/Errors";
+import {ErrorWithCause} from "pony-cause";
 
 export class MessageAction extends Action {
     content: string;
@@ -65,10 +66,7 @@ export class MessageAction extends Action {
                     recipient = `/r/${entityData.name}`;
                 }
             } catch (err: any) {
-                this.logger.error(`'to' field for message was not in a valid format. See ${REDDIT_ENTITY_REGEX_URL} for valid examples`);
-                this.logger.error(err);
-                err.logged = true;
-                throw err;
+                throw new ErrorWithCause(`'to' field for message was not in a valid format. See ${REDDIT_ENTITY_REGEX_URL} for valid examples`, {cause: err});
             }
             if(recipient.includes('/r/') && this.asSubreddit) {
                 throw new SimpleError(`Cannot send a message as a subreddit to another subreddit. Requested recipient: ${recipient}`);

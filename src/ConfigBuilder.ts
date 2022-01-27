@@ -58,6 +58,7 @@ import {
 import {ConfigDocumentInterface} from "./Common/Config/AbstractConfigDocument";
 import {Document as YamlDocument} from "yaml";
 import {SimpleError} from "./Utils/Errors";
+import {ErrorWithCause} from "pony-cause";
 
 export interface ConfigBuilderOptions {
     logger: Logger,
@@ -587,9 +588,7 @@ export const parseOperatorConfigFromSources = async (args: any): Promise<[Operat
                 fileConfigFormat = err.extension
             }
         } else {
-            initLogger.error('Cannot continue app startup because operator config file exists but was not parseable.');
-            err.logged = true;
-            throw err;
+            throw new ErrorWithCause('Cannot continue app startup because operator config file exists but was not parseable.', {cause: err});
         }
     }
     const [format, doc, jsonErr, yamlErr] = parseFromJsonOrYamlToObject(rawConfig, {

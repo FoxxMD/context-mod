@@ -16,10 +16,10 @@ import {
 } from "../Common/interfaces";
 import {
     createRetryHandler,
-    formatNumber, logException,
+    formatNumber, getExceptionMessage,
     mergeArr,
     parseBool,
-    parseDuration,
+    parseDuration, parseMatchMessage,
     parseSubredditName, RetryOptions,
     sleep,
     snooLogWrapper
@@ -30,7 +30,8 @@ import {CommentStream, ModQueueStream, SPoll, SubmissionStream, UnmoderatedStrea
 import {BotResourcesManager} from "../Subreddit/SubredditResources";
 import LoggedError from "../Utils/LoggedError";
 import pEvent from "p-event";
-import {SimpleError, isRateLimitError, isRequestError, isScopeError, isStatusError} from "../Utils/Errors";
+import {SimpleError, isRateLimitError, isRequestError, isScopeError, isStatusError, CMError} from "../Utils/Errors";
+import {ErrorWithCause} from "pony-cause";
 
 
 class Bot {
@@ -279,18 +280,16 @@ class Bot {
             if (initial) {
                 this.logger.error('An error occurred while trying to initialize the Reddit API Client which would prevent the entire application from running.');
             }
-            const msg = logException(this.logger, err, {
-               context: 'Error occurred while testing Reddit API client',
-                match: {
-                   401: 'Likely a credential is missing or incorrect. Check clientId, clientSecret, refreshToken, and accessToken',
-                    400: (err) => {
-                       return `Credentials may have been invalidated manually or by reddit due to behavior => ${err.message}`;
-                    }
-                }
+            const hint = getExceptionMessage(err, {
+                401: 'Likely a credential is missing or incorrect. Check clientId, clientSecret, refreshToken, and accessToken',
+                400: 'Credentials may have been invalidated manually or by reddit due to behavior',
             });
-            this.error = `${msg ?? `Error occurred while testing Reddit API client: ${err.message}`}`;
-            err.logged = true;
-            throw err;
+            let msg = `Error occurred while testing Reddit API client${hint !== undefined ? `: ${hint}` : ''}`;
+            this.error = msg;
+            const clientError = new CMError(msg, {cause: err});
+            clientError.logged = true;
+            this.logger.error(clientError);
+            throw clientError;
         }
     }
 
@@ -468,10 +467,12 @@ class Bot {
         try {
             await manager.parseConfiguration('system', true, {suppressNotification: true, suppressChangeEvent: true});
         } catch (err: any) {
-            if (!(err instanceof LoggedError)) {
-                this.logger.error(`Config was not valid:`, {subreddit: manager.subreddit.display_name_prefixed});
-                this.logger.error(err, {subreddit: manager.subreddit.display_name_prefixed});
-                err.logged = true;
+            if(err.logged !== true) {
+                const normalizedError = new ErrorWithCause(`Bot could not start manager because config was not valid`, {cause: err});
+                // @ts-ignore
+                this.logger.error(normalizedError, {subreddit: manager.subreddit.display_name_prefixed});
+            } else {
+                this.logger.error('Bot could not start manager because config was not valid', {subreddit: manager.subreddit.display_name_prefixed});
             }
         }
     }
@@ -661,9 +662,11 @@ class Bot {
                     }
                 }
             } catch (err: any) {
-                this.logger.info('Stopping event polling to prevent activity processing queue from backing up. Will be restarted when config update succeeds.')
-                await s.stopEvents('system', {reason: 'Invalid config will cause events to pile up in queue. Will be restarted when config update succeeds (next heartbeat).'});
-                if(!(err instanceof LoggedError)) {
+                if(s.eventsState.state === RUNNING) {
+                    this.logger.info('Stopping event polling to prevent activity processing queue from backing up. Will be restarted when config update succeeds.')
+                    await s.stopEvents('system', {reason: 'Invalid config will cause events to pile up in queue. Will be restarted when config update succeeds (next heartbeat).'});
+                }
+                if(err.logged !== true) {
                     this.logger.error(err, {subreddit: s.displayLabel});
                 }
                 if(this.nextHeartbeat !== undefined) {
