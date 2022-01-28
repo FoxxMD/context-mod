@@ -29,10 +29,9 @@ import {
 import UserNotes from "../Subreddit/UserNotes";
 import {Logger} from "winston";
 import InvalidRegexError from "./InvalidRegexError";
-import SimpleError from "./SimpleError";
 import {AuthorCriteria} from "../Author/Author";
 import {URL} from "url";
-import {isStatusError} from "./Errors";
+import {SimpleError, isStatusError} from "./Errors";
 import {Dictionary, ElementOf, SafeDictionary} from "ts-essentials";
 
 export const BOT_LINK = 'https://www.reddit.com/r/ContextModBot/comments/otz396/introduction_to_contextmodbot';

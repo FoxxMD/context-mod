@@ -24,7 +24,6 @@ import EventEmitter from "events";
 import stream, {Readable, Writable, Transform} from "stream";
 import winston from "winston";
 import tcpUsed from "tcp-port-used";
-import SimpleError from "../../Utils/SimpleError";
 import http from "http";
 import jwt from 'jsonwebtoken';
 import {Server as SocketServer} from "socket.io";
@@ -49,6 +48,8 @@ import {ExtendedSnoowrap} from "../../Utils/SnoowrapClients";
 import ClientUser from "../Common/User/ClientUser";
 import {BotStatusResponse} from "../Common/interfaces";
 import {TransformableInfo} from "logform";
+import {SimpleError} from "../../Utils/Errors";
+import {ErrorWithCause} from "pony-cause";
 
 const emitter = new EventEmitter();
 
@@ -630,9 +631,7 @@ const webClient = async (options: OperatorConfig) => {
         server = await app.listen(port);
         io = new SocketServer(server);
     } catch (err: any) {
-        logger.error('Error occurred while initializing web or socket.io server', err);
-        err.logged = true;
-        throw err;
+        throw new ErrorWithCause('[Web] Error occurred while initializing web or socket.io server', {cause: err});
     }
     logger.info(`Web UI started: http://localhost:${port}`, {label: ['Web']});
 

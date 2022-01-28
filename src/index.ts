@@ -205,9 +205,6 @@ const program = new Command();
     } catch (err: any) {
         if (!err.logged && !(err instanceof LoggedError)) {
             const logger = winston.loggers.has('app') ? winston.loggers.get('app') : winston.loggers.get('init');
-            if(isScopeError(err)) {
-                logger.error('Reddit responded with a 403 insufficient_scope which means the bot is lacking necessary OAUTH scopes to perform general actions.');
-            }
             logger.error(err);
         }
         process.kill(process.pid, 'SIGTERM');

@@ -1,10 +1,11 @@
 import {Poll, SnooStormOptions} from "snoostorm"
-import Snoowrap from "snoowrap";
+import Snoowrap, {Listing} from "snoowrap";
 import {EventEmitter} from "events";
 import {PollConfiguration} from "snoostorm/out/util/Poll";
 import {DEFAULT_POLLING_INTERVAL} from "../Common/interfaces";
 import {mergeArr, parseDuration, random} from "../util";
 import { Logger } from "winston";
+import {ErrorWithCause} from "pony-cause";
 
 type Awaitable<T> = Promise<T> | T;
 
@@ -18,11 +19,12 @@ interface RCBPollingOptions<T> extends SnooStormOptions {
 }
 
 interface RCBPollConfiguration<T> extends PollConfiguration<T>,RCBPollingOptions<T> {
+    get: () => Promise<Listing<T>>
 }
 
 export class SPoll<T extends object> extends Poll<T> {
     identifier: keyof T;
-    getter: () => Awaitable<T[]>;
+    getter: () => Promise<Listing<T>>;
     frequency;
     running: boolean = false;
     // intention of newStart is to make polling behavior such that only "new" items AFTER polling has started get emitted
@@ -82,6 +84,10 @@ export class SPoll<T extends object> extends Poll<T> {
                             // @ts-ignore
                             batch = await batch.fetchMore({amount: 100});
                         }
+                        if(batch.length === 0 || batch.isFinished) {
+                            // if nothing is returned we don't want to end up in an endless loop!
+                            anyAlreadySeen = true;
+                        }
                         for (const item of batch) {
                             const id = item[self.identifier];
                             if (self.processed.has(id)) {
@@ -99,7 +105,7 @@ export class SPoll<T extends object> extends Poll<T> {
                         }
                         page++;
                     }
-                    const newItemMsg = `Found ${newItems.length} new items`;
+                    const newItemMsg = `Found ${newItems.length} new items out of ${batch.length} returned`;
                     if(self.newStart) {
                         self.logger.debug(`${newItemMsg} but will ignore all on first start.`);
                         self.emit("listing", []);
@@ -113,6 +119,8 @@ export class SPoll<T extends object> extends Poll<T> {
                     // if everything succeeded then create a new timeout
                     self.createInterval();
                 } catch (err: any) {
+                    self.running = false;
+                    self.logger.error(new ErrorWithCause('Polling Interval stopped due to error encountered', {cause: err}));
                     self.emit('error', err);
                 }
             }
@@ -120,15 +128,22 @@ export class SPoll<T extends object> extends Poll<T> {
     }
 
     // allow controlling newStart state
-    startInterval = (newStartState?: boolean) => {
+    startInterval = (newStartState?: boolean, msg?: string) => {
         this.running = true;
         if(newStartState !== undefined) {
             this.newStart = newStartState;
         }
+        const startMsg = `Polling Interval Started${msg !== undefined ? `: ${msg}` : ''}`;
+        this.logger.debug(startMsg)
         this.createInterval();
     }
 
-    end = () => {
+    end = (reason?: string) => {
+        let msg ='Stopping Polling Interval';
+        if(reason !== undefined) {
+            msg += `: ${reason}`;
+        }
+        this.logger.debug(msg);
         this.running = false;
         this.newStart = true;
         super.end();

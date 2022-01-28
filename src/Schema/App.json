@@ -246,8 +246,7 @@
                     "default": "undefined",
                     "description": "This list determines which categories of domains should be aggregated on. All aggregated domains will be tested against `threshold`\n\n* If `media` is included then aggregate author's submission history which reddit recognizes as media (youtube, vimeo, etc.)\n* If `redditMedia` is included then aggregate on author's submissions history which are media hosted on reddit: galleries, videos, and images (i.redd.it / v.redd.it)\n* If `self` is included then aggregate on author's submission history which are self-post (`self.[subreddit]`) or domain is `reddit.com`\n* If `link` is included then aggregate author's submission history which is external links and not recognized as `media` by reddit\n\nIf nothing is specified or list is empty (default) rule will only aggregate on `link` and `media` (ignores reddit-hosted content and self-posts)",
                     "examples": [
-                        [
-                        ]
+                        []
                     ],
                     "items": {
                         "enum": [
@@ -280,8 +279,7 @@
                 },
                 "domains": {
                     "default": [
-                        [
-                        ]
+                        []
                     ],
                     "description": "A list of domains whose Activities will be tested against `threshold`.\n\nThe values are tested as partial strings so you do not need to include full URLs, just the part that matters.\n\nEX `[\"youtube\"]` will match submissions with the domain `https://youtube.com/c/aChannel`\nEX `[\"youtube.com/c/bChannel\"]` will NOT match submissions with the domain `https://youtube.com/c/aChannel`\n\nIf you wish to aggregate on self-posts for a subreddit use the syntax `self.[subreddit]` EX `self.AskReddit`\n\n**If this Rule is part of a Check for a Submission and you wish to aggregate on the domain of the Submission use the special string `AGG:SELF`**\n\nIf nothing is specified or list is empty (default) aggregate using `aggregateOn`",
                     "items": {
@@ -963,8 +961,7 @@
             "type": "object"
         },
         "CacheOptions": {
-            "additionalProperties": {
-            },
+            "additionalProperties": {},
             "description": "Configure granular settings for a cache provider with this object",
             "properties": {
                 "auth_pass": {
@@ -2638,6 +2635,9 @@
                     ],
                     "pattern": "^[a-zA-Z]([\\w -]*[\\w])?$",
                     "type": "string"
+                },
+                "spam": {
+                    "type": "boolean"
                 }
             },
             "required": [
@@ -3601,8 +3601,7 @@
             "type": "object"
         },
         "ThirdPartyCredentialsJsonConfig": {
-            "additionalProperties": {
-            },
+            "additionalProperties": {},
             "properties": {
                 "youtube": {
                     "properties": {

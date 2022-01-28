@@ -14,8 +14,8 @@ import {
     PASS
 } from "../util";
 import { Comment } from "snoowrap/dist/objects";
-import SimpleError from "../Utils/SimpleError";
 import as from "async";
+import {SimpleError} from "../Utils/Errors";
 
 
 export interface AttributionCriteria {

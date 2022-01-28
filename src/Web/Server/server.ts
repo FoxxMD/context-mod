@@ -18,7 +18,6 @@ import {getLogger} from "../../Utils/loggerFactory";
 import LoggedError from "../../Utils/LoggedError";
 import {Invokee, LogInfo, OperatorConfigWithFileContext} from "../../Common/interfaces";
 import http from "http";
-import SimpleError from "../../Utils/SimpleError";
 import {heartbeat} from "./routes/authenticated/applicationRoutes";
 import logs from "./routes/authenticated/user/logs";
 import status from './routes/authenticated/user/status';
@@ -30,6 +29,8 @@ import Bot from "../../Bot";
 import addBot from "./routes/authenticated/user/addBot";
 import dayjs from "dayjs";
 import ServerUser from "../Common/User/ServerUser";
+import {SimpleError} from "../../Utils/Errors";
+import {ErrorWithCause} from "pony-cause";
 
 const server = addAsync(express());
 server.use(bodyParser.json());
@@ -116,9 +117,7 @@ const rcbServer = async function (options: OperatorConfigWithFileContext) {
         httpServer = await server.listen(port);
         io = new SocketServer(httpServer);
     } catch (err: any) {
-        logger.error('Error occurred while initializing web or socket.io server', err);
-        err.logged = true;
-        throw err;
+        throw new ErrorWithCause('[Server] Error occurred while initializing web or socket.io server', {cause: err});
     }
 
     logger.info(`API started => localhost:${port}`);

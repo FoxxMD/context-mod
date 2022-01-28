@@ -55,9 +55,10 @@ import {
     OperatorConfigDocumentInterface,
     YamlOperatorConfigDocument
 } from "./Common/Config/Operator";
-import SimpleError from "./Utils/SimpleError";
 import {ConfigDocumentInterface} from "./Common/Config/AbstractConfigDocument";
 import {Document as YamlDocument} from "yaml";
+import {SimpleError} from "./Utils/Errors";
+import {ErrorWithCause} from "pony-cause";
 
 export interface ConfigBuilderOptions {
     logger: Logger,
@@ -373,7 +374,16 @@ export const parseOpConfigFromArgs = (args: any): OperatorJsonConfig => {
         },
         logging: {
             level: logLevel,
-            path: logDir === true ? `${process.cwd()}/logs` : undefined,
+            file: {
+                level: logLevel,
+                dirName: logDir,
+            },
+            stream: {
+                level: logLevel,
+            },
+            console: {
+                level: logLevel,
+            }
         },
         caching: {
             provider: caching,
@@ -457,9 +467,17 @@ export const parseOpConfigFromEnv = (): OperatorJsonConfig => {
             display: process.env.OPERATOR_DISPLAY
         },
         logging: {
-            // @ts-ignore
             level: process.env.LOG_LEVEL,
-            path: process.env.LOG_DIR === 'true' ? `${process.cwd()}/logs` : undefined,
+            file: {
+                level: process.env.LOG_LEVEL,
+                dirname: process.env.LOG_DIR,
+            },
+            stream: {
+                level: process.env.LOG_LEVEL,
+            },
+            console: {
+                level: process.env.LOG_LEVEL,
+            }
         },
         caching: {
             provider: {
@@ -501,11 +519,25 @@ export const parseOpConfigFromEnv = (): OperatorJsonConfig => {
 // json config
 // args from cli
 export const parseOperatorConfigFromSources = async (args: any): Promise<[OperatorJsonConfig, OperatorFileConfig]> => {
-    const {logLevel = process.env.LOG_LEVEL, logDir = process.env.LOG_DIR || false} = args || {};
+    const {logLevel = process.env.LOG_LEVEL ?? 'debug', logDir = process.env.LOG_DIR} = args || {};
     const envPath = process.env.OPERATOR_ENV;
+    const initLoggerOptions = {
+        level: logLevel,
+        console: {
+            level: logLevel
+        },
+        file: {
+            level: logLevel,
+            dirname: logDir,
+        },
+        stream: {
+            level: logLevel
+        }
+    }
 
     // create a pre config logger to help with debugging
-    const initLogger = getLogger({logLevel, logDir: logDir === true ? `${process.cwd()}/logs` : logDir}, 'init');
+    // default to debug if nothing is provided
+    const initLogger = getLogger(initLoggerOptions, 'init');
 
     try {
         const vars = await GetEnvVars({
@@ -556,9 +588,7 @@ export const parseOperatorConfigFromSources = async (args: any): Promise<[Operat
                 fileConfigFormat = err.extension
             }
         } else {
-            initLogger.error('Cannot continue app startup because operator config file exists but was not parseable.');
-            err.logged = true;
-            throw err;
+            throw new ErrorWithCause('Cannot continue app startup because operator config file exists but was not parseable.', {cause: err});
         }
     }
     const [format, doc, jsonErr, yamlErr] = parseFromJsonOrYamlToObject(rawConfig, {
@@ -591,7 +621,15 @@ export const parseOperatorConfigFromSources = async (args: any): Promise<[Operat
 
         try {
             configFromFile = validateJson(configDoc.toJS(), operatorSchema, initLogger) as OperatorJsonConfig;
-            const {bots = []} = configFromFile || {};
+            const {
+                bots = [],
+                logging: {
+                    path = undefined
+                } = {}
+            } = configFromFile || {};
+            if(path !== undefined) {
+                initLogger.warn(`'path' property in top-level 'logging' object is DEPRECATED and will be removed in next minor version. Use 'logging.file.dirname' instead`);
+            }
             for (const b of bots) {
                 const {
                     polling: {
@@ -651,6 +689,9 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
         logging: {
             level = 'verbose',
             path,
+            file = {},
+            console = {},
+            stream = {},
         } = {},
         caching: opCache,
         web: {
@@ -726,6 +767,12 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
 
     const defaultOperators = typeof name === 'string' ? [name] : name;
 
+    const {
+        dirname = path,
+        ...fileRest
+    } = file;
+
+
     const config: OperatorConfig = {
         mode,
         operator: {
@@ -734,7 +781,19 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
         },
         logging: {
             level,
-            path
+            file: {
+                level: level,
+                dirname,
+                ...fileRest,
+            },
+            stream: {
+                level: level,
+                ...stream,
+            },
+            console: {
+                level: level,
+                ...console,
+            }
         },
         caching: cache,
         web: {

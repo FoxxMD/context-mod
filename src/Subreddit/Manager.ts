@@ -48,7 +48,8 @@ import {CheckStructuredJson} from "../Check";
 import NotificationManager from "../Notification/NotificationManager";
 import {createHistoricalDefaults, historicalDefaults} from "../Common/defaults";
 import {ExtendedSnoowrap} from "../Utils/SnoowrapClients";
-import {isRateLimitError, isStatusError} from "../Utils/Errors";
+import {CMError, isRateLimitError, isStatusError} from "../Utils/Errors";
+import {ErrorWithCause} from "pony-cause";
 
 export interface RunningState {
     state: RunState,
@@ -449,9 +450,6 @@ export class Manager extends EventEmitter {
                 this.logger.info(checkSummary);
             }
             this.validConfigLoaded = true;
-            if(!suppressChangeEvent) {
-                this.emit('configChange');
-            }
             if(this.eventsState.state === RUNNING) {
                 // need to update polling, potentially
                 await this.buildPolling();
@@ -461,6 +459,9 @@ export class Manager extends EventEmitter {
                         stream.startInterval();
                     }
                 }
+            }
+            if(!suppressChangeEvent) {
+                this.emit('configChange');
             }
         } catch (err: any) {
             this.validConfigLoaded = false;
@@ -484,21 +485,21 @@ export class Manager extends EventEmitter {
                     if(isStatusError(err) && err.statusCode === 404) {
                         // see if we can create the page
                         if (!this.client.scope.includes('wikiedit')) {
-                            throw new Error(`Page does not exist and could not be created because Bot does not have oauth permission 'wikiedit'`);
+                            throw new ErrorWithCause(`Page does not exist and could not be created because Bot does not have oauth permission 'wikiedit'`, {cause: err});
                         }
                         const modPermissions = await this.getModPermissions();
                         if (!modPermissions.includes('all') && !modPermissions.includes('wiki')) {
-                            throw new Error(`Page does not exist and could not be created because Bot not have mod permissions for creating wiki pages. Must have 'all' or 'wiki'`);
+                            throw new ErrorWithCause(`Page does not exist and could not be created because Bot not have mod permissions for creating wiki pages. Must have 'all' or 'wiki'`, {cause: err});
                         }
                         if(!this.client.scope.includes('modwiki')) {
-                            throw new Error(`Bot COULD create wiki config page but WILL NOT because it does not have the oauth permissions 'modwiki' which is required to set page visibility and editing permissions. Safety first!`);
+                            throw new ErrorWithCause(`Bot COULD create wiki config page but WILL NOT because it does not have the oauth permissions 'modwiki' which is required to set page visibility and editing permissions. Safety first!`, {cause: err});
                         }
                         // @ts-ignore
                         wiki = await this.subreddit.getWikiPage(this.wikiLocation).edit({
                             text: '',
                             reason: 'Empty configuration created for ContextMod'
                         });
-                        this.logger.info(`Wiki page at ${this.wikiLocation} did not exist, but bot created it!`);
+                        this.logger.info(`Wiki page at ${this.wikiLocation} did not exist so bot created it!`);
 
                         // 0 = use subreddit wiki permissions
                         // 1 = only approved wiki contributors
@@ -542,11 +543,10 @@ export class Manager extends EventEmitter {
             } catch (err: any) {
                 let hint = '';
                 if(isStatusError(err) && err.statusCode === 403) {
-                    hint = `\r\nHINT: Either the page is restricted to mods only and the bot's reddit account does have the mod permission 'all' or 'wiki' OR the bot does not have the 'wikiread' oauth permission`;
+                    hint = ` -- HINT: Either the page is restricted to mods only and the bot's reddit account does have the mod permission 'all' or 'wiki' OR the bot does not have the 'wikiread' oauth permission`;
                 }
-                const msg = `Could not read wiki configuration. Please ensure the page https://reddit.com${this.subreddit.url}wiki/${this.wikiLocation} exists and is readable${hint} -- error: ${err.message}`;
-                this.logger.error(msg);
-                throw new ConfigParseError(msg);
+                const msg = `Could not read wiki configuration. Please ensure the page https://reddit.com${this.subreddit.url}wiki/${this.wikiLocation} exists and is readable${hint}`;
+                throw new ErrorWithCause(msg, {cause: err});
             }
 
             if (sourceData.replace('\r\n', '').trim() === '') {
@@ -580,8 +580,12 @@ export class Manager extends EventEmitter {
 
             return true;
         } catch (err: any) {
+            const error = new ErrorWithCause('Failed to parse subreddit configuration', {cause: err});
+            // @ts-ignore
+           //error.logged = true;
+            this.logger.error(error);
             this.validConfigLoaded = false;
-            throw err;
+            throw error;
         }
     }
 
@@ -906,9 +910,9 @@ export class Manager extends EventEmitter {
                     }
                     if(!this.sharedStreamCallbacks.has(source)) {
                         stream.once('listing', this.noChecksWarning(source));
-                        this.sharedStreamCallbacks.set(source, onItem);
                         this.logger.debug(`${removedOwn ? 'Stopped own polling and replace with ' : 'Set '}listener on shared polling ${source}`);
                     }
+                    this.sharedStreamCallbacks.set(source, onItem);
                 } else {
                     let ownPollingMsgParts: string[] = [];
                     let removedShared = false;
@@ -937,14 +941,9 @@ export class Manager extends EventEmitter {
 
                         this.emit('error', err);
 
-                        if (isRateLimitError(err)) {
-                            this.logger.error('Encountered rate limit while polling! Bot is all out of requests :( Stopping subreddit queue and polling.');
-                            await this.stop();
-                        }
-                        this.logger.error('Polling error occurred', err);
                         const shouldRetry = await this.pollingRetryHandler(err);
                         if (shouldRetry) {
-                            stream.startInterval(false);
+                            stream.startInterval(false, 'Within retry limits');
                         } else {
                             this.logger.warn('Stopping subreddit processing/polling due to too many errors');
                             await this.stop();
@@ -1140,7 +1139,6 @@ export class Manager extends EventEmitter {
                 s.end();
             }
             this.streams = new Map();
-            this.sharedStreamCallbacks = new Map();
             this.startedAt = undefined;
             this.logger.info(`Events STOPPED by ${causedBy}`);
             this.eventsState = {
