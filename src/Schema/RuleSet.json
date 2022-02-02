@@ -1434,6 +1434,11 @@
                         }
                     ]
                 },
+                "caseSensitive": {
+                    "default": false,
+                    "description": "Should text matching be case sensitive?\n\nDefaults to false",
+                    "type": "boolean"
+                },
                 "exclude": {
                     "description": "If present, activities will be counted only if they are **NOT** found in this list of Subreddits\n\nEach value in the list can be either:\n\n * string (name of subreddit)\n * regular expression to run on the subreddit name\n * `SubredditState`\n\nEX `[\"mealtimevideos\",\"askscience\", \"/onlyfans*\\/i\", {\"over18\": true}]`",
                     "examples": [
@@ -1524,9 +1529,14 @@
                     ],
                     "type": "string"
                 },
+                "matchScore": {
+                    "default": 85,
+                    "description": "The percentage, as a whole number, of a repost title/comment that must match the title/comment being checked in order to consider both a match\n\nNote: Setting to 0 will make every candidate considered a match -- useful if you want to match if the URL has been reposted anywhere\n\nDefaults to `85` (85%)",
+                    "type": "number"
+                },
                 "minWordCount": {
-                    "default": 1,
-                    "description": "For activities that are text-based this is the minimum number of words required for the activity to be considered for a repeat\n\nEX if `minimumWordCount=5` and a comment is `what about you` then it is ignored because `3 is less than 5`\n\n**For self-text submissions** -- title + body text\n\n**For comments* -- body text",
+                    "default": 2,
+                    "description": "The minimum number of words in the activity being checked for which this rule will run on\n\nIf the word count is below the minimum the rule fails\n\nDefaults to 2",
                     "type": "number"
                 },
                 "name": {
@@ -1541,6 +1551,13 @@
                     "default": ">= 5",
                     "description": "The number of repeat submissions that will trigger the rule",
                     "type": "string"
+                },
+                "transformations": {
+                    "description": "A set of search-and-replace operations to perform on text values before performing a match. Transformations are performed in the order they are defined.",
+                    "items": {
+                        "$ref": "#/definitions/SearchAndReplaceRegExp"
+                    },
+                    "type": "array"
                 },
                 "useSubmissionAsReference": {
                     "default": true,

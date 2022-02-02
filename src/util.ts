@@ -136,7 +136,7 @@ const errorAwareFormat = {
                 for(const k in err) {
                     if(dummyErr.hasOwnProperty(k) || k === 'cause') {
                         // @ts-ignore
-                        dummyErr[k] = tinfo[k];
+                        dummyErr[k] = info[k];
                     }
                 }
                 // @ts-ignore

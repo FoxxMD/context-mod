@@ -2100,3 +2100,56 @@ export interface FilterResult<T> {
     join: JoinOperands
     passed: boolean
 }
+
+export interface TextTransformOptions {
+    /**
+     * A set of search-and-replace operations to perform on text values before performing a match. Transformations are performed in the order they are defined.
+     *
+     * * If `transformationsActivity` IS NOT defined then these transformations will be performed on BOTH the activity text (submission title or comment) AND the repost candidate text
+     * * If `transformationsActivity` IS defined then these transformations are only performed on repost candidate text
+     * */
+    transformations?: SearchAndReplaceRegExp[]
+
+    /**
+     * Specify a separate set of transformations for the activity text (submission title or comment)
+     *
+     * To perform no transformations when `transformations` is defined set this to an empty array (`[]`)
+     * */
+    transformationsActivity?: SearchAndReplaceRegExp[]
+}
+
+export interface TextMatchOptions {
+    /**
+     * The percentage, as a whole number, of a repost title/comment that must match the title/comment being checked in order to consider both a match
+     *
+     * Note: Setting to 0 will make every candidate considered a match -- useful if you want to match if the URL has been reposted anywhere
+     *
+     * Defaults to `85` (85%)
+     *
+     * @default 85
+     * @example [85]
+     * */
+    matchScore?: number
+
+    /**
+     * The minimum number of words in the activity being checked for which this rule will run on
+     *
+     * If the word count is below the minimum the rule fails
+     *
+     * Defaults to 2
+     *
+     * @default 2
+     * @example [2]
+     * */
+    minWordCount?: number
+
+    /**
+     * Should text matching be case sensitive?
+     *
+     * Defaults to false
+     *
+     * @default false
+     * @example [false]
+     **/
+    caseSensitive?: boolean
+}

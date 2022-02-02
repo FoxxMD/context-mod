@@ -634,6 +634,9 @@
                 "file": {
                     "allOf": [
                         {
+                            "$ref": "#/definitions/Omit<DailyRotateFileTransportOptions,\"stream\"|\"dirname\"|\"options\"|\"handleRejections\"|\"format\"|\"handleExceptions\"|\"log\"|\"logv\"|\"close\">"
+                        },
+                        {
                             "properties": {
                                 "dirname": {
                                     "description": "The absolute path to a directory where rotating log files should be stored.\n\n* If not present or `null` or `false` no log files will be created\n* If `true` logs will be stored at `[working directory]/logs`\n\n* ENV => `LOG_DIR`\n* ARG => `--logDir [dir]`",
@@ -658,9 +661,6 @@
                                 }
                             },
                             "type": "object"
-                        },
-                        {
-                            "$ref": "#/definitions/Omit<DailyRotateFileTransportOptions,\"stream\"|\"dirname\"|\"options\"|\"handleRejections\"|\"format\"|\"handleExceptions\"|\"log\"|\"logv\"|\"close\">"
                         }
                     ],
                     "description": "Options for Rotating File logging"
