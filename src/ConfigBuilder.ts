@@ -35,7 +35,7 @@ import {
     RedditCredentials,
     BotCredentialsJsonConfig,
     BotCredentialsConfig,
-    FilterCriteriaDefaults, TypedActivityStates, OperatorFileConfig
+    FilterCriteriaDefaults, TypedActivityStates, OperatorFileConfig, PostBehavior
 } from "./Common/interfaces";
 import {isRuleSetJSON, RuleSetJson, RuleSetObjectJson} from "./Rule/RuleSet";
 import deepEqual from "fast-deep-equal";
@@ -59,6 +59,7 @@ import {ConfigDocumentInterface} from "./Common/Config/AbstractConfigDocument";
 import {Document as YamlDocument} from "yaml";
 import {SimpleError} from "./Utils/Errors";
 import {ErrorWithCause} from "pony-cause";
+import {RunStructuredJson} from "./Run";
 
 export interface ConfigBuilderOptions {
     logger: Logger,
@@ -130,55 +131,79 @@ export class ConfigBuilder {
         return validConfig as JSONConfig;
     }
 
-    parseToStructured(config: JSONConfig, filterCriteriaDefaultsFromBot?: FilterCriteriaDefaults): CheckStructuredJson[] {
+    parseToStructured(config: JSONConfig, filterCriteriaDefaultsFromBot?: FilterCriteriaDefaults, postCheckBehaviorDefaultsFromBot: PostBehavior = {}): RunStructuredJson[] {
         let namedRules: Map<string, RuleObjectJson> = new Map();
         let namedActions: Map<string, ActionObjectJson> = new Map();
-        const {checks = [], filterCriteriaDefaults} = config;
-        for (const c of checks) {
-            const {rules = []} = c;
-            namedRules = extractNamedRules(rules, namedRules);
-            namedActions = extractNamedActions(c.actions, namedActions);
+        const {checks = [], runs = [], filterCriteriaDefaults, postCheckBehaviorDefaults} = config;
+
+        if(checks.length > 0 && runs.length > 0) {
+            // cannot have both checks and runs at top-level
+            throw new Error(`Subreddit configuration cannot contain both 'checks' and 'runs' at top-level.`);
         }
 
-        const filterDefs = filterCriteriaDefaults ?? filterCriteriaDefaultsFromBot;
-        const {
-            authorIsBehavior = 'merge',
-            itemIsBehavior = 'merge',
-            authorIs: authorIsDefault = {},
-            itemIs: itemIsDefault = []
-        } = filterDefs || {};
-
-        const structuredChecks: CheckStructuredJson[] = [];
-        for (const c of checks) {
-            const {rules = [], authorIs = {}, itemIs = []} = c;
-            const strongRules = insertNamedRules(rules, namedRules);
-            const strongActions = insertNamedActions(c.actions, namedActions);
-
-            let derivedAuthorIs: AuthorOptions = authorIsDefault;
-            if (authorIsBehavior === 'merge') {
-                derivedAuthorIs = merge.all([authorIs, authorIsDefault], {arrayMerge: removeFromSourceIfKeysExistsInDestination});
-            } else if (Object.keys(authorIs).length > 0) {
-                derivedAuthorIs = authorIs;
-            }
-
-            let derivedItemIs: TypedActivityStates = itemIsDefault;
-            if (itemIsBehavior === 'merge') {
-                derivedItemIs = [...itemIs, ...itemIsDefault];
-            } else if (itemIs.length > 0) {
-                derivedItemIs = itemIs;
-            }
-
-            const strongCheck = {
-                ...c,
-                authorIs: derivedAuthorIs,
-                itemIs: derivedItemIs,
-                rules: strongRules,
-                actions: strongActions
-            } as CheckStructuredJson;
-            structuredChecks.push(strongCheck);
+        const realRuns  = runs;
+        if(checks.length > 0) {
+            realRuns.push({name: 'Run1', checks: checks});
         }
 
-        return structuredChecks;
+        for(const r of realRuns) {
+            for (const c of r.checks) {
+                const {rules = []} = c;
+                namedRules = extractNamedRules(rules, namedRules);
+                namedActions = extractNamedActions(c.actions, namedActions);
+            }
+        }
+
+        const structuredRuns: RunStructuredJson[] = [];
+
+        for(const r of realRuns) {
+
+            const {filterCriteriaDefaults: filterCriteriaDefaultsFromRun, postFail, postTrigger } = r;
+
+            const filterDefs = filterCriteriaDefaultsFromRun ?? (filterCriteriaDefaults ?? filterCriteriaDefaultsFromBot);
+            const {
+                authorIsBehavior = 'merge',
+                itemIsBehavior = 'merge',
+                authorIs: authorIsDefault = {},
+                itemIs: itemIsDefault = []
+            } = filterDefs || {};
+
+            const structuredChecks: CheckStructuredJson[] = [];
+            for (const c of r.checks) {
+                const {rules = [], authorIs = {}, itemIs = []} = c;
+                const strongRules = insertNamedRules(rules, namedRules);
+                const strongActions = insertNamedActions(c.actions, namedActions);
+
+                let derivedAuthorIs: AuthorOptions = authorIsDefault;
+                if (authorIsBehavior === 'merge') {
+                    derivedAuthorIs = merge.all([authorIs, authorIsDefault], {arrayMerge: removeFromSourceIfKeysExistsInDestination});
+                } else if (Object.keys(authorIs).length > 0) {
+                    derivedAuthorIs = authorIs;
+                }
+
+                let derivedItemIs: TypedActivityStates = itemIsDefault;
+                if (itemIsBehavior === 'merge') {
+                    derivedItemIs = [...itemIs, ...itemIsDefault];
+                } else if (itemIs.length > 0) {
+                    derivedItemIs = itemIs;
+                }
+
+                const postCheckBehaviors = Object.assign({}, postCheckBehaviorDefaultsFromBot, removeUndefinedKeys({postFail, postTrigger}));
+
+                const strongCheck = {
+                    ...c,
+                    authorIs: derivedAuthorIs,
+                    itemIs: derivedItemIs,
+                    rules: strongRules,
+                    actions: strongActions,
+                    ...postCheckBehaviors
+                } as CheckStructuredJson;
+                structuredChecks.push(strongCheck);
+            }
+            structuredRuns.push({...r, checks: structuredChecks});
+        }
+
+        return structuredRuns;
     }
 }
 
@@ -840,6 +865,7 @@ export const buildBotConfig = (data: BotInstanceJsonConfig, opConfig: OperatorCo
     const {
         name: botName,
         filterCriteriaDefaults = filterCriteriaDefault,
+        postCheckBehaviorDefaults,
         polling: {
             sharedMod,
             shared = [],
@@ -967,6 +993,7 @@ export const buildBotConfig = (data: BotInstanceJsonConfig, opConfig: OperatorCo
         name: botName,
         snoowrap: snoowrap || {},
         filterCriteriaDefaults,
+        postCheckBehaviorDefaults,
         subreddits: {
             names,
             exclude,

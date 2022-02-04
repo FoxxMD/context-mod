@@ -62,7 +62,6 @@ const action = async (req: Request, res: Response) => {
                         const activities = await manager.subreddit.getUnmoderated({limit: 100});
                         for (const a of activities.reverse()) {
                             await manager.firehose.push({
-                                checkType: a instanceof Submission ? 'Submission' : 'Comment',
                                 activity: a,
                                 options: {
                                     force: true,
@@ -73,7 +72,6 @@ const action = async (req: Request, res: Response) => {
                         const activities = await manager.subreddit.getModqueue({limit: 100});
                         for (const a of activities.reverse()) {
                             await manager.firehose.push({
-                                checkType: a instanceof Submission ? 'Submission' : 'Comment',
                                 activity: a,
                                 options: {
                                     force: true

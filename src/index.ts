@@ -86,7 +86,7 @@ const program = new Command();
             .allowUnknownOption()
             .description('Run check(s) on a specific activity', {
                 activityIdentifier: 'Either a permalink URL or the ID of the Comment or Submission',
-                type: `If activityIdentifier is not a permalink URL then the type of activity ('comment' or 'submission'). May also specify 'submission' type when using a permalink to a comment to get the Submission`,
+                type: `No longer used`,
                 bot: 'Specify the bot to try with using `bot.name` (from config) -- otherwise all bots will be built before the bot to be used can be determined'
             });
         checkCommand = addOptions(checkCommand, getUniversalCLIOptions());
@@ -154,7 +154,7 @@ const program = new Command();
                     await b.buildManagers([sub]);
                     if(b.subManagers.length > 0) {
                        const manager = b.subManagers[0];
-                        await manager.runChecks(type === 'comment' ? 'Comment' : 'Submission', activity, {checkNames: checks});
+                        await manager.runChecks(activity, {checkNames: checks});
                         break;
                     }
                 }
@@ -191,7 +191,6 @@ const program = new Command();
                         const activities = await manager.subreddit.getUnmoderated();
                         for (const a of activities.reverse()) {
                             manager.firehose.push({
-                                checkType: a instanceof Submission ? 'Submission' : 'Comment',
                                 activity: a,
                                 options: {checkNames: checks}
                             });

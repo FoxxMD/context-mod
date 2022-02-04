@@ -16,11 +16,11 @@ import {
     truncateStringToLength
 } from "../util";
 import {
-    ActionResult,
+    ActionResult, ActivityType,
     ChecksActivityState,
     CommentState,
     JoinCondition,
-    JoinOperands,
+    JoinOperands, PostBehavior, PostBehaviorTypes,
     SubmissionState,
     TypedActivityStates, UserResultCache
 } from "../Common/interfaces";
@@ -51,6 +51,8 @@ export abstract class Check implements ICheck {
     notifyOnTrigger: boolean;
     resources: SubredditResources;
     client: ExtendedSnoowrap;
+    postTrigger: PostBehaviorTypes;
+    postFail: PostBehaviorTypes;
 
     constructor(options: CheckOptions) {
         const {
@@ -65,6 +67,8 @@ export abstract class Check implements ICheck {
             notifyOnTrigger = false,
             subredditName,
             cacheUserResult = {},
+            postTrigger = 'nextRun',
+            postFail = 'next',
             itemIs = [],
             authorIs: {
                 include = [],
@@ -93,6 +97,8 @@ export abstract class Check implements ICheck {
             exclude: exclude.map(x => new Author(x)),
             include: include.map(x => new Author(x)),
         }
+        this.postTrigger = postTrigger;
+        this.postFail = postFail;
         this.cacheUserResult = {
             ...userResultCacheDefault,
             ...cacheUserResult
@@ -279,7 +285,7 @@ export abstract class Check implements ICheck {
     }
 }
 
-export interface ICheck extends JoinCondition, ChecksActivityState {
+export interface ICheck extends JoinCondition, ChecksActivityState, PostBehavior {
     /**
      * Friendly name for this Check EX "crosspostSpamCheck"
      *
@@ -339,7 +345,7 @@ export interface CheckJson extends ICheck {
      * The type of event (new submission or new comment) this check should be run against
      * @examples ["submission", "comment"]
      */
-    kind: 'submission' | 'comment'
+    kind: ActivityType
     /**
      * A list of Rules to run.
      *

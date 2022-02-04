@@ -319,6 +319,9 @@
                     ],
                     "description": "Settings related to default polling configurations for subreddits"
                 },
+                "postCheckBehaviorDefaults": {
+                    "$ref": "#/definitions/PostBehavior"
+                },
                 "queue": {
                     "description": "Settings related to default configurations for queue behavior for subreddits",
                     "properties": {
@@ -1029,6 +1032,51 @@
                         50
                     ],
                     "type": "number"
+                }
+            },
+            "type": "object"
+        },
+        "PostBehavior": {
+            "properties": {
+                "postFail": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "enum": [
+                                "next",
+                                "nextRun",
+                                "stop"
+                            ],
+                            "type": "string"
+                        }
+                    ],
+                    "default": "next",
+                    "description": "Do this behavior if a Check is NOT triggered"
+                },
+                "postTrigger": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "enum": [
+                                "next",
+                                "nextRun",
+                                "stop"
+                            ],
+                            "type": "string"
+                        }
+                    ],
+                    "default": "nextRun",
+                    "description": "Do this behavior if a Check is triggered"
                 }
             },
             "type": "object"

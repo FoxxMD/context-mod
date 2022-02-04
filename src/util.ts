@@ -1577,7 +1577,7 @@ export const snooLogWrapper = (logger: Logger) => {
  * Cached activities lose type information when deserialized so need to check properties as well to see if the object is the shape of a Submission
  * */
 export const isSubmission = (value: any) => {
-    return value instanceof Submission || value.domain !== undefined;
+    return value instanceof Submission || (value.id !== undefined && value.id.includes('t3_')) || value.domain !== undefined;
 }
 
 export const asSubmission = (value: any): value is Submission => {
