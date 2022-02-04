@@ -1274,6 +1274,46 @@
                     "description": "If notifications are configured and this is `true` then an `eventActioned` event will be sent when this check is triggered.",
                     "type": "boolean"
                 },
+                "postFail": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "enum": [
+                                "next",
+                                "nextRun",
+                                "stop"
+                            ],
+                            "type": "string"
+                        }
+                    ],
+                    "default": "next",
+                    "description": "Do this behavior if a Check is NOT triggered"
+                },
+                "postTrigger": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "enum": [
+                                "next",
+                                "nextRun",
+                                "stop"
+                            ],
+                            "type": "string"
+                        }
+                    ],
+                    "default": "nextRun",
+                    "description": "Do this behavior if a Check is triggered"
+                },
                 "rules": {
                     "description": "A list of Rules to run.\n\nIf `Rule` objects are triggered based on `condition` then `actions` will be performed.\n\nCan be `Rule`, `RuleSet`, or the `name` of any **named** `Rule` in your subreddit's configuration.\n\n**If `rules` is an empty array or not present then `actions` are performed immediately.**",
                     "items": {
@@ -2225,6 +2265,51 @@
             "required": [
                 "pollOn"
             ],
+            "type": "object"
+        },
+        "PostBehavior": {
+            "properties": {
+                "postFail": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "enum": [
+                                "next",
+                                "nextRun",
+                                "stop"
+                            ],
+                            "type": "string"
+                        }
+                    ],
+                    "default": "next",
+                    "description": "Do this behavior if a Check is NOT triggered"
+                },
+                "postTrigger": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "enum": [
+                                "next",
+                                "nextRun",
+                                "stop"
+                            ],
+                            "type": "string"
+                        }
+                    ],
+                    "default": "nextRun",
+                    "description": "Do this behavior if a Check is triggered"
+                }
+            },
             "type": "object"
         },
         "RecentActivityRuleJSONConfig": {
@@ -3186,6 +3271,87 @@
             ],
             "type": "object"
         },
+        "RunJson": {
+            "properties": {
+                "checks": {
+                    "items": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/definitions/SubmissionCheckJson"
+                            },
+                            {
+                                "$ref": "#/definitions/CommentCheckJson"
+                            }
+                        ]
+                    },
+                    "type": "array"
+                },
+                "dryRun": {
+                    "description": "Use this option to override the `dryRun` setting for all Actions of all Checks in this Run",
+                    "examples": [
+                        false,
+                        true
+                    ],
+                    "type": "boolean"
+                },
+                "filterCriteriaDefaults": {
+                    "$ref": "#/definitions/FilterCriteriaDefaults",
+                    "description": "Set the default filter criteria for all checks. If this property is specified it will override any defaults passed from the bot's config\n\nDefault behavior is to exclude all mods and automoderator from checks"
+                },
+                "name": {
+                    "description": "Friendly name for this Run EX \"flairsRun\"\n\nCan only contain letters, numbers, underscore, spaces, and dashes",
+                    "examples": [
+                        "myNewRun"
+                    ],
+                    "pattern": "^[a-zA-Z]([\\w -]*[\\w])?$",
+                    "type": "string"
+                },
+                "postFail": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "enum": [
+                                "next",
+                                "nextRun",
+                                "stop"
+                            ],
+                            "type": "string"
+                        }
+                    ],
+                    "default": "next",
+                    "description": "Do this behavior if a Check is NOT triggered"
+                },
+                "postTrigger": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "enum": [
+                                "next",
+                                "nextRun",
+                                "stop"
+                            ],
+                            "type": "string"
+                        }
+                    ],
+                    "default": "nextRun",
+                    "description": "Do this behavior if a Check is triggered"
+                }
+            },
+            "required": [
+                "checks"
+            ],
+            "type": "object"
+        },
         "SearchAndReplaceRegExp": {
             "properties": {
                 "replace": {
@@ -3430,6 +3596,46 @@
                     "default": false,
                     "description": "If notifications are configured and this is `true` then an `eventActioned` event will be sent when this check is triggered.",
                     "type": "boolean"
+                },
+                "postFail": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "enum": [
+                                "next",
+                                "nextRun",
+                                "stop"
+                            ],
+                            "type": "string"
+                        }
+                    ],
+                    "default": "next",
+                    "description": "Do this behavior if a Check is NOT triggered"
+                },
+                "postTrigger": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "enum": [
+                                "next",
+                                "nextRun",
+                                "stop"
+                            ],
+                            "type": "string"
+                        }
+                    ],
+                    "default": "nextRun",
+                    "description": "Do this behavior if a Check is triggered"
                 },
                 "rules": {
                     "description": "A list of Rules to run.\n\nIf `Rule` objects are triggered based on `condition` then `actions` will be performed.\n\nCan be `Rule`, `RuleSet`, or the `name` of any **named** `Rule` in your subreddit's configuration.\n\n**If `rules` is an empty array or not present then `actions` are performed immediately.**",
@@ -3980,6 +4186,10 @@
             },
             "type": "array"
         },
+        "postCheckBehaviorDefaults": {
+            "$ref": "#/definitions/PostBehavior",
+            "description": "Set the default post-check behavior for all checks. If this property is specified it will override any defaults passed from the bot's config\n\nDefault behavior is:\n\n* postFail => next\n* postTrigger => nextRun"
+        },
         "queue": {
             "properties": {
                 "maxWorkers": {
@@ -3993,11 +4203,16 @@
                 }
             },
             "type": "object"
+        },
+        "runs": {
+            "description": "A list of sets of Checks to run",
+            "items": {
+                "$ref": "#/definitions/RunJson"
+            },
+            "minItems": 1,
+            "type": "array"
         }
     },
-    "required": [
-        "checks"
-    ],
     "type": "object"
 }
 

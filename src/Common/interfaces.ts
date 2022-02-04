@@ -16,6 +16,7 @@ import {JsonOperatorConfigDocument, YamlOperatorConfigDocument} from "./Config/O
 import {ConsoleTransportOptions} from "winston/lib/winston/transports";
 import {DailyRotateFileTransportOptions} from "winston-daily-rotate-file";
 import {DuplexTransportOptions} from "winston-duplex/dist/DuplexTransport";
+import {CommentCheckJson, SubmissionCheckJson} from "../Check";
 
 /**
  * An ISO 8601 Duration
@@ -836,6 +837,16 @@ export interface ManagerOptions {
      * Default behavior is to exclude all mods and automoderator from checks
      * */
     filterCriteriaDefaults?: FilterCriteriaDefaults
+
+    /**
+     * Set the default post-check behavior for all checks. If this property is specified it will override any defaults passed from the bot's config
+     *
+     * Default behavior is:
+     *
+     * * postFail => next
+     * * postTrigger => nextRun
+     * */
+    postCheckBehaviorDefaults?: PostBehavior
 }
 
 /**
@@ -1479,6 +1490,8 @@ export interface BotInstanceJsonConfig {
      * Defaults to exclude mods and automoderator from checks
      * */
     filterCriteriaDefaults?: FilterCriteriaDefaults
+
+    postCheckBehaviorDefaults?: PostBehavior
 
     /**
      * Settings related to bot behavior for subreddits it is managing
@@ -2157,3 +2170,36 @@ export interface TextMatchOptions {
      **/
     caseSensitive?: boolean
 }
+
+export type ActivityCheckJson = SubmissionCheckJson | CommentCheckJson;
+
+export type GotoPath = `goto:${string}`;
+/**
+ * The possible behaviors that can occur after a check has run
+ *
+ * * next => continue to next Check/Run
+ * * stop => stop CM lifecycle for this activity (immediately end)
+ * * nextRun => skip any remaining Checks in this Run and start the next Run
+ * * goto:[path] => specify a run[.check] to jump to
+ *
+ * */
+export type PostBehaviorTypes = 'next' | 'stop' | 'nextRun' | GotoPath;
+
+export interface PostBehavior {
+    /**
+     * Do this behavior if a Check is triggered
+     *
+     * @default nextRun
+     * @example ["nextRun"]
+     * */
+    postTrigger?: PostBehaviorTypes
+    /**
+     * Do this behavior if a Check is NOT triggered
+     *
+     * @default next
+     * @example ["next"]
+     * */
+    postFail?: PostBehaviorTypes
+}
+
+export type ActivityType = 'submission' | 'comment';
