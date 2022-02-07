@@ -379,11 +379,8 @@ export class SubredditResources {
                     this.logger.debug(`Cache Hit: Submission ${item.name}`);
                     return cachedSubmission;
                 }
-                // @ts-ignore
-                const submission = await item.fetch();
                 this.stats.cache.submission.miss++;
-                await this.cache.set(hash, submission, {ttl: this.submissionTTL});
-                return submission;
+                return await this.setActivity(item);
             } else if (this.commentTTL !== false) {
                 hash = `comm-${item.name}`;
                 await this.stats.cache.comment.identifierRequestCount.set(hash, (await this.stats.cache.comment.identifierRequestCount.wrap(hash, () => 0) as number) + 1);
@@ -394,11 +391,8 @@ export class SubredditResources {
                     this.logger.debug(`Cache Hit: Comment ${item.name}`);
                     return cachedComment;
                 }
-                // @ts-ignore
-                const comment = await item.fetch();
                 this.stats.cache.comment.miss++;
-                await this.cache.set(hash, comment, {ttl: this.commentTTL});
-                return comment;
+                return this.setActivity(item);
             } else {
                 // @ts-ignore
                 return await item.fetch();
@@ -406,6 +400,37 @@ export class SubredditResources {
         } catch (err: any) {
             this.logger.error('Error while trying to fetch a cached activity', err);
             throw err.logged;
+        }
+    }
+
+    // @ts-ignore
+    public async setActivity(item: Submission | Comment, tryToFetch = true)
+    {
+        let hash = '';
+        if(this.submissionTTL !== false && isSubmission(item)) {
+            hash = `sub-${item.name}`;
+            if(tryToFetch && item instanceof Submission) {
+                // @ts-ignore
+                const itemToCache = await item.fetch();
+                await this.cache.set(hash, itemToCache, {ttl: this.submissionTTL});
+                return itemToCache;
+            } else {
+                // @ts-ignore
+                await this.cache.set(hash, item, {ttl: this.submissionTTL});
+                return item;
+            }
+        } else if(this.commentTTL !== false){
+            hash = `comm-${item.name}`;
+            if(tryToFetch && item instanceof Comment) {
+                // @ts-ignore
+                const itemToCache = await item.fetch();
+                await this.cache.set(hash, itemToCache, {ttl: this.commentTTL});
+                return itemToCache;
+            } else {
+                // @ts-ignore
+                await this.cache.set(hash, item, {ttl: this.commentTTL});
+                return item;
+            }
         }
     }
 

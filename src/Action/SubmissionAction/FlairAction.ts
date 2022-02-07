@@ -39,8 +39,11 @@ export class FlairAction extends Action {
             if(!this.dryRun) {
                 if (this.flair_template_id) {
                     await item.selectFlair({flair_template_id: this.flair_template_id}).then(() => {});
+                    item.link_flair_template_id = this.flair_template_id;
                 } else {
                     await item.assignFlair({text: this.text, cssClass: this.css}).then(() => {});
+                    item.link_flair_css_class = this.css;
+                    item.link_flair_text = this.text;
                 }
 
             }

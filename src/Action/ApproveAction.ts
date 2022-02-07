@@ -54,6 +54,18 @@ export class ApproveAction extends Action {
                 }
                 // @ts-ignore
                 touchedEntities.push(await targetItem.approve());
+
+                if(target === 'self') {
+                    // @ts-ignore
+                    item.approved = true;
+                    if(await this.resources.hasActivity(item)) {
+                        await this.resources.setActivity(item, false);
+                    }
+                } else if(await this.resources.hasActivity(targetItem)) {
+                    // @ts-ignore
+                    targetItem.approved = true;
+                    await this.resources.setActivity(targetItem, false);
+                }
             }
         }
 
