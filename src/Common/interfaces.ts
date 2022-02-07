@@ -949,6 +949,10 @@ export interface SubmissionState extends ActivityState {
     link_flair_text?: string | string[]
     link_flair_css_class?: string | string[]
     flairTemplate?: string | string[]
+    /**
+     * Is the submission a reddit-hosted image or video?
+     * */
+    isRedditMediaDomain?: boolean
 }
 
 // properties calculated/derived by CM -- not provided as plain values by reddit

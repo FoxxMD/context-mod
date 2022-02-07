@@ -978,6 +978,20 @@ export class SubredditResources {
                                     return false
                                 }
                                 break;
+                            case 'isRedditMediaDomain':
+                                if((item instanceof Comment)) {
+                                    log.warn('`isRedditMediaDomain` is not allowed in `itemIs` criteria when the main Activity is a Comment');
+                                    continue;
+                                }
+                                // @ts-ignore
+                                const isRedditDomain = crit[k] as boolean;
+                                // @ts-ignore
+                                if (item.is_reddit_media_domain !== isRedditDomain) {
+                                    // @ts-ignore
+                                    log.debug(`Failed: Expected => ${k}:${crit[k]} | Found => ${k}:${item.is_reddit_media_domain}`)
+                                    return false
+                                }
+                                break;
                             case 'approved':
                             case 'spam':
                                 if(!item.can_mod_post) {

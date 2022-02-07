@@ -1952,6 +1952,10 @@
                         }
                     ]
                 },
+                "isRedditMediaDomain": {
+                    "description": "Is the submission a reddit-hosted image or video?",
+                    "type": "boolean"
+                },
                 "is_self": {
                     "type": "boolean"
                 },
