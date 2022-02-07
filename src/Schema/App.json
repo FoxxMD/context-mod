@@ -2413,6 +2413,11 @@
                     "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)(\\s+.*)*$",
                     "type": "string"
                 },
+                "mustMatchCurrent": {
+                    "default": false,
+                    "description": "When `true` the Activity being checked MUST pass the `matchThreshold` before the Rule considers any history\n\nFor use with `activityMatchThreshold`/`totalMatchThreshold` -- useful to conserve API calls",
+                    "type": "boolean"
+                },
                 "name": {
                     "description": "A descriptive name that will be used in logging and be available for templating",
                     "examples": [
