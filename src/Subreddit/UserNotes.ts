@@ -14,6 +14,7 @@ import Submission from "snoowrap/dist/objects/Submission";
 import {RichContent} from "../Common/interfaces";
 import {Cache} from 'cache-manager';
 import {isScopeError} from "../Utils/Errors";
+import {ErrorWithCause} from "pony-cause";
 
 interface RawUserNotesPayload {
     ver: number,
@@ -237,15 +238,14 @@ export class UserNotes {
 
             return payload as RawUserNotesPayload;
         } catch (err: any) {
-            let msg = 'Could not edit usernotes.';
+            let msg = 'Could not edit usernotes!';
             // Make sure at least one moderator has used toolbox and usernotes before and that this account has editing permissions`;
             if(isScopeError(err)) {
                 msg = `${msg} The bot account did not have sufficient OAUTH scope to perform this action. You must re-authenticate the bot and ensure it has has 'wikiedit' permissions.`
             } else {
                 msg = `${msg} Make sure at least one moderator has used toolbox, created a usernote, and that this account has editing permissions for the wiki page.`;
             }
-            this.logger.error(msg, err);
-            throw new LoggedError(msg);
+            throw new ErrorWithCause(msg, {cause: err});
         }
     }
 }

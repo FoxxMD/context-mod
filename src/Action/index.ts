@@ -7,6 +7,7 @@ import Author, {AuthorOptions} from "../Author/Author";
 import {mergeArr} from "../util";
 import LoggedError from "../Utils/LoggedError";
 import {ExtendedSnoowrap} from '../Utils/SnoowrapClients';
+import {ErrorWithCause} from "pony-cause";
 
 export abstract class Action {
     name?: string;
@@ -86,7 +87,8 @@ export abstract class Action {
             return {...actRes, ...results};
         } catch (err: any) {
             if(!(err instanceof LoggedError)) {
-                this.logger.error(`Encountered error while running`, err);
+                const actionError = new ErrorWithCause('Action did not run successfully due to unexpected error', {cause: err});
+                this.logger.error(actionError);
             }
             actRes.success = false;
             actRes.result = err.message;
