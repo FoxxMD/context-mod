@@ -45,7 +45,7 @@ export class FlairAction extends Action {
                     item.link_flair_css_class = this.css;
                     item.link_flair_text = this.text;
                 }
-
+                await this.resources.resetCacheForItem(item);
             }
         } else {
             this.logger.warn('Cannot flair Comment');

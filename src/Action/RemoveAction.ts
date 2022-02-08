@@ -41,13 +41,12 @@ export class RemoveAction extends Action {
             // @ts-ignore
             await item.remove({spam: this.spam});
             item.banned_at_utc = dayjs().unix();
+            item.spam = this.spam;
             if(!isSubmission(item)) {
                 // @ts-ignore
                 item.removed = true;
             }
-            if(await this.resources.hasActivity(item)) {
-                await this.resources.setActivity(item, false);
-            }
+            await this.resources.resetCacheForItem(item);
             touchedEntities.push(item);
         }
 

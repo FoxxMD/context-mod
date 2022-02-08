@@ -12,6 +12,7 @@ import winston, {Logger} from "winston";
 import as from 'async';
 import fetch from 'node-fetch';
 import {
+    asActivity,
     asSubmission,
     buildCacheOptionsFromProvider,
     buildCachePrefix,
@@ -19,18 +20,18 @@ import {
     compareDurationValue,
     comparisonTextOp,
     createCacheManager,
-    createHistoricalStatsDisplay, FAIL,
+    createHistoricalStatsDisplay, escapeRegex, FAIL,
     fetchExternalUrl, filterCriteriaSummary,
     formatNumber,
     getActivityAuthorName,
     getActivitySubredditName,
-    isStrongSubredditState, isSubmission,
+    isStrongSubredditState, isSubmission, isUser,
     mergeArr,
     parseDurationComparison,
     parseExternalUrl,
     parseGenericValueComparison,
-    parseRedditEntity,
-    parseWikiContext, PASS,
+    parseRedditEntity, parseStringToRegex,
+    parseWikiContext, PASS, redisScanIterator,
     shouldCacheSubredditStateCriteriaResult,
     subredditStateIsNameOnly,
     toStrongSubredditState
@@ -69,6 +70,7 @@ import {check} from "tcp-port-used";
 import {ExtendedSnoowrap} from "../Utils/SnoowrapClients";
 import dayjs from "dayjs";
 import ImageData from "../Common/ImageData";
+import globrex from 'globrex';
 
 export const DEFAULT_FOOTER = '\r\n*****\r\nThis action was performed by [a bot.]({{botLink}}) Mention a moderator or [send a modmail]({{modmailLink}}) if you any ideas, questions, or concerns about this action.';
 
@@ -296,6 +298,88 @@ export class SubredditResources {
             return (await this.cache.store.keys()).length;
         }
         return 0;
+    }
+
+    async interactWithCacheByKeyPattern(pattern: string | RegExp, action: 'get' | 'delete') {
+        let patternIsReg = pattern instanceof RegExp;
+        let regPattern: RegExp;
+        let globPattern = pattern;
+
+        const cacheDict: Record<string, any> = {};
+
+        if (typeof pattern === 'string') {
+            const possibleRegPattern = parseStringToRegex(pattern, 'ig');
+            if (possibleRegPattern !== undefined) {
+                regPattern = possibleRegPattern;
+                patternIsReg = true;
+            } else {
+                if (this.prefix !== undefined && !pattern.includes(this.prefix)) {
+                    // need to add wildcard to beginning of pattern so that the regex will still match a key with a prefix
+                    globPattern = `${this.prefix}${pattern}`;
+                }
+                // @ts-ignore
+                const result = globrex(globPattern, {flags: 'i'});
+                regPattern = result.regex;
+            }
+        } else {
+            regPattern = pattern;
+        }
+
+        if (this.cacheType === 'redis') {
+            // @ts-ignore
+            const redisClient = this.cache.store.getClient();
+            if (patternIsReg) {
+                // scan all and test key by regex
+                for await (const key of redisClient.scanIterator()) {
+                    if (regPattern.test(key) && (this.prefix === undefined || key.includes(this.prefix))) {
+                        if (action === 'delete') {
+                            await redisClient.del(key)
+                        } else {
+                            cacheDict[key] = await redisClient.get(key);
+                        }
+                    }
+                }
+            } else {
+                // not a regex means we can use glob pattern (more efficient!)
+                for await (const key of redisScanIterator(redisClient, { MATCH: globPattern })) {
+                    if (action === 'delete') {
+                        await redisClient.del(key)
+                    } else {
+                        cacheDict[key] = await redisClient.get(key);
+                    }
+                }
+            }
+        } else if (this.cache.store.keys !== undefined) {
+            for (const key of await this.cache.store.keys()) {
+                if (regPattern.test(key) && (this.prefix === undefined || key.includes(this.prefix))) {
+                    if (action === 'delete') {
+                        await this.cache.del(key)
+                    } else {
+                        cacheDict[key] = await this.cache.get(key);
+                    }
+                }
+            }
+        }
+        return cacheDict;
+    }
+
+    async deleteCacheByKeyPattern(pattern: string | RegExp) {
+        return await this.interactWithCacheByKeyPattern(pattern, 'delete');
+    }
+
+    async getCacheByKeyPattern(pattern: string | RegExp) {
+        return await this.interactWithCacheByKeyPattern(pattern, 'get');
+    }
+
+    async resetCacheForItem(item: Comment | Submission | RedditUser) {
+        if (asActivity(item)) {
+            if (this.filterCriteriaTTL !== false) {
+                await this.deleteCacheByKeyPattern(`itemCrit-${item.name}*`);
+            }
+            await this.setActivity(item, false);
+        } else if (isUser(item) && this.filterCriteriaTTL !== false) {
+            await this.deleteCacheByKeyPattern(`authorCrit-*-${getActivityAuthorName(item)}*`);
+        }
     }
 
     async getStats() {

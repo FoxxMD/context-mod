@@ -58,13 +58,11 @@ export class ApproveAction extends Action {
                 if(target === 'self') {
                     // @ts-ignore
                     item.approved = true;
-                    if(await this.resources.hasActivity(item)) {
-                        await this.resources.setActivity(item, false);
-                    }
+                    await this.resources.resetCacheForItem(item);
                 } else if(await this.resources.hasActivity(targetItem)) {
                     // @ts-ignore
                     targetItem.approved = true;
-                    await this.resources.setActivity(targetItem, false);
+                    await this.resources.resetCacheForItem(targetItem);
                 }
             }
         }

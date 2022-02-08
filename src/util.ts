@@ -6,8 +6,6 @@ import deepEqual from "fast-deep-equal";
 import {Duration} from 'dayjs/plugin/duration.js';
 import Ajv from "ajv";
 import {InvalidOptionArgumentError} from "commander";
-import Submission from "snoowrap/dist/objects/Submission";
-import {Comment} from "snoowrap";
 import {inflateSync, deflateSync} from "zlib";
 import pixelmatch from 'pixelmatch';
 import os from 'os';
@@ -44,7 +42,7 @@ import crypto from "crypto";
 import Autolinker from 'autolinker';
 import {create as createMemoryStore} from './Utils/memoryStore';
 import {MESSAGE, LEVEL} from "triple-beam";
-import {RedditUser} from "snoowrap/dist/objects";
+import {RedditUser,Comment,Submission} from "snoowrap/dist/objects";
 import reRegExp from '@stdlib/regexp-regexp';
 import fetch, {Response} from "node-fetch";
 import { URL } from "url";
@@ -1577,11 +1575,31 @@ export const snooLogWrapper = (logger: Logger) => {
  * Cached activities lose type information when deserialized so need to check properties as well to see if the object is the shape of a Submission
  * */
 export const isSubmission = (value: any) => {
-    return value instanceof Submission || value.domain !== undefined;
+    return value instanceof Submission || value.name.includes('t3_');
 }
 
 export const asSubmission = (value: any): value is Submission => {
     return isSubmission(value);
+}
+
+export const isComment = (value: any) => {
+    return value instanceof Comment || value.name.includes('t1_');
+}
+
+export const asComment = (value: any): value is Comment => {
+    return isComment(value);
+}
+
+export const asActivity = (value: any): value is (Submission | Comment) => {
+    return asComment(value) || asSubmission(value);
+}
+
+export const isUser = (value: any) => {
+    return value instanceof RedditUser || value.name.includes('t2_');
+}
+
+export const asUser = (value: any): value is RedditUser => {
+    return isUser(value);
 }
 
 export const isUserNoteCriteria = (value: any) => {
@@ -2019,4 +2037,39 @@ export const likelyJson5 = (str: string): boolean => {
         break;
     }
     return validStart;
+}
+
+const defaultScanOptions = {
+    COUNT: '100',
+    MATCH: '*'
+}
+/**
+ * Frankenstein redis scan generator
+ *
+ * Cannot use the built-in scan iterator because it is only available in > v4 of redis client but node-cache-manager-redis is using v3.x --
+ * So combining the async iterator defined in v4 from here https://github.com/redis/node-redis/blob/master/packages/client/lib/client/index.ts#L587
+ * with the scan example from v3 https://github.com/redis/node-redis/blob/8a43dea9bee11e41d33502850f6989943163020a/examples/scan.js
+ *
+ * */
+export async function* redisScanIterator(client: any, options: any = {}): AsyncIterable<string> {
+    let cursor: string = '0';
+    const scanOpts = {...defaultScanOptions, ...options};
+    do {
+        const iterScan = new Promise((resolve, reject) => {
+            client.scan(cursor, 'MATCH', scanOpts.MATCH, 'COUNT', scanOpts.COUNT, (err: any, res: any) => {
+                if(err) {
+                    return reject(err);
+                } else {
+                    const newCursor = res[0];
+                    let keys = res[1];
+                    resolve([newCursor, keys]);
+                }
+            });
+        }) as Promise<[any, string[]]>;
+        const [newCursor, keys] = await iterScan;
+        cursor = newCursor;
+        for (const key of keys) {
+            yield key;
+        }
+    } while (cursor !== '0');
 }

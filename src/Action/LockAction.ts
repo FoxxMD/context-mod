@@ -28,9 +28,7 @@ export class LockAction extends Action {
             await item.lock();
             // @ts-ignore
             item.locked = true;
-            if(await this.resources.hasActivity(item)) {
-                await this.resources.setActivity(item, false);
-            }
+            await this.resources.resetCacheForItem(item);
             touchedEntities.push(item);
         }
         return {
