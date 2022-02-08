@@ -35,6 +35,7 @@ export class ReportAction extends Action {
             await item.report({reason: truncatedContent});
             // due to reddit not updating this in response (maybe)?? just increment stale activity
             item.num_reports++;
+            await this.resources.resetCacheForItem(item);
             touchedEntities.push(item);
         }
 

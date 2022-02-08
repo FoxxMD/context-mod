@@ -4,6 +4,8 @@ import Snoowrap, {Comment, Submission} from "snoowrap";
 import {RuleResult} from "../Rule";
 import {activityIsRemoved} from "../Utils/SnoowrapUtils";
 import {ActionProcessResult} from "../Common/interfaces";
+import dayjs from "dayjs";
+import {isSubmission} from "../util";
 
 export class RemoveAction extends Action {
     spam: boolean;
@@ -38,6 +40,13 @@ export class RemoveAction extends Action {
         if (!dryRun) {
             // @ts-ignore
             await item.remove({spam: this.spam});
+            item.banned_at_utc = dayjs().unix();
+            item.spam = this.spam;
+            if(!isSubmission(item)) {
+                // @ts-ignore
+                item.removed = true;
+            }
+            await this.resources.resetCacheForItem(item);
             touchedEntities.push(item);
         }
 
