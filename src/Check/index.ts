@@ -16,7 +16,7 @@ import {
     truncateStringToLength
 } from "../util";
 import {
-    ActionResult, ActivityType,
+    ActionResult, ActivityType, CheckResult,
     ChecksActivityState,
     CommentState,
     JoinCondition,
@@ -192,7 +192,7 @@ export abstract class Check implements ICheck {
     async setCacheResult(item: Submission | Comment, result: UserResultCache): Promise<void> {
     }
 
-    async runRules(item: Submission | Comment, existingResults: RuleResult[] = []): Promise<[boolean, RuleResult[], boolean?]> {
+    async runRules(item: Submission | Comment, existingResults: RuleResult[] = []): Promise<CheckResult> {
         try {
             let allRuleResults: RuleResult[] = [];
             let allResults: (RuleResult | RuleSetResult)[] = [];
@@ -201,22 +201,35 @@ export abstract class Check implements ICheck {
             const cacheResult = await this.getCacheResult(item);
             if(cacheResult !== undefined) {
                 this.logger.verbose(`Skipping rules run because result was found in cache, Check Triggered Result: ${cacheResult}`);
-                return [cacheResult.result, cacheResult.ruleResults, true];
+                return {
+                    triggered: cacheResult.result,
+                    ruleResults: cacheResult.ruleResults,
+                    fromCache: true
+                };
             }
 
             const itemPass = await this.resources.testItemCriteria(item, this.itemIs);
             if (!itemPass) {
                 this.logger.verbose(`${FAIL} => Item did not pass 'itemIs' test`);
-                return [false, allRuleResults];
+                return {
+                    triggered: false,
+                    ruleResults: allRuleResults,
+                };
             }
             const [authFilterResult, authFilterType] = await checkAuthorFilter(item, this.authorIs, this.resources, this.logger);
             if(!authFilterResult) {
-                return Promise.resolve([false, allRuleResults]);
+                return {
+                    triggered: false,
+                    ruleResults: allRuleResults,
+                };
             }
 
             if (this.rules.length === 0) {
                 this.logger.info(`${PASS} => No rules to run, check auto-passes`);
-                return [true, allRuleResults];
+                return {
+                    triggered: true,
+                    ruleResults: allRuleResults,
+                };
             }
 
             let runOne = false;
@@ -237,24 +250,39 @@ export abstract class Check implements ICheck {
                 if (passed) {
                     if (this.condition === 'OR') {
                         this.logger.info(`${PASS} => Rules: ${resultsSummary(allResults, this.condition)}`);
-                        return [true, allRuleResults];
+                        return {
+                            triggered: true,
+                            ruleResults: allRuleResults,
+                        };
                     }
                 } else if (this.condition === 'AND') {
                     this.logger.verbose(`${FAIL} => Rules: ${resultsSummary(allResults, this.condition)}`);
-                    return [false, allRuleResults];
+                    return {
+                        triggered: false,
+                        ruleResults: allRuleResults,
+                    };
                 }
             }
             if (!runOne) {
                 this.logger.verbose(`${FAIL} => All Rules skipped because of Author checks or itemIs tests`);
-                return [false, allRuleResults];
+                return {
+                    triggered: false,
+                    ruleResults: allRuleResults,
+                };
             } else if (this.condition === 'OR') {
                 // if OR and did not return already then none passed
                 this.logger.verbose(`${FAIL} => Rules: ${resultsSummary(allResults, this.condition)}`);
-                return [false, allRuleResults];
+                return {
+                    triggered: false,
+                    ruleResults: allRuleResults,
+                };
             }
             // otherwise AND and did not return already so all passed
             this.logger.info(`${PASS} => Rules: ${resultsSummary(allResults, this.condition)}`);
-            return [true, allRuleResults];
+            return {
+                triggered: true,
+                ruleResults: allRuleResults,
+            };
         } catch (e: any) {
             throw new ErrorWithCause('Running rules failed due to error', {cause: e});
         }

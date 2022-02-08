@@ -23,7 +23,7 @@ import {RuleResult} from "../Rule";
 import {ConfigBuilder, buildPollingOptions} from "../ConfigBuilder";
 import {
     ActionedEvent,
-    ActionResult,
+    ActionResult, CheckResult, CheckSummary,
     DEFAULT_POLLING_INTERVAL,
     DEFAULT_POLLING_LIMIT, FilterCriteriaDefaults, Invokee,
     ManagerOptions, ManagerStateChangeOption, ManagerStats, PAUSED,
@@ -50,7 +50,7 @@ import NotificationManager from "../Notification/NotificationManager";
 import {createHistoricalDefaults, historicalDefaults} from "../Common/defaults";
 import {ExtendedSnoowrap} from "../Utils/SnoowrapClients";
 import {CMError, isRateLimitError, isStatusError} from "../Utils/Errors";
-import {ErrorWithCause} from "pony-cause";
+import {ErrorWithCause, stackWithCauses} from "pony-cause";
 import {Run} from "../Run";
 import got from "got";
 
@@ -638,6 +638,7 @@ export class Manager extends EventEmitter {
         }
 
         let allRuleResults: RuleResult[] = [];
+        const runChecks: CheckSummary[] = [];
         const itemIdentifier = `${checkType === 'Submission' ? 'SUB' : 'COM'} ${itemId}`;
         this.currentLabels = [itemIdentifier];
         let ePeek = '';
@@ -661,13 +662,13 @@ export class Manager extends EventEmitter {
             },
             author: item.author.name,
             timestamp: Date.now(),
-            check: '',
-            ruleSummary: '',
-            ruleResults: [],
-            actionResults: [],
+            runResults: []
+            //check: '',
+           // ruleSummary: '',
+            //ruleResults: [],
+            //actionResults: [],
         }
         let triggered = false;
-        let triggeredCheckName;
         const checksRunNames = [];
         const cachedCheckNames = [];
         const startingApiLimit = this.client.ratelimitRemaining;
@@ -792,8 +793,15 @@ export class Manager extends EventEmitter {
                     triggered = false;
                     let isFromCache = false;
                     let currentResults: RuleResult[] = [];
+                    let checkRes: CheckResult;
+                    let checkError: string | undefined;
                     try {
-                        const [checkTriggered, checkResults, fromCache = false] = await check.runRules(item, allRuleResults);
+                        checkRes = await check.runRules(item, allRuleResults);
+                        const {
+                            triggered: checkTriggered,
+                            ruleResults: checkResults,
+                            fromCache = false
+                        } = checkRes;
                         isFromCache = fromCache;
                         if (!fromCache) {
                             await check.setCacheResult(item, {result: checkTriggered, ruleResults: checkResults});
@@ -809,6 +817,11 @@ export class Manager extends EventEmitter {
                             triggered = false;
                         }
                     } catch (e: any) {
+                        checkRes = {
+                            triggered: false,
+                            ruleResults: [],
+                        };
+                        checkError = stackWithCauses(e);
                         if (e.logged !== true) {
                             currRun.logger.warn(`Running rules for Check ${check.name} failed due to uncaught exception`, e);
                         }
@@ -819,28 +832,37 @@ export class Manager extends EventEmitter {
                     let behaviorT: string;
 
                     if (triggered) {
-                        triggeredCheckName = check.name;
-                        actionedEvent.check = check.name;
-                        actionedEvent.ruleResults = currentResults;
-                        if (isFromCache) {
-                            actionedEvent.ruleSummary = `Check result was found in cache: ${triggeredIndicator(true)}`;
-                        } else {
-                            actionedEvent.ruleSummary = resultsSummary(currentResults, check.condition);
-                        }
-                        runActions = await check.runActions(item, currentResults.filter(x => x.triggered), dryRun);
-                        // we only can about report and comment actions since those can produce items for newComm and modqueue
-                        const recentCandidates = runActions.filter(x => ['report', 'comment'].includes(x.kind.toLocaleLowerCase())).map(x => x.touchedEntities === undefined ? [] : x.touchedEntities).flat();
-                        for (const recent of recentCandidates) {
-                            await this.resources.setRecentSelf(recent as (Submission | Comment));
-                        }
-                        actionsRun = runActions.length;
+                        //triggeredCheckName = check.name;
+                        //actionedEvent.check = check.name;
+                        //actionedEvent.ruleResults = currentResults;
+                        // if (isFromCache) {
+                        //     actionedEvent.ruleSummary = `Check result was found in cache: ${triggeredIndicator(true)}`;
+                        // } else {
+                        //     actionedEvent.ruleSummary = resultsSummary(currentResults, check.condition);
+                        // }
+                        try {
+                            runActions = await check.runActions(item, currentResults.filter(x => x.triggered), dryRun);
+                            // we only can about report and comment actions since those can produce items for newComm and modqueue
+                            const recentCandidates = runActions.filter(x => ['report', 'comment'].includes(x.kind.toLocaleLowerCase())).map(x => x.touchedEntities === undefined ? [] : x.touchedEntities).flat();
+                            for (const recent of recentCandidates) {
+                                await this.resources.setRecentSelf(recent as (Submission | Comment));
+                            }
+                            actionsRun = runActions.length;
 
-                        if (check.notifyOnTrigger) {
-                            const ar = runActions.filter(x => x.success).map(x => x.name).join(', ');
-                            this.notificationManager.handle('eventActioned', 'Check Triggered', `Check "${check.name}" was triggered on Event: \n\n ${ePeek} \n\n with the following actions run: ${ar}`);
+                            if (check.notifyOnTrigger) {
+                                const ar = runActions.filter(x => x.success).map(x => x.name).join(', ');
+                                this.notificationManager.handle('eventActioned', 'Check Triggered', `Check "${check.name}" was triggered on Event: \n\n ${ePeek} \n\n with the following actions run: ${ar}`);
+                            }
+                            behavior = check.postTrigger;
+                            behaviorT = 'Trigger';
+                        } catch (err: any) {
+                            checkError = stackWithCauses(err);
+                            if (err.logged !== true) {
+                                currRun.logger.warn(`Running actions for Check ${check.name} failed due to uncaught exception`, err);
+                            }
+                            check.logger.debug('Behavior => STOP => Due to uncaught error while running actions', {leaf: `Post Check Trigger`});
+                            throw err;
                         }
-                        behavior = check.postTrigger;
-                        behaviorT = 'Trigger';
                     } else {
                         behavior = check.postFail;
                         behaviorT = 'Fail';
@@ -879,6 +901,18 @@ export class Manager extends EventEmitter {
                                 throw new Error(`Post ${behaviorT} Behavior was not a valid value. Must be one of => next | nextRun | stop | goto:[path]`);
                             }
                     }
+
+                    runChecks.push({
+                        ...checkRes,
+                        error: checkError,
+                        name: check.name,
+                        condition: check.condition,
+                        ruleResults: currentResults,
+                        actionResults: runActions,
+                        postBehavior: behavior,
+                        run: currRun.name,
+                        ruleSummary: isFromCache ? `Check result was found in cache: ${triggeredIndicator(triggered)}` : resultsSummary(currentResults, check.condition)
+                    });
                 }
 
                 if (!triggered) {
@@ -893,7 +927,8 @@ export class Manager extends EventEmitter {
             this.emit('error', err);
         } finally {
             try {
-                actionedEvent.actionResults = runActions;
+                //actionedEvent.actionResults = runActions;
+                actionedEvent.runResults = runChecks;
                 if(triggered) {
                     await this.resources.addActionedEvent(actionedEvent);
                 }
@@ -907,7 +942,7 @@ export class Manager extends EventEmitter {
                 this.resources.updateHistoricalStats({
                     eventsCheckedTotal: 1,
                     eventsActionedTotal: triggered ? 1 : 0,
-                    checksTriggered: triggeredCheckName !== undefined ? [triggeredCheckName] : [],
+                    checksTriggered: runChecks.filter(x => x.triggered).map(x => x.name),
                     checksRun: checksRunNames,
                     checksFromCache: cachedCheckNames,
                     actionsRun: runActions.map(x => x.name),

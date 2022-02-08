@@ -1971,11 +1971,28 @@ export interface ActionedEvent {
     }
     author: string
     timestamp: number
-    check: string
-    ruleSummary: string,
+    //check: string
+    //ruleSummary: string,
     subreddit: string,
+    //ruleResults: RuleResult[]
+    //actionResults: ActionResult[]
+    runResults: CheckSummary[]
+}
+
+export interface CheckResult {
+    triggered: boolean
     ruleResults: RuleResult[]
+    fromCache?: boolean
+}
+
+export interface CheckSummary extends CheckResult {
+    name: string
+    run: string
+    postBehavior: string
+    error?: string
     actionResults: ActionResult[]
+    condition: string
+    ruleSummary: string
 }
 
 export interface UserResultCache {
