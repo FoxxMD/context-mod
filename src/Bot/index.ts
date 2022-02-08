@@ -129,8 +129,6 @@ class Bot {
             }
         } = config;
 
-        this.cacheManager = new BotResourcesManager(config);
-
         this.dryRun = parseBool(dryRun) === true ? true : undefined;
         this.softLimit = softLimit;
         this.hardLimit = hardLimit;
@@ -150,6 +148,8 @@ class Bot {
                 return getBotName();
             }
         }, mergeArr);
+
+        this.cacheManager = new BotResourcesManager(config, this.logger);
 
         let mw = maxWorkers;
         if(maxWorkers < 1) {

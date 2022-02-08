@@ -71,6 +71,7 @@ import {ExtendedSnoowrap} from "../Utils/SnoowrapClients";
 import dayjs from "dayjs";
 import ImageData from "../Common/ImageData";
 import globrex from 'globrex';
+import {runMigrations} from "../Common/Migrations/CacheMigrationUtils";
 
 export const DEFAULT_FOOTER = '\r\n*****\r\nThis action was performed by [a bot.]({{botLink}}) Mention a moderator or [send a modmail]({{modmailLink}}) if you any ideas, questions, or concerns about this action.';
 
@@ -1278,6 +1279,7 @@ export class BotResourcesManager {
     modStreams: Map<string, SPoll<Snoowrap.Submission | Snoowrap.Comment>> = new Map();
     defaultCache: Cache;
     defaultCacheConfig: StrongCache
+    defaultCacheMigrated: boolean = false;
     cacheType: string = 'none';
     cacheHash: string;
     ttlDefaults: Required<TTLConfig>;
@@ -1285,8 +1287,9 @@ export class BotResourcesManager {
     actionedEventsDefault: number;
     pruneInterval: any;
     defaultThirdPartyCredentials: ThirdPartyCredentialsJsonConfig;
+    logger: Logger;
 
-    constructor(config: BotInstanceConfig) {
+    constructor(config: BotInstanceConfig, logger: Logger) {
         const {
             caching: {
                 authorTTL,
@@ -1314,6 +1317,7 @@ export class BotResourcesManager {
         this.defaultCacheConfig = caching;
         this.defaultThirdPartyCredentials = thirdParty;
         this.ttlDefaults = {authorTTL, userNotesTTL, wikiTTL, commentTTL, submissionTTL, filterCriteriaTTL, subredditTTL, selfTTL};
+        this.logger = logger;
 
         const options = provider;
         this.cacheType = options.store;
@@ -1385,15 +1389,16 @@ export class BotResourcesManager {
                     ...init,
                     ...trueRest,
                 };
+                await runMigrations(opts.cache, opts.logger, trueProvider.prefix);
             }
+        } else if(!this.defaultCacheMigrated) {
+            await runMigrations(this.defaultCache, this.logger, opts.prefix);
+            this.defaultCacheMigrated = true;
         }
 
         let resource: SubredditResources;
         const res = this.get(subName);
         if(res === undefined || res.cacheSettingsHash !== hash) {
-            if(res !== undefined && res.cache !== undefined) {
-                res.cache.reset();
-            }
             resource = new SubredditResources(subName, opts);
             await resource.initHistoricalStats();
             resource.setHistoricalSaveInterval();
