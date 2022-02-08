@@ -735,7 +735,7 @@ export class Manager extends EventEmitter {
                     actionsRun = runActions.length;
 
                     if(check.notifyOnTrigger) {
-                        const ar = runActions.map(x => x.name).join(', ');
+                        const ar = runActions.filter(x => x.success).map(x => x.name).join(', ');
                         this.notificationManager.handle('eventActioned', 'Check Triggered', `Check "${check.name}" was triggered on Event: \n\n ${ePeek} \n\n with the following actions run: ${ar}`);
                     }
                     break;
