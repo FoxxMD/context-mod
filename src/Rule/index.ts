@@ -31,6 +31,7 @@ export interface RuleResult extends ResultContext {
     kind: string
     name: string
     triggered: (boolean | null)
+    fromCache?: boolean
 }
 
 export type FormattedRuleResult = RuleResult & {
@@ -94,7 +95,7 @@ export abstract class Rule implements IRule, Triggerable {
             const existingResult = findResultByPremise(this.getPremise(), existingResults);
             if (existingResult) {
                 this.logger.debug(`Returning existing result of ${existingResult.triggered ? '✔️' : '❌'}`);
-                return Promise.resolve([existingResult.triggered, {...existingResult, name: this.name}]);
+                return Promise.resolve([existingResult.triggered, {...existingResult, name: this.name, fromCache: true}]);
             }
             const itemPass = await this.resources.testItemCriteria(item, this.itemIs);
             if (!itemPass) {

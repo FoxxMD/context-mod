@@ -154,7 +154,7 @@ const program = new Command();
                     await b.buildManagers([sub]);
                     if(b.subManagers.length > 0) {
                        const manager = b.subManagers[0];
-                        await manager.runChecks(activity, {checkNames: checks});
+                        await manager.handleActivity(activity, {checkNames: checks});
                         break;
                     }
                 }

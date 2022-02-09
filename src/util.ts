@@ -13,7 +13,7 @@ import {
     ActivityWindowCriteria, ActivityWindowType,
     CacheOptions,
     CacheProvider,
-    DurationComparison, DurationVal, FilterCriteriaPropertyResult, FilterCriteriaResult,
+    DurationComparison, DurationVal, FilterCriteriaDefaults, FilterCriteriaPropertyResult, FilterCriteriaResult,
     GenericComparison,
     HistoricalStats,
     HistoricalStatsDisplay, ImageComparisonResult,
@@ -30,7 +30,7 @@ import {
     StringComparisonOptions,
     StringOperator,
     StrongSubredditState,
-    SubredditState
+    SubredditState, TypedActivityStates
 } from "./Common/interfaces";
 import { Document as YamlDocument } from 'yaml'
 import InvalidRegexError from "./Utils/InvalidRegexError";
@@ -59,6 +59,8 @@ import JsonConfigDocument from "./Common/Config/JsonConfigDocument";
 import YamlConfigDocument from "./Common/Config/YamlConfigDocument";
 import AbstractConfigDocument, {ConfigDocumentInterface} from "./Common/Config/AbstractConfigDocument";
 import LoggedError from "./Utils/LoggedError";
+import {AuthorOptions} from "./Author/Author";
+import merge from "deepmerge";
 
 
 //import {ResembleSingleCallbackComparisonResult} from "resemblejs";
@@ -2072,4 +2074,33 @@ export async function* redisScanIterator(client: any, options: any = {}): AsyncI
             yield key;
         }
     } while (cursor !== '0');
+}
+
+export const mergeFilters = (objectConfig: any, filterDefs: FilterCriteriaDefaults | undefined): [AuthorOptions, TypedActivityStates] => {
+    const {authorIs: aisVal = {}, itemIs: iisVal = []} = objectConfig || {};
+    const authorIs = aisVal as AuthorOptions;
+    const itemIs = iisVal as TypedActivityStates;
+
+    const {
+        authorIsBehavior = 'merge',
+        itemIsBehavior = 'merge',
+        authorIs: authorIsDefault = {},
+        itemIs: itemIsDefault = []
+    } = filterDefs || {};
+
+    let derivedAuthorIs: AuthorOptions = authorIsDefault;
+    if (authorIsBehavior === 'merge') {
+        derivedAuthorIs = merge.all([authorIs, authorIsDefault], {arrayMerge: removeFromSourceIfKeysExistsInDestination});
+    } else if (Object.keys(authorIs).length > 0) {
+        derivedAuthorIs = authorIs;
+    }
+
+    let derivedItemIs: TypedActivityStates = itemIsDefault;
+    if (itemIsBehavior === 'merge') {
+        derivedItemIs = [...itemIs, ...itemIsDefault];
+    } else if (itemIs.length > 0) {
+        derivedItemIs = itemIs;
+    }
+
+    return [derivedAuthorIs, derivedItemIs];
 }

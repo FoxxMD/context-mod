@@ -56,7 +56,7 @@ import {
     HistoricalStats,
     HistoricalStatUpdateData,
     SubredditHistoricalStats,
-    SubredditHistoricalStatsDisplay, ThirdPartyCredentialsJsonConfig, FilterCriteriaResult,
+    SubredditHistoricalStatsDisplay, ThirdPartyCredentialsJsonConfig, FilterCriteriaResult, FilterResult,
 } from "../Common/interfaces";
 import UserNotes from "./UserNotes";
 import Mustache from "mustache";
@@ -1450,7 +1450,7 @@ export class BotResourcesManager {
     }
 }
 
-export const checkAuthorFilter = async (item: (Submission | Comment), filter: AuthorOptions, resources: SubredditResources, logger: Logger): Promise<[boolean, ('inclusive' | 'exclusive' | undefined)]> => {
+export const checkAuthorFilter = async (item: (Submission | Comment), filter: AuthorOptions, resources: SubredditResources, logger: Logger): Promise<[boolean, ('inclusive' | 'exclusive' | undefined), FilterResult<AuthorCriteria>]> => {
     const authLogger = logger.child({labels: ['Author Filter']}, mergeArr);
     const {
         include = [],
@@ -1458,15 +1458,17 @@ export const checkAuthorFilter = async (item: (Submission | Comment), filter: Au
         exclude = [],
     } = filter;
     let authorPass = null;
+    const allCritResults: FilterCriteriaResult<AuthorCriteria>[] = [];
     if (include.length > 0) {
         let index = 1;
         for (const auth of include) {
             const critResult = await resources.testAuthorCriteria(item, auth);
+            allCritResults.push(critResult);
             const [summary, details] = filterCriteriaSummary(critResult);
             if (critResult.passed) {
                 authLogger.verbose(`${PASS} => Inclusive Author Criteria ${index} => ${summary}`);
                 authLogger.debug(`Criteria Details: \n${details.join('\n')}`);
-                return [true, 'inclusive'];
+                return [true, 'inclusive', {criteriaResults: allCritResults, join: 'OR', passed: true}];
             } else {
                 authLogger.debug(`${FAIL} => Inclusive Author Criteria ${index} => ${summary}`);
                 authLogger.debug(`Criteria Details: \n${details.join('\n')}`);
@@ -1474,13 +1476,14 @@ export const checkAuthorFilter = async (item: (Submission | Comment), filter: Au
             index++;
         }
         authLogger.verbose(`${FAIL} => No Inclusive Author Criteria matched`);
-        return [false, 'inclusive'];
+        return [false, 'inclusive', {criteriaResults: allCritResults, join: 'OR', passed: false}];
     }
     if (exclude.length > 0) {
         let index = 1;
         const summaries: string[] = [];
         for (const auth of exclude) {
             const critResult = await resources.testAuthorCriteria(item, auth, false);
+            allCritResults.push(critResult);
             const [summary, details] = filterCriteriaSummary(critResult);
             if (critResult.passed) {
                 if(excludeCondition === 'OR') {
@@ -1512,11 +1515,11 @@ export const checkAuthorFilter = async (item: (Submission | Comment), filter: Au
             if(excludeCondition === 'OR') {
                 authLogger.verbose(`${FAIL} => Exclusive author criteria not matched => ${summaries.length === 1 ? `${summaries[0]}` : '(many, see debug)'}`);
             }
-            return [false, 'exclusive']
+            return [false, 'exclusive', {criteriaResults: allCritResults, join: excludeCondition, passed: false}]
         } else if(excludeCondition === 'AND') {
             authLogger.verbose(`${PASS} => Exclusive author criteria matched => ${summaries.length === 1 ? `${summaries[0]}` : '(many, see debug)'}`);
         }
-        return [true, 'exclusive'];
+        return [true, 'exclusive', {criteriaResults: allCritResults, join: excludeCondition, passed: true}];
     }
-    return [true, undefined];
+    return [true, undefined, {criteriaResults: allCritResults, join: 'OR', passed: true}];
 }

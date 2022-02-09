@@ -6,7 +6,7 @@ import cookieParser from 'cookie-parser';
 import CacheManagerStore from 'express-session-cache-manager'
 import passport from 'passport';
 import {Strategy as CustomStrategy} from 'passport-custom';
-import {OperatorConfig, BotConnection, LogInfo, CheckSummary} from "../../Common/interfaces";
+import {OperatorConfig, BotConnection, LogInfo, CheckSummary, RunResult, ActionedEvent} from "../../Common/interfaces";
 import {
     buildCachePrefix,
     createCacheManager, defaultFormat, filterLogBySubreddit,
@@ -954,7 +954,7 @@ const webClient = async (options: OperatorConfig) => {
             }
         }).json() as [any];
 
-        const actionedEvents = resp.map((x) => {
+        const actionedEvents = resp.map((x: ActionedEvent) => {
             const {timestamp, activity: {peek, link}, runResults = [], ...rest} = x;
             const time = dayjs(timestamp).local().format('YY-MM-DD HH:mm:ss z');
             const formattedPeek = Autolinker.link(peek, {
@@ -965,55 +965,51 @@ const webClient = async (options: OperatorConfig) => {
                 stripPrefix: false,
                 sanitizeHtml: true,
             });
-            const mergedRunResults = runResults.reduce((acc: any, summ: CheckSummary) => {
-                let currentRun = acc.curr;
-                if(currentRun.name !== undefined && summ.run !== currentRun.name) {
-                    currentRun.triggeredVal = currentRun.checkResults.some((x: any) => x.triggered);
-                    currentRun.triggered = triggeredIndicator(currentRun.triggeredVal);
-                    acc.all.push(currentRun);
-                    currentRun = {name: undefined, triggered: false, checkResults: []};
-                }
-                currentRun.name = summ.run;
-                const {actionResults = [], ruleResults = [], triggered: checkTriggered, ...rest} = summ;
-                const formattedRuleResults = ruleResults.map((y: any) => {
-                    const {triggered, result, ...restY} = y;
-                    return {
-                        ...restY,
-                        triggered: triggeredIndicator(triggered, 'Skipped'),
-                        result: result || '-'
-                    };
-                });
-                const formattedActionResults = actionResults.map((y: any) => {
-                    const {run, runReason, success, result, dryRun, ...restA} = y;
-                    let res = '';
-                    if(!run) {
-                        res = `Not Run - ${runReason === undefined ? '(No Reason)' : runReason}`;
-                    } else {
-                        res = `${triggeredIndicator(success)}${result !== undefined ? ` - ${result}` : ''}`;
-                    }
-                    return {
-                        ...restA,
-                        dryRun: dryRun ? ' (DRYRUN)' : '',
-                        result: res
-                    };
-                });
-                currentRun.checkResults.push({
-                    ...rest,
-                    triggered: triggeredIndicator(checkTriggered, 'Skipped'),
-                    triggeredVal: checkTriggered,
-                    ruleResults: formattedRuleResults,
-                    actionResults: formattedActionResults,
-                    ruleSummary: summ.fromCache ? `Check result was found in cache: ${triggeredIndicator(checkTriggered, 'Skipped')}` : resultsSummary(ruleResults, summ.condition)
-                });
-                acc.curr = currentRun;
-                return acc;
-            }, {curr: {name: undefined, triggered: false, checkResults: []}, all: []});
+            const formattedRunResults = runResults.map((summ: RunResult) => {
+                const {checkResults = [], ...rest} = summ;
+                const formattedCheckResults = checkResults.map((y) => {
+                    const {actionResults = [], ruleResults = [], triggered: checkTriggered, ...rest} = y;
 
-            // handle last current run
-            const currentRun = mergedRunResults.curr;
-            currentRun.triggeredVal = currentRun.checkResults.some((x: any) => x.triggered);
-            currentRun.triggered = triggeredIndicator(currentRun.triggeredVal);
-            const rr = mergedRunResults.all.concat(currentRun);
+                    const formattedRuleResults = ruleResults.map((y: any) => {
+                        const {triggered, result, ...restY} = y;
+                        return {
+                            ...restY,
+                            triggered: triggeredIndicator(triggered, 'Skipped'),
+                            result: result || '-'
+                        };
+                    });
+                    const formattedActionResults = actionResults.map((y: any) => {
+                        const {run, runReason, success, result, dryRun, ...restA} = y;
+                        let res = '';
+                        if(!run) {
+                            res = `Not Run - ${runReason === undefined ? '(No Reason)' : runReason}`;
+                        } else {
+                            res = `${triggeredIndicator(success)}${result !== undefined ? ` - ${result}` : ''}`;
+                        }
+                        return {
+                            ...restA,
+                            dryRun: dryRun ? ' (DRYRUN)' : '',
+                            result: res
+                        };
+                    });
+
+                    return {
+                        ...rest,
+                        triggered: triggeredIndicator(checkTriggered, 'Skipped'),
+                        triggeredVal: checkTriggered,
+                        ruleResults: formattedRuleResults,
+                        actionResults: formattedActionResults,
+                        ruleSummary: y.fromCache ? `Check result was found in cache: ${triggeredIndicator(checkTriggered, 'Skipped')}` : resultsSummary(ruleResults, y.condition)
+                    }
+                });
+
+                return {
+                    ...rest,
+                    triggered: triggeredIndicator(summ.triggered, 'Skipped'),
+                    triggeredVal: summ.triggered,
+                    checkResults: formattedCheckResults
+                }
+            });
             return {
                 ...rest,
                 timestamp: time,
@@ -1021,8 +1017,9 @@ const webClient = async (options: OperatorConfig) => {
                     link,
                     peek: formattedPeek,
                 },
-                triggered: rr.some((x: any) => x.triggeredVal),
-                runResults: rr,
+                triggered: triggeredIndicator(x.triggered),
+                triggeredVal: x.triggered,
+                runResults: formattedRunResults,
             }
         });
 

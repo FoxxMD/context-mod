@@ -26,8 +26,8 @@ import {
     ActionResult, CheckResult, CheckSummary,
     DEFAULT_POLLING_INTERVAL,
     DEFAULT_POLLING_LIMIT, FilterCriteriaDefaults, Invokee,
-    ManagerOptions, ManagerStateChangeOption, ManagerStats, PAUSED,
-    PollingOptionsStrong, PollOn, PostBehavior, PostBehaviorTypes, RUNNING, RunState, STOPPED, SYSTEM, USER
+    ManagerOptions, ManagerStateChangeOption, ManagerStats, NotificationEventPayload, PAUSED,
+    PollingOptionsStrong, PollOn, PostBehavior, PostBehaviorTypes, RUNNING, RunResult, RunState, STOPPED, SYSTEM, USER
 } from "../Common/interfaces";
 import Submission from "snoowrap/dist/objects/Submission";
 import {activityIsRemoved, itemContentPeek} from "../Utils/SnoowrapUtils";
@@ -65,6 +65,7 @@ export interface runCheckOptions {
     dryRun?: boolean,
     refresh?: boolean,
     force?: boolean,
+    gotoContext?: string
 }
 
 export interface CheckTask {
@@ -161,6 +162,8 @@ export class Manager extends EventEmitter {
     rulesUniqueSampleInterval: any;
     rulesUniqueRollingAvg: number = 0;
     actionedEvents: ActionedEvent[] = [];
+
+    processEmitter: EventEmitter = new EventEmitter();
 
     getStats = async (): Promise<ManagerStats> => {
         const data: any = {
@@ -277,6 +280,13 @@ export class Manager extends EventEmitter {
                 //self.logger.debug(`Unique Rules Run Rolling Avg: ${formatNumber(self.rulesUniqueRollingAvg)}/s`);
             }
         })(this), 10000);
+
+        this.processEmitter.on('notify', (payload: NotificationEventPayload) => {
+           this.notificationManager.handle(payload.type, payload.title, payload.body, payload.causedBy, payload.logLevel);
+        });
+
+        // relay check/run errors to bot for retry metrics
+        this.processEmitter.on('error', err => this.emit('error', err));
     }
 
     protected async getModPermissions(): Promise<string[]> {
@@ -350,7 +360,7 @@ export class Manager extends EventEmitter {
                 try {
                     const itemMeta = this.queuedItemsMeta[queuedItemIndex];
                     this.queuedItemsMeta.splice(queuedItemIndex, 1, {...itemMeta, state: 'processing'});
-                    await this.runChecks(task.activity, {...task.options, refresh: itemMeta.shouldRefresh});
+                    await this.handleActivity(task.activity, {...task.options, refresh: itemMeta.shouldRefresh});
                 } finally {
                     // always remove item meta regardless of success or failure since we are done with it meow
                     this.queuedItemsMeta.splice(queuedItemIndex, 1);
@@ -451,7 +461,8 @@ export class Manager extends EventEmitter {
                     logger: this.logger,
                     resources: this.resources,
                     subredditName: this.subreddit.display_name,
-                    client: this.client
+                    client: this.client,
+                    emitter: this.processEmitter,
                 });
                 runs.push(run);
                 index++;
@@ -621,7 +632,7 @@ export class Manager extends EventEmitter {
         }
     }
 
-    async runChecks(activity: (Submission | Comment), options?: runCheckOptions): Promise<void> {
+    async handleActivity(activity: (Submission | Comment), options?: runCheckOptions): Promise<void> {
         const checkType = isSubmission(activity) ? 'Submission' : 'Comment';
         let item = activity;
         const itemId = await item.id;
@@ -638,7 +649,7 @@ export class Manager extends EventEmitter {
         }
 
         let allRuleResults: RuleResult[] = [];
-        const runChecks: CheckSummary[] = [];
+        const runResults: RunResult[] = [];
         const itemIdentifier = `${checkType === 'Submission' ? 'SUB' : 'COM'} ${itemId}`;
         this.currentLabels = [itemIdentifier];
         let ePeek = '';
@@ -650,11 +661,8 @@ export class Manager extends EventEmitter {
             this.logger.error(`Error occurred while generating item peek for ${checkType} Activity ${itemId}`, err);
         }
 
-        let checksRun = 0;
-        let actionsRun = 0;
-        let totalRulesRun = 0;
-        let runActions: ActionResult[] = [];
         let actionedEvent: ActionedEvent = {
+            triggered: false,
             subreddit: this.subreddit.display_name_prefixed,
             activity: {
                 peek: ePeek,
@@ -663,20 +671,11 @@ export class Manager extends EventEmitter {
             author: item.author.name,
             timestamp: Date.now(),
             runResults: []
-            //check: '',
-           // ruleSummary: '',
-            //ruleResults: [],
-            //actionResults: [],
         }
-        let triggered = false;
-        const checksRunNames = [];
-        const cachedCheckNames = [];
         const startingApiLimit = this.client.ratelimitRemaining;
 
         const {
-            checkNames = [],
             delayUntil,
-            dryRun,
             refresh = false,
         } = options || {};
 
@@ -742,180 +741,33 @@ export class Manager extends EventEmitter {
                     currRun = this.runs[runIndex];
                 }
 
-                if(isSubmission(item)) {
-                    if(currRun.submissionChecks.length === 0) {
-                        currRun.logger.debug('Skipping b/c Run did not contain any submission Checks');
-                        continue;
-                    }
-                } else if(currRun.commentChecks.length === 0) {
-                    currRun.logger.debug('Skipping b/c Run did not contain any comment Checks');
-                    continue;
-                }
+                const [runResult, postBehavior] = await currRun.handle(item,allRuleResults, {...options, gotoContext});
+                runResults.push(runResult);
 
-                const checks = isSubmission(item) ? currRun.submissionChecks : currRun.commentChecks;
-                let continueCheckIteration = true;
-                let checkIndex = 0;
-                while(continueCheckIteration && checkIndex < checks.length) {
-                    let check: Check;
-                    if(gotoContext !== '') {
-                        const [runName, checkName] = gotoContext.split('.');
-                        const gotoIndex = checks.findIndex(x => normalizeName(x.name) === normalizeName(checkName));
-                        if(gotoIndex !== -1) {
-                            if(gotoIndex > runIndex) {
-                                this.logger.debug(`Fast forwarding Check iteration to ${checks[gotoIndex].name}`, {leaf: 'GOTO'});
-                            } else if(gotoIndex < runIndex) {
-                                this.logger.debug(`Rewinding Check iteration to ${checks[gotoIndex].name}`, {leaf: 'GOTO'});
+                allRuleResults = allRuleResults.concat(determineNewResults(allRuleResults, (runResult.checkResults ?? []).map(x => x.ruleResults).flat()));
+
+                switch (postBehavior.toLowerCase()) {
+                    case 'next':
+                    case 'nextrun':
+                        break;
+                    case 'stop':
+                        continueRunIteration = false;
+                        break;
+                    default:
+                        if (postBehavior.includes('goto:')) {
+                            gotoContext = postBehavior.split(':')[1];
+                            if (!gotoContext.includes('.')) {
+                                // no period means we are going directly to a run
+                                continueRunIteration = false;
                             } else {
-                                this.logger.debug(`Did not iterate to next Check due to GOTO specifying same Check (you probably don't want to do this!)`, {leaf: 'GOTO'});
-                            }
-                            check = checks[gotoIndex];
-                            checkIndex = gotoIndex;
-                            gotoContext = '';
-                        } else {
-                            throw new Error(`GOTO specified a Check that could not be found: ${checkName}`);
-                        }
-                    } else {
-                        check = checks[checkIndex];
-                    }
-
-                    if (checkNames.length > 0 && !checkNames.map(x => x.toLowerCase()).some(x => x === check.name.toLowerCase())) {
-                        currRun.logger.warn(`Check ${check.name} not in array of requested checks to run, skipping...`);
-                        checkIndex++;
-                        continue;
-                    }
-                    if (!check.enabled) {
-                        currRun.logger.info(`Check ${check.name} not run because it is not enabled, skipping...`);
-                        checkIndex++;
-                        continue;
-                    }
-                    checksRunNames.push(check.name);
-                    checksRun++;
-                    triggered = false;
-                    let isFromCache = false;
-                    let currentResults: RuleResult[] = [];
-                    let checkRes: CheckResult;
-                    let checkError: string | undefined;
-                    try {
-                        checkRes = await check.runRules(item, allRuleResults);
-                        const {
-                            triggered: checkTriggered,
-                            ruleResults: checkResults,
-                            fromCache = false
-                        } = checkRes;
-                        isFromCache = fromCache;
-                        if (!fromCache) {
-                            await check.setCacheResult(item, {result: checkTriggered, ruleResults: checkResults});
-                        } else {
-                            cachedCheckNames.push(check.name);
-                        }
-                        currentResults = checkResults;
-                        totalRulesRun += checkResults.length;
-                        allRuleResults = allRuleResults.concat(determineNewResults(allRuleResults, checkResults));
-                        triggered = checkTriggered;
-                        if (triggered && fromCache && !check.cacheUserResult.runActions) {
-                            currRun.logger.info('Check was triggered but cache result options specified NOT to run actions...counting as check NOT triggered');
-                            triggered = false;
-                        }
-                    } catch (e: any) {
-                        checkRes = {
-                            triggered: false,
-                            ruleResults: [],
-                        };
-                        checkError = stackWithCauses(e);
-                        if (e.logged !== true) {
-                            currRun.logger.warn(`Running rules for Check ${check.name} failed due to uncaught exception`, e);
-                        }
-                        this.emit('error', e);
-                    }
-
-                    let behavior: PostBehaviorTypes;
-                    let behaviorT: string;
-
-                    if (triggered) {
-                        //triggeredCheckName = check.name;
-                        //actionedEvent.check = check.name;
-                        //actionedEvent.ruleResults = currentResults;
-                        // if (isFromCache) {
-                        //     actionedEvent.ruleSummary = `Check result was found in cache: ${triggeredIndicator(true)}`;
-                        // } else {
-                        //     actionedEvent.ruleSummary = resultsSummary(currentResults, check.condition);
-                        // }
-                        try {
-                            runActions = await check.runActions(item, currentResults.filter(x => x.triggered), dryRun);
-                            // we only can about report and comment actions since those can produce items for newComm and modqueue
-                            const recentCandidates = runActions.filter(x => ['report', 'comment'].includes(x.kind.toLocaleLowerCase())).map(x => x.touchedEntities === undefined ? [] : x.touchedEntities).flat();
-                            for (const recent of recentCandidates) {
-                                await this.resources.setRecentSelf(recent as (Submission | Comment));
-                            }
-                            actionsRun = runActions.length;
-
-                            if (check.notifyOnTrigger) {
-                                const ar = runActions.filter(x => x.success).map(x => x.name).join(', ');
-                                this.notificationManager.handle('eventActioned', 'Check Triggered', `Check "${check.name}" was triggered on Event: \n\n ${ePeek} \n\n with the following actions run: ${ar}`);
-                            }
-                            behavior = check.postTrigger;
-                            behaviorT = 'Trigger';
-                        } catch (err: any) {
-                            checkError = stackWithCauses(err);
-                            if (err.logged !== true) {
-                                currRun.logger.warn(`Running actions for Check ${check.name} failed due to uncaught exception`, err);
-                            }
-                            check.logger.debug('Behavior => STOP => Due to uncaught error while running actions', {leaf: `Post Check Trigger`});
-                            throw err;
-                        }
-                    } else {
-                        behavior = check.postFail;
-                        behaviorT = 'Fail';
-                    }
-
-                    switch(behavior.toLowerCase()) {
-                        case 'next':
-                            check.logger.debug('Behavior => NEXT => run next check', {leaf: `Post Check ${behaviorT}`});
-                            checkIndex++;
-                            break;
-                        case 'nextrun':
-                            check.logger.debug('Behavior => NEXT RUN => Skip remaining checks and go to next Run', {leaf: `Post Check ${behaviorT}`});
-                            continueCheckIteration = false;
-                            break;
-                        case 'stop':
-                            check.logger.debug('Behavior => STOP => Immediately stop current Run and skip all remaining runs', {leaf: `Post Check ${behaviorT}`});
-                            continueRunIteration = false;
-                            continueCheckIteration = false;
-                            break;
-                        default:
-                            if(behavior.includes('goto:')) {
-                                gotoContext = behavior.split(':')[1];
-                                check.logger.debug(`Behavior => GOTO => Set to ${gotoContext}`, {leaf: `Post Check ${behaviorT}`});
-                                if(!gotoContext.includes('.')) {
-                                    // no period means we are going directly to a run
-                                    continueCheckIteration = false;
-                                } else {
-                                    const [runN, checkN] = gotoContext.split('.');
-                                    if(runN !== '') {
-                                        // if run name is specified then also break check iteration
-                                        // OTHERWISE this is a special "in run" check path IE .check1 where we just want to continue iterating checks
-                                        continueCheckIteration = false;
-                                    }
+                                const [runN, checkN] = gotoContext.split('.');
+                                if (runN !== '') {
+                                    // if run name is specified then also break check iteration
+                                    // OTHERWISE this is a special "in run" check path IE .check1 where we just want to continue iterating checks
+                                    continueRunIteration = false;
                                 }
-                            } else {
-                                throw new Error(`Post ${behaviorT} Behavior was not a valid value. Must be one of => next | nextRun | stop | goto:[path]`);
                             }
-                    }
-
-                    runChecks.push({
-                        ...checkRes,
-                        error: checkError,
-                        name: check.name,
-                        condition: check.condition,
-                        ruleResults: currentResults,
-                        actionResults: runActions,
-                        postBehavior: behavior,
-                        run: currRun.name,
-                    });
-                }
-
-                if (!triggered) {
-                    this.logger.info('No checks triggered');
+                        }
                 }
                 runIndex++;
             }
@@ -925,12 +777,20 @@ export class Manager extends EventEmitter {
             }
             this.emit('error', err);
         } finally {
+            actionedEvent.triggered = runResults.some(x => x.triggered);
+            if(!actionedEvent.triggered) {
+                this.logger.verbose('No checks triggered');
+            }
             try {
                 //actionedEvent.actionResults = runActions;
-                actionedEvent.runResults = runChecks;
-                if(triggered) {
+                actionedEvent.runResults = runResults;
+                if(actionedEvent.triggered) {
                     await this.resources.addActionedEvent(actionedEvent);
                 }
+
+                const checksRun = actionedEvent.runResults.map(x => x.checkResults).flat().length;
+                let actionsRun = actionedEvent.runResults.map(x => x.checkResults?.map(y => y.actionResults)).flat().length;
+                let totalRulesRun = actionedEvent.runResults.map(x => x.checkResults?.map(y => y.ruleResults)).flat().length;
 
                 this.logger.verbose(`Run Stats:        Checks ${checksRun} | Rules => Total: ${totalRulesRun} Unique: ${allRuleResults.length} Cached: ${totalRulesRun - allRuleResults.length} Rolling Avg: ~${formatNumber(this.rulesUniqueRollingAvg)}/s | Actions ${actionsRun}`);
                 this.logger.verbose(`Reddit API Stats: Initial ${startingApiLimit} | Current ${this.client.ratelimitRemaining} | Used ~${startingApiLimit - this.client.ratelimitRemaining} | Events ~${formatNumber(this.eventsRollingAvg)}/s`);
@@ -940,14 +800,7 @@ export class Manager extends EventEmitter {
             } finally {
                 this.resources.updateHistoricalStats({
                     eventsCheckedTotal: 1,
-                    eventsActionedTotal: triggered ? 1 : 0,
-                    checksTriggered: runChecks.filter(x => x.triggered).map(x => x.name),
-                    checksRun: checksRunNames,
-                    checksFromCache: cachedCheckNames,
-                    actionsRun: runActions.map(x => x.name),
-                    rulesRun: allRuleResults.map(x => x.name),
-                    rulesTriggered: allRuleResults.filter(x => x.triggered).map(x => x.name),
-                    rulesCachedTotal: totalRulesRun - allRuleResults.length,
+                    eventsActionedTotal: actionedEvent.triggered ? 1 : 0,
                 });
             }
         }

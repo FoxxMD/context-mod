@@ -2,7 +2,7 @@ import {Logger} from "winston";
 import {
     buildCacheOptionsFromProvider, buildCachePrefix,
     createAjvFactory, fileOrDirectoryIsWriteable,
-    mergeArr,
+    mergeArr, mergeFilters,
     normalizeName,
     overwriteMerge,
     parseBool, parseFromJsonOrYamlToObject, randomId,
@@ -158,15 +158,9 @@ export class ConfigBuilder {
 
         for(const r of realRuns) {
 
-            const {filterCriteriaDefaults: filterCriteriaDefaultsFromRun, postFail, postTrigger } = r;
+            const {filterCriteriaDefaults: filterCriteriaDefaultsFromRun, postFail, postTrigger, authorIs, itemIs } = r;
 
-            const filterDefs = filterCriteriaDefaultsFromRun ?? (filterCriteriaDefaults ?? filterCriteriaDefaultsFromBot);
-            const {
-                authorIsBehavior = 'merge',
-                itemIsBehavior = 'merge',
-                authorIs: authorIsDefault = {},
-                itemIs: itemIsDefault = []
-            } = filterDefs || {};
+            const [derivedRunAuthorIs, derivedRunItemIs] = mergeFilters(r, filterCriteriaDefaults ?? filterCriteriaDefaultsFromBot);
 
             const structuredChecks: CheckStructuredJson[] = [];
             for (const c of r.checks) {
@@ -174,19 +168,7 @@ export class ConfigBuilder {
                 const strongRules = insertNamedRules(rules, namedRules);
                 const strongActions = insertNamedActions(c.actions, namedActions);
 
-                let derivedAuthorIs: AuthorOptions = authorIsDefault;
-                if (authorIsBehavior === 'merge') {
-                    derivedAuthorIs = merge.all([authorIs, authorIsDefault], {arrayMerge: removeFromSourceIfKeysExistsInDestination});
-                } else if (Object.keys(authorIs).length > 0) {
-                    derivedAuthorIs = authorIs;
-                }
-
-                let derivedItemIs: TypedActivityStates = itemIsDefault;
-                if (itemIsBehavior === 'merge') {
-                    derivedItemIs = [...itemIs, ...itemIsDefault];
-                } else if (itemIs.length > 0) {
-                    derivedItemIs = itemIs;
-                }
+                const [derivedAuthorIs, derivedItemIs] = mergeFilters(c, filterCriteriaDefaultsFromRun ?? (filterCriteriaDefaults ?? filterCriteriaDefaultsFromBot));
 
                 const postCheckBehaviors = Object.assign({}, postCheckBehaviorDefaultsFromBot, removeUndefinedKeys({postFail, postTrigger}));
 
@@ -200,7 +182,12 @@ export class ConfigBuilder {
                 } as CheckStructuredJson;
                 structuredChecks.push(strongCheck);
             }
-            structuredRuns.push({...r, checks: structuredChecks});
+            structuredRuns.push({
+                ...r,
+                checks: structuredChecks,
+                authorIs: derivedRunAuthorIs,
+                itemIs: derivedRunItemIs
+            });
         }
 
         return structuredRuns;

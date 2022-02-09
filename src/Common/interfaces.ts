@@ -1261,6 +1261,14 @@ export type NotificationProvider = 'discord';
 
 export type NotificationEventType = 'runStateChanged' | 'pollingError' | 'eventActioned' | 'configUpdated'
 
+export interface NotificationEventPayload  {
+    type: NotificationEventType,
+    title: string
+    body?: string
+    causedBy?: string
+    logLevel?: string
+}
+
 export interface NotificationProviderConfig {
     name: string
     type: NotificationProvider
@@ -1972,7 +1980,8 @@ export interface ActionedEvent {
     author: string
     timestamp: number
     subreddit: string,
-    runResults: CheckSummary[]
+    triggered: boolean,
+    runResults: RunResult[]
 }
 
 export interface CheckResult {
@@ -1988,6 +1997,16 @@ export interface CheckSummary extends CheckResult {
     error?: string
     actionResults: ActionResult[]
     condition: 'AND' | 'OR'
+}
+
+export interface RunResult {
+    name: string
+    triggered: boolean
+    reason?: string
+    error?: string
+    itemIs?: FilterResult<TypedActivityStates>
+    authorIs?: FilterResult<AuthorCriteria>
+    checkResults?: CheckSummary[]
 }
 
 export interface UserResultCache {
@@ -2073,13 +2092,13 @@ export interface ManagerStats {
 export interface HistoricalStatUpdateData {
     eventsCheckedTotal?: number
     eventsActionedTotal?: number
-    checksRun: string[] | string
-    checksTriggered: string[] | string
-    checksFromCache: string[] | string
-    actionsRun: string[] | string
-    rulesRun: string[] | string
-    rulesCachedTotal: number
-    rulesTriggered: string[] | string
+    checksRun?: string[] | string
+    checksTriggered?: string[] | string
+    checksFromCache?: string[] | string
+    actionsRun?: string[] | string
+    rulesRun?: string[] | string
+    rulesCachedTotal?: number
+    rulesTriggered?: string[] | string
 }
 
 export type SearchFacetType = 'title' | 'url' | 'duplicates' | 'crossposts' | 'external';

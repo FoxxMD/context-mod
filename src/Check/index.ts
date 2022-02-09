@@ -7,7 +7,7 @@ import {actionFactory} from "../Action/ActionFactory";
 import {ruleFactory} from "../Rule/RuleFactory";
 import {
     boolToString,
-    createAjvFactory,
+    createAjvFactory, determineNewResults,
     FAIL,
     mergeArr,
     PASS,
@@ -17,10 +17,10 @@ import {
 } from "../util";
 import {
     ActionResult, ActivityType, CheckResult,
-    ChecksActivityState,
+    ChecksActivityState, CheckSummary,
     CommentState,
     JoinCondition,
-    JoinOperands, PostBehavior, PostBehaviorTypes,
+    JoinOperands, NotificationEventPayload, PostBehavior, PostBehaviorTypes,
     SubmissionState,
     TypedActivityStates, UserResultCache
 } from "../Common/interfaces";
@@ -32,7 +32,10 @@ import {checkAuthorFilter, SubredditResources} from "../Subreddit/SubredditResou
 import {Author, AuthorCriteria, AuthorOptions} from '..';
 import {ExtendedSnoowrap} from '../Utils/SnoowrapClients';
 import {isRateLimitError} from "../Utils/Errors";
-import {ErrorWithCause} from "pony-cause";
+import {ErrorWithCause, stackWithCauses} from "pony-cause";
+import {runCheckOptions} from "../Subreddit/Manager";
+import EventEmitter from "events";
+import {itemContentPeek} from "../Utils/SnoowrapUtils";
 
 const checkLogName = truncateStringToLength(25);
 
@@ -53,9 +56,11 @@ export abstract class Check implements ICheck {
     client: ExtendedSnoowrap;
     postTrigger: PostBehaviorTypes;
     postFail: PostBehaviorTypes;
+    emitter: EventEmitter;
 
     constructor(options: CheckOptions) {
         const {
+            emitter,
             enable = true,
             name,
             resources,
@@ -79,6 +84,7 @@ export abstract class Check implements ICheck {
         } = options;
 
         this.enabled = enable;
+        this.emitter = emitter;
 
         this.logger = options.logger.child({labels: [`CHK ${checkLogName(name)}`]}, mergeArr);
 
@@ -190,6 +196,140 @@ export abstract class Check implements ICheck {
     }
 
     async setCacheResult(item: Submission | Comment, result: UserResultCache): Promise<void> {
+    }
+
+    async handle(activity: (Submission | Comment), allRuleResults: RuleResult[], options: runCheckOptions = {}): Promise<CheckSummary> {
+
+        let checkSum: CheckSummary = {
+            name: this.name,
+            run: this.name,
+            actionResults: [],
+            ruleResults: [],
+            postBehavior: 'next',
+            fromCache: false,
+            triggered: false,
+            condition: this.condition
+        }
+
+        let currentResults: RuleResult[] = [];
+
+        try {
+            if (!this.enabled) {
+                this.logger.info(`Not enabled, skipping...`);
+                return checkSum;
+            }
+            //checksRunNames.push(check.name);
+            //checksRun++;
+            let triggered = false;
+            let runActions: ActionResult[] = [];
+            let checkRes: CheckResult;
+            let checkError: string | undefined;
+            try {
+                checkRes = await this.runRules(activity, allRuleResults);
+
+                checkSum = {
+                    ...checkSum,
+                    ...checkRes,
+                }
+                const {
+                    triggered: checkTriggered,
+                    ruleResults: checkResults,
+                    fromCache = false
+                } = checkRes;
+                //isFromCache = fromCache;
+                if (!fromCache) {
+                    await this.setCacheResult(activity, {result: checkTriggered, ruleResults: checkResults});
+                } else {
+                    checkRes.fromCache = true;
+                    //cachedCheckNames.push(check.name);
+                }
+                currentResults = checkResults;
+                //totalRulesRun += checkResults.length;
+                // allRuleResults = allRuleResults.concat(determineNewResults(allRuleResults, checkResults));
+                if (triggered && fromCache && !this.cacheUserResult.runActions) {
+                    this.logger.info('Check was triggered but cache result options specified NOT to run actions...counting as check NOT triggered');
+                    checkSum.triggered = false;
+                    triggered = false;
+                }
+            } catch (err: any) {
+                checkError = stackWithCauses(err);
+                checkSum.error = checkError;
+                if (err.logged !== true) {
+                    const chkLogError = new ErrorWithCause(`Running rules failed due to uncaught exception`, {cause: err});
+                    this.logger.warn(chkLogError);
+                }
+                this.emitter.emit('error', err);
+            }
+
+            let behaviorT: string;
+
+            if (checkSum.triggered) {
+                try {
+                    checkSum.postBehavior = this.postTrigger;
+
+                    checkSum.actionResults = await this.runActions(activity, currentResults.filter(x => x.triggered), options.dryRun);
+                    // we only can about report and comment actions since those can produce items for newComm and modqueue
+                    const recentCandidates = checkSum.actionResults.filter(x => ['report', 'comment'].includes(x.kind.toLocaleLowerCase())).map(x => x.touchedEntities === undefined ? [] : x.touchedEntities).flat();
+                    for (const recent of recentCandidates) {
+                        await this.resources.setRecentSelf(recent as (Submission | Comment));
+                    }
+                    //actionsRun = runActions.length;
+
+                    if (this.notifyOnTrigger) {
+                        const ar = runActions.filter(x => x.success).map(x => x.name).join(', ');
+                        const [peek, _] = await itemContentPeek(activity);
+                        const notifPayload: NotificationEventPayload = {
+                            type: 'eventActioned',
+                            title: 'Check Triggered',
+                            body: `Check "${this.name}" was triggered on Event: \n\n ${peek} \n\n with the following actions run: ${ar}`
+                        }
+                        this.emitter.emit('notify', notifPayload)
+                    }
+                } catch (err: any) {
+                    this.emitter.emit(err);
+                    checkError = stackWithCauses(err);
+                    checkSum.error = checkError;
+                    if (err.logged !== true) {
+                        const chkLogError = new ErrorWithCause(`Running actions failed due to uncaught exception`, {cause: err});
+                        this.logger.warn(chkLogError);
+                    }
+                }
+            } else {
+                checkSum.postBehavior = this.postFail;
+            }
+
+            behaviorT = checkSum.triggered ? 'Trigger' : 'Fail';
+
+            switch (checkSum.postBehavior.toLowerCase()) {
+                case 'next':
+                    this.logger.debug('Behavior => NEXT => run next check', {leaf: `Post Check ${behaviorT}`});
+                    break;
+                case 'nextrun':
+                    this.logger.debug('Behavior => NEXT RUN => Skip remaining checks and go to next Run', {leaf: `Post Check ${behaviorT}`});
+                    break;
+                case 'stop':
+                    this.logger.debug('Behavior => STOP => Immediately stop current Run and skip all remaining runs', {leaf: `Post Check ${behaviorT}`});
+                    break;
+                default:
+                    if (checkSum.postBehavior.includes('goto:')) {
+                        const gotoContext = checkSum.postBehavior.split(':')[1];
+                        this.logger.debug(`Behavior => GOTO => Set to ${gotoContext}`, {leaf: `Post Check ${behaviorT}`});
+                    } else {
+                        throw new Error(`Post ${behaviorT} Behavior was not a valid value. Must be one of => next | nextRun | stop | goto:[path]`);
+                    }
+            }
+        } finally {
+            this.resources.updateHistoricalStats({
+                checksTriggered: checkSum.triggered ? [checkSum.name] : [],
+                checksRun: [checkSum.name],
+                checksFromCache: checkSum.fromCache ? [checkSum.name] : [],
+                actionsRun: checkSum.actionResults.map(x => x.name),
+                rulesRun: checkSum.ruleResults.map(x => x.name),
+                rulesTriggered: checkSum.ruleResults.filter(x => x.triggered).map(x => x.name),
+                rulesCachedTotal: checkSum.ruleResults.filter(x => x.fromCache).length
+            })
+            return checkSum
+        }
     }
 
     async runRules(item: Submission | Comment, existingResults: RuleResult[] = []): Promise<CheckResult> {
@@ -366,6 +506,7 @@ export interface CheckOptions extends ICheck {
     resources: SubredditResources;
     client: ExtendedSnoowrap;
     cacheUserResult?: UserResultCacheOptions;
+    emitter: EventEmitter
 }
 
 export interface CheckJson extends ICheck {
