@@ -647,7 +647,7 @@ export class Manager extends EventEmitter {
             ePeek = peek;
             this.logger.info(`<EVENT> ${peek}`);
         } catch (err: any) {
-            this.logger.error(`Error occurred while generate item peek for ${checkType} Activity ${itemId}`, err);
+            this.logger.error(`Error occurred while generating item peek for ${checkType} Activity ${itemId}`, err);
         }
 
         let checksRun = 0;
@@ -911,7 +911,6 @@ export class Manager extends EventEmitter {
                         actionResults: runActions,
                         postBehavior: behavior,
                         run: currRun.name,
-                        ruleSummary: isFromCache ? `Check result was found in cache: ${triggeredIndicator(triggered)}` : resultsSummary(currentResults, check.condition)
                     });
                 }
 

@@ -16,51 +16,121 @@
     </style>
 </head>
 <body class="bg-gray-900 text-white font-sans">
-<script>localStorage.getItem('ms-dark') === 'no' ? document.body.classList.remove('dark') : document.body.classList.add('dark')</script>
 <div class="min-w-screen min-h-screen">
     <%- include('partials/title') %>
     <div class="container mx-auto">
         <div class="grid">
+            <div class="pr-3 pt-3" style="text-align: right">
+                <input type="checkbox" id="showAll">
+                <label for="showAll">Show all non-triggered details</label>
+            </div>
             <div class="px-3 py-6 space-y-3">
                 <% if(data.length === 0) { %>
                     No events have been actioned yet!
                 <% } %>
-                <% data.forEach(function (eRes){ %>
-                    <div class="shadow-lg">
-                        <div class="space-x-4 px-4 p-2 leading-2 font-semibold bg-gray-700">
+                <% data.forEach(function (eRes) { %>
+                    <div class="shadow-lg bg-gray-700 py-1 triggeredStateWrapper">
+                        <div class="space-x-4 px-4 p-2 leading-2 font-semibold font-semibold triggeredStateToggle">
                             <div class="flex items-center justify-between">
                                 <div>
-                                <span class="peek"><%- eRes.activity.peek %></span><a target="_blank" href="https://reddit.com<%= eRes.activity.link%>">(Link)</a>
+                                <span class="peek"><%- eRes.activity.peek %></span><a class="activityLink" target="_blank" href="https://reddit.com<%= eRes.activity.link%>">(Link)</a>
                                 </div>
                                 <div class="flex items-center flex-end">
                                     <%= eRes.subreddit %> @ <%= eRes.timestamp %>
                                 </div>
                             </div>
                         </div>
-                        <div class="p-4 pl-6 pt-3 space-y-2 bg-gray-500">
-                            <div><span class="font-semibold">Check:</span> <%= eRes.check %><span class="px-3">&#10132;</span><%= eRes.ruleSummary %></div>
-                            <div>
-                                <span class="font-semibold">Rules:</span>
-                                <ul class="list-inside list-disc">
-                                    <% eRes.ruleResults.forEach(function (ruleResult) { %>
-                                        <li><%= ruleResult.name %> - <%= ruleResult.triggered%> - <%= ruleResult.result %></li>
-                                    <% }) %>
-                                </ul>
+                        <div class="border-t-2 border-gray-500 triggeredState <%= eRes.triggered ? 'triggered' : 'notTriggered'%>">
+                        <% eRes.runResults.forEach(function (runSum, index) { %>
+                        <div class="m-4 p-2 px-4 space-y-2 bg-gray-600 triggeredStateWrapper">
+                            <div class="triggeredStateToggle">
+                                <span class="font-semibold">Run:</span>
+                                <span class="px-1"><%= runSum.triggered %></span> <%= runSum.name %>
                             </div>
-                            <div><span class="font-semibold">Actions</span>
-                                <ul class="list-inside list-disc">
-                                    <% eRes.actionResults.forEach(function (aRes) { %>
-                                        <li><%= aRes.name %><%= aRes.dryRun %> - <%= aRes.result %></li>
-                                    <% }) %>
-                                </ul>
+                            <div class="space-y-2 triggeredState <%= runSum.triggeredVal ? 'triggered' : 'notTriggered'%>">
+                            <% runSum.checkResults.forEach(function (chkSum, index) { %>
+                                <div class="py-3 px-4 space-y-2 bg-gray-500 triggeredStateWrapper <%= chkSum.triggeredVal ? 'border-2 border-gray-100' : ''%>">
+                                    <div class="triggeredStateToggle">
+                                        <span class="font-semibold">Check:</span><span class="px-1"><%= chkSum.triggered %></span><%= chkSum.name %><span class="px-3">&#10132;</span><%= chkSum.ruleSummary %>
+                                    </div>
+                                    <div class="space-y-2 triggeredState <%= chkSum.triggeredVal ? 'triggered' : 'notTriggered'%>">
+                                    <div>
+                                        <span class="font-semibold">Rules:</span>
+                                        <ul class="list-inside list-disc">
+                                            <% chkSum.ruleResults.forEach(function (ruleResult) { %>
+                                                <li><%= ruleResult.name %> - <%= ruleResult.triggered%> - <%= ruleResult.result %></li>
+                                            <% }) %>
+                                        </ul>
+                                    </div>
+                                    <% if(chkSum.actionResults.length !== 0) { %>
+                                    <div><span class="font-semibold">Actions</span>
+
+                                            <ul class="list-inside list-disc">
+                                                <% chkSum.actionResults.forEach(function (aRes) { %>
+                                                    <li><%= aRes.name %><%= aRes.dryRun %> - <%= aRes.result %></li>
+                                                <% }) %>
+                                            </ul>
+                                    </div>
+                                    <% } %>
+                                    <div>
+                                        <span class="font-semibold">Post <%= chkSum.triggered ? 'Trigger' : 'Fail' %> Behavior <span class="px-1">&#10132;</span> <%= chkSum.postBehavior %></span>
+                                    </div>
+                                    </div>
+                                </div>
+                        <% }) %>
                             </div>
-                        </div>
                     </div>
+                        <% }) %>
+                        </div>
+            </div>
                 <% }) %>
             </div>
         </div>
     </div>
     <%- include('partials/footer') %>
 </div>
+<script>
+    function toggleShowNonTriggered(val) {
+        document.querySelectorAll('.triggeredState').forEach(el => {
+            el.classList.remove('show','hide');
+            if(val && el.classList.contains('notTriggered')) {
+                el.classList.add('show');
+            }
+        });
+    }
+    document.querySelector('#showAll').addEventListener('change', (e) => {
+        toggleShowNonTriggered(e.target.checked);
+        localStorage.setItem('showNonTriggered', e.target.checked);
+    });
+
+    const initShowNonTiggeredState = localStorage.getItem('showNonTriggered');
+    if(initShowNonTiggeredState === 'true') {
+        document.querySelector('#showAll').checked = true;
+        toggleShowNonTriggered(true);
+    }
+
+    document.querySelectorAll('.triggeredStateToggle').forEach(el => {
+        el.addEventListener('click', (e) => {
+            if(e.target.nodeName.toLowerCase() !== 'a') {
+                const tElm = e.currentTarget.closest('.triggeredStateWrapper').querySelector('.triggeredState');
+                if(tElm !== null) {
+                    if(tElm.classList.contains('triggered')) {
+                        if(tElm.classList.contains('hide')) {
+                            tElm.classList.remove('hide');
+                        } else {
+                            tElm.classList.add('hide');
+                        }
+                    } else {
+                        if(tElm.classList.contains('show')) {
+                            tElm.classList.remove('show');
+                        } else {
+                            tElm.classList.add('show');
+                        }
+                    }
+                }
+            }
+        });
+    })
+</script>
 </body>
 </html>

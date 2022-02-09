@@ -152,3 +152,19 @@ a {
 #saveTip .tooltip:hover {
     transition-delay: 1s;
 }
+
+.triggeredState.notTriggered {
+    display: none;
+}
+
+.triggeredState.hide {
+    display: none;
+}
+
+.triggeredState.notTriggered.show {
+    display: inherit;
+}
+
+.triggeredStateToggle {
+    cursor: pointer;
+}

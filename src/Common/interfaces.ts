@@ -1971,11 +1971,7 @@ export interface ActionedEvent {
     }
     author: string
     timestamp: number
-    //check: string
-    //ruleSummary: string,
     subreddit: string,
-    //ruleResults: RuleResult[]
-    //actionResults: ActionResult[]
     runResults: CheckSummary[]
 }
 
@@ -1991,8 +1987,7 @@ export interface CheckSummary extends CheckResult {
     postBehavior: string
     error?: string
     actionResults: ActionResult[]
-    condition: string
-    ruleSummary: string
+    condition: 'AND' | 'OR'
 }
 
 export interface UserResultCache {

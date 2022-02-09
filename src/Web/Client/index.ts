@@ -6,7 +6,7 @@ import cookieParser from 'cookie-parser';
 import CacheManagerStore from 'express-session-cache-manager'
 import passport from 'passport';
 import {Strategy as CustomStrategy} from 'passport-custom';
-import {OperatorConfig, BotConnection, LogInfo} from "../../Common/interfaces";
+import {OperatorConfig, BotConnection, LogInfo, CheckSummary} from "../../Common/interfaces";
 import {
     buildCachePrefix,
     createCacheManager, defaultFormat, filterLogBySubreddit,
@@ -14,7 +14,7 @@ import {
     intersect, isLogLineMinLevel,
     LogEntry, parseInstanceLogInfoName, parseInstanceLogName, parseRedditEntity,
     parseSubredditLogName, permissions,
-    randomId, sleep, triggeredIndicator
+    randomId, resultsSummary, sleep, triggeredIndicator
 } from "../../util";
 import {Cache} from "cache-manager";
 import session, {Session, SessionData} from "express-session";
@@ -954,57 +954,80 @@ const webClient = async (options: OperatorConfig) => {
             }
         }).json() as [any];
 
-        return res.render('events', {
-            data: resp.map((x) => {
-                const {timestamp, activity: {peek, link}, ruleResults = [], actionResults = [], ...rest} = x;
-                const time = dayjs(timestamp).local().format('YY-MM-DD HH:mm:ss z');
-                const formattedPeek = Autolinker.link(peek, {
-                    email: false,
-                    phone: false,
-                    mention: false,
-                    hashtag: false,
-                    stripPrefix: false,
-                    sanitizeHtml: true,
-                });
+        const actionedEvents = resp.map((x) => {
+            const {timestamp, activity: {peek, link}, runResults = [], ...rest} = x;
+            const time = dayjs(timestamp).local().format('YY-MM-DD HH:mm:ss z');
+            const formattedPeek = Autolinker.link(peek, {
+                email: false,
+                phone: false,
+                mention: false,
+                hashtag: false,
+                stripPrefix: false,
+                sanitizeHtml: true,
+            });
+            const mergedRunResults = runResults.reduce((acc: any, summ: CheckSummary) => {
+                let currentRun = acc.curr;
+                if(currentRun.name !== undefined && summ.run !== currentRun.name) {
+                    currentRun.triggeredVal = currentRun.checkResults.some((x: any) => x.triggered);
+                    currentRun.triggered = triggeredIndicator(currentRun.triggeredVal);
+                    acc.all.push(currentRun);
+                    currentRun = {name: undefined, triggered: false, checkResults: []};
+                }
+                currentRun.name = summ.run;
+                const {actionResults = [], ruleResults = [], triggered: checkTriggered, ...rest} = summ;
                 const formattedRuleResults = ruleResults.map((y: any) => {
                     const {triggered, result, ...restY} = y;
-                    let t = triggeredIndicator(false);
-                    if(triggered === null) {
-                        t = 'Skipped';
-                    } else if(triggered === true) {
-                        t = triggeredIndicator(true);
-                    }
                     return {
                         ...restY,
-                        triggered: t,
+                        triggered: triggeredIndicator(triggered, 'Skipped'),
                         result: result || '-'
                     };
                 });
                 const formattedActionResults = actionResults.map((y: any) => {
-                   const {run, runReason, success, result, dryRun, ...restA} = y;
-                   let res = '';
-                   if(!run) {
-                       res = `Not Run - ${runReason === undefined ? '(No Reason)' : runReason}`;
-                   } else {
-                       res = `${triggeredIndicator(success)}${result !== undefined ? ` - ${result}` : ''}`;
-                   }
-                   return {
-                       ...restA,
-                       dryRun: dryRun ? ' (DRYRUN)' : '',
-                       result: res
-                   };
+                    const {run, runReason, success, result, dryRun, ...restA} = y;
+                    let res = '';
+                    if(!run) {
+                        res = `Not Run - ${runReason === undefined ? '(No Reason)' : runReason}`;
+                    } else {
+                        res = `${triggeredIndicator(success)}${result !== undefined ? ` - ${result}` : ''}`;
+                    }
+                    return {
+                        ...restA,
+                        dryRun: dryRun ? ' (DRYRUN)' : '',
+                        result: res
+                    };
                 });
-                return {
+                currentRun.checkResults.push({
                     ...rest,
-                    timestamp: time,
-                    activity: {
-                        link,
-                        peek: formattedPeek,
-                    },
+                    triggered: triggeredIndicator(checkTriggered, 'Skipped'),
+                    triggeredVal: checkTriggered,
                     ruleResults: formattedRuleResults,
-                    actionResults: formattedActionResults
-                }
-            }),
+                    actionResults: formattedActionResults,
+                    ruleSummary: summ.fromCache ? `Check result was found in cache: ${triggeredIndicator(checkTriggered, 'Skipped')}` : resultsSummary(ruleResults, summ.condition)
+                });
+                acc.curr = currentRun;
+                return acc;
+            }, {curr: {name: undefined, triggered: false, checkResults: []}, all: []});
+
+            // handle last current run
+            const currentRun = mergedRunResults.curr;
+            currentRun.triggeredVal = currentRun.checkResults.some((x: any) => x.triggered);
+            currentRun.triggered = triggeredIndicator(currentRun.triggeredVal);
+            const rr = mergedRunResults.all.concat(currentRun);
+            return {
+                ...rest,
+                timestamp: time,
+                activity: {
+                    link,
+                    peek: formattedPeek,
+                },
+                triggered: rr.some((x: any) => x.triggeredVal),
+                runResults: rr,
+            }
+        });
+
+        return res.render('events', {
+            data: actionedEvents,
             title: `${subreddit !== undefined ? `${subreddit} ` : ''}Actioned Events`
         });
     });

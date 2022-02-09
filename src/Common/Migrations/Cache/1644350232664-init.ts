@@ -51,7 +51,6 @@ export const up = async (context: any, next: any) => {
                         run: 'Run1',
                         postBehavior: 'nextRun',
                         triggered: true,
-                        ruleSummary,
                         condition: ruleSummary.includes('OR') ? 'OR' : 'AND',
                         ruleResults,
                         actionResults,
@@ -106,7 +105,6 @@ export const down = async (context: any, next: any) => {
                     ruleResults: y.ruleResults,
                     actionResults: y.actionResults,
                     check: y.name,
-                    ruleSummary: y.ruleSummary
                 }
             });
             return acc.concat(singleEvents);
