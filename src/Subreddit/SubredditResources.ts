@@ -205,24 +205,23 @@ export class SubredditResources {
          const at = await this.cache.wrap(`${this.name}-historical-allTime`, () => createHistoricalDefaults(), {ttl: 0}) as object;
          const rehydratedAt: any = {};
          for(const [k, v] of Object.entries(at)) {
-            if(Array.isArray(v)) {
+             const t = typeof v;
+             if(t === 'number') {
+                 // simple number stat like eventsCheckedTotal
+                 rehydratedAt[k] = v;
+             } else if(Array.isArray(v)) {
+                 // a map stat that we have data for is serialized as an array of KV pairs
                 rehydratedAt[k] = new Map(v);
-            } else {
-                rehydratedAt[k] = v;
-            }
+             } else if(v === null || v === undefined || (t === 'object' && Object.keys(v).length === 0)) {
+                 // a map stat that was not serialized (for some reason) or serialized without any data
+                 rehydratedAt[k] = new Map();
+             } else {
+                 // ???? shouldn't get here
+                 this.logger.warn(`Did not recognize rehydrated historical stat "${k}" of type ${t}`);
+                 rehydratedAt[k] = v;
+             }
          }
          this.stats.historical.allTime = rehydratedAt as HistoricalStats;
-
-        // const lr = await this.cache.wrap(`${this.name}-historical-lastReload`, () => createHistoricalDefaults(), {ttl: 0}) as object;
-        // const rehydratedLr: any = {};
-        // for(const [k, v] of Object.entries(lr)) {
-        //     if(Array.isArray(v)) {
-        //         rehydratedLr[k] = new Map(v);
-        //     } else {
-        //         rehydratedLr[k] = v;
-        //     }
-        // }
-        // this.stats.historical.lastReload = rehydratedLr;
     }
 
     updateHistoricalStats(data: HistoricalStatUpdateData) {
