@@ -158,7 +158,7 @@ const isProbablyError = (val: any, errName = 'error') => {
     return typeof val === 'object' && val.name !== undefined && val.name.toLowerCase().includes(errName);
 }
 
-export const PASS = '✔';
+export const PASS = '✓';
 export const FAIL = '✘';
 
 export const truncateStringToLength = (length: number, truncStr = '...') => (str: string) => str.length > length ? `${str.slice(0, length - truncStr.length - 1)}${truncStr}` : str;
