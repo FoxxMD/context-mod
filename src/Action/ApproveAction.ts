@@ -36,7 +36,7 @@ export class ApproveAction extends Action {
             }
 
             // @ts-ignore
-            if (item.approved) {
+            if (targetItem.approved) {
                 const msg = `${target === 'self' ? 'Item' : 'Comment\'s parent Submission'} is already approved`;
                 this.logger.warn(msg);
                 return {
