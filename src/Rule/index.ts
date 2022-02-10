@@ -3,8 +3,8 @@ import Submission from "snoowrap/dist/objects/Submission";
 import {Logger} from "winston";
 import {findResultByPremise, mergeArr} from "../util";
 import {checkAuthorFilter, checkItemFilter, SubredditResources} from "../Subreddit/SubredditResources";
-import {ChecksActivityState, TypedActivityStates} from "../Common/interfaces";
-import Author, {AuthorOptions} from "../Author/Author";
+import {ChecksActivityState, FilterResult, TypedActivityState, TypedActivityStates} from "../Common/interfaces";
+import Author, {AuthorCriteria, AuthorOptions} from "../Author/Author";
 
 export interface RuleOptions {
     name?: string;
@@ -32,6 +32,8 @@ export interface RuleResult extends ResultContext {
     name: string
     triggered: (boolean | null)
     fromCache?: boolean
+    itemIs?: FilterResult<TypedActivityState>
+    authorIs?: FilterResult<AuthorCriteria>
 }
 
 export type FormattedRuleResult = RuleResult & {

@@ -1966,6 +1966,8 @@ export interface ActionResult extends ActionProcessResult {
     name: string,
     run: boolean,
     runReason?: string,
+    itemIs?: FilterResult<TypedActivityState>
+    authorIs?: FilterResult<AuthorCriteria>
 }
 
 export interface ActionProcessResult {
@@ -1990,6 +1992,8 @@ export interface ActionedEvent {
 export interface CheckResult {
     triggered: boolean
     ruleResults: RuleResult[]
+    itemIs?: FilterResult<TypedActivityState>
+    authorIs?: FilterResult<AuthorCriteria>
     fromCache?: boolean
 }
 
@@ -2007,7 +2011,7 @@ export interface RunResult {
     triggered: boolean
     reason?: string
     error?: string
-    itemIs?: FilterResult<TypedActivityStates>
+    itemIs?: FilterResult<TypedActivityState>
     authorIs?: FilterResult<AuthorCriteria>
     checkResults: CheckSummary[]
 }

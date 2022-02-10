@@ -342,6 +342,11 @@ export abstract class Check implements ICheck {
             let allRuleResults: RuleResult[] = [];
             let allResults: (RuleResult | RuleSetResult)[] = [];
 
+            const checkResult: CheckResult = {
+                triggered: false,
+                ruleResults: [],
+            }
+
             // check cache results
             const cacheResult = await this.getCacheResult(item);
             if(cacheResult !== undefined) {
@@ -358,14 +363,20 @@ export abstract class Check implements ICheck {
                 return {
                     triggered: false,
                     ruleResults: allRuleResults,
+                    itemIs: itemFilterResults
                 };
+            } else if(this.itemIs.length > 0) {
+                checkResult.itemIs = itemFilterResults;
             }
-            const [authFilterResult, authFilterType] = await checkAuthorFilter(item, this.authorIs, this.resources, this.logger);
-            if(!authFilterResult) {
+            const [authPass, authFilterType, authorFilterResults] = await checkAuthorFilter(item, this.authorIs, this.resources, this.logger);
+            if(!authPass) {
                 return {
                     triggered: false,
                     ruleResults: allRuleResults,
+                    authorIs: authorFilterResults
                 };
+            } else if(authFilterType !== undefined) {
+                checkResult.authorIs = authorFilterResults;
             }
 
             if (this.rules.length === 0) {

@@ -100,12 +100,9 @@ export class Run {
 
     async handle(activity: (Submission | Comment), initAllRuleResults: RuleResult[], existingRunResults: RunResult[] = [], options?: runCheckOptions): Promise<[RunResult, string]> {
 
-        let itemIsResults: FilterResult<TypedActivityStates> | undefined;
-        let authorIsResults: FilterResult<AuthorCriteria> | undefined;
         let allRuleResults = initAllRuleResults;
         let continueRunIteration = true;
         let postBehavior = 'next';
-        let runError: string | undefined;
         const runResult: RunResult = {
             name: this.name,
             triggered: false,
@@ -136,18 +133,16 @@ export class Run {
 
         try {
 
-            const [itemPass, itemFitlerType, itemFilterResults] = await checkItemFilter(activity, this.itemIs, this.resources, this.logger)
+            const [itemPass, itemFilterType, itemFilterResults] = await checkItemFilter(activity, this.itemIs, this.resources, this.logger)
             if (!itemPass) {
                 this.logger.verbose(`${FAIL} => Item did not pass 'itemIs' test`);
                 return [{
                     ...runResult,
                     triggered: false,
-                    // TODO add itemIs results
-                    itemIs: itemIsResults
+                    itemIs: itemFilterResults
                 }, postBehavior];
             } else if (this.itemIs.length > 0) {
-                // TODO add itemIs results
-                //runResult.itemIs = itemPass;
+                runResult.itemIs = itemFilterResults;
             }
 
             const [authFilterPass, authFilterType, authorFilterResult] = await checkAuthorFilter(activity, this.authorIs, this.resources, this.logger);
