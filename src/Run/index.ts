@@ -11,7 +11,7 @@ import {SubmissionCheck} from "../Check/SubmissionCheck";
 import {CommentCheck} from "../Check/CommentCheck";
 import {Logger} from "winston";
 import {determineNewResults, FAIL, isSubmission, mergeArr, normalizeName} from "../util";
-import {checkAuthorFilter, SubredditResources} from "../Subreddit/SubredditResources";
+import {checkAuthorFilter, checkItemFilter, SubredditResources} from "../Subreddit/SubredditResources";
 import {ExtendedSnoowrap} from "../Utils/SnoowrapClients";
 import {Author, AuthorCriteria, AuthorOptions} from "../Author/Author";
 import Submission from "snoowrap/dist/objects/Submission";
@@ -136,7 +136,7 @@ export class Run {
 
         try {
 
-            const itemPass = await this.resources.testItemCriteria(activity, this.itemIs);
+            const [itemPass, itemFitlerType, itemFilterResults] = await checkItemFilter(activity, this.itemIs, this.resources, this.logger)
             if (!itemPass) {
                 this.logger.verbose(`${FAIL} => Item did not pass 'itemIs' test`);
                 return [{

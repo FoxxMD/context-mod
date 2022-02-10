@@ -222,9 +222,11 @@ export class AttributionRule extends Rule {
 
             activities = await as.filter(activities, async (activity) => {
                 if (asSubmission(activity) && submissionState !== undefined) {
-                    return await this.resources.testItemCriteria(activity, [submissionState]);
+                    const {passed} = await this.resources.testItemCriteria(activity, submissionState, this.logger);
+                    return passed;
                 } else if (commentState !== undefined) {
-                    return await this.resources.testItemCriteria(activity, [commentState]);
+                    const {passed} = await this.resources.testItemCriteria(activity, commentState, this.logger);
+                    return passed;
                 }
                 return true;
             });

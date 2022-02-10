@@ -1334,6 +1334,17 @@ export const parseRegex = (reg: RegExp, val: string): RegExResult => {
     }
 }
 
+export const testMaybeStringRegex = (test: string, subject: string, defaultFlags: string = 'i'): [boolean, string] => {
+    let reg = parseStringToRegex(test, defaultFlags);
+    if (reg === undefined) {
+        reg = parseStringToRegex(`/.*${escapeRegex(test.trim())}.*/`, 'i');
+        if (reg === undefined) {
+            throw new SimpleError(`Could not convert test value to a valid regex: ${test}`);
+        }
+    }
+    return [reg.test(subject), reg.toString()];
+}
+
 export const isStrongSubredditState = (value: SubredditState | StrongSubredditState) => {
     return value.name === undefined || value.name instanceof RegExp;
 }

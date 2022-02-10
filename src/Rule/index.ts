@@ -2,7 +2,7 @@ import Snoowrap, {Comment} from "snoowrap";
 import Submission from "snoowrap/dist/objects/Submission";
 import {Logger} from "winston";
 import {findResultByPremise, mergeArr} from "../util";
-import {checkAuthorFilter, SubredditResources} from "../Subreddit/SubredditResources";
+import {checkAuthorFilter, checkItemFilter, SubredditResources} from "../Subreddit/SubredditResources";
 import {ChecksActivityState, TypedActivityStates} from "../Common/interfaces";
 import Author, {AuthorOptions} from "../Author/Author";
 
@@ -97,7 +97,7 @@ export abstract class Rule implements IRule, Triggerable {
                 this.logger.debug(`Returning existing result of ${existingResult.triggered ? '✔️' : '❌'}`);
                 return Promise.resolve([existingResult.triggered, {...existingResult, name: this.name, fromCache: true}]);
             }
-            const itemPass = await this.resources.testItemCriteria(item, this.itemIs);
+            const [itemPass, itemFilterType, itemFilterResults] = await checkItemFilter(item, this.itemIs, this.resources, this.logger);
             if (!itemPass) {
                 this.logger.verbose(`(Skipped) Item did not pass 'itemIs' test`);
                 return Promise.resolve([null, this.getResult(null, {result: `Item did not pass 'itemIs' test`})]);

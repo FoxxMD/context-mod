@@ -28,7 +28,7 @@ import * as RuleSchema from '../Schema/Rule.json';
 import * as RuleSetSchema from '../Schema/RuleSet.json';
 import * as ActionSchema from '../Schema/Action.json';
 import {ActionObjectJson, RuleJson, RuleObjectJson, ActionJson as ActionTypeJson} from "../Common/types";
-import {checkAuthorFilter, SubredditResources} from "../Subreddit/SubredditResources";
+import {checkAuthorFilter, checkItemFilter, SubredditResources} from "../Subreddit/SubredditResources";
 import {Author, AuthorCriteria, AuthorOptions} from '..';
 import {ExtendedSnoowrap} from '../Utils/SnoowrapClients';
 import {CheckProcessingError, isRateLimitError} from "../Utils/Errors";
@@ -353,9 +353,8 @@ export abstract class Check implements ICheck {
                 };
             }
 
-            const itemPass = await this.resources.testItemCriteria(item, this.itemIs);
+            const [itemPass, itemFilterType, itemFilterResults] = await checkItemFilter(item, this.itemIs, this.resources, this.logger);
             if (!itemPass) {
-                this.logger.verbose(`${FAIL} => Item did not pass 'itemIs' test`);
                 return {
                     triggered: false,
                     ruleResults: allRuleResults,

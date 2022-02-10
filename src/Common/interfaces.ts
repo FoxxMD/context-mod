@@ -17,6 +17,7 @@ import {ConsoleTransportOptions} from "winston/lib/winston/transports";
 import {DailyRotateFileTransportOptions} from "winston-daily-rotate-file";
 import {DuplexTransportOptions} from "winston-duplex/dist/DuplexTransport";
 import {CommentCheckJson, SubmissionCheckJson} from "../Check";
+import {SafeDictionary} from "ts-essentials";
 
 /**
  * An ISO 8601 Duration
@@ -1029,7 +1030,9 @@ export interface StrongSubredditState extends SubredditState {
     name?: RegExp
 }
 
-export type TypedActivityStates = SubmissionState[] | CommentState[];
+export type TypedActivityState = SubmissionState | CommentState;
+
+export type TypedActivityStates = TypedActivityState[];
 
 export interface DomainInfo {
     display: string,
@@ -2234,3 +2237,6 @@ export interface PostBehavior {
 }
 
 export type ActivityType = 'submission' | 'comment';
+
+export type ItemCritPropHelper = SafeDictionary<FilterCriteriaPropertyResult<(CommentState & SubmissionState)>, keyof (CommentState & SubmissionState)>;
+export type RequiredItemCrit = Required<(CommentState & SubmissionState)>;

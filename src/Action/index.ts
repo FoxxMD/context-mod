@@ -1,7 +1,7 @@
 import {Comment, Submission} from "snoowrap";
 import {Logger} from "winston";
 import {RuleResult} from "../Rule";
-import {checkAuthorFilter, SubredditResources} from "../Subreddit/SubredditResources";
+import {checkAuthorFilter, checkItemFilter, SubredditResources} from "../Subreddit/SubredditResources";
 import {ActionProcessResult, ActionResult, ChecksActivityState, TypedActivityStates} from "../Common/interfaces";
 import Author, {AuthorOptions} from "../Author/Author";
 import {mergeArr} from "../util";
@@ -69,7 +69,7 @@ export abstract class Action {
             success: false,
         };
         try {
-            const itemPass = await this.resources.testItemCriteria(item, this.itemIs);
+            const [itemPass, itemFilterType, itemFitlerResults] = await checkItemFilter(item, this.itemIs, this.resources, this.logger);
             if (!itemPass) {
                 this.logger.verbose(`Activity did not pass 'itemIs' test, Action not run`);
                 actRes.runReason = `Activity did not pass 'itemIs' test, Action not run`;
