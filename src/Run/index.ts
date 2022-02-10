@@ -108,7 +108,11 @@ export class Run {
             triggered: false,
             checkResults: [],
         }
-        // TODO implement refresh?
+
+        if(!this.enabled) {
+            runResult.error = 'Not enabled';
+            return [runResult, postBehavior];
+        }
 
         if (isSubmission(activity)) {
             if (this.submissionChecks.length === 0) {
@@ -231,7 +235,7 @@ export class Run {
                 runResult.checkResults.push(err.result);
             }
             if(runResult.error === undefined) {
-                runResult.error = stackWithCauses(err);
+                runResult.error = `Run failed due to uncaught exception: ${err.message}`;
             }
             runResult.triggered = runResult.checkResults.some(x => x.triggered);
 

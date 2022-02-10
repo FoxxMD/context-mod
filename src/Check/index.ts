@@ -215,6 +215,7 @@ export abstract class Check implements ICheck {
 
         try {
             if (!this.enabled) {
+                checkSum.error = 'Not enabled';
                 this.logger.info(`Not enabled, skipping...`);
                 return checkSum;
             }
@@ -252,8 +253,7 @@ export abstract class Check implements ICheck {
                     triggered = false;
                 }
             } catch (err: any) {
-                checkError = stackWithCauses(err);
-                checkSum.error = checkError;
+                checkSum.error = `Running rules failed due to uncaught exception: ${err.message}`;
                 const chkLogError = new ErrorWithCause(`[CHK ${this.name}] Running rules failed due to uncaught exception`, {cause: err});
                 if (err.logged !== true) {
                     this.logger.warn(chkLogError);
@@ -287,10 +287,9 @@ export abstract class Check implements ICheck {
                     }
                 } catch (err: any) {
                     this.emitter.emit('error', err);
-                    checkError = stackWithCauses(err);
-                    checkSum.error = checkError;
+                    checkSum.error = `Running actions failed due to uncaught exception: ${err.message}`;
                     if (err.logged !== true) {
-                        const chkLogError = new ErrorWithCause(`Running actions failed due to uncaught exception`, {cause: err});
+                        const chkLogError = new ErrorWithCause(`[CHK ${this.name}] Running actions failed due to uncaught exception`, {cause: err});
                         this.logger.warn(chkLogError);
                     }
                 }
