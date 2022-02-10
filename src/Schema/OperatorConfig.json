@@ -1039,44 +1039,14 @@
         "PostBehavior": {
             "properties": {
                 "postFail": {
-                    "anyOf": [
-                        {
-                            "items": {
-                                "type": "string"
-                            },
-                            "type": "array"
-                        },
-                        {
-                            "enum": [
-                                "next",
-                                "nextRun",
-                                "stop"
-                            ],
-                            "type": "string"
-                        }
-                    ],
                     "default": "next",
-                    "description": "Do this behavior if a Check is NOT triggered"
+                    "description": "Do this behavior if a Check is NOT triggered",
+                    "type": "string"
                 },
                 "postTrigger": {
-                    "anyOf": [
-                        {
-                            "items": {
-                                "type": "string"
-                            },
-                            "type": "array"
-                        },
-                        {
-                            "enum": [
-                                "next",
-                                "nextRun",
-                                "stop"
-                            ],
-                            "type": "string"
-                        }
-                    ],
                     "default": "nextRun",
-                    "description": "Do this behavior if a Check is triggered"
+                    "description": "Do this behavior if a Check is triggered",
+                    "type": "string"
                 }
             },
             "type": "object"

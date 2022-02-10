@@ -1275,44 +1275,14 @@
                     "type": "boolean"
                 },
                 "postFail": {
-                    "anyOf": [
-                        {
-                            "items": {
-                                "type": "string"
-                            },
-                            "type": "array"
-                        },
-                        {
-                            "enum": [
-                                "next",
-                                "nextRun",
-                                "stop"
-                            ],
-                            "type": "string"
-                        }
-                    ],
                     "default": "next",
-                    "description": "Do this behavior if a Check is NOT triggered"
+                    "description": "Do this behavior if a Check is NOT triggered",
+                    "type": "string"
                 },
                 "postTrigger": {
-                    "anyOf": [
-                        {
-                            "items": {
-                                "type": "string"
-                            },
-                            "type": "array"
-                        },
-                        {
-                            "enum": [
-                                "next",
-                                "nextRun",
-                                "stop"
-                            ],
-                            "type": "string"
-                        }
-                    ],
                     "default": "nextRun",
-                    "description": "Do this behavior if a Check is triggered"
+                    "description": "Do this behavior if a Check is triggered",
+                    "type": "string"
                 },
                 "rules": {
                     "description": "A list of Rules to run.\n\nIf `Rule` objects are triggered based on `condition` then `actions` will be performed.\n\nCan be `Rule`, `RuleSet`, or the `name` of any **named** `Rule` in your subreddit's configuration.\n\n**If `rules` is an empty array or not present then `actions` are performed immediately.**",
@@ -2270,44 +2240,14 @@
         "PostBehavior": {
             "properties": {
                 "postFail": {
-                    "anyOf": [
-                        {
-                            "items": {
-                                "type": "string"
-                            },
-                            "type": "array"
-                        },
-                        {
-                            "enum": [
-                                "next",
-                                "nextRun",
-                                "stop"
-                            ],
-                            "type": "string"
-                        }
-                    ],
                     "default": "next",
-                    "description": "Do this behavior if a Check is NOT triggered"
+                    "description": "Do this behavior if a Check is NOT triggered",
+                    "type": "string"
                 },
                 "postTrigger": {
-                    "anyOf": [
-                        {
-                            "items": {
-                                "type": "string"
-                            },
-                            "type": "array"
-                        },
-                        {
-                            "enum": [
-                                "next",
-                                "nextRun",
-                                "stop"
-                            ],
-                            "type": "string"
-                        }
-                    ],
                     "default": "nextRun",
-                    "description": "Do this behavior if a Check is triggered"
+                    "description": "Do this behavior if a Check is triggered",
+                    "type": "string"
                 }
             },
             "type": "object"
@@ -3273,6 +3213,25 @@
         },
         "RunJson": {
             "properties": {
+                "authorIs": {
+                    "$ref": "#/definitions/AuthorOptions",
+                    "description": "If present then these Author criteria are checked before running the Check. If criteria fails then the Check will fail.",
+                    "examples": [
+                        {
+                            "include": [
+                                {
+                                    "flairText": [
+                                        "Contributor",
+                                        "Veteran"
+                                    ]
+                                },
+                                {
+                                    "isMod": true
+                                }
+                            ]
+                        }
+                    ]
+                },
                 "checks": {
                     "items": {
                         "anyOf": [
@@ -3294,9 +3253,34 @@
                     ],
                     "type": "boolean"
                 },
+                "enable": {
+                    "default": true,
+                    "description": "Should this Run be executed by the bot?",
+                    "examples": [
+                        true
+                    ],
+                    "type": "boolean"
+                },
                 "filterCriteriaDefaults": {
                     "$ref": "#/definitions/FilterCriteriaDefaults",
                     "description": "Set the default filter criteria for all checks. If this property is specified it will override any defaults passed from the bot's config\n\nDefault behavior is to exclude all mods and automoderator from checks"
+                },
+                "itemIs": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "$ref": "#/definitions/SubmissionState"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "items": {
+                                "$ref": "#/definitions/CommentState"
+                            },
+                            "type": "array"
+                        }
+                    ],
+                    "description": "A list of criteria to test the state of the `Activity` against before running the check.\n\nIf any set of criteria passes the Check will be run. If the criteria fails then the Check will fail.\n\n* @examples [[{\"over_18\": true, \"removed': false}]]"
                 },
                 "name": {
                     "description": "Friendly name for this Run EX \"flairsRun\"\n\nCan only contain letters, numbers, underscore, spaces, and dashes",
@@ -3307,44 +3291,14 @@
                     "type": "string"
                 },
                 "postFail": {
-                    "anyOf": [
-                        {
-                            "items": {
-                                "type": "string"
-                            },
-                            "type": "array"
-                        },
-                        {
-                            "enum": [
-                                "next",
-                                "nextRun",
-                                "stop"
-                            ],
-                            "type": "string"
-                        }
-                    ],
                     "default": "next",
-                    "description": "Do this behavior if a Check is NOT triggered"
+                    "description": "Do this behavior if a Check is NOT triggered",
+                    "type": "string"
                 },
                 "postTrigger": {
-                    "anyOf": [
-                        {
-                            "items": {
-                                "type": "string"
-                            },
-                            "type": "array"
-                        },
-                        {
-                            "enum": [
-                                "next",
-                                "nextRun",
-                                "stop"
-                            ],
-                            "type": "string"
-                        }
-                    ],
                     "default": "nextRun",
-                    "description": "Do this behavior if a Check is triggered"
+                    "description": "Do this behavior if a Check is triggered",
+                    "type": "string"
                 }
             },
             "required": [
@@ -3598,44 +3552,14 @@
                     "type": "boolean"
                 },
                 "postFail": {
-                    "anyOf": [
-                        {
-                            "items": {
-                                "type": "string"
-                            },
-                            "type": "array"
-                        },
-                        {
-                            "enum": [
-                                "next",
-                                "nextRun",
-                                "stop"
-                            ],
-                            "type": "string"
-                        }
-                    ],
                     "default": "next",
-                    "description": "Do this behavior if a Check is NOT triggered"
+                    "description": "Do this behavior if a Check is NOT triggered",
+                    "type": "string"
                 },
                 "postTrigger": {
-                    "anyOf": [
-                        {
-                            "items": {
-                                "type": "string"
-                            },
-                            "type": "array"
-                        },
-                        {
-                            "enum": [
-                                "next",
-                                "nextRun",
-                                "stop"
-                            ],
-                            "type": "string"
-                        }
-                    ],
                     "default": "nextRun",
-                    "description": "Do this behavior if a Check is triggered"
+                    "description": "Do this behavior if a Check is triggered",
+                    "type": "string"
                 },
                 "rules": {
                     "description": "A list of Rules to run.\n\nIf `Rule` objects are triggered based on `condition` then `actions` will be performed.\n\nCan be `Rule`, `RuleSet`, or the `name` of any **named** `Rule` in your subreddit's configuration.\n\n**If `rules` is an empty array or not present then `actions` are performed immediately.**",

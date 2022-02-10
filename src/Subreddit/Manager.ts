@@ -49,7 +49,7 @@ import {Check, CheckStructuredJson} from "../Check";
 import NotificationManager from "../Notification/NotificationManager";
 import {createHistoricalDefaults, historicalDefaults} from "../Common/defaults";
 import {ExtendedSnoowrap} from "../Utils/SnoowrapClients";
-import {CMError, isRateLimitError, isStatusError} from "../Utils/Errors";
+import {CMError, isRateLimitError, isStatusError, RunProcessingError} from "../Utils/Errors";
 import {ErrorWithCause, stackWithCauses} from "pony-cause";
 import {Run} from "../Run";
 import got from "got";
@@ -712,12 +712,20 @@ export class Manager extends EventEmitter {
                 return;
             }
 
+            // for now disallow the same goto from being run twice
+            // maybe in the future this can be user-configurable
+            const hitGotos: string[] = [];
+
             let continueRunIteration = true;
             let runIndex = 0;
             let gotoContext: string = '';
             while(continueRunIteration && (runIndex < this.runs.length || gotoContext !== '')) {
                 let currRun: Run;
                 if(gotoContext !== '') {
+                    if(hitGotos.includes(gotoContext)) {
+                        throw new Error(`The goto "${gotoContext}" has already been hit once. This indicates a possible endless loop may occur so CM will terminate processing this activity to save you from yourself!`);
+                    }
+                    hitGotos.push(gotoContext);
                     const [runName] = gotoContext.split('.');
                     const gotoIndex = this.runs.findIndex(x => normalizeName(x.name) === normalizeName(runName));
                     if(gotoIndex !== -1) {
@@ -741,7 +749,7 @@ export class Manager extends EventEmitter {
                     currRun = this.runs[runIndex];
                 }
 
-                const [runResult, postBehavior] = await currRun.handle(item,allRuleResults, {...options, gotoContext});
+                const [runResult, postBehavior] = await currRun.handle(item,allRuleResults, runResults.filter(x => x.name === currRun.name), {...options, gotoContext});
                 runResults.push(runResult);
 
                 allRuleResults = allRuleResults.concat(determineNewResults(allRuleResults, (runResult.checkResults ?? []).map(x => x.ruleResults).flat()));
@@ -749,32 +757,26 @@ export class Manager extends EventEmitter {
                 switch (postBehavior.toLowerCase()) {
                     case 'next':
                     case 'nextrun':
+                        continueRunIteration = true;
+                        gotoContext = '';
                         break;
                     case 'stop':
                         continueRunIteration = false;
+                        gotoContext = '';
                         break;
                     default:
                         if (postBehavior.includes('goto:')) {
                             gotoContext = postBehavior.split(':')[1];
-                            if (!gotoContext.includes('.')) {
-                                // no period means we are going directly to a run
-                                continueRunIteration = false;
-                            } else {
-                                const [runN, checkN] = gotoContext.split('.');
-                                if (runN !== '') {
-                                    // if run name is specified then also break check iteration
-                                    // OTHERWISE this is a special "in run" check path IE .check1 where we just want to continue iterating checks
-                                    continueRunIteration = false;
-                                }
-                            }
                         }
                 }
                 runIndex++;
             }
         } catch (err: any) {
-            if (!(err instanceof LoggedError) && err.logged !== true) {
-                this.logger.error('An unhandled error occurred while running checks', err);
+            if(err instanceof RunProcessingError && err.result !== undefined) {
+                runResults.push(err.result);
             }
+            const processError = new ErrorWithCause('Activity processing terminated early due to unexpected error', {cause: err});
+            this.logger.error(processError);
             this.emit('error', err);
         } finally {
             actionedEvent.triggered = runResults.some(x => x.triggered);
@@ -796,7 +798,7 @@ export class Manager extends EventEmitter {
                 this.logger.verbose(`Reddit API Stats: Initial ${startingApiLimit} | Current ${this.client.ratelimitRemaining} | Used ~${startingApiLimit - this.client.ratelimitRemaining} | Events ~${formatNumber(this.eventsRollingAvg)}/s`);
                 this.currentLabels = [];
             } catch (err: any) {
-                this.logger.error('Error occurred while cleaning up Activity check and generating stats', err);
+                this.logger.error(new ErrorWithCause('Error occurred while cleaning up Activity check and generating stats', {cause: err}));
             } finally {
                 this.resources.updateHistoricalStats({
                     eventsCheckedTotal: 1,

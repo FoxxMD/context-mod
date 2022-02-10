@@ -2006,7 +2006,7 @@ export interface RunResult {
     error?: string
     itemIs?: FilterResult<TypedActivityStates>
     authorIs?: FilterResult<AuthorCriteria>
-    checkResults?: CheckSummary[]
+    checkResults: CheckSummary[]
 }
 
 export interface UserResultCache {
@@ -2214,7 +2214,7 @@ export type GotoPath = `goto:${string}`;
  * * goto:[path] => specify a run[.check] to jump to
  *
  * */
-export type PostBehaviorTypes = 'next' | 'stop' | 'nextRun' | GotoPath;
+export type PostBehaviorTypes = 'next' | 'stop' | 'nextRun' | string;
 
 export interface PostBehavior {
     /**

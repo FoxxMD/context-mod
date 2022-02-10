@@ -31,7 +31,7 @@ import {ActionObjectJson, RuleJson, RuleObjectJson, ActionJson as ActionTypeJson
 import {checkAuthorFilter, SubredditResources} from "../Subreddit/SubredditResources";
 import {Author, AuthorCriteria, AuthorOptions} from '..';
 import {ExtendedSnoowrap} from '../Utils/SnoowrapClients';
-import {isRateLimitError} from "../Utils/Errors";
+import {CheckProcessingError, isRateLimitError} from "../Utils/Errors";
 import {ErrorWithCause, stackWithCauses} from "pony-cause";
 import {runCheckOptions} from "../Subreddit/Manager";
 import EventEmitter from "events";
@@ -254,11 +254,11 @@ export abstract class Check implements ICheck {
             } catch (err: any) {
                 checkError = stackWithCauses(err);
                 checkSum.error = checkError;
+                const chkLogError = new ErrorWithCause(`[CHK ${this.name}] Running rules failed due to uncaught exception`, {cause: err});
                 if (err.logged !== true) {
-                    const chkLogError = new ErrorWithCause(`Running rules failed due to uncaught exception`, {cause: err});
                     this.logger.warn(chkLogError);
                 }
-                this.emitter.emit('error', err);
+                this.emitter.emit('error', chkLogError);
             }
 
             let behaviorT: string;
@@ -286,7 +286,7 @@ export abstract class Check implements ICheck {
                         this.emitter.emit('notify', notifPayload)
                     }
                 } catch (err: any) {
-                    this.emitter.emit(err);
+                    this.emitter.emit('error', err);
                     checkError = stackWithCauses(err);
                     checkSum.error = checkError;
                     if (err.logged !== true) {
@@ -302,7 +302,7 @@ export abstract class Check implements ICheck {
 
             switch (checkSum.postBehavior.toLowerCase()) {
                 case 'next':
-                    this.logger.debug('Behavior => NEXT => run next check', {leaf: `Post Check ${behaviorT}`});
+                    this.logger.debug('Behavior => NEXT => Run next check', {leaf: `Post Check ${behaviorT}`});
                     break;
                 case 'nextrun':
                     this.logger.debug('Behavior => NEXT RUN => Skip remaining checks and go to next Run', {leaf: `Post Check ${behaviorT}`});
@@ -313,11 +313,17 @@ export abstract class Check implements ICheck {
                 default:
                     if (checkSum.postBehavior.includes('goto:')) {
                         const gotoContext = checkSum.postBehavior.split(':')[1];
-                        this.logger.debug(`Behavior => GOTO => Set to ${gotoContext}`, {leaf: `Post Check ${behaviorT}`});
+                        this.logger.debug(`Behavior => GOTO => ${gotoContext}`, {leaf: `Post Check ${behaviorT}`});
                     } else {
-                        throw new Error(`Post ${behaviorT} Behavior was not a valid value. Must be one of => next | nextRun | stop | goto:[path]`);
+                        throw new Error(`Post ${behaviorT} Behavior "${checkSum.postBehavior}" was not a valid value. Must be one of => next | nextRun | stop | goto:[path]`);
                     }
             }
+            return checkSum;
+        } catch (err: any) {
+            if(checkSum.error === undefined) {
+                checkSum.error = stackWithCauses(err);
+            }
+            throw new CheckProcessingError(`[CHK ${this.name}] An uncaught exception occurred while processing Check`, {cause: err}, checkSum);
         } finally {
             this.resources.updateHistoricalStats({
                 checksTriggered: checkSum.triggered ? [checkSum.name] : [],
@@ -328,7 +334,6 @@ export abstract class Check implements ICheck {
                 rulesTriggered: checkSum.ruleResults.filter(x => x.triggered).map(x => x.name),
                 rulesCachedTotal: checkSum.ruleResults.filter(x => x.fromCache).length
             })
-            return checkSum
         }
     }
 

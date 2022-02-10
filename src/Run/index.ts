@@ -20,6 +20,7 @@ import {runCheckOptions} from "../Subreddit/Manager";
 import {RuleResult} from "../Rule";
 import {ErrorWithCause, stackWithCauses} from "pony-cause";
 import EventEmitter from "events";
+import {CheckProcessingError, RunProcessingError} from "../Utils/Errors";
 
 export class Run {
     name: string;
@@ -97,7 +98,7 @@ export class Run {
         }
     }
 
-    async handle(activity: (Submission | Comment), initAllRuleResults: RuleResult[], options?: runCheckOptions): Promise<[RunResult, string]> {
+    async handle(activity: (Submission | Comment), initAllRuleResults: RuleResult[], existingRunResults: RunResult[] = [], options?: runCheckOptions): Promise<[RunResult, string]> {
 
         let itemIsResults: FilterResult<TypedActivityStates> | undefined;
         let authorIsResults: FilterResult<AuthorCriteria> | undefined;
@@ -105,9 +106,10 @@ export class Run {
         let continueRunIteration = true;
         let postBehavior = 'next';
         let runError: string | undefined;
-        const defaultRunResult = {
+        const runResult: RunResult = {
             name: this.name,
-            triggered: false
+            triggered: false,
+            checkResults: [],
         }
         // TODO implement refresh?
 
@@ -115,19 +117,22 @@ export class Run {
             if (this.submissionChecks.length === 0) {
                 const msg = 'Skipping b/c Run did not contain any submission Checks';
                 this.logger.debug(msg);
-                return [{...defaultRunResult, reason: msg}, postBehavior];
+                return [{...runResult, reason: msg}, postBehavior];
             }
         } else if (this.commentChecks.length === 0) {
             const msg = 'Skipping b/c Run did not contain any comment Checks';
             this.logger.debug(msg);
-            return [{...defaultRunResult, reason: msg}, postBehavior];
+            return [{...runResult, reason: msg}, postBehavior];
         }
 
         let gotoContext = options?.gotoContext ?? '';
         const checks = isSubmission(activity) ? this.submissionChecks : this.commentChecks;
         let continueCheckIteration = true;
         let checkIndex = 0;
-        const runChecks: CheckSummary[] = [];
+
+        // for now disallow the same goto from being run twice
+        // maybe in the future this can be user-configurable
+        const hitGotos: string[] = [];
 
         try {
 
@@ -135,49 +140,55 @@ export class Run {
             if (!itemPass) {
                 this.logger.verbose(`${FAIL} => Item did not pass 'itemIs' test`);
                 return [{
-                    ...defaultRunResult,
+                    ...runResult,
                     triggered: false,
                     // TODO add itemIs results
-                    //itemIs: itemPass
+                    itemIs: itemIsResults
                 }, postBehavior];
             } else if (this.itemIs.length > 0) {
                 // TODO add itemIs results
-                // itemIsResults = itemPass;
+                //runResult.itemIs = itemPass;
             }
 
             const [authFilterPass, authFilterType, authorFilterResult] = await checkAuthorFilter(activity, this.authorIs, this.resources, this.logger);
             if (!authFilterPass) {
                 return [{
-                    ...defaultRunResult,
-                    triggered: false,
-                    itemIs: itemIsResults,
+                    ...runResult,
                     authorIs: authorFilterResult
                 }, postBehavior];
             } else if (authFilterType !== undefined) {
-                authorIsResults = authorFilterResult;
+                runResult.authorIs = authorFilterResult;
             }
 
-            while (continueCheckIteration && checkIndex < checks.length) {
+            while (continueCheckIteration && (checkIndex < checks.length || gotoContext !== '')) {
                 let check: Check;
                 if (gotoContext !== '') {
                     const [runName, checkName] = gotoContext.split('.');
+                    if(hitGotos.includes(checkName)) {
+                        throw new Error(`The check specified in goto "${gotoContext}" has already been hit once. This indicates a possible endless loop may occur so CM will terminate processing this activity to save you from yourself!`);
+                    }
+                    hitGotos.push(checkName);
                     const gotoIndex = checks.findIndex(x => normalizeName(x.name) === normalizeName(checkName));
                     if (gotoIndex !== -1) {
                         if (gotoIndex > checkIndex) {
                             this.logger.debug(`Fast forwarding Check iteration to ${checks[gotoIndex].name}`, {leaf: 'GOTO'});
                         } else if (gotoIndex < checkIndex) {
                             this.logger.debug(`Rewinding Check iteration to ${checks[gotoIndex].name}`, {leaf: 'GOTO'});
-                        } else {
+                        } else if(checkIndex !== 0) {
                             this.logger.debug(`Did not iterate to next Check due to GOTO specifying same Check (you probably don't want to do this!)`, {leaf: 'GOTO'});
                         }
                         check = checks[gotoIndex];
                         checkIndex = gotoIndex;
                         gotoContext = '';
                     } else {
-                        throw new Error(`GOTO specified a Check that could not be found: ${checkName}`);
+                        throw new Error(`GOTO specified a Check that could not be found in ${isSubmission(activity) ? 'Submission' : 'Comment'} checks: ${checkName}`);
                     }
                 } else {
                     check = checks[checkIndex];
+                }
+
+                if(existingRunResults.some(x => x.checkResults?.map(y => y.name).includes(check.name))) {
+                    throw new Error(`The check "${check.name}" has already been run once. This indicates a possible endless loop may occur so CM will terminate processing this activity to save you from yourself!`);
                 }
 
                 const checkSummary = await check.handle(activity, allRuleResults, options);
@@ -185,18 +196,21 @@ export class Run {
 
                 allRuleResults = allRuleResults.concat(determineNewResults(allRuleResults, checkSummary.ruleResults));
 
-                runChecks.push(checkSummary);
+                runResult.checkResults.push(checkSummary);
 
                 switch (checkSummary.postBehavior.toLowerCase()) {
                     case 'next':
                         checkIndex++;
+                        gotoContext = '';
                         break;
                     case 'nextrun':
                         continueCheckIteration = false;
+                        gotoContext = '';
                         break;
                     case 'stop':
                         continueCheckIteration = false;
                         continueRunIteration = false;
+                        gotoContext = '';
                         break;
                     default:
                         if (checkSummary.postBehavior.includes('goto:')) {
@@ -215,26 +229,18 @@ export class Run {
                         }
                 }
             }
+            runResult.triggered = runResult.checkResults.some(x => x.triggered);
+            return [runResult, postBehavior]
         } catch (err: any) {
-            runError = stackWithCauses(err);
-            if (err.logged !== true) {
-                const chkLogError = new ErrorWithCause(`Run failed due to uncaught exception`, {cause: err});
-                this.logger.warn(chkLogError);
+            if(err instanceof CheckProcessingError && err.result !== undefined) {
+                runResult.checkResults.push(err.result);
             }
-        } finally {
-            const triggered = runChecks.some(x => x.triggered);
-            // if (!triggered) {
-            //     this.logger.info('No checks triggered');
-            // }
+            if(runResult.error === undefined) {
+                runResult.error = stackWithCauses(err);
+            }
+            runResult.triggered = runResult.checkResults.some(x => x.triggered);
 
-            return [{
-                ...defaultRunResult,
-                triggered,
-                error: runError,
-                itemIs: itemIsResults,
-                authorIs: authorIsResults,
-                checkResults: runChecks
-            }, postBehavior]
+            throw new RunProcessingError(`[RUN ${this.name}] An uncaught exception occurred while processing Run`, {cause: err}, runResult);
         }
     }
 }
