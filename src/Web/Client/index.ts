@@ -6,10 +6,18 @@ import cookieParser from 'cookie-parser';
 import CacheManagerStore from 'express-session-cache-manager'
 import passport from 'passport';
 import {Strategy as CustomStrategy} from 'passport-custom';
-import {OperatorConfig, BotConnection, LogInfo, CheckSummary, RunResult, ActionedEvent} from "../../Common/interfaces";
+import {
+    OperatorConfig,
+    BotConnection,
+    LogInfo,
+    CheckSummary,
+    RunResult,
+    ActionedEvent,
+    ActionResult
+} from "../../Common/interfaces";
 import {
     buildCachePrefix,
-    createCacheManager, defaultFormat, filterLogBySubreddit,
+    createCacheManager, defaultFormat, filterCriteriaSummary, filterLogBySubreddit, formatFilterData,
     formatLogLineToHtml,
     intersect, isLogLineMinLevel,
     LogEntry, parseInstanceLogInfoName, parseInstanceLogName, parseRedditEntity,
@@ -50,6 +58,7 @@ import {BotStatusResponse} from "../Common/interfaces";
 import {TransformableInfo} from "logform";
 import {SimpleError} from "../../Utils/Errors";
 import {ErrorWithCause} from "pony-cause";
+import {RuleResult} from "../../Rule";
 
 const emitter = new EventEmitter();
 
@@ -967,19 +976,20 @@ const webClient = async (options: OperatorConfig) => {
             });
             const formattedRunResults = runResults.map((summ: RunResult) => {
                 const {checkResults = [], ...rest} = summ;
-                const formattedCheckResults = checkResults.map((y) => {
-                    const {actionResults = [], ruleResults = [], triggered: checkTriggered, ...rest} = y;
+                const formattedCheckResults = checkResults.map((y: CheckSummary) => {
+                    const {actionResults = [], ruleResults = [], triggered: checkTriggered, authorIs, itemIs, ...rest} = y;
 
-                    const formattedRuleResults = ruleResults.map((y: any) => {
-                        const {triggered, result, ...restY} = y;
+                    const formattedRuleResults = ruleResults.map((z: RuleResult) => {
+                        const {triggered, result, ...restY} = z;
                         return {
                             ...restY,
                             triggered: triggeredIndicator(triggered, 'Skipped'),
-                            result: result || '-'
+                            result: result || '-',
+                            ...formatFilterData(z)
                         };
                     });
-                    const formattedActionResults = actionResults.map((y: any) => {
-                        const {run, runReason, success, result, dryRun, ...restA} = y;
+                    const formattedActionResults = actionResults.map((z: ActionResult) => {
+                        const {run, runReason, success, result, dryRun, ...restA} = z;
                         let res = '';
                         if(!run) {
                             res = `Not Run - ${runReason === undefined ? '(No Reason)' : runReason}`;
@@ -989,7 +999,8 @@ const webClient = async (options: OperatorConfig) => {
                         return {
                             ...restA,
                             dryRun: dryRun ? ' (DRYRUN)' : '',
-                            result: res
+                            result: res,
+                            ...formatFilterData(z)
                         };
                     });
 
@@ -999,7 +1010,8 @@ const webClient = async (options: OperatorConfig) => {
                         triggeredVal: checkTriggered,
                         ruleResults: formattedRuleResults,
                         actionResults: formattedActionResults,
-                        ruleSummary: y.fromCache ? `Check result was found in cache: ${triggeredIndicator(checkTriggered, 'Skipped')}` : resultsSummary(ruleResults, y.condition)
+                        ruleSummary: y.fromCache ? `Check result was found in cache: ${triggeredIndicator(checkTriggered, 'Skipped')}` : resultsSummary(ruleResults, y.condition),
+                        ...formatFilterData(y)
                     }
                 });
 
@@ -1007,7 +1019,8 @@ const webClient = async (options: OperatorConfig) => {
                     ...rest,
                     triggered: triggeredIndicator(summ.triggered, 'Skipped'),
                     triggeredVal: summ.triggered,
-                    checkResults: formattedCheckResults
+                    checkResults: formattedCheckResults,
+                    ...formatFilterData(summ)
                 }
             });
             return {

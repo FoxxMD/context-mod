@@ -10,9 +10,10 @@ import {inflateSync, deflateSync} from "zlib";
 import pixelmatch from 'pixelmatch';
 import os from 'os';
 import {
+    ActionResult,
     ActivityWindowCriteria, ActivityWindowType,
     CacheOptions,
-    CacheProvider,
+    CacheProvider, CheckSummary,
     DurationComparison, DurationVal, FilterCriteriaDefaults, FilterCriteriaPropertyResult, FilterCriteriaResult,
     GenericComparison,
     HistoricalStats,
@@ -26,7 +27,7 @@ import {
     RedditEntity,
     RedditEntityType,
     RegExResult, RepostItem, RepostItemResult,
-    ResourceStats, SearchAndReplaceRegExp,
+    ResourceStats, RunResult, SearchAndReplaceRegExp,
     StringComparisonOptions,
     StringOperator,
     StrongSubredditState,
@@ -2114,4 +2115,28 @@ export const mergeFilters = (objectConfig: any, filterDefs: FilterCriteriaDefaul
     }
 
     return [derivedAuthorIs, derivedItemIs];
+}
+
+export const formatFilterData = (result: (RunResult | CheckSummary | RuleResult | ActionResult)) => {
+
+    const formattedResult: any = {};
+
+    const {authorIs, itemIs} = result;
+
+    if (authorIs !== undefined) {
+        formattedResult.authorIs = {
+            ...authorIs,
+            passed: triggeredIndicator(authorIs.passed),
+            criteriaResults: authorIs.criteriaResults.map(x => filterCriteriaSummary(x))
+        }
+    }
+    if (itemIs !== undefined) {
+        formattedResult.itemIs = {
+            ...itemIs,
+            passed: triggeredIndicator(itemIs.passed),
+            criteriaResults: itemIs.criteriaResults.map(x => filterCriteriaSummary(x))
+        }
+    }
+
+    return formattedResult;
 }
