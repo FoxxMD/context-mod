@@ -1,5 +1,5 @@
 import {Cache} from 'cache-manager';
-import {CheckSummary} from "../../interfaces";
+import {ActionedEvent, CheckSummary, RunResult} from "../../interfaces";
 import {parseStringToRegex, redisScanIterator} from "../../../util";
 
 export const up = async (context: any, next: any) => {
@@ -43,21 +43,27 @@ export const up = async (context: any, next: any) => {
                 return x;
             }
             // otherwise wrap in dummy run
-            const checkSum: CheckSummary = {
+            const result: ActionedEvent = {
                 ...rest,
                 runResults: [
                     {
-                        name: check,
-                        run: 'Run1',
-                        postBehavior: 'nextRun',
+                        name: 'Run1',
                         triggered: true,
-                        condition: ruleSummary.includes('OR') ? 'OR' : 'AND',
-                        ruleResults,
-                        actionResults,
+                        checkResults: [
+                            {
+                                name: check,
+                                run: 'Run1',
+                                postBehavior: 'nextRun',
+                                triggered: true,
+                                condition: ruleSummary.includes('OR') ? 'OR' : 'AND',
+                                ruleResults,
+                                actionResults,
+                            }
+                        ],
                     }
                 ]
             }
-            return checkSum;
+            return result;
         });
         await client.set(k, newEvents);
     }
@@ -99,11 +105,11 @@ export const down = async (context: any, next: any) => {
                 return acc;
             }
             const {runResults = [], ...rest} = curr;
-            const singleEvents = (runResults as CheckSummary[]).map(y => {
+            const singleEvents = (runResults as RunResult[]).map(y => {
                 return {
                     ...rest,
-                    ruleResults: y.ruleResults,
-                    actionResults: y.actionResults,
+                    ruleResults: y.checkResults[0].ruleResults,
+                    actionResults: y.checkResults[0].actionResults,
                     check: y.name,
                 }
             });
