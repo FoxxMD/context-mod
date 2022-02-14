@@ -503,7 +503,7 @@ export const testAuthorCriteria = async (item: (Comment | Submission), authorOpt
                         break;
                     case 'isMod':
                         const mods: RedditUser[] = await item.subreddit.getModerators();
-                        const isModerator = mods.some(x => x.name === authorName);
+                        const isModerator = mods.some(x => x.name === authorName) || authorName.toLowerCase() === 'automoderator';
                         const modMatch = authorOpts.isMod === isModerator;
                         propResultsMap.isMod!.found = isModerator;
                         propResultsMap.isMod!.passed = !((include && !modMatch) || (!include && modMatch));
