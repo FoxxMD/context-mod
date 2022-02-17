@@ -283,6 +283,7 @@ export class Manager extends EventEmitter {
         } catch (e) {
             const err = new ErrorWithCause('Unable to retrieve moderator permissions', {cause: e});
             this.logger.error(err);
+            return [];
         }
         return this.modPermissions as string[];
     }

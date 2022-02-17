@@ -233,13 +233,14 @@ const status = () => {
         const cacheMiss = subManagerData.reduce((acc, curr) => acc + curr.stats.cache.totalMiss, 0);
         const sharedSub = subManagerData.find(x => x.stats.cache.isShared);
         const sharedCount = sharedSub !== undefined ? sharedSub.stats.cache.currentKeyCount : 0;
+        const scopes = req.user?.isInstanceOperator(bot) ? bot.client.scope : [];
         let allManagerData: any = {
             name: 'All',
             status: bot.running ? 'RUNNING' : 'NOT RUNNING',
             indicator: bot.running ? 'green' : 'grey',
             maxWorkers,
             globalMaxWorkers,
-            scopes: req.user?.isInstanceOperator(bot) ? bot.client.scope : [],
+            scopes: scopes === null || !Array.isArray(scopes) ? [] : scopes,
             subMaxWorkers,
             runningActivities,
             queuedActivities,
