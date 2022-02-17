@@ -3,3 +3,28 @@
         <a href="https://github.com/FoxxMD/context-mod">ContextMod Web</a> created by /u/FoxxMD
     </div>
 </div>
+<script type="text/javascript" src="https://cdn.statuspage.io/se-v2.js"></script>
+<script>
+    // https://www.redditstatus.com/api#status
+    var sp = new StatusPage.page({ page : '2kbc0d48tv3j' });
+    sp.status({
+        success : function(data) {
+            debugger;
+            console.log(data.status.indicator);
+            switch(data.status.indicator){
+                case 'minor':
+                    document.querySelector('#redditStatus').innerHTML = '<span class="iconify-inline yellow" data-icon="ep:warning-filled"></span>';
+                    break;
+                case 'none':
+                    document.querySelector('#redditStatus').innerHTML = '<span class="iconify-inline green" data-icon="ep:circle-check-filled"></span>';
+                    break;
+                default:
+                    document.querySelector('#redditStatus').innerHTML = '<span class="iconify-inline red" data-icon="ep:warning-filled"></span>';
+                    break;
+            }
+            // data.page.updated_at
+            // data.status.indicator => none, minor, major, or critical
+            // data.status.description
+        }
+    });
+</script>
