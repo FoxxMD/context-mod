@@ -270,15 +270,20 @@ export class Manager extends EventEmitter {
         })(this), 10000);
     }
 
-    protected async getModPermissions(): Promise<string[]> {
+    public async getModPermissions(): Promise<string[]> {
         if(this.modPermissions !== undefined) {
             return this.modPermissions as string[];
         }
         this.logger.debug('Retrieving mod permissions for bot');
-        const userInfo = parseRedditEntity(this.botName, 'user');
-        const mods = this.subreddit.getModerators({name: userInfo.name});
-        // @ts-ignore
-        this.modPermissions = mods[0].mod_permissions;
+        try {
+            const userInfo = parseRedditEntity(this.botName, 'user');
+            const mods = this.subreddit.getModerators({name: userInfo.name});
+            // @ts-ignore
+            this.modPermissions = mods[0].mod_permissions;
+        } catch (e) {
+            const err = new ErrorWithCause('Unable to retrieve moderator permissions', {cause: e});
+            this.logger.error(err);
+        }
         return this.modPermissions as string[];
     }
 

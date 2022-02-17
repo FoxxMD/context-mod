@@ -93,6 +93,7 @@ const status = () => {
                 eventsState: m.eventsState,
                 queueState: m.queueState,
                 indicator: 'gray',
+                permissions: await m.getModPermissions(),
                 queuedActivities: m.queue.length(),
                 runningActivities: m.queue.running(),
                 maxWorkers: m.queue.concurrency,

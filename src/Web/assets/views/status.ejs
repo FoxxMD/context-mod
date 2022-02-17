@@ -160,6 +160,19 @@
                                                         </div>
                                                     </div>
                                                 </div>
+                                                <label>Mod Perms</label>
+                                                <span class="has-tooltip">
+                                                    <span class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2'>
+                                                        <span>
+                                                            <ul class="list-inside list-disc">
+                                                                <% data.permissions.forEach(function (i){ %>
+                                                                    <li class="font-mono"><%= i %></li>
+                                                                <% }) %>
+                                                            </ul>
+                                                        </span>
+                                                    </span>
+                                                    <span class="cursor-help underline" style="text-decoration-style: dotted"><%= data.permissions.length %></span>
+                                                </span>
                                                 <label>Slow Mode</label>
                                                 <span><%= data.delayBy %></span>
                                             <% } %>
