@@ -238,6 +238,7 @@ const status = () => {
             indicator: bot.running ? 'green' : 'grey',
             maxWorkers,
             globalMaxWorkers,
+            scopes: req.user?.isInstanceOperator(bot) ? bot.client.scope : [],
             subMaxWorkers,
             runningActivities,
             queuedActivities,
