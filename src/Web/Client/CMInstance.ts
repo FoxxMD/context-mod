@@ -2,7 +2,7 @@ import {URL} from "url";
 import {Logger} from "winston";
 import {BotInstance, CMInstanceInterface, CMInstanceInterface as CMInterface} from "../interfaces";
 import dayjs from 'dayjs';
-import {BotConnection} from "../../Common/interfaces";
+import {BotConnection, LogInfo} from "../../Common/interfaces";
 import normalizeUrl from "normalize-url";
 import {HeartbeatResponse} from "../Common/interfaces";
 import jwt from "jsonwebtoken";
@@ -24,6 +24,7 @@ export class CMInstance implements CMInterface {
     secret: string;
 
     logger: Logger;
+    logs: LogInfo[] = [];
 
     constructor(options: BotConnection, logger: Logger) {
         const {
@@ -44,7 +45,13 @@ export class CMInstance implements CMInterface {
             get instance() {
                 return name();
             }
-        })
+        });
+
+        this.logger.stream().on('log', (log: LogInfo) => {
+            if(log.instance !== undefined && log.instance === this.getName()) {
+                this.logs = [log, ...this.logs].slice(0, 301);
+            }
+        });
     }
 
     getData(): CMInterface {
@@ -109,6 +116,7 @@ export class CMInstance implements CMInterface {
             }
         }
         if (shouldCheck) {
+            this.logger.debug('Starting Heartbeat check');
             this.lastCheck = dayjs().unix();
             const machineToken = jwt.sign({
                 data: {
@@ -131,7 +139,7 @@ export class CMInstance implements CMInterface {
             } catch (err: any) {
                 this.online = false;
                 this.error = err.message;
-                const badHeartbeat = new ErrorWithCause(`Heartbeat response from ${this.getName()} was not ok`, {cause: err});
+                const badHeartbeat = new ErrorWithCause('Heartbeat response was not ok', {cause: err});
                 this.logger.error(badHeartbeat);
             }
         }

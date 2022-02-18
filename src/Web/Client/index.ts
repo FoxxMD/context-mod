@@ -9,7 +9,7 @@ import {Strategy as CustomStrategy} from 'passport-custom';
 import {OperatorConfig, BotConnection, LogInfo} from "../../Common/interfaces";
 import {
     buildCachePrefix,
-    createCacheManager, defaultFormat, filterLogBySubreddit,
+    createCacheManager, defaultFormat, filterLogBySubreddit, filterLogs,
     formatLogLineToHtml,
     intersect, isLogLineMinLevel,
     LogEntry, parseInstanceLogInfoName, parseInstanceLogName, parseRedditEntity,
@@ -118,8 +118,6 @@ const createToken = (bot: CMInstanceInterface, user?: Express.User | any, ) => {
 
 const availableLevels = ['error', 'warn', 'info', 'verbose', 'debug'];
 
-const instanceLogMap: Map<string, LogEntry[]> = new Map();
-
 const webClient = async (options: OperatorConfig) => {
     const {
         operator: {
@@ -155,17 +153,6 @@ const webClient = async (options: OperatorConfig) => {
     const logger = getLogger({defaultLabel: 'Web', ...options.logging}, 'Web');
 
     logger.stream().on('log', (log: LogInfo) => {
-        const logEntry: LogEntry = [dayjs(log.timestamp).unix(), log];
-        const {instance: instanceLogName} = log;
-        if (instanceLogName !== undefined) {
-            const subLogs = instanceLogMap.get(instanceLogName) || [];
-            subLogs.unshift(logEntry);
-            instanceLogMap.set(instanceLogName, subLogs.slice(0, 200 + 1));
-        } else {
-            const appLogs = instanceLogMap.get('web') || [];
-            appLogs.unshift(logEntry);
-            instanceLogMap.set('web', appLogs.slice(0, 200 + 1));
-        }
         emitter.emit('log', log[MESSAGE]);
     });
 
@@ -558,7 +545,8 @@ const webClient = async (options: OperatorConfig) => {
                     });
 
                     if(err !== undefined) {
-                        logger.warn(`Log streaming encountered an error, trying to reconnect (retries: ${retryCount}) -- ${err.code !== undefined ? `(${err.code}) ` : ''}${err.message}`, {instance: currInstance.friendly});
+                        // @ts-ignore
+                        currInstance.logger.warn(new ErrorWithCause(`Log streaming encountered an error, trying to reconnect (retries: ${retryCount})`, {cause: err}), {user: user.name});
                     }
                     const gotStream = got.stream.get(`${currInstance.normalUrl}/logs`, {
                         retry: {
@@ -579,7 +567,7 @@ const webClient = async (options: OperatorConfig) => {
 
                     if(err !== undefined) {
                         gotStream.once('data', () => {
-                            logger.info('Streaming resumed', {subreddit: currInstance.getName()});
+                            currInstance.logger.info('Streaming resumed', {instance: currInstance.getName(), user: user.name});
                         });
                     }
 
@@ -593,7 +581,8 @@ const webClient = async (options: OperatorConfig) => {
                     // ECONNRESET
                     s.catch((err) => {
                         if(err.code !== 'ABORT_ERR' && err.code !== 'ERR_STREAM_PREMATURE_CLOSE') {
-                            logger.error(`Unexpected error, or too many retries, occurred while streaming logs -- ${err.code !== undefined ? `(${err.code}) ` : ''}${err.message}`, {instance: currInstance.friendly});
+                            // @ts-ignore
+                            currInstance.logger.error(new ErrorWithCause('Unexpected error, or too many retries, occurred while streaming logs', {cause: err}), {user: user.name});
                         }
                     });
 
@@ -745,7 +734,7 @@ const webClient = async (options: OperatorConfig) => {
             });
 
             if(accessibleInstance === undefined) {
-                logger.warn(`User ${user.name} is not an operator and has no subreddits in common with any *running* bot instances. If you are sure they should have common subreddits then this client may not be able to access all defined CM servers or the bot may be offline.`);
+                logger.warn(`User ${user.name} is not an operator and has no subreddits in common with any *running* bot instances. If you are sure they should have common subreddits then this client may not be able to access all defined CM servers or the bot may be offline.`, {user: user.name});
                 return res.render('noAccess');
             }
 
@@ -778,13 +767,13 @@ const webClient = async (options: OperatorConfig) => {
     app.getAsync('/', [initHeartbeat, redirectBotsNotAuthed, ensureAuthenticated, defaultSession, defaultInstance, instanceWithPermissions, createUserToken], async (req: express.Request, res: express.Response) => {
 
         const user = req.user as Express.User;
-        const instance = req.instance as CMInstanceInterface;
+        const instance = req.instance as CMInstance;
 
         const limit = req.session.limit;
         const sort = req.session.sort;
         const level = req.session.level;
 
-        const shownInstances = cmInstances.reduce((acc: CMInstanceInterface[], curr) => {
+        const shownInstances = cmInstances.reduce((acc: CMInstance[], curr) => {
             const isBotOperator = req.user?.isInstanceOperator(curr);
             if(user?.clientData?.webOperator) {
                 // @ts-ignore
@@ -812,14 +801,15 @@ const webClient = async (options: OperatorConfig) => {
             }).json() as any;
 
         } catch(err: any) {
-            logger.error(`Error occurred while retrieving bot information. Will update heartbeat -- ${err.message}`, {instance: instance.friendly});
-            refreshClient(clients.find(x => normalizeUrl(x.host) === instance.normalUrl) as BotConnection);
+            instance.logger.error(new ErrorWithCause(`Could not retrieve instance information. Will attempted to update heartbeat.`, {cause: err}));
+            refreshClient({host: instance.host, secret: instance.secret});
+            const isOp = req.user?.isInstanceOperator(instance);
             return res.render('offline', {
                 instances: shownInstances,
                 instanceId: (req.instance as CMInstance).getName(),
-                isOperator: req.user?.isInstanceOperator(instance),
+                isOperator: isOp,
                 // @ts-ignore
-                logs: filterLogBySubreddit(instanceLogMap, [instance.friendly], {limit, sort, level, allLogName: 'web', allLogsParser: parseInstanceLogInfoName }).get(instance.friendly),
+                logs: filterLogs((isOp ? instance.logs : instance.logs.filter(x => x.user === undefined || x.user.includes(req.user.name))), {limit, sort, level}),
                 logSettings: {
                     limitSelect: [10, 20, 50, 100, 200].map(x => `<option ${limit === x ? 'selected' : ''} class="capitalize ${limit === x ? 'font-bold' : ''}" data-value="${x}">${x}</option>`).join(' | '),
                     sortSelect: ['ascending', 'descending'].map(x => `<option ${sort === x ? 'selected' : ''} class="capitalize ${sort === x ? 'font-bold' : ''}" data-value="${x}">${x}</option>`).join(' '),
@@ -1102,7 +1092,7 @@ const webClient = async (options: OperatorConfig) => {
                                 }).json() as object;
                                 io.to(session.id).emit('opStats', resp);
                             } catch (err: any) {
-                                logger.error(`Could not retrieve stats ${err.message}`, {instance: bot.friendly});
+                                bot.logger.error(new ErrorWithCause('Could not retrieve stats', {cause: err}));
                                 clearInterval(interval);
                             }
                         }, 5000);
@@ -1120,7 +1110,6 @@ const webClient = async (options: OperatorConfig) => {
 
     const loopHeartbeat = async () => {
         while(true) {
-            logger.debug('Starting heartbeat check');
             for(const c of clients) {
                 await refreshClient(c);
             }
