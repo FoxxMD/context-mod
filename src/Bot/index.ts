@@ -16,7 +16,7 @@ import {
 } from "../Common/interfaces";
 import {
     createRetryHandler,
-    formatNumber, getExceptionMessage,
+    formatNumber, getExceptionMessage, getUserAgent,
     mergeArr,
     parseBool,
     parseDuration, parseMatchMessage,
@@ -98,6 +98,7 @@ class Bot {
                 dryRun,
                 heartbeatInterval,
             },
+            userAgent,
             credentials: {
                 reddit: {
                     clientId,
@@ -166,7 +167,9 @@ class Bot {
         this.excludeSubreddits = exclude.map(parseSubredditName);
 
         let creds: any = {
-            get userAgent() { return getUserName() },
+            get userAgent() {
+                return getUserAgent(`web:contextBot:{VERSION}{FRAG}:BOT-${getBotName()}`, userAgent)
+            },
             clientId,
             clientSecret,
             refreshToken,

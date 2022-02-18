@@ -1384,6 +1384,10 @@
             "$ref": "#/definitions/SnoowrapOptions",
             "description": "Set global snoowrap options as well as default snoowrap config for all bots that don't specify their own"
         },
+        "userAgent": {
+            "description": "Added to the User-Agent information sent to reddit\n\nThis string will be added BETWEEN version and your bot name.\n\nEX: `myBranch` => `web:contextMod:v1.0.0-myBranch:BOT-/u/MyBotUser`\n\n* ENV => `USER_AGENT`",
+            "type": "string"
+        },
         "web": {
             "description": "Settings for the web interface",
             "properties": {

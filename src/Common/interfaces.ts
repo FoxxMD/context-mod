@@ -1691,6 +1691,17 @@ export interface OperatorJsonConfig {
     bots?: BotInstanceJsonConfig[]
 
     /**
+     * Added to the User-Agent information sent to reddit
+     *
+     * This string will be added BETWEEN version and your bot name.
+     *
+     * EX: `myBranch` => `web:contextMod:v1.0.0-myBranch:BOT-/u/MyBotUser`
+     *
+     * * ENV => `USER_AGENT`
+     * */
+    userAgent?: string
+
+    /**
      * Settings for the web interface
      * */
     web?: {
@@ -1865,6 +1876,7 @@ export interface BotInstanceConfig extends BotInstanceJsonConfig {
         softLimit: number,
         hardLimit: number,
     }
+    userAgent?: string
 }
 
 export interface OperatorConfig extends OperatorJsonConfig {
