@@ -9,11 +9,6 @@ import {Strategy as JwtStrategy, ExtractJwt} from 'passport-jwt';
 import passport from 'passport';
 import tcpUsed from 'tcp-port-used';
 
-import {
-    intersect,
-    LogEntry, parseBotLogName,
-    parseSubredditLogName
-} from "../../util";
 import {getLogger} from "../../Utils/loggerFactory";
 import LoggedError from "../../Utils/LoggedError";
 import {Invokee, LogInfo, OperatorConfigWithFileContext} from "../../Common/interfaces";
@@ -27,7 +22,6 @@ import {authUserCheck, botRoute} from "./middleware";
 import {opStats} from "../Common/util";
 import Bot from "../../Bot";
 import addBot from "./routes/authenticated/user/addBot";
-import dayjs from "dayjs";
 import ServerUser from "../Common/User/ServerUser";
 import {SimpleError} from "../../Utils/Errors";
 import {ErrorWithCause} from "pony-cause";
@@ -47,11 +41,7 @@ declare module 'express-session' {
     }
 }
 
-const subLogMap: Map<string, LogEntry[]> = new Map();
-const systemLogs: LogEntry[] = [];
-const botLogMap: Map<string, Map<string, LogEntry[]>> = new Map();
-
-const botSubreddits: Map<string, string[]> = new Map();
+let sysLogs: LogInfo[] = [];
 
 const rcbServer = async function (options: OperatorConfigWithFileContext) {
 
@@ -73,36 +63,12 @@ const rcbServer = async function (options: OperatorConfigWithFileContext) {
     const logger = getLogger({...options.logging});
 
     logger.stream().on('log', (log: LogInfo) => {
-        const logEntry: LogEntry = [dayjs(log.timestamp).unix(), log];
 
         const {bot: botName, subreddit: subName} = log;
 
-        if(botName === undefined) {
-            systemLogs.unshift(logEntry);
-            systemLogs.slice(0, 201);
-        } else {
-            const botLog = botLogMap.get(botName) || new Map();
-
-            if(subName === undefined) {
-                const appLogs = botLog.get('app') || [];
-                appLogs.unshift(logEntry);
-                botLog.set('app', appLogs.slice(0, 200 + 1));
-            } else {
-                let botSubs = botSubreddits.get(botName) || [];
-                if(app !== undefined && (botSubs.length === 0 || !botSubs.includes(subName))) {
-                    const b = app.bots.find(x => x.botName === botName);
-                    if(b !== undefined) {
-                        botSubs = b.subManagers.map(x => x.displayLabel);
-                        botSubreddits.set(botName, botSubs);
-                    }
-                }
-                if(botSubs.length === 0 || botSubs.includes(subName)) {
-                    const subLogs = botLog.get(subName) || [];
-                    subLogs.unshift(logEntry);
-                    botLog.set(subName, subLogs.slice(0, 200 + 1));
-                }
-            }
-            botLogMap.set(botName, botLog);
+        if(botName === undefined && subName === undefined) {
+            sysLogs.unshift(log);
+            sysLogs = sysLogs.slice(0, 201);
         }
     })
 
@@ -167,7 +133,7 @@ const rcbServer = async function (options: OperatorConfigWithFileContext) {
 
     server.getAsync('/heartbeat', ...heartbeat({name, display, friendly}));
 
-    server.getAsync('/logs', ...logs(subLogMap));
+    server.getAsync('/logs', ...logs());
 
     server.getAsync('/stats', [authUserCheck(), botRoute(false)], async (req: Request, res: Response) => {
         let bots: Bot[] = [];
@@ -186,9 +152,7 @@ const rcbServer = async function (options: OperatorConfigWithFileContext) {
     });
     const passLogs = async (req: Request, res: Response, next: Function) => {
         // @ts-ignore
-        req.botLogs = botLogMap;
-        // @ts-ignore
-        req.systemLogs = systemLogs;
+        req.sysLogs = sysLogs;
         next();
     }
     server.getAsync('/status', passLogs, ...status())

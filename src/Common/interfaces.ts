@@ -1935,6 +1935,7 @@ export interface LogInfo {
     instance?: string
     labels?: string[]
     bot?: string
+    user?: string
 }
 
 export interface ActionResult extends ActionProcessResult {

@@ -6,7 +6,7 @@ import EventEmitter from "events";
 import {
     BotInstanceConfig,
     FilterCriteriaDefaults,
-    Invokee,
+    Invokee, LogInfo,
     PAUSED,
     PollOn,
     RUNNING,
@@ -38,6 +38,7 @@ class Bot {
 
     client!: ExtendedSnoowrap;
     logger!: Logger;
+    logs: LogInfo[] = [];
     wikiLocation: string;
     dryRun?: true | undefined;
     running: boolean = false;
@@ -150,6 +151,12 @@ class Bot {
                 return getBotName();
             }
         }, mergeArr);
+
+        this.logger.stream().on('log', (log: LogInfo) => {
+            if(log.bot !== undefined && log.bot === this.getBotName() && log.subreddit === undefined) {
+                this.logs = [log, ...this.logs].slice(0, 301);
+            }
+        });
 
         let mw = maxWorkers;
         if(maxWorkers < 1) {
