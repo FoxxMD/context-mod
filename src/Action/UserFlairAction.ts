@@ -50,6 +50,7 @@ export class UserFlairAction extends Action {
             flairTemplateId: this.flair_template_id,
             username: item.author.name,
           });
+          item.author_flair_template_id = this.flair_template_id
         } catch (err: any) {
           this.logger.error('Either the flair template ID is incorrect or you do not have permission to access it.');
           throw err;
@@ -57,6 +58,9 @@ export class UserFlairAction extends Action {
       } else if (this.text === undefined && this.css === undefined) {
         // @ts-ignore
         await item.subreddit.deleteUserFlair(item.author.name);
+        item.author_flair_css_class = null;
+        item.author_flair_text = null;
+        item.author_flair_template_id = null;
       } else {
         // @ts-ignore
         await item.author.assignFlair({
@@ -64,7 +68,11 @@ export class UserFlairAction extends Action {
           cssClass: this.css,
           text: this.text,
         });
+        item.author_flair_text = this.text ?? null;
+        item.author_flair_css_class = this.css ?? null;
       }
+      await this.resources.resetCacheForItem(item);
+      await this.resources.resetCacheForItem(item.author);
     }
 
     return {

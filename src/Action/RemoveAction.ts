@@ -4,6 +4,8 @@ import Snoowrap, {Comment, Submission} from "snoowrap";
 import {RuleResult} from "../Rule";
 import {activityIsRemoved} from "../Utils/SnoowrapUtils";
 import {ActionProcessResult} from "../Common/interfaces";
+import dayjs from "dayjs";
+import {isSubmission} from "../util";
 
 export class RemoveAction extends Action {
     spam: boolean;
@@ -26,11 +28,7 @@ export class RemoveAction extends Action {
         // issue with snoowrap typings, doesn't think prop exists on Submission
         // @ts-ignore
         if (activityIsRemoved(item)) {
-            return {
-                dryRun,
-                success: false,
-                result: 'Item is already removed',
-            }
+            this.logger.warn('It looks like this Item is already removed!');
         }
         if (this.spam) {
             this.logger.verbose('Marking as spam on removal');
@@ -38,6 +36,13 @@ export class RemoveAction extends Action {
         if (!dryRun) {
             // @ts-ignore
             await item.remove({spam: this.spam});
+            item.banned_at_utc = dayjs().unix();
+            item.spam = this.spam;
+            if(!isSubmission(item)) {
+                // @ts-ignore
+                item.removed = true;
+            }
+            await this.resources.resetCacheForItem(item);
             touchedEntities.push(item);
         }
 

@@ -152,3 +152,7 @@ a {
 #saveTip .tooltip:hover {
     transition-delay: 1s;
 }
+
+#redditStatus .iconify-inline {
+    display: inline;
+}

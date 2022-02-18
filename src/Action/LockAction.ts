@@ -26,6 +26,9 @@ export class LockAction extends Action {
             //snoowrap typing issue, thinks comments can't be locked
             // @ts-ignore
             await item.lock();
+            // @ts-ignore
+            item.locked = true;
+            await this.resources.resetCacheForItem(item);
             touchedEntities.push(item);
         }
         return {

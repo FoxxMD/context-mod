@@ -744,6 +744,7 @@ const webClient = async (options: OperatorConfig) => {
             });
 
             if(accessibleInstance === undefined) {
+                logger.warn(`User ${user.name} is not an operator and has no subreddits in common with any *running* bot instances. If you are sure they should have common subreddits then this client may not be able to access all defined CM servers or the bot may be offline.`);
                 return res.render('noAccess');
             }
 

@@ -666,9 +666,13 @@ export const parseOperatorConfigFromSources = async (args: any): Promise<[Operat
         defaultBotInstance.caching = configFromFile.caching;
     }
 
-    let botInstances = [];
+    let botInstances: BotInstanceJsonConfig[] = [];
     if (botInstancesFromFile.length === 0) {
-        botInstances = [defaultBotInstance];
+        // only add default bot if user supplied any credentials
+        // otherwise its most likely just default, empty settings
+        if(defaultBotInstance.credentials !== undefined) {
+            botInstances = [defaultBotInstance];
+        }
     } else {
         botInstances = botInstancesFromFile.map(x => merge.all([defaultBotInstance, x], {arrayMerge: overwriteMerge}));
     }
@@ -772,6 +776,10 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
         ...fileRest
     } = file;
 
+     const defaultWebCredentials = {
+         redirectUri: 'http://localhost:8085/callback'
+     };
+
 
     const config: OperatorConfig = {
         mode,
@@ -811,7 +819,7 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
             },
             maxLogs,
             clients: clients === undefined ? [{host: 'localhost:8095', secret: apiSecret}] : clients,
-            credentials: webCredentials as RequiredWebRedditCredentials,
+            credentials: {...defaultWebCredentials, ...webCredentials} as RequiredWebRedditCredentials,
             operators: operators || defaultOperators,
         },
         api: {

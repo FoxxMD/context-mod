@@ -36,7 +36,7 @@ export class ApproveAction extends Action {
             }
 
             // @ts-ignore
-            if (item.approved) {
+            if (targetItem.approved) {
                 const msg = `${target === 'self' ? 'Item' : 'Comment\'s parent Submission'} is already approved`;
                 this.logger.warn(msg);
                 return {
@@ -54,6 +54,16 @@ export class ApproveAction extends Action {
                 }
                 // @ts-ignore
                 touchedEntities.push(await targetItem.approve());
+
+                if(target === 'self') {
+                    // @ts-ignore
+                    item.approved = true;
+                    await this.resources.resetCacheForItem(item);
+                } else if(await this.resources.hasActivity(targetItem)) {
+                    // @ts-ignore
+                    targetItem.approved = true;
+                    await this.resources.resetCacheForItem(targetItem);
+                }
             }
         }
 
