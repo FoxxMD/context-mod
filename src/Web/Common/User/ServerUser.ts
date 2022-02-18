@@ -1,4 +1,4 @@
-import {BotInstance, CMInstance} from "../../interfaces";
+import {BotInstance, CMInstanceInterface} from "../../interfaces";
 import CMUser from "./CMUser";
 import {intersect, parseRedditEntity} from "../../../util";
 import {App} from "../../../App";
