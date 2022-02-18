@@ -35,7 +35,7 @@ import {
 import { Document as YamlDocument } from 'yaml'
 import InvalidRegexError from "./Utils/InvalidRegexError";
 import {constants, promises} from "fs";
-import {cacheOptDefaults} from "./Common/defaults";
+import {cacheOptDefaults, VERSION} from "./Common/defaults";
 import cacheManager, {Cache} from "cache-manager";
 import redisStore from "cache-manager-redis-store";
 import crypto from "crypto";
@@ -2107,4 +2107,12 @@ export async function* redisScanIterator(client: any, options: any = {}): AsyncI
             yield key;
         }
     } while (cursor !== '0');
+}
+
+export const getUserAgent = (val: string, fragment?: string) => {
+    return `${replaceApplicationIdentifier(val, fragment)} (developed by /u/FoxxMD)`;
+}
+
+export const replaceApplicationIdentifier = (val: string, fragment?: string) => {
+    return val.replace('{VERSION}', `v${VERSION}`).replace('{FRAG}', (fragment !== undefined ? `-${fragment}` : ''));
 }

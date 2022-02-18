@@ -10,11 +10,11 @@ import {OperatorConfig, BotConnection, LogInfo} from "../../Common/interfaces";
 import {
     buildCachePrefix,
     createCacheManager, defaultFormat, filterLogBySubreddit, filterLogs,
-    formatLogLineToHtml,
+    formatLogLineToHtml, getUserAgent,
     intersect, isLogLineMinLevel,
     LogEntry, parseInstanceLogInfoName, parseInstanceLogName, parseRedditEntity,
     parseSubredditLogName, permissions,
-    randomId, sleep, triggeredIndicator
+    randomId, replaceApplicationIdentifier, sleep, triggeredIndicator
 } from "../../util";
 import {Cache} from "cache-manager";
 import session, {Session, SessionData} from "express-session";
@@ -124,6 +124,7 @@ const webClient = async (options: OperatorConfig) => {
             name,
             display,
         },
+        userAgent: uaFragment,
         web: {
             port,
             caching,
@@ -147,6 +148,13 @@ const webClient = async (options: OperatorConfig) => {
             operators = [],
         },
     } = options;
+
+    const userAgent = getUserAgent(`web:contextBot:{VERSION}{FRAG}:dashboard`, uaFragment);
+
+    app.use((req, res, next) => {
+        res.locals.applicationIdentifier = replaceApplicationIdentifier('{VERSION}{FRAG}', uaFragment);
+        next();
+    });
 
     const webOps = operators.map(x => x.toLowerCase());
 

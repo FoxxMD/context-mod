@@ -39,3 +39,5 @@ export const filterCriteriaDefault: FilterCriteriaDefaults = {
         ]
     }
 }
+
+export const VERSION = '0.10.11';
