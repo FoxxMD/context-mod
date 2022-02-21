@@ -41,8 +41,10 @@ configuration.
 **Note:** When reading the **schema** if the variable is available at a level of configuration other than **FILE** it will be
 noted with the same symbol as above. The value shown is the default.
 
-* To load a JSON configuration (for **FILE**) **from the command line** use the `-c` cli argument EX: `node src/index.js -c /path/to/JSON/config.json`
-* To load a JSON configuration (for **FILE**) **using an environmental variable** use `OPERATOR_CONFIG` EX: `OPERATOR_CONFIG=/path/to/JSON/config.json`
+## Defining Configuration Via File
+
+* **from the command line**  use the `-c` cli argument EX: `node src/index.js -c /path/to/JSON/config.json`
+* **using an environmental variable**  use `OPERATOR_CONFIG` EX: `OPERATOR_CONFIG=/path/to/JSON/config.json`
 
 [**See the Operator Config Schema here**](https://json-schema.app/view/%23?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Fcontext-mod%2Fmaster%2Fsrc%2FSchema%2FOperatorConfig.json)
 
@@ -121,28 +123,41 @@ Below are examples of the minimum required config to run the application using a
 Using **FILE**
 <details>
 
+CM will look for a file configuration at `PROJECT_DIR/config.yaml` by default [or you can specify your own location.](#defining-configuration-via-file)
+
 YAML
 ```yaml
+operator:
+  name: YourRedditUsername
 bots:
   - credentials:
       clientId: f4b4df1c7b2
       clientSecret: 34v5q1c56ub
-      refreshToken: 34_f1w1v4
-      accessToken: p75_1c467b2
+web:
+  credentials:
+    clientId: f4b4df1c7b2
+    clientSecret: 34v5q1c56ub
 ```
 JSON
 ```json5
 {
+  "operator": {
+    "name": "YourRedditUsername"
+  },
   "bots": [
     {
       "credentials": {
         "clientId": "f4b4df1c7b2",
-        "clientSecret": "34v5q1c56ub",
-        "refreshToken": "34_f1w1v4",
-        "accessToken": "p75_1c467b2"
+        "clientSecret": "34v5q1c56ub"
       }
     }
-  ]
+  ],
+  "web": {
+    "credentials": {
+      "clientId": "f4b4df1c7b2",
+      "clientSecret": "34v5q1c56ub"
+    }
+  }
 }
 ```
 
@@ -153,10 +168,9 @@ Using **ENV** (`.env`)
 <details>
 
 ```
+OPERATOR=YourRedditUsername
 CLIENT_ID=f4b4df1c7b2
 CLIENT_SECRET=34v5q1c56ub
-REFRESH_TOKEN=34_f1w1v4
-ACCESS_TOKEN=p75_1c467b2
 ```
 
 </details>
