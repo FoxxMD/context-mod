@@ -1079,6 +1079,9 @@ const webClient = async (options: OperatorConfig) => {
         const session = socket.handshake.session as (Session & Partial<SessionData> | undefined);
         // @ts-ignore
         const user = session !== undefined ? session?.passport?.user as Express.User : undefined;
+
+        let liveInterval: any = undefined;
+
         if (session !== undefined && user !== undefined) {
             clearSockStreams(socket.id);
             socket.join(session.id);
@@ -1092,8 +1095,6 @@ const webClient = async (options: OperatorConfig) => {
             }
             emitter.on('log', webLogListener);
             socketListeners.set(socket.id, [...(socketListeners.get(socket.id) || []), webLogListener]);
-
-            let liveInterval: any = undefined;
 
             socket.on('viewing', (data) => {
                 if(user !== undefined) {
@@ -1175,6 +1176,7 @@ const webClient = async (options: OperatorConfig) => {
         socket.on('disconnect', (reason) => {
             clearSockStreams(socket.id);
             clearSockListeners(socket.id);
+            clearInterval(liveInterval);
         });
     });
 
