@@ -12,7 +12,7 @@ import winston from "winston";
 import pEvent from "p-event";
 import {getLogger} from "../../../../../Utils/loggerFactory";
 import {booleanMiddle} from "../../../../Common/middleware";
-import {authUserCheck, botRoute} from "../../../middleware";
+import {authUserCheck, botRoute, subredditRoute} from "../../../middleware";
 import {LogInfo} from "../../../../../Common/interfaces";
 import {MESSAGE} from "triple-beam";
 import {Manager} from "../../../../../Subreddit/Manager";
@@ -22,6 +22,8 @@ import Bot from "../../../../../Bot";
 const logs = () => {
     const middleware = [
         authUserCheck(),
+        botRoute(false),
+        subredditRoute(false),
         booleanMiddle([{
             name: 'stream',
             defaultVal: false
@@ -78,10 +80,14 @@ const logs = () => {
             } else {
                 bots = req.user?.accessibleBots(req.botApp.bots) as Bot[];
             }
+
+            const allReq = req.query.subreddit !== undefined && (req.query.subreddit as string).toLowerCase() === 'all';
+
             const botArr: any = [];
             for(const b of bots) {
                 const managerLogs = new Map<string, LogInfo[]>();
-                for (const m of req.user?.accessibleSubreddits(b) as Manager[]) {
+                const managers = req.manager !== undefined ? [req.manager] : req.user?.accessibleSubreddits(b) as Manager[];
+                for (const m of managers) {
                     const logs = filterLogs(m.logs, {
                         level: (level as string),
                         // @ts-ignore
@@ -108,9 +114,16 @@ const logs = () => {
                 botArr.push({
                     name: b.getBotName(),
                     system: systemLogs,
-                    all: allLogs,
-                    subreddits: [...managerLogs.entries()].reduce((acc: any[], curr) => {
-                        acc.push({name: curr[0], logs: curr[1]});
+                    all: formatted ? allLogs.map(x => {
+                        const {[MESSAGE]: fMessage, ...rest} = x;
+                        return {...rest, formatted: fMessage};
+                    }) : allLogs,
+                    subreddits: allReq ? [] : [...managerLogs.entries()].reduce((acc: any[], curr) => {
+                        const l = formatted ? curr[1].map(x => {
+                            const {[MESSAGE]: fMessage, ...rest} = x;
+                            return {...rest, formatted: fMessage};
+                            }) : curr[1];
+                        acc.push({name: curr[0], logs: l});
                         return acc;
                     }, [])
                 });

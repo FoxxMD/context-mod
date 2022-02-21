@@ -14,14 +14,15 @@ import {LogInfo, ResourceStats, RUNNING, STOPPED, SYSTEM} from "../../../../../C
 import {BotStatusResponse} from "../../../../Common/interfaces";
 import winston from "winston";
 import {opStats} from "../../../../Common/util";
-import {authUserCheck, botRoute} from "../../../middleware";
+import {authUserCheck, botRoute, subredditRoute} from "../../../middleware";
 import Bot from "../../../../../Bot";
 
 const status = () => {
 
     const middleware = [
         authUserCheck(),
-        //botRoute(),
+        botRoute(false),
+        subredditRoute(false)
     ];
 
     const response = async (req: Request, res: Response) => {
@@ -32,11 +33,8 @@ const status = () => {
             sort = 'descending',
         } = req.query;
 
-        if(req.serverBot !== undefined) {
-            bots = [req.serverBot];
-        } else {
-            bots = req.user?.accessibleBots(req.botApp.bots) as Bot[];
-        }
+        bots = req.user?.accessibleBots(req.botApp.bots) as Bot[];
+
         const botResponses: BotStatusResponse[] = [];
         let index = 1;
         for(const b of bots) {
@@ -63,15 +61,17 @@ const status = () => {
             lastCheck
         } = req.query;
 
+        const allReq = req.query.subreddit !== undefined && (req.query.subreddit as string).toLowerCase() === 'all';
+
         const subManagerData = [];
         for (const m of req.user?.accessibleSubreddits(bot) as Manager[]) {
-            const logs = filterLogs(m.logs, {
+            const logs = req.manager === undefined || allReq || req.manager.getDisplay() === m.getDisplay() ? filterLogs(m.logs, {
                     level: (level as string),
                     // @ts-ignore
                     sort,
                     limit: limit as string,
                     returnType: 'object'
-                }) as LogInfo[];
+                }) as LogInfo[]: [];
             const sd = {
                 name: m.displayLabel,
                 //linkName: s.replace(/\W/g, ''),
@@ -80,7 +80,7 @@ const status = () => {
                 eventsState: m.eventsState,
                 queueState: m.queueState,
                 indicator: 'gray',
-                permissions: await m.getModPermissions(),
+                permissions: [],
                 queuedActivities: m.queue.length(),
                 runningActivities: m.queue.running(),
                 maxWorkers: m.queue.concurrency,
@@ -300,7 +300,7 @@ const status = () => {
                 name: (bot.botName as string) ?? `Bot ${index}`,
                 ...opStats(bot),
             },
-            subreddits: [allManagerData, ...subManagerData],
+            subreddits: [allManagerData, ...(allReq ? subManagerData.map(({logs, ...x}) => ({...x, logs: []})) : subManagerData)],
 
         };
 

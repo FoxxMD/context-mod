@@ -9,7 +9,6 @@
     var sp = new StatusPage.page({ page : '2kbc0d48tv3j' });
     sp.status({
         success : function(data) {
-            debugger;
             console.log(data.status.indicator);
             switch(data.status.indicator){
                 case 'minor':

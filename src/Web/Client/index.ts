@@ -659,7 +659,7 @@ const webClient = async (options: OperatorConfig) => {
     }
 
 
-    const botWithPermissions = async (req: express.Request, res: express.Response, next: Function) => {
+    const botWithPermissions = (required: boolean = false, setDefault: boolean = false) => async (req: express.Request, res: express.Response, next: Function) => {
 
         const instance = req.instance;
         if(instance === undefined) {
@@ -668,23 +668,37 @@ const webClient = async (options: OperatorConfig) => {
 
         const msg = 'Bot does not exist or you do not have permission to access it';
         const botVal = req.query.bot as string;
-        if(botVal === undefined) {
+        if(botVal === undefined && required) {
             return res.status(400).render('error', {error: `"bot" param must be defined`});
         }
 
-        const botInstance = instance.bots.find(x => x.botName === botVal);
-        if(botInstance === undefined) {
-            return res.status(404).render('error', {error: msg});
+        if(botVal !== undefined || setDefault) {
+
+            let botInstance;
+            if(botVal === undefined) {
+                // find a bot they can access
+                botInstance = instance.bots.find(x => req.user?.canAccessBot(x));
+                if(botInstance !== undefined) {
+                    req.query.bot = botInstance.botName;
+                }
+            } else {
+                botInstance = instance.bots.find(x => x.botName === botVal);
+            }
+
+            if(botInstance === undefined) {
+                return res.status(404).render('error', {error: msg});
+            }
+
+            if (!req.user?.clientData?.webOperator && !req.user?.canAccessBot(botInstance)) {
+                return res.status(404).render('error', {error: msg});
+            }
+
+            if (req.params.subreddit !== undefined && !req.user?.isInstanceOperator(instance) && !req.user?.subreddits.includes(req.params.subreddit)) {
+                return res.status(404).render('error', {error: msg});
+            }
+            req.bot = botInstance;
         }
 
-        if (!req.user?.clientData?.webOperator && !req.user?.canAccessBot(botInstance)) {
-            return res.status(404).render('error', {error: msg});
-        }
-
-        if (req.params.subreddit !== undefined && !req.user?.isInstanceOperator(instance) && !req.user?.subreddits.includes(req.params.subreddit)) {
-            return res.status(404).render('error', {error: msg});
-        }
-        req.bot = botInstance;
         next();
     }
 
@@ -713,7 +727,7 @@ const webClient = async (options: OperatorConfig) => {
     // botUserRouter.use([ensureAuthenticated, defaultSession, botWithPermissions, createUserToken]);
     // app.use(botUserRouter);
 
-    app.useAsync('/api/', [ensureAuthenticated, defaultSession, instanceWithPermissions, botWithPermissions, createUserToken], (req: express.Request, res: express.Response) => {
+    app.useAsync('/api/', [ensureAuthenticated, defaultSession, instanceWithPermissions, botWithPermissions(true), createUserToken], (req: express.Request, res: express.Response) => {
         req.headers.Authorization = `Bearer ${req.token}`
 
         const instance = req.instance as CMInstanceInterface;
@@ -753,6 +767,14 @@ const webClient = async (options: OperatorConfig) => {
         next();
     }
 
+    const defaultSubreddit = async (req: express.Request, res: express.Response, next: Function) => {
+        if(req.bot !== undefined && req.query.subreddit === undefined) {
+            const firstAccessibleSub = req.bot.subreddits.find(x => req.user?.isInstanceOperator(req.instance) || req.user?.subreddits.includes(x));
+            req.query.subreddit = firstAccessibleSub;
+        }
+        next();
+    }
+
     const initHeartbeat = async (req: express.Request, res: express.Response, next: Function) => {
         if(!init) {
             for(const c of clients) {
@@ -772,7 +794,7 @@ const webClient = async (options: OperatorConfig) => {
         next();
     }
 
-    app.getAsync('/', [initHeartbeat, redirectBotsNotAuthed, ensureAuthenticated, defaultSession, defaultInstance, instanceWithPermissions, createUserToken], async (req: express.Request, res: express.Response) => {
+    app.getAsync('/', [initHeartbeat, redirectBotsNotAuthed, ensureAuthenticated, defaultSession, defaultInstance, instanceWithPermissions, botWithPermissions(false, true), createUserToken], async (req: express.Request, res: express.Response) => {
 
         const user = req.user as Express.User;
         const instance = req.instance as CMInstance;
@@ -801,6 +823,8 @@ const webClient = async (options: OperatorConfig) => {
                     'Authorization': `Bearer ${req.token}`,
                 },
                 searchParams: {
+                    bot: req.query.bot as (string | undefined),
+                    subreddit: req.query.sub as (string | undefined) ?? 'all',
                     limit,
                     sort,
                     level,
@@ -901,7 +925,7 @@ const webClient = async (options: OperatorConfig) => {
         });
     });
 
-    app.postAsync('/config', [ensureAuthenticatedApi, defaultSession, instanceWithPermissions, botWithPermissions], async (req: express.Request, res: express.Response) => {
+    app.postAsync('/config', [ensureAuthenticatedApi, defaultSession, instanceWithPermissions, botWithPermissions(true)], async (req: express.Request, res: express.Response) => {
         const {subreddit} = req.query as any;
         const {location, data, create = false} = req.body as any;
 
@@ -942,7 +966,7 @@ const webClient = async (options: OperatorConfig) => {
         return res.send();
     });
 
-    app.getAsync('/events', [ensureAuthenticatedApi, defaultSession, instanceWithPermissions, botWithPermissions, createUserToken], async (req: express.Request, res: express.Response) => {
+    app.getAsync('/events', [ensureAuthenticatedApi, defaultSession, instanceWithPermissions, botWithPermissions(true), createUserToken], async (req: express.Request, res: express.Response) => {
         const {subreddit} = req.query as any;
         const resp = await got.get(`${(req.instance as CMInstanceInterface).normalUrl}/events`, {
             headers: {
@@ -1068,6 +1092,44 @@ const webClient = async (options: OperatorConfig) => {
             }
             emitter.on('log', webLogListener);
             socketListeners.set(socket.id, [...(socketListeners.get(socket.id) || []), webLogListener]);
+
+            let liveInterval: any = undefined;
+
+            socket.on('viewing', (data) => {
+                if(user !== undefined) {
+                    const {subreddit, bot: botVal} = data;
+                    const currBot = cmInstances.find(x => x.getName() === session.botId);
+                    if(currBot !== undefined) {
+
+                        if(liveInterval !== undefined) {
+                            clearInterval(liveInterval)
+                        }
+
+                        const liveEmit = async () => {
+                            try {
+                                const resp = await got.get(`${currBot.normalUrl}/liveStats`, {
+                                    headers: {
+                                        'Authorization': `Bearer ${createToken(currBot, user)}`,
+                                    },
+                                    searchParams: {
+                                        bot: botVal,
+                                        subreddit
+                                    }
+                                });
+                                const stats = JSON.parse(resp.body);
+                                io.to(session.id).emit('liveStats', stats);
+                            } catch (err: any) {
+                                currBot.logger.error(new ErrorWithCause('Could not retrieve live stats', {cause: err}));
+                            }
+                        }
+
+                        // do an initial get
+                        liveEmit();
+                        // and then every 5 seconds after that
+                        liveInterval = setInterval(async () => await liveEmit(), 5000);
+                    }
+                }
+            });
 
             if(session.botId !== undefined) {
                 const bot = cmInstances.find(x => x.getName() === session.botId);

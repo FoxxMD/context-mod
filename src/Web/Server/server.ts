@@ -16,6 +16,7 @@ import http from "http";
 import {heartbeat} from "./routes/authenticated/applicationRoutes";
 import logs from "./routes/authenticated/user/logs";
 import status from './routes/authenticated/user/status';
+import liveStats from './routes/authenticated/user/liveStats';
 import {actionedEventsRoute, actionRoute, configRoute, configLocationRoute, deleteInviteRoute, addInviteRoute, getInvitesRoute} from "./routes/authenticated/user";
 import action from "./routes/authenticated/user/action";
 import {authUserCheck, botRoute} from "./middleware";
@@ -156,6 +157,8 @@ const rcbServer = async function (options: OperatorConfigWithFileContext) {
         next();
     }
     server.getAsync('/status', passLogs, ...status())
+
+    server.getAsync('/liveStats', ...liveStats())
 
     server.getAsync('/config', ...configRoute);
 
