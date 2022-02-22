@@ -65,7 +65,7 @@ export const up = async (context: any, next: any) => {
             }
             return result;
         });
-        await client.set(k, newEvents);
+        await client.set(k, newEvents, {ttl: 0});
     }
 }
 
@@ -115,6 +115,6 @@ export const down = async (context: any, next: any) => {
             });
             return acc.concat(singleEvents);
         }, []);
-        await client.set(k, newEvents);
+        await client.set(k, newEvents, {ttl: 0});
     }
 }
