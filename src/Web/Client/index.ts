@@ -17,8 +17,8 @@ import {
 } from "../../Common/interfaces";
 import {
     buildCachePrefix,
-    createCacheManager, defaultFormat, filterLogBySubreddit, filterCriteriaSummary, formatFilterData
-    formatLogLineToHtml, filterLogs, getUserAgent
+    createCacheManager, defaultFormat, filterLogBySubreddit, filterCriteriaSummary, formatFilterData,
+    formatLogLineToHtml, filterLogs, getUserAgent,
     intersect, isLogLineMinLevel,
     LogEntry, parseInstanceLogInfoName, parseInstanceLogName, parseRedditEntity,
     parseSubredditLogName, permissions,
