@@ -40,4 +40,4 @@ export const filterCriteriaDefault: FilterCriteriaDefaults = {
     }
 }
 
-export const VERSION = '0.10.11';
+export const VERSION = '0.10.12';
