@@ -28,11 +28,7 @@ export class RemoveAction extends Action {
         // issue with snoowrap typings, doesn't think prop exists on Submission
         // @ts-ignore
         if (activityIsRemoved(item)) {
-            return {
-                dryRun,
-                success: false,
-                result: 'Item is already removed',
-            }
+            this.logger.warn('It looks like this Item is already removed!');
         }
         if (this.spam) {
             this.logger.verbose('Marking as spam on removal');

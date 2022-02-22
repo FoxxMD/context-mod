@@ -36,7 +36,7 @@ import {
 import { Document as YamlDocument } from 'yaml'
 import InvalidRegexError from "./Utils/InvalidRegexError";
 import {constants, promises} from "fs";
-import {cacheOptDefaults} from "./Common/defaults";
+import {cacheOptDefaults, VERSION} from "./Common/defaults";
 import cacheManager, {Cache} from "cache-manager";
 import redisStore from "cache-manager-redis-store";
 import crypto from "crypto";
@@ -1162,9 +1162,14 @@ export const formatLogLineToHtml = (log: string | LogInfo, timestamp?: string) =
         //.replace(HYPERLINK_REGEX, '<a target="_blank" href="$&">$&</a>');
     let line = '';
 
-    if(timestamp !== undefined) {
-        const timeStampReplacement = formattedTime(dayjs(timestamp).format('HH:mm:ss z'), timestamp);
-        const splitLine = logContent.split(timestamp);
+    let timestampString = timestamp;
+    if(timestamp === undefined && typeof log !== 'string') {
+        timestampString = (log as LogInfo).timestamp;
+    }
+
+    if(timestampString !== undefined) {
+        const timeStampReplacement = formattedTime(dayjs(timestampString).format('HH:mm:ss z'), timestampString);
+        const splitLine = logContent.split(timestampString);
         line = `<div class="logLine">${splitLine[0]}${timeStampReplacement}<span style="white-space: pre-wrap">${splitLine[1]}</span></div>`;
     } else {
         line = `<div style="white-space: pre-wrap" class="logLine">${logContent}</div>`
@@ -1174,7 +1179,7 @@ export const formatLogLineToHtml = (log: string | LogInfo, timestamp?: string) =
 
 export type LogEntry = [number, LogInfo];
 export interface LogOptions {
-    limit: number,
+    limit: number | string,
     level: string,
     sort: 'ascending' | 'descending',
     operator?: boolean,
@@ -1186,7 +1191,7 @@ export interface LogOptions {
 
 export const filterLogBySubreddit = (logs: Map<string, LogEntry[]>, validLogCategories: string[] = [], options: LogOptions): Map<string, (string|LogInfo)[]> => {
     const {
-        limit,
+        limit: limitVal,
         level,
         sort,
         operator = false,
@@ -1196,6 +1201,7 @@ export const filterLogBySubreddit = (logs: Map<string, LogEntry[]>, validLogCate
         returnType = 'string',
     } = options;
 
+    let limit = typeof limitVal === 'number' ? limitVal : Number.parseInt(limitVal);
     // get map of valid logs categories
     const validSubMap: Map<string, LogEntry[]> = new Map();
     for(const [k, v] of logs) {
@@ -1243,6 +1249,35 @@ export const filterLogBySubreddit = (logs: Map<string, LogEntry[]>, validLogCate
 
 
     return preparedMap;
+}
+
+export const logSortFunc = (sort: string = 'ascending') => sort === 'ascending' ? (a: LogInfo, b: LogInfo) => (dayjs(a.timestamp).isSameOrAfter(b.timestamp) ? 1 : -1) : (a: LogInfo, b: LogInfo) => (dayjs(a.timestamp).isSameOrBefore(b.timestamp) ? 1 : -1);
+
+export const filterLogs= (logs: LogInfo[], options: LogOptions): LogInfo[] | string[] => {
+    const {
+        limit: limitVal,
+        level,
+        sort,
+        operator = false,
+        user,
+        allLogsParser = parseSubredditLogInfoName,
+        allLogName = 'app',
+        returnType = 'string',
+    } = options;
+
+    let limit = typeof limitVal === 'number' ? limitVal : Number.parseInt(limitVal);
+    let leveledLogs = logs.filter(x => isLogLineMinLevel(x, level));
+    if(user !== undefined) {
+        leveledLogs = logs.filter(x => x.user !== undefined && x.user === user);
+    }
+    leveledLogs.sort(logSortFunc(sort));
+    leveledLogs = leveledLogs.slice(0, limit + 1);
+
+    if(returnType === 'string') {
+        return leveledLogs.map(x => formatLogLineToHtml(x));
+    } else {
+        return leveledLogs;
+    }
 }
 
 export const logLevels = {
@@ -2139,4 +2174,12 @@ export const formatFilterData = (result: (RunResult | CheckSummary | RuleResult 
     }
 
     return formattedResult;
+}
+
+export const getUserAgent = (val: string, fragment?: string) => {
+    return `${replaceApplicationIdentifier(val, fragment)} (developed by /u/FoxxMD)`;
+}
+
+export const replaceApplicationIdentifier = (val: string, fragment?: string) => {
+    return val.replace('{VERSION}', `v${VERSION}`).replace('{FRAG}', (fragment !== undefined ? `-${fragment}` : ''));
 }

@@ -678,9 +678,13 @@ export const parseOperatorConfigFromSources = async (args: any): Promise<[Operat
         defaultBotInstance.caching = configFromFile.caching;
     }
 
-    let botInstances = [];
+    let botInstances: BotInstanceJsonConfig[] = [];
     if (botInstancesFromFile.length === 0) {
-        botInstances = [defaultBotInstance];
+        // only add default bot if user supplied any credentials
+        // otherwise its most likely just default, empty settings
+        if(defaultBotInstance.credentials !== undefined) {
+            botInstances = [defaultBotInstance];
+        }
     } else {
         botInstances = botInstancesFromFile.map(x => merge.all([defaultBotInstance, x], {arrayMerge: overwriteMerge}));
     }
@@ -706,6 +710,7 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
             stream = {},
         } = {},
         caching: opCache,
+        userAgent,
         web: {
             port = 8085,
             maxLogs = 200,
@@ -784,6 +789,10 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
         ...fileRest
     } = file;
 
+     const defaultWebCredentials = {
+         redirectUri: 'http://localhost:8085/callback'
+     };
+
 
     const config: OperatorConfig = {
         mode,
@@ -808,6 +817,7 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
             }
         },
         caching: cache,
+        userAgent,
         web: {
             port,
             caching: {
@@ -823,7 +833,7 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
             },
             maxLogs,
             clients: clients === undefined ? [{host: 'localhost:8095', secret: apiSecret}] : clients,
-            credentials: webCredentials as RequiredWebRedditCredentials,
+            credentials: {...defaultWebCredentials, ...webCredentials} as RequiredWebRedditCredentials,
             operators: operators || defaultOperators,
         },
         api: {
@@ -847,7 +857,8 @@ export const buildBotConfig = (data: BotInstanceJsonConfig, opConfig: OperatorCo
             actionedEventsMax: opActionedEventsMax,
             actionedEventsDefault: opActionedEventsDefault = 25,
             provider: defaultProvider,
-        } = {}
+        } = {},
+        userAgent,
     } = opConfig;
     const {
         name: botName,
@@ -990,6 +1001,7 @@ export const buildBotConfig = (data: BotInstanceJsonConfig, opConfig: OperatorCo
         },
         credentials: botCreds,
         caching: botCache,
+        userAgent,
         polling: {
             shared: [...new Set(realShared)] as PollOn[],
             stagger,

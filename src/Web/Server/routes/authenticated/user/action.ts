@@ -19,7 +19,7 @@ const action = async (req: Request, res: Response) => {
 
     for (const manager of subreddits) {
         const mLogger = manager.logger;
-        mLogger.info(`/u/${userName} invoked '${action}' action for ${type} on ${manager.displayLabel}`);
+        mLogger.info(`/u/${userName} invoked '${action}' action for ${type} on ${manager.displayLabel}`, {user: userName});
         try {
             switch (action) {
                 case 'start':

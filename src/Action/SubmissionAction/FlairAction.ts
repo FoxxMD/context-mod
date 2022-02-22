@@ -33,12 +33,19 @@ export class FlairAction extends Action {
         if(this.css !== '') {
             flairParts.push(`CSS: ${this.css}`);
         }
+        if(this.flair_template_id !== '') {
+            flairParts.push(`Template: ${this.flair_template_id}`);
+        }
         const flairSummary = flairParts.length === 0 ? 'No flair (unflaired)' : flairParts.join(' | ');
         this.logger.verbose(flairSummary);
         if (item instanceof Submission) {
             if(!this.dryRun) {
                 if (this.flair_template_id) {
-                    await item.selectFlair({flair_template_id: this.flair_template_id}).then(() => {});
+                    // typings are wrong for this function, flair_template_id should be accepted
+                    // assignFlair uses /api/flair (mod endpoint)
+                    // selectFlair uses /api/selectflair (self endpoint for user to choose their own flair for submission)
+                    // @ts-ignore
+                    await item.assignFlair({flair_template_id: this.flair_template_id}).then(() => {});
                     item.link_flair_template_id = this.flair_template_id;
                 } else {
                     await item.assignFlair({text: this.text, cssClass: this.css}).then(() => {});

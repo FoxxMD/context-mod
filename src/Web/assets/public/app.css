@@ -153,6 +153,10 @@ a {
     transition-delay: 1s;
 }
 
+#redditStatus .iconify-inline {
+    display: inline;
+}
+
 .triggeredState.notTriggered {
     display: none;
 }

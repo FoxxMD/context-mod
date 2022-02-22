@@ -25,7 +25,7 @@ import {
     ActionedEvent,
     ActionResult, CheckResult, CheckSummary,
     DEFAULT_POLLING_INTERVAL,
-    DEFAULT_POLLING_LIMIT, FilterCriteriaDefaults, Invokee,
+    DEFAULT_POLLING_LIMIT, FilterCriteriaDefaults, Invokee, LogInfo,
     ManagerOptions, ManagerStateChangeOption, ManagerStats, NotificationEventPayload, PAUSED,
     PollingOptionsStrong, PollOn, PostBehavior, PostBehaviorTypes, RUNNING, RunResult, RunState, STOPPED, SYSTEM, USER
 } from "../Common/interfaces";
@@ -90,6 +90,7 @@ export class Manager extends EventEmitter {
     subreddit: Subreddit;
     client: ExtendedSnoowrap;
     logger: Logger;
+    logs: LogInfo[] = [];
     botName: string;
     pollOptions: PollingOptionsStrong[] = [];
     get submissionChecks() {
@@ -222,6 +223,11 @@ export class Manager extends EventEmitter {
                 return getDisplay()
             }
         }, mergeArr);
+        this.logger.stream().on('log', (log: LogInfo) => {
+            if(log.subreddit !== undefined && log.subreddit === this.getDisplay()) {
+                this.logs = [log, ...this.logs].slice(0, 301);
+            }
+        });
         this.globalDryRun = dryRun;
         this.wikiLocation = wikiLocation;
         this.filterCriteriaDefaults = filterCriteriaDefaults;
@@ -289,15 +295,21 @@ export class Manager extends EventEmitter {
         this.processEmitter.on('error', err => this.emit('error', err));
     }
 
-    protected async getModPermissions(): Promise<string[]> {
+    public async getModPermissions(): Promise<string[]> {
         if(this.modPermissions !== undefined) {
             return this.modPermissions as string[];
         }
         this.logger.debug('Retrieving mod permissions for bot');
-        const userInfo = parseRedditEntity(this.botName, 'user');
-        const mods = this.subreddit.getModerators({name: userInfo.name});
-        // @ts-ignore
-        this.modPermissions = mods[0].mod_permissions;
+        try {
+            const userInfo = parseRedditEntity(this.botName, 'user');
+            const mods = this.subreddit.getModerators({name: userInfo.name});
+            // @ts-ignore
+            this.modPermissions = mods[0].mod_permissions;
+        } catch (e) {
+            const err = new ErrorWithCause('Unable to retrieve moderator permissions', {cause: e});
+            this.logger.error(err);
+            return [];
+        }
         return this.modPermissions as string[];
     }
 

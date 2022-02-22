@@ -6,7 +6,7 @@ import EventEmitter from "events";
 import {
     BotInstanceConfig,
     FilterCriteriaDefaults,
-    Invokee,
+    Invokee, LogInfo,
     PAUSED,
     PollOn,
     RUNNING,
@@ -16,7 +16,7 @@ import {
 } from "../Common/interfaces";
 import {
     createRetryHandler,
-    formatNumber, getExceptionMessage,
+    formatNumber, getExceptionMessage, getUserAgent,
     mergeArr,
     parseBool,
     parseDuration, parseMatchMessage,
@@ -38,6 +38,7 @@ class Bot {
 
     client!: ExtendedSnoowrap;
     logger!: Logger;
+    logs: LogInfo[] = [];
     wikiLocation: string;
     dryRun?: true | undefined;
     running: boolean = false;
@@ -98,6 +99,7 @@ class Bot {
                 dryRun,
                 heartbeatInterval,
             },
+            userAgent,
             credentials: {
                 reddit: {
                     clientId,
@@ -149,6 +151,12 @@ class Bot {
             }
         }, mergeArr);
 
+        this.logger.stream().on('log', (log: LogInfo) => {
+            if(log.bot !== undefined && log.bot === this.getBotName() && log.subreddit === undefined) {
+                this.logs = [log, ...this.logs].slice(0, 301);
+            }
+        });
+
         this.cacheManager = new BotResourcesManager(config, this.logger);
 
         let mw = maxWorkers;
@@ -166,7 +174,9 @@ class Bot {
         this.excludeSubreddits = exclude.map(parseSubredditName);
 
         let creds: any = {
-            get userAgent() { return getUserName() },
+            get userAgent() {
+                return getUserAgent(`web:contextBot:{VERSION}{FRAG}:BOT-${getBotName()}`, userAgent)
+            },
             clientId,
             clientSecret,
             refreshToken,

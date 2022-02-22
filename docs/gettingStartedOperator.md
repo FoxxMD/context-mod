@@ -22,13 +22,14 @@ PROTIP: Using a container management tool like [Portainer.io CE](https://www.por
 
 ### [Dockerhub](https://hub.docker.com/r/foxxmd/context-mod)
 
-```
-foxxmd/context-mod:latest
-```
+An example of starting the container using the [minimum configuration](/docs/operatorConfiguration.md#minimum-config) with a [configuration file](/docs/operatorConfiguration.md#defining-configuration-via-file):
 
-Adding **environmental variables** to your `docker run` command will pass them through to the app EX:
+* Bind the folder where the config is located on your host machine into the container `-v /host/path/folder:/config`
+* Tell CM where to find the config using an env `-e "OPERATOR_CONFIG=/config/myConfig.yaml"`
+* Expose the web interface using the container port `8085`
+
 ```
-docker run -d -e "CLIENT_ID=myId" ... foxxmd/context-mod
+docker run -d -e "OPERATOR_CONFIG=/config/myConfig.yaml" -v /host/path/folder:/config -p 8085:8085 foxxmd/context-mod
 ```
 
 ### Locally
@@ -45,6 +46,12 @@ git clone https://github.com/FoxxMD/context-mod.git .
 cd context-mod
 npm install
 tsc -p .
+```
+
+An example of running CM using the [minimum configuration](/docs/operatorConfiguration.md#minimum-config) with a [configuration file](/docs/operatorConfiguration.md#defining-configuration-via-file):
+
+```bash
+node src/index.js run
 ```
 
 ### [Heroku Quick Deploy](https://heroku.com/about)

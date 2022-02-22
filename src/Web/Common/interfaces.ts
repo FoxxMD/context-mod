@@ -1,5 +1,6 @@
 import {RunningState} from "../../Subreddit/Manager";
 import {LogInfo, ManagerStats} from "../../Common/interfaces";
+import {BotInstance} from "../interfaces";
 
 export interface BotStats {
     startedAtHuman: string,
@@ -72,4 +73,12 @@ export interface IUser {
     scope?: string[]
     token?: string
     tokenExpiresAt?: number
+}
+
+export interface HeartbeatResponse {
+    subreddits: string[]
+    operators: string[]
+    operatorDisplay?: string
+    friendly?: string
+    bots: BotInstance[]
 }
