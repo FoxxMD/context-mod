@@ -24,7 +24,7 @@ import {
     ActionedEvent,
     ActionResult,
     DEFAULT_POLLING_INTERVAL,
-    DEFAULT_POLLING_LIMIT, FilterCriteriaDefaults, Invokee,
+    DEFAULT_POLLING_LIMIT, FilterCriteriaDefaults, Invokee, LogInfo,
     ManagerOptions, ManagerStateChangeOption, ManagerStats, PAUSED,
     PollingOptionsStrong, PollOn, RUNNING, RunState, STOPPED, SYSTEM, USER
 } from "../Common/interfaces";
@@ -87,6 +87,7 @@ export class Manager extends EventEmitter {
     subreddit: Subreddit;
     client: ExtendedSnoowrap;
     logger: Logger;
+    logs: LogInfo[] = [];
     botName: string;
     pollOptions: PollingOptionsStrong[] = [];
     submissionChecks!: SubmissionCheck[];
@@ -211,6 +212,11 @@ export class Manager extends EventEmitter {
                 return getDisplay()
             }
         }, mergeArr);
+        this.logger.stream().on('log', (log: LogInfo) => {
+            if(log.subreddit !== undefined && log.subreddit === this.getDisplay()) {
+                this.logs = [log, ...this.logs].slice(0, 301);
+            }
+        });
         this.globalDryRun = dryRun;
         this.wikiLocation = wikiLocation;
         this.filterCriteriaDefaults = filterCriteriaDefaults;

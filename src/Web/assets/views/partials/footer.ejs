@@ -1,6 +1,6 @@
 <div class="py-3 flex items-center justify-around font-semibold">
     <div>
-        <a href="https://github.com/FoxxMD/context-mod">ContextMod Web</a> created by /u/FoxxMD
+        <a href="https://github.com/FoxxMD/context-mod">ContextMod <%= locals.applicationIdentifier%></a> created by /u/FoxxMD
     </div>
 </div>
 <script type="text/javascript" src="https://cdn.statuspage.io/se-v2.js"></script>
@@ -9,7 +9,6 @@
     var sp = new StatusPage.page({ page : '2kbc0d48tv3j' });
     sp.status({
         success : function(data) {
-            debugger;
             console.log(data.status.indicator);
             switch(data.status.indicator){
                 case 'minor':

@@ -698,6 +698,7 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
             stream = {},
         } = {},
         caching: opCache,
+        userAgent,
         web: {
             port = 8085,
             maxLogs = 200,
@@ -804,6 +805,7 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
             }
         },
         caching: cache,
+        userAgent,
         web: {
             port,
             caching: {
@@ -843,7 +845,8 @@ export const buildBotConfig = (data: BotInstanceJsonConfig, opConfig: OperatorCo
             actionedEventsMax: opActionedEventsMax,
             actionedEventsDefault: opActionedEventsDefault = 25,
             provider: defaultProvider,
-        } = {}
+        } = {},
+        userAgent,
     } = opConfig;
     const {
         name: botName,
@@ -984,6 +987,7 @@ export const buildBotConfig = (data: BotInstanceJsonConfig, opConfig: OperatorCo
         },
         credentials: botCreds,
         caching: botCache,
+        userAgent,
         polling: {
             shared: [...new Set(realShared)] as PollOn[],
             stagger,

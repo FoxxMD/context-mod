@@ -1,5 +1,6 @@
 import { URL } from "url";
 import {BotConnection} from "../Common/interfaces";
+import {Logger} from "winston";
 
 export interface BotInstance {
     botName: string
@@ -8,16 +9,16 @@ export interface BotInstance {
     subreddits: string[]
     nanny?: string
     running: boolean
-    instance: CMInstance
+    instance: CMInstanceInterface
 }
 
-export interface CMInstance extends BotConnection {
-    friendly: string
+export interface CMInstanceInterface extends BotConnection {
+    friendly?: string
     operators: string[]
     operatorDisplay: string
     url: URL,
     normalUrl: string,
-    lastCheck: number
+    lastCheck?: number
     online: boolean
     subreddits: string[]
     bots: BotInstance[]

@@ -164,14 +164,14 @@
                                                 <span class="has-tooltip">
                                                     <span class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2'>
                                                         <span>
-                                                            <ul class="list-inside list-disc">
+                                                            <ul class="list-inside list-disc modPermissionsList">
                                                                 <% data.permissions.forEach(function (i){ %>
                                                                     <li class="font-mono"><%= i %></li>
                                                                 <% }) %>
                                                             </ul>
                                                         </span>
                                                     </span>
-                                                    <span class="cursor-help underline" style="text-decoration-style: dotted"><%= data.permissions.length %></span>
+                                                    <span class="cursor-help underline modPermissionsCount" style="text-decoration-style: dotted"><%= data.permissions.length %></span>
                                                 </span>
                                                 <label>Slow Mode</label>
                                                 <span><%= data.delayBy %></span>
@@ -677,6 +677,48 @@
 </div>
 <%- include('partials/instanceTabJs') %>
 <%- include('partials/logSettingsJs') %>
+<script src="https://unpkg.com/autolinker@3.14.3/dist/Autolinker.min.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/dayjs@1.10.7/dayjs.min.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/dayjs@1.10.7/plugin/advancedFormat.js"></script>
+<script src="https://unpkg.com/dayjs@1.10.7/plugin/timezone.js"></script>
+<script>
+    dayjs.extend(window.dayjs_plugin_timezone)
+    dayjs.extend(window.dayjs_plugin_advancedFormat)
+    window.formattedTime = (short, full) => `<span class="has-tooltip"><span style="margin-top:35px" class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black space-y-3 p-2 text-left'>${full}</span><span>${short}</span></span>`;
+    window.formatLogLineToHtml = (log, timestamp = undefined) => {
+        const val = typeof log === 'string' ? log : log['MESSAGE'];
+        const logContent = Autolinker.link(val, {
+            email: false,
+            phone: false,
+            mention: false,
+            hashtag: false,
+            stripPrefix: false,
+            sanitizeHtml: true,
+        })
+            .replace(/(\s*debug\s*):/i, '<span class="debug blue">$1</span>:')
+            .replace(/(\s*warn\s*):/i, '<span class="warn yellow">$1</span>:')
+            .replace(/(\s*info\s*):/i, '<span class="info green">$1</span>:')
+            .replace(/(\s*error\s*):/i, '<span class="error red">$1</span>:')
+            .replace(/(\s*verbose\s*):/i, '<span class="error purple">$1</span>:')
+            .replaceAll('\n', '<br />');
+        //.replace(HYPERLINK_REGEX, '<a target="_blank" href="$&">$&</a>');
+        let line = '';
+
+        let timestampString = timestamp;
+        if(timestamp === undefined && typeof log !== 'string') {
+            timestampString = log.timestamp;
+        }
+
+        if(timestampString !== undefined) {
+            const timeStampReplacement = formattedTime(dayjs(timestampString).format('HH:mm:ss z'), timestampString);
+            const splitLine = logContent.split(timestampString);
+            line = `<div class="logLine">${splitLine[0]}${timeStampReplacement}<span style="white-space: pre-wrap">${splitLine[1]}</span></div>`;
+        } else {
+            line = `<div style="white-space: pre-wrap" class="logLine">${logContent}</div>`
+        }
+        return line;
+    }
+</script>
 <script>
     window.sort = 'desc';
 
@@ -837,6 +879,44 @@
                 var newRelativePathQuery = window.location.pathname + '?' + searchParams.toString();
                 history.pushState(null, '', newRelativePathQuery);
             }
+            const activeSub = document.querySelector(`[data-subreddit="${subreddit}"][data-bot="${bot}"].sub`);
+            if(!activeSub.classList.contains('seen')) {
+                //firstSub.classList.add('seen');
+
+                //subreddit = firstSub.dataset.subreddit;
+                //bot = subSection.dataset.bot;
+                level = document.querySelector(`[data-subreddit="${subreddit}"] [data-type="level"]`).value;
+                sort = document.querySelector(`[data-subreddit="${subreddit}"] [data-type="sort"]`).value;
+                limitSel = document.querySelector(`[data-subreddit="${subreddit}"] [data-type="limit"]`).value;
+
+                fetch(`/api/logs?instance=<%= instanceId %>&bot=${bot}&subreddit=${subreddit}&level=${level}&sort=${sort}&limit=${limitSel}&stream=false&formatted=true`).then((resp) => {
+                    if (!resp.ok) {
+                        console.error('Response was not OK from logs GET');
+                    } else {
+                        resp.json().then((data) => {
+                            const logContainer = document.querySelector(`[data-subreddit="${subreddit}"] .logs`);
+                            const logLines = (subreddit.toLowerCase() === 'all' ? data[0].all : data[0].subreddits[0].logs).map(x => {
+                                let fString = x.formatted;
+                                if(x.bot !== undefined) {
+                                    fString = fString.replace(`~${x.bot}~ `, '');
+                                }
+                                if(x.subreddit !== undefined && subreddit !== 'All') {
+                                    fString = fString.replace(`{${x.subreddit}} `, '');
+                                }
+                                return window.formatLogLineToHtml(fString, x.timestamp)
+                            }).join('');
+                            logContainer.insertAdjacentHTML('afterbegin', logLines);
+                            activeSub.classList.add('seen');
+                        });
+                    }
+                }).catch((err) => {
+                    console.log(err);
+                });
+
+            }
+            if(window.socket !== undefined) {
+                window.socket.emit('viewing', {bot, subreddit});
+            }
         });
     });
 
@@ -864,7 +944,7 @@
         tabSelect.classList.add('font-bold', 'no-underline', 'pointer-events-none');
     }
     document.querySelectorAll('.tabSelectWrapper').forEach(el => el.classList.add('border'));
-    document.querySelector(`[data-bot="${shownBot}"][data-subreddit="${shownSub}"].sub`).classList.add('active');
+    document.querySelector(`[data-bot="${shownBot}"][data-subreddit="${shownSub}"].sub`).classList.add('active', 'seen');
     const subWrapper = document.querySelector(`ul[data-bot="${shownBot}"] [data-subreddit="${shownSub}"].tabSelectWrapper`);
     if(subWrapper !== null) {
         subWrapper.classList.remove('border');
@@ -891,6 +971,7 @@
     let socket = io({
         reconnectionAttempts: 5, // bail after 5 attempts
     });
+    window.socket = socket;
 
     // get all bots
     let bots = [];
@@ -908,6 +989,11 @@
 
     socket.on("connect", () => {
         document.body.classList.add('connected')
+
+        const shownSub = searchParams.get('sub') || 'All'
+        let shownBot = searchParams.get('bot');
+        window.socket.emit('viewing', {bot: shownBot, subreddit: shownSub});
+
         socket.on("log", data => {
             const {
                 subreddit,
@@ -942,12 +1028,12 @@
                     }
                     subLogs.forEach((logs, subKey) => {
                         // check sub exists -- may be a web log
-                        const el = document.querySelector(`[data-subreddit="${subKey}"][data-bot="${botName}"].sub`);
+                        const el = document.querySelector(`[data-subreddit="${subKey}"][data-bot="${botName}"].sub.seen`);
                         if(null !== el) {
                             const limit = Number.parseInt(document.querySelector(`[data-subreddit="${subKey}"] [data-type="limit"]`).value);
                             const logContainer = el.querySelector(`.logs`);
                             let existingLogs;
-                            if(window.sort === 'desc') {
+                            if(window.sort === 'desc' || window.sort === 'descending') {
                                 logs.forEach((l) => {
                                     logContainer.insertAdjacentHTML('afterbegin', l);
                                 })
@@ -998,6 +1084,29 @@
                 }
             }
 
+        });
+        socket.on('liveStats', (resp) => {
+            let el;
+            let isAll = resp.system !== undefined;
+            if(isAll) {
+                // got all
+                el = document.querySelector(`[data-subreddit="All"][data-bot="${resp.bot}"].sub`);
+            } else {
+                // got subreddit
+                el = document.querySelector(`[data-subreddit="${resp.name}"].sub`);
+            }
+
+            if(isAll) {
+
+            } else {
+                if(el.querySelector('.modPermissionsCount').innerHTML != resp.permissions.length) {
+                    el.querySelector('.modPermissionsCount').innerHTML = resp.permissions.length;
+                    el.querySelector('.modPermissionsList').innerHTML = '';
+                    el.querySelector('.modPermissionsList').insertAdjacentHTML('afterbegin', resp.permissions.map(x => `<li class="font-mono">${x}</li>`).join(''));
+                }
+            }
+
+            console.log(resp);
         });
     });
 

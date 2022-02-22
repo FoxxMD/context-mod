@@ -46,19 +46,24 @@ export const subredditRoute = (required = true) => async (req: Request, res: Res
     if(subreddit === undefined && !required) {
         next();
     } else {
-        //const {name: userName} = req.user as Express.User;
 
-        const manager = bot.subManagers.find(x => x.displayLabel === subreddit);
-        if (manager === undefined) {
-            return res.status(400).send('Cannot access route for subreddit you do not manage or is not run by the bot')
+        if(subreddit.toLowerCase() === 'all') {
+            next();
+        } else {
+            //const {name: userName} = req.user as Express.User;
+
+            const manager = bot.subManagers.find(x => x.displayLabel === subreddit);
+            if (manager === undefined) {
+                return res.status(400).send('Cannot access route for subreddit you do not manage or is not run by the bot')
+            }
+
+            if (!req.user?.canAccessSubreddit(bot, subreddit)) {
+                return res.status(400).send('Cannot access route for subreddit you do not manage or is not run by the bot')
+            }
+
+            req.manager = manager;
+
+            next();
         }
-
-        if (!req.user?.canAccessSubreddit(bot, subreddit)) {
-            return res.status(400).send('Cannot access route for subreddit you do not manage or is not run by the bot')
-        }
-
-        req.manager = manager;
-
-        next();
     }
 }

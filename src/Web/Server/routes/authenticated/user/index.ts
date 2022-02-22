@@ -106,7 +106,7 @@ const action = async (req: Request, res: Response) => {
     }
 
     if (a === undefined) {
-        winston.loggers.get('app').error('Could not parse Comment or Submission ID from given URL', {subreddit: `/u/${userName}`});
+        winston.loggers.get('app').error('Could not parse Comment or Submission ID from given URL', {user: userName});
         return res.send('OK');
     } else {
         // @ts-ignore
@@ -118,15 +118,15 @@ const action = async (req: Request, res: Response) => {
         if (manager === undefined || !req.user?.canAccessSubreddit(req.serverBot, manager.subreddit.display_name)) {
             let msg = 'Activity does not belong to a subreddit you moderate or the bot runs on.';
             if (subreddit === 'All') {
-                msg = `${msg} If you want to test an Activity against a Subreddit\'s config it does not belong to then switch to that Subreddit's tab first.`
+                msg = `${msg} If you want to test an Activity against a Subreddit's config it does not belong to then switch to that Subreddit's tab first.`
             }
-            winston.loggers.get('app').error(msg, {subreddit: `/u/${userName}`});
+            winston.loggers.get('app').error(msg, {user: userName});
             return res.send('OK');
         }
 
         // will run dryrun if specified or if running activity on subreddit it does not belong to
         const dr: boolean | undefined = (dryRun || manager.subreddit.display_name !== sub) ? true : undefined;
-        manager.logger.info(`/u/${userName} running${dr === true ? ' DRY RUN ' : ' '}check on${manager.subreddit.display_name !== sub ? ' FOREIGN ACTIVITY ' : ' '}${url}`);
+        manager.logger.info(`/u/${userName} running${dr === true ? ' DRY RUN ' : ' '}check on${manager.subreddit.display_name !== sub ? ' FOREIGN ACTIVITY ' : ' '}${url}`, {user: userName, subreddit});
         await manager.runChecks(activity instanceof Submission ? 'Submission' : 'Comment', activity, {dryRun: dr, force: true})
     }
     res.send('OK');

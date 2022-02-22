@@ -1,6 +1,6 @@
 import {App} from "../../../App";
 import Bot from "../../../Bot";
-import {BotInstance, CMInstance} from "../../interfaces";
+import {BotInstance, CMInstanceInterface} from "../../interfaces";
 import {Manager} from "../../../Subreddit/Manager";
 import CMUser from "../../Common/User/CMUser";
 
@@ -9,7 +9,7 @@ declare global {
         interface Request {
             botApp: App;
             token?: string,
-            instance?: CMInstance,
+            instance?: CMInstanceInterface,
             bot?: BotInstance,
             serverBot: Bot,
             manager?: Manager,
