@@ -1467,6 +1467,13 @@ export interface FilterCriteriaDefaults {
     authorIsBehavior?: FilterCriteriaDefaultBehavior
 }
 
+export interface SubredditOverrides {
+    name: string
+    flowControlDefaults?: {
+        maxGotoDepth?: number
+    }
+}
+
 /**
  * The configuration for an **individual reddit account** ContextMod will run as a bot.
  *
@@ -1503,6 +1510,10 @@ export interface BotInstanceJsonConfig {
     filterCriteriaDefaults?: FilterCriteriaDefaults
 
     postCheckBehaviorDefaults?: PostBehavior
+
+    flowControlDefaults?: {
+        maxGotoDepth?: number
+    }
 
     /**
      * Settings related to bot behavior for subreddits it is managing
@@ -1564,6 +1575,8 @@ export interface BotInstanceJsonConfig {
          * @examples [300]
          * */
         heartbeatInterval?: number,
+
+        overrides?: SubredditOverrides[]
     }
 
     /**
@@ -1600,22 +1613,23 @@ export interface BotInstanceJsonConfig {
          * Useful when running many subreddits and rules are potentially cpu/memory/traffic heavy -- allows spreading out load
          * */
         stagger?: number,
-    },
+    }
+
     /**
      * Settings related to default configurations for queue behavior for subreddits
      * */
     queue?: {
-        /**
-         * Set the number of maximum concurrent workers any subreddit can use.
-         *
-         * Subreddits may define their own number of max workers in their config but the application will never allow any subreddit's max workers to be larger than the operator
-         *
-         * NOTE: Do not increase this unless you are certain you know what you are doing! The default is suitable for the majority of use cases.
-         *
-         * @default 1
-         * @examples [1]
-         * */
-        maxWorkers?: number,
+    /**
+     * Set the number of maximum concurrent workers any subreddit can use.
+     *
+     * Subreddits may define their own number of max workers in their config but the application will never allow any subreddit's max workers to be larger than the operator
+     *
+     * NOTE: Do not increase this unless you are certain you know what you are doing! The default is suitable for the majority of use cases.
+     *
+     * @default 1
+     * @examples [1]
+     * */
+    maxWorkers?: number,
     }
 
     /**
@@ -1885,6 +1899,7 @@ export interface BotInstanceConfig extends BotInstanceJsonConfig {
         dryRun?: boolean,
         wikiConfig: string,
         heartbeatInterval: number,
+        overrides?: SubredditOverrides[]
     },
     polling: {
         shared: PollOn[],

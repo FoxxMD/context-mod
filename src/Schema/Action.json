@@ -438,21 +438,18 @@
             "type": "boolean"
         },
         "itemIs": {
-            "anyOf": [
-                {
-                    "items": {
+            "description": "A list of criteria to test the state of the `Activity` against before running the Action.\n\nIf any set of criteria passes the Action will be run.",
+            "items": {
+                "anyOf": [
+                    {
                         "$ref": "#/definitions/SubmissionState"
                     },
-                    "type": "array"
-                },
-                {
-                    "items": {
+                    {
                         "$ref": "#/definitions/CommentState"
-                    },
-                    "type": "array"
-                }
-            ],
-            "description": "A list of criteria to test the state of the `Activity` against before running the Action.\n\nIf any set of criteria passes the Action will be run."
+                    }
+                ]
+            },
+            "type": "array"
         },
         "kind": {
             "description": "The type of action that will be performed",

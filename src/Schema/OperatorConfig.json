@@ -245,6 +245,14 @@
                     "$ref": "#/definitions/FilterCriteriaDefaults",
                     "description": "Define the default behavior for all filter criteria on all checks in all subreddits\n\nDefaults to exclude mods and automoderator from checks"
                 },
+                "flowControlDefaults": {
+                    "properties": {
+                        "maxGotoDepth": {
+                            "type": "number"
+                        }
+                    },
+                    "type": "object"
+                },
                 "name": {
                     "type": "string"
                 },
@@ -382,6 +390,12 @@
                             ],
                             "items": {
                                 "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        "overrides": {
+                            "items": {
+                                "$ref": "#/definitions/SubredditOverrides"
                             },
                             "type": "array"
                         },
@@ -583,20 +597,17 @@
                     "type": "string"
                 },
                 "itemIs": {
-                    "anyOf": [
-                        {
-                            "items": {
+                    "items": {
+                        "anyOf": [
+                            {
                                 "$ref": "#/definitions/SubmissionState"
                             },
-                            "type": "array"
-                        },
-                        {
-                            "items": {
+                            {
                                 "$ref": "#/definitions/CommentState"
-                            },
-                            "type": "array"
-                        }
-                    ]
+                            }
+                        ]
+                    },
+                    "type": "array"
                 },
                 "itemIsBehavior": {
                     "description": "Determine how itemIs defaults behave when itemIs is present on the check\n\n* merge => adds defaults to check's itemIs\n* replace => check itemIs will replace defaults (no defaults used)",
@@ -1219,6 +1230,25 @@
                     "type": "string"
                 }
             },
+            "type": "object"
+        },
+        "SubredditOverrides": {
+            "properties": {
+                "flowControlDefaults": {
+                    "properties": {
+                        "maxGotoDepth": {
+                            "type": "number"
+                        }
+                    },
+                    "type": "object"
+                },
+                "name": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "name"
+            ],
             "type": "object"
         },
         "ThirdPartyCredentialsJsonConfig": {

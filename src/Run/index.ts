@@ -108,6 +108,10 @@ export class Run {
             triggered: false,
             checkResults: [],
         }
+        const {
+            maxGotoDepth = 1,
+            gotoContext: optGotoContext = '',
+        } = options || {};
 
         if(!this.enabled) {
             runResult.error = 'Not enabled';
@@ -126,7 +130,7 @@ export class Run {
             return [{...runResult, reason: msg}, postBehavior];
         }
 
-        let gotoContext = options?.gotoContext ?? '';
+        let gotoContext = optGotoContext;
         const checks = isSubmission(activity) ? this.submissionChecks : this.commentChecks;
         let continueCheckIteration = true;
         let checkIndex = 0;
@@ -163,10 +167,11 @@ export class Run {
                 let check: Check;
                 if (gotoContext !== '') {
                     const [runName, checkName] = gotoContext.split('.');
-                    if(hitGotos.includes(checkName)) {
-                        throw new Error(`The check specified in goto "${gotoContext}" has already been hit once. This indicates a possible endless loop may occur so CM will terminate processing this activity to save you from yourself!`);
-                    }
                     hitGotos.push(checkName);
+                    if(hitGotos.filter(x => x === gotoContext).length > maxGotoDepth) {
+                        throw new Error(`The check specified in goto "${gotoContext}" has been triggered ${hitGotos.filter(x => x === gotoContext).length} times which is more than the max allowed for any single goto (${maxGotoDepth}).
+                         This indicates a possible endless loop may occur so CM will terminate processing this activity to save you from yourself! The max triggered depth can be configured by the operator.`);
+                    }
                     const gotoIndex = checks.findIndex(x => normalizeName(x.name) === normalizeName(checkName));
                     if (gotoIndex !== -1) {
                         if (gotoIndex > checkIndex) {

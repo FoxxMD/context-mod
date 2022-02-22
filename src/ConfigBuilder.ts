@@ -880,8 +880,10 @@ export const buildBotConfig = (data: BotInstanceJsonConfig, opConfig: OperatorCo
             hardLimit = 50
         } = {},
         snoowrap = snoowrapOp,
+        flowControlDefaults,
         credentials = {},
         subreddits: {
+            overrides = [],
             names = [],
             exclude = [],
             wikiConfig = 'botconfig/contextbot',
@@ -990,6 +992,7 @@ export const buildBotConfig = (data: BotInstanceJsonConfig, opConfig: OperatorCo
     return {
         name: botName,
         snoowrap: snoowrap || {},
+        flowControlDefaults,
         filterCriteriaDefaults,
         postCheckBehaviorDefaults,
         subreddits: {
@@ -998,6 +1001,7 @@ export const buildBotConfig = (data: BotInstanceJsonConfig, opConfig: OperatorCo
             wikiConfig,
             heartbeatInterval,
             dryRun,
+            overrides,
         },
         credentials: botCreds,
         caching: botCache,

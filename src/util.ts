@@ -1610,6 +1610,28 @@ export const intersect = (a: Array<any>, b: Array<any>) => {
     const intersection = new Set([...setA].filter(x => setB.has(x)));
     return Array.from(intersection);
 }
+/**
+ * @see https://stackoverflow.com/a/64245521/1469797
+ * */
+function *setMinus(A: Array<any>, B: Array<any>) {
+    const setA = new Set(A);
+    const setB = new Set(B);
+
+    for (const v of setB.values()) {
+        if (!setA.delete(v)) {
+            yield v;
+        }
+    }
+
+    for (const v of setA.values()) {
+        yield v;
+    }
+}
+
+
+export const difference = (a: Array<any>, b: Array<any>) => {
+    return Array.from(setMinus(a, b));
+}
 
 export const snooLogWrapper = (logger: Logger) => {
     return {

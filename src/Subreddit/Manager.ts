@@ -66,6 +66,7 @@ export interface runCheckOptions {
     refresh?: boolean,
     force?: boolean,
     gotoContext?: string
+    maxGotoDepth?: number
 }
 
 export interface CheckTask {
@@ -76,8 +77,9 @@ export interface CheckTask {
 export interface RuntimeManagerOptions extends ManagerOptions {
     sharedStreams?: PollOn[];
     wikiLocation?: string;
-    botName: string;
-    maxWorkers: number;
+    botName?: string;
+    maxWorkers?: number;
+    maxGotoDepth?: number
 }
 
 interface QueuedIdentifier {
@@ -128,6 +130,7 @@ export class Manager extends EventEmitter {
     queuedItemsMeta: QueuedIdentifier[] = [];
     globalMaxWorkers: number;
     subMaxWorkers?: number;
+    maxGotoDepth: number;
 
     displayLabel: string;
     currentLabels: string[] = [];
@@ -206,10 +209,19 @@ export class Manager extends EventEmitter {
         return this.displayLabel;
     }
 
-    constructor(sub: Subreddit, client: ExtendedSnoowrap, logger: Logger, cacheManager: BotResourcesManager, opts: RuntimeManagerOptions = {botName: 'ContextMod', maxWorkers: 1}) {
+    constructor(sub: Subreddit, client: ExtendedSnoowrap, logger: Logger, cacheManager: BotResourcesManager, opts: RuntimeManagerOptions) {
         super();
 
-        const {dryRun, sharedStreams = [], wikiLocation = 'botconfig/contextbot', botName, maxWorkers, filterCriteriaDefaults, postCheckBehaviorDefaults} = opts;
+        const {
+            dryRun,
+            sharedStreams = [],
+            wikiLocation = 'botconfig/contextbot',
+            botName = 'ContextMod',
+            maxWorkers = 1,
+            maxGotoDepth = 1,
+            filterCriteriaDefaults,
+            postCheckBehaviorDefaults
+        } = opts || {};
         this.displayLabel = opts.nickname || `${sub.display_name_prefixed}`;
         const getLabels = this.getCurrentLabels;
         const getDisplay = this.getDisplay;
@@ -237,6 +249,7 @@ export class Manager extends EventEmitter {
         this.subreddit = sub;
         this.client = client;
         this.botName = botName;
+        this.maxGotoDepth = maxGotoDepth;
         this.globalMaxWorkers = maxWorkers;
         this.notificationManager = new NotificationManager(this.logger, this.subreddit, this.displayLabel, botName);
         this.cacheManager = cacheManager;
@@ -244,6 +257,8 @@ export class Manager extends EventEmitter {
         this.queue = this.generateQueue(this.getMaxWorkers(this.globalMaxWorkers));
         this.queue.pause();
         this.firehose = this.generateFirehose();
+
+        this.logger.info(`Max GOTO Depth: ${this.maxGotoDepth}`);
 
         this.eventsSampleInterval = setInterval((function(self) {
             return function() {
@@ -734,10 +749,11 @@ export class Manager extends EventEmitter {
             while(continueRunIteration && (runIndex < this.runs.length || gotoContext !== '')) {
                 let currRun: Run;
                 if(gotoContext !== '') {
-                    if(hitGotos.includes(gotoContext)) {
-                        throw new Error(`The goto "${gotoContext}" has already been hit once. This indicates a possible endless loop may occur so CM will terminate processing this activity to save you from yourself!`);
-                    }
                     hitGotos.push(gotoContext);
+                    if(hitGotos.filter(x => x === gotoContext).length > this.maxGotoDepth) {
+                        throw new Error(`The goto "${gotoContext}" has been triggered ${hitGotos.filter(x => x === gotoContext).length} times which is more than the max allowed for any single goto (${this.maxGotoDepth}).
+                         This indicates a possible endless loop may occur so CM will terminate processing this activity to save you from yourself! The max triggered depth can be configured by the operator.`);
+                    }
                     const [runName] = gotoContext.split('.');
                     const gotoIndex = this.runs.findIndex(x => normalizeName(x.name) === normalizeName(runName));
                     if(gotoIndex !== -1) {
@@ -761,7 +777,7 @@ export class Manager extends EventEmitter {
                     currRun = this.runs[runIndex];
                 }
 
-                const [runResult, postBehavior] = await currRun.handle(item,allRuleResults, runResults.filter(x => x.name === currRun.name), {...options, gotoContext});
+                const [runResult, postBehavior] = await currRun.handle(item,allRuleResults, runResults.filter(x => x.name === currRun.name), {...options, gotoContext, maxGotoDepth: this.maxGotoDepth});
                 runResults.push(runResult);
 
                 allRuleResults = allRuleResults.concat(determineNewResults(allRuleResults, (runResult.checkResults ?? []).map(x => x.ruleResults).flat()));
