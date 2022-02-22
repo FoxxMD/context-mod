@@ -153,10 +153,6 @@ const liveStats = () => {
                     }
                 },
             };
-            if (allManagerData.logs === undefined) {
-                // this should happen but saw an edge case where potentially did
-                winston.loggers.get('app').warn(`Logs for 'all' were undefined found but should always have a default empty value`);
-            }
             // if(isOperator) {
             allManagerData.startedAt = bot.startedAt.local().format('MMMM D, YYYY h:mm A Z');
             allManagerData.heartbeatHuman = dayjs.duration({seconds: bot.heartbeatInterval}).humanize();
