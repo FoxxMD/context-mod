@@ -1049,11 +1049,20 @@ const _transformError = (err: Error, seen: Set<Error>, matchOptions?: LogMatch) 
 
             const {error, statusCode, message, stack: errStack} = err;
 
-            const errorSample = (error as unknown as string).slice(0, 10);
-            const messageBeforeIndex = message.indexOf(errorSample);
             let newMessage = `Status Error ${statusCode} from Reddit`;
-            if (messageBeforeIndex > 0) {
-                newMessage = `${message.slice(0, messageBeforeIndex)} - ${newMessage}`;
+
+            if(error !== undefined) {
+                if(typeof error === 'string') {
+                    const errorSample = (error as unknown as string).slice(0, 10);
+                    const messageBeforeIndex = message.indexOf(errorSample);
+                    if (messageBeforeIndex > 0) {
+                        newMessage = `${message.slice(0, messageBeforeIndex)} - ${newMessage}`;
+                    }
+                } else if(error !== null && (error instanceof Error || (typeof error === 'object' && (error as any).message !== undefined))) {
+                    newMessage = `${newMessage} with error: ${truncateStringToLength(100)(error.message)}`;
+                }
+            } else if(message !== undefined) {
+                newMessage = `${newMessage} with message: ${truncateStringToLength(100)(message)}`;
             }
             let cleanStack = errStack;
 
