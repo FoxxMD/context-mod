@@ -58,7 +58,7 @@
                                             <span class="font-semibold">Author:</span> <span class="px-1"><%= runSum.authorIs.passed %> (<%= runSum.authorIs.join %>)</span>
                                             <ul class="list-inside list-disc">
                                                 <% runSum.authorIs.criteriaResults.forEach(function (res, index) { %>
-                                                    <li>Criteria #<%= index %> => <%= res[0] %>
+                                                    <li>Criteria #<%= index + 1 %> => <%= res[0] %>
                                                         <ul class="list-inside list-disc">
                                                             <% res[1].forEach(function (resInside) { %>
                                                                 <li><%= resInside %></li>
@@ -74,7 +74,7 @@
                                                 <span class="font-semibold">Item:</span> <span class="px-1"><%= runSum.itemIs.passed %> (<%= runSum.itemIs.join %>)</span>
                                                 <ul class="list-inside list-disc">
                                                     <% runSum.itemIs.criteriaResults.forEach(function (res, index) { %>
-                                                        <li>Criteria #<%= index %> => <%= res[0] %>
+                                                        <li>Criteria #<%= index + 1 %> => <%= res[0] %>
                                                             <ul class="list-inside list-disc">
                                                                 <% res[1].forEach(function (resInside) { %>
                                                                     <li><%= resInside %></li>
