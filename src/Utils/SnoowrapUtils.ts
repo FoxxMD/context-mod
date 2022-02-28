@@ -378,7 +378,6 @@ export const testAuthorCriteria = async (item: (Comment | Submission), authorOpt
         }
         acc[key] = {
             property: key,
-            expected: ex,
             behavior: include ? 'include' : 'exclude',
         };
         return acc;

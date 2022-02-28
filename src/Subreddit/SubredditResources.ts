@@ -883,20 +883,6 @@ export class SubredditResources {
             let item = i;
             let state = activityState;
 
-            if (item instanceof Comment && Object.keys(activityState).length === 1 && (activityState as CommentState).submissionState !== undefined) {
-                // optimize for submission only checks on comment item
-                //
-                // we replace the commentState => submissionState object
-                // with ONLY the submissionState object
-                // so that we cache the subsmission state result instead of caching a nested submission state in an otherwise empty comment state --
-                // we get a cache submission for free and still return a "comment state" result for the comment
-
-                // @ts-ignore
-                const subProxy = await this.client.getSubmission(await i.link_id);
-                // @ts-ignore
-                item = await this.getActivity(subProxy);
-                state = (state as CommentState).submissionState as SubmissionState;
-            }
             try {
                 const hash = `itemCrit-${item.name}-${objectHash.sha1(state)}`;
                 await this.stats.cache.itemCrit.identifierRequestCount.set(hash, (await this.stats.cache.itemCrit.identifierRequestCount.wrap(hash, () => 0) as number) + 1);
@@ -1002,19 +988,8 @@ export class SubredditResources {
 
         const propResultsMap = Object.entries(definedStateCriteria).reduce((acc: ItemCritPropHelper, [k, v]) => {
             const key = (k as keyof (SubmissionState & CommentState));
-            let ex;
-            if (Array.isArray(v)) {
-                ex = v;
-            } else {
-                ex = [v];
-            }
-            if(key === 'submissionState') {
-                ex = [''];
-            }
             acc[key] = {
                 property: key,
-                // @ts-ignore
-                expected: ex,
                 behavior: 'include',
             };
             return acc;
@@ -1051,8 +1026,12 @@ export class SubredditResources {
                         for(const subState of subStates) {
                             subResults.push(await this.testItemCriteria(sub, subState as SubmissionState, logger))
                         }
-                        propResultsMap.submissionState!.passed = subResults.length === 0 || subResults.every(x => x.passed);
-                        propResultsMap.submissionState!.found = subResults.map(x => filterCriteriaSummary(x)).join(' && ');
+                        propResultsMap.submissionState!.passed = subResults.length === 0 || subResults.some(x => x.passed);
+                        propResultsMap.submissionState!.found = {
+                            join: 'OR',
+                            criteriaResults: subResults,
+                            passed: propResultsMap.submissionState!.passed
+                        };
                         break;
                     case 'score':
                         const scoreCompare = parseGenericValueComparison(itemOptVal as string);

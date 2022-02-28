@@ -11,27 +11,41 @@ import pixelmatch from 'pixelmatch';
 import os from 'os';
 import {
     ActionResult,
-    ActivityWindowCriteria, ActivityWindowType,
+    ActivityWindowCriteria,
+    ActivityWindowType,
     CacheOptions,
-    CacheProvider, CheckSummary,
-    DurationComparison, DurationVal, FilterCriteriaDefaults, FilterCriteriaPropertyResult, FilterCriteriaResult,
+    CacheProvider,
+    CheckSummary,
+    DurationComparison,
+    DurationVal,
+    FilterCriteriaDefaults,
+    FilterCriteriaPropertyResult,
+    FilterCriteriaResult,
+    FilterResult,
     GenericComparison,
     HistoricalStats,
-    HistoricalStatsDisplay, ImageComparisonResult,
+    HistoricalStatsDisplay,
+    ImageComparisonResult,
     //ImageData,
     ImageDetection,
     //ImageDownloadOptions,
     LogInfo,
-    NamedGroup, OperatorJsonConfig,
+    NamedGroup,
+    OperatorJsonConfig,
     PollingOptionsStrong,
     RedditEntity,
     RedditEntityType,
-    RegExResult, RepostItem, RepostItemResult,
-    ResourceStats, RunResult, SearchAndReplaceRegExp,
+    RegExResult,
+    RepostItem,
+    RepostItemResult,
+    ResourceStats,
+    RunResult,
+    SearchAndReplaceRegExp,
     StringComparisonOptions,
     StringOperator,
-    StrongSubredditState,
-    SubredditState, TypedActivityStates
+    StrongSubredditState, SubmissionState,
+    SubredditState,
+    TypedActivityStates
 } from "./Common/interfaces";
 import { Document as YamlDocument } from 'yaml'
 import InvalidRegexError from "./Utils/InvalidRegexError";
@@ -385,7 +399,7 @@ export const resultsSummary = (results: (RuleResult|RuleSetResult)[], topLevelCo
     //return results.map(x => x.name || x.premise.kind).join(' | ')
 }
 
-export const filterCriteriaSummary = (val: FilterCriteriaResult<any>): [string, string[]] => {
+export const filterCriteriaSummary = <T>(val: FilterCriteriaResult<T>): [string, string[]] => {
     // summarize properties relevant to result
     const passedProps = {props: val.propertyResults.filter(x => x.passed === true), name: 'Passed'};
     const failedProps = {props: val.propertyResults.filter(x => x.passed === false), name: 'Failed'};
@@ -400,10 +414,10 @@ export const filterCriteriaSummary = (val: FilterCriteriaResult<any>): [string, 
         propSummary.push(dnrProps);
     }
     const propSummaryStrArr = propSummary.map(x => `${x.props.length} ${x.name}${x.props.length > 0 ? ` (${x.props.map(y => y.property as string)})` : ''}`);
-    return [propSummaryStrArr.join(' | '), val.propertyResults.map(filterCriteriaPropertySummary)]
+    return [propSummaryStrArr.join(' | '), val.propertyResults.map(x => filterCriteriaPropertySummary(x, val.criteria))]
 }
 
-export const filterCriteriaPropertySummary = (val: FilterCriteriaPropertyResult<any>): string => {
+export const filterCriteriaPropertySummary = <T>(val: FilterCriteriaPropertyResult<T>, criteria: T): string => {
     let passResult: string;
     switch (val.passed) {
         case undefined:
@@ -415,8 +429,36 @@ export const filterCriteriaPropertySummary = (val: FilterCriteriaPropertyResult<
             passResult = triggeredIndicator(val.passed, 'Skipped');
             break;
     }
-    const found = val.passed === null || val.passed === undefined ? '' : ` => Found: ${val.found}${val.reason !== undefined ? ` -- ${val.reason}` : ''}${val.behavior === 'exclude' ? ' (Exclude passes when Expected is not Found)' : ''}`;
-    return `${val.property as string} => ${passResult} => Expected: ${val.expected}${found}`;
+    let found;
+    if(val.passed === null || val.passed === undefined) {
+        found = '';
+    } else if(val.property === 'submissionState') {
+        const foundResult = val.found as FilterResult<SubmissionState>;
+        const criteriaResults = foundResult.criteriaResults.map((x, index) => `Criteria #${index + 1} => ${triggeredIndicator(x.passed)}\n   ${x.propertyResults.map(y => filterCriteriaPropertySummary(y, x.criteria)).join('\n    ')}`).join('\n  ');
+        found = `\n  ${criteriaResults}`;
+    } else {
+        found = ` => Found: ${val.found}`;
+    }
+
+    let expected = '';
+    if(val.property !== 'submissionState') {
+        let crit: T[keyof T][];
+        if(Array.isArray(criteria[val.property])) {
+            // @ts-ignore
+            crit = criteria[val.property];
+        } else {
+            crit = [criteria[val.property]];
+        }
+        const expectedStrings = crit.map((x: any) => {
+            if (asUserNoteCriteria(x)) {
+                return userNoteCriteriaSummary(x);
+            }
+            return x;
+        }).join(' OR ');
+        expected = ` => Expected: ${expectedStrings}`;
+    }
+
+    return `${val.property as string} => ${passResult}${expected}${found}${val.reason !== undefined ? ` -- ${val.reason}` : ''}${val.behavior === 'exclude' ? ' (Exclude passes when Expected is not Found)' : ''}`;
 }
 
 export const createAjvFactory = (logger: Logger) => {

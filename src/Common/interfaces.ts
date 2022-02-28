@@ -2162,8 +2162,7 @@ export interface StringComparisonOptions {
 
 export interface FilterCriteriaPropertyResult<T> {
     property: keyof T
-    expected: (string | boolean | number)[]
-    found?: string | boolean | number | null
+    found?: string | boolean | number | null | FilterResult<any>
     passed?: null | boolean
     reason?: string
     behavior: FilterBehavior
