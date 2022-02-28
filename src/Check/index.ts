@@ -276,7 +276,7 @@ export abstract class Check implements ICheck {
                     //actionsRun = runActions.length;
 
                     if (this.notifyOnTrigger) {
-                        const ar = runActions.filter(x => x.success).map(x => x.name).join(', ');
+                        const ar = checkSum.actionResults.filter(x => x.success).map(x => x.name).join(', ');
                         const [peek, _] = await itemContentPeek(activity);
                         const notifPayload: NotificationEventPayload = {
                             type: 'eventActioned',
