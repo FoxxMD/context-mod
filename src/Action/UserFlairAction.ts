@@ -41,7 +41,7 @@ export class UserFlairAction extends Action {
     const flairSummary = flairParts.length === 0 ? 'Unflair user' : flairParts.join(' | ');
     this.logger.verbose(flairSummary);
 
-    if (!this.dryRun) {
+    if (!dryRun) {
       if (this.flair_template_id !== undefined) {
         try {
           // @ts-ignore
