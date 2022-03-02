@@ -1081,69 +1081,76 @@ const _transformError = (err: Error, seen: Set<Error>, matchOptions?: LogMatch) 
         return err;
     }
 
-    // @ts-ignore
-    let mOpts = err.matchOptions ?? matchOptions;
+    try {
 
-    if (isRequestError(err)) {
-        const errMsgParts = [`Reddit responded with a NOT OK status (${err.statusCode})`];
-
-        if (err.response.headers !== undefined && (typeof err.response.headers['content-type'] === 'string' || Array.isArray(err.response.headers['content-type'])) && err.response.headers['content-type'].includes('html')) {
-            // reddit returns html even when we specify raw_json in the querystring (via snoowrap)
-            // which means the html gets set as the message for the error AND gets added to the stack as the message
-            // and we end up with a h u g e log statement full of noisy html >:(
-
-            const {error, statusCode, message, stack: errStack} = err;
-
-            let newMessage = `Status Error ${statusCode} from Reddit`;
-
-            if(error !== undefined) {
-                if(typeof error === 'string') {
-                    const errorSample = (error as unknown as string).slice(0, 10);
-                    const messageBeforeIndex = message.indexOf(errorSample);
-                    if (messageBeforeIndex > 0) {
-                        newMessage = `${message.slice(0, messageBeforeIndex)} - ${newMessage}`;
-                    }
-                } else if(error !== null && (error instanceof Error || (typeof error === 'object' && (error as any).message !== undefined))) {
-                    newMessage = `${newMessage} with error: ${truncateStringToLength(100)(error.message)}`;
-                }
-            } else if(message !== undefined) {
-                newMessage = `${newMessage} with message: ${truncateStringToLength(100)(message)}`;
-            }
-            let cleanStack = errStack;
-
-            // try to get just stacktrace by finding beginning of what we assume is the actual trace
-            if (errStack) {
-                cleanStack = `${newMessage}\n${errStack.slice(errStack.indexOf('at new StatusCodeError'))}`;
-            }
-            // now put it all together so its nice and clean
-            err.message = newMessage;
-            err.stack = cleanStack;
-        }
-
-        const msg = getExceptionMessage(err, mOpts);
-        if (msg !== undefined) {
-            errMsgParts.push(msg);
-        }
-
-        // we don't care about stack trace for this error because we know where it came from so truncate to two lines for now...maybe remove all together later
-        if(err.stack !== undefined) {
-            err.stack = err.stack.split('\n').slice(0, 2).join('\n');
-        }
-
-        const normalizedError = new ErrorWithCause(errMsgParts.join(' => '), {cause: err});
-        normalizedError.stack = normalizedError.message;
-        return normalizedError;
-    }
-
-    // @ts-ignore
-    const cause = err.cause as unknown;
-
-    if (cause !== undefined && cause instanceof Error) {
         // @ts-ignore
-        err.cause = _transformError(cause, seen, mOpts);
-    }
+        let mOpts = err.matchOptions ?? matchOptions;
 
-    return err;
+        if (isRequestError(err)) {
+            const errMsgParts = [`Reddit responded with a NOT OK status (${err.statusCode})`];
+
+            if (err.response.headers !== undefined && (typeof err.response.headers['content-type'] === 'string' || Array.isArray(err.response.headers['content-type'])) && err.response.headers['content-type'].includes('html')) {
+                // reddit returns html even when we specify raw_json in the querystring (via snoowrap)
+                // which means the html gets set as the message for the error AND gets added to the stack as the message
+                // and we end up with a h u g e log statement full of noisy html >:(
+
+                const {error, statusCode, message, stack: errStack} = err;
+
+                let newMessage = `Status Error ${statusCode} from Reddit`;
+
+                if (error !== undefined) {
+                    if (typeof error === 'string') {
+                        const errorSample = (error as unknown as string).slice(0, 10);
+                        const messageBeforeIndex = message.indexOf(errorSample);
+                        if (messageBeforeIndex > 0) {
+                            newMessage = `${message.slice(0, messageBeforeIndex)} - ${newMessage}`;
+                        }
+                    } else if (error !== null && (error instanceof Error || (typeof error === 'object' && (error as any).message !== undefined))) {
+                        newMessage = `${newMessage} with error: ${truncateStringToLength(100)(error.message)}`;
+                    }
+                } else if (message !== undefined) {
+                    newMessage = `${newMessage} with message: ${truncateStringToLength(100)(message)}`;
+                }
+                let cleanStack = errStack;
+
+                // try to get just stacktrace by finding beginning of what we assume is the actual trace
+                if (errStack) {
+                    cleanStack = `${newMessage}\n${errStack.slice(errStack.indexOf('at new StatusCodeError'))}`;
+                }
+                // now put it all together so its nice and clean
+                err.message = newMessage;
+                err.stack = cleanStack;
+            }
+
+            const msg = getExceptionMessage(err, mOpts);
+            if (msg !== undefined) {
+                errMsgParts.push(msg);
+            }
+
+            // we don't care about stack trace for this error because we know where it came from so truncate to two lines for now...maybe remove all together later
+            if (err.stack !== undefined) {
+                err.stack = err.stack.split('\n').slice(0, 2).join('\n');
+            }
+
+            const normalizedError = new ErrorWithCause(errMsgParts.join(' => '), {cause: err});
+            normalizedError.stack = normalizedError.message;
+            return normalizedError;
+        }
+
+        // @ts-ignore
+        const cause = err.cause as unknown;
+
+        if (cause !== undefined && cause instanceof Error) {
+            // @ts-ignore
+            err.cause = _transformError(cause, seen, mOpts);
+        }
+
+        return err;
+    } catch (e: any) {
+        // oops :(
+        // we're gonna swallow silently instead of reporting to avoid any infinite nesting and hopefully the original error looks funny enough to provide clues as to what to fix here
+        return err;
+    }
 }
 
 export const transformError = (err: Error): any => _transformError(err, new Set());
