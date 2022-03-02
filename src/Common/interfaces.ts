@@ -2005,12 +2005,18 @@ export interface ActionProcessResult {
     touchedEntities?: (Submission | Comment | RedditUser | string)[]
 }
 
-export interface ActionedEvent {
-    activity: {
-        peek: string
-        link: string
-    }
+export interface EventActivity {
+    peek: string
+    link: string
+    type: ActivityType
+    id: string
+    subreddit: string
     author: string
+}
+
+export interface ActionedEvent {
+    activity: EventActivity
+    parentSubmission?: EventActivity
     timestamp: number
     subreddit: string,
     triggered: boolean,

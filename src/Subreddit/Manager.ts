@@ -681,8 +681,8 @@ export class Manager extends EventEmitter {
         this.currentLabels = [itemIdentifier];
         let ePeek = '';
         try {
-            const [peek, _] = await itemContentPeek(item);
-            ePeek = peek;
+            const [peek, { content: peekContent }] = await itemContentPeek(item);
+            ePeek = peekContent;
             this.logger.info(`<EVENT> ${peek}`);
         } catch (err: any) {
             this.logger.error(`Error occurred while generating item peek for ${checkType} Activity ${itemId}`, err);
@@ -693,9 +693,12 @@ export class Manager extends EventEmitter {
             subreddit: this.subreddit.display_name_prefixed,
             activity: {
                 peek: ePeek,
-                link: item.permalink
+                link: item.permalink,
+                type: checkType === 'Submission' ? 'submission' : 'comment',
+                id: itemId,
+                author: item.author.name,
+                subreddit: item.subreddit_name_prefixed
             },
-            author: item.author.name,
             timestamp: Date.now(),
             runResults: []
         }
@@ -815,6 +818,25 @@ export class Manager extends EventEmitter {
                 //actionedEvent.actionResults = runActions;
                 actionedEvent.runResults = runResults;
                 if(actionedEvent.triggered) {
+                    // only get parent submission info if we are actually going to use this event
+                    if(checkType === 'Comment') {
+                        try {
+                            // @ts-ignore
+                            const subProxy = await this.client.getSubmission(await item.link_id);
+                            const sub = await this.resources.getActivity(subProxy);
+                            const [peek, { content: peekContent, author, permalink }] = await itemContentPeek(sub);
+                            actionedEvent.parentSubmission = {
+                                peek: peekContent,
+                                author,
+                                subreddit: item.subreddit_name_prefixed,
+                                id: (item as Comment).link_id,
+                                type: 'comment',
+                                link: permalink
+                            }
+                        } catch (err: any) {
+                            this.logger.error(`Error occurred while generating item peek for ${checkType} Activity ${itemId}`, err);
+                        }
+                    }
                     await this.resources.addActionedEvent(actionedEvent);
                 }
 

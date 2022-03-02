@@ -10,9 +10,9 @@
     <meta name="viewport" content="width=device-width,initial-scale=1.0">
     <!--icons from https://heroicons.com -->
     <style>
-        .peek a {
-            display: none;
-        }
+        /*.peek a {*/
+        /*    display: none;*/
+        /*}*/
     </style>
 </head>
 <body class="bg-gray-900 text-white font-sans">
@@ -30,17 +30,31 @@
                 <% } %>
                 <% data.forEach(function (eRes) { %>
                     <div class="shadow-lg bg-gray-700 py-1 triggeredStateWrapper">
-                        <div class="space-x-4 px-4 p-2 leading-2 font-semibold font-semibold triggeredStateToggle">
+                        <div class="space-x-4 px-4 p-2 leading-2 triggeredStateToggle">
                             <div class="flex items-center justify-between">
                                 <div>
-                                <span class="peek"><%- eRes.activity.peek %></span><a class="activityLink" target="_blank" href="https://reddit.com<%= eRes.activity.link%>">(Link)</a>
+                                    <a class="activityLink font-semibold" target="_blank" href="https://reddit.com<%= eRes.activity.link%>"><%= eRes.activity.type === 'comment' ? 'Comment' : 'Submission' %></a>
+                                    by <a class="activityLink" target="_blank" href="https://reddit.com/u/<%= eRes.activity.author%>"><%= eRes.activity.author%></a>
                                 </div>
-                                <div class="flex items-center flex-end">
-                                    <%= eRes.subreddit %> @ <%= eRes.timestamp %>
+                                <div class="font-semibold flex items-center flex-end">
+                                    <a class="activityLink mr-1" target="_blank" href="https://reddit.com/<%= eRes.activity.subreddit %>"><%= eRes.activity.subreddit %></a>
+                                     @ <%= eRes.timestamp %>
                                 </div>
                             </div>
                         </div>
                         <div class="border-t-2 border-gray-500 triggeredState <%= eRes.triggered ? 'triggered' : 'notTriggered'%>">
+                            <div class="m-4 p-2 px-4">
+                                <blockquote class="ml-3 italic" cite="https://reddit.com<%= eRes.activity.link%>">
+                                    "<%- eRes.activity.peek %>"
+                                </blockquote>
+                                <% if(eRes.parentSubmission !== undefined) { %>
+                                    <div class="my-3">in the <a class="activityLink" href="https://reddit.com<%= eRes.parentSubmission.link%>">Submission</a></div>
+                                <blockquote class="ml-3 mb-2 italic" cite="https://reddit.com<%= eRes.parentSubmission.link%>">
+                                    "<%= eRes.parentSubmission.peek%>"
+                                </blockquote>
+                                    by <a class="activityLink" target="_blank" href="https://reddit.com/u/<%= eRes.parentSubmission.author%>"><%= eRes.parentSubmission.author%></a>
+                                <% } %>
+                            </div>
                         <% eRes.runResults.forEach(function (runSum, index) { %>
                         <div class="m-4 p-2 px-4 space-y-2 bg-gray-600 triggeredStateWrapper">
                             <div class="triggeredStateToggle">

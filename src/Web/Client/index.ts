@@ -988,7 +988,7 @@ const webClient = async (options: OperatorConfig) => {
         }).json() as [any];
 
         const actionedEvents = resp.map((x: ActionedEvent) => {
-            const {timestamp, activity: {peek, link}, runResults = [], ...rest} = x;
+            const {timestamp, activity: {peek, link, ...restAct}, runResults = [], ...rest} = x;
             const time = dayjs(timestamp).local().format('YY-MM-DD HH:mm:ss z');
             const formattedPeek = Autolinker.link(peek.replace(`https://reddit.com${link}`, ''), {
                 email: false,
@@ -1054,6 +1054,7 @@ const webClient = async (options: OperatorConfig) => {
                 activity: {
                     link,
                     peek: formattedPeek,
+                    ...restAct,
                 },
                 triggered: triggeredIndicator(x.triggered),
                 triggeredVal: x.triggered,
