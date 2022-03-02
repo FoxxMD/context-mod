@@ -46,7 +46,7 @@ export interface RawNote {
     /**
      * Link shorthand
      * */
-    l: string;
+    l: (string | null);
     /**
      * type/color index from constants.warnings
      * */
@@ -132,12 +132,12 @@ export class UserNotes {
             this.logger.info(`Mod ${mod.name} does not exist in UserNote constants, adding them`);
             payload.constants.users.push(mod.name);
         }
+        const modIndex = payload.constants.users.findIndex((x: string) => x === mod.name);
         if(!payload.constants.warnings.find((x: string) => x === type)) {
             this.logger.warn(`UserNote type '${type}' does not exist, adding it but make sure spelling and letter case is correct`);
             payload.constants.warnings.push(type);
-            //throw new LoggedError(`UserNote type '${type}' does not exist. If you meant to use this please add it through Toolbox first.`);
         }
-        const newNote = new UserNote(dayjs(), text, mod, type, `https://reddit.com${item.permalink}`);
+        const newNote = new UserNote(dayjs(), text, modIndex, type, `https://reddit.com${item.permalink}`, mod);
 
         if(payload.blob[userName] === undefined) {
             payload.blob[userName] = {ns: []};
@@ -237,7 +237,7 @@ export class UserNote {
     // noteType: string | null;
     // link: string;
 
-    constructor(public time: Dayjs, public text: string, public modIndex: number, public noteType: string | number, public link: string, public moderator?: RedditUser) {
+    constructor(public time: Dayjs, public text: string, public modIndex: number, public noteType: string | number, public link: (string | null) = null, public moderator?: RedditUser) {
 
     }
 
@@ -273,7 +273,10 @@ export class UserNote {
 }
 
 // https://github.com/toolbox-team/reddit-moderator-toolbox/wiki/Subreddit-Wikis%3A-usernotes#link-string-formats
-export const usernoteLinkExpand = (link: string) => {
+export const usernoteLinkExpand = (link: (string | null)): (string | null) => {
+    if(link === null || link === '') {
+        return null;
+    }
     if (link.charAt(0) === 'l') {
         const pieces = link.split(',');
         if (pieces.length === 3) {
@@ -287,7 +290,11 @@ export const usernoteLinkExpand = (link: string) => {
         return `https://www.reddit.com/message/messages/${link.split(',')[1]}`;
     }
 }
-export const usernoteLinkShorthand = (link: string) => {
+export const usernoteLinkShorthand = (link: (string | null)) => {
+
+    if(link === null || link === '') {
+        return '';
+    }
 
     const commentReg = parseLinkIdentifier([COMMENT_URL_ID]);
     const submissionReg = parseLinkIdentifier([SUBMISSION_URL_ID]);

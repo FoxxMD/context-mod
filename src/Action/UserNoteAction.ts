@@ -33,8 +33,15 @@ export class UserNoteAction extends Action {
 
         if (!this.allowDuplicate) {
             const notes = await this.resources.userNotes.getUserNotes(item.author);
-            const existingNote = notes.find((x) => x.link.includes(item.id));
-            if (existingNote) {
+            let existingNote = notes.find((x) => x.link !== null && x.link.includes(item.id));
+            if(existingNote === undefined && notes.length > 0) {
+                const lastNote = notes[notes.length - 1];
+                // possibly notes don't have a reference link so check if last one has same text
+                if(lastNote.link === null && lastNote.text === renderedContent) {
+                    existingNote = lastNote;
+                }
+            }
+            if (existingNote !== undefined && existingNote.noteType === this.type) {
                 this.logger.info(`Will not add note because one already exists for this Activity (${existingNote.time.local().format()}) and allowDuplicate=false`);
                 return {
                     dryRun,
