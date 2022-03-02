@@ -28,7 +28,7 @@ export const isStatusError = (err: any): err is StatusCodeError => {
 }
 
 export const isRequestError = (err: any): err is RequestError => {
-    return typeof err === 'object' && err.response !== undefined;
+    return typeof err === 'object' && err.response !== undefined && err.response !== null && typeof err.response === 'object';
 }
 
 export class SimpleError extends ExtendableError {

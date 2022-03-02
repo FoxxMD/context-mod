@@ -1087,7 +1087,7 @@ const _transformError = (err: Error, seen: Set<Error>, matchOptions?: LogMatch) 
     if (isRequestError(err)) {
         const errMsgParts = [`Reddit responded with a NOT OK status (${err.statusCode})`];
 
-        if (err.response.headers['content-type'].includes('html')) {
+        if (err.response.headers !== undefined && err.response.headers['content-type'] !== null && err.response.headers['content-type'].includes('html')) {
             // reddit returns html even when we specify raw_json in the querystring (via snoowrap)
             // which means the html gets set as the message for the error AND gets added to the stack as the message
             // and we end up with a h u g e log statement full of noisy html >:(
