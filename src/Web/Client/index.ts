@@ -990,13 +990,14 @@ const webClient = async (options: OperatorConfig) => {
         const actionedEvents = resp.map((x: ActionedEvent) => {
             const {timestamp, activity: {peek, link}, runResults = [], ...rest} = x;
             const time = dayjs(timestamp).local().format('YY-MM-DD HH:mm:ss z');
-            const formattedPeek = Autolinker.link(peek, {
+            const formattedPeek = Autolinker.link(peek.replace(`https://reddit.com${link}`, ''), {
                 email: false,
                 phone: false,
                 mention: false,
                 hashtag: false,
                 stripPrefix: false,
                 sanitizeHtml: true,
+                urls: false
             });
             const formattedRunResults = runResults.map((summ: RunResult) => {
                 const {checkResults = [], ...rest} = summ;
