@@ -23,7 +23,7 @@ import {RuleResult} from "../Rule";
 import {ConfigBuilder, buildPollingOptions} from "../ConfigBuilder";
 import {
     ActionedEvent,
-    ActionResult, CheckResult, CheckSummary,
+    ActionResult, ActivityRerun, CheckResult, CheckSummary,
     DEFAULT_POLLING_INTERVAL,
     DEFAULT_POLLING_LIMIT, FilterCriteriaDefaults, Invokee, LogInfo,
     ManagerOptions, ManagerStateChangeOption, ManagerStats, NotificationEventPayload, PAUSED,
@@ -128,6 +128,7 @@ export class Manager extends EventEmitter {
     // 2) if currently processing then re-queue but also refresh before processing
     firehose: QueueObject<CheckTask>;
     queuedItemsMeta: QueuedIdentifier[] = [];
+    delayedItems: ActivityRerun[] = [];
     globalMaxWorkers: number;
     subMaxWorkers?: number;
     maxGotoDepth: number;
@@ -370,6 +371,20 @@ export class Manager extends EventEmitter {
             }
         }
         , 1);
+    }
+
+    protected async startDelayQueue() {
+        while(this.queueState.state === RUNNING) {
+            for(const ar of this.delayedItems) {
+                if(dayjs.unix(ar.queuedAt).add(ar.duration).isSameOrBefore(dayjs())) {
+                    this.logger.info(`Delayed Activity ${ar.activity.name} is being queued.`);
+                    await this.queue.push({activity: ar.activity, options: {refresh: true}});
+                    this.delayedItems = this.delayedItems.filter(x => x.activity !== ar.activity);
+                }
+            }
+            // sleep for 5 seconds
+            await sleep(5000);
+        }
     }
 
     protected generateQueue(maxWorkers: number) {
@@ -1062,6 +1077,7 @@ export class Manager extends EventEmitter {
                 state: RUNNING,
                 causedBy
             }
+            this.startDelayQueue();
             if(!suppressNotification) {
                 this.notificationManager.handle('runStateChanged', 'Queue Started', reason, causedBy);
             }

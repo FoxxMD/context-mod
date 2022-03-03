@@ -2277,3 +2277,15 @@ export type ActivityType = 'submission' | 'comment';
 
 export type ItemCritPropHelper = SafeDictionary<FilterCriteriaPropertyResult<(CommentState & SubmissionState)>, keyof (CommentState & SubmissionState)>;
 export type RequiredItemCrit = Required<(CommentState & SubmissionState)>;
+
+export interface ActivityRerunConfig {
+    rerunIdentifier?: string
+    cancelIfQueued?: boolean
+    goto?: string
+    duration?: DurationVal
+}
+
+export interface ActivityRerun extends ActivityRerunConfig {
+    queuedAt: number
+    activity: Submission | Comment
+}
