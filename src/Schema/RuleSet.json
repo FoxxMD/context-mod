@@ -31,6 +31,15 @@
                         }
                     ]
                 },
+                "subredditThreshold": {
+                    "default": ">= 1",
+                    "description": "A string containing a comparison operator and a value to compare the **number of subreddits that have valid activities** against\n\nThe syntax is `(< OR > OR <= OR >=) <number>[percent sign]`\n\n* EX `> 3`  => greater than 3 Subreddits found with valid activities\n* EX `<= 75%` => number of Subreddits with valid activities are equal to or less than 75% of all Subreddits found\n\n**Note:** If you use percentage comparison here as well as `useSubmissionAsReference` then \"all Subreddits found\" is only pertains to Subreddits that had the Link of the Submission, rather than all Subreddits from this window.",
+                    "examples": [
+                        ">= 1"
+                    ],
+                    "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
+                    "type": "string"
+                },
                 "subreddits": {
                     "description": "Activities will be counted if they are found in this list of Subreddits\n\nEach value in the list can be either:\n\n * string (name of subreddit)\n * regular expression to run on the subreddit name\n * `SubredditState`\n\nEX `[\"mealtimevideos\",\"askscience\", \"/onlyfans*\\/i\", {\"over18\": true}]`",
                     "examples": [
