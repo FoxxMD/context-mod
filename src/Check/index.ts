@@ -148,7 +148,7 @@ export abstract class Check implements ICheck {
                     this.actions.push(actionFactory({
                         ...aj,
                         dryRun: this.dryRun || aj.dryRun
-                    }, this.logger, subredditName, this.resources, this.client));
+                    }, this.logger, subredditName, this.resources, this.client, this.emitter));
                     // @ts-ignore
                     a.logger = this.logger;
                 } else {
@@ -198,7 +198,7 @@ export abstract class Check implements ICheck {
     async setCacheResult(item: Submission | Comment, result: UserResultCache): Promise<void> {
     }
 
-    async handle(activity: (Submission | Comment), allRuleResults: RuleResult[], options: runCheckOptions = {}): Promise<CheckSummary> {
+    async handle(activity: (Submission | Comment), allRuleResults: RuleResult[], options: runCheckOptions): Promise<CheckSummary> {
 
         let checkSum: CheckSummary = {
             name: this.name,
@@ -226,7 +226,7 @@ export abstract class Check implements ICheck {
             let checkRes: CheckResult;
             let checkError: string | undefined;
             try {
-                checkRes = await this.runRules(activity, allRuleResults);
+                checkRes = await this.runRules(activity, allRuleResults, options);
 
                 checkSum = {
                     ...checkSum,
@@ -267,7 +267,7 @@ export abstract class Check implements ICheck {
                 try {
                     checkSum.postBehavior = this.postTrigger;
 
-                    checkSum.actionResults = await this.runActions(activity, currentResults.filter(x => x.triggered), options.dryRun);
+                    checkSum.actionResults = await this.runActions(activity, currentResults.filter(x => x.triggered), options);
                     // we only can about report and comment actions since those can produce items for newComm and modqueue
                     const recentCandidates = checkSum.actionResults.filter(x => ['report', 'comment'].includes(x.kind.toLocaleLowerCase())).map(x => x.touchedEntities === undefined ? [] : x.touchedEntities).flat();
                     for (const recent of recentCandidates) {
@@ -336,7 +336,7 @@ export abstract class Check implements ICheck {
         }
     }
 
-    async runRules(item: Submission | Comment, existingResults: RuleResult[] = []): Promise<CheckResult> {
+    async runRules(item: Submission | Comment, existingResults: RuleResult[] = [], options: runCheckOptions): Promise<CheckResult> {
         try {
             let allRuleResults: RuleResult[] = [];
             let allResults: (RuleResult | RuleSetResult)[] = [];
@@ -357,7 +357,7 @@ export abstract class Check implements ICheck {
                 };
             }
 
-            const [itemPass, itemFilterType, itemFilterResults] = await checkItemFilter(item, this.itemIs, this.resources, this.logger);
+            const [itemPass, itemFilterType, itemFilterResults] = await checkItemFilter(item, this.itemIs, this.resources, this.logger, options.source);
             if (!itemPass) {
                 return {
                     triggered: false,
@@ -390,7 +390,7 @@ export abstract class Check implements ICheck {
             for (const r of this.rules) {
                 //let results: RuleResult | RuleSetResult;
                 const combinedResults = [...existingResults, ...allRuleResults];
-                const [passed, results] = await r.run(item, combinedResults);
+                const [passed, results] = await r.run(item, combinedResults, options);
                 if (isRuleSetResult(results)) {
                     allRuleResults = allRuleResults.concat(results.results);
                 } else {
@@ -442,8 +442,9 @@ export abstract class Check implements ICheck {
         }
     }
 
-    async runActions(item: Submission | Comment, ruleResults: RuleResult[], runtimeDryrun?: boolean): Promise<ActionResult[]> {
-        const dr = runtimeDryrun || this.dryRun;
+    async runActions(item: Submission | Comment, ruleResults: RuleResult[], options: runCheckOptions): Promise<ActionResult[]> {
+        const {dryRun} = options;
+        const dr = dryRun || this.dryRun;
         this.logger.debug(`${dr ? 'DRYRUN - ' : ''}Running Actions`);
         const runActions: ActionResult[] = [];
         for (const a of this.actions) {
@@ -459,7 +460,7 @@ export abstract class Check implements ICheck {
                 this.logger.info(`Action ${a.getActionUniqueName()} not run because it is not enabled.`);
                 continue;
             }
-            const res = await a.handle(item, ruleResults, runtimeDryrun);
+            const res = await a.handle(item, ruleResults, options);
             runActions.push(res);
         }
         this.logger.info(`${dr ? 'DRYRUN - ' : ''}Ran Actions: ${runActions.map(x => x.name).join(' | ')}`);
@@ -544,10 +545,9 @@ export interface CheckJson extends ICheck {
      *
      *  Can be `Action` or the `name` of any **named** `Action` in your subreddit's configuration
      *
-     * @minItems 1
      * @examples [[{"kind": "comment", "content": "this is the content of the comment", "distinguish": true}, {"kind": "lock"}]]
      * */
-    actions: Array<ActionTypeJson>
+    actions?: Array<ActionTypeJson>
 
     /**
      * If notifications are configured and this is `true` then an `eventActioned` event will be sent when this check is triggered.

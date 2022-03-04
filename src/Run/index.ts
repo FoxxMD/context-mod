@@ -98,7 +98,7 @@ export class Run {
         }
     }
 
-    async handle(activity: (Submission | Comment), initAllRuleResults: RuleResult[], existingRunResults: RunResult[] = [], options?: runCheckOptions): Promise<[RunResult, string]> {
+    async handle(activity: (Submission | Comment), initAllRuleResults: RuleResult[], existingRunResults: RunResult[] = [], options: runCheckOptions): Promise<[RunResult, string]> {
 
         let allRuleResults = initAllRuleResults;
         let continueRunIteration = true;
@@ -111,7 +111,8 @@ export class Run {
         const {
             maxGotoDepth = 1,
             gotoContext: optGotoContext = '',
-        } = options || {};
+            source,
+        } = options;
 
         if(!this.enabled) {
             runResult.error = 'Not enabled';
@@ -141,7 +142,7 @@ export class Run {
 
         try {
 
-            const [itemPass, itemFilterType, itemFilterResults] = await checkItemFilter(activity, this.itemIs, this.resources, this.logger)
+            const [itemPass, itemFilterType, itemFilterResults] = await checkItemFilter(activity, this.itemIs, this.resources, this.logger, source)
             if (!itemPass) {
                 this.logger.verbose(`${FAIL} => Item did not pass 'itemIs' test`);
                 return [{

@@ -15,7 +15,7 @@ import {
     ActivityWindowType,
     CacheOptions,
     CacheProvider,
-    CheckSummary,
+    CheckSummary, CommentState,
     DurationComparison,
     DurationVal,
     FilterCriteriaDefaults,
@@ -27,7 +27,7 @@ import {
     HistoricalStatsDisplay,
     ImageComparisonResult,
     //ImageData,
-    ImageDetection,
+    ImageDetection, ItemCritPropHelper,
     //ImageDownloadOptions,
     LogInfo,
     NamedGroup,
@@ -37,14 +37,14 @@ import {
     RedditEntityType,
     RegExResult,
     RepostItem,
-    RepostItemResult,
+    RepostItemResult, RequiredItemCrit,
     ResourceStats,
     RunResult,
     SearchAndReplaceRegExp,
     StringComparisonOptions,
     StringOperator,
     StrongSubredditState, SubmissionState,
-    SubredditState,
+    SubredditState, TypedActivityState,
     TypedActivityStates
 } from "./Common/interfaces";
 import { Document as YamlDocument } from 'yaml'
@@ -2262,4 +2262,47 @@ export const getUserAgent = (val: string, fragment?: string) => {
 
 export const replaceApplicationIdentifier = (val: string, fragment?: string) => {
     return val.replace('{VERSION}', `v${VERSION}`).replace('{FRAG}', (fragment !== undefined ? `-${fragment}` : ''));
+}
+
+export const parseDurationValToDuration = (val: DurationVal): Duration => {
+    let duration: Duration;
+    if (typeof val === 'object') {
+        duration = dayjs.duration(val);
+        if (!dayjs.isDuration(duration)) {
+            throw new Error('window value given was not a well-formed Duration object');
+        }
+    } else {
+        try {
+            duration = parseDuration(val);
+        } catch (e) {
+            if (e instanceof InvalidRegexError) {
+                throw new Error(`duration value of '${val}' could not be parsed as a valid ISO8601 duration or DayJS duration shorthand (see Schema)`);
+            }
+            throw e;
+        }
+    }
+    return duration;
+}
+
+export const generateItemFilterHelpers = (stateCriteria: TypedActivityState): [ItemCritPropHelper, RequiredItemCrit] => {
+    const definedStateCriteria = (removeUndefinedKeys(stateCriteria) as RequiredItemCrit);
+
+    if(definedStateCriteria === undefined) {
+        return [{}, {} as RequiredItemCrit];
+    }
+
+    const propResultsMap = Object.entries(definedStateCriteria).reduce((acc: ItemCritPropHelper, [k, v]) => {
+        const key = (k as keyof (SubmissionState & CommentState));
+        acc[key] = {
+            property: key,
+            behavior: 'include',
+        };
+        return acc;
+    }, {});
+
+    return [propResultsMap, definedStateCriteria];
+}
+
+export const isCommentState = (state: TypedActivityState): state is CommentState => {
+    return 'op' in state || 'depth' in state || 'submissionState' in state;
 }

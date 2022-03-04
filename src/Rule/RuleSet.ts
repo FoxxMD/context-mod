@@ -8,6 +8,7 @@ import * as RuleSchema from '../Schema/Rule.json';
 import Ajv from 'ajv';
 import {RuleJson, RuleObjectJson} from "../Common/types";
 import {SubredditResources} from "../Subreddit/SubredditResources";
+import {runCheckOptions} from "../Subreddit/Manager";
 
 export class RuleSet implements IRuleSet {
     rules: Rule[] = [];
@@ -33,12 +34,12 @@ export class RuleSet implements IRuleSet {
         }
     }
 
-    async run(item: Comment | Submission, existingResults: RuleResult[] = []): Promise<[boolean, RuleSetResult]> {
+    async run(item: Comment | Submission, existingResults: RuleResult[] = [], options: runCheckOptions): Promise<[boolean, RuleSetResult]> {
         let results: RuleResult[] = [];
         let runOne = false;
         for (const r of this.rules) {
             const combinedResults = [...existingResults, ...results];
-            const [passed, result] = await r.run(item, combinedResults);
+            const [passed, result] = await r.run(item, combinedResults, options);
             //results = results.concat(determineNewResults(combinedResults, result));
             results.push(result);
             // skip rule if author check failed

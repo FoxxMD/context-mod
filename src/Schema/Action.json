@@ -230,10 +230,73 @@
                     "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
                     "type": "string"
                 },
+                "rerun": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
+                        }
+                    ]
+                },
                 "score": {
                     "description": "A string containing a comparison operator and a value to compare against\n\nThe syntax is `(< OR > OR <= OR >=) <number>`\n\n* EX `> 100`  => greater than 100",
                     "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
                     "type": "string"
+                },
+                "source": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "items": {
+                                "anyOf": [
+                                    {
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "type": "array"
+                                    },
+                                    {
+                                        "enum": [
+                                            "poll",
+                                            "poll:modqueue",
+                                            "poll:newComm",
+                                            "poll:newSub",
+                                            "poll:unmoderated",
+                                            "rerun",
+                                            "user"
+                                        ],
+                                        "type": "string"
+                                    }
+                                ]
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "enum": [
+                                "poll",
+                                "poll:modqueue",
+                                "poll:newComm",
+                                "poll:newSub",
+                                "poll:unmoderated",
+                                "rerun",
+                                "user"
+                            ],
+                            "type": "string"
+                        }
+                    ]
                 },
                 "spam": {
                     "type": "boolean"
@@ -341,10 +404,73 @@
                     "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
                     "type": "string"
                 },
+                "rerun": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
+                        }
+                    ]
+                },
                 "score": {
                     "description": "A string containing a comparison operator and a value to compare against\n\nThe syntax is `(< OR > OR <= OR >=) <number>`\n\n* EX `> 100`  => greater than 100",
                     "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
                     "type": "string"
+                },
+                "source": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "items": {
+                                "anyOf": [
+                                    {
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "type": "array"
+                                    },
+                                    {
+                                        "enum": [
+                                            "poll",
+                                            "poll:modqueue",
+                                            "poll:newComm",
+                                            "poll:newSub",
+                                            "poll:unmoderated",
+                                            "rerun",
+                                            "user"
+                                        ],
+                                        "type": "string"
+                                    }
+                                ]
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "enum": [
+                                "poll",
+                                "poll:modqueue",
+                                "poll:newComm",
+                                "poll:newSub",
+                                "poll:unmoderated",
+                                "rerun",
+                                "user"
+                            ],
+                            "type": "string"
+                        }
+                    ]
                 },
                 "spam": {
                     "type": "boolean"
@@ -456,12 +582,14 @@
             "enum": [
                 "approve",
                 "ban",
+                "cancelRerun",
                 "comment",
                 "flair",
                 "lock",
                 "message",
                 "remove",
                 "report",
+                "rerun",
                 "userflair",
                 "usernote"
             ],

@@ -33,6 +33,9 @@
                         <div class="space-x-4 px-4 p-2 leading-2 triggeredStateToggle">
                             <div class="flex items-center justify-between">
                                 <div>
+                                    <% if(eRes.rerunSource !== undefined) { %>
+                                        [RERUN]
+                                    <% } %>
                                     <a class="activityLink font-semibold" target="_blank" href="https://reddit.com<%= eRes.activity.link%>"><%= eRes.activity.type === 'comment' ? 'Comment' : 'Submission' %></a>
                                     by <a class="activityLink" target="_blank" href="https://reddit.com/u/<%= eRes.activity.author%>"><%= eRes.activity.author%></a>
                                 </div>
@@ -44,16 +47,30 @@
                         </div>
                         <div class="border-t-2 border-gray-500 triggeredState <%= eRes.triggered ? 'triggered' : 'notTriggered'%>">
                             <div class="m-4 p-2 px-4">
-                                <blockquote class="ml-3 italic" cite="https://reddit.com<%= eRes.activity.link%>">
-                                    "<%- eRes.activity.peek %>"
-                                </blockquote>
-                                <% if(eRes.parentSubmission !== undefined) { %>
-                                    <div class="my-3">in the <a class="activityLink" href="https://reddit.com<%= eRes.parentSubmission.link%>">Submission</a></div>
-                                <blockquote class="ml-3 mb-2 italic" cite="https://reddit.com<%= eRes.parentSubmission.link%>">
-                                    "<%= eRes.parentSubmission.peek%>"
-                                </blockquote>
-                                    by <a class="activityLink" target="_blank" href="https://reddit.com/u/<%= eRes.parentSubmission.author%>"><%= eRes.parentSubmission.author%></a>
+                                <% if(eRes.rerunSource !== undefined) { %>
+                                    <div class="mb-3">
+                                        <div class="font-semibold mb-2">Rerun Summary</div>
+                                        <ul class="list-inside list-disc">
+                                            <li>Dispatched By: <i><%= eRes.rerunSource.action %></i></li>
+                                            <li>Queued At: <i><%= eRes.rerunSource.queuedAt %></i></li>
+                                            <li>Delayed For: <i><%= eRes.rerunSource.delay %></i></li>
+                                            <li>Initial Goto:<i><%= eRes.rerunSource.goto %></i></li>
+                                        </ul>
+                                    </div>
                                 <% } %>
+                                <div class="font-semibold mb-2">Content Summary</div>
+                                <div class="ml-5">
+                                    <blockquote class="ml-4 italic" cite="https://reddit.com<%= eRes.activity.link%>">
+                                        "<%- eRes.activity.peek %>"
+                                    </blockquote>
+                                    <% if(eRes.parentSubmission !== undefined) { %>
+                                        <div class="my-3">in the <a class="activityLink" href="https://reddit.com<%= eRes.parentSubmission.link%>">Submission</a></div>
+                                    <blockquote class="ml-4 mb-2 italic" cite="https://reddit.com<%= eRes.parentSubmission.link%>">
+                                        "<%= eRes.parentSubmission.peek%>"
+                                    </blockquote>
+                                        by <a class="activityLink" target="_blank" href="https://reddit.com/u/<%= eRes.parentSubmission.author%>"><%= eRes.parentSubmission.author%></a>
+                                    <% } %>
+                                </div>
                             </div>
                         <% eRes.runResults.forEach(function (runSum, index) { %>
                         <div class="m-4 p-2 px-4 space-y-2 bg-gray-600 triggeredStateWrapper">

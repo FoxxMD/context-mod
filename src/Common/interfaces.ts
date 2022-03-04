@@ -939,6 +939,9 @@ export interface ActivityState {
      * */
     reports?: CompareValue
     age?: DurationComparor
+
+    rerun?: boolean | string | string[]
+    source?: ActivitySource | ActivitySource[]
 }
 
 /**
@@ -2021,6 +2024,7 @@ export interface ActionedEvent {
     subreddit: string,
     triggered: boolean,
     runResults: RunResult[]
+    rerunSource?: RerunAudit
 }
 
 export interface CheckResult {
@@ -2278,14 +2282,39 @@ export type ActivityType = 'submission' | 'comment';
 export type ItemCritPropHelper = SafeDictionary<FilterCriteriaPropertyResult<(CommentState & SubmissionState)>, keyof (CommentState & SubmissionState)>;
 export type RequiredItemCrit = Required<(CommentState & SubmissionState)>;
 
+export type onExistingFoundBehavior = 'replace' | 'skip' | 'ignore';
+
 export interface ActivityRerunConfig {
     rerunIdentifier?: string
-    cancelIfQueued?: boolean
+    cancelIfQueued?: boolean | NonRerunActivitySource | NonRerunActivitySource[]
     goto?: string
-    duration?: DurationVal
+    onExistingFound?: onExistingFoundBehavior
+    delay: DurationVal
 }
 
 export interface ActivityRerun extends ActivityRerunConfig {
+    id: string
     queuedAt: number
     activity: Submission | Comment
+    duration: Duration
+    processing: boolean
+    action: string
 }
+
+export interface RerunAudit {
+    goto?: string
+    queuedAt: number
+    action: string,
+    delay: string,
+    id: string
+}
+
+export type ActionTarget = 'self' | 'parent';
+
+export type InclusiveActionTarget = ActionTarget | 'any';
+
+export type RerunSource = 'rerun' | `rerun:${string}`;
+
+export type NonRerunActivitySource = 'poll' | `poll:${PollOn}` | 'user';
+
+export type ActivitySource = NonRerunActivitySource | RerunSource;

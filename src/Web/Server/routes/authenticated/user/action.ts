@@ -64,6 +64,7 @@ const action = async (req: Request, res: Response) => {
                             await manager.firehose.push({
                                 activity: a,
                                 options: {
+                                    source: 'user',
                                     force: true,
                                 }
                             });
@@ -74,6 +75,7 @@ const action = async (req: Request, res: Response) => {
                             await manager.firehose.push({
                                 activity: a,
                                 options: {
+                                    source: 'user',
                                     force: true
                                 }
                             });

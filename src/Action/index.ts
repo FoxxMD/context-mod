@@ -8,6 +8,8 @@ import {mergeArr} from "../util";
 import LoggedError from "../Utils/LoggedError";
 import {ExtendedSnoowrap} from '../Utils/SnoowrapClients';
 import {ErrorWithCause} from "pony-cause";
+import EventEmitter from "events";
+import {runCheckOptions} from "../Subreddit/Manager";
 
 export abstract class Action {
     name?: string;
@@ -18,6 +20,7 @@ export abstract class Action {
     itemIs: TypedActivityStates;
     dryRun: boolean;
     enabled: boolean;
+    managerEmitter: EventEmitter;
 
     constructor(options: ActionOptions) {
         const {
@@ -34,6 +37,7 @@ export abstract class Action {
                 exclude = [],
             } = {},
             itemIs = [],
+            emitter,
         } = options;
 
         this.name = name;
@@ -42,6 +46,7 @@ export abstract class Action {
         this.resources = resources;
         this.client = client;
         this.logger = logger.child({labels: [`Action ${this.getActionUniqueName()}`]}, mergeArr);
+        this.managerEmitter = emitter;
 
         this.authorIs = {
             excludeCondition,
@@ -58,7 +63,8 @@ export abstract class Action {
         return this.name === this.getKind() ? this.getKind() : `${this.getKind()} - ${this.name}`;
     }
 
-    async handle(item: Comment | Submission, ruleResults: RuleResult[], runtimeDryrun?: boolean): Promise<ActionResult> {
+    async handle(item: Comment | Submission, ruleResults: RuleResult[], options: runCheckOptions): Promise<ActionResult> {
+        const {dryRun: runtimeDryrun} = options;
         const dryRun = runtimeDryrun || this.dryRun;
 
         let actRes: ActionResult = {
@@ -69,7 +75,7 @@ export abstract class Action {
             success: false,
         };
         try {
-            const [itemPass, itemFilterType, itemFilterResults] = await checkItemFilter(item, this.itemIs, this.resources, this.logger);
+            const [itemPass, itemFilterType, itemFilterResults] = await checkItemFilter(item, this.itemIs, this.resources, this.logger, options.source);
             if (!itemPass) {
                 this.logger.verbose(`Activity did not pass 'itemIs' test, Action not run`);
                 actRes.runReason = `Activity did not pass 'itemIs' test, Action not run`;
@@ -111,6 +117,7 @@ export interface ActionOptions extends ActionConfig {
     subredditName: string;
     resources: SubredditResources;
     client: ExtendedSnoowrap;
+    emitter: EventEmitter
 }
 
 export interface ActionConfig extends ChecksActivityState {
@@ -157,7 +164,7 @@ export interface ActionJson extends ActionConfig {
     /**
      * The type of action that will be performed
      */
-    kind: 'comment' | 'lock' | 'remove' | 'report' | 'approve' | 'ban' | 'flair' | 'usernote' | 'message' | 'userflair'
+    kind: 'comment' | 'lock' | 'remove' | 'report' | 'approve' | 'ban' | 'flair' | 'usernote' | 'message' | 'userflair' | 'rerun' | 'cancelRerun'
 }
 
 export const isActionJson = (obj: object): obj is ActionJson => {

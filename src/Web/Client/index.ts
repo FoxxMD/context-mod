@@ -988,7 +988,7 @@ const webClient = async (options: OperatorConfig) => {
         }).json() as [any];
 
         const actionedEvents = resp.map((x: ActionedEvent) => {
-            const {timestamp, activity: {peek, link, ...restAct}, runResults = [], ...rest} = x;
+            const {timestamp, activity: {peek, link, ...restAct}, runResults = [], rerunSource, ...rest} = x;
             const time = dayjs(timestamp).local().format('YY-MM-DD HH:mm:ss z');
             const formattedPeek = Autolinker.link(peek.replace(`https://reddit.com${link}`, ''), {
                 email: false,
@@ -1048,7 +1048,12 @@ const webClient = async (options: OperatorConfig) => {
                     ...formatFilterData(summ)
                 }
             });
+            let rrSource = rerunSource === undefined ? rerunSource : {
+                ...rerunSource,
+                queuedAt: dayjs.unix(rerunSource.queuedAt).local().format('YY-MM-DD HH:mm:ss z')
+            }
             return {
+                rerunSource: rrSource,
                 ...rest,
                 timestamp: time,
                 activity: {

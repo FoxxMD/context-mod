@@ -12,30 +12,37 @@ import {MessageAction, MessageActionJson} from "./MessageAction";
 import {SubredditResources} from "../Subreddit/SubredditResources";
 import {UserFlairAction, UserFlairActionJson} from './UserFlairAction';
 import {ExtendedSnoowrap} from '../Utils/SnoowrapClients';
+import EventEmitter from "events";
+import {RerunAction, RerunActionJson} from "./RerunAction";
+import {CancelRerunAction, CancelRerunActionJson} from "./CancelRerunAction";
 
 export function actionFactory
-(config: ActionJson, logger: Logger, subredditName: string, resources: SubredditResources, client: ExtendedSnoowrap): Action {
+(config: ActionJson, logger: Logger, subredditName: string, resources: SubredditResources, client: ExtendedSnoowrap, emitter: EventEmitter): Action {
     switch (config.kind) {
         case 'comment':
-            return new CommentAction({...config as CommentActionJson, logger, subredditName, resources, client});
+            return new CommentAction({...config as CommentActionJson, logger, subredditName, resources, client, emitter});
         case 'lock':
-            return new LockAction({...config, logger, subredditName, resources, client});
+            return new LockAction({...config, logger, subredditName, resources, client, emitter});
         case 'remove':
-            return new RemoveAction({...config, logger, subredditName, resources, client});
+            return new RemoveAction({...config, logger, subredditName, resources, client, emitter});
         case 'report':
-            return new ReportAction({...config as ReportActionJson, logger, subredditName, resources, client});
+            return new ReportAction({...config as ReportActionJson, logger, subredditName, resources, client, emitter});
         case 'flair':
-            return new FlairAction({...config as FlairActionJson, logger, subredditName, resources, client});
+            return new FlairAction({...config as FlairActionJson, logger, subredditName, resources, client, emitter});
         case 'userflair':
-            return new UserFlairAction({...config as UserFlairActionJson, logger, subredditName, resources, client});
+            return new UserFlairAction({...config as UserFlairActionJson, logger, subredditName, resources, client, emitter});
         case 'approve':
-            return new ApproveAction({...config as ApproveActionConfig, logger, subredditName, resources, client});
+            return new ApproveAction({...config as ApproveActionConfig, logger, subredditName, resources, client, emitter});
         case 'usernote':
-            return new UserNoteAction({...config as UserNoteActionJson, logger, subredditName, resources, client});
+            return new UserNoteAction({...config as UserNoteActionJson, logger, subredditName, resources, client, emitter});
         case 'ban':
-            return new BanAction({...config as BanActionJson, logger, subredditName, resources, client});
+            return new BanAction({...config as BanActionJson, logger, subredditName, resources, client, emitter});
         case 'message':
-            return new MessageAction({...config as MessageActionJson, logger, subredditName, resources, client});
+            return new MessageAction({...config as MessageActionJson, logger, subredditName, resources, client, emitter});
+        case 'rerun':
+            return new RerunAction({...config as RerunActionJson, logger, subredditName, resources, client, emitter});
+        case 'cancelRerun':
+            return new CancelRerunAction({...config as CancelRerunActionJson, logger, subredditName, resources, client, emitter})
         default:
             throw new Error('rule "kind" was not recognized.');
     }

@@ -1023,6 +1023,120 @@
             ],
             "type": "string"
         },
+        "CancelRerunActionJson": {
+            "description": "Remove the Activity",
+            "properties": {
+                "authorIs": {
+                    "$ref": "#/definitions/AuthorOptions",
+                    "description": "If present then these Author criteria are checked before running the Action. If criteria fails then the Action is not run.",
+                    "examples": [
+                        {
+                            "include": [
+                                {
+                                    "flairText": [
+                                        "Contributor",
+                                        "Veteran"
+                                    ]
+                                },
+                                {
+                                    "isMod": true
+                                }
+                            ]
+                        }
+                    ]
+                },
+                "dryRun": {
+                    "default": false,
+                    "description": "If `true` the Action will not make the API request to Reddit to perform its action.",
+                    "examples": [
+                        false,
+                        true
+                    ],
+                    "type": "boolean"
+                },
+                "enable": {
+                    "default": true,
+                    "description": "If set to `false` the Action will not be run",
+                    "examples": [
+                        true
+                    ],
+                    "type": "boolean"
+                },
+                "itemIs": {
+                    "description": "A list of criteria to test the state of the `Activity` against before running the Action.\n\nIf any set of criteria passes the Action will be run.",
+                    "items": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/definitions/SubmissionState"
+                            },
+                            {
+                                "$ref": "#/definitions/CommentState"
+                            }
+                        ]
+                    },
+                    "type": "array"
+                },
+                "kind": {
+                    "description": "The type of action that will be performed",
+                    "enum": [
+                        "cancelRerun"
+                    ],
+                    "type": "string"
+                },
+                "name": {
+                    "description": "An optional, but highly recommended, friendly name for this Action. If not present will default to `kind`.\n\nCan only contain letters, numbers, underscore, spaces, and dashes",
+                    "examples": [
+                        "myDescriptiveAction"
+                    ],
+                    "pattern": "^[a-zA-Z]([\\w -]*[\\w])?$",
+                    "type": "string"
+                },
+                "rerunIdentifier": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": [
+                                "null",
+                                "string"
+                            ]
+                        }
+                    ]
+                },
+                "target": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "enum": [
+                                    "any",
+                                    "parent",
+                                    "self"
+                                ],
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "enum": [
+                                "any",
+                                "parent",
+                                "self"
+                            ],
+                            "type": "string"
+                        }
+                    ]
+                }
+            },
+            "required": [
+                "kind",
+                "target"
+            ],
+            "type": "object"
+        },
         "CommentActionJson": {
             "description": "Reply to the Activity. For a submission the reply will be a top-level comment.",
             "properties": {
@@ -1147,22 +1261,16 @@
                     "items": {
                         "anyOf": [
                             {
-                                "$ref": "#/definitions/FlairActionJson"
-                            },
-                            {
-                                "$ref": "#/definitions/UserFlairActionJson"
-                            },
-                            {
                                 "$ref": "#/definitions/CommentActionJson"
-                            },
-                            {
-                                "$ref": "#/definitions/ReportActionJson"
                             },
                             {
                                 "$ref": "#/definitions/LockActionJson"
                             },
                             {
                                 "$ref": "#/definitions/RemoveActionJson"
+                            },
+                            {
+                                "$ref": "#/definitions/ReportActionJson"
                             },
                             {
                                 "$ref": "#/definitions/UserNoteActionJson"
@@ -1177,11 +1285,22 @@
                                 "$ref": "#/definitions/MessageActionJson"
                             },
                             {
+                                "$ref": "#/definitions/UserFlairActionJson"
+                            },
+                            {
+                                "$ref": "#/definitions/RerunActionJson"
+                            },
+                            {
+                                "$ref": "#/definitions/CancelRerunActionJson"
+                            },
+                            {
+                                "$ref": "#/definitions/FlairActionJson"
+                            },
+                            {
                                 "type": "string"
                             }
                         ]
                     },
-                    "minItems": 1,
                     "type": "array"
                 },
                 "authorIs": {
@@ -1315,7 +1434,6 @@
                 }
             },
             "required": [
-                "actions",
                 "kind",
                 "name"
             ],
@@ -1367,10 +1485,73 @@
                     "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
                     "type": "string"
                 },
+                "rerun": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
+                        }
+                    ]
+                },
                 "score": {
                     "description": "A string containing a comparison operator and a value to compare against\n\nThe syntax is `(< OR > OR <= OR >=) <number>`\n\n* EX `> 100`  => greater than 100",
                     "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
                     "type": "string"
+                },
+                "source": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "items": {
+                                "anyOf": [
+                                    {
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "type": "array"
+                                    },
+                                    {
+                                        "enum": [
+                                            "poll",
+                                            "poll:modqueue",
+                                            "poll:newComm",
+                                            "poll:newSub",
+                                            "poll:unmoderated",
+                                            "rerun",
+                                            "user"
+                                        ],
+                                        "type": "string"
+                                    }
+                                ]
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "enum": [
+                                "poll",
+                                "poll:modqueue",
+                                "poll:newComm",
+                                "poll:newSub",
+                                "poll:unmoderated",
+                                "rerun",
+                                "user"
+                            ],
+                            "type": "string"
+                        }
+                    ]
                 },
                 "spam": {
                     "type": "boolean"
@@ -3118,6 +3299,157 @@
             ],
             "type": "object"
         },
+        "RerunActionJson": {
+            "description": "Remove the Activity",
+            "properties": {
+                "authorIs": {
+                    "$ref": "#/definitions/AuthorOptions",
+                    "description": "If present then these Author criteria are checked before running the Action. If criteria fails then the Action is not run.",
+                    "examples": [
+                        {
+                            "include": [
+                                {
+                                    "flairText": [
+                                        "Contributor",
+                                        "Veteran"
+                                    ]
+                                },
+                                {
+                                    "isMod": true
+                                }
+                            ]
+                        }
+                    ]
+                },
+                "cancelIfQueued": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "enum": [
+                                    "poll",
+                                    "poll:modqueue",
+                                    "poll:newComm",
+                                    "poll:newSub",
+                                    "poll:unmoderated",
+                                    "user"
+                                ],
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "enum": [
+                                false,
+                                "poll",
+                                "poll:modqueue",
+                                "poll:newComm",
+                                "poll:newSub",
+                                "poll:unmoderated",
+                                true,
+                                "user"
+                            ]
+                        }
+                    ]
+                },
+                "delay": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/definitions/DurationObject"
+                        },
+                        {
+                            "type": "string"
+                        }
+                    ]
+                },
+                "dryRun": {
+                    "default": false,
+                    "description": "If `true` the Action will not make the API request to Reddit to perform its action.",
+                    "examples": [
+                        false,
+                        true
+                    ],
+                    "type": "boolean"
+                },
+                "enable": {
+                    "default": true,
+                    "description": "If set to `false` the Action will not be run",
+                    "examples": [
+                        true
+                    ],
+                    "type": "boolean"
+                },
+                "goto": {
+                    "type": "string"
+                },
+                "itemIs": {
+                    "description": "A list of criteria to test the state of the `Activity` against before running the Action.\n\nIf any set of criteria passes the Action will be run.",
+                    "items": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/definitions/SubmissionState"
+                            },
+                            {
+                                "$ref": "#/definitions/CommentState"
+                            }
+                        ]
+                    },
+                    "type": "array"
+                },
+                "kind": {
+                    "description": "The type of action that will be performed",
+                    "enum": [
+                        "rerun"
+                    ],
+                    "type": "string"
+                },
+                "name": {
+                    "description": "An optional, but highly recommended, friendly name for this Action. If not present will default to `kind`.\n\nCan only contain letters, numbers, underscore, spaces, and dashes",
+                    "examples": [
+                        "myDescriptiveAction"
+                    ],
+                    "pattern": "^[a-zA-Z]([\\w -]*[\\w])?$",
+                    "type": "string"
+                },
+                "onExistingFound": {
+                    "enum": [
+                        "ignore",
+                        "replace",
+                        "skip"
+                    ],
+                    "type": "string"
+                },
+                "rerunIdentifier": {
+                    "type": "string"
+                },
+                "target": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "enum": [
+                                    "parent",
+                                    "self"
+                                ],
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "enum": [
+                                "parent",
+                                "self"
+                            ],
+                            "type": "string"
+                        }
+                    ]
+                }
+            },
+            "required": [
+                "delay",
+                "kind",
+                "target"
+            ],
+            "type": "object"
+        },
         "RuleSetJson": {
             "description": "A RuleSet is a \"nested\" set of `Rule` objects that can be used to create more complex AND/OR behavior. Think of the outcome of a `RuleSet` as the result of all of its run `Rule` objects (based on `condition`)",
             "properties": {
@@ -3388,22 +3720,16 @@
                     "items": {
                         "anyOf": [
                             {
-                                "$ref": "#/definitions/FlairActionJson"
-                            },
-                            {
-                                "$ref": "#/definitions/UserFlairActionJson"
-                            },
-                            {
                                 "$ref": "#/definitions/CommentActionJson"
-                            },
-                            {
-                                "$ref": "#/definitions/ReportActionJson"
                             },
                             {
                                 "$ref": "#/definitions/LockActionJson"
                             },
                             {
                                 "$ref": "#/definitions/RemoveActionJson"
+                            },
+                            {
+                                "$ref": "#/definitions/ReportActionJson"
                             },
                             {
                                 "$ref": "#/definitions/UserNoteActionJson"
@@ -3418,11 +3744,22 @@
                                 "$ref": "#/definitions/MessageActionJson"
                             },
                             {
+                                "$ref": "#/definitions/UserFlairActionJson"
+                            },
+                            {
+                                "$ref": "#/definitions/RerunActionJson"
+                            },
+                            {
+                                "$ref": "#/definitions/CancelRerunActionJson"
+                            },
+                            {
+                                "$ref": "#/definitions/FlairActionJson"
+                            },
+                            {
                                 "type": "string"
                             }
                         ]
                     },
-                    "minItems": 1,
                     "type": "array"
                 },
                 "authorIs": {
@@ -3556,7 +3893,6 @@
                 }
             },
             "required": [
-                "actions",
                 "kind",
                 "name"
             ],
@@ -3652,10 +3988,73 @@
                     "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
                     "type": "string"
                 },
+                "rerun": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
+                        }
+                    ]
+                },
                 "score": {
                     "description": "A string containing a comparison operator and a value to compare against\n\nThe syntax is `(< OR > OR <= OR >=) <number>`\n\n* EX `> 100`  => greater than 100",
                     "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
                     "type": "string"
+                },
+                "source": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "items": {
+                                "anyOf": [
+                                    {
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "type": "array"
+                                    },
+                                    {
+                                        "enum": [
+                                            "poll",
+                                            "poll:modqueue",
+                                            "poll:newComm",
+                                            "poll:newSub",
+                                            "poll:unmoderated",
+                                            "rerun",
+                                            "user"
+                                        ],
+                                        "type": "string"
+                                    }
+                                ]
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "enum": [
+                                "poll",
+                                "poll:modqueue",
+                                "poll:newComm",
+                                "poll:newSub",
+                                "poll:unmoderated",
+                                "rerun",
+                                "user"
+                            ],
+                            "type": "string"
+                        }
+                    ]
                 },
                 "spam": {
                     "type": "boolean"

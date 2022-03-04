@@ -20,7 +20,7 @@ import {
     isActivityWindowCriteria, isSubmission, isUserNoteCriteria,
     normalizeName,
     parseDuration,
-    parseDurationComparison,
+    parseDurationComparison, parseDurationValToDuration,
     parseGenericValueComparison,
     parseGenericValueOrPercentComparison,
     parseRuleResultsToMarkdownSummary, parseStringToRegex,
@@ -126,21 +126,7 @@ export async function getActivities(listingFunc: (limit: number) => Promise<List
 
     if (durVal !== undefined) {
         const endTime = dayjs();
-        if (typeof durVal === 'object') {
-            duration = dayjs.duration(durVal);
-            if (!dayjs.isDuration(duration)) {
-                throw new Error('window value given was not a well-formed Duration object');
-            }
-        } else {
-            try {
-                duration = parseDuration(durVal);
-            } catch (e) {
-                if (e instanceof InvalidRegexError) {
-                    throw new Error(`window value of '${durVal}' could not be parsed as a valid ISO8601 duration or DayJS duration shorthand (see Schema)`);
-                }
-                throw e;
-            }
-        }
+        const duration = parseDurationValToDuration(durVal);
         satisfiedEndtime = endTime.subtract(duration.asMilliseconds(), 'milliseconds');
     }
 

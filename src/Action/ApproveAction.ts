@@ -2,13 +2,13 @@ import {ActionJson, ActionConfig, ActionOptions} from "./index";
 import Action from "./index";
 import Snoowrap from "snoowrap";
 import {RuleResult} from "../Rule";
-import {ActionProcessResult} from "../Common/interfaces";
+import {ActionProcessResult, ActionTarget} from "../Common/interfaces";
 import Submission from "snoowrap/dist/objects/Submission";
 import Comment from "snoowrap/dist/objects/Comment";
 
 export class ApproveAction extends Action {
 
-    targets: ApproveTarget[]
+    targets: ActionTarget[]
 
     getKind() {
         return 'Approve';
@@ -75,8 +75,6 @@ export class ApproveAction extends Action {
     }
 }
 
-export type ApproveTarget = 'self' | 'parent';
-
 export interface ApproveOptions extends ApproveActionConfig, ActionOptions {}
 
 export interface ApproveActionConfig extends ActionConfig {
@@ -88,7 +86,7 @@ export interface ApproveActionConfig extends ActionConfig {
      * * self => approve activity being checked (comment)
      * * parent => approve parent (submission) of activity being checked (comment)
      * */
-    targets?: ApproveTarget[]
+    targets?: ActionTarget[]
 }
 
 /**

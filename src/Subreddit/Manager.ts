@@ -23,11 +23,32 @@ import {RuleResult} from "../Rule";
 import {ConfigBuilder, buildPollingOptions} from "../ConfigBuilder";
 import {
     ActionedEvent,
-    ActionResult, ActivityRerun, CheckResult, CheckSummary,
+    ActionResult,
+    ActivityRerun,
+    ActivitySource,
+    CheckResult,
+    CheckSummary,
     DEFAULT_POLLING_INTERVAL,
-    DEFAULT_POLLING_LIMIT, FilterCriteriaDefaults, Invokee, LogInfo,
-    ManagerOptions, ManagerStateChangeOption, ManagerStats, NotificationEventPayload, PAUSED,
-    PollingOptionsStrong, PollOn, PostBehavior, PostBehaviorTypes, RUNNING, RunResult, RunState, STOPPED, SYSTEM, USER
+    DEFAULT_POLLING_LIMIT,
+    FilterCriteriaDefaults,
+    Invokee,
+    LogInfo,
+    ManagerOptions,
+    ManagerStateChangeOption,
+    ManagerStats,
+    NotificationEventPayload,
+    PAUSED,
+    PollingOptionsStrong,
+    PollOn,
+    PostBehavior,
+    PostBehaviorTypes, RerunAudit,
+    RerunSource,
+    RUNNING,
+    RunResult,
+    RunState,
+    STOPPED,
+    SYSTEM,
+    USER
 } from "../Common/interfaces";
 import Submission from "snoowrap/dist/objects/Submission";
 import {activityIsRemoved, itemContentPeek} from "../Utils/SnoowrapUtils";
@@ -67,11 +88,14 @@ export interface runCheckOptions {
     force?: boolean,
     gotoContext?: string
     maxGotoDepth?: number
+    source: ActivitySource
+    initialGoto?: string
+    rerunSource?: RerunAudit
 }
 
 export interface CheckTask {
     activity: (Submission | Comment),
-    options?: runCheckOptions
+    options: runCheckOptions
 }
 
 export interface RuntimeManagerOptions extends ManagerOptions {
@@ -128,7 +152,6 @@ export class Manager extends EventEmitter {
     // 2) if currently processing then re-queue but also refresh before processing
     firehose: QueueObject<CheckTask>;
     queuedItemsMeta: QueuedIdentifier[] = [];
-    delayedItems: ActivityRerun[] = [];
     globalMaxWorkers: number;
     subMaxWorkers?: number;
     maxGotoDepth: number;
@@ -369,18 +392,43 @@ export class Manager extends EventEmitter {
                 this.queuedItemsMeta.push({id: task.activity.id, shouldRefresh: false, state: 'queued'});
                 this.queue.push(task);
             }
+
+            if(!task.options.source.includes('rerun')) {
+                // check for delayed items to cancel
+                const existingDelayedToCancel = this.resources.delayedItems.filter(x => {
+                    if (x.activity.name === task.activity.name) {
+                        const {cancelIfQueued = false} = x;
+                        if(cancelIfQueued === false) {
+                            return false;
+                        } else if (cancelIfQueued === true) {
+                            return true;
+                        } else {
+                            const cancelFrom = !Array.isArray(cancelIfQueued) ? [cancelIfQueued] : cancelIfQueued;
+                            return cancelFrom.map(x => x.toLowerCase()).includes(task.options.source.toLowerCase());
+                        }
+                    }
+                });
+                if(existingDelayedToCancel.length > 0) {
+                    this.logger.debug(`Cancelling existing delayed activities due to activity being queued from non-rerun sources: ${existingDelayedToCancel.map((x, index) => `[${index + 1}] Queued At ${dayjs.unix(x.queuedAt).format('YYYY-MM-DD HH:mm:ssZ')} for ${x.duration.humanize()}`).join(' ')}`);
+                    const toCancelIds = existingDelayedToCancel.map(x => x.id);
+                    this.resources.delayedItems.filter(x => !toCancelIds.includes(x.id));
+                }
+            }
         }
         , 1);
     }
 
     protected async startDelayQueue() {
         while(this.queueState.state === RUNNING) {
-            for(const ar of this.delayedItems) {
-                if(dayjs.unix(ar.queuedAt).add(ar.duration).isSameOrBefore(dayjs())) {
+            let index = 0;
+            for(const ar of this.resources.delayedItems) {
+                if(!ar.processing && dayjs.unix(ar.queuedAt).add(ar.duration.asMilliseconds(), 'milliseconds').isSameOrBefore(dayjs())) {
                     this.logger.info(`Delayed Activity ${ar.activity.name} is being queued.`);
-                    await this.queue.push({activity: ar.activity, options: {refresh: true}});
-                    this.delayedItems = this.delayedItems.filter(x => x.activity !== ar.activity);
+                    const rerunStr: RerunSource = ar.rerunIdentifier === undefined ? 'rerun' : `rerun:${ar.rerunIdentifier}`;
+                    await this.firehose.push({activity: ar.activity, options: {refresh: true, source: rerunStr, initialGoto: ar.goto, rerunSource: {id: ar.id, queuedAt: ar.queuedAt, delay: ar.duration.humanize(), action: ar.action, goto: ar.goto}}});
+                    this.resources.delayedItems.splice(index, 1, {...ar, processing: true});
                 }
+                index++;
             }
             // sleep for 5 seconds
             await sleep(5000);
@@ -402,10 +450,14 @@ export class Manager extends EventEmitter {
                 try {
                     const itemMeta = this.queuedItemsMeta[queuedItemIndex];
                     this.queuedItemsMeta.splice(queuedItemIndex, 1, {...itemMeta, state: 'processing'});
-                    await this.handleActivity(task.activity, {...task.options, refresh: itemMeta.shouldRefresh});
+                    await this.handleActivity(task.activity, {refresh: itemMeta.shouldRefresh, ...task.options});
                 } finally {
                     // always remove item meta regardless of success or failure since we are done with it meow
                     this.queuedItemsMeta.splice(queuedItemIndex, 1);
+                    if(task.options.rerunSource?.id !== undefined) {
+                        const delayIndex = this.resources.delayedItems.findIndex(x => x.id === task.options.rerunSource?.id);
+                        this.resources.delayedItems.splice(delayIndex, 1);
+                    }
                 }
             }
             , maxWorkers);
@@ -674,13 +726,13 @@ export class Manager extends EventEmitter {
         }
     }
 
-    async handleActivity(activity: (Submission | Comment), options?: runCheckOptions): Promise<void> {
+    async handleActivity(activity: (Submission | Comment), options: runCheckOptions): Promise<void> {
         const checkType = isSubmission(activity) ? 'Submission' : 'Comment';
         let item = activity;
         const itemId = await item.id;
 
         if(await this.resources.hasRecentSelf(item)) {
-            const {force = false} = options || {};
+            const {force = false} = options;
             let recentMsg = `Found in Activities recently (last ${this.resources.selfTTL} seconds) modified/created by this bot`;
             if(force) {
                 this.logger.debug(`${recentMsg} but will run anyway because "force" option was true.`);
@@ -690,10 +742,21 @@ export class Manager extends EventEmitter {
             }
         }
 
+        const {
+            delayUntil,
+            refresh = false,
+            initialGoto = '',
+            rerunSource,
+        } = options;
+
         let allRuleResults: RuleResult[] = [];
         const runResults: RunResult[] = [];
-        const itemIdentifier = `${checkType === 'Submission' ? 'SUB' : 'COM'} ${itemId}`;
-        this.currentLabels = [itemIdentifier];
+        const itemIdentifiers = [];
+        if(rerunSource !== undefined) {
+            itemIdentifiers.push(`RERUN ${rerunSource.action}`);
+        }
+        itemIdentifiers.push(`${checkType === 'Submission' ? 'SUB' : 'COM'} ${itemId}`);
+        this.currentLabels = itemIdentifiers;
         let ePeek = '';
         try {
             const [peek, { content: peekContent }] = await itemContentPeek(item);
@@ -714,15 +777,11 @@ export class Manager extends EventEmitter {
                 author: item.author.name,
                 subreddit: item.subreddit_name_prefixed
             },
+            rerunSource,
             timestamp: Date.now(),
             runResults: []
         }
         const startingApiLimit = this.client.ratelimitRemaining;
-
-        const {
-            delayUntil,
-            refresh = false,
-        } = options || {};
 
         let wasRefreshed = false;
 
@@ -742,7 +801,7 @@ export class Manager extends EventEmitter {
             // refresh signal from firehose if activity was ingested multiple times before processing or re-queued while processing
             // want to make sure we have the most recent data
             if(!wasRefreshed && refresh === true) {
-                this.logger.verbose('Refreshed data (probably due to signal from firehose)');
+                this.logger.verbose(`Refreshed data ${rerunSource !== undefined ? 'b/c activity is a rerun' : 'b/c activity was delayed'}`);
                 // @ts-ignore
                 item = await activity.refresh();
             }
@@ -763,7 +822,7 @@ export class Manager extends EventEmitter {
 
             let continueRunIteration = true;
             let runIndex = 0;
-            let gotoContext: string = '';
+            let gotoContext: string = initialGoto;
             while(continueRunIteration && (runIndex < this.runs.length || gotoContext !== '')) {
                 let currRun: Run;
                 if(gotoContext !== '') {
@@ -977,7 +1036,7 @@ export class Manager extends EventEmitter {
                     continue;
                 }
 
-                const onItem = async (item: Comment | Submission) => {
+                const onItem = (source: PollOn) => async (item: Comment | Submission) => {
                     if (item.subreddit.display_name !== subName || this.eventsState.state !== RUNNING) {
                         return;
                     }
@@ -990,7 +1049,7 @@ export class Manager extends EventEmitter {
                         checkType = 'Comment';
                     }
                     if (checkType !== undefined) {
-                        this.firehose.push({activity: item, options: {delayUntil}})
+                        this.firehose.push({activity: item, options: {delayUntil, source: `poll:${source}`}})
                     }
                 };
 
@@ -1006,7 +1065,7 @@ export class Manager extends EventEmitter {
                         stream.once('listing', this.noChecksWarning(source));
                         this.logger.debug(`${removedOwn ? 'Stopped own polling and replace with ' : 'Set '}listener on shared polling ${source}`);
                     }
-                    this.sharedStreamCallbacks.set(source, onItem);
+                    this.sharedStreamCallbacks.set(source, onItem(source));
                 } else {
                     let ownPollingMsgParts: string[] = [];
                     let removedShared = false;
@@ -1029,7 +1088,7 @@ export class Manager extends EventEmitter {
 
                     this.logger.debug(`Polling ${source.toUpperCase()} => ${ownPollingMsgParts.join('and')} dedicated stream`);
 
-                    stream.on('item', onItem);
+                    stream.on('item', onItem(source));
                     // @ts-ignore
                     stream.on('error', async (err: any) => {
 

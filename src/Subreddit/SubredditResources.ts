@@ -22,9 +22,9 @@ import {
     createCacheManager,
     createHistoricalStatsDisplay, escapeRegex, FAIL,
     fetchExternalUrl, filterCriteriaSummary,
-    formatNumber,
+    formatNumber, generateItemFilterHelpers,
     getActivityAuthorName,
-    getActivitySubredditName,
+    getActivitySubredditName, isComment, isCommentState,
     isStrongSubredditState, isSubmission, isUser,
     mergeArr,
     parseDurationComparison,
@@ -60,7 +60,12 @@ import {
     ThirdPartyCredentialsJsonConfig,
     FilterCriteriaResult,
     FilterResult,
-    TypedActivityState, RequiredItemCrit, ItemCritPropHelper,
+    TypedActivityState,
+    RequiredItemCrit,
+    ItemCritPropHelper,
+    ActivityRerun,
+    FilterCriteriaPropertyResult,
+    ActivitySource,
 } from "../Common/interfaces";
 import UserNotes from "./UserNotes";
 import Mustache from "mustache";
@@ -100,6 +105,7 @@ interface SubredditResourceOptions extends Footer {
     prefix?: string;
     actionedEventsMax: number;
     thirdPartyCredentials: ThirdPartyCredentialsJsonConfig
+    delayedItems?: ActivityRerun[]
 }
 
 export interface SubredditResourceSetOptions extends CacheConfig, Footer {
@@ -129,6 +135,7 @@ export class SubredditResources {
     prefix?: string
     actionedEventsMax: number;
     thirdPartyCredentials: ThirdPartyCredentialsJsonConfig;
+    delayedItems: ActivityRerun[] = [];
 
     stats: {
         cache: ResourceStats
@@ -156,8 +163,10 @@ export class SubredditResources {
             cacheSettingsHash,
             client,
             thirdPartyCredentials,
+            delayedItems = [],
         } = options || {};
 
+        this.delayedItems = delayedItems;
         this.cacheSettingsHash = cacheSettingsHash;
         this.cache = cache;
         this.prefix = prefix;
@@ -870,7 +879,7 @@ export class SubredditResources {
         return await testAuthorCriteria(item, authorOpts, include, this.userNotes);
     }
 
-    async testItemCriteria(i: (Comment | Submission), activityState: TypedActivityState, logger: Logger): Promise<FilterCriteriaResult<TypedActivityState>> {
+    async testItemCriteria(i: (Comment | Submission), activityState: TypedActivityState, logger: Logger, source?: ActivitySource): Promise<FilterCriteriaResult<TypedActivityState>> {
         if(Object.keys(activityState).length === 0) {
             return {
                 behavior: 'include',
@@ -881,21 +890,60 @@ export class SubredditResources {
         }
         if (this.filterCriteriaTTL !== false) {
             let item = i;
-            let state = activityState;
+            const {rerun, source: stateSource, ...rest} = activityState;
+            let state = rest;
+
+            // if using cache and rerun is present we want to test for it separately from the rest of the state
+            // because it can change independently from the rest of the activity criteria (its only related to CM!) so storing in cache would make everything potentially stale
+            // -- additionally we keep that data in-memory (for now??) so its always accessible and doesn't need to be stored in cache
+            let runtimeRes: FilterCriteriaResult<(SubmissionState & CommentState)> | undefined;
+            if(rerun !== undefined || stateSource !== undefined) {
+                runtimeRes = await this.isItem(item, {rerun, source: stateSource}, logger, source);
+                if(!runtimeRes.passed) {
+                    // if rerun does not pass can return early and avoid testing the rest of the item
+                    const [propResultsMap, definedStateCriteria] = generateItemFilterHelpers(rest);
+                    if(rerun !== undefined) {
+                        propResultsMap.rerun = runtimeRes.propertyResults.find(x => x.property === 'rerun');
+                    }
+                    if(stateSource !== undefined) {
+                        propResultsMap.source = runtimeRes.propertyResults.find(x => x.property === 'source');
+                    }
+
+                    return {
+                        behavior: 'include',
+                        criteria: activityState,
+                        propertyResults: Object.values(propResultsMap),
+                        passed: false
+                    }
+                }
+            }
 
             try {
+                // only cache non-runtime state and results
                 const hash = `itemCrit-${item.name}-${objectHash.sha1(state)}`;
                 await this.stats.cache.itemCrit.identifierRequestCount.set(hash, (await this.stats.cache.itemCrit.identifierRequestCount.wrap(hash, () => 0) as number) + 1);
                 this.stats.cache.itemCrit.requestTimestamps.push(Date.now());
                 this.stats.cache.itemCrit.requests++;
-                const cachedItem = await this.cache.get(hash);
-                if (cachedItem !== undefined && cachedItem !== null) {
+                let itemResult = await this.cache.get(hash) as FilterCriteriaResult<TypedActivityState> | undefined | null;
+                if (itemResult !== undefined && itemResult !== null) {
                     this.logger.debug(`Cache Hit: Item Check on ${item.name} (Hash ${hash})`);
                     //return cachedItem as boolean;
+                } else {
+                    itemResult = await this.isItem(item, state, logger);
                 }
-                const itemResult = await this.isItem(item, state, logger);
                 this.stats.cache.itemCrit.miss++;
                 await this.cache.set(hash, itemResult, {ttl: this.filterCriteriaTTL});
+
+                // add in runtime results, if present
+                if(runtimeRes !== undefined) {
+                    if(rerun !== undefined) {
+                        itemResult.propertyResults.push(runtimeRes.propertyResults.find(x => x.property === 'rerun') as FilterCriteriaPropertyResult<TypedActivityState>);
+                    }
+                    if(stateSource !== undefined) {
+                        itemResult.propertyResults.push(runtimeRes.propertyResults.find(x => x.property === 'source') as FilterCriteriaPropertyResult<TypedActivityState>);
+                    }
+                }
+
                 return itemResult;
             } catch (err: any) {
                 if (err.logged !== true) {
@@ -905,7 +953,7 @@ export class SubredditResources {
             }
         }
 
-        return await this.isItem(i, activityState, logger);
+        return await this.isItem(i, activityState, logger, source);
     }
 
     async isSubreddit (subreddit: Subreddit, stateCriteriaRaw: SubredditState | StrongSubredditState, logger: Logger) {
@@ -971,9 +1019,11 @@ export class SubredditResources {
         })() as boolean;
     }
 
-    async isItem (item: Submission | Comment, stateCriteria: TypedActivityState, logger: Logger): Promise<FilterCriteriaResult<(SubmissionState & CommentState)>> {
+    async isItem (item: Submission | Comment, stateCriteria: TypedActivityState, logger: Logger, source?: ActivitySource): Promise<FilterCriteriaResult<(SubmissionState & CommentState)>> {
 
-        const definedStateCriteria = (removeUndefinedKeys(stateCriteria) as RequiredItemCrit);
+        //const definedStateCriteria = (removeUndefinedKeys(stateCriteria) as RequiredItemCrit);
+
+        const [propResultsMap, definedStateCriteria] = generateItemFilterHelpers(stateCriteria);
 
         const log = logger.child({leaf: 'Item Check'}, mergeArr);
 
@@ -986,14 +1036,14 @@ export class SubredditResources {
             }
         }
 
-        const propResultsMap = Object.entries(definedStateCriteria).reduce((acc: ItemCritPropHelper, [k, v]) => {
-            const key = (k as keyof (SubmissionState & CommentState));
-            acc[key] = {
-                property: key,
-                behavior: 'include',
-            };
-            return acc;
-        }, {});
+        // const propResultsMap = Object.entries(definedStateCriteria).reduce((acc: ItemCritPropHelper, [k, v]) => {
+        //     const key = (k as keyof (SubmissionState & CommentState));
+        //     acc[key] = {
+        //         property: key,
+        //         behavior: 'include',
+        //     };
+        //     return acc;
+        // }, {});
 
         const keys = Object.keys(propResultsMap) as (keyof (SubmissionState & CommentState))[]
 
@@ -1014,25 +1064,62 @@ export class SubredditResources {
                             propResultsMap.submissionState!.reason = subMsg;
                             break;
                         }
-                        // get submission
-                        // @ts-ignore
-                        const subProxy = await this.client.getSubmission(await item.link_id);
-                        // @ts-ignore
-                        const sub = await this.getActivity(subProxy);
-
-                        const subStates = itemOptVal as RequiredItemCrit['submissionState'];
-                        // @ts-ignore
-                        const subResults = [];
-                        for(const subState of subStates) {
-                            subResults.push(await this.testItemCriteria(sub, subState as SubmissionState, logger))
+                    //     // get submission
+                    //     // @ts-ignore
+                    //     const subProxy = await this.client.getSubmission(await item.link_id);
+                    //     // @ts-ignore
+                    //     const sub = await this.getActivity(subProxy);
+                    //
+                    //     const subStates = itemOptVal as RequiredItemCrit['submissionState'];
+                    //     // @ts-ignore
+                    //     const subResults = [];
+                    //     for(const subState of subStates) {
+                    //         subResults.push(await this.testItemCriteria(sub, subState as SubmissionState, logger))
+                    //     }
+                    //     propResultsMap.submissionState!.passed = subResults.length === 0 || subResults.some(x => x.passed);
+                    //     propResultsMap.submissionState!.found = {
+                    //         join: 'OR',
+                    //         criteriaResults: subResults,
+                    //         passed: propResultsMap.submissionState!.passed
+                    //     };
+                         break;
+                    case 'rerun':
+                        const matchingDelayedActivities = this.delayedItems.filter(x => x.activity.name === item.name);
+                        let found: string | boolean = matchingDelayedActivities.length > 0;
+                        let reason: string | undefined;
+                        let identifiers: string[] | undefined;
+                        if(found && typeof itemOptVal !== 'boolean') {
+                            identifiers = Array.isArray(itemOptVal) ? (itemOptVal as string[]) : [itemOptVal];
+                            for(const i of identifiers) {
+                                const matchingDelayedIdentifier = matchingDelayedActivities.find(x => x.rerunIdentifier === i);
+                                if(matchingDelayedIdentifier !== undefined) {
+                                    found = matchingDelayedIdentifier.rerunIdentifier as string;
+                                    break;
+                                }
+                            }
+                            if(found === true) {
+                                reason = 'Found delayed activities but none matched rerunIdentifier';
+                            }
                         }
-                        propResultsMap.submissionState!.passed = subResults.length === 0 || subResults.some(x => x.passed);
-                        propResultsMap.submissionState!.found = {
-                            join: 'OR',
-                            criteriaResults: subResults,
-                            passed: propResultsMap.submissionState!.passed
-                        };
+                        propResultsMap.rerun!.passed = found === itemOptVal || typeof found === 'string';
+                        propResultsMap.rerun!.found = found;
+                        propResultsMap.rerun!.reason = reason;
                         break;
+                    case 'source':
+                        if(source === undefined) {
+                            propResultsMap.source!.passed = false;
+                            propResultsMap.source!.found = 'Not From Source';
+                            propResultsMap.source!.reason = 'Activity was not retrieved from a source (may be from cache)';
+                            break;
+                        } else {
+                            propResultsMap.source!.found = source;
+
+                            const requestedSourceVal = itemOptVal as ActivitySource | ActivitySource[];
+                            const requestedSources = !Array.isArray(requestedSourceVal) ? [requestedSourceVal] : requestedSourceVal;
+
+                            propResultsMap.source!.passed = requestedSources.map(x => x.trim().toLowerCase()).includes(source.toLowerCase());
+                            break;
+                        }
                     case 'score':
                         const scoreCompare = parseGenericValueComparison(itemOptVal as string);
                         propResultsMap.score!.passed = comparisonTextOp(item.score, scoreCompare.operator, scoreCompare.value);
@@ -1436,7 +1523,7 @@ export class BotResourcesManager {
         let resource: SubredditResources;
         const res = this.get(subName);
         if(res === undefined || res.cacheSettingsHash !== hash) {
-            resource = new SubredditResources(subName, opts);
+            resource = new SubredditResources(subName, {...opts, delayedItems: res?.delayedItems});
             await resource.initHistoricalStats();
             resource.setHistoricalSaveInterval();
             this.resources.set(subName, resource);
@@ -1562,7 +1649,7 @@ export const checkAuthorFilter = async (item: (Submission | Comment), filter: Au
     return [true, undefined, {criteriaResults: allCritResults, join: 'OR', passed: true}];
 }
 
-export const checkItemFilter = async (item: (Submission | Comment), filter: TypedActivityStates, resources: SubredditResources, parentLogger: Logger): Promise<[boolean, ('inclusive' | 'exclusive' | undefined), FilterResult<TypedActivityState>]> => {
+export const checkItemFilter = async (item: (Submission | Comment), filter: TypedActivityStates, resources: SubredditResources, parentLogger: Logger, source?: ActivitySource): Promise<[boolean, ('inclusive' | 'exclusive' | undefined), FilterResult<TypedActivityState>]> => {
     const logger = parentLogger.child({labels: ['Item Filter']}, mergeArr);
 
     const allCritResults: FilterCriteriaResult<TypedActivityState>[] = [];
@@ -1570,7 +1657,51 @@ export const checkItemFilter = async (item: (Submission | Comment), filter: Type
     if(filter.length > 0) {
         let index = 1
         for(const state of filter) {
-            const critResult = await resources.testItemCriteria(item, state, parentLogger);
+            let critResult: FilterCriteriaResult<TypedActivityState>;
+
+            // need to determine if criteria is for comment or submission state
+            // and if its comment state WITH submission state then break apart testing into individual activity testing
+            if(isCommentState(state) && isComment(item) && state.submissionState !== undefined) {
+                const {submissionState, ...restCommentState} = state;
+                // test submission state first since it's more likely(??) we have crit results or cache data for this submission than for the comment
+
+                // get submission
+                // @ts-ignore
+                const subProxy = await resources.client.getSubmission(await item.link_id);
+                // @ts-ignore
+                const sub = await resources.getActivity(subProxy);
+                const [subPass, _, subFilterResults] = await checkItemFilter(sub, submissionState, resources, parentLogger);
+                const subPropertyResult: FilterCriteriaPropertyResult<CommentState> = {
+                    property: 'submissionState',
+                    behavior: 'include',
+                    passed: subPass,
+                    found: {
+                        join: 'OR',
+                        criteriaResults: subFilterResults.criteriaResults,
+                        passed: subPass,
+                    }
+                };
+
+                if(!subPass) {
+                    // generate dummy results for the rest of the comment state since we don't need to test it
+                    const [propResultsMap, definedStateCriteria] = generateItemFilterHelpers(restCommentState);
+                    propResultsMap.submissionState = subPropertyResult;
+                    critResult = {
+                        behavior: 'include',
+                        criteria: state,
+                        propertyResults: Object.values(propResultsMap),
+                        passed: false
+                    }
+                } else {
+                    critResult = await resources.testItemCriteria(item, restCommentState, parentLogger, source);
+                    critResult.criteria = state;
+                    critResult.propertyResults.unshift(subPropertyResult);
+                }
+            } else {
+                critResult = await resources.testItemCriteria(item, state, parentLogger, source);
+            }
+
+            //critResult = await resources.testItemCriteria(item, state, parentLogger);
             allCritResults.push(critResult);
             const [summary, details] = filterCriteriaSummary(critResult);
             if (critResult.passed) {
