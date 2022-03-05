@@ -33,11 +33,21 @@
                         <div class="space-x-4 px-4 p-2 leading-2 triggeredStateToggle">
                             <div class="flex items-center justify-between">
                                 <div>
-                                    <% if(eRes.rerunSource !== undefined) { %>
-                                        [RERUN]
-                                    <% } %>
                                     <a class="activityLink font-semibold" target="_blank" href="https://reddit.com<%= eRes.activity.link%>"><%= eRes.activity.type === 'comment' ? 'Comment' : 'Submission' %></a>
                                     by <a class="activityLink" target="_blank" href="https://reddit.com/u/<%= eRes.activity.author%>"><%= eRes.activity.author%></a>
+                                    <% if(eRes.rerunSource !== undefined) { %>
+                                        <span class="has-tooltip ml-2">
+                                            <span class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2 space-y-3 p-2 text-left'>
+                                                <ul class="list-inside list-disc">
+                                                    <li>Dispatched By: <i><%= eRes.rerunSource.action %><%= eRes.rerunSource.identifier !== undefined ? ` with identifier '${eRes.rerunSource.identifier}'` : ''%></i></li>
+                                                    <li>Queued At: <i><%= eRes.rerunSource.queuedAt %></i></li>
+                                                    <li>Delayed For: <i><%= eRes.rerunSource.delay %></i></li>
+                                                    <li>Initial Goto:<i><%= eRes.rerunSource.goto %></i></li>
+                                                </ul>
+                                            </span>
+                                            (<span class="cursor-help underline" style="text-decoration-style: dotted">Dispatched by <%= eRes.rerunSource.action%><%= eRes.rerunSource.identifier !== undefined ? ` with identifier '${eRes.rerunSource.identifier}'` : ''%></span>)
+                                        </span>
+                                    <% } %>
                                 </div>
                                 <div class="font-semibold flex items-center flex-end">
                                     <a class="activityLink mr-1" target="_blank" href="https://reddit.com/<%= eRes.activity.subreddit %>"><%= eRes.activity.subreddit %></a>
@@ -47,18 +57,6 @@
                         </div>
                         <div class="border-t-2 border-gray-500 triggeredState <%= eRes.triggered ? 'triggered' : 'notTriggered'%>">
                             <div class="m-4 p-2 px-4">
-                                <% if(eRes.rerunSource !== undefined) { %>
-                                    <div class="mb-3">
-                                        <div class="font-semibold mb-2">Rerun Summary</div>
-                                        <ul class="list-inside list-disc">
-                                            <li>Dispatched By: <i><%= eRes.rerunSource.action %></i></li>
-                                            <li>Queued At: <i><%= eRes.rerunSource.queuedAt %></i></li>
-                                            <li>Delayed For: <i><%= eRes.rerunSource.delay %></i></li>
-                                            <li>Initial Goto:<i><%= eRes.rerunSource.goto %></i></li>
-                                        </ul>
-                                    </div>
-                                <% } %>
-                                <div class="font-semibold mb-2">Content Summary</div>
                                 <div class="ml-5">
                                     <blockquote class="ml-4 italic" cite="https://reddit.com<%= eRes.activity.link%>">
                                         "<%- eRes.activity.peek %>"

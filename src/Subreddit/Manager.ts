@@ -425,7 +425,7 @@ export class Manager extends EventEmitter {
                 if(!ar.processing && dayjs.unix(ar.queuedAt).add(ar.duration.asMilliseconds(), 'milliseconds').isSameOrBefore(dayjs())) {
                     this.logger.info(`Delayed Activity ${ar.activity.name} is being queued.`);
                     const rerunStr: RerunSource = ar.rerunIdentifier === undefined ? 'rerun' : `rerun:${ar.rerunIdentifier}`;
-                    await this.firehose.push({activity: ar.activity, options: {refresh: true, source: rerunStr, initialGoto: ar.goto, rerunSource: {id: ar.id, queuedAt: ar.queuedAt, delay: ar.duration.humanize(), action: ar.action, goto: ar.goto}}});
+                    await this.firehose.push({activity: ar.activity, options: {refresh: true, source: rerunStr, initialGoto: ar.goto, rerunSource: {id: ar.id, queuedAt: ar.queuedAt, delay: ar.duration.humanize(), action: ar.action, goto: ar.goto, identifier: ar.rerunIdentifier}}});
                     this.resources.delayedItems.splice(index, 1, {...ar, processing: true});
                 }
                 index++;

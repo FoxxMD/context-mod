@@ -2307,6 +2307,7 @@ export interface RerunAudit {
     action: string,
     delay: string,
     id: string
+    identifier?: string
 }
 
 export type ActionTarget = 'self' | 'parent';
