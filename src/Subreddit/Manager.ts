@@ -761,7 +761,8 @@ export class Manager extends EventEmitter {
         try {
             const [peek, { content: peekContent }] = await itemContentPeek(item);
             ePeek = peekContent;
-            this.logger.info(`<EVENT> ${peek}`);
+            const rerunStr = rerunSource !== undefined ? ` (Dispatched by ${rerunSource.action}${rerunSource.identifier !== undefined ? ` | ${rerunSource.identifier}` : ''}) ${peek}` : peek;
+            this.logger.info(`<EVENT> ${rerunStr}`);
         } catch (err: any) {
             this.logger.error(`Error occurred while generating item peek for ${checkType} Activity ${itemId}`, err);
         }
