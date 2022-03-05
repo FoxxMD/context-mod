@@ -64,11 +64,11 @@
                                         "<%- eRes.activity.peek %>"
                                     </blockquote>
                                     <% if(eRes.parentSubmission !== undefined) { %>
-                                        <div class="my-3">in the <a class="activityLink" href="https://reddit.com<%= eRes.parentSubmission.link%>">Submission</a></div>
+                                        <div class="my-3">in a <a class="activityLink inline" href="https://reddit.com<%= eRes.parentSubmission.link%>">Submission</a> by <a class="activityLink inline" target="_blank" href="https://reddit.com/u/<%= eRes.parentSubmission.author%>">/u/<%= eRes.parentSubmission.author%></a> titled:</div>
                                     <blockquote class="ml-4 mb-2 italic" cite="https://reddit.com<%= eRes.parentSubmission.link%>">
                                         "<%= eRes.parentSubmission.peek%>"
                                     </blockquote>
-                                        by <a class="activityLink" target="_blank" href="https://reddit.com/u/<%= eRes.parentSubmission.author%>"><%= eRes.parentSubmission.author%></a>
+
                                     <% } %>
                                 </div>
                             </div>
