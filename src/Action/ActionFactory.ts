@@ -13,8 +13,8 @@ import {SubredditResources} from "../Subreddit/SubredditResources";
 import {UserFlairAction, UserFlairActionJson} from './UserFlairAction';
 import {ExtendedSnoowrap} from '../Utils/SnoowrapClients';
 import EventEmitter from "events";
-import {RerunAction, RerunActionJson} from "./RerunAction";
-import {CancelRerunAction, CancelRerunActionJson} from "./CancelRerunAction";
+import {DispatchAction, DispatchActionJson} from "./DispatchAction";
+import {CancelDispatchAction, CancelDispatchActionJson} from "./CancelDispatchAction";
 
 export function actionFactory
 (config: ActionJson, logger: Logger, subredditName: string, resources: SubredditResources, client: ExtendedSnoowrap, emitter: EventEmitter): Action {
@@ -39,10 +39,10 @@ export function actionFactory
             return new BanAction({...config as BanActionJson, logger, subredditName, resources, client, emitter});
         case 'message':
             return new MessageAction({...config as MessageActionJson, logger, subredditName, resources, client, emitter});
-        case 'rerun':
-            return new RerunAction({...config as RerunActionJson, logger, subredditName, resources, client, emitter});
-        case 'cancelRerun':
-            return new CancelRerunAction({...config as CancelRerunActionJson, logger, subredditName, resources, client, emitter})
+        case 'dispatch':
+            return new DispatchAction({...config as DispatchActionJson, logger, subredditName, resources, client, emitter});
+        case 'cancelDispatch':
+            return new CancelDispatchAction({...config as CancelDispatchActionJson, logger, subredditName, resources, client, emitter})
         default:
             throw new Error('rule "kind" was not recognized.');
     }

@@ -7,15 +7,15 @@ import {ActionProcessResult, ActionTarget, ActivityRerunConfig} from "../Common/
 import dayjs from "dayjs";
 import {isSubmission, parseDurationValToDuration, randomId} from "../util";
 
-export class RerunAction extends Action {
+export class DispatchAction extends Action {
     rerunData: ActivityRerunConfig;
     targets: ActionTarget[];
 
     getKind() {
-        return 'Rerun';
+        return 'Dispatch';
     }
 
-    constructor(options: RerunOptions) {
+    constructor(options: DispatchOptions) {
         super(options);
         const {
             rerunIdentifier,
@@ -71,7 +71,7 @@ export class RerunAction extends Action {
                     act = await this.resources.client.getSubmission((item as Comment).link_id);
                 }
             } else {
-                actHint = 'Comment';
+                actHint = `This Activity (${item.name})`;
             }
 
             const existing = this.resources.delayedItems.filter(x => {
@@ -81,7 +81,7 @@ export class RerunAction extends Action {
             });
 
             if (existing.length > 0) {
-                let existingRes = `Rerun activities (${existing.map((x, index) => `[${index + 1}] Queued At ${dayjs.unix(x.queuedAt).format('YYYY-MM-DD HH:mm:ssZ')} for ${x.duration.humanize()}`).join(' ')}}) already exist for ${actHint}`;
+                let existingRes = `Dispatch activities (${existing.map((x, index) => `[${index + 1}] Queued At ${dayjs.unix(x.queuedAt).format('YYYY-MM-DD HH:mm:ssZ')} for ${x.duration.humanize()}`).join(' ')}}) already exist for ${actHint}`;
                 if (this.rerunData.onExistingFound === 'skip') {
                     existingRes += ` and existing behavior is SKIP so nothing queued`;
                     continue;
@@ -113,7 +113,7 @@ export class RerunAction extends Action {
         if (rerunPayload.goto !== undefined) {
             rerunBehaviors.push(`Goto: ${rerunPayload.goto}`);
         }
-        let result = `Delay: ${rerunPayload.duration.humanize()}${rerunBehaviors.length > 0 ? `| ${rerunBehaviors.join(' | ')}` : ''} | Queue Results:\n${rerunActivitiesHints.join('\n')}`;
+        let result = `Delay: ${rerunPayload.duration.humanize()}${rerunBehaviors.length > 0 ? `| ${rerunBehaviors.join(' | ')}` : ''} | Dispatch Results:\n${rerunActivitiesHints.join('\n')}`;
 
         this.logger.verbose(result);
         return {
@@ -124,17 +124,17 @@ export class RerunAction extends Action {
     }
 }
 
-export interface RerunOptions extends RerunActionConfig, ActionOptions {
+export interface DispatchOptions extends DispatchActionConfig, ActionOptions {
 }
 
-export interface RerunActionConfig extends ActionConfig, ActivityRerunConfig {
+export interface DispatchActionConfig extends ActionConfig, ActivityRerunConfig {
     target: ActionTarget | ActionTarget[]
 }
 
 /**
  * Remove the Activity
  * */
-export interface RerunActionJson extends RerunActionConfig, ActionJson {
-    kind: 'rerun'
+export interface DispatchActionJson extends DispatchActionConfig, ActionJson {
+    kind: 'dispatch'
 
 }

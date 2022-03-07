@@ -582,14 +582,14 @@
             "enum": [
                 "approve",
                 "ban",
-                "cancelRerun",
+                "cancelDispatch",
                 "comment",
+                "dispatch",
                 "flair",
                 "lock",
                 "message",
                 "remove",
                 "report",
-                "rerun",
                 "userflair",
                 "usernote"
             ],

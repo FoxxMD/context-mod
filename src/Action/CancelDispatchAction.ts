@@ -7,12 +7,12 @@ import {ActionProcessResult, ActionTarget, ActivityRerunConfig, InclusiveActionT
 import dayjs from "dayjs";
 import {isSubmission, parseDurationValToDuration} from "../util";
 
-export class CancelRerunAction extends Action {
+export class CancelDispatchAction extends Action {
     identifiers?: (string | null)[];
     targets: InclusiveActionTarget[];
 
     getKind() {
-        return 'Cancel Rerun';
+        return 'Cancel Dispatch';
     }
 
     constructor(options: CancelRerunOptions) {
@@ -114,15 +114,15 @@ export class CancelRerunAction extends Action {
         return {
             dryRun,
             success: true,
-            result: cancelledActivities.length === 0 ? 'No activities cancelled' : `Cancelled Activities: ${cancelledActivities.join(', ')}`,
+            result: cancelledActivities.length === 0 ? 'No Dispatch Actions cancelled' : `Cancelled Dispatch Actions: ${cancelledActivities.join(', ')}`,
         }
     }
 }
 
-export interface CancelRerunOptions extends CancelRerunActionConfig, ActionOptions {
+export interface CancelRerunOptions extends CancelDispatchActionConfig, ActionOptions {
 }
 
-export interface CancelRerunActionConfig extends ActionConfig {
+export interface CancelDispatchActionConfig extends ActionConfig {
     target: InclusiveActionTarget | InclusiveActionTarget[]
     rerunIdentifier?: string | string[] | null
 }
@@ -130,6 +130,6 @@ export interface CancelRerunActionConfig extends ActionConfig {
 /**
  * Remove the Activity
  * */
-export interface CancelRerunActionJson extends CancelRerunActionConfig, ActionJson {
-    kind: 'cancelRerun'
+export interface CancelDispatchActionJson extends CancelDispatchActionConfig, ActionJson {
+    kind: 'cancelDispatch'
 }

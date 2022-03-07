@@ -1023,7 +1023,7 @@
             ],
             "type": "string"
         },
-        "CancelRerunActionJson": {
+        "CancelDispatchActionJson": {
             "description": "Remove the Activity",
             "properties": {
                 "authorIs": {
@@ -1079,7 +1079,7 @@
                 "kind": {
                     "description": "The type of action that will be performed",
                     "enum": [
-                        "cancelRerun"
+                        "cancelDispatch"
                     ],
                     "type": "string"
                 },
@@ -1288,10 +1288,10 @@
                                 "$ref": "#/definitions/UserFlairActionJson"
                             },
                             {
-                                "$ref": "#/definitions/RerunActionJson"
+                                "$ref": "#/definitions/DispatchActionJson"
                             },
                             {
-                                "$ref": "#/definitions/CancelRerunActionJson"
+                                "$ref": "#/definitions/CancelDispatchActionJson"
                             },
                             {
                                 "$ref": "#/definitions/FlairActionJson"
@@ -1588,6 +1588,157 @@
                 "name",
                 "type",
                 "url"
+            ],
+            "type": "object"
+        },
+        "DispatchActionJson": {
+            "description": "Remove the Activity",
+            "properties": {
+                "authorIs": {
+                    "$ref": "#/definitions/AuthorOptions",
+                    "description": "If present then these Author criteria are checked before running the Action. If criteria fails then the Action is not run.",
+                    "examples": [
+                        {
+                            "include": [
+                                {
+                                    "flairText": [
+                                        "Contributor",
+                                        "Veteran"
+                                    ]
+                                },
+                                {
+                                    "isMod": true
+                                }
+                            ]
+                        }
+                    ]
+                },
+                "cancelIfQueued": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "enum": [
+                                    "poll",
+                                    "poll:modqueue",
+                                    "poll:newComm",
+                                    "poll:newSub",
+                                    "poll:unmoderated",
+                                    "user"
+                                ],
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "enum": [
+                                false,
+                                "poll",
+                                "poll:modqueue",
+                                "poll:newComm",
+                                "poll:newSub",
+                                "poll:unmoderated",
+                                true,
+                                "user"
+                            ]
+                        }
+                    ]
+                },
+                "delay": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/definitions/DurationObject"
+                        },
+                        {
+                            "type": "string"
+                        }
+                    ]
+                },
+                "dryRun": {
+                    "default": false,
+                    "description": "If `true` the Action will not make the API request to Reddit to perform its action.",
+                    "examples": [
+                        false,
+                        true
+                    ],
+                    "type": "boolean"
+                },
+                "enable": {
+                    "default": true,
+                    "description": "If set to `false` the Action will not be run",
+                    "examples": [
+                        true
+                    ],
+                    "type": "boolean"
+                },
+                "goto": {
+                    "type": "string"
+                },
+                "itemIs": {
+                    "description": "A list of criteria to test the state of the `Activity` against before running the Action.\n\nIf any set of criteria passes the Action will be run.",
+                    "items": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/definitions/SubmissionState"
+                            },
+                            {
+                                "$ref": "#/definitions/CommentState"
+                            }
+                        ]
+                    },
+                    "type": "array"
+                },
+                "kind": {
+                    "description": "The type of action that will be performed",
+                    "enum": [
+                        "dispatch"
+                    ],
+                    "type": "string"
+                },
+                "name": {
+                    "description": "An optional, but highly recommended, friendly name for this Action. If not present will default to `kind`.\n\nCan only contain letters, numbers, underscore, spaces, and dashes",
+                    "examples": [
+                        "myDescriptiveAction"
+                    ],
+                    "pattern": "^[a-zA-Z]([\\w -]*[\\w])?$",
+                    "type": "string"
+                },
+                "onExistingFound": {
+                    "enum": [
+                        "ignore",
+                        "replace",
+                        "skip"
+                    ],
+                    "type": "string"
+                },
+                "rerunIdentifier": {
+                    "type": "string"
+                },
+                "target": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "enum": [
+                                    "parent",
+                                    "self"
+                                ],
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "enum": [
+                                "parent",
+                                "self"
+                            ],
+                            "type": "string"
+                        }
+                    ]
+                }
+            },
+            "required": [
+                "delay",
+                "kind",
+                "target"
             ],
             "type": "object"
         },
@@ -3299,157 +3450,6 @@
             ],
             "type": "object"
         },
-        "RerunActionJson": {
-            "description": "Remove the Activity",
-            "properties": {
-                "authorIs": {
-                    "$ref": "#/definitions/AuthorOptions",
-                    "description": "If present then these Author criteria are checked before running the Action. If criteria fails then the Action is not run.",
-                    "examples": [
-                        {
-                            "include": [
-                                {
-                                    "flairText": [
-                                        "Contributor",
-                                        "Veteran"
-                                    ]
-                                },
-                                {
-                                    "isMod": true
-                                }
-                            ]
-                        }
-                    ]
-                },
-                "cancelIfQueued": {
-                    "anyOf": [
-                        {
-                            "items": {
-                                "enum": [
-                                    "poll",
-                                    "poll:modqueue",
-                                    "poll:newComm",
-                                    "poll:newSub",
-                                    "poll:unmoderated",
-                                    "user"
-                                ],
-                                "type": "string"
-                            },
-                            "type": "array"
-                        },
-                        {
-                            "enum": [
-                                false,
-                                "poll",
-                                "poll:modqueue",
-                                "poll:newComm",
-                                "poll:newSub",
-                                "poll:unmoderated",
-                                true,
-                                "user"
-                            ]
-                        }
-                    ]
-                },
-                "delay": {
-                    "anyOf": [
-                        {
-                            "$ref": "#/definitions/DurationObject"
-                        },
-                        {
-                            "type": "string"
-                        }
-                    ]
-                },
-                "dryRun": {
-                    "default": false,
-                    "description": "If `true` the Action will not make the API request to Reddit to perform its action.",
-                    "examples": [
-                        false,
-                        true
-                    ],
-                    "type": "boolean"
-                },
-                "enable": {
-                    "default": true,
-                    "description": "If set to `false` the Action will not be run",
-                    "examples": [
-                        true
-                    ],
-                    "type": "boolean"
-                },
-                "goto": {
-                    "type": "string"
-                },
-                "itemIs": {
-                    "description": "A list of criteria to test the state of the `Activity` against before running the Action.\n\nIf any set of criteria passes the Action will be run.",
-                    "items": {
-                        "anyOf": [
-                            {
-                                "$ref": "#/definitions/SubmissionState"
-                            },
-                            {
-                                "$ref": "#/definitions/CommentState"
-                            }
-                        ]
-                    },
-                    "type": "array"
-                },
-                "kind": {
-                    "description": "The type of action that will be performed",
-                    "enum": [
-                        "rerun"
-                    ],
-                    "type": "string"
-                },
-                "name": {
-                    "description": "An optional, but highly recommended, friendly name for this Action. If not present will default to `kind`.\n\nCan only contain letters, numbers, underscore, spaces, and dashes",
-                    "examples": [
-                        "myDescriptiveAction"
-                    ],
-                    "pattern": "^[a-zA-Z]([\\w -]*[\\w])?$",
-                    "type": "string"
-                },
-                "onExistingFound": {
-                    "enum": [
-                        "ignore",
-                        "replace",
-                        "skip"
-                    ],
-                    "type": "string"
-                },
-                "rerunIdentifier": {
-                    "type": "string"
-                },
-                "target": {
-                    "anyOf": [
-                        {
-                            "items": {
-                                "enum": [
-                                    "parent",
-                                    "self"
-                                ],
-                                "type": "string"
-                            },
-                            "type": "array"
-                        },
-                        {
-                            "enum": [
-                                "parent",
-                                "self"
-                            ],
-                            "type": "string"
-                        }
-                    ]
-                }
-            },
-            "required": [
-                "delay",
-                "kind",
-                "target"
-            ],
-            "type": "object"
-        },
         "RuleSetJson": {
             "description": "A RuleSet is a \"nested\" set of `Rule` objects that can be used to create more complex AND/OR behavior. Think of the outcome of a `RuleSet` as the result of all of its run `Rule` objects (based on `condition`)",
             "properties": {
@@ -3747,10 +3747,10 @@
                                 "$ref": "#/definitions/UserFlairActionJson"
                             },
                             {
-                                "$ref": "#/definitions/RerunActionJson"
+                                "$ref": "#/definitions/DispatchActionJson"
                             },
                             {
-                                "$ref": "#/definitions/CancelRerunActionJson"
+                                "$ref": "#/definitions/CancelDispatchActionJson"
                             },
                             {
                                 "$ref": "#/definitions/FlairActionJson"
