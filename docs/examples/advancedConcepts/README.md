@@ -2,11 +2,13 @@
 
 See **Rule Name Reuse Examples [YAML](/docs/examples/advancedConcepts/ruleNameReuse.yaml) | [JSON](/docs/examples/advancedConcepts/ruleNameReuse.json5)**
 
-### Check Order
+### Check Order and Flow Control
 
 Checks are run in the order they appear in your configuration, therefore you should place your highest requirement/severe action checks at the top and lowest requirement/moderate actions at the bottom.
 
-This is so that if an Activity warrants a more serious reaction that Check is triggered first rather than having a lower requirement check with less severe actions triggered and causing all subsequent Checks to be skipped.
+This is so that if an Activity warrants a more serious reaction that Check is triggered first rather than having a lower requirement check with less severe actions triggered and causing all subsequent Checks to be skipped. 
+
+This behavior can also be controlled modified using [Flow Control](/docs/examples/advancedConcepts/flowControl.md)
 
 * Attribution >50% AND Repeat Activity 8x AND Recent Activity in 2 subs => remove submission + ban
 * Attribution >20% AND Repeat Activity 4x AND Recent Activity in 5 subs => remove submission + flair user restricted

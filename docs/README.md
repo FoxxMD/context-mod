@@ -90,7 +90,7 @@ An example of Runs:
 * A group of Checks that look for missing flairs on a user or a new submission and flair accordingly
 * A group of Checks that detect spam or self-promotion and then remove those activities
 
-Both group of Checks are independent of each other (don't have any patterns or actions in common)
+Both group of Checks are independent of each other (don't have any patterns or actions in common). Learn more about using [Runs and **Flow Control** to control how CM behaves.](/docs/examples/advancedConcepts/flowControl.md)
 
 ### Checks
 
