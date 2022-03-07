@@ -34,7 +34,7 @@ There are **four** behaviors CM can take. Both/either **state properties** can b
 
 ### Next
 
-The **Next** behavior tells CM to continue to whatever comes *after the Check that was just processed.* This could be another Check or, if this is the last Check in a Run.
+The **Next** behavior tells CM to continue to whatever comes *after the Check that was just processed.* This could be another Check or, if this is the last Check in a Run, the next Run.
 
 NOTE: `next` is the **default behavior** for the `postFail` state
 
@@ -43,7 +43,7 @@ Example
 ```yaml
 - name: MyCheck
   # ...
-  postFail: next # CM will start processing AnotherCheck
+  postFail: next # if Check is not triggered then CM will start processing AnotherCheck
   
 - name: AnotherCheck
   # ...
@@ -63,7 +63,7 @@ runs:
     checks:
       - name: MyCheck
         # ...
-        postTrigger: nextRun # CM will SKIP mySecondCheck and instead start processing MySecondRun
+        postTrigger: nextRun # if Check is triggered then CM will SKIP mySecondCheck and instead start processing MySecondRun
       - name: MySecondCheck
         # ...
         
@@ -85,7 +85,7 @@ runs:
     checks:
       - name: MyCheck
         # ...
-        postTrigger: stop # CM will NOT process MySecondCheck OR MySecondRun. The activity is "done" being processed at this point
+        postTrigger: stop # if Check is triggered CM will NOT process MySecondCheck OR MySecondRun. The activity is "done" being processed at this point
       - name: MySecondCheck
         # ...
         
