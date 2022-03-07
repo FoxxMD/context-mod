@@ -72,7 +72,9 @@ export class UserFlairAction extends Action {
         item.author_flair_css_class = this.css ?? null;
       }
       await this.resources.resetCacheForItem(item);
-      await this.resources.resetCacheForItem(item.author);
+      if(typeof item.author !== 'string') {
+          await this.resources.resetCacheForItem(item.author);
+      }
     }
 
     return {
