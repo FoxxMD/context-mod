@@ -188,49 +188,41 @@ runs:
 
 One **Run** with **default behavior** (no post-Check behavior explicitly defined)
 
-<details>
-
 ```mermaid
 flowchart TB
     subgraph spam ["(Run) Spam"]
-        b1["(Check) self-promotion"] -- "postFail = next" --> b2
-        b2["(Check) repeat spam"] -- "postFail = next" --> b3
+        b1["(Check) self-promotion"] -- "postFail: next" --> b2
+        b2["(Check) repeat spam"] -- "postFail: next" --> b3
         b3["(Check) Good user"]
     end
-    b1 -- "postTrigger = nextRun" --> finish
-    b2 -- "postTrigger = nextRun" --> finish
-    b3 -- "postFail = next" --> finish
-    b3 -- "postTrigger = nextRun" --> finish
+    b1 -- "postTrigger: nextRun" --> finish
+    b2 -- "postTrigger: nextRun" --> finish
+    b3 -- "postFail: next" --> finish
+    b3 -- "postTrigger: nextRun" --> finish
     finish[Processing Finished]
 ```
 
-</details>
-
 Two **Runs** with **default behavior** (no post-Check behavior explicitly defined)
-
-<details>
 
 ```mermaid
 flowchart TB
     subgraph flair ["(Run) Flairing"]
-        a1["(Check) Flair Submission based on history"]-- "postFail = next" -->a2
-        a2["(Check) Flair Submission based on user profile"] -- "postFail = next" --> a3
+        a1["(Check) Flair Submission based on history"]-- "postFail: next" -->a2
+        a2["(Check) Flair Submission based on user profile"] -- "postFail: next" --> a3
         a3["(Check) Flair Submission based on self text"]
     end
-    a1 -- "postTrigger = nextRun" --> b1
-    a2 -- "postTrigger = nextRun" --> b1
-    a3 -- "postFail = next" --> b1
-    a3 -- "postTrigger = nextRun" --> b1
+    a1 -- "postTrigger: nextRun" --> b1
+    a2 -- "postTrigger: nextRun" --> b1
+    a3 -- "postFail: next" --> b1
+    a3 -- "postTrigger: nextRun" --> b1
     subgraph spam ["(Run) Spam"]
-        b1["(Check) self-promotion"] -- "postFail = next" -->b2
-        b2["(Check) repeat spam"] -- "postFail = next" -->b3
+        b1["(Check) self-promotion"] -- "postFail: next" -->b2
+        b2["(Check) repeat spam"] -- "postFail: next" -->b3
         b3["(Check) Good user"]
     end
-    b1 -- "postTrigger = nextRun" --> finish
-    b2 -- "postTrigger = nextRun" --> finish
-    b3 -- "postFail = next" --> finish
-    b3 -- "postTrigger = nextRun" --> finish
+    b1 -- "postTrigger: nextRun" --> finish
+    b2 -- "postTrigger: nextRun" --> finish
+    b3 -- "postFail: next" --> finish
+    b3 -- "postTrigger: nextRun" --> finish
     finish[Processing Finished]
 ```
-
-</details>
