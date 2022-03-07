@@ -1,27 +1,31 @@
 {
-  "checks": [
+  "runs": [
     {
-      "name": "Flair New User Sub",
-      "description": "Flair submission as sketchy if user does not have vet flair",
-      // check will run on a new submission in your subreddit and look at the Author of that submission
-      "kind": "submission",
-      "rules": [
+      "checks": [
         {
-          "name": "newflair",
-          "kind": "author",
-          // rule will trigger if Author does not have "vet" flair text
-          "exclude": [
+          "name": "Flair New User Sub",
+          "description": "Flair submission as sketchy if user does not have vet flair",
+          // check will run on a new submission in your subreddit and look at the Author of that submission
+          "kind": "submission",
+          "rules": [
             {
-              "flairText": ["vet"]
+              "name": "newflair",
+              "kind": "author",
+              // rule will trigger if Author does not have "vet" flair text
+              "exclude": [
+                {
+                  "flairText": ["vet"]
+                }
+              ]
+            }
+          ],
+          "actions": [
+            {
+              "kind": "flair",
+              "text": "New User",
+              "css": "orange"
             }
           ]
-        }
-      ],
-      "actions": [
-        {
-          "kind": "flair",
-          "text": "New User",
-          "css": "orange"
         }
       ]
     }

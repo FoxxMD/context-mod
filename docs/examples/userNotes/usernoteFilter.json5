@@ -1,43 +1,47 @@
 {
-  "checks": [
+  "runs": [
     {
-      "name": "Self Promo Activities",
-      "description": "Tag SP only if user does not have good contributor user note",
-      // check will run on a new submission in your subreddit and look at the Author of that submission
-      "kind": "submission",
-      "rules": [
+      "checks": [
         {
-          "name": "attr10all",
-          "kind": "attribution",
-          "author": {
-            "exclude": [
-              {
-                // the key of the usernote type to look for https://github.com/toolbox-team/reddit-moderator-toolbox/wiki/Subreddit-Wikis%3A-usernotes#working-with-note-types
-                // rule will not run if current usernote on Author is of type 'gooduser'
-                "type": "gooduser"
-              }
-            ]
-          },
-          "criteria": [
+          "name": "Self Promo Activities",
+          "description": "Tag SP only if user does not have good contributor user note",
+          // check will run on a new submission in your subreddit and look at the Author of that submission
+          "kind": "submission",
+          "rules": [
             {
-              "threshold": "> 10%",
-              "window": "90 days"
-            },
-            {
-              "threshold": "> 10%",
-              "window": 100
+              "name": "attr10all",
+              "kind": "attribution",
+              "author": {
+                "exclude": [
+                  {
+                    // the key of the usernote type to look for https://github.com/toolbox-team/reddit-moderator-toolbox/wiki/Subreddit-Wikis%3A-usernotes#working-with-note-types
+                    // rule will not run if current usernote on Author is of type 'gooduser'
+                    "type": "gooduser"
+                  }
+                ]
+              },
+              "criteria": [
+                {
+                  "threshold": "> 10%",
+                  "window": "90 days"
+                },
+                {
+                  "threshold": "> 10%",
+                  "window": 100
+                }
+              ],
             }
           ],
-        }
-      ],
-      "actions": [
-        {
-          "kind": "usernote",
-          // the key of usernote type
-          // https://github.com/toolbox-team/reddit-moderator-toolbox/wiki/Subreddit-Wikis%3A-usernotes#working-with-note-types
-          "type": "spamwarn",
-          // content is mustache templated as usual
-          "content": "Self Promotion: {{rules.attr10all.titlesDelim}} {{rules.attr10sub.largestPercent}}%"
+          "actions": [
+            {
+              "kind": "usernote",
+              // the key of usernote type
+              // https://github.com/toolbox-team/reddit-moderator-toolbox/wiki/Subreddit-Wikis%3A-usernotes#working-with-note-types
+              "type": "spamwarn",
+              // content is mustache templated as usual
+              "content": "Self Promotion: {{rules.attr10all.titlesDelim}} {{rules.attr10sub.largestPercent}}%"
+            }
+          ]
         }
       ]
     }

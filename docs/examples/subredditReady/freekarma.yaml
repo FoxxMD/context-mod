@@ -1,35 +1,36 @@
 polling:
   - unmoderated
-checks:
-    # Remove submissions from users who have recent activity in freekarma subs within the last 50 activities or 6 months (whichever is less)
-  - name: freekarma removal
-    description: Remove submission if user has used freekarma sub recently
-    kind: submission
-    itemIs:
-      - removed: false
-    condition: AND
-    rules:
-      - name: freekarma
-        kind: recentActivity
-        window:
-          count: 50
-          duration: 6 months
-        useSubmissionAsReference: false
-        thresholds:
-          - subreddits:
-              - FreeKarma4U
-              - FreeKarma4You
-              - KarmaStore
-              - upvote
-    actions:
-      - kind: report
-        enable: true
-        content: 'Remove=> {{rules.newtube.totalCount}} activities in freekarma subs'
-      - kind: remove
-        enable: true
-      - kind: comment
-        enable: false
-        content: >-
-          Your submission has been removed because you have recent activity in
-          'freekarma' subs
-        distinguish: true
+runs:
+  - checks:
+      # Remove submissions from users who have recent activity in freekarma subs within the last 50 activities or 6 months (whichever is less)
+      - name: freekarma removal
+        description: Remove submission if user has used freekarma sub recently
+        kind: submission
+        itemIs:
+          - removed: false
+        condition: AND
+        rules:
+          - name: freekarma
+            kind: recentActivity
+            window:
+              count: 50
+              duration: 6 months
+            useSubmissionAsReference: false
+            thresholds:
+              - subreddits:
+                  - FreeKarma4U
+                  - FreeKarma4You
+                  - KarmaStore
+                  - upvote
+        actions:
+          - kind: report
+            enable: true
+            content: 'Remove=> {{rules.newtube.totalCount}} activities in freekarma subs'
+          - kind: remove
+            enable: true
+          - kind: comment
+            enable: false
+            content: >-
+              Your submission has been removed because you have recent activity in
+              'freekarma' subs
+            distinguish: true
