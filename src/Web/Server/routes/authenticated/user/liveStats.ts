@@ -199,6 +199,7 @@ const liveStats = () => {
                 permissions: await manager.getModPermissions(),
                 queuedActivities: manager.queue.length(),
                 runningActivities: manager.queue.running(),
+                delayedItems: manager.getDelayedSummary(),
                 maxWorkers: manager.queue.concurrency,
                 subMaxWorkers: manager.subMaxWorkers || bot.maxWorkers,
                 globalMaxWorkers: bot.maxWorkers,

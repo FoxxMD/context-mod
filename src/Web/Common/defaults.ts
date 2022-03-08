@@ -57,6 +57,7 @@ const sub: SubredditDataResponse = {
     queueState: runningState,
     queuedActivities: 0,
     runningActivities: 0,
+    delayedItems: [],
     softLimit: 0,
     startedAt: "-",
     startedAtHuman: "-",

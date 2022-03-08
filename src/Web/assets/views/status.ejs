@@ -230,7 +230,16 @@
                                                     </span>
                                                 </span>
                                             </label>
-                                            <span><%= `${data.runningActivities} Processing / ${data.queuedActivities} Queued` %></span>
+                                                <span>
+                                                    <span class="runningActivities"><%= data.runningActivities %></span> Processing /
+                                                    <span class="queuedActivities"><%= data.queuedActivities %></span> Queued /
+                                                    <span class="has-tooltip">
+                                                        <span style="margin-top:35px"
+                                                              class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2 space-y-3 p-2 text-left delayedItemsList'>
+                                                        </span>
+                                                    <span class="underline" style="text-decoration-style: dotted"><span class="delayedItemsCount"><%= data.delayedItems.length %></span> Delayed</span>
+                                                    </span>
+                                                </span>
                                                 <label>Operated By</label>
                                                 <span><%= operatorDisplay %></span>
                                             <% if (data.name === 'All' && isOperator) { %>
@@ -392,7 +401,7 @@
                                                     <div data-subreddit="<%= data.name %>"
                                                          class="stats botStats reloadStats mb-2">
                                                         <label>Events</label>
-                                                        <span>
+                                                        <span class="eventsCount">
                                                             <%= data.stats.historical.lastReload.eventsCheckedTotal === undefined ? '-' : data.stats.historical.lastReload.eventsCheckedTotal %>
                                                         </span>
                                                         <label>Checks</label>
@@ -400,7 +409,7 @@
                                                         <span class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2'>
                                                             <span><%= data.stats.historical.lastReload.checksTriggeredTotal %></span> Triggered / <span><%= data.stats.historical.lastReload.checksRunTotal %></span> Run / <span><%= data.stats.historical.lastReload.checksFromCacheTotal %></span> Cached
                                                         </span>
-                                                        <span class="cursor-help underline" style="text-decoration-style: dotted"><%= data.stats.historical.lastReload.checksTriggeredTotal %> Triggered</span>
+                                                            <span class="cursor-help underline" style="text-decoration-style: dotted"><span class="checksCount"><%= data.stats.historical.lastReload.checksTriggeredTotal %></span> Triggered</span>
                                                     </span>
 
                                                         <label>Rules</label>
@@ -409,16 +418,16 @@
                                                         <span><%= data.stats.historical.lastReload.rulesTriggeredTotal %></span> Triggered / <span><%= data.stats.historical.lastReload.rulesCachedTotal %></span> Cached / <span><%= data.stats.historical.lastReload.rulesRunTotal %></span> Run
                                                     </span>
                                                     <span class="cursor-help cursor-help underline" style="text-decoration-style: dotted">
-                                                        <span><%= data.stats.historical.lastReload.rulesTriggeredTotal %></span> Triggered</span>
+                                                        <span class="rulesCount"><%= data.stats.historical.lastReload.rulesTriggeredTotal %></span> Triggered</span>
                                                 </span>
 
                                                         <label>Actions</label>
-                                                        <span><%= data.stats.historical.lastReload.actionsRunTotal === undefined ? '0' : data.stats.historical.lastReload.actionsRunTotal %> Run</span>
+                                                        <span><span class="actionsCount"><%= data.stats.historical.lastReload.actionsRunTotal === undefined ? '0' : data.stats.historical.lastReload.actionsRunTotal %></span> Run</span>
                                                     </div>
                                                 <% } %>
                                                 <div data-subreddit="<%= data.name %>" class="stats botStats allStats mb-2">
                                                     <label>Events</label>
-                                                    <span>
+                                                    <span class="eventsCount">
                                                         <%= data.stats.historical.allTime.eventsCheckedTotal %>
                                                     </span>
                                                     <label>Checks</label>
@@ -426,7 +435,7 @@
                                                         <span class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2'>
                                                             <span><%= data.stats.historical.allTime.checksTriggeredTotal %></span> Triggered / <span><%= data.stats.historical.allTime.checksRunTotal %></span> Run / <span><%= data.stats.historical.allTime.checksFromCacheTotal %></span> Cached
                                                         </span>
-                                                        <span class="cursor-help underline" style="text-decoration-style: dotted"><%= data.stats.historical.allTime.checksTriggeredTotal %> Triggered</span>
+                                                        <span class="cursor-help underline" style="text-decoration-style: dotted"><span class="checksCount"><%= data.stats.historical.allTime.checksTriggeredTotal %></span> Triggered</span>
                                                     </span>
 
                                                     <label>Rules</label>
@@ -434,12 +443,12 @@
                                                         <span class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2'>
                                                             <span><%= data.stats.historical.allTime.rulesTriggeredTotal %></span> Triggered / <span><%= data.stats.historical.allTime.rulesCachedTotal %></span> Cached / <span><%= data.stats.historical.allTime.rulesRunTotal %></span> Run
                                                         </span>
-                                                        <span class="cursor-help underline" style="text-decoration-style: dotted"><span><%= data.stats.historical.allTime.rulesTriggeredTotal %></span> Triggered</span>
+                                                        <span class="cursor-help underline" style="text-decoration-style: dotted"><span class="rulesCount"><%= data.stats.historical.allTime.rulesTriggeredTotal %></span> Triggered</span>
                                                     </span>
 
                                                     <label>Actions</label>
                                                     <span>
-                                                        <span><%= data.stats.historical.allTime.actionsRunTotal === undefined ? '0' : data.stats.historical.allTime.actionsRunTotal %> Run</span>
+                                                        <span><span class="actionsCount"><%= data.stats.historical.allTime.actionsRunTotal === undefined ? '0' : data.stats.historical.allTime.actionsRunTotal %></span> Run</span>
                                                     </span>
                                                 </div>
                                                 <% if (data.name !== 'All') { %>
@@ -681,9 +690,13 @@
 <script src="https://unpkg.com/dayjs@1.10.7/dayjs.min.js" crossorigin="anonymous"></script>
 <script src="https://unpkg.com/dayjs@1.10.7/plugin/advancedFormat.js"></script>
 <script src="https://unpkg.com/dayjs@1.10.7/plugin/timezone.js"></script>
+<script src="https://unpkg.com/dayjs@1.10.7/plugin/duration.js"></script>
+<script src="https://unpkg.com/dayjs@1.10.7/plugin/relativeTime.js"></script>
 <script>
     dayjs.extend(window.dayjs_plugin_timezone)
     dayjs.extend(window.dayjs_plugin_advancedFormat)
+    dayjs.extend(window.dayjs_plugin_duration)
+    dayjs.extend(window.dayjs_plugin_relativeTime)
     window.formattedTime = (short, full) => `<span class="has-tooltip"><span style="margin-top:35px" class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black space-y-3 p-2 text-left'>${full}</span><span>${short}</span></span>`;
     window.formatLogLineToHtml = (log, timestamp = undefined) => {
         const val = typeof log === 'string' ? log : log['MESSAGE'];
@@ -1103,6 +1116,32 @@
                     el.querySelector('.modPermissionsCount').innerHTML = resp.permissions.length;
                     el.querySelector('.modPermissionsList').innerHTML = '';
                     el.querySelector('.modPermissionsList').insertAdjacentHTML('afterbegin', resp.permissions.map(x => `<li class="font-mono">${x}</li>`).join(''));
+                }
+
+                el.querySelector('.reloadStats .eventsCount').innerHTML = resp.stats.historical.lastReload.eventsCheckedTotal;
+                el.querySelector('.allStats .eventsCount').innerHTML = resp.stats.historical.allTime.eventsCheckedTotal;
+                el.querySelector('.reloadStats .checksCount').innerHTML = resp.stats.historical.lastReload.checksTriggeredTotal;
+                el.querySelector('.allStats .checksCount').innerHTML = resp.stats.historical.allTime.checksTriggeredTotal;
+                el.querySelector('.reloadStats .rulesCount').innerHTML = resp.stats.historical.lastReload.rulesTriggeredTotal;
+                el.querySelector('.allStats .rulesCount').innerHTML = resp.stats.historical.allTime.rulesTriggeredTotal;
+                el.querySelector('.reloadStats .actionsCount').innerHTML = resp.stats.historical.lastReload.actionsRunTotal;
+                el.querySelector('.allStats .actionsCount').innerHTML = resp.stats.historical.allTime.actionsRunTotal;
+
+                el.querySelector('.runningActivities').innerHTML = resp.runningActivities;
+                el.querySelector('.queuedActivities').innerHTML = resp.queuedActivities;
+                el.querySelector('.delayedItemsCount').innerHTML = resp.delayedItems.length;
+                el.querySelector('.delayedItemsList').innerHTML = 'No delayed Items!';
+                if(resp.delayedItems.length > 0) {
+                    el.querySelector('.delayedItemsList').innerHTML = '';
+                    const now = dayjs();
+                    const sorted = resp.delayedItems.map(x => ({...x, dispatchAt: dayjs.unix(x.queuedAt + (x.durationMilli/1000))}));
+                    sorted.sort((a, b) => a.dispatchAt.isSameOrAfter(b.dispatchAt) ? 1 : -1);
+                    const delayedItemDivs = sorted.map(x => {
+                        const diffUntilNow = x.dispatchAt.diff(now)
+                        const durationUntilNow = dayjs.duration(diffUntilNow);
+                        return `<div>A <a href="https://reddit.com${x.permalink}">${x.submissionId !== undefined ? 'Comment' : 'Submssion'}</a> by <a href="https://reddit.com/u/${x.author}">${x.author}</a> queued by ${x.source} on ${dayjs.unix(x.queuedAt).format('HH:mm:ss z')} for ${x.duration} (dispatches in ${durationUntilNow.humanize()})</div>`
+                    });
+                    el.querySelector('.delayedItemsList').insertAdjacentHTML('afterbegin', delayedItemDivs.join(''));
                 }
             }
 

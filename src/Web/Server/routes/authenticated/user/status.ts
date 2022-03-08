@@ -83,6 +83,7 @@ const status = () => {
                 permissions: [],
                 queuedActivities: m.queue.length(),
                 runningActivities: m.queue.running(),
+                delayedItems: m.getDelayedSummary(),
                 maxWorkers: m.queue.concurrency,
                 subMaxWorkers: m.subMaxWorkers || bot.maxWorkers,
                 globalMaxWorkers: bot.maxWorkers,
@@ -163,6 +164,8 @@ const status = () => {
                 globalMaxWorkers: acc.globalMaxWorkers + curr.globalMaxWorkers,
                 runningActivities: acc.runningActivities + curr.runningActivities,
                 queuedActivities: acc.queuedActivities + curr.queuedActivities,
+                // @ts-ignore
+                delayedItems: acc.delayedItems.concat(curr.delayedItems)
             };
         }, {
             checks: {
@@ -187,6 +190,7 @@ const status = () => {
             globalMaxWorkers: 0,
             runningActivities: 0,
             queuedActivities: 0,
+            delayedItems: [],
         });
         const {
             checks,
@@ -195,6 +199,7 @@ const status = () => {
             subMaxWorkers,
             runningActivities,
             queuedActivities,
+            delayedItems,
             ...rest
         } = totalStats;
 
@@ -239,6 +244,7 @@ const status = () => {
             subMaxWorkers,
             runningActivities,
             queuedActivities,
+            delayedItems,
             botState: {
                 state: RUNNING,
                 causedBy: SYSTEM

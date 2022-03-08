@@ -3,13 +3,14 @@ import {Logger} from "winston";
 import {SubmissionCheck} from "../Check/SubmissionCheck";
 import {CommentCheck} from "../Check/CommentCheck";
 import {
+    asComment,
     asSubmission,
     cacheStats,
     createHistoricalStatsDisplay,
     createRetryHandler,
     determineNewResults,
     findLastIndex,
-    formatNumber, isSubmission, likelyJson5,
+    formatNumber, getActivityAuthorName, isComment, isSubmission, likelyJson5,
     mergeArr, normalizeName,
     parseFromJsonOrYamlToObject,
     parseRedditEntity,
@@ -223,6 +224,25 @@ export class Manager extends EventEmitter {
             data.cache.provider = this.resources.cacheType;
         }
         return data;
+    }
+
+    getDelayedSummary = (): any[] => {
+        if(this.resources === undefined) {
+            return [];
+        }
+        return this.resources.delayedItems.map((x) => {
+            return {
+                id: x.id,
+                activityId: x.activity.name,
+                permalink: x.activity.permalink,
+                submissionId: asComment(x.activity) ? x.activity.link_id : undefined,
+                author: getActivityAuthorName(x.activity.author),
+                queuedAt: x.queuedAt,
+                durationMilli: x.duration.asMilliseconds(),
+                duration: x.duration.humanize(),
+                source: `${x.action}${x.rerunIdentifier !== undefined ? ` (${x.rerunIdentifier})` : ''}`
+            }
+        });
     }
 
     getCurrentLabels = () => {
