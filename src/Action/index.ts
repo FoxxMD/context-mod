@@ -1,7 +1,7 @@
 import {Comment, Submission} from "snoowrap";
 import {Logger} from "winston";
 import {RuleResult} from "../Rule";
-import {checkAuthorFilter, SubredditResources} from "../Subreddit/SubredditResources";
+import {checkAuthorFilter, checkItemFilter, SubredditResources} from "../Subreddit/SubredditResources";
 import {ActionProcessResult, ActionResult, ChecksActivityState, TypedActivityStates} from "../Common/interfaces";
 import Author, {AuthorOptions} from "../Author/Author";
 import {mergeArr} from "../util";
@@ -69,17 +69,24 @@ export abstract class Action {
             success: false,
         };
         try {
-            const itemPass = await this.resources.testItemCriteria(item, this.itemIs);
+            const [itemPass, itemFilterType, itemFilterResults] = await checkItemFilter(item, this.itemIs, this.resources, this.logger);
             if (!itemPass) {
                 this.logger.verbose(`Activity did not pass 'itemIs' test, Action not run`);
                 actRes.runReason = `Activity did not pass 'itemIs' test, Action not run`;
+                actRes.itemIs = itemFilterResults;
                 return actRes;
+            } else if(this.itemIs.length > 0) {
+                actRes.itemIs = itemFilterResults;
             }
-            const [authFilterResult, authFilterType] = await checkAuthorFilter(item, this.authorIs, this.resources, this.logger);
-            if(!authFilterResult) {
+
+            const [authPass, authFilterType, authorFilterResult] = await checkAuthorFilter(item, this.authorIs, this.resources, this.logger);
+            if(!authPass) {
                 this.logger.verbose(`${authFilterType} author criteria not matched, Action not run`);
                 actRes.runReason = `${authFilterType} author criteria not matched`;
+                actRes.authorIs = authorFilterResult;
                 return actRes;
+            } else if(authFilterType !== undefined) {
+                actRes.authorIs = authorFilterResult;
             }
 
             actRes.run = true;

@@ -1,67 +1,71 @@
 {
-  "checks": [
+  "runs": [
     {
-      "name": "Karma/Meme Sub Activity",
-      "description": "Report on karma sub activity or meme sub activity if user isn't a memelord",
-      // check will run on a new submission in your subreddit and look at the Author of that submission
-      "kind": "submission",
-      "rules": [
+      "checks": [
         {
-          "name": "freekarma",
-          "kind": "recentActivity",
-          "lookAt": "submissions",
-          "thresholds": [
+          "name": "Karma/Meme Sub Activity",
+          "description": "Report on karma sub activity or meme sub activity if user isn't a memelord",
+          // check will run on a new submission in your subreddit and look at the Author of that submission
+          "kind": "submission",
+          "rules": [
             {
-              "threshold": ">= 1",
-              "subreddits": [
-                "DeFreeKarma",
-                "FreeKarma4U",
-              ]
-            }
-          ],
-          "window": "7 days"
-        },
-        {
-          "name": "noobmemer",
-          "kind": "recentActivity",
-          // authors filter will be checked before a rule is run. If anything passes then the Rule is skipped -- it is not failed or triggered.
-          // if *all* Rules for a Check are skipped due to authors filter then the Check will fail
-          "authorIs": {
-            // each property (include/exclude) can contain multiple AuthorCriteria
-            // if any AuthorCriteria passes its test the Rule is skipped
-            //
-            // for an AuthorCriteria to pass all properties present on it must pass
-            //
-            // if "include" is present it will always run and exclude will be skipped
-            // "include:" []
-            "exclude": [
-              // for this to pass the Author of the Submission must not have the flair "Supreme Memer" and have the name "user1" or "user2"
-              {
-                "flairText": ["Supreme Memer"],
-                "names": ["user1","user2"]
+              "name": "freekarma",
+              "kind": "recentActivity",
+              "lookAt": "submissions",
+              "thresholds": [
+                {
+                  "threshold": ">= 1",
+                  "subreddits": [
+                    "DeFreeKarma",
+                    "FreeKarma4U",
+                  ]
+                }
+              ],
+              "window": "7 days"
+            },
+            {
+              "name": "noobmemer",
+              "kind": "recentActivity",
+              // authors filter will be checked before a rule is run. If anything passes then the Rule is skipped -- it is not failed or triggered.
+              // if *all* Rules for a Check are skipped due to authors filter then the Check will fail
+              "authorIs": {
+                // each property (include/exclude) can contain multiple AuthorCriteria
+                // if any AuthorCriteria passes its test the Rule is skipped
+                //
+                // for an AuthorCriteria to pass all properties present on it must pass
+                //
+                // if "include" is present it will always run and exclude will be skipped
+                // "include:" []
+                "exclude": [
+                  // for this to pass the Author of the Submission must not have the flair "Supreme Memer" and have the name "user1" or "user2"
+                  {
+                    "flairText": ["Supreme Memer"],
+                    "names": ["user1","user2"]
+                  },
+                  {
+                    // for this to pass the Author of the Submission must not have the flair "Decent Memer"
+                    "flairText": ["Decent Memer"]
+                  }
+                ]
               },
-              {
-                // for this to pass the Author of the Submission must not have the flair "Decent Memer"
-                "flairText": ["Decent Memer"]
-              }
-            ]
-          },
-          "lookAt": "submissions",
-          "thresholds": [
-            {
-              "threshold": ">= 1",
-              "subreddits": [
-                "dankmemes",
-              ]
+              "lookAt": "submissions",
+              "thresholds": [
+                {
+                  "threshold": ">= 1",
+                  "subreddits": [
+                    "dankmemes",
+                  ]
+                }
+              ],
+              "window": "7 days"
             }
           ],
-          "window": "7 days"
-        }
-      ],
-      "actions": [
-        {
-          "kind": "report",
-          "content": "Author has posted in free karma sub, or in /r/dankmemes and does not have meme flair in this subreddit"
+          "actions": [
+            {
+              "kind": "report",
+              "content": "Author has posted in free karma sub, or in /r/dankmemes and does not have meme flair in this subreddit"
+            }
+          ]
         }
       ]
     }

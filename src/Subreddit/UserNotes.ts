@@ -46,7 +46,7 @@ export interface RawNote {
     /**
      * Link shorthand
      * */
-    l: string;
+    l: (string | null);
     /**
      * type/color index from constants.warnings
      * */
@@ -100,7 +100,7 @@ export class UserNotes {
             if (this.moderators === undefined) {
                 this.moderators = await this.subreddit.getModerators();
             }
-            const notes = rawNotes.ns.map(x => UserNote.fromRaw(x, payload.constants, this.moderators as RedditUser[]));
+            const notes = rawNotes.ns.map(x => UserNote.fromRaw(x, payload.constants, this.moderators as RedditUser[], this.logger));
             // sort in ascending order by time
             notes.sort((a, b) => a.time.isBefore(b.time) ? -1 : 1);
             if (this.notesTTL > 0 && this.cache !== undefined) {
@@ -132,12 +132,12 @@ export class UserNotes {
             this.logger.info(`Mod ${mod.name} does not exist in UserNote constants, adding them`);
             payload.constants.users.push(mod.name);
         }
+        const modIndex = payload.constants.users.findIndex((x: string) => x === mod.name);
         if(!payload.constants.warnings.find((x: string) => x === type)) {
             this.logger.warn(`UserNote type '${type}' does not exist, adding it but make sure spelling and letter case is correct`);
             payload.constants.warnings.push(type);
-            //throw new LoggedError(`UserNote type '${type}' does not exist. If you meant to use this please add it through Toolbox first.`);
         }
-        const newNote = new UserNote(dayjs(), text, mod, type, `https://reddit.com${item.permalink}`);
+        const newNote = new UserNote(dayjs(), text, modIndex, type, `https://reddit.com${item.permalink}`, mod);
 
         if(payload.blob[userName] === undefined) {
             payload.blob[userName] = {ns: []};
@@ -237,31 +237,46 @@ export class UserNote {
     // noteType: string | null;
     // link: string;
 
-    constructor(public time: Dayjs, public text: string, public moderator: RedditUser, public noteType: string | number, public link: string) {
+    constructor(public time: Dayjs, public text: string, public modIndex: number, public noteType: string | number, public link: (string | null) = null, public moderator?: RedditUser) {
 
     }
 
     public toRaw(constants: UserNotesConstants): RawNote {
+        let m = this.modIndex;
+        if(m === undefined && this.moderator !== undefined) {
+            m = constants.users.findIndex((x: string) => x === this.moderator?.name);
+        }
         return {
             t: this.time.unix(),
             n: this.text,
-            m: constants.users.findIndex((x: string) => x === this.moderator.name),
+            m,
             w: typeof this.noteType === 'number' ? this.noteType : constants.warnings.findIndex((x: string) => x === this.noteType),
             l: usernoteLinkShorthand(this.link)
         }
     }
 
-    public static fromRaw(obj: RawNote, constants: UserNotesConstants, mods: RedditUser[]) {
-        const mod = mods.find(x => x.name === constants.users[obj.m]);
-        if (mod === undefined) {
-            throw new Error('Could not find moderator for Usernote');
+    public static fromRaw(obj: RawNote, constants: UserNotesConstants, mods: RedditUser[], logger?: Logger) {
+        const modName = constants.users[obj.m];
+        let mod;
+        if(modName === undefined) {
+            if(logger !== undefined) {
+                logger.warn(`Usernote says a moderator should be present at index ${obj.m} but none exists there! May need to clean up usernotes in toolbox.`);
+            }
+        } else {
+            mod = mods.find(x => x.name === constants.users[obj.m]);
         }
-        return new UserNote(dayjs.unix(obj.t), obj.n, mod, constants.warnings[obj.w] === null ? obj.w : constants.warnings[obj.w], usernoteLinkExpand(obj.l))
+        if (mod === undefined && logger !== undefined) {
+            logger.warn(`Usernote says it was created by user u/${modName} but they are not currently a moderator! You should cleanup usernotes in toolbox.`);
+        }
+        return new UserNote(dayjs.unix(obj.t), obj.n, obj.m, constants.warnings[obj.w] === null ? obj.w : constants.warnings[obj.w], usernoteLinkExpand(obj.l), mod)
     }
 }
 
 // https://github.com/toolbox-team/reddit-moderator-toolbox/wiki/Subreddit-Wikis%3A-usernotes#link-string-formats
-export const usernoteLinkExpand = (link: string) => {
+export const usernoteLinkExpand = (link: (string | null)): (string | null) => {
+    if(link === null || link === '') {
+        return null;
+    }
     if (link.charAt(0) === 'l') {
         const pieces = link.split(',');
         if (pieces.length === 3) {
@@ -275,7 +290,11 @@ export const usernoteLinkExpand = (link: string) => {
         return `https://www.reddit.com/message/messages/${link.split(',')[1]}`;
     }
 }
-export const usernoteLinkShorthand = (link: string) => {
+export const usernoteLinkShorthand = (link: (string | null)) => {
+
+    if(link === null || link === '') {
+        return '';
+    }
 
     const commentReg = parseLinkIdentifier([COMMENT_URL_ID]);
     const submissionReg = parseLinkIdentifier([SUBMISSION_URL_ID]);

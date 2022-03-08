@@ -2,9 +2,9 @@ import Snoowrap, {Comment} from "snoowrap";
 import Submission from "snoowrap/dist/objects/Submission";
 import {Logger} from "winston";
 import {findResultByPremise, mergeArr} from "../util";
-import {checkAuthorFilter, SubredditResources} from "../Subreddit/SubredditResources";
-import {ChecksActivityState, TypedActivityStates} from "../Common/interfaces";
-import Author, {AuthorOptions} from "../Author/Author";
+import {checkAuthorFilter, checkItemFilter, SubredditResources} from "../Subreddit/SubredditResources";
+import {ChecksActivityState, FilterResult, TypedActivityState, TypedActivityStates} from "../Common/interfaces";
+import Author, {AuthorCriteria, AuthorOptions} from "../Author/Author";
 
 export interface RuleOptions {
     name?: string;
@@ -31,6 +31,9 @@ export interface RuleResult extends ResultContext {
     kind: string
     name: string
     triggered: (boolean | null)
+    fromCache?: boolean
+    itemIs?: FilterResult<TypedActivityState>
+    authorIs?: FilterResult<AuthorCriteria>
 }
 
 export type FormattedRuleResult = RuleResult & {
@@ -94,9 +97,9 @@ export abstract class Rule implements IRule, Triggerable {
             const existingResult = findResultByPremise(this.getPremise(), existingResults);
             if (existingResult) {
                 this.logger.debug(`Returning existing result of ${existingResult.triggered ? '✔️' : '❌'}`);
-                return Promise.resolve([existingResult.triggered, {...existingResult, name: this.name}]);
+                return Promise.resolve([existingResult.triggered, {...existingResult, name: this.name, fromCache: true}]);
             }
-            const itemPass = await this.resources.testItemCriteria(item, this.itemIs);
+            const [itemPass, itemFilterType, itemFilterResults] = await checkItemFilter(item, this.itemIs, this.resources, this.logger);
             if (!itemPass) {
                 this.logger.verbose(`(Skipped) Item did not pass 'itemIs' test`);
                 return Promise.resolve([null, this.getResult(null, {result: `Item did not pass 'itemIs' test`})]);

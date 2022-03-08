@@ -3,13 +3,14 @@ import {Logger} from "winston";
 import {SubmissionCheck} from "../Check/SubmissionCheck";
 import {CommentCheck} from "../Check/CommentCheck";
 import {
+    asSubmission,
     cacheStats,
     createHistoricalStatsDisplay,
     createRetryHandler,
     determineNewResults,
     findLastIndex,
-    formatNumber, likelyJson5,
-    mergeArr,
+    formatNumber, isSubmission, likelyJson5,
+    mergeArr, normalizeName,
     parseFromJsonOrYamlToObject,
     parseRedditEntity,
     pollingInfo,
@@ -22,11 +23,11 @@ import {RuleResult} from "../Rule";
 import {ConfigBuilder, buildPollingOptions} from "../ConfigBuilder";
 import {
     ActionedEvent,
-    ActionResult,
+    ActionResult, CheckResult, CheckSummary,
     DEFAULT_POLLING_INTERVAL,
     DEFAULT_POLLING_LIMIT, FilterCriteriaDefaults, Invokee, LogInfo,
-    ManagerOptions, ManagerStateChangeOption, ManagerStats, PAUSED,
-    PollingOptionsStrong, PollOn, RUNNING, RunState, STOPPED, SYSTEM, USER
+    ManagerOptions, ManagerStateChangeOption, ManagerStats, NotificationEventPayload, PAUSED,
+    PollingOptionsStrong, PollOn, PostBehavior, PostBehaviorTypes, RUNNING, RunResult, RunState, STOPPED, SYSTEM, USER
 } from "../Common/interfaces";
 import Submission from "snoowrap/dist/objects/Submission";
 import {activityIsRemoved, itemContentPeek} from "../Utils/SnoowrapUtils";
@@ -44,12 +45,14 @@ import dayjs, {Dayjs as DayjsObj} from "dayjs";
 import Action from "../Action";
 import {queue, QueueObject} from 'async';
 import {JSONConfig} from "../JsonConfig";
-import {CheckStructuredJson} from "../Check";
+import {Check, CheckStructuredJson} from "../Check";
 import NotificationManager from "../Notification/NotificationManager";
 import {createHistoricalDefaults, historicalDefaults} from "../Common/defaults";
 import {ExtendedSnoowrap} from "../Utils/SnoowrapClients";
-import {CMError, isRateLimitError, isStatusError} from "../Utils/Errors";
-import {ErrorWithCause} from "pony-cause";
+import {CMError, isRateLimitError, isStatusError, RunProcessingError} from "../Utils/Errors";
+import {ErrorWithCause, stackWithCauses} from "pony-cause";
+import {Run} from "../Run";
+import got from "got";
 
 export interface RunningState {
     state: RunState,
@@ -62,10 +65,11 @@ export interface runCheckOptions {
     dryRun?: boolean,
     refresh?: boolean,
     force?: boolean,
+    gotoContext?: string
+    maxGotoDepth?: number
 }
 
 export interface CheckTask {
-    checkType: ('Comment' | 'Submission'),
     activity: (Submission | Comment),
     options?: runCheckOptions
 }
@@ -73,8 +77,9 @@ export interface CheckTask {
 export interface RuntimeManagerOptions extends ManagerOptions {
     sharedStreams?: PollOn[];
     wikiLocation?: string;
-    botName: string;
-    maxWorkers: number;
+    botName?: string;
+    maxWorkers?: number;
+    maxGotoDepth?: number
 }
 
 interface QueuedIdentifier {
@@ -90,14 +95,20 @@ export class Manager extends EventEmitter {
     logs: LogInfo[] = [];
     botName: string;
     pollOptions: PollingOptionsStrong[] = [];
-    submissionChecks!: SubmissionCheck[];
-    commentChecks!: CommentCheck[];
+    get submissionChecks() {
+        return this.runs.map(x => x.submissionChecks).flat();
+    }
+    get commentChecks() {
+        return this.runs.map(x => x.commentChecks).flat();
+    }
+    runs: Run[] = []
     resources!: SubredditResources;
     wikiLocation: string;
     lastWikiRevision?: DayjsObj
     lastWikiCheck: DayjsObj = dayjs();
     wikiFormat: ('yaml' | 'json') = 'yaml';
     filterCriteriaDefaults?: FilterCriteriaDefaults
+    postCheckBehaviorDefaults?: PostBehavior
     //wikiUpdateRunning: boolean = false;
 
     streams: Map<string, SPoll<Snoowrap.Submission | Snoowrap.Comment>> = new Map();
@@ -119,6 +130,7 @@ export class Manager extends EventEmitter {
     queuedItemsMeta: QueuedIdentifier[] = [];
     globalMaxWorkers: number;
     subMaxWorkers?: number;
+    maxGotoDepth: number;
 
     displayLabel: string;
     currentLabels: string[] = [];
@@ -154,6 +166,8 @@ export class Manager extends EventEmitter {
     rulesUniqueSampleInterval: any;
     rulesUniqueRollingAvg: number = 0;
     actionedEvents: ActionedEvent[] = [];
+
+    processEmitter: EventEmitter = new EventEmitter();
 
     getStats = async (): Promise<ManagerStats> => {
         const data: any = {
@@ -195,10 +209,19 @@ export class Manager extends EventEmitter {
         return this.displayLabel;
     }
 
-    constructor(sub: Subreddit, client: ExtendedSnoowrap, logger: Logger, cacheManager: BotResourcesManager, opts: RuntimeManagerOptions = {botName: 'ContextMod', maxWorkers: 1}) {
+    constructor(sub: Subreddit, client: ExtendedSnoowrap, logger: Logger, cacheManager: BotResourcesManager, opts: RuntimeManagerOptions) {
         super();
 
-        const {dryRun, sharedStreams = [], wikiLocation = 'botconfig/contextbot', botName, maxWorkers, filterCriteriaDefaults} = opts;
+        const {
+            dryRun,
+            sharedStreams = [],
+            wikiLocation = 'botconfig/contextbot',
+            botName = 'ContextMod',
+            maxWorkers = 1,
+            maxGotoDepth = 1,
+            filterCriteriaDefaults,
+            postCheckBehaviorDefaults
+        } = opts || {};
         this.displayLabel = opts.nickname || `${sub.display_name_prefixed}`;
         const getLabels = this.getCurrentLabels;
         const getDisplay = this.getDisplay;
@@ -220,11 +243,13 @@ export class Manager extends EventEmitter {
         this.globalDryRun = dryRun;
         this.wikiLocation = wikiLocation;
         this.filterCriteriaDefaults = filterCriteriaDefaults;
+        this.postCheckBehaviorDefaults = postCheckBehaviorDefaults;
         this.sharedStreams = sharedStreams;
         this.pollingRetryHandler = createRetryHandler({maxRequestRetry: 3, maxOtherRetry: 2}, this.logger);
         this.subreddit = sub;
         this.client = client;
         this.botName = botName;
+        this.maxGotoDepth = maxGotoDepth;
         this.globalMaxWorkers = maxWorkers;
         this.notificationManager = new NotificationManager(this.logger, this.subreddit, this.displayLabel, botName);
         this.cacheManager = cacheManager;
@@ -232,6 +257,8 @@ export class Manager extends EventEmitter {
         this.queue = this.generateQueue(this.getMaxWorkers(this.globalMaxWorkers));
         this.queue.pause();
         this.firehose = this.generateFirehose();
+
+        this.logger.info(`Max GOTO Depth: ${this.maxGotoDepth}`);
 
         this.eventsSampleInterval = setInterval((function(self) {
             return function() {
@@ -274,6 +301,13 @@ export class Manager extends EventEmitter {
                 //self.logger.debug(`Unique Rules Run Rolling Avg: ${formatNumber(self.rulesUniqueRollingAvg)}/s`);
             }
         })(this), 10000);
+
+        this.processEmitter.on('notify', (payload: NotificationEventPayload) => {
+           this.notificationManager.handle(payload.type, payload.title, payload.body, payload.causedBy, payload.logLevel);
+        });
+
+        // relay check/run errors to bot for retry metrics
+        this.processEmitter.on('error', err => this.emit('error', err));
     }
 
     public async getModPermissions(): Promise<string[]> {
@@ -353,7 +387,7 @@ export class Manager extends EventEmitter {
                 try {
                     const itemMeta = this.queuedItemsMeta[queuedItemIndex];
                     this.queuedItemsMeta.splice(queuedItemIndex, 1, {...itemMeta, state: 'processing'});
-                    await this.runChecks(task.checkType, task.activity, {...task.options, refresh: itemMeta.shouldRefresh});
+                    await this.handleActivity(task.activity, {...task.options, refresh: itemMeta.shouldRefresh});
                 } finally {
                     // always remove item meta regardless of success or failure since we are done with it meow
                     this.queuedItemsMeta.splice(queuedItemIndex, 1);
@@ -370,6 +404,14 @@ export class Manager extends EventEmitter {
 
         this.logger.info(`Generated new Queue with ${maxWorkers} max workers`);
         return q;
+    }
+
+    public getCommentChecks() {
+        return this.runs.map(x => x.commentChecks);
+    }
+
+    public getSubmissionChecks() {
+        return this.runs.map(x => x.commentChecks);
     }
 
     protected async parseConfigurationFromObject(configObj: object, suppressChangeEvent: boolean = false) {
@@ -428,35 +470,51 @@ export class Manager extends EventEmitter {
             this.resources.setLogger(this.logger);
 
             this.logger.info('Subreddit-specific options updated');
-            this.logger.info('Building Checks...');
+            this.logger.info('Building Runs and Checks...');
 
-            const commentChecks: Array<CommentCheck> = [];
-            const subChecks: Array<SubmissionCheck> = [];
-            const structuredChecks = configBuilder.parseToStructured(validJson, this.filterCriteriaDefaults);
+            const structuredRuns = configBuilder.parseToStructured(validJson, this.filterCriteriaDefaults, this.postCheckBehaviorDefaults);
+
+            let runs: Run[] = [];
 
             // TODO check that bot has permissions for subreddit for all specified actions
             // can find permissions in this.subreddit.mod_permissions
 
-            for (const jCheck of structuredChecks) {
-                const checkConfig = {
-                    ...jCheck,
-                    dryRun: this.dryRun || jCheck.dryRun,
+            let index = 1;
+            for (const r of structuredRuns) {
+                const {name = `Run${index}`, ...rest} = r;
+                const run = new Run({
+                    name,
+                    ...rest,
                     logger: this.logger,
-                    subredditName: this.subreddit.display_name,
                     resources: this.resources,
+                    subredditName: this.subreddit.display_name,
                     client: this.client,
-                };
-                if (jCheck.kind === 'comment') {
-                    commentChecks.push(new CommentCheck(checkConfig));
-                } else if (jCheck.kind === 'submission') {
-                    subChecks.push(new SubmissionCheck(checkConfig));
-                }
+                    emitter: this.processEmitter,
+                });
+                runs.push(run);
+                index++;
             }
 
-            this.submissionChecks = subChecks;
-            this.commentChecks = commentChecks;
+            // make sure run names are unique
+            const rNames: string[] = [];
+            for(const r of runs) {
+                if(rNames.includes(normalizeName(r.name))) {
+                    throw new Error(`Rule names must be unique. Duplicate name detected: ${r.name}`);
+                }
+                rNames.push(normalizeName(r.name));
+            }
+
+            this.runs = runs;
+            const runSummary = `Found ${runs.length} Runs with ${this.submissionChecks.length + this.commentChecks.length} Checks`;
+
+            if(this.runs.length === 0) {
+                this.logger.warn(runSummary);
+            } else {
+                this.logger.info(runSummary);
+            }
+
             const checkSummary = `Found Checks -- Submission: ${this.submissionChecks.length} | Comment: ${this.commentChecks.length}`;
-            if (subChecks.length === 0 && commentChecks.length === 0) {
+            if (this.submissionChecks.length === 0 && this.commentChecks.length === 0) {
                 this.logger.warn(checkSummary);
             } else {
                 this.logger.info(checkSummary);
@@ -601,8 +659,8 @@ export class Manager extends EventEmitter {
         }
     }
 
-    async runChecks(checkType: ('Comment' | 'Submission'), activity: (Submission | Comment), options?: runCheckOptions): Promise<void> {
-        const checks = checkType === 'Comment' ? this.commentChecks : this.submissionChecks;
+    async handleActivity(activity: (Submission | Comment), options?: runCheckOptions): Promise<void> {
+        const checkType = isSubmission(activity) ? 'Submission' : 'Comment';
         let item = activity;
         const itemId = await item.id;
 
@@ -618,44 +676,36 @@ export class Manager extends EventEmitter {
         }
 
         let allRuleResults: RuleResult[] = [];
+        const runResults: RunResult[] = [];
         const itemIdentifier = `${checkType === 'Submission' ? 'SUB' : 'COM'} ${itemId}`;
         this.currentLabels = [itemIdentifier];
         let ePeek = '';
         try {
-            const [peek, _] = await itemContentPeek(item);
-            ePeek = peek;
+            const [peek, { content: peekContent }] = await itemContentPeek(item);
+            ePeek = peekContent;
             this.logger.info(`<EVENT> ${peek}`);
         } catch (err: any) {
-            this.logger.error(`Error occurred while generate item peek for ${checkType} Activity ${itemId}`, err);
+            this.logger.error(`Error occurred while generating item peek for ${checkType} Activity ${itemId}`, err);
         }
 
-        let checksRun = 0;
-        let actionsRun = 0;
-        let totalRulesRun = 0;
-        let runActions: ActionResult[] = [];
         let actionedEvent: ActionedEvent = {
+            triggered: false,
             subreddit: this.subreddit.display_name_prefixed,
             activity: {
                 peek: ePeek,
-                link: item.permalink
+                link: item.permalink,
+                type: checkType === 'Submission' ? 'submission' : 'comment',
+                id: itemId,
+                author: item.author.name,
+                subreddit: item.subreddit_name_prefixed
             },
-            author: item.author.name,
             timestamp: Date.now(),
-            check: '',
-            ruleSummary: '',
-            ruleResults: [],
-            actionResults: [],
+            runResults: []
         }
-        let triggered = false;
-        let triggeredCheckName;
-        const checksRunNames = [];
-        const cachedCheckNames = [];
         const startingApiLimit = this.client.ratelimitRemaining;
 
         const {
-            checkNames = [],
             delayUntil,
-            dryRun,
             refresh = false,
         } = options || {};
 
@@ -682,7 +732,7 @@ export class Manager extends EventEmitter {
                 item = await activity.refresh();
             }
 
-            if (item instanceof Submission) {
+            if (asSubmission(item)) {
                 if (await item.removed_by_category === 'deleted') {
                     this.logger.warn('Submission was deleted, cannot process.');
                     return;
@@ -692,100 +742,117 @@ export class Manager extends EventEmitter {
                 return;
             }
 
-            for (const check of checks) {
-                if (checkNames.length > 0 && !checkNames.map(x => x.toLowerCase()).some(x => x === check.name.toLowerCase())) {
-                    this.logger.warn(`Check ${check.name} not in array of requested checks to run, skipping...`);
-                    continue;
-                }
-                if(!check.enabled) {
-                    this.logger.info(`Check ${check.name} not run because it is not enabled, skipping...`);
-                    continue;
-                }
-                checksRunNames.push(check.name);
-                checksRun++;
-                triggered = false;
-                let isFromCache = false;
-                let currentResults: RuleResult[] = [];
-                try {
-                    const [checkTriggered, checkResults, fromCache = false] = await check.runRules(item, allRuleResults);
-                    isFromCache = fromCache;
-                    if(!fromCache) {
-                        await check.setCacheResult(item, {result: checkTriggered, ruleResults: checkResults});
+            // for now disallow the same goto from being run twice
+            // maybe in the future this can be user-configurable
+            const hitGotos: string[] = [];
+
+            let continueRunIteration = true;
+            let runIndex = 0;
+            let gotoContext: string = '';
+            while(continueRunIteration && (runIndex < this.runs.length || gotoContext !== '')) {
+                let currRun: Run;
+                if(gotoContext !== '') {
+                    hitGotos.push(gotoContext);
+                    if(hitGotos.filter(x => x === gotoContext).length > this.maxGotoDepth) {
+                        throw new Error(`The goto "${gotoContext}" has been triggered ${hitGotos.filter(x => x === gotoContext).length} times which is more than the max allowed for any single goto (${this.maxGotoDepth}).
+                         This indicates a possible endless loop may occur so CM will terminate processing this activity to save you from yourself! The max triggered depth can be configured by the operator.`);
+                    }
+                    const [runName] = gotoContext.split('.');
+                    const gotoIndex = this.runs.findIndex(x => normalizeName(x.name) === normalizeName(runName));
+                    if(gotoIndex !== -1) {
+                        if(gotoIndex > runIndex) {
+                            this.logger.debug(`Fast forwarding Run iteration to ${this.runs[gotoIndex].name}`, {leaf: 'GOTO'});
+                        } else if(gotoIndex < runIndex) {
+                            this.logger.debug(`Rewinding Run iteration to ${this.runs[gotoIndex].name}`, {leaf: 'GOTO'});
+                        } else {
+                            this.logger.debug(`Did not iterate to next Run due to GOTO specifying same run`, {leaf: 'GOTO'});
+                        }
+                        currRun = this.runs[gotoIndex];
+                        runIndex = gotoIndex;
+                        if(!gotoContext.includes('.')) {
+                            // goto completed, no check
+                            gotoContext = '';
+                        }
                     } else {
-                        cachedCheckNames.push(check.name);
+                        throw new Error(`GOTO specified a Run that could not be found: ${runName}`);
                     }
-                    currentResults = checkResults;
-                    totalRulesRun += checkResults.length;
-                    allRuleResults = allRuleResults.concat(determineNewResults(allRuleResults, checkResults));
-                    triggered = checkTriggered;
-                    if(triggered && fromCache && !check.cacheUserResult.runActions) {
-                        this.logger.info('Check was triggered but cache result options specified NOT to run actions...counting as check NOT triggered');
-                        triggered = false;
-                    }
-                } catch (e: any) {
-                    if (e.logged !== true) {
-                        this.logger.warn(`Running rules for Check ${check.name} failed due to uncaught exception`, e);
-                    }
-                    this.emit('error', e);
+                } else {
+                    currRun = this.runs[runIndex];
                 }
 
-                if (triggered) {
-                    triggeredCheckName = check.name;
-                    actionedEvent.check = check.name;
-                    actionedEvent.ruleResults = currentResults;
-                    if(isFromCache) {
-                        actionedEvent.ruleSummary = `Check result was found in cache: ${triggeredIndicator(true)}`;
-                    } else {
-                        actionedEvent.ruleSummary = resultsSummary(currentResults, check.condition);
-                    }
-                    runActions = await check.runActions(item, currentResults.filter(x => x.triggered), dryRun);
-                    // we only can about report and comment actions since those can produce items for newComm and modqueue
-                    const recentCandidates = runActions.filter(x => ['report','comment'].includes(x.kind.toLocaleLowerCase())).map(x => x.touchedEntities === undefined ? [] : x.touchedEntities).flat();
-                    for(const recent of recentCandidates) {
-                        await this.resources.setRecentSelf(recent as (Submission|Comment));
-                    }
-                    actionsRun = runActions.length;
+                const [runResult, postBehavior] = await currRun.handle(item,allRuleResults, runResults.filter(x => x.name === currRun.name), {...options, gotoContext, maxGotoDepth: this.maxGotoDepth});
+                runResults.push(runResult);
 
-                    if(check.notifyOnTrigger) {
-                        const ar = runActions.filter(x => x.success).map(x => x.name).join(', ');
-                        this.notificationManager.handle('eventActioned', 'Check Triggered', `Check "${check.name}" was triggered on Event: \n\n ${ePeek} \n\n with the following actions run: ${ar}`);
-                    }
-                    break;
+                allRuleResults = allRuleResults.concat(determineNewResults(allRuleResults, (runResult.checkResults ?? []).map(x => x.ruleResults).flat()));
+
+                switch (postBehavior.toLowerCase()) {
+                    case 'next':
+                    case 'nextrun':
+                        continueRunIteration = true;
+                        gotoContext = '';
+                        break;
+                    case 'stop':
+                        continueRunIteration = false;
+                        gotoContext = '';
+                        break;
+                    default:
+                        if (postBehavior.includes('goto:')) {
+                            gotoContext = postBehavior.split(':')[1];
+                        }
                 }
+                runIndex++;
             }
-
-            if (!triggered) {
-                this.logger.info('No checks triggered');
-            }
-
         } catch (err: any) {
-            if (!(err instanceof LoggedError) && err.logged !== true) {
-                this.logger.error('An unhandled error occurred while running checks', err);
+            if(err instanceof RunProcessingError && err.result !== undefined) {
+                runResults.push(err.result);
             }
+            const processError = new ErrorWithCause('Activity processing terminated early due to unexpected error', {cause: err});
+            this.logger.error(processError);
             this.emit('error', err);
         } finally {
+            actionedEvent.triggered = runResults.some(x => x.triggered);
+            if(!actionedEvent.triggered) {
+                this.logger.verbose('No checks triggered');
+            }
             try {
-                actionedEvent.actionResults = runActions;
-                if(triggered) {
+                //actionedEvent.actionResults = runActions;
+                actionedEvent.runResults = runResults;
+                if(actionedEvent.triggered) {
+                    // only get parent submission info if we are actually going to use this event
+                    if(checkType === 'Comment') {
+                        try {
+                            // @ts-ignore
+                            const subProxy = await this.client.getSubmission(await item.link_id);
+                            const sub = await this.resources.getActivity(subProxy);
+                            const [peek, { content: peekContent, author, permalink }] = await itemContentPeek(sub);
+                            actionedEvent.parentSubmission = {
+                                peek: peekContent,
+                                author,
+                                subreddit: item.subreddit_name_prefixed,
+                                id: (item as Comment).link_id,
+                                type: 'comment',
+                                link: permalink
+                            }
+                        } catch (err: any) {
+                            this.logger.error(`Error occurred while generating item peek for ${checkType} Activity ${itemId}`, err);
+                        }
+                    }
                     await this.resources.addActionedEvent(actionedEvent);
                 }
+
+                const checksRun = actionedEvent.runResults.map(x => x.checkResults).flat().length;
+                let actionsRun = actionedEvent.runResults.map(x => x.checkResults?.map(y => y.actionResults)).flat().length;
+                let totalRulesRun = actionedEvent.runResults.map(x => x.checkResults?.map(y => y.ruleResults)).flat().length;
 
                 this.logger.verbose(`Run Stats:        Checks ${checksRun} | Rules => Total: ${totalRulesRun} Unique: ${allRuleResults.length} Cached: ${totalRulesRun - allRuleResults.length} Rolling Avg: ~${formatNumber(this.rulesUniqueRollingAvg)}/s | Actions ${actionsRun}`);
                 this.logger.verbose(`Reddit API Stats: Initial ${startingApiLimit} | Current ${this.client.ratelimitRemaining} | Used ~${startingApiLimit - this.client.ratelimitRemaining} | Events ~${formatNumber(this.eventsRollingAvg)}/s`);
                 this.currentLabels = [];
             } catch (err: any) {
-                this.logger.error('Error occurred while cleaning up Activity check and generating stats', err);
+                this.logger.error(new ErrorWithCause('Error occurred while cleaning up Activity check and generating stats', {cause: err}));
             } finally {
                 this.resources.updateHistoricalStats({
                     eventsCheckedTotal: 1,
-                    eventsActionedTotal: triggered ? 1 : 0,
-                    checksTriggered: triggeredCheckName !== undefined ? [triggeredCheckName] : [],
-                    checksRun: checksRunNames,
-                    checksFromCache: cachedCheckNames,
-                    actionsRun: runActions.map(x => x.name),
-                    rulesRun: allRuleResults.map(x => x.name),
-                    rulesTriggered: allRuleResults.filter(x => x.triggered).map(x => x.name),
-                    rulesCachedTotal: totalRulesRun - allRuleResults.length,
+                    eventsActionedTotal: actionedEvent.triggered ? 1 : 0,
                 });
             }
         }
@@ -908,7 +975,7 @@ export class Manager extends EventEmitter {
                         checkType = 'Comment';
                     }
                     if (checkType !== undefined) {
-                        this.firehose.push({checkType, activity: item, options: {delayUntil}})
+                        this.firehose.push({activity: item, options: {delayUntil}})
                     }
                 };
 

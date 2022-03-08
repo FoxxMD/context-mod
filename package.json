@@ -59,6 +59,7 @@
     "leven": "^3.1.0",
     "lodash": "^4.17.21",
     "lru-cache": "^6.0.0",
+    "migrate": "github:johsunds/node-migrate#49b0054de0a9295857aa8b8eea9a3cdeb2643913",
     "mustache": "^4.2.0",
     "node-fetch": "^2.6.1",
     "normalize-url": "^6.1.0",

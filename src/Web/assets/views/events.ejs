@@ -10,57 +10,301 @@
     <meta name="viewport" content="width=device-width,initial-scale=1.0">
     <!--icons from https://heroicons.com -->
     <style>
-        .peek a {
-            display: none;
-        }
+        /*.peek a {*/
+        /*    display: none;*/
+        /*}*/
     </style>
 </head>
 <body class="bg-gray-900 text-white font-sans">
-<script>localStorage.getItem('ms-dark') === 'no' ? document.body.classList.remove('dark') : document.body.classList.add('dark')</script>
 <div class="min-w-screen min-h-screen">
     <%- include('partials/title') %>
     <div class="container mx-auto">
         <div class="grid">
+            <div class="pr-3 pt-3" style="text-align: right">
+                <input type="checkbox" id="showAll">
+                <label for="showAll">Show all non-triggered details</label>
+            </div>
             <div class="px-3 py-6 space-y-3">
                 <% if(data.length === 0) { %>
                     No events have been actioned yet!
                 <% } %>
-                <% data.forEach(function (eRes){ %>
-                    <div class="shadow-lg">
-                        <div class="space-x-4 px-4 p-2 leading-2 font-semibold bg-gray-700">
+                <% data.forEach(function (eRes) { %>
+                    <div class="shadow-lg bg-gray-700 py-1 triggeredStateWrapper">
+                        <div class="space-x-4 px-4 p-2 leading-2 triggeredStateToggle">
                             <div class="flex items-center justify-between">
                                 <div>
-                                <span class="peek"><%- eRes.activity.peek %></span><a target="_blank" href="https://reddit.com<%= eRes.activity.link%>">(Link)</a>
+                                    <a class="activityLink font-semibold" target="_blank" href="https://reddit.com<%= eRes.activity.link%>"><%= eRes.activity.type === 'comment' ? 'Comment' : 'Submission' %></a>
+                                    by <a class="activityLink" target="_blank" href="https://reddit.com/u/<%= eRes.activity.author%>"><%= eRes.activity.author%></a>
                                 </div>
-                                <div class="flex items-center flex-end">
-                                    <%= eRes.subreddit %> @ <%= eRes.timestamp %>
+                                <div class="font-semibold flex items-center flex-end">
+                                    <a class="activityLink mr-1" target="_blank" href="https://reddit.com/<%= eRes.activity.subreddit %>"><%= eRes.activity.subreddit %></a>
+                                     @ <%= eRes.timestamp %>
                                 </div>
                             </div>
                         </div>
-                        <div class="p-4 pl-6 pt-3 space-y-2 bg-gray-500">
-                            <div><span class="font-semibold">Check:</span> <%= eRes.check %><span class="px-3">&#10132;</span><%= eRes.ruleSummary %></div>
-                            <div>
-                                <span class="font-semibold">Rules:</span>
-                                <ul class="list-inside list-disc">
-                                    <% eRes.ruleResults.forEach(function (ruleResult) { %>
-                                        <li><%= ruleResult.name %> - <%= ruleResult.triggered%> - <%= ruleResult.result %></li>
-                                    <% }) %>
-                                </ul>
+                        <div class="border-t-2 border-gray-500 triggeredState <%= eRes.triggered ? 'triggered' : 'notTriggered'%>">
+                            <div class="m-4 p-2 px-4">
+                                <blockquote class="ml-3 italic" cite="https://reddit.com<%= eRes.activity.link%>">
+                                    "<%- eRes.activity.peek %>"
+                                </blockquote>
+                                <% if(eRes.parentSubmission !== undefined) { %>
+                                    <div class="my-3">in a <a class="activityLink inline" href="https://reddit.com<%= eRes.parentSubmission.link%>">Submission</a> by <a class="activityLink inline" target="_blank" href="https://reddit.com/u/<%= eRes.parentSubmission.author%>">/u/<%= eRes.parentSubmission.author%></a> titled:</div>
+                                <blockquote class="ml-3 mb-2 italic" cite="https://reddit.com<%= eRes.parentSubmission.link%>">
+                                    "<%= eRes.parentSubmission.peek%>"
+                                </blockquote>
+                                <% } %>
                             </div>
-                            <div><span class="font-semibold">Actions</span>
-                                <ul class="list-inside list-disc">
-                                    <% eRes.actionResults.forEach(function (aRes) { %>
-                                        <li><%= aRes.name %><%= aRes.dryRun %> - <%= aRes.result %></li>
-                                    <% }) %>
-                                </ul>
+                        <% eRes.runResults.forEach(function (runSum, index) { %>
+                        <div class="m-4 p-2 px-4 space-y-2 bg-gray-600 triggeredStateWrapper">
+                            <div class="triggeredStateToggle">
+                                <span class="font-semibold">Run:</span>
+                                <span class="px-1"><%= runSum.triggered %></span> <%= runSum.name %>
                             </div>
-                        </div>
+                            <div class="space-y-2 triggeredState <%= runSum.triggeredVal ? 'triggered' : 'notTriggered'%>">
+                                <% if (runSum.error !== undefined) { %>
+                                    <span class="font-semibold">Not Run</span> <span class="px-1">=> <%= runSum.error %></span>
+                                <% } %>
+                                <% if(runSum.authorIs !== undefined || runSum.itemIs !== undefined) { %>
+                                <ul class="list-inside list-disc">
+                                    <% if(runSum.authorIs !== undefined) { %>
+                                        <li>
+                                            <span class="font-semibold">Author:</span> <span class="px-1"><%= runSum.authorIs.passed %> (<%= runSum.authorIs.join %>)</span>
+                                            <ul class="list-inside list-disc">
+                                                <% runSum.authorIs.criteriaResults.forEach(function (res, index) { %>
+                                                    <li>Criteria #<%= index + 1 %> => <%= res[0] %>
+                                                        <ul class="list-inside list-disc">
+                                                            <% res[1].forEach(function (resInside) { %>
+                                                                <li><%= resInside %></li>
+                                                            <% }) %>
+                                                        </ul>
+                                                    </li>
+                                                <% }) %>
+                                            </ul>
+                                        </li>
+                                    <% } %>
+                                        <% if(runSum.itemIs !== undefined) { %>
+                                            <li>
+                                                <span class="font-semibold">Item:</span> <span class="px-1"><%= runSum.itemIs.passed %> (<%= runSum.itemIs.join %>)</span>
+                                                <ul class="list-inside list-disc">
+                                                    <% runSum.itemIs.criteriaResults.forEach(function (res, index) { %>
+                                                        <li>Criteria #<%= index + 1 %> => <%= res[0] %>
+                                                            <ul class="list-inside list-disc">
+                                                                <% res[1].forEach(function (resInside) { %>
+                                                                    <li><%= resInside %></li>
+                                                                <% }) %>
+                                                            </ul>
+                                                        </li>
+                                                    <% }) %>
+                                                </ul>
+                                            </li>
+                                        <% } %>
+                                </ul>
+                                <% } %>
+                            <% runSum.checkResults.forEach(function (chkSum, index) { %>
+                                <div class="py-3 px-4 space-y-2 bg-gray-500 triggeredStateWrapper <%= chkSum.triggeredVal ? 'border-2 border-gray-100' : ''%>">
+                                    <div class="triggeredStateToggle">
+                                        <span class="font-semibold">Check:</span><span class="px-1"><%= chkSum.triggered %></span><%= chkSum.name %><span class="px-3">&#10132;</span><%= chkSum.ruleSummary %>
+                                    </div>
+                                    <div class="space-y-2 triggeredState <%= chkSum.triggeredVal ? 'triggered' : 'notTriggered'%>">
+                                    <% if (chkSum.error !== undefined) { %>
+                                        <span class="font-semibold">Not Run</span><span class="px-1"> => <%= chkSum.error %></span>
+                                    <% } %>
+                                    <% if(chkSum.authorIs !== undefined || chkSum.itemIs !== undefined) { %>
+                                        <ul class="list-inside list-disc">
+                                            <% if(chkSum.authorIs !== undefined) { %>
+                                                <li>
+                                                    <span class="font-semibold">Author:</span> <span class="px-1"><%= chkSum.authorIs.passed %> (<%= chkSum.authorIs.join %>)</span>
+                                                    <ul class="list-inside list-disc">
+                                                        <% chkSum.authorIs.criteriaResults.forEach(function (res, index) { %>
+                                                            <li>Criteria #<%= index %> => <%= res[0] %>
+                                                                <ul class="list-inside list-disc">
+                                                                    <% res[1].forEach(function (resInside) { %>
+                                                                        <li><%= resInside %></li>
+                                                                    <% }) %>
+                                                                </ul>
+                                                            </li>
+                                                        <% }) %>
+                                                    </ul>
+                                                </li>
+                                            <% } %>
+                                            <% if(chkSum.itemIs !== undefined) { %>
+                                                <li>
+                                                    <span class="font-semibold">Item:</span> <span class="px-1"><%= chkSum.itemIs.passed %> (<%= chkSum.itemIs.join %>)</span>
+                                                    <ul class="list-inside list-disc">
+                                                        <% chkSum.itemIs.criteriaResults.forEach(function (res, index) { %>
+                                                            <li>Criteria #<%= index %> => <%= res[0] %>
+                                                                <ul class="list-inside list-disc">
+                                                                    <% res[1].forEach(function (resInside) { %>
+                                                                        <li><%= resInside %></li>
+                                                                    <% }) %>
+                                                                </ul>
+                                                            </li>
+                                                        <% }) %>
+                                                    </ul>
+                                                </li>
+                                            <% } %>
+                                        </ul>
+                                    <% } %>
+                                    <div>
+                                        <span class="font-semibold">Rules:</span>
+                                        <ul class="list-inside list-disc">
+                                            <% chkSum.ruleResults.forEach(function (ruleResult) { %>
+                                                <% if(ruleResult.authorIs !== undefined || ruleResult.itemIs !== undefined) { %>
+                                                    <li><%= ruleResult.name %> <%= ruleResult.triggered%>
+                                                        <ul class="list-inside list-disc">
+                                                            <% if(chkSum.authorIs !== undefined) { %>
+                                                                <li>
+                                                                    <span class="font-semibold">Author:</span> <span class="px-1"><%= ruleResult.authorIs.passed %> (<%= ruleResult.authorIs.join %>)</span>
+                                                                    <ul class="list-inside list-disc">
+                                                                        <% ruleResult.authorIs.criteriaResults.forEach(function (res, index) { %>
+                                                                            <li>Criteria #<%= index %> => <%= res[0] %>
+                                                                                <ul class="list-inside list-disc">
+                                                                                    <% res[1].forEach(function (resInside) { %>
+                                                                                        <li><%= resInside %></li>
+                                                                                    <% }) %>
+                                                                                </ul>
+                                                                            </li>
+                                                                        <% }) %>
+                                                                    </ul>
+                                                                </li>
+                                                            <% } %>
+                                                            <% if(ruleResult.itemIs !== undefined) { %>
+                                                                <li>
+                                                                    <span class="font-semibold">Item:</span> <span class="px-1"><%= ruleResult.itemIs.passed %> (<%= ruleResult.itemIs.join %>)</span>
+                                                                    <ul class="list-inside list-disc">
+                                                                        <% ruleResult.itemIs.criteriaResults.forEach(function (res, index) { %>
+                                                                            <li>Criteria #<%= index %> => <%= res[0] %>
+                                                                                <ul class="list-inside list-disc">
+                                                                                    <% res[1].forEach(function (resInside) { %>
+                                                                                        <li><%= resInside %></li>
+                                                                                    <% }) %>
+                                                                                </ul>
+                                                                            </li>
+                                                                        <% }) %>
+                                                                    </ul>
+                                                                </li>
+                                                            <% } %>
+                                                            <li><span class="font-semibold">Result:</span> <%= ruleResult.result %></li>
+                                                        </ul>
+                                                    </li>
+                                                <% } else { %>
+                                                    <li><%= ruleResult.name %> <%= ruleResult.triggered%> - <%= ruleResult.result %></li>
+                                                <% } %>
+                                            <% }) %>
+                                        </ul>
+                                    </div>
+                                    <% if(chkSum.actionResults.length !== 0) { %>
+                                    <div><span class="font-semibold">Actions</span>
+
+                                            <ul class="list-inside list-disc">
+                                                <% chkSum.actionResults.forEach(function (aRes) { %>
+                                                    <% if (aRes.error !== undefined) { %>
+                                                        <span class="font-semibold">Not Run</span><span class="px-1"> => <%= aRes.error %></span>
+                                                    <% } %>
+                                                    <% if(aRes.authorIs !== undefined || aRes.itemIs !== undefined) { %>
+                                                        <li><%= aRes.name %> <%= aRes.triggered%>
+                                                            <ul class="list-inside list-disc">
+                                                                <% if(aRes.authorIs !== undefined) { %>
+                                                                    <li>
+                                                                        <span class="font-semibold">Author:</span> <span class="px-1"><%= aRes.authorIs.passed %> (<%= aRes.authorIs.join %>)</span>
+                                                                        <ul class="list-inside list-disc">
+                                                                            <% aRes.authorIs.criteriaResults.forEach(function (res, index) { %>
+                                                                                <li>Criteria #<%= index %> => <%= res[0] %>
+                                                                                    <ul class="list-inside list-disc">
+                                                                                        <% res[1].forEach(function (resInside) { %>
+                                                                                            <li><%= resInside %></li>
+                                                                                        <% }) %>
+                                                                                    </ul>
+                                                                                </li>
+                                                                            <% }) %>
+                                                                        </ul>
+                                                                    </li>
+                                                                <% } %>
+                                                                <% if(aRes.itemIs !== undefined) { %>
+                                                                    <li>
+                                                                        <span class="font-semibold">Item:</span> <span class="px-1"><%= aRes.itemIs.passed %> (<%= aRes.itemIs.join %>)</span>
+                                                                        <ul class="list-inside list-disc">
+                                                                            <% aRes.itemIs.criteriaResults.forEach(function (res, index) { %>
+                                                                                <li>Criteria #<%= index %> => <%= res[0] %>
+                                                                                    <ul class="list-inside list-disc">
+                                                                                        <% res[1].forEach(function (resInside) { %>
+                                                                                            <li><%= resInside %></li>
+                                                                                        <% }) %>
+                                                                                    </ul>
+                                                                                </li>
+                                                                            <% }) %>
+                                                                        </ul>
+                                                                    </li>
+                                                                <% } %>
+                                                                <li><span class="font-semibold">Result:</span> <%= aRes.result %></li>
+                                                            </ul>
+                                                        </li>
+                                                    <% } else { %>
+                                                            <li><%= aRes.name %><%= aRes.dryRun %> - <%= aRes.result %></li>
+                                                    <% } %>
+                                                <% }) %>
+                                            </ul>
+                                    </div>
+                                    <% } %>
+                                    <div>
+                                        <span class="font-semibold">Post <%= chkSum.triggered ? 'Trigger' : 'Fail' %> Behavior <span class="px-1">&#10132;</span> <%= chkSum.postBehavior %></span>
+                                    </div>
+                                    </div>
+                                </div>
+                        <% }) %>
+                            </div>
                     </div>
+                        <% }) %>
+                        </div>
+            </div>
                 <% }) %>
             </div>
         </div>
     </div>
     <%- include('partials/footer') %>
 </div>
+<script>
+    function toggleShowNonTriggered(val) {
+        document.querySelectorAll('.triggeredState').forEach(el => {
+            el.classList.remove('show','hide');
+            if(val && el.classList.contains('notTriggered')) {
+                el.classList.add('show');
+            }
+        });
+    }
+    document.querySelector('#showAll').addEventListener('change', (e) => {
+        toggleShowNonTriggered(e.target.checked);
+        localStorage.setItem('showNonTriggered', e.target.checked);
+    });
+
+    const initShowNonTiggeredState = localStorage.getItem('showNonTriggered');
+    if(initShowNonTiggeredState === 'true') {
+        document.querySelector('#showAll').checked = true;
+        toggleShowNonTriggered(true);
+    }
+
+    document.querySelectorAll('.triggeredStateToggle').forEach(el => {
+        el.addEventListener('click', (e) => {
+            if(e.target.nodeName.toLowerCase() !== 'a') {
+                const tElm = e.currentTarget.closest('.triggeredStateWrapper').querySelector('.triggeredState');
+                if(tElm !== null) {
+                    if(tElm.classList.contains('triggered')) {
+                        if(tElm.classList.contains('hide')) {
+                            tElm.classList.remove('hide');
+                        } else {
+                            tElm.classList.add('hide');
+                        }
+                    } else {
+                        if(tElm.classList.contains('show')) {
+                            tElm.classList.remove('show');
+                        } else {
+                            tElm.classList.add('show');
+                        }
+                    }
+                }
+            }
+        });
+    })
+</script>
 </body>
 </html>

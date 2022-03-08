@@ -1,23 +1,24 @@
-checks:
-  - name: Burstpost Spam
-    description: Check if Author is crossposting in short bursts
-    # check will run on a new submission in your subreddit and look at the Author of that submission
-    kind: submission
-    rules:
-      - name: burstpost
-        kind: repeatActivity
-        # will only look at Submissions in Author's history that contain the same content (link) as the Submission this check was initiated by
-        useSubmissionAsReference: true
-        # the number of non-repeat activities (submissions or comments) to ignore between repeat submissions
-        gapAllowance: 3
-        # if the Author has posted this Submission 6 times, ignoring 3 non-repeat activities between each repeat, then this rule will trigger
-        threshold: '>= 6'
-        # look at all of the Author's submissions in the last 7 days or 100 submissions
-        window:
-          duration: 7 days
-          count: 100
-    actions:
-      - kind: report
-        content: >-
-          Author has burst-posted this link {{rules.burstpost.largestRepeat}}
-          times over {{rules.burstpost.window}}
+runs:
+  - checks:
+      - name: Burstpost Spam
+        description: Check if Author is crossposting in short bursts
+        # check will run on a new submission in your subreddit and look at the Author of that submission
+        kind: submission
+        rules:
+          - name: burstpost
+            kind: repeatActivity
+            # will only look at Submissions in Author's history that contain the same content (link) as the Submission this check was initiated by
+            useSubmissionAsReference: true
+            # the number of non-repeat activities (submissions or comments) to ignore between repeat submissions
+            gapAllowance: 3
+            # if the Author has posted this Submission 6 times, ignoring 3 non-repeat activities between each repeat, then this rule will trigger
+            threshold: '>= 6'
+            # look at all of the Author's submissions in the last 7 days or 100 submissions
+            window:
+              duration: 7 days
+              count: 100
+        actions:
+          - kind: report
+            content: >-
+              Author has burst-posted this link {{rules.burstpost.largestRepeat}}
+              times over {{rules.burstpost.window}}

@@ -13,7 +13,7 @@ import as from 'async';
 import fetch from 'node-fetch';
 import {
     asActivity,
-    asSubmission,
+    asSubmission, asUserNoteCriteria,
     buildCacheOptionsFromProvider,
     buildCachePrefix,
     cacheStats,
@@ -31,10 +31,10 @@ import {
     parseExternalUrl,
     parseGenericValueComparison,
     parseRedditEntity, parseStringToRegex,
-    parseWikiContext, PASS, redisScanIterator,
+    parseWikiContext, PASS, redisScanIterator, removeUndefinedKeys,
     shouldCacheSubredditStateCriteriaResult,
-    subredditStateIsNameOnly,
-    toStrongSubredditState
+    subredditStateIsNameOnly, testMaybeStringRegex,
+    toStrongSubredditState, userNoteCriteriaSummary
 } from "../util";
 import LoggedError from "../Utils/LoggedError";
 import {
@@ -56,7 +56,11 @@ import {
     HistoricalStats,
     HistoricalStatUpdateData,
     SubredditHistoricalStats,
-    SubredditHistoricalStatsDisplay, ThirdPartyCredentialsJsonConfig, FilterCriteriaResult,
+    SubredditHistoricalStatsDisplay,
+    ThirdPartyCredentialsJsonConfig,
+    FilterCriteriaResult,
+    FilterResult,
+    TypedActivityState, RequiredItemCrit, ItemCritPropHelper,
 } from "../Common/interfaces";
 import UserNotes from "./UserNotes";
 import Mustache from "mustache";
@@ -71,6 +75,9 @@ import {ExtendedSnoowrap} from "../Utils/SnoowrapClients";
 import dayjs from "dayjs";
 import ImageData from "../Common/ImageData";
 import globrex from 'globrex';
+import {runMigrations} from "../Common/Migrations/CacheMigrationUtils";
+import {isStatusError, SimpleError} from "../Utils/Errors";
+import {ErrorWithCause} from "pony-cause";
 
 export const DEFAULT_FOOTER = '\r\n*****\r\nThis action was performed by [a bot.]({{botLink}}) Mention a moderator or [send a modmail]({{modmailLink}}) if you any ideas, questions, or concerns about this action.';
 
@@ -863,24 +870,21 @@ export class SubredditResources {
         return await testAuthorCriteria(item, authorOpts, include, this.userNotes);
     }
 
-    async testItemCriteria(i: (Comment | Submission), activityStates: TypedActivityStates) {
-        // return early if nothing is being checked for so we don't store an empty cache result for this (duh)
-        if(activityStates.length === 0) {
-            return true;
+    async testItemCriteria(i: (Comment | Submission), activityState: TypedActivityState, logger: Logger): Promise<FilterCriteriaResult<TypedActivityState>> {
+        if(Object.keys(activityState).length === 0) {
+            return {
+                behavior: 'include',
+                criteria: activityState,
+                propertyResults: [],
+                passed: true
+            }
         }
         if (this.filterCriteriaTTL !== false) {
             let item = i;
-            let states = activityStates;
-            // optimize for submission only checks on comment item
-            if (item instanceof Comment && states.length === 1 && Object.keys(states[0]).length === 1 && (states[0] as CommentState).submissionState !== undefined) {
-                // @ts-ignore
-                const subProxy = await this.client.getSubmission(await i.link_id);
-                // @ts-ignore
-                item = await this.getActivity(subProxy);
-                states = (states[0] as CommentState).submissionState as SubmissionState[];
-            }
+            let state = activityState;
+
             try {
-                const hash = `itemCrit-${item.name}-${objectHash.sha1(states)}`;
+                const hash = `itemCrit-${item.name}-${objectHash.sha1(state)}`;
                 await this.stats.cache.itemCrit.identifierRequestCount.set(hash, (await this.stats.cache.itemCrit.identifierRequestCount.wrap(hash, () => 0) as number) + 1);
                 this.stats.cache.itemCrit.requestTimestamps.push(Date.now());
                 this.stats.cache.itemCrit.requests++;
@@ -889,7 +893,7 @@ export class SubredditResources {
                     this.logger.debug(`Cache Hit: Item Check on ${item.name} (Hash ${hash})`);
                     //return cachedItem as boolean;
                 }
-                const itemResult = await this.isItem(item, states, this.logger);
+                const itemResult = await this.isItem(item, state, logger);
                 this.stats.cache.itemCrit.miss++;
                 await this.cache.set(hash, itemResult, {ttl: this.filterCriteriaTTL});
                 return itemResult;
@@ -901,7 +905,7 @@ export class SubredditResources {
             }
         }
 
-        return await this.isItem(i, activityStates, this.logger);
+        return await this.isItem(i, activityState, logger);
     }
 
     async isSubreddit (subreddit: Subreddit, stateCriteriaRaw: SubredditState | StrongSubredditState, logger: Logger) {
@@ -967,235 +971,270 @@ export class SubredditResources {
         })() as boolean;
     }
 
-    async isItem (item: Submission | Comment, stateCriteria: TypedActivityStates, logger: Logger) {
-        if (stateCriteria.length === 0) {
-            return true;
-        }
+    async isItem (item: Submission | Comment, stateCriteria: TypedActivityState, logger: Logger): Promise<FilterCriteriaResult<(SubmissionState & CommentState)>> {
+
+        const definedStateCriteria = (removeUndefinedKeys(stateCriteria) as RequiredItemCrit);
 
         const log = logger.child({leaf: 'Item Check'}, mergeArr);
 
-        for (const crit of stateCriteria) {
-            const pass = await (async () => {
-                for (const k of Object.keys(crit)) {
-                    // @ts-ignore
-                    if (crit[k] !== undefined) {
-                        switch (k) {
-                            case 'submissionState':
-                                if(isSubmission(item)) {
-                                    log.warn('`submissionState` is not allowed in `itemIs` criteria when the main Activity is a Submission');
-                                    continue;
-                                }
-                                // get submission
-                                // @ts-ignore
-                                const subProxy = await this.client.getSubmission(await item.link_id);
-                                // @ts-ignore
-                                const sub = await this.getActivity(subProxy);
-                                // @ts-ignore
-                                const res = await this.testItemCriteria(sub, crit[k] as SubmissionState[], logger);
-                                if(!res) {
-                                    return false;
-                                }
-                                break;
-                            case 'score':
-                                const scoreCompare = parseGenericValueComparison(crit[k] as string);
-                                if(!comparisonTextOp(item.score, scoreCompare.operator, scoreCompare.value)) {
-                                    // @ts-ignore
-                                    log.debug(`Failed: Expected => ${k}:${crit[k]} | Found => ${k}:${item.score}`)
-                                    return false
-                                }
-                                break;
-                            case 'reports':
-                                if (!item.can_mod_post) {
-                                    log.debug(`Cannot test for reports on Activity in a subreddit bot account is not a moderator of. Skipping criteria...`);
-                                    break;
-                                }
-                                const reportCompare = parseGenericValueComparison(crit[k] as string);
-                                let reportType = 'total';
-                                if(reportCompare.extra !== undefined && reportCompare.extra.trim() !== '') {
-                                    const requestedType = reportCompare.extra.toLocaleLowerCase().trim();
-                                    if(requestedType.includes('mod')) {
-                                        reportType = 'mod';
-                                    } else if(requestedType.includes('user')) {
-                                        reportType = 'user';
-                                    } else {
-                                        log.warn(`Did not recognize the report type "${requestedType}" -- can only use "mod" or "user". Will default to TOTAL reports`);
-                                    }
-                                }
-                                let reportNum = item.num_reports;
-                                if(reportType === 'user') {
-                                    reportNum = item.user_reports.length;
-                                } else {
-                                    reportNum = item.mod_reports.length;
-                                }
-                                if(!comparisonTextOp(reportNum, reportCompare.operator, reportCompare.value)) {
-                                    // @ts-ignore
-                                    log.debug(`Failed: Expected => ${k}:${crit[k]} ${reportType} reports | Found => ${k}:${reportNum} ${reportType} reports`)
-                                    return false
-                                }
-                                break;
-                            case 'removed':
-                                const removed = activityIsRemoved(item);
-                                if (removed !== crit['removed']) {
-                                    // @ts-ignore
-                                    log.debug(`Failed: Expected => ${k}:${crit[k]} | Found => ${k}:${removed}`)
-                                    return false
-                                }
-                                break;
-                            case 'deleted':
-                                const deleted = activityIsDeleted(item);
-                                if (deleted !== crit['deleted']) {
-                                    // @ts-ignore
-                                    log.debug(`Failed: Expected => ${k}:${crit[k]} | Found => ${k}:${deleted}`)
-                                    return false
-                                }
-                                break;
-                            case 'filtered':
-                                if (!item.can_mod_post) {
-                                    log.debug(`Cannot test for 'filtered' state on Activity in a subreddit bot account is not a moderator for. Skipping criteria...`);
-                                    break;
-                                }
-                                const filtered = activityIsFiltered(item);
-                                if (filtered !== crit['filtered']) {
-                                    // @ts-ignore
-                                    log.debug(`Failed: Expected => ${k}:${crit[k]} | Found => ${k}:${filtered}`)
-                                    return false
-                                }
-                                break;
-                            case 'age':
-                                const ageTest = compareDurationValue(parseDurationComparison(crit[k] as string), dayjs.unix(await item.created));
-                                if (!ageTest) {
-                                    log.debug(`Failed: Activity did not pass age test "${crit[k] as string}"`);
-                                    return false;
-                                }
-                                break;
-                            case 'title':
-                                if((item instanceof Comment)) {
-                                    log.warn('`title` is not allowed in `itemIs` criteria when the main Activity is a Comment');
-                                    continue;
-                                }
-                                // @ts-ignore
-                                const titleReg = crit[k] as string;
-                                try {
-                                    if (null === item.title.match(titleReg)) {
-                                        // @ts-ignore
-                                        log.debug(`Failed to match title as regular expression: ${titleReg}`);
-                                        return false;
-                                    }
-                                } catch (err: any) {
-                                    log.error(`An error occurred while attempting to match title against string as regular expression: ${titleReg}. Most likely the string does not make a valid regular expression.`, err);
-                                    return false
-                                }
-                                break;
-                            case 'isRedditMediaDomain':
-                                if((item instanceof Comment)) {
-                                    log.warn('`isRedditMediaDomain` is not allowed in `itemIs` criteria when the main Activity is a Comment');
-                                    continue;
-                                }
-                                // @ts-ignore
-                                const isRedditDomain = crit[k] as boolean;
-                                // @ts-ignore
-                                if (item.is_reddit_media_domain !== isRedditDomain) {
-                                    // @ts-ignore
-                                    log.debug(`Failed: Expected => ${k}:${crit[k]} | Found => ${k}:${item.is_reddit_media_domain}`)
-                                    return false
-                                }
-                                break;
-                            case 'approved':
-                            case 'spam':
-                                if(!item.can_mod_post) {
-                                    log.debug(`Cannot test for '${k}' state on Activity in a subreddit bot account is not a moderator for. Skipping criteria...`);
-                                    break;
-                                }
-                                // @ts-ignore
-                                if (item[k] !== crit[k]) {
-                                    // @ts-ignore
-                                    log.debug(`Failed: Expected => ${k}:${crit[k]} | Found => ${k}:${item[k]}`)
-                                    return false
-                                }
-                                break;
-                            case 'op':
-                                if(isSubmission(item)) {
-                                    log.warn(`On a Submission the 'op' property will always be true. Did you mean to use this on a comment instead?`);
-                                    break;
-                                }
-                                // @ts-ignore
-                                if (item.is_submitter !== crit[k]) {
-                                    // @ts-ignore
-                                    log.debug(`Failed: Expected => ${k}:${crit[k]} | Found => ${k}:${item[k]}`)
-                                    return false
-                                }
-                                break;
-                            case 'depth':
-                                if(isSubmission(item)) {
-                                    log.warn(`Cannot test for 'depth' on a Submission`);
-                                    break;
-                                }
-                                // @ts-ignore
-                                const depthCompare = parseGenericValueComparison(crit[k] as string);
-                                if(!comparisonTextOp(item.score, depthCompare.operator, depthCompare.value)) {
-                                    // @ts-ignore
-                                    log.debug(`Failed: Expected => ${k}:${crit[k]} | Found => ${k}:${item.score}`)
-                                    return false
-                                }
-                                break;
-                            case 'flairTemplate':
-                            case 'link_flair_text':
-                            case 'link_flair_css_class':
-                                if(asSubmission(item)) {
-                                    const subCrit = crit as SubmissionState;
-                                    let propertyValue: string | null;
-                                    if(k === 'flairTemplate') {
-                                        propertyValue = await item.link_flair_template_id;
-                                    } else {
-                                        propertyValue = await item[k];
-                                    }
-                                    const expectedValues = typeof subCrit[k] === 'string' ? [subCrit[k]] : (subCrit[k] as string[]);
-                                    const VALUEPass = () => {
-                                        for (const c of expectedValues) {
-                                            if (c === propertyValue) {
-                                                return true;
-                                            }
-                                        }
-                                        return false;
-                                    };
-                                    const valueResult = VALUEPass();
-                                    if(!valueResult) {
-                                        log.debug(`Failed: Expected => ${k} ${expectedValues.join(' OR ')} | Found => ${k}:${propertyValue}`);
-                                        return false;
-                                    }
-                                    break;
-                                } else {
-                                    log.warn(`Cannot test for ${k} on Comment`);
-                                    break;
-                                }
-                            default:
-                                // @ts-ignore
-                                if (item[k] !== undefined) {
-                                    // @ts-ignore
-                                    if (item[k] !== crit[k]) {
-                                        // @ts-ignore
-                                        log.debug(`Failed: Expected => ${k}:${crit[k]} | Found => ${k}:${item[k]}`)
-                                        return false
-                                    }
-                                } else {
-                                    if(!item.can_mod_post) {
-                                        log.warn(`Tried to test for Activity property '${k}' but it did not exist. This Activity is not in a subreddit the bot can mod so it may be that this property is only available to mods of that subreddit. Or the property may be misspelled.`);
-                                    } else {
-                                        log.warn(`Tried to test for Activity property '${k}' but it did not exist. Check the spelling of the property.`);
-                                    }
-                                }
-                                break;
-                        }
-                    }
-                }
-                log.debug(`Passed: ${JSON.stringify(crit)}`);
-                return true;
-            })() as boolean;
-            if (pass) {
-                return true
+        if(Object.keys(stateCriteria).length === 0) {
+            return {
+                behavior: 'include',
+                criteria: stateCriteria,
+                propertyResults: [],
+                passed: true
             }
         }
-        return false
+
+        const propResultsMap = Object.entries(definedStateCriteria).reduce((acc: ItemCritPropHelper, [k, v]) => {
+            const key = (k as keyof (SubmissionState & CommentState));
+            acc[key] = {
+                property: key,
+                behavior: 'include',
+            };
+            return acc;
+        }, {});
+
+        const keys = Object.keys(propResultsMap) as (keyof (SubmissionState & CommentState))[]
+
+        let shouldContinue;
+
+        try {
+            for(const k of keys) {
+                const itemOptVal = definedStateCriteria[k];
+
+                shouldContinue = undefined;
+
+                switch(k) {
+                    case 'submissionState':
+                        if(isSubmission(item)) {
+                            const subMsg = `'submissionState' is not allowed in 'itemIs' criteria when the main Activity is a Submission`;
+                            log.debug(subMsg);
+                            propResultsMap.submissionState!.passed = true;
+                            propResultsMap.submissionState!.reason = subMsg;
+                            break;
+                        }
+                        // get submission
+                        // @ts-ignore
+                        const subProxy = await this.client.getSubmission(await item.link_id);
+                        // @ts-ignore
+                        const sub = await this.getActivity(subProxy);
+
+                        const subStates = itemOptVal as RequiredItemCrit['submissionState'];
+                        // @ts-ignore
+                        const subResults = [];
+                        for(const subState of subStates) {
+                            subResults.push(await this.testItemCriteria(sub, subState as SubmissionState, logger))
+                        }
+                        propResultsMap.submissionState!.passed = subResults.length === 0 || subResults.some(x => x.passed);
+                        propResultsMap.submissionState!.found = {
+                            join: 'OR',
+                            criteriaResults: subResults,
+                            passed: propResultsMap.submissionState!.passed
+                        };
+                        break;
+                    case 'score':
+                        const scoreCompare = parseGenericValueComparison(itemOptVal as string);
+                        propResultsMap.score!.passed = comparisonTextOp(item.score, scoreCompare.operator, scoreCompare.value);
+                        propResultsMap.score!.found = item.score;
+                        break;
+                    case 'reports':
+                        if (!item.can_mod_post) {
+                            const reportsMsg = 'Cannot test for reports on Activity in a subreddit bot account is not a moderator of. Skipping criteria...';
+                            log.debug(reportsMsg);
+                            propResultsMap.reports!.passed = true;
+                            propResultsMap.reports!.reason = reportsMsg;
+                            break;
+                        }
+                        const reportCompare = parseGenericValueComparison(itemOptVal as string);
+                        let reportType = 'total';
+                        if(reportCompare.extra !== undefined && reportCompare.extra.trim() !== '') {
+                            const requestedType = reportCompare.extra.toLocaleLowerCase().trim();
+                            if(requestedType.includes('mod')) {
+                                reportType = 'mod';
+                            } else if(requestedType.includes('user')) {
+                                reportType = 'user';
+                            } else {
+                                const reportTypeWarn = `Did not recognize the report type "${requestedType}" -- can only use "mod" or "user". Will default to TOTAL reports`;
+                                log.debug(reportTypeWarn);
+                                propResultsMap.reports!.reason = reportTypeWarn;
+                            }
+                        }
+                        let reportNum = item.num_reports;
+                        if(reportType === 'user') {
+                            reportNum = item.user_reports.length;
+                        } else {
+                            reportNum = item.mod_reports.length;
+                        }
+                        propResultsMap.reports!.found = `${reportNum} ${reportType}`;
+                        propResultsMap.reports!.passed = comparisonTextOp(reportNum, reportCompare.operator, reportCompare.value);
+                        break;
+                    case 'removed':
+                        const removed = activityIsRemoved(item);
+                        propResultsMap.removed!.passed = removed === itemOptVal;
+                        propResultsMap.removed!.found = removed;
+                        break;
+                    case 'deleted':
+                        const deleted = activityIsDeleted(item);
+                        propResultsMap.deleted!.passed = deleted === itemOptVal;
+                        propResultsMap.deleted!.found = deleted;
+                        break;
+                    case 'filtered':
+                        if (!item.can_mod_post) {
+                            const filteredWarn =`Cannot test for 'filtered' state on Activity in a subreddit bot account is not a moderator for. Skipping criteria...`;
+                            log.debug(filteredWarn);
+                            propResultsMap.filtered!.passed = true;
+                            propResultsMap.filtered!.reason = filteredWarn;
+                            break;
+                        }
+                        const filtered = activityIsFiltered(item);
+                        propResultsMap.filtered!.passed = filtered === itemOptVal;
+                        propResultsMap.filtered!.found = filtered;
+                        break;
+                    case 'age':
+                        const created = dayjs.unix(await item.created);
+                        const ageTest = compareDurationValue(parseDurationComparison(itemOptVal as string), created);
+                        propResultsMap.age!.passed = ageTest;
+                        propResultsMap.age!.found = created.format('MMMM D, YYYY h:mm A Z');
+                        break;
+                    case 'title':
+                        if((item instanceof Comment)) {
+                            const titleWarn ='`title` is not allowed in `itemIs` criteria when the main Activity is a Comment';
+                            log.debug(titleWarn);
+                            propResultsMap.title!.passed = true;
+                            propResultsMap.title!.reason = titleWarn;
+                            break;
+                        }
+
+                        propResultsMap.title!.found = item.title;
+
+                        try {
+                            const [titlePass, reg] = testMaybeStringRegex(itemOptVal as string, item.title);
+                            propResultsMap.title!.passed = titlePass;
+                        } catch (err: any) {
+                            propResultsMap.title!.passed = false;
+                            propResultsMap.title!.reason = err.message;
+                        }
+                        break;
+                    case 'isRedditMediaDomain':
+                        if((item instanceof Comment)) {
+                            const mediaWarn = '`isRedditMediaDomain` is not allowed in `itemIs` criteria when the main Activity is a Comment';
+                            log.debug(mediaWarn);
+                            propResultsMap.isRedditMediaDomain!.passed = true;
+                            propResultsMap.isRedditMediaDomain!.reason = mediaWarn;
+                            break;
+                        }
+
+                        propResultsMap.isRedditMediaDomain!.found = item.is_reddit_media_domain;
+                        propResultsMap.isRedditMediaDomain!.passed = item.is_reddit_media_domain === itemOptVal;
+                        break;
+                    case 'approved':
+                    case 'spam':
+                        if(!item.can_mod_post) {
+                            const spamWarn = `Cannot test for '${k}' state on Activity in a subreddit bot account is not a moderator for. Skipping criteria...`
+                            log.debug(spamWarn);
+                            propResultsMap[k]!.passed = true;
+                            propResultsMap[k]!.reason = spamWarn;
+                            break;
+                        }
+                        // @ts-ignore
+                        propResultsMap[k]!.found = item[k];
+                        propResultsMap[k]!.passed = propResultsMap[k]!.found === itemOptVal;
+                        break;
+                    case 'op':
+                        if(isSubmission(item)) {
+                            const opWarn = `On a Submission the 'op' property will always be true. Did you mean to use this on a comment instead?`;
+                            log.debug(opWarn);
+                            propResultsMap.op!.passed = true;
+                            propResultsMap.op!.reason = opWarn;
+                            break;
+                        }
+                        propResultsMap.op!.found = (item as Comment).is_submitter;
+                        propResultsMap.op!.passed = propResultsMap.op!.found === itemOptVal;
+                        break;
+                    case 'depth':
+                        if(isSubmission(item)) {
+                            const depthWarn = `Cannot test for 'depth' on a Submission`;
+                            log.debug(depthWarn);
+                            propResultsMap.depth!.passed = true;
+                            propResultsMap.depth!.reason = depthWarn;
+                            break;
+                        }
+                        const depthCompare = parseGenericValueComparison(itemOptVal as string);
+
+                        const depth = (item as Comment).depth;
+                        propResultsMap.depth!.found = depth;
+                        propResultsMap.depth!.passed = comparisonTextOp(depth, depthCompare.operator, depthCompare.value);
+                        break;
+                    case 'flairTemplate':
+                    case 'link_flair_text':
+                    case 'link_flair_css_class':
+                        if(asSubmission(item)) {
+                            let propertyValue: string | null;
+                            if(k === 'flairTemplate') {
+                                propertyValue = await item.link_flair_template_id;
+                            } else {
+                                propertyValue = await item[k];
+                            }
+
+                            propResultsMap[k]!.found = propertyValue;
+
+                            const expectedValues = typeof itemOptVal === 'string' ? [itemOptVal] : (itemOptVal as string[]);
+                            const VALUEPass = () => {
+                                for (const c of expectedValues) {
+                                    if (c === propertyValue) {
+                                        return true;
+                                    }
+                                }
+                                return false;
+                            };
+                            propResultsMap[k]!.passed = VALUEPass();
+                            break;
+                        } else {
+                            log.warn(`Cannot test for ${k} on Comment`);
+                            break;
+                        }
+                    default:
+                        // @ts-ignore
+                        const val = item[k];
+
+                        if (val !== undefined && propResultsMap[k] !== undefined) {
+                            propResultsMap[k]!.found = val;
+                            propResultsMap[k]!.passed = val === itemOptVal;
+                        } else {
+                            let defaultWarn = `Tried to test for Activity property '${k}' but it did not exist. Check the spelling of the property.`;
+                            if(!item.can_mod_post) {
+                                defaultWarn =`Tried to test for Activity property '${k}' but it did not exist. This Activity is not in a subreddit the bot can mod so it may be that this property is only available to mods of that subreddit. Or the property may be misspelled.`;
+                            }
+                            propResultsMap.depth!.passed = true;
+                            propResultsMap.depth!.reason = defaultWarn;
+                            log.debug(defaultWarn);
+                        }
+                        break;
+                }
+
+                if(!propResultsMap[k]!.passed && shouldContinue === undefined) {
+                    shouldContinue = false;
+                }
+
+                if(!shouldContinue) {
+                    break;
+                }
+            }
+        } catch (err: any) {
+            throw new ErrorWithCause('Could not execute Item Filter on Activity due to an expected error', {cause: err});
+        }
+
+        // gather values and determine overall passed
+        const propResults = Object.values(propResultsMap);
+        const passed = propResults.filter(x => typeof x.passed === 'boolean').every(x => x.passed === true);
+
+        return {
+            behavior: 'include',
+            criteria: stateCriteria,
+            propertyResults: propResults,
+            passed,
+        };
     }
 
     async getCommentCheckCacheResult(item: Comment, checkConfig: object): Promise<UserResultCache | undefined> {
@@ -1277,6 +1316,7 @@ export class BotResourcesManager {
     modStreams: Map<string, SPoll<Snoowrap.Submission | Snoowrap.Comment>> = new Map();
     defaultCache: Cache;
     defaultCacheConfig: StrongCache
+    defaultCacheMigrated: boolean = false;
     cacheType: string = 'none';
     cacheHash: string;
     ttlDefaults: Required<TTLConfig>;
@@ -1284,8 +1324,9 @@ export class BotResourcesManager {
     actionedEventsDefault: number;
     pruneInterval: any;
     defaultThirdPartyCredentials: ThirdPartyCredentialsJsonConfig;
+    logger: Logger;
 
-    constructor(config: BotInstanceConfig) {
+    constructor(config: BotInstanceConfig, logger: Logger) {
         const {
             caching: {
                 authorTTL,
@@ -1313,6 +1354,7 @@ export class BotResourcesManager {
         this.defaultCacheConfig = caching;
         this.defaultThirdPartyCredentials = thirdParty;
         this.ttlDefaults = {authorTTL, userNotesTTL, wikiTTL, commentTTL, submissionTTL, filterCriteriaTTL, subredditTTL, selfTTL};
+        this.logger = logger;
 
         const options = provider;
         this.cacheType = options.store;
@@ -1384,15 +1426,16 @@ export class BotResourcesManager {
                     ...init,
                     ...trueRest,
                 };
+                await runMigrations(opts.cache, opts.logger, trueProvider.prefix);
             }
+        } else if(!this.defaultCacheMigrated) {
+            await runMigrations(this.defaultCache, this.logger, opts.prefix);
+            this.defaultCacheMigrated = true;
         }
 
         let resource: SubredditResources;
         const res = this.get(subName);
         if(res === undefined || res.cacheSettingsHash !== hash) {
-            if(res !== undefined && res.cache !== undefined) {
-                res.cache.reset();
-            }
             resource = new SubredditResources(subName, opts);
             await resource.initHistoricalStats();
             resource.setHistoricalSaveInterval();
@@ -1445,7 +1488,7 @@ export class BotResourcesManager {
     }
 }
 
-export const checkAuthorFilter = async (item: (Submission | Comment), filter: AuthorOptions, resources: SubredditResources, logger: Logger): Promise<[boolean, ('inclusive' | 'exclusive' | undefined)]> => {
+export const checkAuthorFilter = async (item: (Submission | Comment), filter: AuthorOptions, resources: SubredditResources, logger: Logger): Promise<[boolean, ('inclusive' | 'exclusive' | undefined), FilterResult<AuthorCriteria>]> => {
     const authLogger = logger.child({labels: ['Author Filter']}, mergeArr);
     const {
         include = [],
@@ -1453,15 +1496,17 @@ export const checkAuthorFilter = async (item: (Submission | Comment), filter: Au
         exclude = [],
     } = filter;
     let authorPass = null;
+    const allCritResults: FilterCriteriaResult<AuthorCriteria>[] = [];
     if (include.length > 0) {
         let index = 1;
         for (const auth of include) {
             const critResult = await resources.testAuthorCriteria(item, auth);
+            allCritResults.push(critResult);
             const [summary, details] = filterCriteriaSummary(critResult);
             if (critResult.passed) {
                 authLogger.verbose(`${PASS} => Inclusive Author Criteria ${index} => ${summary}`);
                 authLogger.debug(`Criteria Details: \n${details.join('\n')}`);
-                return [true, 'inclusive'];
+                return [true, 'inclusive', {criteriaResults: allCritResults, join: 'OR', passed: true}];
             } else {
                 authLogger.debug(`${FAIL} => Inclusive Author Criteria ${index} => ${summary}`);
                 authLogger.debug(`Criteria Details: \n${details.join('\n')}`);
@@ -1469,13 +1514,14 @@ export const checkAuthorFilter = async (item: (Submission | Comment), filter: Au
             index++;
         }
         authLogger.verbose(`${FAIL} => No Inclusive Author Criteria matched`);
-        return [false, 'inclusive'];
+        return [false, 'inclusive', {criteriaResults: allCritResults, join: 'OR', passed: false}];
     }
     if (exclude.length > 0) {
         let index = 1;
         const summaries: string[] = [];
         for (const auth of exclude) {
             const critResult = await resources.testAuthorCriteria(item, auth, false);
+            allCritResults.push(critResult);
             const [summary, details] = filterCriteriaSummary(critResult);
             if (critResult.passed) {
                 if(excludeCondition === 'OR') {
@@ -1507,11 +1553,39 @@ export const checkAuthorFilter = async (item: (Submission | Comment), filter: Au
             if(excludeCondition === 'OR') {
                 authLogger.verbose(`${FAIL} => Exclusive author criteria not matched => ${summaries.length === 1 ? `${summaries[0]}` : '(many, see debug)'}`);
             }
-            return [false, 'exclusive']
+            return [false, 'exclusive', {criteriaResults: allCritResults, join: excludeCondition, passed: false}]
         } else if(excludeCondition === 'AND') {
             authLogger.verbose(`${PASS} => Exclusive author criteria matched => ${summaries.length === 1 ? `${summaries[0]}` : '(many, see debug)'}`);
         }
-        return [true, 'exclusive'];
+        return [true, 'exclusive', {criteriaResults: allCritResults, join: excludeCondition, passed: true}];
     }
-    return [true, undefined];
+    return [true, undefined, {criteriaResults: allCritResults, join: 'OR', passed: true}];
+}
+
+export const checkItemFilter = async (item: (Submission | Comment), filter: TypedActivityStates, resources: SubredditResources, parentLogger: Logger): Promise<[boolean, ('inclusive' | 'exclusive' | undefined), FilterResult<TypedActivityState>]> => {
+    const logger = parentLogger.child({labels: ['Item Filter']}, mergeArr);
+
+    const allCritResults: FilterCriteriaResult<TypedActivityState>[] = [];
+
+    if(filter.length > 0) {
+        let index = 1
+        for(const state of filter) {
+            const critResult = await resources.testItemCriteria(item, state, parentLogger);
+            allCritResults.push(critResult);
+            const [summary, details] = filterCriteriaSummary(critResult);
+            if (critResult.passed) {
+                logger.verbose(`${PASS} => Item Criteria ${index} => ${summary}`);
+                logger.debug(`Criteria Details: \n${details.join('\n')}`);
+                return [true, 'inclusive', {criteriaResults: allCritResults, join: 'OR', passed: true}];
+            } else {
+                logger.debug(`${FAIL} => Item Author Criteria ${index} => ${summary}`);
+                logger.debug(`Criteria Details: \n${details.join('\n')}`);
+            }
+            index++;
+        }
+        logger.verbose(`${FAIL} => No Item Criteria matched`);
+        return [false, 'inclusive', {criteriaResults: allCritResults, join: 'OR', passed: false}];
+    }
+
+    return [true, undefined, {criteriaResults: allCritResults, join: 'OR', passed: true}];
 }

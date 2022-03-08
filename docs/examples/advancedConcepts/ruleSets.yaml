@@ -1,53 +1,54 @@
-checks:
-  - name: Self Promo All or low comment
-    description: >-
-      SP >10% of all activities or >10% of submissions with low comment
-      engagement
-    kind: submission
-    rules:
-      # this attribution rule is looking at all activities
-      #
-      # we want want this one rule to trigger the check because >10% of all activity (submission AND comments) is a good requirement
-      - name: attr10all
-        kind: attribution
-        criteria:
-          - threshold: '> 10%'
-            window: 90 days
-          - threshold: '> 10%'
-            window: 100
-        # this is a RULE SET
-        #
-        # it is made up of "nested" rules with a pass condition (AND/OR)
-        # if the nested rules pass the condition then the Rule Set triggers the Check
-        #
-        # AND = all nested rules must be triggered to make the Rule Set trigger
-        # AND = any of the nested Rules will be the Rule Set trigger
-      - condition: AND
-        # in this check we use an Attribution >10% on ONLY submissions, which is a lower requirement then the above attribution rule
-        # and combine it with a History rule looking for low comment engagement
-        # to make a "higher" requirement Rule Set our of two low requirement Rules
+runs:
+  - checks:
+      - name: Self Promo All or low comment
+        description: >-
+          SP >10% of all activities or >10% of submissions with low comment
+          engagement
+        kind: submission
         rules:
-          - name: attr20sub
+          # this attribution rule is looking at all activities
+          #
+          # we want want this one rule to trigger the check because >10% of all activity (submission AND comments) is a good requirement
+          - name: attr10all
             kind: attribution
             criteria:
               - threshold: '> 10%'
-                thresholdOn: submissions
                 window: 90 days
               - threshold: '> 10%'
-                thresholdOn: submissions
                 window: 100
-            lookAt: media
-          - name: lowOrOpComm
-            kind: history
-            criteriaJoin: OR
-            criteria:
-              - window: 90 days
-                comment: < 50%
-              - window: 90 days
-                comment: '> 40% OP'
-    actions:
-      - kind: remove
-      - kind: comment
-        content: >-
-          Your submission was removed because you are over reddit's threshold
-          for self-promotion or exhibit low comment engagement
+            # this is a RULE SET
+            #
+            # it is made up of "nested" rules with a pass condition (AND/OR)
+            # if the nested rules pass the condition then the Rule Set triggers the Check
+            #
+            # AND = all nested rules must be triggered to make the Rule Set trigger
+            # AND = any of the nested Rules will be the Rule Set trigger
+          - condition: AND
+            # in this check we use an Attribution >10% on ONLY submissions, which is a lower requirement then the above attribution rule
+            # and combine it with a History rule looking for low comment engagement
+            # to make a "higher" requirement Rule Set our of two low requirement Rules
+            rules:
+              - name: attr20sub
+                kind: attribution
+                criteria:
+                  - threshold: '> 10%'
+                    thresholdOn: submissions
+                    window: 90 days
+                  - threshold: '> 10%'
+                    thresholdOn: submissions
+                    window: 100
+                lookAt: media
+              - name: lowOrOpComm
+                kind: history
+                criteriaJoin: OR
+                criteria:
+                  - window: 90 days
+                    comment: < 50%
+                  - window: 90 days
+                    comment: '> 40% OP'
+        actions:
+          - kind: remove
+          - kind: comment
+            content: >-
+              Your submission was removed because you are over reddit's threshold
+              for self-promotion or exhibit low comment engagement

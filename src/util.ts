@@ -10,27 +10,42 @@ import {inflateSync, deflateSync} from "zlib";
 import pixelmatch from 'pixelmatch';
 import os from 'os';
 import {
-    ActivityWindowCriteria, ActivityWindowType,
+    ActionResult,
+    ActivityWindowCriteria,
+    ActivityWindowType,
     CacheOptions,
     CacheProvider,
-    DurationComparison, DurationVal, FilterCriteriaPropertyResult, FilterCriteriaResult,
+    CheckSummary,
+    DurationComparison,
+    DurationVal,
+    FilterCriteriaDefaults,
+    FilterCriteriaPropertyResult,
+    FilterCriteriaResult,
+    FilterResult,
     GenericComparison,
     HistoricalStats,
-    HistoricalStatsDisplay, ImageComparisonResult,
+    HistoricalStatsDisplay,
+    ImageComparisonResult,
     //ImageData,
     ImageDetection,
     //ImageDownloadOptions,
     LogInfo,
-    NamedGroup, OperatorJsonConfig,
+    NamedGroup,
+    OperatorJsonConfig,
     PollingOptionsStrong,
     RedditEntity,
     RedditEntityType,
-    RegExResult, RepostItem, RepostItemResult,
-    ResourceStats, SearchAndReplaceRegExp,
+    RegExResult,
+    RepostItem,
+    RepostItemResult,
+    ResourceStats,
+    RunResult,
+    SearchAndReplaceRegExp,
     StringComparisonOptions,
     StringOperator,
-    StrongSubredditState,
-    SubredditState
+    StrongSubredditState, SubmissionState,
+    SubredditState,
+    TypedActivityStates
 } from "./Common/interfaces";
 import { Document as YamlDocument } from 'yaml'
 import InvalidRegexError from "./Utils/InvalidRegexError";
@@ -59,6 +74,8 @@ import JsonConfigDocument from "./Common/Config/JsonConfigDocument";
 import YamlConfigDocument from "./Common/Config/YamlConfigDocument";
 import AbstractConfigDocument, {ConfigDocumentInterface} from "./Common/Config/AbstractConfigDocument";
 import LoggedError from "./Utils/LoggedError";
+import {AuthorOptions} from "./Author/Author";
+import merge from "deepmerge";
 
 
 //import {ResembleSingleCallbackComparisonResult} from "resemblejs";
@@ -382,7 +399,7 @@ export const resultsSummary = (results: (RuleResult|RuleSetResult)[], topLevelCo
     //return results.map(x => x.name || x.premise.kind).join(' | ')
 }
 
-export const filterCriteriaSummary = (val: FilterCriteriaResult<any>): [string, string[]] => {
+export const filterCriteriaSummary = <T>(val: FilterCriteriaResult<T>): [string, string[]] => {
     // summarize properties relevant to result
     const passedProps = {props: val.propertyResults.filter(x => x.passed === true), name: 'Passed'};
     const failedProps = {props: val.propertyResults.filter(x => x.passed === false), name: 'Failed'};
@@ -397,10 +414,10 @@ export const filterCriteriaSummary = (val: FilterCriteriaResult<any>): [string, 
         propSummary.push(dnrProps);
     }
     const propSummaryStrArr = propSummary.map(x => `${x.props.length} ${x.name}${x.props.length > 0 ? ` (${x.props.map(y => y.property as string)})` : ''}`);
-    return [propSummaryStrArr.join(' | '), val.propertyResults.map(filterCriteriaPropertySummary)]
+    return [propSummaryStrArr.join(' | '), val.propertyResults.map(x => filterCriteriaPropertySummary(x, val.criteria))]
 }
 
-export const filterCriteriaPropertySummary = (val: FilterCriteriaPropertyResult<any>): string => {
+export const filterCriteriaPropertySummary = <T>(val: FilterCriteriaPropertyResult<T>, criteria: T): string => {
     let passResult: string;
     switch (val.passed) {
         case undefined:
@@ -412,8 +429,36 @@ export const filterCriteriaPropertySummary = (val: FilterCriteriaPropertyResult<
             passResult = triggeredIndicator(val.passed, 'Skipped');
             break;
     }
-    const found = val.passed === null || val.passed === undefined ? '' : ` => Found: ${val.found}${val.reason !== undefined ? ` -- ${val.reason}` : ''}${val.behavior === 'exclude' ? ' (Exclude passes when Expected is not Found)' : ''}`;
-    return `${val.property as string} => ${passResult} => Expected: ${val.expected}${found}`;
+    let found;
+    if(val.passed === null || val.passed === undefined) {
+        found = '';
+    } else if(val.property === 'submissionState') {
+        const foundResult = val.found as FilterResult<SubmissionState>;
+        const criteriaResults = foundResult.criteriaResults.map((x, index) => `Criteria #${index + 1} => ${triggeredIndicator(x.passed)}\n   ${x.propertyResults.map(y => filterCriteriaPropertySummary(y, x.criteria)).join('\n    ')}`).join('\n  ');
+        found = `\n  ${criteriaResults}`;
+    } else {
+        found = ` => Found: ${val.found}`;
+    }
+
+    let expected = '';
+    if(val.property !== 'submissionState') {
+        let crit: T[keyof T][];
+        if(Array.isArray(criteria[val.property])) {
+            // @ts-ignore
+            crit = criteria[val.property];
+        } else {
+            crit = [criteria[val.property]];
+        }
+        const expectedStrings = crit.map((x: any) => {
+            if (asUserNoteCriteria(x)) {
+                return userNoteCriteriaSummary(x);
+            }
+            return x;
+        }).join(' OR ');
+        expected = ` => Expected: ${expectedStrings}`;
+    }
+
+    return `${val.property as string} => ${passResult}${expected}${found}${val.reason !== undefined ? ` -- ${val.reason}` : ''}${val.behavior === 'exclude' ? ' (Exclude passes when Expected is not Found)' : ''}`;
 }
 
 export const createAjvFactory = (logger: Logger) => {
@@ -1036,60 +1081,76 @@ const _transformError = (err: Error, seen: Set<Error>, matchOptions?: LogMatch) 
         return err;
     }
 
-    // @ts-ignore
-    let mOpts = err.matchOptions ?? matchOptions;
+    try {
 
-    if (isRequestError(err)) {
-        const errMsgParts = [`Reddit responded with a NOT OK status (${err.statusCode})`];
-
-        if (err.response.headers['content-type'].includes('html')) {
-            // reddit returns html even when we specify raw_json in the querystring (via snoowrap)
-            // which means the html gets set as the message for the error AND gets added to the stack as the message
-            // and we end up with a h u g e log statement full of noisy html >:(
-
-            const {error, statusCode, message, stack: errStack} = err;
-
-            const errorSample = (error as unknown as string).slice(0, 10);
-            const messageBeforeIndex = message.indexOf(errorSample);
-            let newMessage = `Status Error ${statusCode} from Reddit`;
-            if (messageBeforeIndex > 0) {
-                newMessage = `${message.slice(0, messageBeforeIndex)} - ${newMessage}`;
-            }
-            let cleanStack = errStack;
-
-            // try to get just stacktrace by finding beginning of what we assume is the actual trace
-            if (errStack) {
-                cleanStack = `${newMessage}\n${errStack.slice(errStack.indexOf('at new StatusCodeError'))}`;
-            }
-            // now put it all together so its nice and clean
-            err.message = newMessage;
-            err.stack = cleanStack;
-        }
-
-        const msg = getExceptionMessage(err, mOpts);
-        if (msg !== undefined) {
-            errMsgParts.push(msg);
-        }
-
-        // we don't care about stack trace for this error because we know where it came from so truncate to two lines for now...maybe remove all together later
-        if(err.stack !== undefined) {
-            err.stack = err.stack.split('\n').slice(0, 2).join('\n');
-        }
-
-        const normalizedError = new ErrorWithCause(errMsgParts.join(' => '), {cause: err});
-        normalizedError.stack = normalizedError.message;
-        return normalizedError;
-    }
-
-    // @ts-ignore
-    const cause = err.cause as unknown;
-
-    if (cause !== undefined && cause instanceof Error) {
         // @ts-ignore
-        err.cause = _transformError(cause, seen, mOpts);
-    }
+        let mOpts = err.matchOptions ?? matchOptions;
 
-    return err;
+        if (isRequestError(err)) {
+            const errMsgParts = [`Reddit responded with a NOT OK status (${err.statusCode})`];
+
+            if (err.response.headers !== undefined && (typeof err.response.headers['content-type'] === 'string' || Array.isArray(err.response.headers['content-type'])) && err.response.headers['content-type'].includes('html')) {
+                // reddit returns html even when we specify raw_json in the querystring (via snoowrap)
+                // which means the html gets set as the message for the error AND gets added to the stack as the message
+                // and we end up with a h u g e log statement full of noisy html >:(
+
+                const {error, statusCode, message, stack: errStack} = err;
+
+                let newMessage = `Status Error ${statusCode} from Reddit`;
+
+                if (error !== undefined) {
+                    if (typeof error === 'string') {
+                        const errorSample = (error as unknown as string).slice(0, 10);
+                        const messageBeforeIndex = message.indexOf(errorSample);
+                        if (messageBeforeIndex > 0) {
+                            newMessage = `${message.slice(0, messageBeforeIndex)} - ${newMessage}`;
+                        }
+                    } else if (error !== null && (error instanceof Error || (typeof error === 'object' && (error as any).message !== undefined))) {
+                        newMessage = `${newMessage} with error: ${truncateStringToLength(100)(error.message)}`;
+                    }
+                } else if (message !== undefined) {
+                    newMessage = `${newMessage} with message: ${truncateStringToLength(100)(message)}`;
+                }
+                let cleanStack = errStack;
+
+                // try to get just stacktrace by finding beginning of what we assume is the actual trace
+                if (errStack) {
+                    cleanStack = `${newMessage}\n${errStack.slice(errStack.indexOf('at new StatusCodeError'))}`;
+                }
+                // now put it all together so its nice and clean
+                err.message = newMessage;
+                err.stack = cleanStack;
+            }
+
+            const msg = getExceptionMessage(err, mOpts);
+            if (msg !== undefined) {
+                errMsgParts.push(msg);
+            }
+
+            // we don't care about stack trace for this error because we know where it came from so truncate to two lines for now...maybe remove all together later
+            if (err.stack !== undefined) {
+                err.stack = err.stack.split('\n').slice(0, 2).join('\n');
+            }
+
+            const normalizedError = new ErrorWithCause(errMsgParts.join(' => '), {cause: err});
+            normalizedError.stack = normalizedError.message;
+            return normalizedError;
+        }
+
+        // @ts-ignore
+        const cause = err.cause as unknown;
+
+        if (cause !== undefined && cause instanceof Error) {
+            // @ts-ignore
+            err.cause = _transformError(cause, seen, mOpts);
+        }
+
+        return err;
+    } catch (e: any) {
+        // oops :(
+        // we're gonna swallow silently instead of reporting to avoid any infinite nesting and hopefully the original error looks funny enough to provide clues as to what to fix here
+        return err;
+    }
 }
 
 export const transformError = (err: Error): any => _transformError(err, new Set());
@@ -1367,6 +1428,17 @@ export const parseRegex = (reg: RegExp, val: string): RegExResult => {
     }
 }
 
+export const testMaybeStringRegex = (test: string, subject: string, defaultFlags: string = 'i'): [boolean, string] => {
+    let reg = parseStringToRegex(test, defaultFlags);
+    if (reg === undefined) {
+        reg = parseStringToRegex(`/.*${escapeRegex(test.trim())}.*/`, 'i');
+        if (reg === undefined) {
+            throw new SimpleError(`Could not convert test value to a valid regex: ${test}`);
+        }
+    }
+    return [reg.test(subject), reg.toString()];
+}
+
 export const isStrongSubredditState = (value: SubredditState | StrongSubredditState) => {
     return value.name === undefined || value.name instanceof RegExp;
 }
@@ -1596,6 +1668,28 @@ export const intersect = (a: Array<any>, b: Array<any>) => {
     const intersection = new Set([...setA].filter(x => setB.has(x)));
     return Array.from(intersection);
 }
+/**
+ * @see https://stackoverflow.com/a/64245521/1469797
+ * */
+function *setMinus(A: Array<any>, B: Array<any>) {
+    const setA = new Set(A);
+    const setB = new Set(B);
+
+    for (const v of setB.values()) {
+        if (!setA.delete(v)) {
+            yield v;
+        }
+    }
+
+    for (const v of setA.values()) {
+        yield v;
+    }
+}
+
+
+export const difference = (a: Array<any>, b: Array<any>) => {
+    return Array.from(setMinus(a, b));
+}
 
 export const snooLogWrapper = (logger: Logger) => {
     return {
@@ -1610,7 +1704,11 @@ export const snooLogWrapper = (logger: Logger) => {
  * Cached activities lose type information when deserialized so need to check properties as well to see if the object is the shape of a Submission
  * */
 export const isSubmission = (value: any) => {
-    return value instanceof Submission || value.name.includes('t3_');
+    try {
+        return value !== null && typeof value === 'object' && (value instanceof Submission || (value.name !== undefined && value.name.includes('t3_')) || value.domain !== undefined);
+    } catch (e) {
+        return false;
+    }
 }
 
 export const asSubmission = (value: any): value is Submission => {
@@ -1618,7 +1716,11 @@ export const asSubmission = (value: any): value is Submission => {
 }
 
 export const isComment = (value: any) => {
-    return value instanceof Comment || value.name.includes('t1_');
+    try {
+        return value !== null && typeof value === 'object' && (value instanceof Comment || value.name.includes('t1_'));
+    } catch (e) {
+        return false;
+    }
 }
 
 export const asComment = (value: any): value is Comment => {
@@ -1630,7 +1732,11 @@ export const asActivity = (value: any): value is (Submission | Comment) => {
 }
 
 export const isUser = (value: any) => {
-    return value instanceof RedditUser || value.name.includes('t2_');
+    try {
+        return value !== null && typeof value === 'object' && (value instanceof RedditUser || value.name.includes('t2_'));
+    } catch(e) {
+        return false;
+    }
 }
 
 export const asUser = (value: any): value is RedditUser => {
@@ -2107,6 +2213,59 @@ export async function* redisScanIterator(client: any, options: any = {}): AsyncI
             yield key;
         }
     } while (cursor !== '0');
+}
+
+export const mergeFilters = (objectConfig: any, filterDefs: FilterCriteriaDefaults | undefined): [AuthorOptions, TypedActivityStates] => {
+    const {authorIs: aisVal = {}, itemIs: iisVal = []} = objectConfig || {};
+    const authorIs = aisVal as AuthorOptions;
+    const itemIs = iisVal as TypedActivityStates;
+
+    const {
+        authorIsBehavior = 'merge',
+        itemIsBehavior = 'merge',
+        authorIs: authorIsDefault = {},
+        itemIs: itemIsDefault = []
+    } = filterDefs || {};
+
+    let derivedAuthorIs: AuthorOptions = authorIsDefault;
+    if (authorIsBehavior === 'merge') {
+        derivedAuthorIs = merge.all([authorIs, authorIsDefault], {arrayMerge: removeFromSourceIfKeysExistsInDestination});
+    } else if (Object.keys(authorIs).length > 0) {
+        derivedAuthorIs = authorIs;
+    }
+
+    let derivedItemIs: TypedActivityStates = itemIsDefault;
+    if (itemIsBehavior === 'merge') {
+        derivedItemIs = [...itemIs, ...itemIsDefault];
+    } else if (itemIs.length > 0) {
+        derivedItemIs = itemIs;
+    }
+
+    return [derivedAuthorIs, derivedItemIs];
+}
+
+export const formatFilterData = (result: (RunResult | CheckSummary | RuleResult | ActionResult)) => {
+
+    const formattedResult: any = {};
+
+    const {authorIs, itemIs} = result;
+
+    if (authorIs !== undefined) {
+        formattedResult.authorIs = {
+            ...authorIs,
+            passed: triggeredIndicator(authorIs.passed),
+            criteriaResults: authorIs.criteriaResults.map(x => filterCriteriaSummary(x))
+        }
+    }
+    if (itemIs !== undefined) {
+        formattedResult.itemIs = {
+            ...itemIs,
+            passed: triggeredIndicator(itemIs.passed),
+            criteriaResults: itemIs.criteriaResults.map(x => filterCriteriaSummary(x))
+        }
+    }
+
+    return formattedResult;
 }
 
 export const getUserAgent = (val: string, fragment?: string) => {

@@ -57,6 +57,15 @@
                         }
                     ]
                 },
+                "subredditThreshold": {
+                    "default": ">= 1",
+                    "description": "A string containing a comparison operator and a value to compare the **number of subreddits that have valid activities** against\n\nThe syntax is `(< OR > OR <= OR >=) <number>[percent sign]`\n\n* EX `> 3`  => greater than 3 Subreddits found with valid activities\n* EX `<= 75%` => number of Subreddits with valid activities are equal to or less than 75% of all Subreddits found\n\n**Note:** If you use percentage comparison here as well as `useSubmissionAsReference` then \"all Subreddits found\" is only pertains to Subreddits that had the Link of the Submission, rather than all Subreddits from this window.",
+                    "examples": [
+                        ">= 1"
+                    ],
+                    "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
+                    "type": "string"
+                },
                 "subreddits": {
                     "description": "Activities will be counted if they are found in this list of Subreddits\n\nEach value in the list can be either:\n\n * string (name of subreddit)\n * regular expression to run on the subreddit name\n * `SubredditState`\n\nEX `[\"mealtimevideos\",\"askscience\", \"/onlyfans*\\/i\", {\"over18\": true}]`",
                     "examples": [
@@ -366,21 +375,18 @@
                     "type": "string"
                 },
                 "itemIs": {
-                    "anyOf": [
-                        {
-                            "items": {
+                    "description": "A list of criteria to test the state of the `Activity` against before running the Rule.\n\nIf any set of criteria passes the Rule will be run. If the criteria fails then the Rule is skipped.",
+                    "items": {
+                        "anyOf": [
+                            {
                                 "$ref": "#/definitions/SubmissionState"
                             },
-                            "type": "array"
-                        },
-                        {
-                            "items": {
+                            {
                                 "$ref": "#/definitions/CommentState"
-                            },
-                            "type": "array"
-                        }
-                    ],
-                    "description": "A list of criteria to test the state of the `Activity` against before running the Rule.\n\nIf any set of criteria passes the Rule will be run. If the criteria fails then the Rule is skipped."
+                            }
+                        ]
+                    },
+                    "type": "array"
                 },
                 "kind": {
                     "description": "The kind of rule to run",
@@ -622,21 +628,18 @@
                     "type": "array"
                 },
                 "itemIs": {
-                    "anyOf": [
-                        {
-                            "items": {
+                    "description": "A list of criteria to test the state of the `Activity` against before running the Rule.\n\nIf any set of criteria passes the Rule will be run. If the criteria fails then the Rule is skipped.",
+                    "items": {
+                        "anyOf": [
+                            {
                                 "$ref": "#/definitions/SubmissionState"
                             },
-                            "type": "array"
-                        },
-                        {
-                            "items": {
+                            {
                                 "$ref": "#/definitions/CommentState"
-                            },
-                            "type": "array"
-                        }
-                    ],
-                    "description": "A list of criteria to test the state of the `Activity` against before running the Rule.\n\nIf any set of criteria passes the Rule will be run. If the criteria fails then the Rule is skipped."
+                            }
+                        ]
+                    },
+                    "type": "array"
                 },
                 "kind": {
                     "description": "The kind of rule to run",
@@ -921,21 +924,18 @@
                     "type": "array"
                 },
                 "itemIs": {
-                    "anyOf": [
-                        {
-                            "items": {
+                    "description": "A list of criteria to test the state of the `Activity` against before running the Rule.\n\nIf any set of criteria passes the Rule will be run. If the criteria fails then the Rule is skipped.",
+                    "items": {
+                        "anyOf": [
+                            {
                                 "$ref": "#/definitions/SubmissionState"
                             },
-                            "type": "array"
-                        },
-                        {
-                            "items": {
+                            {
                                 "$ref": "#/definitions/CommentState"
-                            },
-                            "type": "array"
-                        }
-                    ],
-                    "description": "A list of criteria to test the state of the `Activity` against before running the Rule.\n\nIf any set of criteria passes the Rule will be run. If the criteria fails then the Rule is skipped."
+                            }
+                        ]
+                    },
+                    "type": "array"
                 },
                 "kind": {
                     "description": "The kind of rule to run",
@@ -1127,21 +1127,18 @@
                     "description": "When comparing submissions detect if the reference submission is an image and do a pixel-comparison to other detected image submissions.\n\n**Note:** This is an **experimental feature**"
                 },
                 "itemIs": {
-                    "anyOf": [
-                        {
-                            "items": {
+                    "description": "A list of criteria to test the state of the `Activity` against before running the Rule.\n\nIf any set of criteria passes the Rule will be run. If the criteria fails then the Rule is skipped.",
+                    "items": {
+                        "anyOf": [
+                            {
                                 "$ref": "#/definitions/SubmissionState"
                             },
-                            "type": "array"
-                        },
-                        {
-                            "items": {
+                            {
                                 "$ref": "#/definitions/CommentState"
-                            },
-                            "type": "array"
-                        }
-                    ],
-                    "description": "A list of criteria to test the state of the `Activity` against before running the Rule.\n\nIf any set of criteria passes the Rule will be run. If the criteria fails then the Rule is skipped."
+                            }
+                        ]
+                    },
+                    "type": "array"
                 },
                 "kind": {
                     "description": "The kind of rule to run",
@@ -1402,21 +1399,18 @@
                     "type": "array"
                 },
                 "itemIs": {
-                    "anyOf": [
-                        {
-                            "items": {
+                    "description": "A list of criteria to test the state of the `Activity` against before running the Rule.\n\nIf any set of criteria passes the Rule will be run. If the criteria fails then the Rule is skipped.",
+                    "items": {
+                        "anyOf": [
+                            {
                                 "$ref": "#/definitions/SubmissionState"
                             },
-                            "type": "array"
-                        },
-                        {
-                            "items": {
+                            {
                                 "$ref": "#/definitions/CommentState"
-                            },
-                            "type": "array"
-                        }
-                    ],
-                    "description": "A list of criteria to test the state of the `Activity` against before running the Rule.\n\nIf any set of criteria passes the Rule will be run. If the criteria fails then the Rule is skipped."
+                            }
+                        ]
+                    },
+                    "type": "array"
                 },
                 "kind": {
                     "description": "The kind of rule to run",
@@ -1523,21 +1517,18 @@
                     "type": "array"
                 },
                 "itemIs": {
-                    "anyOf": [
-                        {
-                            "items": {
+                    "description": "A list of criteria to test the state of the `Activity` against before running the Rule.\n\nIf any set of criteria passes the Rule will be run. If the criteria fails then the Rule is skipped.",
+                    "items": {
+                        "anyOf": [
+                            {
                                 "$ref": "#/definitions/SubmissionState"
                             },
-                            "type": "array"
-                        },
-                        {
-                            "items": {
+                            {
                                 "$ref": "#/definitions/CommentState"
-                            },
-                            "type": "array"
-                        }
-                    ],
-                    "description": "A list of criteria to test the state of the `Activity` against before running the Rule.\n\nIf any set of criteria passes the Rule will be run. If the criteria fails then the Rule is skipped."
+                            }
+                        ]
+                    },
+                    "type": "array"
                 },
                 "keepRemoved": {
                     "default": false,
@@ -1799,21 +1790,18 @@
                     "type": "array"
                 },
                 "itemIs": {
-                    "anyOf": [
-                        {
-                            "items": {
+                    "description": "A list of criteria to test the state of the `Activity` against before running the Rule.\n\nIf any set of criteria passes the Rule will be run. If the criteria fails then the Rule is skipped.",
+                    "items": {
+                        "anyOf": [
+                            {
                                 "$ref": "#/definitions/SubmissionState"
                             },
-                            "type": "array"
-                        },
-                        {
-                            "items": {
+                            {
                                 "$ref": "#/definitions/CommentState"
-                            },
-                            "type": "array"
-                        }
-                    ],
-                    "description": "A list of criteria to test the state of the `Activity` against before running the Rule.\n\nIf any set of criteria passes the Rule will be run. If the criteria fails then the Rule is skipped."
+                            }
+                        ]
+                    },
+                    "type": "array"
                 },
                 "kind": {
                     "description": "The kind of rule to run",

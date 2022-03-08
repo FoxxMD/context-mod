@@ -13,10 +13,11 @@ import {
     TypedActivityStates
 } from "../Common/interfaces";
 import {
+    asSubmission,
     asUserNoteCriteria,
     compareDurationValue,
     comparisonTextOp, escapeRegex, formatNumber, getActivityAuthorName,
-    isActivityWindowCriteria, isUserNoteCriteria,
+    isActivityWindowCriteria, isSubmission, isUserNoteCriteria,
     normalizeName,
     parseDuration,
     parseDurationComparison,
@@ -378,7 +379,6 @@ export const testAuthorCriteria = async (item: (Comment | Submission), authorOpt
         }
         acc[key] = {
             property: key,
-            expected: ex,
             behavior: include ? 'include' : 'exclude',
         };
         return acc;
@@ -717,9 +717,10 @@ export const itemContentPeek = async (item: (Comment | Submission), peekLength =
     let content = '';
     let submissionTitle = '';
     let peek = '';
-    const author = item.author.name;
-    if (item instanceof Submission) {
+    const author = getActivityAuthorName(item.author);
+    if (asSubmission(item)) {
         submissionTitle = item.title;
+        content = truncatePeek(item.title);
         peek = `${truncatePeek(item.title)} by ${author} https://reddit.com${item.permalink}`;
 
     } else {

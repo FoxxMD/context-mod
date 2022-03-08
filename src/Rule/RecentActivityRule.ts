@@ -19,7 +19,7 @@ import {
     isSubmission,
     isValidImageURL,
     objectToStringSummary,
-    parseGenericValueOrPercentComparison,
+    parseGenericValueOrPercentComparison, parseRedditEntity,
     parseStringToRegex,
     parseSubredditName,
     parseUsableLinkIdentifier,
@@ -29,7 +29,7 @@ import {
 import {
     ActivityWindow,
     ActivityWindowCriteria,
-    ActivityWindowType, CommentState,
+    ActivityWindowType, CommentState, CompareValueOrPercent,
     //ImageData,
     ImageDetection,
     ReferenceSubmission, StrongImageDetection, StrongSubredditState, SubmissionState,
@@ -303,6 +303,11 @@ export class RecentActivityRule extends Rule {
             }
         }
 
+        const allDistinctSubreddits = [...viableActivity.reduce((acc, curr) => {
+            acc.add(curr.subreddit_name_prefixed);
+            return acc;
+        }, new Set())].map(x => parseRedditEntity(x as string));
+
         const summaries = [];
         let totalTriggeredOn;
         for (const triggerSet of this.thresholds) {
@@ -315,6 +320,7 @@ export class RecentActivityRule extends Rule {
                 karma: karmaThreshold,
                 commentState,
                 submissionState,
+                subredditThreshold,
             } = triggerSet;
 
             // convert subreddits array into entirely StrongSubredditState
@@ -326,9 +332,11 @@ export class RecentActivityRule extends Rule {
 
             let validActivity: (Comment | Submission)[] = await as.filter(viableActivity, async (activity) => {
                 if (asSubmission(activity) && submissionState !== undefined) {
-                    return await this.resources.testItemCriteria(activity, [submissionState]);
+                    const {passed} = await this.resources.testItemCriteria(activity, submissionState, this.logger);
+                    return passed;
                 } else if (commentState !== undefined) {
-                    return await this.resources.testItemCriteria(activity, [commentState]);
+                    const {passed} = await this.resources.testItemCriteria(activity, commentState, this.logger);
+                    return passed;
                 }
                 return true;
             });
@@ -345,36 +353,44 @@ export class RecentActivityRule extends Rule {
             }
 
             const {operator, value, isPercent} = parseGenericValueOrPercentComparison(threshold);
-            let sum = {
+            let sum: any = {
                 subsWithActivity: presentSubs,
                 combinedKarma,
                 karmaThreshold,
-                subreddits: subStates.map(x => x.stateDescription),
+                subredditCriteria: subStates.map(x => x.stateDescription),
+                subreddits: allDistinctSubreddits.map(x => x.name),
                 count: currCount,
                 threshold,
+                subredditThreshold,
                 triggered: false,
                 testValue: currCount.toString()
             };
             if (isPercent) {
                 sum.testValue = `${formatNumber((currCount / viableActivity.length) * 100)}%`;
-                if (comparisonTextOp(currCount / viableActivity.length, operator, value / 100)) {
-                    sum.triggered = true;
-                    totalTriggeredOn = sum;
-                }
-            } else if (comparisonTextOp(currCount, operator, value)) {
-                sum.triggered = true;
-                totalTriggeredOn = sum;
+                sum.thresholdTriggered = comparisonTextOp(currCount / viableActivity.length, operator, value / 100);
+            } else {
+                sum.thresholdTriggered = comparisonTextOp(currCount, operator, value);
             }
             // if we would trigger on threshold need to also test for karma
-            if (totalTriggeredOn !== undefined && karmaThreshold !== undefined) {
+            if (sum.thresholdTriggered && karmaThreshold !== undefined) {
                 const {operator: opKarma, value: valueKarma} = parseGenericValueOrPercentComparison(karmaThreshold);
-                if (!comparisonTextOp(combinedKarma, opKarma, valueKarma)) {
-                    sum.triggered = false;
-                    totalTriggeredOn = undefined;
+                sum.karmaThresholdTriggered = comparisonTextOp(combinedKarma, opKarma, valueKarma);
+            }
+            if(sum.thresholdTriggered && subredditThreshold !== undefined) {
+                const {operator, value, isPercent} = parseGenericValueOrPercentComparison(subredditThreshold);
+                if (isPercent) {
+                    sum.subredditThresholdTriggered = comparisonTextOp(sum.subsWithActivity / sum.subreddits, operator, value / 100);
+                } else {
+                    sum.subredditThresholdTriggered = comparisonTextOp(sum.subsWithActivity, operator, value);
                 }
             }
 
             summaries.push(sum);
+            const { thresholdTriggered, karmaThresholdTriggered, subredditThresholdTriggered } = sum;
+            sum.triggered = thresholdTriggered && ((karmaThresholdTriggered === undefined || karmaThresholdTriggered) && (subredditThresholdTriggered === undefined || subredditThresholdTriggered));
+            if(sum.triggered) {
+                totalTriggeredOn = sum;
+            }
             // if either trigger condition is hit end the iteration early
             if (totalTriggeredOn !== undefined) {
                 break;
@@ -410,12 +426,45 @@ export class RecentActivityRule extends Rule {
             triggered,
             combinedKarma,
             karmaThreshold,
+            subredditThreshold,
         } = summary;
         const relevantSubs = subsWithActivity.length === 0 ? subreddits : subsWithActivity;
-        let totalSummary = `${testValue} activities over ${relevantSubs.length} subreddits${karmaThreshold !== undefined ? ` with ${combinedKarma} combined karma` : ''} ${triggered ? 'met' : 'did not meet'} threshold of ${threshold}${karmaThreshold !== undefined ? ` and ${karmaThreshold} combined karma` : ''}`;
-        if (triggered && subsWithActivity.length > 0) {
-            totalSummary = `${totalSummary} -- subreddits: ${subsWithActivity.join(', ')}`;
+        let totalSummaryParts: string[] = [`${testValue} activities found in ${subsWithActivity.length} of the specified subreddits (out of ${subreddits.length} total)`];
+        let statSummary = '';
+        let thresholdSummary = '';
+        if(karmaThreshold !== undefined || subredditThreshold !== undefined) {
+            let statParts = [];
+            let thresholdParts = [];
+            if(karmaThreshold !== undefined) {
+                statParts.push(`${combinedKarma} combined karma`);
+                thresholdParts.push(`${karmaThreshold} combined karma`);
+            }
+            if(subredditThreshold !== undefined) {
+                statParts.push(`${subsWithActivity.length} distinct subreddits`);
+                thresholdParts.push(`${subredditThreshold} distinct subreddits`);
+            }
+            statSummary = statParts.join(' and ');
+            thresholdSummary = thresholdParts.join(' and ');
         }
+
+        if(statSummary !== '') {
+            totalSummaryParts.push(` with ${statSummary}`)
+        }
+
+        totalSummaryParts.push(` ${triggered ? 'MET' : 'DID NOT MEET'} threshold of ${threshold} activities`);
+
+        if(thresholdSummary !== '') {
+            totalSummaryParts.push(` and ${thresholdSummary}`);
+        }
+
+        if (triggered && subsWithActivity.length > 0) {
+            totalSummaryParts.push(` -- subreddits: ${subsWithActivity.join(', ')}`);
+        }
+
+        // EX
+        // 2 activities over 1 subreddits with 4 combined karma and 1 distinct subreddits did not meet threshold of > 1 activities and > 2 distinct subreddits -- subreddits: mySubreddit
+        const totalSummary = totalSummaryParts.join('');
+
         return {
             result: totalSummary,
             data: {
@@ -493,6 +542,22 @@ export interface ActivityThreshold {
      * @examples [["mealtimevideos","askscience", "/onlyfans*\/i", {"over18": true}]]
      * */
     subreddits?: (string | SubredditState)[]
+
+    /**
+     * A string containing a comparison operator and a value to compare the **number of subreddits that have valid activities** against
+     *
+     * The syntax is `(< OR > OR <= OR >=) <number>[percent sign]`
+     *
+     * * EX `> 3`  => greater than 3 Subreddits found with valid activities
+     * * EX `<= 75%` => number of Subreddits with valid activities are equal to or less than 75% of all Subreddits found
+     *
+     * **Note:** If you use percentage comparison here as well as `useSubmissionAsReference` then "all Subreddits found" is only pertains to Subreddits that had the Link of the Submission, rather than all Subreddits from this window.
+     *
+     * @pattern ^\s*(>|>=|<|<=)\s*(\d+)\s*(%?)(.*)$
+     * @default ">= 1"
+     * @examples [">= 1"]
+     * */
+    subredditThreshold?: string
 }
 
 interface RecentActivityConfig extends ActivityWindow, ReferenceSubmission {

@@ -15,11 +15,11 @@ import {
     USER
 } from "../Common/interfaces";
 import {
-    createRetryHandler,
+    createRetryHandler, difference,
     formatNumber, getExceptionMessage, getUserAgent,
     mergeArr,
     parseBool,
-    parseDuration, parseMatchMessage,
+    parseDuration, parseMatchMessage, parseRedditEntity,
     parseSubredditName, RetryOptions,
     sleep,
     snooLogWrapper
@@ -79,6 +79,8 @@ class Bot {
 
     cacheManager: BotResourcesManager;
 
+    config: BotInstanceConfig;
+
     getBotName = () => {
         return this.botName;
     }
@@ -131,8 +133,7 @@ class Bot {
             }
         } = config;
 
-        this.cacheManager = new BotResourcesManager(config);
-
+        this.config = config;
         this.dryRun = parseBool(dryRun) === true ? true : undefined;
         this.softLimit = softLimit;
         this.hardLimit = hardLimit;
@@ -158,6 +159,8 @@ class Bot {
                 this.logs = [log, ...this.logs].slice(0, 301);
             }
         });
+
+        this.cacheManager = new BotResourcesManager(config, this.logger);
 
         let mw = maxWorkers;
         if(maxWorkers < 1) {
@@ -350,6 +353,31 @@ class Bot {
             }
         }
 
+        const {
+            subreddits: {
+                overrides = [],
+            } = {}
+        } = this.config;
+        if(overrides.length > 0) {
+            // check for overrides that don't match subs to run and warn operator
+            const subsToRunNames = subsToRun.map(x => x.display_name.toLowerCase());
+
+            const normalizedOverrideNames = overrides.reduce((acc: string[], curr) => {
+                try {
+                    const ent = parseRedditEntity(curr.name);
+                    return acc.concat(ent.name.toLowerCase());
+                } catch (e) {
+                    this.logger.warn(new ErrorWithCause(`Could not use subreddit override because name was not valid: ${curr.name}`, {cause: e}));
+                    return acc;
+                }
+            }, []);
+            const notMatched = difference(normalizedOverrideNames, subsToRunNames);
+            if(notMatched.length > 0) {
+                this.logger.warn(`There are overrides defined for subreddits the bot is not running. Check your spelling! Overrides not matched: ${notMatched.join(', ')}`);
+            }
+        }
+
+
         // get configs for subs we want to run on and build/validate them
         for (const sub of subsToRun) {
             try {
@@ -487,6 +515,29 @@ class Bot {
     }
 
     createManager(sub: Subreddit): Manager {
+        const {
+            flowControlDefaults: {
+                maxGotoDepth: botMaxDefault
+            } = {},
+            subreddits: {
+                overrides = [],
+            } = {}
+        } = this.config;
+
+        const override = overrides.find(x => {
+            const configName = parseRedditEntity(x.name).name;
+            if(configName !== undefined) {
+                return configName.toLowerCase() === sub.display_name.toLowerCase();
+            }
+            return false;
+        });
+
+        const {
+            flowControlDefaults: {
+                maxGotoDepth: subMax = undefined,
+            } = {}
+        } = override || {};
+
         const manager = new Manager(sub, this.client, this.logger, this.cacheManager, {
             dryRun: this.dryRun,
             sharedStreams: this.sharedStreams,
@@ -494,6 +545,7 @@ class Bot {
             botName: this.botName as string,
             maxWorkers: this.maxWorkers,
             filterCriteriaDefaults: this.filterCriteriaDefaults,
+            maxGotoDepth: subMax ?? botMaxDefault
         });
         // all errors from managers will count towards bot-level retry count
         manager.on('error', async (err) => await this.panicOnRetries(err));

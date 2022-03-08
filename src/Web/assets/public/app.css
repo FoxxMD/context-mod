@@ -156,3 +156,23 @@ a {
 #redditStatus .iconify-inline {
     display: inline;
 }
+
+.triggeredState.notTriggered {
+    display: none;
+}
+
+.triggeredState.hide {
+    display: none;
+}
+
+.triggeredState.notTriggered.show {
+    display: inherit;
+}
+
+.triggeredStateToggle {
+    cursor: pointer;
+}
+
+li > ul {
+    padding: revert;
+}

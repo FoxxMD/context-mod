@@ -16,6 +16,8 @@ import {JsonOperatorConfigDocument, YamlOperatorConfigDocument} from "./Config/O
 import {ConsoleTransportOptions} from "winston/lib/winston/transports";
 import {DailyRotateFileTransportOptions} from "winston-daily-rotate-file";
 import {DuplexTransportOptions} from "winston-duplex/dist/DuplexTransport";
+import {CommentCheckJson, SubmissionCheckJson} from "../Check";
+import {SafeDictionary} from "ts-essentials";
 
 /**
  * An ISO 8601 Duration
@@ -836,6 +838,16 @@ export interface ManagerOptions {
      * Default behavior is to exclude all mods and automoderator from checks
      * */
     filterCriteriaDefaults?: FilterCriteriaDefaults
+
+    /**
+     * Set the default post-check behavior for all checks. If this property is specified it will override any defaults passed from the bot's config
+     *
+     * Default behavior is:
+     *
+     * * postFail => next
+     * * postTrigger => nextRun
+     * */
+    postCheckBehaviorDefaults?: PostBehavior
 }
 
 /**
@@ -1018,7 +1030,9 @@ export interface StrongSubredditState extends SubredditState {
     name?: RegExp
 }
 
-export type TypedActivityStates = SubmissionState[] | CommentState[];
+export type TypedActivityState = SubmissionState | CommentState;
+
+export type TypedActivityStates = TypedActivityState[];
 
 export interface DomainInfo {
     display: string,
@@ -1250,6 +1264,14 @@ export type NotificationProvider = 'discord';
 
 export type NotificationEventType = 'runStateChanged' | 'pollingError' | 'eventActioned' | 'configUpdated'
 
+export interface NotificationEventPayload  {
+    type: NotificationEventType,
+    title: string
+    body?: string
+    causedBy?: string
+    logLevel?: string
+}
+
 export interface NotificationProviderConfig {
     name: string
     type: NotificationProvider
@@ -1445,6 +1467,13 @@ export interface FilterCriteriaDefaults {
     authorIsBehavior?: FilterCriteriaDefaultBehavior
 }
 
+export interface SubredditOverrides {
+    name: string
+    flowControlDefaults?: {
+        maxGotoDepth?: number
+    }
+}
+
 /**
  * The configuration for an **individual reddit account** ContextMod will run as a bot.
  *
@@ -1479,6 +1508,12 @@ export interface BotInstanceJsonConfig {
      * Defaults to exclude mods and automoderator from checks
      * */
     filterCriteriaDefaults?: FilterCriteriaDefaults
+
+    postCheckBehaviorDefaults?: PostBehavior
+
+    flowControlDefaults?: {
+        maxGotoDepth?: number
+    }
 
     /**
      * Settings related to bot behavior for subreddits it is managing
@@ -1540,6 +1575,8 @@ export interface BotInstanceJsonConfig {
          * @examples [300]
          * */
         heartbeatInterval?: number,
+
+        overrides?: SubredditOverrides[]
     }
 
     /**
@@ -1576,22 +1613,23 @@ export interface BotInstanceJsonConfig {
          * Useful when running many subreddits and rules are potentially cpu/memory/traffic heavy -- allows spreading out load
          * */
         stagger?: number,
-    },
+    }
+
     /**
      * Settings related to default configurations for queue behavior for subreddits
      * */
     queue?: {
-        /**
-         * Set the number of maximum concurrent workers any subreddit can use.
-         *
-         * Subreddits may define their own number of max workers in their config but the application will never allow any subreddit's max workers to be larger than the operator
-         *
-         * NOTE: Do not increase this unless you are certain you know what you are doing! The default is suitable for the majority of use cases.
-         *
-         * @default 1
-         * @examples [1]
-         * */
-        maxWorkers?: number,
+    /**
+     * Set the number of maximum concurrent workers any subreddit can use.
+     *
+     * Subreddits may define their own number of max workers in their config but the application will never allow any subreddit's max workers to be larger than the operator
+     *
+     * NOTE: Do not increase this unless you are certain you know what you are doing! The default is suitable for the majority of use cases.
+     *
+     * @default 1
+     * @examples [1]
+     * */
+    maxWorkers?: number,
     }
 
     /**
@@ -1861,6 +1899,7 @@ export interface BotInstanceConfig extends BotInstanceJsonConfig {
         dryRun?: boolean,
         wikiConfig: string,
         heartbeatInterval: number,
+        overrides?: SubredditOverrides[]
     },
     polling: {
         shared: PollOn[],
@@ -1955,6 +1994,8 @@ export interface ActionResult extends ActionProcessResult {
     name: string,
     run: boolean,
     runReason?: string,
+    itemIs?: FilterResult<TypedActivityState>
+    authorIs?: FilterResult<AuthorCriteria>
 }
 
 export interface ActionProcessResult {
@@ -1964,18 +2005,49 @@ export interface ActionProcessResult {
     touchedEntities?: (Submission | Comment | RedditUser | string)[]
 }
 
-export interface ActionedEvent {
-    activity: {
-        peek: string
-        link: string
-    }
+export interface EventActivity {
+    peek: string
+    link: string
+    type: ActivityType
+    id: string
+    subreddit: string
     author: string
+}
+
+export interface ActionedEvent {
+    activity: EventActivity
+    parentSubmission?: EventActivity
     timestamp: number
-    check: string
-    ruleSummary: string,
     subreddit: string,
+    triggered: boolean,
+    runResults: RunResult[]
+}
+
+export interface CheckResult {
+    triggered: boolean
     ruleResults: RuleResult[]
+    itemIs?: FilterResult<TypedActivityState>
+    authorIs?: FilterResult<AuthorCriteria>
+    fromCache?: boolean
+}
+
+export interface CheckSummary extends CheckResult {
+    name: string
+    run: string
+    postBehavior: string
+    error?: string
     actionResults: ActionResult[]
+    condition: 'AND' | 'OR'
+}
+
+export interface RunResult {
+    name: string
+    triggered: boolean
+    reason?: string
+    error?: string
+    itemIs?: FilterResult<TypedActivityState>
+    authorIs?: FilterResult<AuthorCriteria>
+    checkResults: CheckSummary[]
 }
 
 export interface UserResultCache {
@@ -2061,13 +2133,13 @@ export interface ManagerStats {
 export interface HistoricalStatUpdateData {
     eventsCheckedTotal?: number
     eventsActionedTotal?: number
-    checksRun: string[] | string
-    checksTriggered: string[] | string
-    checksFromCache: string[] | string
-    actionsRun: string[] | string
-    rulesRun: string[] | string
-    rulesCachedTotal: number
-    rulesTriggered: string[] | string
+    checksRun?: string[] | string
+    checksTriggered?: string[] | string
+    checksFromCache?: string[] | string
+    actionsRun?: string[] | string
+    rulesRun?: string[] | string
+    rulesCachedTotal?: number
+    rulesTriggered?: string[] | string
 }
 
 export type SearchFacetType = 'title' | 'url' | 'duplicates' | 'crossposts' | 'external';
@@ -2096,8 +2168,7 @@ export interface StringComparisonOptions {
 
 export interface FilterCriteriaPropertyResult<T> {
     property: keyof T
-    expected: (string | boolean | number)[]
-    found?: string | boolean | number | null
+    found?: string | boolean | number | null | FilterResult<any>
     passed?: null | boolean
     reason?: string
     behavior: FilterBehavior
@@ -2170,3 +2241,39 @@ export interface TextMatchOptions {
      **/
     caseSensitive?: boolean
 }
+
+export type ActivityCheckJson = SubmissionCheckJson | CommentCheckJson;
+
+export type GotoPath = `goto:${string}`;
+/**
+ * The possible behaviors that can occur after a check has run
+ *
+ * * next => continue to next Check/Run
+ * * stop => stop CM lifecycle for this activity (immediately end)
+ * * nextRun => skip any remaining Checks in this Run and start the next Run
+ * * goto:[path] => specify a run[.check] to jump to
+ *
+ * */
+export type PostBehaviorTypes = 'next' | 'stop' | 'nextRun' | string;
+
+export interface PostBehavior {
+    /**
+     * Do this behavior if a Check is triggered
+     *
+     * @default nextRun
+     * @example ["nextRun"]
+     * */
+    postTrigger?: PostBehaviorTypes
+    /**
+     * Do this behavior if a Check is NOT triggered
+     *
+     * @default next
+     * @example ["next"]
+     * */
+    postFail?: PostBehaviorTypes
+}
+
+export type ActivityType = 'submission' | 'comment';
+
+export type ItemCritPropHelper = SafeDictionary<FilterCriteriaPropertyResult<(CommentState & SubmissionState)>, keyof (CommentState & SubmissionState)>;
+export type RequiredItemCrit = Required<(CommentState & SubmissionState)>;

@@ -41,7 +41,7 @@ export class UserFlairAction extends Action {
     const flairSummary = flairParts.length === 0 ? 'Unflair user' : flairParts.join(' | ');
     this.logger.verbose(flairSummary);
 
-    if (!this.dryRun) {
+    if (!dryRun) {
       if (this.flair_template_id !== undefined) {
         try {
           // @ts-ignore
@@ -72,7 +72,9 @@ export class UserFlairAction extends Action {
         item.author_flair_css_class = this.css ?? null;
       }
       await this.resources.resetCacheForItem(item);
-      await this.resources.resetCacheForItem(item.author);
+      if(typeof item.author !== 'string') {
+          await this.resources.resetCacheForItem(item.author);
+      }
     }
 
     return {

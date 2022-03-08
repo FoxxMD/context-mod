@@ -1,6 +1,7 @@
 import {RateLimitError, RequestError, StatusCodeError} from 'snoowrap/dist/errors';
 import ExtendableError from "es6-error";
 import {ErrorWithCause} from "pony-cause";
+import {CheckSummary, RunResult} from "../Common/interfaces";
 
 
 export const isRateLimitError = (err: any): err is RateLimitError => {
@@ -27,7 +28,7 @@ export const isStatusError = (err: any): err is StatusCodeError => {
 }
 
 export const isRequestError = (err: any): err is RequestError => {
-    return typeof err === 'object' && err.response !== undefined;
+    return typeof err === 'object' && err.response !== undefined && err.response !== null && typeof err.response === 'object';
 }
 
 export class SimpleError extends ExtendableError {
@@ -36,4 +37,18 @@ export class SimpleError extends ExtendableError {
 
 export class CMError extends ErrorWithCause {
     logged: boolean = false;
+}
+
+export class ProcessingError<T> extends ErrorWithCause {
+    constructor(msg: string, cause?: any, result?: T) {
+        super(msg, cause);
+        this.result = result;
+    }
+    result?: T
+}
+
+export class RunProcessingError extends ProcessingError<RunResult> {
+}
+
+export class CheckProcessingError extends ProcessingError<CheckSummary> {
 }

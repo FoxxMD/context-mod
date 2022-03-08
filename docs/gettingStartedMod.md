@@ -81,7 +81,7 @@ The default location for this page is at `https://old.reddit.com/r/YOURSUBERDDIT
 
 The bot automatically tries to create its configuration wiki page. You can find the result of this in the log for your subreddit in the web interface.
 
-If this fails for some reason you can create the wiki page through the web interface by navigating to your subreddit's tab, opening the [built-in editor (click **View**)](/docs/screenshots/configBox.png), and following the directions in **Create configuration for...** link found there.
+If this fails for some reason you can create the wiki page through the web interface by navigating to your subreddit's tab, opening the [built-in editor (click **View**)](/docs/images/configBox.png), and following the directions in **Create configuration for...** link found there.
 
 If neither of the above approaches work, or you do not wish to use the web interface, expand the section below for directions on how to manually setup the wiki page:
 
@@ -134,7 +134,7 @@ PROTIP: Find an [example config](#using-an-example-config) to use as a starting 
 In the web interface each subreddit's tab has access to the built-in editor. Use this built-in editor to automatically create, load, or save the configuration for that subreddit's wiki.
 
 * Visit the tab for the subreddit you want to edit the configuration of
-* Open the [built-in editor by click **View**](/docs/screenshots/configBox.png)
+* Open the [built-in editor by click **View**](/docs/images/configBox.png)
 * Edit your configuration
 * Follow the directions on the **Save to r/..** link found at the top of the editor to automatically save your configuration
 

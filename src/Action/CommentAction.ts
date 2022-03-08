@@ -52,6 +52,7 @@ export class CommentAction extends Action {
             };
         }
         const touchedEntities = [];
+        let modifiers = [];
         let reply: Comment;
         if(!dryRun) {
             // @ts-ignore
@@ -59,29 +60,29 @@ export class CommentAction extends Action {
            touchedEntities.push(reply);
         }
         if (this.lock) {
+            modifiers.push('Locked');
             if (!dryRun) {
                 // snoopwrap typing issue, thinks comments can't be locked
                 // @ts-ignore
-                await item.lock();
-                touchedEntities.push(item);
+                await reply.lock();
             }
         }
         if (this.distinguish && !dryRun) {
-            // @ts-ignore
-            await reply.distinguish({sticky: this.sticky});
-        }
-        let modifiers = [];
-        if(this.distinguish) {
             modifiers.push('Distinguished');
+            if(this.sticky) {
+                modifiers.push('Stickied');
+            }
+            if(!dryRun) {
+                // @ts-ignore
+                await reply.distinguish({sticky: this.sticky});
+            }
         }
-        if(this.sticky) {
-            modifiers.push('Stickied');
-        }
+
         const modifierStr = modifiers.length === 0 ? '' : `[${modifiers.join(' | ')}]`;
         return {
             dryRun,
             success: true,
-            result: `${modifierStr}${this.lock ? ' - Locked Author\'s Activity - ' : ''}${truncateStringToLength(100)(body)}`,
+            result: `${modifierStr}${truncateStringToLength(100)(body)}`,
             touchedEntities,
         };
     }

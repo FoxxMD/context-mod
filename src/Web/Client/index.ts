@@ -6,15 +6,23 @@ import cookieParser from 'cookie-parser';
 import CacheManagerStore from 'express-session-cache-manager'
 import passport from 'passport';
 import {Strategy as CustomStrategy} from 'passport-custom';
-import {OperatorConfig, BotConnection, LogInfo} from "../../Common/interfaces";
+import {
+    OperatorConfig,
+    BotConnection,
+    LogInfo,
+    CheckSummary,
+    RunResult,
+    ActionedEvent,
+    ActionResult
+} from "../../Common/interfaces";
 import {
     buildCachePrefix,
-    createCacheManager, defaultFormat, filterLogBySubreddit, filterLogs,
-    formatLogLineToHtml, getUserAgent,
+    createCacheManager, defaultFormat, filterLogBySubreddit, filterCriteriaSummary, formatFilterData,
+    formatLogLineToHtml, filterLogs, getUserAgent,
     intersect, isLogLineMinLevel,
     LogEntry, parseInstanceLogInfoName, parseInstanceLogName, parseRedditEntity,
     parseSubredditLogName, permissions,
-    randomId, replaceApplicationIdentifier, sleep, triggeredIndicator
+    randomId, replaceApplicationIdentifier, resultsSummary, sleep, triggeredIndicator
 } from "../../util";
 import {Cache} from "cache-manager";
 import session, {Session, SessionData} from "express-session";
@@ -50,6 +58,7 @@ import {BotStatusResponse} from "../Common/interfaces";
 import {TransformableInfo} from "logform";
 import {SimpleError} from "../../Utils/Errors";
 import {ErrorWithCause} from "pony-cause";
+import {RuleResult} from "../../Rule";
 import {CMInstance} from "./CMInstance";
 
 const emitter = new EventEmitter();
@@ -978,57 +987,83 @@ const webClient = async (options: OperatorConfig) => {
             }
         }).json() as [any];
 
-        return res.render('events', {
-            data: resp.map((x) => {
-                const {timestamp, activity: {peek, link}, ruleResults = [], actionResults = [], ...rest} = x;
-                const time = dayjs(timestamp).local().format('YY-MM-DD HH:mm:ss z');
-                const formattedPeek = Autolinker.link(peek, {
-                    email: false,
-                    phone: false,
-                    mention: false,
-                    hashtag: false,
-                    stripPrefix: false,
-                    sanitizeHtml: true,
-                });
-                const formattedRuleResults = ruleResults.map((y: any) => {
-                    const {triggered, result, ...restY} = y;
-                    let t = triggeredIndicator(false);
-                    if(triggered === null) {
-                        t = 'Skipped';
-                    } else if(triggered === true) {
-                        t = triggeredIndicator(true);
-                    }
+        const actionedEvents = resp.map((x: ActionedEvent) => {
+            const {timestamp, activity: {peek, link, ...restAct}, runResults = [], ...rest} = x;
+            const time = dayjs(timestamp).local().format('YY-MM-DD HH:mm:ss z');
+            const formattedPeek = Autolinker.link(peek.replace(`https://reddit.com${link}`, ''), {
+                email: false,
+                phone: false,
+                mention: false,
+                hashtag: false,
+                stripPrefix: false,
+                sanitizeHtml: true,
+                urls: false
+            });
+            const formattedRunResults = runResults.map((summ: RunResult) => {
+                const {checkResults = [], ...rest} = summ;
+                const formattedCheckResults = checkResults.map((y: CheckSummary) => {
+                    const {actionResults = [], ruleResults = [], triggered: checkTriggered, authorIs, itemIs, ...rest} = y;
+
+                    const formattedRuleResults = ruleResults.map((z: RuleResult) => {
+                        const {triggered, result, ...restY} = z;
+                        return {
+                            ...restY,
+                            triggered: triggeredIndicator(triggered, 'Skipped'),
+                            result: result || '-',
+                            ...formatFilterData(z)
+                        };
+                    });
+                    const formattedActionResults = actionResults.map((z: ActionResult) => {
+                        const {run, runReason, success, result, dryRun, ...restA} = z;
+                        let res = '';
+                        if(!run) {
+                            res = `Not Run - ${runReason === undefined ? '(No Reason)' : runReason}`;
+                        } else {
+                            res = `${triggeredIndicator(success)}${result !== undefined ? ` - ${result}` : ''}`;
+                        }
+                        return {
+                            ...restA,
+                            dryRun: dryRun ? ' (DRYRUN)' : '',
+                            result: res,
+                            ...formatFilterData(z)
+                        };
+                    });
+
                     return {
-                        ...restY,
-                        triggered: t,
-                        result: result || '-'
-                    };
+                        ...rest,
+                        triggered: triggeredIndicator(checkTriggered, 'Skipped'),
+                        triggeredVal: checkTriggered,
+                        ruleResults: formattedRuleResults,
+                        actionResults: formattedActionResults,
+                        ruleSummary: y.fromCache ? `Check result was found in cache: ${triggeredIndicator(checkTriggered, 'Skipped')}` : resultsSummary(ruleResults, y.condition),
+                        ...formatFilterData(y)
+                    }
                 });
-                const formattedActionResults = actionResults.map((y: any) => {
-                   const {run, runReason, success, result, dryRun, ...restA} = y;
-                   let res = '';
-                   if(!run) {
-                       res = `Not Run - ${runReason === undefined ? '(No Reason)' : runReason}`;
-                   } else {
-                       res = `${triggeredIndicator(success)}${result !== undefined ? ` - ${result}` : ''}`;
-                   }
-                   return {
-                       ...restA,
-                       dryRun: dryRun ? ' (DRYRUN)' : '',
-                       result: res
-                   };
-                });
+
                 return {
                     ...rest,
-                    timestamp: time,
-                    activity: {
-                        link,
-                        peek: formattedPeek,
-                    },
-                    ruleResults: formattedRuleResults,
-                    actionResults: formattedActionResults
+                    triggered: triggeredIndicator(summ.triggered, 'Skipped'),
+                    triggeredVal: summ.triggered,
+                    checkResults: formattedCheckResults,
+                    ...formatFilterData(summ)
                 }
-            }),
+            });
+            return {
+                ...rest,
+                timestamp: time,
+                activity: {
+                    link,
+                    peek: formattedPeek,
+                    ...restAct,
+                },
+                triggered: triggeredIndicator(x.triggered),
+                triggeredVal: x.triggered,
+                runResults: formattedRunResults,
+            }
+        });
+
+        return res.render('events', {
+            data: actionedEvents,
             title: `${subreddit !== undefined ? `${subreddit} ` : ''}Actioned Events`
         });
     });

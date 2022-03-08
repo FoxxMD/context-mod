@@ -1,0 +1,96 @@
+runs:
+  - name: flairAndCategory
+
+    # Runs inherit the same filters as checks/rules/actions
+    # If these filters fail the Run is skipped and CM processes the next run in order
+    #    authorIs:
+    #    itemIs:
+
+    # Set the default behavior for check trigger/fail
+    #    postTrigger:
+    #    postFail:
+
+    # Defaults can also be set for check authorIs/itemIs
+    # same as at operator/subreddit level - any defined here will override "higher" defaults
+    #    filterCriteriaDefaults:
+
+    checks:
+      - name: goodUserFlair
+        description: flair user if they have decent history in sub
+        kind: submission
+        authorIs:
+          exclude:
+            - flairText: 'Good User'
+        rules:
+          - kind: recentActivity
+            thresholds:
+              - threshold: '> 5'
+                karma: '> 10'
+                subreddits:
+                  - mySubreddit
+        actions:
+          - kind: userflair
+            text: 'Good User'
+        # post-behavior after a check has run. Either the check is TRIGGERED or FAIL
+        # there are 4 possible behaviors for each post-behavior type:
+        #
+        # 'next' => Continue to next check in order
+        # 'nextRun' => Exit the current Run (skip all remaining Checks) and go to the next Run in order
+        # 'stop' => Exit the current Run and finish activity processing immediately (skip all remaining Runs)
+        # 'goto:run[.check]' => Specify a run[.check] to jump to. This can be anywhere in your config. CM will continue to process in order from the specified point.
+        #
+        # GOTO syntax --
+        # 'goto:normalFilters' => go to run "normalFilters"
+        # 'goto:normalFilters.myCheck' => go to run "normalFilters" and start at check "myCheck"
+        # 'goto:.goodUserFlair' => go to check 'goodUserFlair' IN THE SAME RUN currently processing
+        #
+
+        # this means if the check triggers then continue to 'good submission flair'
+        postTrigger: next # default is 'nextRun'
+      #        postFail: # default is 'next'
+
+      - name: good submission flair
+        description: flair submission if from good user
+        kind: submission
+        authorIs:
+          include:
+            - flairText: 'Good User'
+        actions:
+          - kind: flair
+            text: 'Trusted Source'
+          - kind: approve
+        # this means if the check is triggered then stop processing the activity entirely
+        postTrigger: stop
+
+  - name: Determine Suspect
+    checks:
+      - name: is suspect
+        kind: submission
+        rules:
+          - kind: recentActivity
+            thresholds:
+              - subreddits:
+                  - over_18: true
+        actions:
+        # do some actions
+
+        # if check is triggered then go to run 'suspectFilters'
+        postTrigger: 'goto:suspectFilters'
+        # if check is not triggered then go to run 'normalFilters'
+        postFail: 'goto:normalFilters'
+
+  - name: suspectFilters
+    postTrigger: stop
+    authorIs:
+      exclude:
+        - flairText: 'Good User'
+    checks:
+    # some checks for users that are suspicious
+
+
+  - name: normalFilters
+    authorIs:
+      exclude:
+        - flairText: 'Good User'
+    checks:
+    # some checks for general activities
