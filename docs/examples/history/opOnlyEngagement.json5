@@ -1,28 +1,32 @@
 {
-  "checks": [
+  "runs": [
     {
-      "name": "Engaging Own Content Only",
-      "description": "Check if Author is mostly engaging in their own content only",
-      // check will run on a new submission in your subreddit and look at the Author of that submission
-      "kind": "submission",
-      "rules": [
+      "checks": [
         {
-          "name": "opOnly",
-          "kind": "history",
-          "criteria": [
+          "name": "Engaging Own Content Only",
+          "description": "Check if Author is mostly engaging in their own content only",
+          // check will run on a new submission in your subreddit and look at the Author of that submission
+          "kind": "submission",
+          "rules": [
             {
-              // look at last 90 days of Author's activities
-              "window": "90 days",
-              // trigger if more than 60% of their activities in this time period are comments as OP
-              "comment": "> 60% OP"
-            },
+              "name": "opOnly",
+              "kind": "history",
+              "criteria": [
+                {
+                  // look at last 90 days of Author's activities
+                  "window": "90 days",
+                  // trigger if more than 60% of their activities in this time period are comments as OP
+                  "comment": "> 60% OP"
+                },
+              ]
+            }
+          ],
+          "actions": [
+            {
+              "kind": "report",
+              "content": "Selfish OP: {{rules.oponly.opPercent}} of {{rules.oponly.commentTotal}} comments over {{rules.oponly.window}} are as OP"
+            }
           ]
-        }
-      ],
-      "actions": [
-        {
-          "kind": "report",
-          "content": "Selfish OP: {{rules.oponly.opPercent}} of {{rules.oponly.commentTotal}} comments over {{rules.oponly.window}} are as OP"
         }
       ]
     }

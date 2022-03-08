@@ -1,75 +1,79 @@
 {
-  "checks": [
+  "runs": [
     {
-      "name": "Auto Remove SP Karma",
-      "description": "Remove submission because author has self-promo >10% and posted in karma subs recently",
-      "kind": "submission",
-      "rules": [
-        // named rules can be referenced at any point in the configuration (where they occur does not matter)
-        // and can be used in any Check
-        // Note: rules do not transfer between subreddit configurations
-        "freekarmasub",
+      "checks": [
         {
-          "name": "attr10all",
-          "kind": "attribution",
-          "criteria": [
+          "name": "Auto Remove SP Karma",
+          "description": "Remove submission because author has self-promo >10% and posted in karma subs recently",
+          "kind": "submission",
+          "rules": [
+            // named rules can be referenced at any point in the configuration (where they occur does not matter)
+            // and can be used in any Check
+            // Note: rules do not transfer between subreddit configurations
+            "freekarmasub",
             {
-              "threshold": "> 10%",
-              "window": "90 days"
+              "name": "attr10all",
+              "kind": "attribution",
+              "criteria": [
+                {
+                  "threshold": "> 10%",
+                  "window": "90 days"
+                },
+                {
+                  "threshold": "> 10%",
+                  "window": 100
+                }
+              ],
+            }
+          ],
+          "actions": [
+            {
+              "kind": "remove"
             },
             {
-              "threshold": "> 10%",
-              "window": 100
+              "kind": "comment",
+              "content": "Your submission was removed because you are over reddit's threshold for self-promotion and recently posted this content in a karma sub"
             }
-          ],
-        }
-      ],
-      "actions": [
-        {
-          "kind": "remove"
+          ]
         },
         {
-          "kind": "comment",
-          "content": "Your submission was removed because you are over reddit's threshold for self-promotion and recently posted this content in a karma sub"
-        }
-      ]
-    },
-    {
-      "name": "Free Karma On Submission Alert",
-      "description": "Check if author has posted this submission in 'freekarma' subreddits",
-      "kind": "submission",
-      "rules": [
-        {
-          // rules can be re-used throughout a configuration by referencing them by name
-          //
-          // The rule name itself can only contain spaces, hyphens and underscores
-          // The value used to reference it will have all of these removed, and lower-cased
-          //
-          // so to reference this rule use the value 'freekarmasub'
-          "name": "Free_Karma-SUB",
-          "kind": "recentActivity",
-          "lookAt": "submissions",
-          "useSubmissionAsReference":true,
-          "thresholds": [
+          "name": "Free Karma On Submission Alert",
+          "description": "Check if author has posted this submission in 'freekarma' subreddits",
+          "kind": "submission",
+          "rules": [
             {
-              "threshold": ">= 1",
-              "subreddits": [
-                "DeFreeKarma",
-                "FreeKarma4U",
-                "FreeKarma4You",
-                "upvote"
-              ]
+              // rules can be re-used throughout a configuration by referencing them by name
+              //
+              // The rule name itself can only contain spaces, hyphens and underscores
+              // The value used to reference it will have all of these removed, and lower-cased
+              //
+              // so to reference this rule use the value 'freekarmasub'
+              "name": "Free_Karma-SUB",
+              "kind": "recentActivity",
+              "lookAt": "submissions",
+              "useSubmissionAsReference":true,
+              "thresholds": [
+                {
+                  "threshold": ">= 1",
+                  "subreddits": [
+                    "DeFreeKarma",
+                    "FreeKarma4U",
+                    "FreeKarma4You",
+                    "upvote"
+                  ]
+                }
+              ],
+              "window": "7 days"
             }
           ],
-          "window": "7 days"
-        }
-      ],
-      "actions": [
-        {
-          "kind": "report",
-          "content": "Submission posted {{rules.freekarmasub.totalCount}} times in karma {{rules.freekarmasub.subCount}} subs over {{rules.freekarmasub.window}}: {{rules.freekarmasub.subSummary}}"
-        }
+          "actions": [
+            {
+              "kind": "report",
+              "content": "Submission posted {{rules.freekarmasub.totalCount}} times in karma {{rules.freekarmasub.subCount}} subs over {{rules.freekarmasub.window}}: {{rules.freekarmasub.subSummary}}"
+            }
+          ]
+        },
       ]
-    },
+    }
   ]
 }

@@ -1,38 +1,39 @@
-checks:
-  - name: Flair OF submitters
-    description: Flair submission as OF if user does not have Verified flair and has
-      certain keywords in their profile
-    kind: submission
-    authorIs:
-      exclude:
-        - flairCssClass:
-            - verified
-    rules:
-      - name: OnlyFans strings in description
-        kind: author
-        include:
-          - description:
-              - '/(cashapp|allmylinks|linktr|onlyfans\.com)/i'
-              - '/(see|check|my|view) (out|of|onlyfans|kik|skype|insta|ig|profile|links)/i'
-              - my links
-              - "$"
-    actions:
-      - name: Set OnlyFans user flair
-        kind: userflair
-        flair_template_id: put-your-onlyfans-user-flair-id-here
-      - name: Set OF Creator SUBMISSION flair
-        kind: flair
-        flair_template_id: put-your-onlyfans-post-flair-id-here
-  - name: Flair posts of OF submitters
-    description: Flair submission as OnlyFans if submitter has OnlyFans userflair (override post flair set by submitter)
-    kind: submission
-    rules:
-      - name: Include OF submitters
-        kind: author
-        include:
-          - flairCssClass:
-              - onlyfans
-    actions:
-      - name: Set OF Creator SUBMISSION flair
-        kind: flair
-        flair_template_id: put-your-onlyfans-post-flair-id-here
+runs:
+  - checks:
+      - name: Flair OF submitters
+        description: Flair submission as OF if user does not have Verified flair and has
+          certain keywords in their profile
+        kind: submission
+        authorIs:
+          exclude:
+            - flairCssClass:
+                - verified
+        rules:
+          - name: OnlyFans strings in description
+            kind: author
+            include:
+              - description:
+                  - '/(cashapp|allmylinks|linktr|onlyfans\.com)/i'
+                  - '/(see|check|my|view) (out|of|onlyfans|kik|skype|insta|ig|profile|links)/i'
+                  - my links
+                  - "$"
+        actions:
+          - name: Set OnlyFans user flair
+            kind: userflair
+            flair_template_id: put-your-onlyfans-user-flair-id-here
+          - name: Set OF Creator SUBMISSION flair
+            kind: flair
+            flair_template_id: put-your-onlyfans-post-flair-id-here
+      - name: Flair posts of OF submitters
+        description: Flair submission as OnlyFans if submitter has OnlyFans userflair (override post flair set by submitter)
+        kind: submission
+        rules:
+          - name: Include OF submitters
+            kind: author
+            include:
+              - flairCssClass:
+                  - onlyfans
+        actions:
+          - name: Set OF Creator SUBMISSION flair
+            kind: flair
+            flair_template_id: put-your-onlyfans-post-flair-id-here

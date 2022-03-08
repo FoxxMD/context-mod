@@ -1704,7 +1704,11 @@ export const snooLogWrapper = (logger: Logger) => {
  * Cached activities lose type information when deserialized so need to check properties as well to see if the object is the shape of a Submission
  * */
 export const isSubmission = (value: any) => {
-    return value instanceof Submission || (value.id !== undefined && value.id.includes('t3_')) || value.domain !== undefined;
+    try {
+        return value !== null && typeof value === 'object' && (value instanceof Submission || (value.name !== undefined && value.name.includes('t3_')) || value.domain !== undefined);
+    } catch (e) {
+        return false;
+    }
 }
 
 export const asSubmission = (value: any): value is Submission => {
@@ -1712,7 +1716,11 @@ export const asSubmission = (value: any): value is Submission => {
 }
 
 export const isComment = (value: any) => {
-    return value instanceof Comment || value.name.includes('t1_');
+    try {
+        return value !== null && typeof value === 'object' && (value instanceof Comment || value.name.includes('t1_'));
+    } catch (e) {
+        return false;
+    }
 }
 
 export const asComment = (value: any): value is Comment => {
@@ -1724,7 +1732,11 @@ export const asActivity = (value: any): value is (Submission | Comment) => {
 }
 
 export const isUser = (value: any) => {
-    return value instanceof RedditUser || value.name.includes('t2_');
+    try {
+        return value !== null && typeof value === 'object' && (value instanceof RedditUser || value.name.includes('t2_'));
+    } catch(e) {
+        return false;
+    }
 }
 
 export const asUser = (value: any): value is RedditUser => {

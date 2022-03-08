@@ -21,6 +21,7 @@ This directory contains example of valid, ready-to-go configurations for Context
   * [Author and post flairs](/docs/examples/onlyfansFlair)
 * [Toolbox User Notes](/docs/examples/userNotes)
 * [Advanced Concepts](/docs/examples/advancedConcepts)
+  * [Flow Control](/docs/examples/advancedConcepts/flowControl.md)
   * [Rule Sets](/docs/examples/advancedConcepts/ruleSets.json5)
   * [Name Rules](/docs/examples/advancedConcepts/ruleNameReuse.json5)
   * [Check Ordering](/docs/examples/advancedConcepts)

@@ -1,73 +1,77 @@
 {
-  "checks": [
+  "runs": [
     {
-      "name": "remove discord spam",
-      "notifyOnTrigger": true,
-      "description": "remove comments from users who are spamming discord links",
-      "kind": "comment",
-      "authorIs": {
-        "exclude": [
-          {
-            "isMod": true
-          }
-        ]
-      },
-      "itemIs": [
+      "checks": [
         {
-          "removed": false,
-          "approved": false,
-        }
-      ],
-      "condition": "OR",
-      "rules": [
-        {
-          // set to false if you want to allow comments with a discord link ONLY IF
-          // the author doesn't have a history of spamming discord links
-          // -- basically allows one-off/organic discord links
-          "enable": true,
-          "name": "linkOnlySpam",
-          "kind": "regex",
-          "criteria": [
+          "name": "remove discord spam",
+          "notifyOnTrigger": true,
+          "description": "remove comments from users who are spamming discord links",
+          "kind": "comment",
+          "authorIs": {
+            "exclude": [
+              {
+                "isMod": true
+              }
+            ]
+          },
+          "itemIs": [
             {
-              "name": "only link",
-              "regex": "/^.*(discord\\.gg\\/[\\w\\d]+)$/i",
+              "removed": false,
+              "approved": false,
             }
-          ]
-        },
-        {
-          "condition": "AND",
+          ],
+          "condition": "OR",
           "rules": [
             {
-              "name": "linkAnywhereSpam",
+              // set to false if you want to allow comments with a discord link ONLY IF
+              // the author doesn't have a history of spamming discord links
+              // -- basically allows one-off/organic discord links
+              "enable": true,
+              "name": "linkOnlySpam",
               "kind": "regex",
               "criteria": [
                 {
-                  "name": "contains link anywhere",
-                  "regex": "/^.*(discord\\.gg\\/[\\w\\d]+).*$/i",
+                  "name": "only link",
+                  "regex": "/^.*(discord\\.gg\\/[\\w\\d]+)$/i",
                 }
               ]
             },
             {
-              "name": "linkAnywhereHistoricalSpam",
-              "kind": "regex",
-              "criteria": [
+              "condition": "AND",
+              "rules": [
                 {
-                  "name": "contains links anywhere historically",
-                  "regex": "/^.*(discord\\.gg\\/[\\w\\d]+).*$/i",
-                  "totalMatchThreshold": ">= 3",
-                  "lookAt": "comments",
-                  "window": 10
+                  "name": "linkAnywhereSpam",
+                  "kind": "regex",
+                  "criteria": [
+                    {
+                      "name": "contains link anywhere",
+                      "regex": "/^.*(discord\\.gg\\/[\\w\\d]+).*$/i",
+                    }
+                  ]
+                },
+                {
+                  "name": "linkAnywhereHistoricalSpam",
+                  "kind": "regex",
+                  "criteria": [
+                    {
+                      "name": "contains links anywhere historically",
+                      "regex": "/^.*(discord\\.gg\\/[\\w\\d]+).*$/i",
+                      "totalMatchThreshold": ">= 3",
+                      "lookAt": "comments",
+                      "window": 10
+                    }
+                  ]
                 }
               ]
             }
+          ],
+          "actions": [
+            {
+              "kind": "remove"
+            }
           ]
-        }
-      ],
-      "actions": [
-        {
-          "kind": "remove"
         }
       ]
     }
-  ]
+  ],
 }

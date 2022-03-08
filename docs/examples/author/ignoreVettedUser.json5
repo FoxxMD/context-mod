@@ -1,73 +1,77 @@
 {
-  "checks": [
+  "runs": [
     {
-      "name": "non-vetted karma/meme activity",
-      "description": "Report if Author has SP and has recent karma/meme sub activity and isn't vetted",
-      // check will run on a new submission in your subreddit and look at the Author of that submission
-      "kind": "submission",
-      "rules": [
+      "checks": [
         {
-          // The Author Rule is best used in conjunction with other Rules --
-          // instead of having to write an AuthorFilter for every Rule where you want to skip it based on Author criteria
-          // you can write one Author Rule and make it fail on the required criteria
-          // so that the check fails and Actions don't run
-          "name": "nonvet",
-          "kind": "author",
-          "exclude": [
+          "name": "non-vetted karma/meme activity",
+          "description": "Report if Author has SP and has recent karma/meme sub activity and isn't vetted",
+          // check will run on a new submission in your subreddit and look at the Author of that submission
+          "kind": "submission",
+          "rules": [
             {
-              "flairText": ["vet"]
-            }
-          ]
-        },
-        {
-          "name": "attr10",
-          "kind": "attribution",
-          "criteria": [
-            {
-              "threshold": "> 10%",
-              "window": "90 days"
+              // The Author Rule is best used in conjunction with other Rules --
+              // instead of having to write an AuthorFilter for every Rule where you want to skip it based on Author criteria
+              // you can write one Author Rule and make it fail on the required criteria
+              // so that the check fails and Actions don't run
+              "name": "nonvet",
+              "kind": "author",
+              "exclude": [
+                {
+                  "flairText": ["vet"]
+                }
+              ]
             },
             {
-              "threshold": "> 10%",
-              "window": 100
-            }
-          ],
-        },
-        {
-          "name": "freekarma",
-          "kind": "recentActivity",
-          "lookAt": "submissions",
-          "thresholds": [
+              "name": "attr10",
+              "kind": "attribution",
+              "criteria": [
+                {
+                  "threshold": "> 10%",
+                  "window": "90 days"
+                },
+                {
+                  "threshold": "> 10%",
+                  "window": 100
+                }
+              ],
+            },
             {
-              "threshold": ">= 1",
-              "subreddits": [
-                "DeFreeKarma",
-                "FreeKarma4U",
-              ]
-            }
-          ],
-          "window": "7 days"
-        },
-        {
-          "name": "memes",
-          "kind": "recentActivity",
-          "lookAt": "submissions",
-          "thresholds": [
+              "name": "freekarma",
+              "kind": "recentActivity",
+              "lookAt": "submissions",
+              "thresholds": [
+                {
+                  "threshold": ">= 1",
+                  "subreddits": [
+                    "DeFreeKarma",
+                    "FreeKarma4U",
+                  ]
+                }
+              ],
+              "window": "7 days"
+            },
             {
-              "threshold": ">= 3",
-              "subreddits": [
-                "dankmemes",
-              ]
+              "name": "memes",
+              "kind": "recentActivity",
+              "lookAt": "submissions",
+              "thresholds": [
+                {
+                  "threshold": ">= 3",
+                  "subreddits": [
+                    "dankmemes",
+                  ]
+                }
+              ],
+              "window": "7 days"
             }
           ],
-          "window": "7 days"
-        }
-      ],
-      // will NOT run if the Author for this Submission has the flair "vet"
-      "actions": [
-        {
-          "kind": "report",
-          "content": "Author has posted in free karma or meme subs recently"
+          // will NOT run if the Author for this Submission has the flair "vet"
+          "actions": [
+            {
+              "kind": "report",
+              "content": "Author has posted in free karma or meme subs recently"
+            }
+          ]
         }
       ]
     }
