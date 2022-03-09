@@ -381,6 +381,8 @@ dist
 .pnp.*
 
 **/src/**/*.js
+**/tests/**/*.js
+**/tests/**/*.map
 !src/Web/assets/public/yaml/*
 **/src/**/*.map
 /**/*.sqlite
