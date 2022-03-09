@@ -853,13 +853,17 @@ export const activityIsRemoved = (item: Submission | Comment): boolean => {
 }
 
 export const activityIsFiltered = (item: Submission | Comment): boolean => {
-    if (item instanceof Submission) {
-        // when automod filters a post it gets this category
-        return item.banned_at_utc !== null && item.removed_by_category === 'automod_filtered';
+    if(item.can_mod_post) {
+        if (item instanceof Submission) {
+            // when automod filters a post it gets this category
+            return item.banned_at_utc !== null && item.removed_by_category === 'automod_filtered';
+        }
+        // when automod filters a comment item.removed === false
+        // so if we want to processing filtered comments we need to check for this
+        return item.banned_at_utc !== null && !item.removed;
     }
-    // when automod filters a comment item.removed === false
-    // so if we want to processing filtered comments we need to check for this
-    return item.banned_at_utc !== null && !item.removed;
+    // not possible to know if its filtered if user isn't a mod so always return false
+    return false;
 }
 
 export const activityIsDeleted = (item: Submission | Comment): boolean => {
