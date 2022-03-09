@@ -1,5 +1,5 @@
-import Snoowrap, {Listing} from "snoowrap";
-import {Subreddit} from "snoowrap/dist/objects";
+import Snoowrap, {Listing, RedditUser} from "snoowrap";
+import {Submission, Subreddit, Comment} from "snoowrap/dist/objects";
 import {parseSubredditName} from "../util";
 
 // const proxyFactory = (endpoint: string) => {
@@ -13,6 +13,16 @@ import {parseSubredditName} from "../util";
 //         }
 //     }
 // }
+
+export type ModNoteLabel = 'BOT_BAN' | 'PERMA_BAN' | 'BAN' | 'ABUSE_WARNING' | 'SPAM_WARNING' | 'SPAM_WATCH' | 'SOLID_CONTRIBUTOR' | 'HELPFUL_USER';
+
+export interface ModNoteData {
+    user: RedditUser
+    subreddit: Subreddit
+    activity?: Submission | Comment
+    label?: ModNoteLabel
+    note: string
+}
 
 export class ExtendedSnoowrap extends Snoowrap {
     /**
@@ -43,6 +53,26 @@ export class ExtendedSnoowrap extends Snoowrap {
                 name: options.username,
                 flair_template_id: options.flairTemplateId,
             }
+        });
+    }
+
+    async addModNote(data: ModNoteData): Promise<any> {
+        const {note, label} = data;
+        const userId = await data.user.id;
+        const requestData: any = {
+            note,
+            label,
+            subreddit_id: await data.subreddit.name,
+            user_id: `t2_${userId}`,
+        }
+        if(data.activity !== undefined) {
+            requestData.reddit_id = await data.activity.name;
+        }
+
+        return await this.oauthRequest({
+            uri: `/api/mod/notes`,
+            method: 'post',
+            form: requestData
         });
     }
 }
