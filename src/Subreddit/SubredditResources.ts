@@ -1047,13 +1047,9 @@ export class SubredditResources {
 
         const keys = Object.keys(propResultsMap) as (keyof (SubmissionState & CommentState))[]
 
-        let shouldContinue;
-
         try {
             for(const k of keys) {
                 const itemOptVal = definedStateCriteria[k];
-
-                shouldContinue = undefined;
 
                 switch(k) {
                     case 'submissionState':
@@ -1284,17 +1280,23 @@ export class SubredditResources {
                             break;
                         }
                     default:
+
                         // @ts-ignore
                         const val = item[k];
 
-                        if(val === undefined) {
-                            log.warn(`Value for ${k} cannot be undefined`);
-                        } else if(propResultsMap[k] === undefined) {
+                        // this shouldn't happen
+                        if(propResultsMap[k] === undefined) {
+                            log.warn(`State criteria property ${k} was not found in property map?? This shouldn't happen`);
+                        } else if(val === undefined) {
+
                             let defaultWarn = `Tried to test for Activity property '${k}' but it did not exist. Check the spelling of the property.`;
                             if(!item.can_mod_post) {
                                 defaultWarn =`Tried to test for Activity property '${k}' but it did not exist. This Activity is not in a subreddit the bot can mod so it may be that this property is only available to mods of that subreddit. Or the property may be misspelled.`;
                             }
                             log.debug(defaultWarn);
+                            propResultsMap[k]!.found = 'undefined';
+                            propResultsMap[k]!.reason = defaultWarn;
+
                         } else {
                             propResultsMap[k]!.found = val;
                             propResultsMap[k]!.passed = val === itemOptVal;
