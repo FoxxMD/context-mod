@@ -701,7 +701,8 @@
                                 "boolean"
                             ]
                         }
-                    ]
+                    ],
+                    "description": "Test whether the activity is present in dispatched/delayed activities\n\nNOTE: This is DOES NOT mean that THIS activity is from dispatch -- just that it exists there. To test whether THIS activity is from dispatch use `source`\n\n* `true` => activity exists in delayed activities\n* `false` => activity DOES NOT exist in delayed activities\n* `string` => activity exists in delayed activities with given identifier\n* `string[]` => activity exists in delayed activities with any of the given identifiers"
                 },
                 "distinguished": {
                     "type": "boolean"
@@ -733,7 +734,8 @@
                     "anyOf": [
                         {
                             "items": {
-                                "type": "string"
+                                "type": "string",
+                                "pattern": "^(((poll|dispatch)(:\\w+)?)|user)$"
                             },
                             "type": "array"
                         },
@@ -742,7 +744,8 @@
                                 "anyOf": [
                                     {
                                         "items": {
-                                            "type": "string"
+                                            "type": "string",
+                                            "pattern": "^(((poll|dispatch)(:\\w+)?)|user)$"
                                         },
                                         "type": "array"
                                     },
@@ -758,7 +761,8 @@
                                         ],
                                         "type": "string"
                                     }
-                                ]
+                                ],
+                                "description": "Where an Activity was retrieved from\n\nSource can be any of:\n\n* `poll` => activity was retrieved from polling a queue (unmoderated, modqueue, etc...)\n* `poll:[pollSource]` => activity was retrieved from specific polling source IE `poll:unmoderated` activity comes from unmoderated queue\n* `dispatch` => activity is from Dispatch Action\n* `dispatch:[identifier]` => activity is from Dispatch Action with specific identifier\n* `user` => activity was from user input (web dashboard)"
                             },
                             "type": "array"
                         },
@@ -774,7 +778,8 @@
                             ],
                             "type": "string"
                         }
-                    ]
+                    ],
+                    "description": "Test where the current activity was sourced from.\n\nA source can be any of:\n\n* `poll` => activity was retrieved from polling a queue (unmoderated, modqueue, etc...)\n* `poll:[pollSource]` => activity was retrieved from specific polling source IE `poll:unmoderated` activity comes from unmoderated queue\n* `dispatch` => activity is from Dispatch Action\n* `dispatch:[identifier]` => activity is from Dispatch Action with specific identifier\n* `user` => activity was from user input (web dashboard)"
                 },
                 "spam": {
                     "type": "boolean"
@@ -2029,7 +2034,8 @@
                                 "boolean"
                             ]
                         }
-                    ]
+                    ],
+                    "description": "Test whether the activity is present in dispatched/delayed activities\n\nNOTE: This is DOES NOT mean that THIS activity is from dispatch -- just that it exists there. To test whether THIS activity is from dispatch use `source`\n\n* `true` => activity exists in delayed activities\n* `false` => activity DOES NOT exist in delayed activities\n* `string` => activity exists in delayed activities with given identifier\n* `string[]` => activity exists in delayed activities with any of the given identifiers"
                 },
                 "distinguished": {
                     "type": "boolean"
@@ -2110,7 +2116,8 @@
                     "anyOf": [
                         {
                             "items": {
-                                "type": "string"
+                                "type": "string",
+                                "pattern": "^(((poll|dispatch)(:\\w+)?)|user)$"
                             },
                             "type": "array"
                         },
@@ -2119,7 +2126,8 @@
                                 "anyOf": [
                                     {
                                         "items": {
-                                            "type": "string"
+                                            "type": "string",
+                                            "pattern": "^(((poll|dispatch)(:\\w+)?)|user)$"
                                         },
                                         "type": "array"
                                     },
@@ -2135,7 +2143,8 @@
                                         ],
                                         "type": "string"
                                     }
-                                ]
+                                ],
+                                "description": "Where an Activity was retrieved from\n\nSource can be any of:\n\n* `poll` => activity was retrieved from polling a queue (unmoderated, modqueue, etc...)\n* `poll:[pollSource]` => activity was retrieved from specific polling source IE `poll:unmoderated` activity comes from unmoderated queue\n* `dispatch` => activity is from Dispatch Action\n* `dispatch:[identifier]` => activity is from Dispatch Action with specific identifier\n* `user` => activity was from user input (web dashboard)"
                             },
                             "type": "array"
                         },
@@ -2151,7 +2160,8 @@
                             ],
                             "type": "string"
                         }
-                    ]
+                    ],
+                    "description": "Test where the current activity was sourced from.\n\nA source can be any of:\n\n* `poll` => activity was retrieved from polling a queue (unmoderated, modqueue, etc...)\n* `poll:[pollSource]` => activity was retrieved from specific polling source IE `poll:unmoderated` activity comes from unmoderated queue\n* `dispatch` => activity is from Dispatch Action\n* `dispatch:[identifier]` => activity is from Dispatch Action with specific identifier\n* `user` => activity was from user input (web dashboard)"
                 },
                 "spam": {
                     "type": "boolean"

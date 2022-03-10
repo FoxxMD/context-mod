@@ -939,8 +939,31 @@ export interface ActivityState {
      * */
     reports?: CompareValue
     age?: DurationComparor
-
+    /**
+     * Test whether the activity is present in dispatched/delayed activities
+     *
+     * NOTE: This is DOES NOT mean that THIS activity is from dispatch -- just that it exists there. To test whether THIS activity is from dispatch use `source`
+     *
+     * * `true` => activity exists in delayed activities
+     * * `false` => activity DOES NOT exist in delayed activities
+     * * `string` => activity exists in delayed activities with given identifier
+     * * `string[]` => activity exists in delayed activities with any of the given identifiers
+     *
+     * */
     dispatched?: boolean | string | string[]
+
+    /**
+     * Test where the current activity was sourced from.
+     *
+     * A source can be any of:
+     *
+     * * `poll` => activity was retrieved from polling a queue (unmoderated, modqueue, etc...)
+     * * `poll:[pollSource]` => activity was retrieved from specific polling source IE `poll:unmoderated` activity comes from unmoderated queue
+     * * `dispatch` => activity is from Dispatch Action
+     * * `dispatch:[identifier]` => activity is from Dispatch Action with specific identifier
+     * * `user` => activity was from user input (web dashboard)
+     *
+     * */
     source?: ActivitySource | ActivitySource[]
 }
 
@@ -2318,4 +2341,22 @@ export type DispatchSource = 'dispatch' | `dispatch:${string}`;
 
 export type NonDispatchActivitySource = 'poll' | `poll:${PollOn}` | 'user';
 
+// TODO
+// https://github.com/YousefED/typescript-json-schema/issues/426
+// https://github.com/YousefED/typescript-json-schema/issues/425
+// @pattern ^(((poll|dispatch)(:\w+)?)|user)$
+// @type string
+/**
+ * Where an Activity was retrieved from
+ *
+ * Source can be any of:
+ *
+ * * `poll` => activity was retrieved from polling a queue (unmoderated, modqueue, etc...)
+ * * `poll:[pollSource]` => activity was retrieved from specific polling source IE `poll:unmoderated` activity comes from unmoderated queue
+ * * `dispatch` => activity is from Dispatch Action
+ * * `dispatch:[identifier]` => activity is from Dispatch Action with specific identifier
+ * * `user` => activity was from user input (web dashboard)
+ *
+ *
+ * */
 export type ActivitySource = NonDispatchActivitySource | DispatchSource;
