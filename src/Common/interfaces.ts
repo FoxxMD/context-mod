@@ -952,6 +952,8 @@ export interface ActivityState {
      * */
     dispatched?: boolean | string | string[]
 
+
+    // can use ActivitySource | ActivitySource[] here because of issues with generating json schema, see ActivitySource comments
     /**
      * Test where the current activity was sourced from.
      *
@@ -959,12 +961,13 @@ export interface ActivityState {
      *
      * * `poll` => activity was retrieved from polling a queue (unmoderated, modqueue, etc...)
      * * `poll:[pollSource]` => activity was retrieved from specific polling source IE `poll:unmoderated` activity comes from unmoderated queue
+     *   * valid sources: unmoderated modqueue newComm newSub
      * * `dispatch` => activity is from Dispatch Action
      * * `dispatch:[identifier]` => activity is from Dispatch Action with specific identifier
      * * `user` => activity was from user input (web dashboard)
      *
      * */
-    source?: ActivitySource | ActivitySource[]
+    source?: string | string[]
 }
 
 /**

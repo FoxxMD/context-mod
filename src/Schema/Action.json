@@ -256,52 +256,15 @@
                     "anyOf": [
                         {
                             "items": {
-                                "type": "string",
-                                "pattern": "^(((poll|dispatch)(:\\w+)?)|user)$"
+                                "type": "string"
                             },
                             "type": "array"
                         },
                         {
-                            "items": {
-                                "anyOf": [
-                                    {
-                                        "items": {
-                                            "type": "string",
-                                            "pattern": "^(((poll|dispatch)(:\\w+)?)|user)$"
-                                        },
-                                        "type": "array"
-                                    },
-                                    {
-                                        "enum": [
-                                            "dispatch",
-                                            "poll",
-                                            "poll:modqueue",
-                                            "poll:newComm",
-                                            "poll:newSub",
-                                            "poll:unmoderated",
-                                            "user"
-                                        ],
-                                        "type": "string"
-                                    }
-                                ],
-                                "description": "Where an Activity was retrieved from\n\nSource can be any of:\n\n* `poll` => activity was retrieved from polling a queue (unmoderated, modqueue, etc...)\n* `poll:[pollSource]` => activity was retrieved from specific polling source IE `poll:unmoderated` activity comes from unmoderated queue\n* `dispatch` => activity is from Dispatch Action\n* `dispatch:[identifier]` => activity is from Dispatch Action with specific identifier\n* `user` => activity was from user input (web dashboard)"
-                            },
-                            "type": "array"
-                        },
-                        {
-                            "enum": [
-                                "dispatch",
-                                "poll",
-                                "poll:modqueue",
-                                "poll:newComm",
-                                "poll:newSub",
-                                "poll:unmoderated",
-                                "user"
-                            ],
                             "type": "string"
                         }
                     ],
-                    "description": "Test where the current activity was sourced from.\n\nA source can be any of:\n\n* `poll` => activity was retrieved from polling a queue (unmoderated, modqueue, etc...)\n* `poll:[pollSource]` => activity was retrieved from specific polling source IE `poll:unmoderated` activity comes from unmoderated queue\n* `dispatch` => activity is from Dispatch Action\n* `dispatch:[identifier]` => activity is from Dispatch Action with specific identifier\n* `user` => activity was from user input (web dashboard)"
+                    "description": "Test where the current activity was sourced from.\n\nA source can be any of:\n\n* `poll` => activity was retrieved from polling a queue (unmoderated, modqueue, etc...)\n* `poll:[pollSource]` => activity was retrieved from specific polling source IE `poll:unmoderated` activity comes from unmoderated queue\n  * valid sources: unmoderated modqueue newComm newSub\n* `dispatch` => activity is from Dispatch Action\n* `dispatch:[identifier]` => activity is from Dispatch Action with specific identifier\n* `user` => activity was from user input (web dashboard)"
                 },
                 "spam": {
                     "type": "boolean"
@@ -435,52 +398,15 @@
                     "anyOf": [
                         {
                             "items": {
-                                "type": "string",
-                                "pattern": "^(((poll|dispatch)(:\\w+)?)|user)$"
+                                "type": "string"
                             },
                             "type": "array"
                         },
                         {
-                            "items": {
-                                "anyOf": [
-                                    {
-                                        "items": {
-                                            "type": "string",
-                                            "pattern": "^(((poll|dispatch)(:\\w+)?)|user)$"
-                                        },
-                                        "type": "array"
-                                    },
-                                    {
-                                        "enum": [
-                                            "dispatch",
-                                            "poll",
-                                            "poll:modqueue",
-                                            "poll:newComm",
-                                            "poll:newSub",
-                                            "poll:unmoderated",
-                                            "user"
-                                        ],
-                                        "type": "string"
-                                    }
-                                ],
-                                "description": "Where an Activity was retrieved from\n\nSource can be any of:\n\n* `poll` => activity was retrieved from polling a queue (unmoderated, modqueue, etc...)\n* `poll:[pollSource]` => activity was retrieved from specific polling source IE `poll:unmoderated` activity comes from unmoderated queue\n* `dispatch` => activity is from Dispatch Action\n* `dispatch:[identifier]` => activity is from Dispatch Action with specific identifier\n* `user` => activity was from user input (web dashboard)"
-                            },
-                            "type": "array"
-                        },
-                        {
-                            "enum": [
-                                "dispatch",
-                                "poll",
-                                "poll:modqueue",
-                                "poll:newComm",
-                                "poll:newSub",
-                                "poll:unmoderated",
-                                "user"
-                            ],
                             "type": "string"
                         }
                     ],
-                    "description": "Test where the current activity was sourced from.\n\nA source can be any of:\n\n* `poll` => activity was retrieved from polling a queue (unmoderated, modqueue, etc...)\n* `poll:[pollSource]` => activity was retrieved from specific polling source IE `poll:unmoderated` activity comes from unmoderated queue\n* `dispatch` => activity is from Dispatch Action\n* `dispatch:[identifier]` => activity is from Dispatch Action with specific identifier\n* `user` => activity was from user input (web dashboard)"
+                    "description": "Test where the current activity was sourced from.\n\nA source can be any of:\n\n* `poll` => activity was retrieved from polling a queue (unmoderated, modqueue, etc...)\n* `poll:[pollSource]` => activity was retrieved from specific polling source IE `poll:unmoderated` activity comes from unmoderated queue\n  * valid sources: unmoderated modqueue newComm newSub\n* `dispatch` => activity is from Dispatch Action\n* `dispatch:[identifier]` => activity is from Dispatch Action with specific identifier\n* `user` => activity was from user input (web dashboard)"
                 },
                 "spam": {
                     "type": "boolean"
