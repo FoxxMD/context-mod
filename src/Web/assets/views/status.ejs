@@ -851,6 +851,11 @@
             wrapper.classList.remove('border');
             wrapper.classList.add('border-2');
 
+            // special case for system
+            if(bot === 'system') {
+                document.querySelector('[data-bot="system"].sub').classList.add('seen');
+            }
+
             if ('URLSearchParams' in window) {
                 var searchParams = new URLSearchParams(window.location.search)
                 searchParams.set("bot", bot);
@@ -1079,9 +1084,6 @@
                 clearTimeout(bufferTimeout);
                 bufferTimeout = setTimeout(() => {flushLogs();}, 1000);
             }
-        });
-        socket.on("webLog", data => {
-           console.log(data);
         });
         socket.on("logClear", data => {
             data.forEach((obj) => {

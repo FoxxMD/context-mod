@@ -170,7 +170,7 @@ const webClient = async (options: OperatorConfig) => {
     const logger = getLogger({defaultLabel: 'Web', ...options.logging}, 'Web');
 
     logger.stream().on('log', (log: LogInfo) => {
-        emitter.emit('log', log[MESSAGE]);
+        emitter.emit('log', log);
     });
 
     if (await tcpUsed.check(port)) {
@@ -769,7 +769,7 @@ const webClient = async (options: OperatorConfig) => {
                 return res.render('noAccess');
             }
 
-            return res.redirect(`/?instance=${accessibleInstance.friendly}`);
+            return res.redirect(`/?instance=${accessibleInstance.getName()}`);
         }
         const instance = cmInstances.find(x => x.getName() === req.query.instance);
         req.instance = instance;
@@ -907,7 +907,8 @@ const webClient = async (options: OperatorConfig) => {
             instanceId: (req.instance as CMInstanceInterface).friendly,
             isOperator: isOp,
             system: isOp ? {
-                logs: resp.system.logs,
+                // @ts-ignore
+                logs: resp.system.logs.map((x: LogInfo) => formatLogLineToHtml(formatter.transform(x)[MESSAGE] as string, x.timestamp)),
                 } : undefined,
             operators: instance.operators.join(', '),
             operatorDisplay: instance.operatorDisplay,
@@ -1126,16 +1127,6 @@ const webClient = async (options: OperatorConfig) => {
             clearSockStreams(socket.id);
             socket.join(session.id);
 
-            // setup general web log event
-            const webLogListener = (log: string) => {
-                const subName = parseSubredditLogName(log);
-                if((subName === undefined || user.clientData?.webOperator === true) && isLogLineMinLevel(log, session.level as string)) {
-                    io.to(session.id).emit('webLog', formatLogLineToHtml(log));
-                }
-            }
-            emitter.on('log', webLogListener);
-            socketListeners.set(socket.id, [...(socketListeners.get(socket.id) || []), webLogListener]);
-
             socket.on('viewing', (data) => {
                 if(user !== undefined) {
                     const {subreddit, bot: botVal} = data;
@@ -1176,11 +1167,17 @@ const webClient = async (options: OperatorConfig) => {
                 const bot = cmInstances.find(x => x.getName() === session.botId);
                 if(bot !== undefined) {
                     // web log listener for bot specifically
-                    const botWebLogListener = (log: string) => {
-                        const subName = parseSubredditLogName(log);
-                        const instanceName = parseInstanceLogName(log);
-                        if((subName !== undefined || instanceName !== undefined) && isLogLineMinLevel(log, session.level as string) && (session.botId?.toLowerCase() === instanceName || (subName !== undefined && subName.toLowerCase().includes(user.name.toLowerCase())))) {
-                            io.to(session.id).emit('log', formatLogLineToHtml(log));
+                    const botWebLogListener = (log: LogInfo) => {
+                        const {subreddit, instance, user: userFromLog} = log;
+                        if((subreddit !== undefined || instance !== undefined)
+                            && isLogLineMinLevel(log, session.level as string)
+                            && (session.botId?.toLowerCase() === instance
+                                || user.clientData?.webOperator === true
+                                || (userFromLog !== undefined && userFromLog.toLowerCase().includes(user.name.toLowerCase()))
+                            )) {
+                            // @ts-ignore
+                            const formattedMessage = formatLogLineToHtml(formatter.transform(log)[MESSAGE], log.timestamp);
+                            io.to(session.id).emit('log', {...log, formattedMessage});
                         }
                     }
                     emitter.on('log', botWebLogListener);
