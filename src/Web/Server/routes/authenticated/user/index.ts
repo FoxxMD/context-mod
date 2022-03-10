@@ -126,8 +126,8 @@ const action = async (req: Request, res: Response) => {
 
         // will run dryrun if specified or if running activity on subreddit it does not belong to
         const dr: boolean | undefined = (dryRun || manager.subreddit.display_name !== sub) ? true : undefined;
-        manager.logger.info(`/u/${userName} running${dr === true ? ' DRY RUN ' : ' '}check on${manager.subreddit.display_name !== sub ? ' FOREIGN ACTIVITY ' : ' '}${url}`, {user: userName, subreddit});
-        await manager.handleActivity(activity, {dryRun: dr, force: true, source: 'user'})
+        manager.logger.info(`/u/${userName} Queued ${dr === true ? 'DRY RUN ' : ''}check on ${manager.subreddit.display_name !== sub ? 'FOREIGN ACTIVITY ' : ''}${url}`, {user: userName, subreddit});
+        await manager.firehose.push({activity, options: {dryRun: dr, force: true, source: 'user'}})
     }
     res.send('OK');
 };
