@@ -32,7 +32,7 @@ import {
     parseGenericValueComparison,
     parseRedditEntity, parseStringToRegex,
     parseWikiContext, PASS, redisScanIterator, removeUndefinedKeys,
-    shouldCacheSubredditStateCriteriaResult,
+    shouldCacheSubredditStateCriteriaResult, strToActivitySource,
     subredditStateIsNameOnly, testMaybeStringRegex,
     toStrongSubredditState, userNoteCriteriaSummary
 } from "../util";
@@ -1114,10 +1114,10 @@ export class SubredditResources {
                         } else {
                             propResultsMap.source!.found = source;
 
-                            const requestedSourceVal = itemOptVal as ActivitySource | ActivitySource[];
-                            const requestedSources = !Array.isArray(requestedSourceVal) ? [requestedSourceVal] : requestedSourceVal;
+                            const requestedSourcesVal: string[] = !Array.isArray(itemOptVal) ? [itemOptVal] as string[] : itemOptVal as string[];
+                            const requestedSources = requestedSourcesVal.map(x => strToActivitySource(x).toLowerCase());
 
-                            propResultsMap.source!.passed = requestedSources.map(x => x.trim().toLowerCase()).includes(source.toLowerCase());
+                            propResultsMap.source!.passed = requestedSources.some(x => source.toLowerCase().includes(x))
                             break;
                         }
                     case 'score':

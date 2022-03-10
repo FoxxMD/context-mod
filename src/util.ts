@@ -10,7 +10,7 @@ import {inflateSync, deflateSync} from "zlib";
 import pixelmatch from 'pixelmatch';
 import os from 'os';
 import {
-    ActionResult,
+    ActionResult, ActivitySource,
     ActivityWindowCriteria,
     ActivityWindowType,
     CacheOptions,
@@ -2317,4 +2317,20 @@ export const generateItemFilterHelpers = (stateCriteria: TypedActivityState): [I
 
 export const isCommentState = (state: TypedActivityState): state is CommentState => {
     return 'op' in state || 'depth' in state || 'submissionState' in state;
+}
+const DISPATCH_REGEX: RegExp = /^dispatch:/i;
+const POLL_REGEX: RegExp = /^poll:/i;
+export const asActivitySource = (val: string): val is ActivitySource => {
+    if(['dispatch','poll','user'].some(x => x === val)) {
+        return true;
+    }
+    return DISPATCH_REGEX.test(val) || POLL_REGEX.test(val);
+}
+
+export const strToActivitySource = (val: string): ActivitySource => {
+    const cleanStr = val.trim();
+    if (asActivitySource(cleanStr)) {
+        return cleanStr;
+    }
+    throw new SimpleError(`'${cleanStr}' is not a valid ActivitySource. Must be one of: dispatch, dispatch:[identifier], poll, poll:[identifier], user`);
 }
