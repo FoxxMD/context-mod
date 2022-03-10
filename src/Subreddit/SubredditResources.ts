@@ -1278,6 +1278,8 @@ export class SubredditResources {
                             propResultsMap[k]!.passed = VALUEPass();
                             break;
                         } else {
+                            propResultsMap[k]!.passed = true;
+                            propResultsMap[k]!.reason = `Cannot test for ${k} on Comment`;
                             log.warn(`Cannot test for ${k} on Comment`);
                             break;
                         }
@@ -1285,26 +1287,22 @@ export class SubredditResources {
                         // @ts-ignore
                         const val = item[k];
 
-                        if (val !== undefined && propResultsMap[k] !== undefined) {
-                            propResultsMap[k]!.found = val;
-                            propResultsMap[k]!.passed = val === itemOptVal;
-                        } else {
+                        if(val === undefined) {
+                            log.warn(`Value for ${k} cannot be undefined`);
+                        } else if(propResultsMap[k] === undefined) {
                             let defaultWarn = `Tried to test for Activity property '${k}' but it did not exist. Check the spelling of the property.`;
                             if(!item.can_mod_post) {
                                 defaultWarn =`Tried to test for Activity property '${k}' but it did not exist. This Activity is not in a subreddit the bot can mod so it may be that this property is only available to mods of that subreddit. Or the property may be misspelled.`;
                             }
-                            propResultsMap.depth!.passed = true;
-                            propResultsMap.depth!.reason = defaultWarn;
                             log.debug(defaultWarn);
+                        } else {
+                            propResultsMap[k]!.found = val;
+                            propResultsMap[k]!.passed = val === itemOptVal;
                         }
                         break;
                 }
 
-                if(!propResultsMap[k]!.passed && shouldContinue === undefined) {
-                    shouldContinue = false;
-                }
-
-                if(!shouldContinue) {
+                if(propResultsMap[k] !== undefined && propResultsMap[k]!.passed === false) {
                     break;
                 }
             }
