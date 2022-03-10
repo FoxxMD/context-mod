@@ -25,7 +25,7 @@ import {ConfigBuilder, buildPollingOptions} from "../ConfigBuilder";
 import {
     ActionedEvent,
     ActionResult,
-    ActivityRerun,
+    ActivityDispatch,
     ActivitySource,
     CheckResult,
     CheckSummary,
@@ -42,8 +42,8 @@ import {
     PollingOptionsStrong,
     PollOn,
     PostBehavior,
-    PostBehaviorTypes, RerunAudit,
-    RerunSource,
+    PostBehaviorTypes, DispatchAudit,
+    DispatchSource,
     RUNNING,
     RunResult,
     RunState,
@@ -91,7 +91,7 @@ export interface runCheckOptions {
     maxGotoDepth?: number
     source: ActivitySource
     initialGoto?: string
-    rerunSource?: RerunAudit
+    dispatchSource?: DispatchAudit
 }
 
 export interface CheckTask {
@@ -240,7 +240,7 @@ export class Manager extends EventEmitter {
                 queuedAt: x.queuedAt,
                 durationMilli: x.duration.asMilliseconds(),
                 duration: x.duration.humanize(),
-                source: `${x.action}${x.rerunIdentifier !== undefined ? ` (${x.rerunIdentifier})` : ''}`
+                source: `${x.action}${x.identifier !== undefined ? ` (${x.identifier})` : ''}`
             }
         });
     }
@@ -413,7 +413,7 @@ export class Manager extends EventEmitter {
                 this.queue.push(task);
             }
 
-            if(!task.options.source.includes('rerun')) {
+            if(!task.options.source.includes('dispatch')) {
                 // check for delayed items to cancel
                 const existingDelayedToCancel = this.resources.delayedItems.filter(x => {
                     if (x.activity.name === task.activity.name) {
@@ -429,7 +429,7 @@ export class Manager extends EventEmitter {
                     }
                 });
                 if(existingDelayedToCancel.length > 0) {
-                    this.logger.debug(`Cancelling existing delayed activities due to activity being queued from non-rerun sources: ${existingDelayedToCancel.map((x, index) => `[${index + 1}] Queued At ${dayjs.unix(x.queuedAt).format('YYYY-MM-DD HH:mm:ssZ')} for ${x.duration.humanize()}`).join(' ')}`);
+                    this.logger.debug(`Cancelling existing delayed activities due to activity being queued from non-dispatch sources: ${existingDelayedToCancel.map((x, index) => `[${index + 1}] Queued At ${dayjs.unix(x.queuedAt).format('YYYY-MM-DD HH:mm:ssZ')} for ${x.duration.humanize()}`).join(' ')}`);
                     const toCancelIds = existingDelayedToCancel.map(x => x.id);
                     this.resources.delayedItems.filter(x => !toCancelIds.includes(x.id));
                 }
@@ -444,8 +444,8 @@ export class Manager extends EventEmitter {
             for(const ar of this.resources.delayedItems) {
                 if(!ar.processing && dayjs.unix(ar.queuedAt).add(ar.duration.asMilliseconds(), 'milliseconds').isSameOrBefore(dayjs())) {
                     this.logger.info(`Delayed Activity ${ar.activity.name} is being queued.`);
-                    const rerunStr: RerunSource = ar.rerunIdentifier === undefined ? 'rerun' : `rerun:${ar.rerunIdentifier}`;
-                    await this.firehose.push({activity: ar.activity, options: {refresh: true, source: rerunStr, initialGoto: ar.goto, rerunSource: {id: ar.id, queuedAt: ar.queuedAt, delay: ar.duration.humanize(), action: ar.action, goto: ar.goto, identifier: ar.rerunIdentifier}}});
+                    const dispatchStr: DispatchSource = ar.identifier === undefined ? 'dispatch' : `dispatch:${ar.identifier}`;
+                    await this.firehose.push({activity: ar.activity, options: {refresh: true, source: dispatchStr, initialGoto: ar.goto, dispatchSource: {id: ar.id, queuedAt: ar.queuedAt, delay: ar.duration.humanize(), action: ar.action, goto: ar.goto, identifier: ar.identifier}}});
                     this.resources.delayedItems.splice(index, 1, {...ar, processing: true});
                 }
                 index++;
@@ -474,8 +474,8 @@ export class Manager extends EventEmitter {
                 } finally {
                     // always remove item meta regardless of success or failure since we are done with it meow
                     this.queuedItemsMeta.splice(queuedItemIndex, 1);
-                    if(task.options.rerunSource?.id !== undefined) {
-                        const delayIndex = this.resources.delayedItems.findIndex(x => x.id === task.options.rerunSource?.id);
+                    if(task.options.dispatchSource?.id !== undefined) {
+                        const delayIndex = this.resources.delayedItems.findIndex(x => x.id === task.options.dispatchSource?.id);
                         this.resources.delayedItems.splice(delayIndex, 1);
                     }
                 }
@@ -766,23 +766,20 @@ export class Manager extends EventEmitter {
             delayUntil,
             refresh = false,
             initialGoto = '',
-            rerunSource,
+            dispatchSource,
         } = options;
 
         let allRuleResults: RuleResult[] = [];
         const runResults: RunResult[] = [];
         const itemIdentifiers = [];
-        if(rerunSource !== undefined) {
-            itemIdentifiers.push(`RERUN ${rerunSource.action}`);
-        }
         itemIdentifiers.push(`${checkType === 'Submission' ? 'SUB' : 'COM'} ${itemId}`);
         this.currentLabels = itemIdentifiers;
         let ePeek = '';
         try {
             const [peek, { content: peekContent }] = await itemContentPeek(item);
             ePeek = peekContent;
-            const rerunStr = rerunSource !== undefined ? ` (Dispatched by ${rerunSource.action}${rerunSource.identifier !== undefined ? ` | ${rerunSource.identifier}` : ''}) ${peek}` : peek;
-            this.logger.info(`<EVENT> ${rerunStr}`);
+            const dispatchStr = dispatchSource !== undefined ? ` (Dispatched by ${dispatchSource.action}${dispatchSource.identifier !== undefined ? ` | ${dispatchSource.identifier}` : ''}) ${peek}` : peek;
+            this.logger.info(`<EVENT> ${dispatchStr}`);
         } catch (err: any) {
             this.logger.error(`Error occurred while generating item peek for ${checkType} Activity ${itemId}`, err);
         }
@@ -798,7 +795,7 @@ export class Manager extends EventEmitter {
                 author: item.author.name,
                 subreddit: item.subreddit_name_prefixed
             },
-            rerunSource,
+            dispatchSource: dispatchSource,
             timestamp: Date.now(),
             runResults: []
         }
@@ -822,7 +819,7 @@ export class Manager extends EventEmitter {
             // refresh signal from firehose if activity was ingested multiple times before processing or re-queued while processing
             // want to make sure we have the most recent data
             if(!wasRefreshed && refresh === true) {
-                this.logger.verbose(`Refreshed data ${rerunSource !== undefined ? 'b/c activity is a rerun' : 'b/c activity was delayed'}`);
+                this.logger.verbose(`Refreshed data ${dispatchSource !== undefined ? 'b/c activity is from dispatch' : 'b/c activity was delayed'}`);
                 // @ts-ignore
                 item = await activity.refresh();
             }

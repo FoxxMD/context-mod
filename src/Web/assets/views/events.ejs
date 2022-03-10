@@ -35,17 +35,17 @@
                                 <div>
                                     <a class="activityLink font-semibold" target="_blank" href="https://reddit.com<%= eRes.activity.link%>"><%= eRes.activity.type === 'comment' ? 'Comment' : 'Submission' %></a>
                                     by <a class="activityLink" target="_blank" href="https://reddit.com/u/<%= eRes.activity.author%>"><%= eRes.activity.author%></a>
-                                    <% if(eRes.rerunSource !== undefined) { %>
+                                    <% if(eRes.dispatchSource !== undefined) { %>
                                         <span class="has-tooltip ml-2">
                                             <span class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2 space-y-3 p-2 text-left'>
                                                 <ul class="list-inside list-disc">
-                                                    <li>Dispatched By: <i><%= eRes.rerunSource.action %><%= eRes.rerunSource.identifier !== undefined ? ` | ${eRes.rerunSource.identifier}` : ''%></i></li>
-                                                    <li>Queued At: <i><%= eRes.rerunSource.queuedAt %></i></li>
-                                                    <li>Delayed For: <i><%= eRes.rerunSource.delay %></i></li>
-                                                    <li>Initial Goto:<i><%= eRes.rerunSource.goto %></i></li>
+                                                    <li>Dispatched By: <i><%= eRes.dispatchSource.action %><%= eRes.dispatchSource.identifier !== undefined ? ` | ${eRes.dispatchSource.identifier}` : ''%></i></li>
+                                                    <li>Queued At: <i><%= eRes.dispatchSource.queuedAt %></i></li>
+                                                    <li>Delayed For: <i><%= eRes.dispatchSource.delay %></i></li>
+                                                    <li>Initial Goto:<i><%= eRes.dispatchSource.goto %></i></li>
                                                 </ul>
                                             </span>
-                                            (<span class="cursor-help underline" style="text-decoration-style: dotted">Dispatched by <%= eRes.rerunSource.action%><%= eRes.rerunSource.identifier !== undefined ? ` | ${eRes.rerunSource.identifier}` : ''%></span>)
+                                            (<span class="cursor-help underline" style="text-decoration-style: dotted">Dispatched by <%= eRes.dispatchSource.action%><%= eRes.dispatchSource.identifier !== undefined ? ` | ${eRes.dispatchSource.identifier}` : ''%></span>)
                                         </span>
                                     <% } %>
                                 </div>

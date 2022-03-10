@@ -687,6 +687,22 @@
                     "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(days|weeks|months|years|hours|minutes|seconds|milliseconds)\\s*$",
                     "type": "string"
                 },
+                "dispatched": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
+                        }
+                    ]
+                },
                 "distinguished": {
                     "type": "boolean"
                 },
@@ -707,22 +723,6 @@
                     "description": "A string containing a comparison operator and a value to compare against\n\nThe syntax is `(< OR > OR <= OR >=) <number>`\n\n* EX `> 2`  => greater than 2 total reports\n\nDefaults to TOTAL reports on an Activity. Suffix the value with the report type to check that type:\n\n* EX `> 3 mod` => greater than 3 mod reports\n* EX `>= 1 user` => greater than 1 user report",
                     "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
                     "type": "string"
-                },
-                "rerun": {
-                    "anyOf": [
-                        {
-                            "items": {
-                                "type": "string"
-                            },
-                            "type": "array"
-                        },
-                        {
-                            "type": [
-                                "string",
-                                "boolean"
-                            ]
-                        }
-                    ]
                 },
                 "score": {
                     "description": "A string containing a comparison operator and a value to compare against\n\nThe syntax is `(< OR > OR <= OR >=) <number>`\n\n* EX `> 100`  => greater than 100",
@@ -748,12 +748,12 @@
                                     },
                                     {
                                         "enum": [
+                                            "dispatch",
                                             "poll",
                                             "poll:modqueue",
                                             "poll:newComm",
                                             "poll:newSub",
                                             "poll:unmoderated",
-                                            "rerun",
                                             "user"
                                         ],
                                         "type": "string"
@@ -764,12 +764,12 @@
                         },
                         {
                             "enum": [
+                                "dispatch",
                                 "poll",
                                 "poll:modqueue",
                                 "poll:newComm",
                                 "poll:newSub",
                                 "poll:unmoderated",
-                                "rerun",
                                 "user"
                             ],
                             "type": "string"
@@ -2015,6 +2015,22 @@
                 "deleted": {
                     "type": "boolean"
                 },
+                "dispatched": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
+                        }
+                    ]
+                },
                 "distinguished": {
                     "type": "boolean"
                 },
@@ -2085,22 +2101,6 @@
                     "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
                     "type": "string"
                 },
-                "rerun": {
-                    "anyOf": [
-                        {
-                            "items": {
-                                "type": "string"
-                            },
-                            "type": "array"
-                        },
-                        {
-                            "type": [
-                                "string",
-                                "boolean"
-                            ]
-                        }
-                    ]
-                },
                 "score": {
                     "description": "A string containing a comparison operator and a value to compare against\n\nThe syntax is `(< OR > OR <= OR >=) <number>`\n\n* EX `> 100`  => greater than 100",
                     "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
@@ -2125,12 +2125,12 @@
                                     },
                                     {
                                         "enum": [
+                                            "dispatch",
                                             "poll",
                                             "poll:modqueue",
                                             "poll:newComm",
                                             "poll:newSub",
                                             "poll:unmoderated",
-                                            "rerun",
                                             "user"
                                         ],
                                         "type": "string"
@@ -2141,12 +2141,12 @@
                         },
                         {
                             "enum": [
+                                "dispatch",
                                 "poll",
                                 "poll:modqueue",
                                 "poll:newComm",
                                 "poll:newSub",
                                 "poll:unmoderated",
-                                "rerun",
                                 "user"
                             ],
                             "type": "string"

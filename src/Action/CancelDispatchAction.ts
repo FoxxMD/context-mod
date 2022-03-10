@@ -3,7 +3,7 @@ import Action from "./index";
 import Snoowrap, {Comment, Submission} from "snoowrap";
 import {RuleResult} from "../Rule";
 import {activityIsRemoved} from "../Utils/SnoowrapUtils";
-import {ActionProcessResult, ActionTarget, ActivityRerunConfig, InclusiveActionTarget} from "../Common/interfaces";
+import {ActionProcessResult, ActionTarget, ActivityDispatchConfig, InclusiveActionTarget} from "../Common/interfaces";
 import dayjs from "dayjs";
 import {isSubmission, parseDurationValToDuration} from "../util";
 
@@ -15,16 +15,16 @@ export class CancelDispatchAction extends Action {
         return 'Cancel Dispatch';
     }
 
-    constructor(options: CancelRerunOptions) {
+    constructor(options: CancelDispatchOptions) {
         super(options);
         const {
-            rerunIdentifier,
+            identifier,
             target
         } = options;
-        if (rerunIdentifier === undefined) {
-            this.identifiers = rerunIdentifier;
+        if (identifier === undefined) {
+            this.identifiers = identifier;
         } else {
-            this.identifiers = !Array.isArray(rerunIdentifier) ? [rerunIdentifier] : rerunIdentifier;
+            this.identifiers = !Array.isArray(identifier) ? [identifier] : identifier;
         }
         this.targets = !Array.isArray(target) ? [target] : target;
     }
@@ -56,15 +56,15 @@ export class CancelDispatchAction extends Action {
 
             const delayedItemsToRemove = this.resources.delayedItems.filter(x => {
                 const matchedId = matchId === undefined || x.activity.name === matchId;
-                let matchedRerunIdentifier;
+                let matchedDispatchIdentifier;
                 if (this.identifiers === undefined) {
-                    matchedRerunIdentifier = true;
-                } else if (x.rerunIdentifier === undefined) {
-                    matchedRerunIdentifier = this.identifiers.includes(null);
+                    matchedDispatchIdentifier = true;
+                } else if (x.identifier === undefined) {
+                    matchedDispatchIdentifier = this.identifiers.includes(null);
                 } else {
-                    matchedRerunIdentifier = this.identifiers.filter(x => x !== null).includes(x.rerunIdentifier);
+                    matchedDispatchIdentifier = this.identifiers.filter(x => x !== null).includes(x.identifier);
                 }
-                const matched = matchedId && matchedRerunIdentifier;
+                const matched = matchedId && matchedDispatchIdentifier;
                 if(matched && x.processing) {
                     this.logger.debug(`Cannot remove ${isSubmission(x.activity) ? 'Submission' : 'Comment'} ${x.activity.name} because it is currently processing`);
                     return false;
@@ -119,12 +119,12 @@ export class CancelDispatchAction extends Action {
     }
 }
 
-export interface CancelRerunOptions extends CancelDispatchActionConfig, ActionOptions {
+export interface CancelDispatchOptions extends CancelDispatchActionConfig, ActionOptions {
 }
 
 export interface CancelDispatchActionConfig extends ActionConfig {
     target: InclusiveActionTarget | InclusiveActionTarget[]
-    rerunIdentifier?: string | string[] | null
+    identifier?: string | string[] | null
 }
 
 /**

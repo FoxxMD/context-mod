@@ -63,7 +63,7 @@ import {
     TypedActivityState,
     RequiredItemCrit,
     ItemCritPropHelper,
-    ActivityRerun,
+    ActivityDispatch,
     FilterCriteriaPropertyResult,
     ActivitySource,
 } from "../Common/interfaces";
@@ -105,7 +105,7 @@ interface SubredditResourceOptions extends Footer {
     prefix?: string;
     actionedEventsMax: number;
     thirdPartyCredentials: ThirdPartyCredentialsJsonConfig
-    delayedItems?: ActivityRerun[]
+    delayedItems?: ActivityDispatch[]
 }
 
 export interface SubredditResourceSetOptions extends CacheConfig, Footer {
@@ -135,7 +135,7 @@ export class SubredditResources {
     prefix?: string
     actionedEventsMax: number;
     thirdPartyCredentials: ThirdPartyCredentialsJsonConfig;
-    delayedItems: ActivityRerun[] = [];
+    delayedItems: ActivityDispatch[] = [];
 
     stats: {
         cache: ResourceStats
@@ -890,20 +890,20 @@ export class SubredditResources {
         }
         if (this.filterCriteriaTTL !== false) {
             let item = i;
-            const {rerun, source: stateSource, ...rest} = activityState;
+            const {dispatched, source: stateSource, ...rest} = activityState;
             let state = rest;
 
-            // if using cache and rerun is present we want to test for it separately from the rest of the state
+            // if using cache and dispatched is present we want to test for it separately from the rest of the state
             // because it can change independently from the rest of the activity criteria (its only related to CM!) so storing in cache would make everything potentially stale
             // -- additionally we keep that data in-memory (for now??) so its always accessible and doesn't need to be stored in cache
             let runtimeRes: FilterCriteriaResult<(SubmissionState & CommentState)> | undefined;
-            if(rerun !== undefined || stateSource !== undefined) {
-                runtimeRes = await this.isItem(item, {rerun, source: stateSource}, logger, source);
+            if(dispatched !== undefined || stateSource !== undefined) {
+                runtimeRes = await this.isItem(item, {dispatched, source: stateSource}, logger, source);
                 if(!runtimeRes.passed) {
-                    // if rerun does not pass can return early and avoid testing the rest of the item
+                    // if dispatched does not pass can return early and avoid testing the rest of the item
                     const [propResultsMap, definedStateCriteria] = generateItemFilterHelpers(rest);
-                    if(rerun !== undefined) {
-                        propResultsMap.rerun = runtimeRes.propertyResults.find(x => x.property === 'rerun');
+                    if(dispatched !== undefined) {
+                        propResultsMap.dispatched = runtimeRes.propertyResults.find(x => x.property === 'dispatched');
                     }
                     if(stateSource !== undefined) {
                         propResultsMap.source = runtimeRes.propertyResults.find(x => x.property === 'source');
@@ -936,8 +936,8 @@ export class SubredditResources {
 
                 // add in runtime results, if present
                 if(runtimeRes !== undefined) {
-                    if(rerun !== undefined) {
-                        itemResult.propertyResults.push(runtimeRes.propertyResults.find(x => x.property === 'rerun') as FilterCriteriaPropertyResult<TypedActivityState>);
+                    if(dispatched !== undefined) {
+                        itemResult.propertyResults.push(runtimeRes.propertyResults.find(x => x.property === 'dispatched') as FilterCriteriaPropertyResult<TypedActivityState>);
                     }
                     if(stateSource !== undefined) {
                         itemResult.propertyResults.push(runtimeRes.propertyResults.find(x => x.property === 'source') as FilterCriteriaPropertyResult<TypedActivityState>);
@@ -1083,7 +1083,7 @@ export class SubredditResources {
                     //         passed: propResultsMap.submissionState!.passed
                     //     };
                          break;
-                    case 'rerun':
+                    case 'dispatched':
                         const matchingDelayedActivities = this.delayedItems.filter(x => x.activity.name === item.name);
                         let found: string | boolean = matchingDelayedActivities.length > 0;
                         let reason: string | undefined;
@@ -1091,19 +1091,19 @@ export class SubredditResources {
                         if(found && typeof itemOptVal !== 'boolean') {
                             identifiers = Array.isArray(itemOptVal) ? (itemOptVal as string[]) : [itemOptVal];
                             for(const i of identifiers) {
-                                const matchingDelayedIdentifier = matchingDelayedActivities.find(x => x.rerunIdentifier === i);
+                                const matchingDelayedIdentifier = matchingDelayedActivities.find(x => x.identifier === i);
                                 if(matchingDelayedIdentifier !== undefined) {
-                                    found = matchingDelayedIdentifier.rerunIdentifier as string;
+                                    found = matchingDelayedIdentifier.identifier as string;
                                     break;
                                 }
                             }
                             if(found === true) {
-                                reason = 'Found delayed activities but none matched rerunIdentifier';
+                                reason = 'Found delayed activities but none matched dispatch identifier';
                             }
                         }
-                        propResultsMap.rerun!.passed = found === itemOptVal || typeof found === 'string';
-                        propResultsMap.rerun!.found = found;
-                        propResultsMap.rerun!.reason = reason;
+                        propResultsMap.dispatched!.passed = found === itemOptVal || typeof found === 'string';
+                        propResultsMap.dispatched!.found = found;
+                        propResultsMap.dispatched!.reason = reason;
                         break;
                     case 'source':
                         if(source === undefined) {

@@ -940,7 +940,7 @@ export interface ActivityState {
     reports?: CompareValue
     age?: DurationComparor
 
-    rerun?: boolean | string | string[]
+    dispatched?: boolean | string | string[]
     source?: ActivitySource | ActivitySource[]
 }
 
@@ -2024,7 +2024,7 @@ export interface ActionedEvent {
     subreddit: string,
     triggered: boolean,
     runResults: RunResult[]
-    rerunSource?: RerunAudit
+    dispatchSource?: DispatchAudit
 }
 
 export interface CheckResult {
@@ -2284,15 +2284,15 @@ export type RequiredItemCrit = Required<(CommentState & SubmissionState)>;
 
 export type onExistingFoundBehavior = 'replace' | 'skip' | 'ignore';
 
-export interface ActivityRerunConfig {
-    rerunIdentifier?: string
-    cancelIfQueued?: boolean | NonRerunActivitySource | NonRerunActivitySource[]
+export interface ActivityDispatchConfig {
+    identifier?: string
+    cancelIfQueued?: boolean | NonDispatchActivitySource | NonDispatchActivitySource[]
     goto?: string
     onExistingFound?: onExistingFoundBehavior
     delay: DurationVal
 }
 
-export interface ActivityRerun extends ActivityRerunConfig {
+export interface ActivityDispatch extends ActivityDispatchConfig {
     id: string
     queuedAt: number
     activity: Submission | Comment
@@ -2301,7 +2301,7 @@ export interface ActivityRerun extends ActivityRerunConfig {
     action: string
 }
 
-export interface RerunAudit {
+export interface DispatchAudit {
     goto?: string
     queuedAt: number
     action: string,
@@ -2314,8 +2314,8 @@ export type ActionTarget = 'self' | 'parent';
 
 export type InclusiveActionTarget = ActionTarget | 'any';
 
-export type RerunSource = 'rerun' | `rerun:${string}`;
+export type DispatchSource = 'dispatch' | `dispatch:${string}`;
 
-export type NonRerunActivitySource = 'poll' | `poll:${PollOn}` | 'user';
+export type NonDispatchActivitySource = 'poll' | `poll:${PollOn}` | 'user';
 
-export type ActivitySource = NonRerunActivitySource | RerunSource;
+export type ActivitySource = NonDispatchActivitySource | DispatchSource;

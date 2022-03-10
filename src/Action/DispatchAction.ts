@@ -3,12 +3,12 @@ import Action from "./index";
 import Snoowrap, {Comment, Submission} from "snoowrap";
 import {RuleResult} from "../Rule";
 import {activityIsRemoved} from "../Utils/SnoowrapUtils";
-import {ActionProcessResult, ActionTarget, ActivityRerunConfig} from "../Common/interfaces";
+import {ActionProcessResult, ActionTarget, ActivityDispatchConfig} from "../Common/interfaces";
 import dayjs from "dayjs";
 import {isSubmission, parseDurationValToDuration, randomId} from "../util";
 
 export class DispatchAction extends Action {
-    rerunData: ActivityRerunConfig;
+    dispatchData: ActivityDispatchConfig;
     targets: ActionTarget[];
 
     getKind() {
@@ -18,14 +18,14 @@ export class DispatchAction extends Action {
     constructor(options: DispatchOptions) {
         super(options);
         const {
-            rerunIdentifier,
+            identifier,
             cancelIfQueued = false,
             goto,
             delay,
             target = ['self']
         } = options;
-        this.rerunData = {
-            rerunIdentifier,
+        this.dispatchData = {
+            identifier: identifier,
             cancelIfQueued,
             goto,
             delay,
@@ -49,16 +49,16 @@ export class DispatchAction extends Action {
             }
         }
 
-        const {delay, ...restRerunData} = this.rerunData;
-        const rerunPayload = {
-            ...restRerunData,
+        const {delay, ...restDispatchData} = this.dispatchData;
+        const dispatchPayload = {
+            ...restDispatchData,
             delay,
             queuedAt: dayjs().unix(),
             duration: parseDurationValToDuration(delay),
             processing: false,
         };
 
-        const rerunActivitiesHints = [];
+        const dispatchActivitiesHints = [];
         for (const target of realTargets) {
             let act = item;
             let actHint = `Comment's parent Submission (${(item as Comment).link_id})`;
@@ -76,44 +76,44 @@ export class DispatchAction extends Action {
 
             const existing = this.resources.delayedItems.filter(x => {
                 const matchedActivityId = x.activity.name === act.name;
-                const matchRerunIdentifier = rerunPayload.rerunIdentifier === undefined ? true : rerunPayload.rerunIdentifier === x.rerunIdentifier;
-                return matchedActivityId && matchRerunIdentifier;
+                const matchDispatchIdentifier = dispatchPayload.identifier === undefined ? true : dispatchPayload.identifier === x.identifier;
+                return matchedActivityId && matchDispatchIdentifier;
             });
 
             if (existing.length > 0) {
                 let existingRes = `Dispatch activities (${existing.map((x, index) => `[${index + 1}] Queued At ${dayjs.unix(x.queuedAt).format('YYYY-MM-DD HH:mm:ssZ')} for ${x.duration.humanize()}`).join(' ')}}) already exist for ${actHint}`;
-                if (this.rerunData.onExistingFound === 'skip') {
+                if (this.dispatchData.onExistingFound === 'skip') {
                     existingRes += ` and existing behavior is SKIP so nothing queued`;
                     continue;
-                } else if (this.rerunData.onExistingFound === 'replace') {
+                } else if (this.dispatchData.onExistingFound === 'replace') {
                     existingRes += ` and existing behavior is REPLACE so replaced existing`;
                     const existingIds = existing.map(x => x.id);
                     this.resources.delayedItems = this.resources.delayedItems.filter(x => !existingIds.includes(x.id));
                 } else {
-                    existingRes += ` but existing behavior is IGNORE so adding new rerun activity anyway`;
+                    existingRes += ` but existing behavior is IGNORE so adding new dispatch activity anyway`;
                 }
-                rerunActivitiesHints.push(existingRes);
+                dispatchActivitiesHints.push(existingRes);
             } else {
-                rerunActivitiesHints.push(actHint);
+                dispatchActivitiesHints.push(actHint);
             }
 
             if (!dryRun) {
                 this.resources.delayedItems.push({
-                    ...rerunPayload,
+                    ...dispatchPayload,
                     activity: act,
                     id: randomId(),
                     action: this.getActionUniqueName()
                 });
             }
         }
-        let rerunBehaviors = [];
-        if (rerunPayload.rerunIdentifier !== undefined) {
-            rerunBehaviors.push(`Identifier: ${rerunPayload.rerunIdentifier}`);
+        let dispatchBehaviors = [];
+        if (dispatchPayload.identifier !== undefined) {
+            dispatchBehaviors.push(`Identifier: ${dispatchPayload.identifier}`);
         }
-        if (rerunPayload.goto !== undefined) {
-            rerunBehaviors.push(`Goto: ${rerunPayload.goto}`);
+        if (dispatchPayload.goto !== undefined) {
+            dispatchBehaviors.push(`Goto: ${dispatchPayload.goto}`);
         }
-        let result = `Delay: ${rerunPayload.duration.humanize()}${rerunBehaviors.length > 0 ? `| ${rerunBehaviors.join(' | ')}` : ''} | Dispatch Results:\n${rerunActivitiesHints.join('\n')}`;
+        let result = `Delay: ${dispatchPayload.duration.humanize()}${dispatchBehaviors.length > 0 ? ` | ${dispatchBehaviors.join(' | ')}` : ''} | Dispatch Results: ${dispatchActivitiesHints.join(' <<>> ')}`;
 
         this.logger.verbose(result);
         return {
@@ -127,7 +127,7 @@ export class DispatchAction extends Action {
 export interface DispatchOptions extends DispatchActionConfig, ActionOptions {
 }
 
-export interface DispatchActionConfig extends ActionConfig, ActivityRerunConfig {
+export interface DispatchActionConfig extends ActionConfig, ActivityDispatchConfig {
     target: ActionTarget | ActionTarget[]
 }
 
