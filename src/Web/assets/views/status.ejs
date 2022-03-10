@@ -692,11 +692,13 @@
 <script src="https://unpkg.com/dayjs@1.10.7/plugin/timezone.js"></script>
 <script src="https://unpkg.com/dayjs@1.10.7/plugin/duration.js"></script>
 <script src="https://unpkg.com/dayjs@1.10.7/plugin/relativeTime.js"></script>
+<script src="https://unpkg.com/dayjs@1.10.7/plugin/isSameOrAfter.js"></script>
 <script>
     dayjs.extend(window.dayjs_plugin_timezone)
     dayjs.extend(window.dayjs_plugin_advancedFormat)
     dayjs.extend(window.dayjs_plugin_duration)
     dayjs.extend(window.dayjs_plugin_relativeTime)
+    dayjs.extend(window.dayjs_plugin_isSameOrAfter)
     window.formattedTime = (short, full) => `<span class="has-tooltip"><span style="margin-top:35px" class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black space-y-3 p-2 text-left'>${full}</span><span>${short}</span></span>`;
     window.formatLogLineToHtml = (log, timestamp = undefined) => {
         const val = typeof log === 'string' ? log : log['MESSAGE'];
@@ -1137,7 +1139,9 @@
                     el.querySelector('.delayedItemsList').innerHTML = '';
                     const now = dayjs();
                     const sorted = resp.delayedItems.map(x => ({...x, dispatchAt: dayjs.unix(x.queuedAt + (x.durationMilli/1000))}));
-                    sorted.sort((a, b) => a.dispatchAt.isSameOrAfter(b.dispatchAt) ? 1 : -1);
+                    sorted.sort((a, b) => {
+                        return a.dispatchAt.isSameOrAfter(b.dispatchAt) ? 1 : -1
+                    });
                     const delayedItemDivs = sorted.map(x => {
                         const diffUntilNow = x.dispatchAt.diff(now)
                         const durationUntilNow = dayjs.duration(diffUntilNow);
