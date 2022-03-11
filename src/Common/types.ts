@@ -17,6 +17,9 @@ import {MessageActionJson} from "../Action/MessageAction";
 import {RepostRuleJSONConfig} from "../Rule/RepostRule";
 import {DispatchActionJson} from "../Action/DispatchAction";
 import {CancelDispatchActionJson} from "../Action/CancelDispatchAction";
+import {SafeDictionary} from "ts-essentials";
+import {FilterCriteriaPropertyResult} from "./interfaces";
+import {AuthorCriteria} from "../Author/Author";
 
 export type RuleJson = RecentActivityRuleJSONConfig | RepeatActivityJSONConfig | AuthorRuleJSONConfig | AttributionJSONConfig | HistoryJSONConfig | RegexRuleJSONConfig | RepostRuleJSONConfig | string;
 export type RuleObjectJson = Exclude<RuleJson, string>
@@ -32,3 +35,6 @@ export type SetRandomInterval = (
 ) => { clear: () => void };
 
 export type ConfigFormat = 'json' | 'yaml';
+
+export type AuthorCritPropHelper = SafeDictionary<FilterCriteriaPropertyResult<AuthorCriteria>, keyof AuthorCriteria>;
+export type RequiredAuthorCrit = Required<AuthorCriteria>;

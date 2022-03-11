@@ -1,12 +1,11 @@
-import Snoowrap, {RedditUser} from "snoowrap";
+import Snoowrap from "snoowrap";
 import objectHash from 'object-hash';
 import {
     activityIsDeleted, activityIsFiltered,
     activityIsRemoved,
     AuthorActivitiesOptions,
     AuthorTypedActivitiesOptions, BOT_LINK,
-    getAuthorActivities,
-    testAuthorCriteria
+    getAuthorActivities
 } from "../Utils/SnoowrapUtils";
 import winston, {Logger} from "winston";
 import as from 'async';
@@ -29,12 +28,12 @@ import {
     mergeArr,
     parseDurationComparison,
     parseExternalUrl,
-    parseGenericValueComparison,
+    parseGenericValueComparison, parseGenericValueOrPercentComparison,
     parseRedditEntity, parseStringToRegex,
     parseWikiContext, PASS, redisScanIterator, removeUndefinedKeys,
     shouldCacheSubredditStateCriteriaResult, strToActivitySource,
     subredditStateIsNameOnly, testMaybeStringRegex,
-    toStrongSubredditState, userNoteCriteriaSummary
+    toStrongSubredditState, truncateStringToLength, userNoteCriteriaSummary
 } from "../util";
 import LoggedError from "../Utils/LoggedError";
 import {
@@ -73,7 +72,7 @@ import he from "he";
 import {AuthorCriteria, AuthorOptions} from "../Author/Author";
 import {SPoll} from "./Streams";
 import {Cache} from 'cache-manager';
-import {Submission, Comment, Subreddit} from "snoowrap/dist/objects";
+import {Submission, Comment, Subreddit, RedditUser} from "snoowrap/dist/objects";
 import {cacheTTLDefaults, createHistoricalDefaults, historicalDefaults} from "../Common/defaults";
 import {check} from "tcp-port-used";
 import {ExtendedSnoowrap} from "../Utils/SnoowrapClients";
@@ -83,6 +82,8 @@ import globrex from 'globrex';
 import {runMigrations} from "../Common/Migrations/CacheMigrationUtils";
 import {isStatusError, SimpleError} from "../Utils/Errors";
 import {ErrorWithCause} from "pony-cause";
+import {UserNoteCriteria} from "../Rule";
+import {AuthorCritPropHelper, RequiredAuthorCrit} from "../Common/types";
 
 export const DEFAULT_FOOTER = '\r\n*****\r\nThis action was performed by [a bot.]({{botLink}}) Mention a moderator or [send a modmail]({{modmailLink}}) if you any ideas, questions, or concerns about this action.';
 
@@ -612,6 +613,33 @@ export class SubredditResources {
         }
     }
 
+    async getSubredditModerators(subredditVal: Subreddit | string) {
+        const subName = typeof subredditVal === 'string' ? subredditVal : subredditVal.display_name;
+        const hash = `sub-${subName}-moderators`;
+        if (this.subredditTTL !== false) {
+            const cachedSubredditMods = await this.cache.get(hash);
+            if (cachedSubredditMods !== undefined && cachedSubredditMods !== null) {
+                this.logger.debug(`Cache Hit: Subreddit Moderators ${subName}`);
+                return (cachedSubredditMods as string[]).map(x => new RedditUser({name: x}, this.client, false));
+            }
+        }
+
+        let sub: Subreddit;
+        if (typeof subredditVal !== 'string') {
+            sub = subredditVal;
+        } else {
+            sub = this.client.getSubreddit(subredditVal);
+        }
+        const mods = await sub.getModerators();
+
+        if (this.subredditTTL !== false) {
+            // @ts-ignore
+            await this.cache.set(hash, mods.map(x => x.name), {ttl: this.subredditTTL});
+        }
+
+        return mods;
+    }
+
     async hasSubreddit(name: string) {
         if (this.subredditTTL !== false) {
             const hash = `sub-${name}`;
@@ -625,6 +653,44 @@ export class SubredditResources {
             return val !== undefined && val !== null;
         }
         return false;
+    }
+
+    // @ts-ignore
+    async getAuthor(val: RedditUser | string) {
+        const authorName = typeof val === 'string' ? val : val.name;
+        const hash = `author-${authorName}`;
+        if (this.authorTTL !== false) {
+            const cachedAuthorData = await this.cache.get(hash);
+            if (cachedAuthorData !== undefined && cachedAuthorData !== null) {
+                this.logger.debug(`Cache Hit: Author ${authorName}`);
+                const {subreddit, ...rest} = cachedAuthorData as any;
+                const snoowrapConformedData = {...rest};
+                if(subreddit !== null) {
+                    snoowrapConformedData.subreddit = {
+                        display_name: subreddit
+                    };
+                } else {
+                    snoowrapConformedData.subreddit = null;
+                }
+                return new RedditUser(snoowrapConformedData, this.client, true);
+            }
+        }
+
+        let user: RedditUser;
+        if (typeof val !== 'string') {
+            user = val;
+        } else {
+            user = this.client.getUser(val);
+        }
+        // @ts-ignore
+        user = await user.fetch();
+
+        if (this.authorTTL !== false) {
+            // @ts-ignore
+            await this.cache.set(hash, user, {ttl: this.authorTTL});
+        }
+
+        return user;
     }
 
     async getAuthorActivities(user: RedditUser, options: AuthorTypedActivitiesOptions): Promise<Array<Submission | Comment>> {
@@ -870,13 +936,13 @@ export class SubredditResources {
                 return cachedAuthorTest;
             } else {
                 this.stats.cache.authorCrit.miss++;
-                cachedAuthorTest = await testAuthorCriteria(item, authorOpts, include, this.userNotes);
+                cachedAuthorTest = await this.isAuthor(item, authorOpts, include);
                 await this.cache.set(hash, cachedAuthorTest, {ttl: this.filterCriteriaTTL});
                 return cachedAuthorTest;
             }
         }
 
-        return await testAuthorCriteria(item, authorOpts, include, this.userNotes);
+        return await this.isAuthor(item, authorOpts, include);
     }
 
     async testItemCriteria(i: (Comment | Submission), activityState: TypedActivityState, logger: Logger, source?: ActivitySource): Promise<FilterCriteriaResult<TypedActivityState>> {
@@ -1319,6 +1385,362 @@ export class SubredditResources {
         return {
             behavior: 'include',
             criteria: stateCriteria,
+            propertyResults: propResults,
+            passed,
+        };
+    }
+
+    async isAuthor(item: (Comment | Submission), authorOpts: AuthorCriteria, include = true): Promise<FilterCriteriaResult<AuthorCriteria>> {
+        const definedAuthorOpts = (removeUndefinedKeys(authorOpts) as RequiredAuthorCrit);
+
+        let fetchedUser: RedditUser | undefined;
+        // @ts-ignore
+        const user = async (): Promise<RedditUser> => {
+            if(fetchedUser === undefined) {
+                fetchedUser = await this.getAuthor(item.author);
+            }
+            // @ts-ignore
+            return fetchedUser;
+        }
+
+        const propResultsMap = Object.entries(definedAuthorOpts).reduce((acc: AuthorCritPropHelper, [k, v]) => {
+            const key = (k as keyof AuthorCriteria);
+            let ex;
+            if (Array.isArray(v)) {
+                ex = v.map(x => {
+                    if (asUserNoteCriteria(x)) {
+                        return userNoteCriteriaSummary(x);
+                    }
+                    return x;
+                });
+            } else {
+                ex = [v];
+            }
+            acc[key] = {
+                property: key,
+                behavior: include ? 'include' : 'exclude',
+            };
+            return acc;
+        }, {});
+
+        const {shadowBanned} = authorOpts;
+
+        if (shadowBanned !== undefined) {
+            try {
+                // @ts-ignore
+                await item.author.fetch();
+                // user is not shadowbanned
+                // if criteria specifies they SHOULD be shadowbanned then return false now
+                if (shadowBanned) {
+                    propResultsMap.shadowBanned!.found = false;
+                    propResultsMap.shadowBanned!.passed = false;
+                }
+            } catch (err: any) {
+                if (isStatusError(err) && err.statusCode === 404) {
+                    // user is shadowbanned
+                    // if criteria specifies they should not be shadowbanned then return false now
+                    if (!shadowBanned) {
+                        propResultsMap.shadowBanned!.found = true;
+                        propResultsMap.shadowBanned!.passed = false;
+                    }
+                } else {
+                    throw err;
+                }
+            }
+        }
+
+
+
+        if (propResultsMap.shadowBanned === undefined || propResultsMap.shadowBanned.passed === undefined) {
+            try {
+                const authorName = getActivityAuthorName(item.author);
+
+                const keys = Object.keys(propResultsMap) as (keyof AuthorCriteria)[]
+
+                let shouldContinue = true;
+                for (const k of keys) {
+                    if (k === 'shadowBanned') {
+                        // we have already taken care of this with shadowban check above
+                        continue;
+                    }
+
+                    const authorOptVal = definedAuthorOpts[k];
+
+                    //if (authorOpts[k] !== undefined) {
+                    switch (k) {
+                        case 'name':
+                            const nameVal = authorOptVal as RequiredAuthorCrit['name'];
+                            const authPass = () => {
+
+                                for (const n of nameVal) {
+                                    if (n.toLowerCase() === authorName.toLowerCase()) {
+                                        return true;
+                                    }
+                                }
+                                return false;
+                            }
+                            const authResult = authPass();
+                            propResultsMap.name!.found = authorName;
+                            propResultsMap.name!.passed = !((include && !authResult) || (!include && authResult));
+                            if (!propResultsMap.name!.passed) {
+                                shouldContinue = false;
+                            }
+                            break;
+                        case 'flairCssClass':
+                            const css = await item.author_flair_css_class;
+                            const cssPass = () => {
+                                // @ts-ignore
+                                for (const c of authorOpts[k]) {
+                                    if (c === css) {
+                                        return true;
+                                    }
+                                }
+                                return false;
+                            }
+                            const cssResult = cssPass();
+                            propResultsMap.flairCssClass!.found = css;
+                            propResultsMap.flairCssClass!.passed = !((include && !cssResult) || (!include && cssResult));
+                            if (!propResultsMap.flairCssClass!.passed) {
+                                shouldContinue = false;
+                            }
+                            break;
+                        case 'flairText':
+                            const text = await item.author_flair_text;
+                            const textPass = () => {
+                                // @ts-ignore
+                                for (const c of authorOpts[k]) {
+                                    if (c === text) {
+                                        return true;
+                                    }
+                                }
+                                return false;
+                            };
+                            const textResult = textPass();
+                            propResultsMap.flairText!.found = text;
+                            propResultsMap.flairText!.passed = !((include && !textResult) || (!include && textResult));
+                            if (!propResultsMap.flairText!.passed) {
+                                shouldContinue = false;
+                            }
+                            break;
+                        case 'flairTemplate':
+                            const templateId = await item.author_flair_template_id;
+                            const templatePass = () => {
+                                // @ts-ignore
+                                for (const c of authorOpts[k]) {
+                                    if (c === templateId) {
+                                        return true;
+                                    }
+                                }
+                                return false;
+                            };
+                            const templateResult = templatePass();
+                            propResultsMap.flairTemplate!.found = templateId;
+                            propResultsMap.flairTemplate!.passed = !((include && !templateResult) || (!include && templateResult));
+                            if (!propResultsMap.flairTemplate!.passed) {
+                                shouldContinue = false;
+                            }
+                            break;
+                        case 'isMod':
+                            const mods: RedditUser[] = await this.getSubredditModerators(item.subreddit);
+                            const isModerator = mods.some(x => x.name === authorName) || authorName.toLowerCase() === 'automoderator';
+                            const modMatch = authorOpts.isMod === isModerator;
+                            propResultsMap.isMod!.found = isModerator;
+                            propResultsMap.isMod!.passed = !((include && !modMatch) || (!include && modMatch));
+                            if (!propResultsMap.isMod!.passed) {
+                                shouldContinue = false;
+                            }
+                            break;
+                        case 'age':
+                            // @ts-ignore
+                            const authorAge = dayjs.unix((await user()).created);
+                            const ageTest = compareDurationValue(parseDurationComparison(await authorOpts.age as string), authorAge);
+                            propResultsMap.age!.found = authorAge.fromNow(true);
+                            propResultsMap.age!.passed = !((include && !ageTest) || (!include && ageTest));
+                            if (!propResultsMap.age!.passed) {
+                                shouldContinue = false;
+                            }
+                            break;
+                        case 'linkKarma':
+                            // @ts-ignore
+                            const tk = (await user()).total_karma as number;
+                            const lkCompare = parseGenericValueOrPercentComparison(await authorOpts.linkKarma as string);
+                            let lkMatch;
+                            if (lkCompare.isPercent) {
+
+                                lkMatch = comparisonTextOp(item.author.link_karma / tk, lkCompare.operator, lkCompare.value / 100);
+                            } else {
+                                lkMatch = comparisonTextOp(item.author.link_karma, lkCompare.operator, lkCompare.value);
+                            }
+                            propResultsMap.linkKarma!.found = tk;
+                            propResultsMap.linkKarma!.passed = !((include && !lkMatch) || (!include && lkMatch));
+                            if (!propResultsMap.linkKarma!.passed) {
+                                shouldContinue = false;
+                            }
+                            break;
+                        case 'commentKarma':
+                            // @ts-ignore
+                            const ck = (await user()).comment_karma as number;
+                            const ckCompare = parseGenericValueOrPercentComparison(await authorOpts.commentKarma as string);
+                            let ckMatch;
+                            if (ckCompare.isPercent) {
+                                ckMatch = comparisonTextOp(item.author.comment_karma / ck, ckCompare.operator, ckCompare.value / 100);
+                            } else {
+                                ckMatch = comparisonTextOp(item.author.comment_karma, ckCompare.operator, ckCompare.value);
+                            }
+                            propResultsMap.commentKarma!.found = ck;
+                            propResultsMap.commentKarma!.passed = !((include && !ckMatch) || (!include && ckMatch));
+                            if (!propResultsMap.commentKarma!.passed) {
+                                shouldContinue = false;
+                            }
+                            break;
+                        case 'totalKarma':
+                            // @ts-ignore
+                            const totalKarma = (await user()).total_karma as number;
+                            const tkCompare = parseGenericValueComparison(await authorOpts.totalKarma as string);
+                            if (tkCompare.isPercent) {
+                                throw new SimpleError(`'totalKarma' value on AuthorCriteria cannot be a percentage`);
+                            }
+                            const tkMatch = comparisonTextOp(totalKarma, tkCompare.operator, tkCompare.value);
+                            propResultsMap.totalKarma!.found = totalKarma;
+                            propResultsMap.totalKarma!.passed = !((include && !tkMatch) || (!include && tkMatch));
+                            if (!propResultsMap.totalKarma!.passed) {
+                                shouldContinue = false;
+                            }
+                            break;
+                        case 'verified':
+                            // @ts-ignore
+                            const verified = (await user()).has_verified_mail;
+                            const vMatch = verified === authorOpts.verified as boolean;
+                            propResultsMap.verified!.found = verified;
+                            propResultsMap.verified!.passed = !((include && !vMatch) || (!include && vMatch));
+                            if (!propResultsMap.verified!.passed) {
+                                shouldContinue = false;
+                            }
+                            break;
+                        case 'description':
+                            // @ts-ignore
+                            const desc = (await user()).subreddit?.display_name.public_description;
+                            const dVals = authorOpts[k] as string[];
+                            let passed = false;
+                            let passReg;
+                            for (const val of dVals) {
+                                let reg = parseStringToRegex(val, 'i');
+                                if (reg === undefined) {
+                                    reg = parseStringToRegex(`/.*${escapeRegex(val.trim())}.*/`, 'i');
+                                    if (reg === undefined) {
+                                        throw new SimpleError(`Could not convert 'description' value to a valid regex: ${authorOpts[k] as string}`);
+                                    }
+                                }
+                                if (reg.test(desc)) {
+                                    passed = true;
+                                    passReg = reg.toString();
+                                    break;
+                                }
+                            }
+                            propResultsMap.description!.found = typeof desc === 'string' ? truncateStringToLength(50)(desc) : desc;
+                            propResultsMap.description!.passed = !((include && !passed) || (!include && passed));
+                            if (!propResultsMap.description!.passed) {
+                                shouldContinue = false;
+                            } else {
+                                propResultsMap.description!.reason = `Matched with: ${passReg as string}`;
+                            }
+                            break;
+                        case 'userNotes':
+                            const notes = await this.userNotes.getUserNotes(item.author);
+                            let foundNoteResult: string[] = [];
+                            const notePass = () => {
+                                for (const noteCriteria of authorOpts[k] as UserNoteCriteria[]) {
+                                    const {count = '>= 1', search = 'current', type} = noteCriteria;
+                                    const {
+                                        value,
+                                        operator,
+                                        isPercent,
+                                        extra = ''
+                                    } = parseGenericValueOrPercentComparison(count);
+                                    const order = extra.includes('asc') ? 'ascending' : 'descending';
+                                    switch (search) {
+                                        case 'current':
+                                            if (notes.length > 0) {
+                                                const currentNoteType = notes[notes.length - 1].noteType;
+                                                foundNoteResult.push(`Current => ${currentNoteType}`);
+                                                if (currentNoteType === type) {
+                                                    return true;
+                                                }
+                                            } else {
+                                                foundNoteResult.push('No notes present');
+                                            }
+                                            break;
+                                        case 'consecutive':
+                                            let orderedNotes = notes;
+                                            if (order === 'descending') {
+                                                orderedNotes = [...notes];
+                                                orderedNotes.reverse();
+                                            }
+                                            let currCount = 0;
+                                            for (const note of orderedNotes) {
+                                                if (note.noteType === type) {
+                                                    currCount++;
+                                                } else {
+                                                    currCount = 0;
+                                                }
+                                                if (isPercent) {
+                                                    throw new SimpleError(`When comparing UserNotes with 'consecutive' search 'count' cannot be a percentage. Given: ${count}`);
+                                                }
+                                                foundNoteResult.push(`Found ${currCount} ${type} consecutively`);
+                                                if (comparisonTextOp(currCount, operator, value)) {
+                                                    return true;
+                                                }
+                                            }
+                                            break;
+                                        case 'total':
+                                            const filteredNotes = notes.filter(x => x.noteType === type);
+                                            if (isPercent) {
+                                                // avoid divide by zero
+                                                const percent = notes.length === 0 ? 0 : filteredNotes.length / notes.length;
+                                                foundNoteResult.push(`${formatNumber(percent)}% are ${type}`);
+                                                if (comparisonTextOp(percent, operator, value / 100)) {
+                                                    return true;
+                                                }
+                                            } else {
+                                                foundNoteResult.push(`${filteredNotes.length} are ${type}`);
+                                                if (comparisonTextOp(notes.filter(x => x.noteType === type).length, operator, value)) {
+                                                    return true;
+                                                }
+                                            }
+                                            break;
+                                    }
+                                }
+                                return false;
+                            }
+                            const noteResult = notePass();
+                            propResultsMap.userNotes!.found = foundNoteResult.join(' | ');
+                            propResultsMap.userNotes!.passed = !((include && !noteResult) || (!include && noteResult));
+                            if (!propResultsMap.userNotes!.passed) {
+                                shouldContinue = false;
+                            }
+                            break;
+                    }
+                    //}
+                    if (!shouldContinue) {
+                        break;
+                    }
+                }
+            } catch (err: any) {
+                if (isStatusError(err) && err.statusCode === 404) {
+                    throw new SimpleError('Reddit returned a 404 while trying to retrieve User profile. It is likely this user is shadowbanned.');
+                } else {
+                    throw err;
+                }
+            }
+        }
+
+        // gather values and determine overall passed
+        const propResults = Object.values(propResultsMap);
+        const passed = propResults.filter(x => typeof x.passed === 'boolean').every(x => x.passed === true);
+
+        return {
+            behavior: include ? 'include' : 'exclude',
+            criteria: authorOpts,
             propertyResults: propResults,
             passed,
         };
