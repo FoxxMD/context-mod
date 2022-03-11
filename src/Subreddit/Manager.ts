@@ -240,7 +240,8 @@ export class Manager extends EventEmitter {
                 queuedAt: x.queuedAt,
                 durationMilli: x.duration.asMilliseconds(),
                 duration: x.duration.humanize(),
-                source: `${x.action}${x.identifier !== undefined ? ` (${x.identifier})` : ''}`
+                source: `${x.action}${x.identifier !== undefined ? ` (${x.identifier})` : ''}`,
+                subreddit: this.subreddit.display_name_prefixed
             }
         });
     }
