@@ -1328,16 +1328,19 @@ export class SubredditResources {
 
                             propResultsMap[k]!.found = propertyValue;
 
-                            const expectedValues = typeof itemOptVal === 'string' ? [itemOptVal] : (itemOptVal as string[]);
-                            const VALUEPass = () => {
-                                for (const c of expectedValues) {
-                                    if (c === propertyValue) {
-                                        return true;
-                                    }
+                            if (typeof itemOptVal === 'boolean') {
+                                if (itemOptVal === true) {
+                                    propResultsMap[k]!.passed = propertyValue !== undefined && propertyValue !== null && propertyValue !== '';
+                                } else {
+                                    propResultsMap[k]!.passed = propertyValue === undefined || propertyValue === null || propertyValue === '';
                                 }
-                                return false;
-                            };
-                            propResultsMap[k]!.passed = VALUEPass();
+                            } else if (propertyValue === undefined || propertyValue === null || propertyValue === '') {
+                                // if crit is not a boolean but property is "empty" then it'll never pass anyway
+                                propResultsMap[k]!.passed = false;
+                            } else {
+                                const expectedValues = typeof itemOptVal === 'string' ? [itemOptVal] : (itemOptVal as string[]);
+                                propResultsMap[k]!.passed = expectedValues.some(x => x.trim().toLowerCase() === propertyValue?.trim().toLowerCase());
+                            }
                             break;
                         } else {
                             propResultsMap[k]!.passed = true;
@@ -1488,35 +1491,48 @@ export class SubredditResources {
                             break;
                         case 'flairCssClass':
                             const css = await item.author_flair_css_class;
-                            const cssPass = () => {
-                                // @ts-ignore
-                                for (const c of authorOpts[k]) {
-                                    if (c === css) {
-                                        return true;
-                                    }
-                                }
-                                return false;
-                            }
-                            const cssResult = cssPass();
                             propResultsMap.flairCssClass!.found = css;
+
+                            let cssResult:boolean;
+
+                            if (typeof authorOptVal === 'boolean') {
+                                if (authorOptVal === true) {
+                                    cssResult = css !== undefined && css !== null && css !== '';
+                                } else {
+                                    cssResult = css === undefined || css === null || css === '';
+                                }
+                            } else if (css === undefined || css === null || css === '') {
+                                // if crit is not a boolean but property is "empty" then it'll never pass anyway
+                                cssResult = false;
+                            } else {
+                                const opts = Array.isArray(authorOptVal) ? authorOptVal as string[] : [authorOptVal] as string[];
+                                cssResult = opts.some(x => x.trim().toLowerCase() === css.trim().toLowerCase())
+                            }
+
                             propResultsMap.flairCssClass!.passed = !((include && !cssResult) || (!include && cssResult));
                             if (!propResultsMap.flairCssClass!.passed) {
                                 shouldContinue = false;
                             }
                             break;
                         case 'flairText':
+
                             const text = await item.author_flair_text;
-                            const textPass = () => {
-                                // @ts-ignore
-                                for (const c of authorOpts[k]) {
-                                    if (c === text) {
-                                        return true;
-                                    }
-                                }
-                                return false;
-                            };
-                            const textResult = textPass();
                             propResultsMap.flairText!.found = text;
+
+                            let textResult: boolean;
+                            if (typeof authorOptVal === 'boolean') {
+                                if (authorOptVal === true) {
+                                    textResult = text !== undefined && text !== null && text !== '';
+                                } else {
+                                    textResult = text === undefined || text === null || text === '';
+                                }
+                            } else if (text === undefined || text === null) {
+                                // if crit is not a boolean but property is "empty" then it'll never pass anyway
+                                textResult = false;
+                            } else {
+                                const opts = Array.isArray(authorOptVal) ? authorOptVal as string[] : [authorOptVal] as string[];
+                                textResult = opts.some(x => x.trim().toLowerCase() === text.trim().toLowerCase())
+                            }
                             propResultsMap.flairText!.passed = !((include && !textResult) || (!include && textResult));
                             if (!propResultsMap.flairText!.passed) {
                                 shouldContinue = false;
@@ -1524,17 +1540,23 @@ export class SubredditResources {
                             break;
                         case 'flairTemplate':
                             const templateId = await item.author_flair_template_id;
-                            const templatePass = () => {
-                                // @ts-ignore
-                                for (const c of authorOpts[k]) {
-                                    if (c === templateId) {
-                                        return true;
-                                    }
-                                }
-                                return false;
-                            };
-                            const templateResult = templatePass();
                             propResultsMap.flairTemplate!.found = templateId;
+
+                            let templateResult: boolean;
+                            if (typeof authorOptVal === 'boolean') {
+                                if (authorOptVal === true) {
+                                    templateResult = templateId !== undefined && templateId !== null && templateId !== '';
+                                } else {
+                                    templateResult = templateId === undefined || templateId === null || templateId === '';
+                                }
+                            } else if (templateId === undefined || templateId === null || templateId === '') {
+                                // if crit is not a boolean but property is "empty" then it'll never pass anyway
+                                templateResult = false;
+                            } else {
+                                const opts = Array.isArray(authorOptVal) ? authorOptVal as string[] : [authorOptVal] as string[];
+                                templateResult = opts.some(x => x.trim() === templateId);
+                            }
+
                             propResultsMap.flairTemplate!.passed = !((include && !templateResult) || (!include && templateResult));
                             if (!propResultsMap.flairTemplate!.passed) {
                                 shouldContinue = false;

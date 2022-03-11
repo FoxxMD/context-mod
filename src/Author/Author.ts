@@ -47,19 +47,30 @@ export interface AuthorCriteria {
     name?: string[],
     /**
      * A (user) flair css class (or list of) from the subreddit to match against
+     *
+     * * If `true` then passes if ANY css is assigned
+     * * If `false` then passes if NO css is assigned
      * @examples ["red"]
      * */
-    flairCssClass?: string | string[],
+    flairCssClass?: boolean | string | string[],
     /**
      * A (user) flair text value (or list of) from the subreddit to match against
+     *
+     * * If `true` then passes if ANY text is assigned
+     * * If `false` then passes if NO text is assigned
+     *
      * @examples ["Approved"]
      * */
-    flairText?: string | string[],
+    flairText?: boolean | string | string[],
 
     /**
      * A (user) flair template id (or list of) from the subreddit to match against
+     *
+     * * If `true` then passes if ANY template is assigned
+     * * If `false` then passed if NO template is assigned
+     *
      * */
-    flairTemplate?: string | string[]
+    flairTemplate?: boolean | string | string[]
     /**
      * Is the author a moderator?
      * */
@@ -137,8 +148,8 @@ export interface AuthorCriteria {
 
 export class Author implements AuthorCriteria {
     name?: string[];
-    flairCssClass?: string[];
-    flairText?: string[];
+    flairCssClass?: boolean | string[];
+    flairText?: boolean | string[];
     isMod?: boolean;
     userNotes?: UserNoteCriteria[];
     age?: string;

@@ -525,10 +525,13 @@
                             "type": "array"
                         },
                         {
-                            "type": "string"
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
                         }
                     ],
-                    "description": "A (user) flair css class (or list of) from the subreddit to match against",
+                    "description": "A (user) flair css class (or list of) from the subreddit to match against\n\n* If `true` then passes if ANY css is assigned\n* If `false` then passes if NO css is assigned",
                     "examples": [
                         "red"
                     ]
@@ -542,10 +545,13 @@
                             "type": "array"
                         },
                         {
-                            "type": "string"
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
                         }
                     ],
-                    "description": "A (user) flair template id (or list of) from the subreddit to match against"
+                    "description": "A (user) flair template id (or list of) from the subreddit to match against\n\n* If `true` then passes if ANY template is assigned\n* If `false` then passed if NO template is assigned"
                 },
                 "flairText": {
                     "anyOf": [
@@ -556,10 +562,13 @@
                             "type": "array"
                         },
                         {
-                            "type": "string"
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
                         }
                     ],
-                    "description": "A (user) flair text value (or list of) from the subreddit to match against",
+                    "description": "A (user) flair text value (or list of) from the subreddit to match against\n\n* If `true` then passes if ANY text is assigned\n* If `false` then passes if NO text is assigned",
                     "examples": [
                         "Approved"
                     ]
@@ -3918,9 +3927,13 @@
                             "type": "array"
                         },
                         {
-                            "type": "string"
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
                         }
-                    ]
+                    ],
+                    "description": "* If `true` then passes if there is ANY flair template id\n* If `false` then passes if there is NO flair template id"
                 },
                 "isRedditMediaDomain": {
                     "description": "Is the submission a reddit-hosted image or video?",
@@ -3938,9 +3951,13 @@
                             "type": "array"
                         },
                         {
-                            "type": "string"
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
                         }
-                    ]
+                    ],
+                    "description": "* If `true` then passes if flair has ANY css\n* If `false` then passes if flair has NO css"
                 },
                 "link_flair_text": {
                     "anyOf": [
@@ -3951,9 +3968,13 @@
                             "type": "array"
                         },
                         {
-                            "type": "string"
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
                         }
-                    ]
+                    ],
+                    "description": "* If `true` then passes if flair has ANY text\n* If `false` then passes if flair has NO text"
                 },
                 "locked": {
                     "type": "boolean"

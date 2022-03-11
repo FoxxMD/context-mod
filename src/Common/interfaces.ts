@@ -987,9 +987,21 @@ export interface SubmissionState extends ActivityState {
      * */
     title?: string
 
-    link_flair_text?: string | string[]
-    link_flair_css_class?: string | string[]
-    flairTemplate?: string | string[]
+    /**
+     * * If `true` then passes if flair has ANY text
+     * * If `false` then passes if flair has NO text
+     * */
+    link_flair_text?: boolean | string | string[]
+    /**
+     * * If `true` then passes if flair has ANY css
+     * * If `false` then passes if flair has NO css
+     * */
+    link_flair_css_class?: boolean | string | string[]
+    /**
+     * * If `true` then passes if there is ANY flair template id
+     * * If `false` then passes if there is NO flair template id
+     * */
+    flairTemplate?: boolean | string | string[]
     /**
      * Is the submission a reddit-hosted image or video?
      * */
