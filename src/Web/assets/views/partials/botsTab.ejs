@@ -19,7 +19,7 @@
                             <%= data.system.name %>
                         </a>
                             <% if ((data.system.name === 'All' && isOperator) || data.system.name !== 'All') { %>
-                                <span class="inline-block mb-0.5 ml-0.5 w-2 h-2 bg-<%= data.system.running ? 'green' : 'red' %>-400 rounded-full"></span>
+                                <span data-bot="<%= data.system.name %>" class="botTabStatus inline-block mb-0.5 ml-0.5 w-2 h-2 bg-<%= data.system.running ? 'green' : 'red' %>-400 rounded-full"></span>
                             <% } %>
                         </span>
                 </li>

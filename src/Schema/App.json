@@ -525,10 +525,13 @@
                             "type": "array"
                         },
                         {
-                            "type": "string"
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
                         }
                     ],
-                    "description": "A (user) flair css class (or list of) from the subreddit to match against",
+                    "description": "A (user) flair css class (or list of) from the subreddit to match against\n\n* If `true` then passes if ANY css is assigned\n* If `false` then passes if NO css is assigned",
                     "examples": [
                         "red"
                     ]
@@ -542,10 +545,13 @@
                             "type": "array"
                         },
                         {
-                            "type": "string"
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
                         }
                     ],
-                    "description": "A (user) flair template id (or list of) from the subreddit to match against"
+                    "description": "A (user) flair template id (or list of) from the subreddit to match against\n\n* If `true` then passes if ANY template is assigned\n* If `false` then passed if NO template is assigned"
                 },
                 "flairText": {
                     "anyOf": [
@@ -556,10 +562,13 @@
                             "type": "array"
                         },
                         {
-                            "type": "string"
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
                         }
                     ],
-                    "description": "A (user) flair text value (or list of) from the subreddit to match against",
+                    "description": "A (user) flair text value (or list of) from the subreddit to match against\n\n* If `true` then passes if ANY text is assigned\n* If `false` then passes if NO text is assigned",
                     "examples": [
                         "Approved"
                     ]
@@ -1023,6 +1032,120 @@
             ],
             "type": "string"
         },
+        "CancelDispatchActionJson": {
+            "description": "Remove the Activity",
+            "properties": {
+                "authorIs": {
+                    "$ref": "#/definitions/AuthorOptions",
+                    "description": "If present then these Author criteria are checked before running the Action. If criteria fails then the Action is not run.",
+                    "examples": [
+                        {
+                            "include": [
+                                {
+                                    "flairText": [
+                                        "Contributor",
+                                        "Veteran"
+                                    ]
+                                },
+                                {
+                                    "isMod": true
+                                }
+                            ]
+                        }
+                    ]
+                },
+                "dryRun": {
+                    "default": false,
+                    "description": "If `true` the Action will not make the API request to Reddit to perform its action.",
+                    "examples": [
+                        false,
+                        true
+                    ],
+                    "type": "boolean"
+                },
+                "enable": {
+                    "default": true,
+                    "description": "If set to `false` the Action will not be run",
+                    "examples": [
+                        true
+                    ],
+                    "type": "boolean"
+                },
+                "identifier": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": [
+                                "null",
+                                "string"
+                            ]
+                        }
+                    ]
+                },
+                "itemIs": {
+                    "description": "A list of criteria to test the state of the `Activity` against before running the Action.\n\nIf any set of criteria passes the Action will be run.",
+                    "items": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/definitions/SubmissionState"
+                            },
+                            {
+                                "$ref": "#/definitions/CommentState"
+                            }
+                        ]
+                    },
+                    "type": "array"
+                },
+                "kind": {
+                    "description": "The type of action that will be performed",
+                    "enum": [
+                        "cancelDispatch"
+                    ],
+                    "type": "string"
+                },
+                "name": {
+                    "description": "An optional, but highly recommended, friendly name for this Action. If not present will default to `kind`.\n\nCan only contain letters, numbers, underscore, spaces, and dashes",
+                    "examples": [
+                        "myDescriptiveAction"
+                    ],
+                    "pattern": "^[a-zA-Z]([\\w -]*[\\w])?$",
+                    "type": "string"
+                },
+                "target": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "enum": [
+                                    "any",
+                                    "parent",
+                                    "self"
+                                ],
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "enum": [
+                                "any",
+                                "parent",
+                                "self"
+                            ],
+                            "type": "string"
+                        }
+                    ]
+                }
+            },
+            "required": [
+                "kind",
+                "target"
+            ],
+            "type": "object"
+        },
         "CommentActionJson": {
             "description": "Reply to the Activity. For a submission the reply will be a top-level comment.",
             "properties": {
@@ -1147,22 +1270,16 @@
                     "items": {
                         "anyOf": [
                             {
-                                "$ref": "#/definitions/FlairActionJson"
-                            },
-                            {
-                                "$ref": "#/definitions/UserFlairActionJson"
-                            },
-                            {
                                 "$ref": "#/definitions/CommentActionJson"
-                            },
-                            {
-                                "$ref": "#/definitions/ReportActionJson"
                             },
                             {
                                 "$ref": "#/definitions/LockActionJson"
                             },
                             {
                                 "$ref": "#/definitions/RemoveActionJson"
+                            },
+                            {
+                                "$ref": "#/definitions/ReportActionJson"
                             },
                             {
                                 "$ref": "#/definitions/UserNoteActionJson"
@@ -1177,11 +1294,22 @@
                                 "$ref": "#/definitions/MessageActionJson"
                             },
                             {
+                                "$ref": "#/definitions/UserFlairActionJson"
+                            },
+                            {
+                                "$ref": "#/definitions/DispatchActionJson"
+                            },
+                            {
+                                "$ref": "#/definitions/CancelDispatchActionJson"
+                            },
+                            {
+                                "$ref": "#/definitions/FlairActionJson"
+                            },
+                            {
                                 "type": "string"
                             }
                         ]
                     },
-                    "minItems": 1,
                     "type": "array"
                 },
                 "authorIs": {
@@ -1315,7 +1443,6 @@
                 }
             },
             "required": [
-                "actions",
                 "kind",
                 "name"
             ],
@@ -1346,6 +1473,23 @@
                     "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(days|weeks|months|years|hours|minutes|seconds|milliseconds)\\s*$",
                     "type": "string"
                 },
+                "dispatched": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
+                        }
+                    ],
+                    "description": "Test whether the activity is present in dispatched/delayed activities\n\nNOTE: This is DOES NOT mean that THIS activity is from dispatch -- just that it exists there. To test whether THIS activity is from dispatch use `source`\n\n* `true` => activity exists in delayed activities\n* `false` => activity DOES NOT exist in delayed activities\n* `string` => activity exists in delayed activities with given identifier\n* `string[]` => activity exists in delayed activities with any of the given identifiers"
+                },
                 "distinguished": {
                     "type": "boolean"
                 },
@@ -1371,6 +1515,20 @@
                     "description": "A string containing a comparison operator and a value to compare against\n\nThe syntax is `(< OR > OR <= OR >=) <number>`\n\n* EX `> 100`  => greater than 100",
                     "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
                     "type": "string"
+                },
+                "source": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "string"
+                        }
+                    ],
+                    "description": "Test where the current activity was sourced from.\n\nA source can be any of:\n\n* `poll` => activity was retrieved from polling a queue (unmoderated, modqueue, etc...)\n* `poll:[pollSource]` => activity was retrieved from specific polling source IE `poll:unmoderated` activity comes from unmoderated queue\n  * valid sources: unmoderated modqueue newComm newSub\n* `dispatch` => activity is from Dispatch Action\n* `dispatch:[identifier]` => activity is from Dispatch Action with specific identifier\n* `user` => activity was from user input (web dashboard)"
                 },
                 "spam": {
                     "type": "boolean"
@@ -1407,6 +1565,157 @@
                 "name",
                 "type",
                 "url"
+            ],
+            "type": "object"
+        },
+        "DispatchActionJson": {
+            "description": "Remove the Activity",
+            "properties": {
+                "authorIs": {
+                    "$ref": "#/definitions/AuthorOptions",
+                    "description": "If present then these Author criteria are checked before running the Action. If criteria fails then the Action is not run.",
+                    "examples": [
+                        {
+                            "include": [
+                                {
+                                    "flairText": [
+                                        "Contributor",
+                                        "Veteran"
+                                    ]
+                                },
+                                {
+                                    "isMod": true
+                                }
+                            ]
+                        }
+                    ]
+                },
+                "cancelIfQueued": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "enum": [
+                                    "poll",
+                                    "poll:modqueue",
+                                    "poll:newComm",
+                                    "poll:newSub",
+                                    "poll:unmoderated",
+                                    "user"
+                                ],
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "enum": [
+                                false,
+                                "poll",
+                                "poll:modqueue",
+                                "poll:newComm",
+                                "poll:newSub",
+                                "poll:unmoderated",
+                                true,
+                                "user"
+                            ]
+                        }
+                    ]
+                },
+                "delay": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/definitions/DurationObject"
+                        },
+                        {
+                            "type": "string"
+                        }
+                    ]
+                },
+                "dryRun": {
+                    "default": false,
+                    "description": "If `true` the Action will not make the API request to Reddit to perform its action.",
+                    "examples": [
+                        false,
+                        true
+                    ],
+                    "type": "boolean"
+                },
+                "enable": {
+                    "default": true,
+                    "description": "If set to `false` the Action will not be run",
+                    "examples": [
+                        true
+                    ],
+                    "type": "boolean"
+                },
+                "goto": {
+                    "type": "string"
+                },
+                "identifier": {
+                    "type": "string"
+                },
+                "itemIs": {
+                    "description": "A list of criteria to test the state of the `Activity` against before running the Action.\n\nIf any set of criteria passes the Action will be run.",
+                    "items": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/definitions/SubmissionState"
+                            },
+                            {
+                                "$ref": "#/definitions/CommentState"
+                            }
+                        ]
+                    },
+                    "type": "array"
+                },
+                "kind": {
+                    "description": "The type of action that will be performed",
+                    "enum": [
+                        "dispatch"
+                    ],
+                    "type": "string"
+                },
+                "name": {
+                    "description": "An optional, but highly recommended, friendly name for this Action. If not present will default to `kind`.\n\nCan only contain letters, numbers, underscore, spaces, and dashes",
+                    "examples": [
+                        "myDescriptiveAction"
+                    ],
+                    "pattern": "^[a-zA-Z]([\\w -]*[\\w])?$",
+                    "type": "string"
+                },
+                "onExistingFound": {
+                    "enum": [
+                        "ignore",
+                        "replace",
+                        "skip"
+                    ],
+                    "type": "string"
+                },
+                "target": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "enum": [
+                                    "parent",
+                                    "self"
+                                ],
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "enum": [
+                                "parent",
+                                "self"
+                            ],
+                            "type": "string"
+                        }
+                    ]
+                }
+            },
+            "required": [
+                "delay",
+                "kind",
+                "target"
             ],
             "type": "object"
         },
@@ -3388,22 +3697,16 @@
                     "items": {
                         "anyOf": [
                             {
-                                "$ref": "#/definitions/FlairActionJson"
-                            },
-                            {
-                                "$ref": "#/definitions/UserFlairActionJson"
-                            },
-                            {
                                 "$ref": "#/definitions/CommentActionJson"
-                            },
-                            {
-                                "$ref": "#/definitions/ReportActionJson"
                             },
                             {
                                 "$ref": "#/definitions/LockActionJson"
                             },
                             {
                                 "$ref": "#/definitions/RemoveActionJson"
+                            },
+                            {
+                                "$ref": "#/definitions/ReportActionJson"
                             },
                             {
                                 "$ref": "#/definitions/UserNoteActionJson"
@@ -3418,11 +3721,22 @@
                                 "$ref": "#/definitions/MessageActionJson"
                             },
                             {
+                                "$ref": "#/definitions/UserFlairActionJson"
+                            },
+                            {
+                                "$ref": "#/definitions/DispatchActionJson"
+                            },
+                            {
+                                "$ref": "#/definitions/CancelDispatchActionJson"
+                            },
+                            {
+                                "$ref": "#/definitions/FlairActionJson"
+                            },
+                            {
                                 "type": "string"
                             }
                         ]
                     },
-                    "minItems": 1,
                     "type": "array"
                 },
                 "authorIs": {
@@ -3556,7 +3870,6 @@
                 }
             },
             "required": [
-                "actions",
                 "kind",
                 "name"
             ],
@@ -3582,6 +3895,23 @@
                 "deleted": {
                     "type": "boolean"
                 },
+                "dispatched": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
+                        }
+                    ],
+                    "description": "Test whether the activity is present in dispatched/delayed activities\n\nNOTE: This is DOES NOT mean that THIS activity is from dispatch -- just that it exists there. To test whether THIS activity is from dispatch use `source`\n\n* `true` => activity exists in delayed activities\n* `false` => activity DOES NOT exist in delayed activities\n* `string` => activity exists in delayed activities with given identifier\n* `string[]` => activity exists in delayed activities with any of the given identifiers"
+                },
                 "distinguished": {
                     "type": "boolean"
                 },
@@ -3597,9 +3927,13 @@
                             "type": "array"
                         },
                         {
-                            "type": "string"
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
                         }
-                    ]
+                    ],
+                    "description": "* If `true` then passes if there is ANY flair template id\n* If `false` then passes if there is NO flair template id"
                 },
                 "isRedditMediaDomain": {
                     "description": "Is the submission a reddit-hosted image or video?",
@@ -3617,9 +3951,13 @@
                             "type": "array"
                         },
                         {
-                            "type": "string"
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
                         }
-                    ]
+                    ],
+                    "description": "* If `true` then passes if flair has ANY css\n* If `false` then passes if flair has NO css"
                 },
                 "link_flair_text": {
                     "anyOf": [
@@ -3630,9 +3968,13 @@
                             "type": "array"
                         },
                         {
-                            "type": "string"
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
                         }
-                    ]
+                    ],
+                    "description": "* If `true` then passes if flair has ANY text\n* If `false` then passes if flair has NO text"
                 },
                 "locked": {
                     "type": "boolean"
@@ -3656,6 +3998,20 @@
                     "description": "A string containing a comparison operator and a value to compare against\n\nThe syntax is `(< OR > OR <= OR >=) <number>`\n\n* EX `> 100`  => greater than 100",
                     "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
                     "type": "string"
+                },
+                "source": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "string"
+                        }
+                    ],
+                    "description": "Test where the current activity was sourced from.\n\nA source can be any of:\n\n* `poll` => activity was retrieved from polling a queue (unmoderated, modqueue, etc...)\n* `poll:[pollSource]` => activity was retrieved from specific polling source IE `poll:unmoderated` activity comes from unmoderated queue\n  * valid sources: unmoderated modqueue newComm newSub\n* `dispatch` => activity is from Dispatch Action\n* `dispatch:[identifier]` => activity is from Dispatch Action with specific identifier\n* `user` => activity was from user input (web dashboard)"
                 },
                 "spam": {
                     "type": "boolean"

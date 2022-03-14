@@ -28,6 +28,7 @@ const liveStats = () => {
                 const sd = {
                     queuedActivities: m.queue.length(),
                     runningActivities: m.queue.running(),
+                    delayedItems: m.getDelayedSummary(),
                     maxWorkers: m.queue.concurrency,
                     subMaxWorkers: m.subMaxWorkers || bot.maxWorkers,
                     globalMaxWorkers: bot.maxWorkers,
@@ -37,6 +38,27 @@ const liveStats = () => {
                     },
                     stats: await m.getStats(),
                 }
+                if (m.startedAt !== undefined) {
+                    const dur = dayjs.duration(dayjs().diff(m.startedAt));
+
+                    if (sd.stats.cache.totalRequests > 0) {
+                        const minutes = dur.asMinutes();
+                        if (minutes < 10) {
+                            sd.stats.cache.requestRate = formatNumber((10 / minutes) * sd.stats.cache.totalRequests, {
+                                toFixed: 0,
+                                round: {enable: true, indicate: true}
+                            });
+                        } else {
+                            sd.stats.cache.requestRate = formatNumber(sd.stats.cache.totalRequests / (minutes / 10), {
+                                toFixed: 0,
+                                round: {enable: true, indicate: true}
+                            });
+                        }
+                    } else {
+                        sd.stats.cache.requestRate = 0;
+                    }
+                }
+                subManagerData.push(sd);
             }
 
             const totalStats = subManagerData.reduce((acc, curr) => {
@@ -63,6 +85,8 @@ const liveStats = () => {
                     globalMaxWorkers: acc.globalMaxWorkers + curr.globalMaxWorkers,
                     runningActivities: acc.runningActivities + curr.runningActivities,
                     queuedActivities: acc.queuedActivities + curr.queuedActivities,
+                    // @ts-ignore
+                    delayedItems: acc.delayedItems.concat(curr.delayedItems)
                 };
             }, {
                 checks: {
@@ -87,6 +111,7 @@ const liveStats = () => {
                 globalMaxWorkers: 0,
                 runningActivities: 0,
                 queuedActivities: 0,
+                delayedItems: [],
             });
             const {
                 checks,
@@ -95,6 +120,7 @@ const liveStats = () => {
                 subMaxWorkers,
                 runningActivities,
                 queuedActivities,
+                delayedItems,
                 ...rest
             } = totalStats;
 
@@ -131,6 +157,7 @@ const liveStats = () => {
                 subMaxWorkers,
                 runningActivities,
                 queuedActivities,
+                delayedItems,
                 botState: {
                     state: RUNNING,
                     causedBy: SYSTEM
@@ -184,8 +211,8 @@ const liveStats = () => {
                     startedAt: bot.startedAt.local().format('MMMM D, YYYY h:mm A Z'),
                     running: bot.running,
                     error: bot.error,
-                    ...opStats(bot),
                 },
+                ...allManagerData,
             };
             return res.json(data);
         } else {
@@ -199,6 +226,7 @@ const liveStats = () => {
                 permissions: await manager.getModPermissions(),
                 queuedActivities: manager.queue.length(),
                 runningActivities: manager.queue.running(),
+                delayedItems: manager.getDelayedSummary(),
                 maxWorkers: manager.queue.concurrency,
                 subMaxWorkers: manager.subMaxWorkers || bot.maxWorkers,
                 globalMaxWorkers: bot.maxWorkers,
@@ -218,6 +246,9 @@ const liveStats = () => {
                 startedAt: 'Not Started',
                 startedAtHuman: 'Not Started',
                 delayBy: manager.delayBy === undefined ? 'No' : `Delayed by ${manager.delayBy} sec`,
+                system: {
+                    running: bot.running,
+                }
             };
             // TODO replace indicator data with js on client page
             let indicator;

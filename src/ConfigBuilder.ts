@@ -148,9 +148,9 @@ export class ConfigBuilder {
 
         for(const r of realRuns) {
             for (const c of r.checks) {
-                const {rules = []} = c;
+                const {rules = [], actions = []} = c;
                 namedRules = extractNamedRules(rules, namedRules);
-                namedActions = extractNamedActions(c.actions, namedActions);
+                namedActions = extractNamedActions(actions, namedActions);
             }
         }
 
@@ -164,9 +164,9 @@ export class ConfigBuilder {
 
             const structuredChecks: CheckStructuredJson[] = [];
             for (const c of r.checks) {
-                const {rules = [], authorIs = {}, itemIs = []} = c;
+                const {rules = [], actions = [], authorIs = {}, itemIs = []} = c;
                 const strongRules = insertNamedRules(rules, namedRules);
-                const strongActions = insertNamedActions(c.actions, namedActions);
+                const strongActions = insertNamedActions(actions, namedActions);
 
                 const [derivedAuthorIs, derivedItemIs] = mergeFilters(c, filterCriteriaDefaultsFromRun ?? (filterCriteriaDefaults ?? filterCriteriaDefaultsFromBot));
 

@@ -5,6 +5,7 @@ import {findResultByPremise, mergeArr} from "../util";
 import {checkAuthorFilter, checkItemFilter, SubredditResources} from "../Subreddit/SubredditResources";
 import {ChecksActivityState, FilterResult, TypedActivityState, TypedActivityStates} from "../Common/interfaces";
 import Author, {AuthorCriteria, AuthorOptions} from "../Author/Author";
+import {runCheckOptions} from "../Subreddit/Manager";
 
 export interface RuleOptions {
     name?: string;
@@ -52,7 +53,7 @@ export const isRuleSetResult = (obj: any): obj is RuleSetResult => {
 }
 
 export interface Triggerable {
-    run(item: Comment | Submission, existingResults: RuleResult[]): Promise<[(boolean | null), RuleResult?]>;
+    run(item: Comment | Submission, existingResults: RuleResult[], options: runCheckOptions): Promise<[(boolean | null), RuleResult?]>;
 }
 
 export abstract class Rule implements IRule, Triggerable {
@@ -92,14 +93,14 @@ export abstract class Rule implements IRule, Triggerable {
         this.logger = logger.child({labels: [`Rule ${this.getRuleUniqueName()}`]}, mergeArr);
     }
 
-    async run(item: Comment | Submission, existingResults: RuleResult[] = []): Promise<[(boolean | null), RuleResult]> {
+    async run(item: Comment | Submission, existingResults: RuleResult[] = [], options: runCheckOptions): Promise<[(boolean | null), RuleResult]> {
         try {
             const existingResult = findResultByPremise(this.getPremise(), existingResults);
             if (existingResult) {
                 this.logger.debug(`Returning existing result of ${existingResult.triggered ? '✔️' : '❌'}`);
                 return Promise.resolve([existingResult.triggered, {...existingResult, name: this.name, fromCache: true}]);
             }
-            const [itemPass, itemFilterType, itemFilterResults] = await checkItemFilter(item, this.itemIs, this.resources, this.logger);
+            const [itemPass, itemFilterType, itemFilterResults] = await checkItemFilter(item, this.itemIs, this.resources, this.logger, options.source);
             if (!itemPass) {
                 this.logger.verbose(`(Skipped) Item did not pass 'itemIs' test`);
                 return Promise.resolve([null, this.getResult(null, {result: `Item did not pass 'itemIs' test`})]);

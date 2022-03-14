@@ -3,13 +3,14 @@ import {Logger} from "winston";
 import {SubmissionCheck} from "../Check/SubmissionCheck";
 import {CommentCheck} from "../Check/CommentCheck";
 import {
+    asComment,
     asSubmission,
     cacheStats,
     createHistoricalStatsDisplay,
     createRetryHandler,
     determineNewResults,
     findLastIndex,
-    formatNumber, isSubmission, likelyJson5,
+    formatNumber, getActivityAuthorName, isComment, isSubmission, likelyJson5,
     mergeArr, normalizeName,
     parseFromJsonOrYamlToObject,
     parseRedditEntity,
@@ -23,11 +24,32 @@ import {RuleResult} from "../Rule";
 import {ConfigBuilder, buildPollingOptions} from "../ConfigBuilder";
 import {
     ActionedEvent,
-    ActionResult, CheckResult, CheckSummary,
+    ActionResult,
+    ActivityDispatch,
+    ActivitySource,
+    CheckResult,
+    CheckSummary,
     DEFAULT_POLLING_INTERVAL,
-    DEFAULT_POLLING_LIMIT, FilterCriteriaDefaults, Invokee, LogInfo,
-    ManagerOptions, ManagerStateChangeOption, ManagerStats, NotificationEventPayload, PAUSED,
-    PollingOptionsStrong, PollOn, PostBehavior, PostBehaviorTypes, RUNNING, RunResult, RunState, STOPPED, SYSTEM, USER
+    DEFAULT_POLLING_LIMIT,
+    FilterCriteriaDefaults,
+    Invokee,
+    LogInfo,
+    ManagerOptions,
+    ManagerStateChangeOption,
+    ManagerStats,
+    NotificationEventPayload,
+    PAUSED,
+    PollingOptionsStrong,
+    PollOn,
+    PostBehavior,
+    PostBehaviorTypes, DispatchAudit,
+    DispatchSource,
+    RUNNING,
+    RunResult,
+    RunState,
+    STOPPED,
+    SYSTEM,
+    USER
 } from "../Common/interfaces";
 import Submission from "snoowrap/dist/objects/Submission";
 import {activityIsRemoved, itemContentPeek} from "../Utils/SnoowrapUtils";
@@ -67,11 +89,14 @@ export interface runCheckOptions {
     force?: boolean,
     gotoContext?: string
     maxGotoDepth?: number
+    source: ActivitySource
+    initialGoto?: string
+    dispatchSource?: DispatchAudit
 }
 
 export interface CheckTask {
     activity: (Submission | Comment),
-    options?: runCheckOptions
+    options: runCheckOptions
 }
 
 export interface RuntimeManagerOptions extends ManagerOptions {
@@ -199,6 +224,26 @@ export class Manager extends EventEmitter {
             data.cache.provider = this.resources.cacheType;
         }
         return data;
+    }
+
+    getDelayedSummary = (): any[] => {
+        if(this.resources === undefined) {
+            return [];
+        }
+        return this.resources.delayedItems.map((x) => {
+            return {
+                id: x.id,
+                activityId: x.activity.name,
+                permalink: x.activity.permalink,
+                submissionId: asComment(x.activity) ? x.activity.link_id : undefined,
+                author: getActivityAuthorName(x.activity.author),
+                queuedAt: x.queuedAt,
+                durationMilli: x.duration.asMilliseconds(),
+                duration: x.duration.humanize(),
+                source: `${x.action}${x.identifier !== undefined ? ` (${x.identifier})` : ''}`,
+                subreddit: this.subreddit.display_name_prefixed
+            }
+        });
     }
 
     getCurrentLabels = () => {
@@ -368,8 +413,47 @@ export class Manager extends EventEmitter {
                 this.queuedItemsMeta.push({id: task.activity.id, shouldRefresh: false, state: 'queued'});
                 this.queue.push(task);
             }
+
+            if(!task.options.source.includes('dispatch')) {
+                // check for delayed items to cancel
+                const existingDelayedToCancel = this.resources.delayedItems.filter(x => {
+                    if (x.activity.name === task.activity.name) {
+                        const {cancelIfQueued = false} = x;
+                        if(cancelIfQueued === false) {
+                            return false;
+                        } else if (cancelIfQueued === true) {
+                            return true;
+                        } else {
+                            const cancelFrom = !Array.isArray(cancelIfQueued) ? [cancelIfQueued] : cancelIfQueued;
+                            return cancelFrom.map(x => x.toLowerCase()).includes(task.options.source.toLowerCase());
+                        }
+                    }
+                });
+                if(existingDelayedToCancel.length > 0) {
+                    this.logger.debug(`Cancelling existing delayed activities due to activity being queued from non-dispatch sources: ${existingDelayedToCancel.map((x, index) => `[${index + 1}] Queued At ${dayjs.unix(x.queuedAt).format('YYYY-MM-DD HH:mm:ssZ')} for ${x.duration.humanize()}`).join(' ')}`);
+                    const toCancelIds = existingDelayedToCancel.map(x => x.id);
+                    this.resources.delayedItems.filter(x => !toCancelIds.includes(x.id));
+                }
+            }
         }
         , 1);
+    }
+
+    protected async startDelayQueue() {
+        while(this.queueState.state === RUNNING) {
+            let index = 0;
+            for(const ar of this.resources.delayedItems) {
+                if(!ar.processing && dayjs.unix(ar.queuedAt).add(ar.duration.asMilliseconds(), 'milliseconds').isSameOrBefore(dayjs())) {
+                    this.logger.info(`Delayed Activity ${ar.activity.name} is being queued.`);
+                    const dispatchStr: DispatchSource = ar.identifier === undefined ? 'dispatch' : `dispatch:${ar.identifier}`;
+                    await this.firehose.push({activity: ar.activity, options: {refresh: true, source: dispatchStr, initialGoto: ar.goto, dispatchSource: {id: ar.id, queuedAt: ar.queuedAt, delay: ar.duration.humanize(), action: ar.action, goto: ar.goto, identifier: ar.identifier}}});
+                    this.resources.delayedItems.splice(index, 1, {...ar, processing: true});
+                }
+                index++;
+            }
+            // sleep for 5 seconds
+            await sleep(5000);
+        }
     }
 
     protected generateQueue(maxWorkers: number) {
@@ -387,10 +471,14 @@ export class Manager extends EventEmitter {
                 try {
                     const itemMeta = this.queuedItemsMeta[queuedItemIndex];
                     this.queuedItemsMeta.splice(queuedItemIndex, 1, {...itemMeta, state: 'processing'});
-                    await this.handleActivity(task.activity, {...task.options, refresh: itemMeta.shouldRefresh});
+                    await this.handleActivity(task.activity, {refresh: itemMeta.shouldRefresh, ...task.options});
                 } finally {
                     // always remove item meta regardless of success or failure since we are done with it meow
                     this.queuedItemsMeta.splice(queuedItemIndex, 1);
+                    if(task.options.dispatchSource?.id !== undefined) {
+                        const delayIndex = this.resources.delayedItems.findIndex(x => x.id === task.options.dispatchSource?.id);
+                        this.resources.delayedItems.splice(delayIndex, 1);
+                    }
                 }
             }
             , maxWorkers);
@@ -659,13 +747,13 @@ export class Manager extends EventEmitter {
         }
     }
 
-    async handleActivity(activity: (Submission | Comment), options?: runCheckOptions): Promise<void> {
+    async handleActivity(activity: (Submission | Comment), options: runCheckOptions): Promise<void> {
         const checkType = isSubmission(activity) ? 'Submission' : 'Comment';
         let item = activity;
         const itemId = await item.id;
 
         if(await this.resources.hasRecentSelf(item)) {
-            const {force = false} = options || {};
+            const {force = false} = options;
             let recentMsg = `Found in Activities recently (last ${this.resources.selfTTL} seconds) modified/created by this bot`;
             if(force) {
                 this.logger.debug(`${recentMsg} but will run anyway because "force" option was true.`);
@@ -675,15 +763,24 @@ export class Manager extends EventEmitter {
             }
         }
 
+        const {
+            delayUntil,
+            refresh = false,
+            initialGoto = '',
+            dispatchSource,
+        } = options;
+
         let allRuleResults: RuleResult[] = [];
         const runResults: RunResult[] = [];
-        const itemIdentifier = `${checkType === 'Submission' ? 'SUB' : 'COM'} ${itemId}`;
-        this.currentLabels = [itemIdentifier];
+        const itemIdentifiers = [];
+        itemIdentifiers.push(`${checkType === 'Submission' ? 'SUB' : 'COM'} ${itemId}`);
+        this.currentLabels = itemIdentifiers;
         let ePeek = '';
         try {
             const [peek, { content: peekContent }] = await itemContentPeek(item);
             ePeek = peekContent;
-            this.logger.info(`<EVENT> ${peek}`);
+            const dispatchStr = dispatchSource !== undefined ? ` (Dispatched by ${dispatchSource.action}${dispatchSource.identifier !== undefined ? ` | ${dispatchSource.identifier}` : ''}) ${peek}` : peek;
+            this.logger.info(`<EVENT> ${dispatchStr}`);
         } catch (err: any) {
             this.logger.error(`Error occurred while generating item peek for ${checkType} Activity ${itemId}`, err);
         }
@@ -699,15 +796,11 @@ export class Manager extends EventEmitter {
                 author: item.author.name,
                 subreddit: item.subreddit_name_prefixed
             },
+            dispatchSource: dispatchSource,
             timestamp: Date.now(),
             runResults: []
         }
         const startingApiLimit = this.client.ratelimitRemaining;
-
-        const {
-            delayUntil,
-            refresh = false,
-        } = options || {};
 
         let wasRefreshed = false;
 
@@ -727,7 +820,7 @@ export class Manager extends EventEmitter {
             // refresh signal from firehose if activity was ingested multiple times before processing or re-queued while processing
             // want to make sure we have the most recent data
             if(!wasRefreshed && refresh === true) {
-                this.logger.verbose('Refreshed data (probably due to signal from firehose)');
+                this.logger.verbose(`Refreshed data ${dispatchSource !== undefined ? 'b/c activity is from dispatch' : 'b/c activity was delayed'}`);
                 // @ts-ignore
                 item = await activity.refresh();
             }
@@ -748,7 +841,7 @@ export class Manager extends EventEmitter {
 
             let continueRunIteration = true;
             let runIndex = 0;
-            let gotoContext: string = '';
+            let gotoContext: string = initialGoto;
             while(continueRunIteration && (runIndex < this.runs.length || gotoContext !== '')) {
                 let currRun: Run;
                 if(gotoContext !== '') {
@@ -962,7 +1055,7 @@ export class Manager extends EventEmitter {
                     continue;
                 }
 
-                const onItem = async (item: Comment | Submission) => {
+                const onItem = (source: PollOn) => async (item: Comment | Submission) => {
                     if (item.subreddit.display_name !== subName || this.eventsState.state !== RUNNING) {
                         return;
                     }
@@ -975,7 +1068,7 @@ export class Manager extends EventEmitter {
                         checkType = 'Comment';
                     }
                     if (checkType !== undefined) {
-                        this.firehose.push({activity: item, options: {delayUntil}})
+                        this.firehose.push({activity: item, options: {delayUntil, source: `poll:${source}`}})
                     }
                 };
 
@@ -991,7 +1084,7 @@ export class Manager extends EventEmitter {
                         stream.once('listing', this.noChecksWarning(source));
                         this.logger.debug(`${removedOwn ? 'Stopped own polling and replace with ' : 'Set '}listener on shared polling ${source}`);
                     }
-                    this.sharedStreamCallbacks.set(source, onItem);
+                    this.sharedStreamCallbacks.set(source, onItem(source));
                 } else {
                     let ownPollingMsgParts: string[] = [];
                     let removedShared = false;
@@ -1014,7 +1107,7 @@ export class Manager extends EventEmitter {
 
                     this.logger.debug(`Polling ${source.toUpperCase()} => ${ownPollingMsgParts.join('and')} dedicated stream`);
 
-                    stream.on('item', onItem);
+                    stream.on('item', onItem(source));
                     // @ts-ignore
                     stream.on('error', async (err: any) => {
 
@@ -1062,6 +1155,7 @@ export class Manager extends EventEmitter {
                 state: RUNNING,
                 causedBy
             }
+            this.startDelayQueue();
             if(!suppressNotification) {
                 this.notificationManager.handle('runStateChanged', 'Queue Started', reason, causedBy);
             }

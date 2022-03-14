@@ -6,3 +6,4 @@ src/logs
 .github
 /docs/
 /node_modules/
+coverage
