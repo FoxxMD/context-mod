@@ -17,7 +17,7 @@ import {heartbeat} from "./routes/authenticated/applicationRoutes";
 import logs from "./routes/authenticated/user/logs";
 import status from './routes/authenticated/user/status';
 import liveStats from './routes/authenticated/user/liveStats';
-import {actionedEventsRoute, actionRoute, configRoute, configLocationRoute, deleteInviteRoute, addInviteRoute, getInvitesRoute} from "./routes/authenticated/user";
+import {actionedEventsRoute, actionRoute, configRoute, configLocationRoute, deleteInviteRoute, addInviteRoute, getInvitesRoute, cancelDelayedRoute} from "./routes/authenticated/user";
 import action from "./routes/authenticated/user/action";
 import {authUserCheck, botRoute} from "./middleware";
 import {opStats} from "../Common/util";
@@ -198,6 +198,8 @@ const rcbServer = async function (options: OperatorConfigWithFileContext) {
     server.postAsync('/bot/invite', ...addInviteRoute);
 
     server.deleteAsync('/bot/invite', ...deleteInviteRoute);
+
+    server.deleteAsync('/delayed', ...cancelDelayedRoute);
 
     const initBot = async (causedBy: Invokee = 'system') => {
         if (app !== undefined) {

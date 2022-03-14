@@ -133,3 +133,26 @@ const action = async (req: Request, res: Response) => {
 };
 
 export const actionRoute = [authUserCheck(), botRoute(), booleanMiddle(['dryRun']), action];
+
+const cancelDelayed = async (req: Request, res: Response) => {
+
+    const {id} = req.query as any;
+    const {name: userName} = req.user as Express.User;
+
+    if(req.manager?.resources === undefined) {
+        req.manager?.logger.error('Subreddit does not have delayed items!', {user: userName});
+        return res.status(400).send();
+    }
+
+    const delayedItem = req.manager.resources.delayedItems.find(x => x.id === id);
+    if(delayedItem === undefined) {
+        req.manager?.logger.error(`No delayed items exists with the id ${id}`, {user: userName});
+        return res.status(400).send();
+    }
+
+    req.manager.resources.delayedItems = req.manager.resources.delayedItems.filter(x => x.id !== id);
+    req.manager?.logger.info(`Remove Delayed Item '${delayedItem.id}'`, {user: userName});
+    return res.send('OK');
+};
+
+export const cancelDelayedRoute = [authUserCheck(), botRoute(), subredditRoute(true), cancelDelayed];

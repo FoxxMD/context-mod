@@ -1151,9 +1151,26 @@
                 const delayedItemDivs = sorted.map(x => {
                     const diffUntilNow = x.dispatchAt.diff(now)
                     const durationUntilNow = dayjs.duration(diffUntilNow);
-                    return `<div>A <a href="https://reddit.com${x.permalink}">${x.submissionId !== undefined ? 'Comment' : 'Submssion'}</a>${isAll ? ` in <a href="https://reddit.com${x.subreddit}">${x.subreddit}</a> ` :''} by <a href="https://reddit.com/u/${x.author}">${x.author}</a> queued by ${x.source} at ${dayjs.unix(x.queuedAt).format('HH:mm:ss z')} for ${x.duration} (dispatches in ${durationUntilNow.humanize()})</div>`
+                    const cancelLink = `<a href="#" data-id="${x.id}" data-subreddit="${x.subreddit}" class="delayCancel">CANCEL</a>`;
+                    return `<div>A <a href="https://reddit.com${x.permalink}">${x.submissionId !== undefined ? 'Comment' : 'Submssion'}</a>${isAll ? ` in <a href="https://reddit.com${x.subreddit}">${x.subreddit}</a> ` : ''} by <a href="https://reddit.com/u/${x.author}">${x.author}</a> queued by ${x.source} at ${dayjs.unix(x.queuedAt).format('HH:mm:ss z')} for ${x.duration} (dispatches in ${durationUntilNow.humanize()}) -- ${cancelLink}</div>`;
                 });
                 el.querySelector('.delayedItemsList').insertAdjacentHTML('afterbegin', delayedItemDivs.join(''));
+                el.querySelectorAll('.delayedItemsList .delayCancel').forEach(elm => {
+                    elm.addEventListener('click', e => {
+                        e.preventDefault();
+                        const id = e.target.dataset.id;
+                        const subreddit = e.target.dataset.subreddit;
+                        fetch(`/api/delayed?instance=<%= instanceId %>&bot=${resp.bot}&subreddit=${subreddit}&id=${id}`, {
+                            method: 'DELETE'
+                        }).then((resp) => {
+                            if (!resp.ok) {
+                                console.error('Response was not OK from delay cancel');
+                            } else {
+                                console.log('Removed ok');
+                            }
+                        });
+                    });
+                });
             }
 
             el.querySelector('.allStats .eventsCount').innerHTML = resp.stats.historical.allTime.eventsCheckedTotal;
@@ -1194,7 +1211,7 @@
                 }
             }
 
-            console.log(resp);
+            //console.log(resp);
         });
     });
 
