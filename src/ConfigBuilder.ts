@@ -817,6 +817,7 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
             }
         },
         caching: cache,
+        snoowrap: snoowrapOp,
         userAgent,
         web: {
             port,
