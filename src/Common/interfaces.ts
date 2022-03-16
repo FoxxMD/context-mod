@@ -1485,6 +1485,38 @@ export interface SnoowrapOptions {
      * * ARG => `--snooDebug`
      * */
     debug?: boolean,
+
+    /**
+     * Set the maximum number of times snoowrap will retry a request if it encounters one of the codes specified in either retryErrorCodes or timeoutCodes
+     *
+     * Each retry attempt is delayed by an exponential falloff timer
+     *
+     * @default 2
+     * @examples [2]
+     * */
+    maxRetryAttempts?: number
+
+    /**
+     * Specify the HTTP Status codes that should be valid for retrying a request
+     *
+     * Defaults: 502, 503, 504, 522
+     *
+     * @default [502, 503, 504, 522]
+     * */
+    retryErrorCodes?: number[]
+
+    /**
+     * Specify the error codes that should be valid for retrying a request.
+     *
+     * These are used to make snoowrap retry if a request times out or reddit's api response times out -- which happens occasionally for no reason.
+     *
+     * You most likely do not need to change these. However, if you want snoowrap to always fail on a network issue set this to an empty array
+     *
+     * Defaults: 'ESOCKETTIMEDOUT', 'ETIMEDOUT', 'ECONNRESET'
+     *
+     * @default ['ESOCKETTIMEDOUT', 'ETIMEDOUT', 'ECONNRESET']
+     * */
+    timeoutCodes?: string[]
 }
 
 export type FilterCriteriaDefaultBehavior = 'replace' | 'merge';
@@ -1930,10 +1962,7 @@ export interface BotCredentialsConfig extends ThirdPartyCredentialsJsonConfig {
 
 export interface BotInstanceConfig extends BotInstanceJsonConfig {
     credentials: BotCredentialsJsonConfig
-    snoowrap: {
-        proxy?: string,
-        debug?: boolean,
-    }
+    snoowrap: SnoowrapOptions
     subreddits: {
         names?: string[],
         exclude?: string[],

@@ -15,7 +15,8 @@
     "schema-config": "typescript-json-schema tsconfig.json OperatorJsonConfig --out src/Schema/OperatorConfig.json --required --tsNodeRegister --refs",
     "schemaNotWorking": "./node_modules/.bin/ts-json-schema-generator -f tsconfig.json -p src/JsonConfig.ts -t JSONConfig --out src/Schema/vegaSchema.json",
     "circular": "madge --circular --extensions ts src/index.ts",
-    "circular-graph": "madge --image graph.svg --circular --extensions ts src/index.ts"
+    "circular-graph": "madge --image graph.svg --circular --extensions ts src/index.ts",
+    "postinstall": "patch-package"
   },
   "engines": {
     "node": ">=15"
@@ -69,6 +70,7 @@
     "passport": "^0.4.1",
     "passport-custom": "^1.1.1",
     "passport-jwt": "^4.0.0",
+    "patch-package": "^6.4.7",
     "pixelmatch": "^5.2.1",
     "pony-cause": "^1.1.1",
     "pretty-print-json": "^1.0.3",
