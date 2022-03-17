@@ -1,6 +1,4 @@
-import {Entity, Column, PrimaryGeneratedColumn, ManyToOne, PrimaryColumn, OneToMany, OneToOne} from "typeorm";
-import {Author} from "./Author";
-import {ActionedEvent} from "./ActionedEvent";
+import {Entity, Column, PrimaryColumn, OneToMany} from "typeorm";
 import {Activity} from "./Activity";
 
 @Entity()

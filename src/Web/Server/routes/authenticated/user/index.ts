@@ -6,7 +6,7 @@ import {COMMENT_URL_ID, parseLinkIdentifier, SUBMISSION_URL_ID} from "../../../.
 import {booleanMiddle} from "../../../../Common/middleware";
 import {Manager} from "../../../../../Subreddit/Manager";
 import {ActionedEvent} from "../../../../../Common/interfaces";
-import {ActionedEvent as ActionedEventEntity} from "../../../../../Common/Entities/ActionedEvent";
+import {CMEvent as ActionedEventEntity} from "../../../../../Common/Entities/CMEvent";
 
 const commentReg = parseLinkIdentifier([COMMENT_URL_ID]);
 const submissionReg = parseLinkIdentifier([SUBMISSION_URL_ID]);

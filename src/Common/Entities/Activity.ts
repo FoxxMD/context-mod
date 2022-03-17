@@ -1,7 +1,7 @@
 import {Entity, Column, PrimaryGeneratedColumn, ManyToOne, PrimaryColumn, OneToMany, OneToOne} from "typeorm";
 import {Author} from "./Author";
-import {ActionedEvent} from "./ActionedEvent";
 import {Subreddit} from "./Subreddit";
+import {CMEvent} from "./CMEvent";
 
 @Entity()
 export class Activity {
@@ -24,8 +24,8 @@ export class Activity {
     @ManyToOne(type => Author, author => author.activities, {cascade: ['insert']})
     author!: Author;
 
-    @OneToMany(type => ActionedEvent, act => act.activity) // note: we will create author property in the Photo class below
-    actionedEvents!: ActionedEvent[]
+    @OneToMany(type => CMEvent, act => act.activity) // note: we will create author property in the Photo class below
+    actionedEvents!: CMEvent[]
 
     @ManyToOne(type => Activity, obj => obj.comments, {nullable: true})
     submission!: Activity;

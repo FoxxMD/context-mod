@@ -10,6 +10,7 @@ import {ExtendedSnoowrap} from '../Utils/SnoowrapClients';
 import {ErrorWithCause} from "pony-cause";
 import EventEmitter from "events";
 import {runCheckOptions} from "../Subreddit/Manager";
+import {ActionTypes} from "../Common/types";
 
 export abstract class Action {
     name?: string;
@@ -164,7 +165,7 @@ export interface ActionJson extends ActionConfig {
     /**
      * The type of action that will be performed
      */
-    kind: 'comment' | 'lock' | 'remove' | 'report' | 'approve' | 'ban' | 'flair' | 'usernote' | 'message' | 'userflair' | 'dispatch' | 'cancelDispatch'
+    kind: ActionTypes
 }
 
 export const isActionJson = (obj: object): obj is ActionJson => {

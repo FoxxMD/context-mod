@@ -1,6 +1,10 @@
-import {Entity, Column, PrimaryGeneratedColumn, ManyToOne} from "typeorm";
-import {ActionedEvent} from "./ActionedEvent";
+import {Entity, Column, PrimaryGeneratedColumn, ManyToOne, OneToOne} from "typeorm";
 import {RulePremise} from "./RulePremise";
+import {Action} from "./Action";
+import {ActivityStateFilterResult} from "./FilterCriteria/ActivityStateFilterResult";
+import {AuthorFilterResult} from "./FilterCriteria/AuthorFilterResult";
+import {CheckResult} from "./CheckResult";
+import {ActionResult as IActionResult} from "../interfaces";
 
 @Entity()
 export class ActionResult {
@@ -8,11 +12,8 @@ export class ActionResult {
     @PrimaryGeneratedColumn()
     id!: number;
 
-    @Column("varchar", {length: 50})
-    kind!: string;
-
-    @Column("varchar", {length: 200, nullable: true})
-    name!: string | undefined;
+    @ManyToOne(type => Action, act => act.results, {cascade: ['insert']})
+    action!: Action;
 
     @Column("boolean")
     run!: boolean;
@@ -24,11 +25,17 @@ export class ActionResult {
     success!: boolean;
 
     @Column("text", {nullable: true})
-    runReason!: string | undefined
+    runReason?: string
 
     @Column("text", {nullable: true})
-    result!: string | undefined
+    result?: string
 
-    @ManyToOne(type => ActionedEvent, act => act.actionResults)
-    actionedEvent!: ActionedEvent;
+    @OneToOne(() => ActivityStateFilterResult, {nullable: true})
+    itemIs?: ActivityStateFilterResult
+
+    @OneToOne(() => AuthorFilterResult, {nullable: true})
+    authorIs?: AuthorFilterResult
+
+    @ManyToOne(type => CheckResult, act => act.actionResults, {cascade: ['insert']})
+    checkResult!: CheckResult;
 }

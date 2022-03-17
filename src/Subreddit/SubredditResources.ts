@@ -84,7 +84,7 @@ import {Activity} from "../Common/Entities/Activity";
 import {Subreddit as SubredditEntity} from "../Common/Entities/Subreddit";
 import {Author} from "../Common/Entities/Author";
 import {RulePremise} from "../Common/Entities/RulePremise";
-import {ActionedEvent as ActionedEventEntity } from "../Common/Entities/ActionedEvent";
+import {CMEvent as ActionedEventEntity } from "../Common/Entities/CMEvent";
 import {RuleResult} from "../Common/Entities/RuleResult";
 import {ActionResult} from "../Common/Entities/ActionResult";
 import globrex from 'globrex';

@@ -3,17 +3,17 @@
    "autoSave": true,
    "location": "database.sqlite",
    "synchronize": true,
-   "logging": false,
+   "logging": "all",
    "entities": [
       "src/Common/Entities/**/*.js"
    ],
    "migrations": [
-      "src/Common/Migrations/**/*.js"
+      "src/Common/Migrations/Database/**/*.js"
    ],
    "subscribers": [],
    "cli": {
       "entitiesDir": "src/Common/Entities",
-      "migrationsDir": "src/Common/Migrations",
+      "migrationsDir": "src/Common/Migrations/Database",
       "subscribersDir": "src/Common/Subscriptions"
    }
 }
