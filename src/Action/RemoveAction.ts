@@ -52,6 +52,12 @@ export class RemoveAction extends Action {
             touchedEntities
         }
     }
+
+    protected getSpecificPremise(): object {
+        return {
+            spam: this.spam
+        }
+    }
 }
 
 export interface RemoveOptions extends RemoveActionConfig, ActionOptions {

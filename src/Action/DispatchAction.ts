@@ -122,6 +122,13 @@ export class DispatchAction extends Action {
             result,
         }
     }
+
+    protected getSpecificPremise(): object {
+        return {
+            dispatchData: this.dispatchData,
+            targets: this.targets
+        }
+    }
 }
 
 export interface DispatchOptions extends DispatchActionConfig, ActionOptions {

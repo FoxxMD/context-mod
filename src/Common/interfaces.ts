@@ -2085,6 +2085,7 @@ export interface LogInfo {
 }
 
 export interface ActionResult extends ActionProcessResult {
+    premise: ObjectPremise
     kind: string,
     name: string,
     run: boolean,
@@ -2433,3 +2434,8 @@ export type NonDispatchActivitySource = 'poll' | `poll:${PollOn}` | 'user';
  *
  * */
 export type ActivitySource = NonDispatchActivitySource | DispatchSource;
+
+export interface ObjectPremise {
+    kind: string
+    config: object
+}

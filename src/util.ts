@@ -1,7 +1,7 @@
 import winston, {Logger} from "winston";
 import jsonStringify from 'safe-stable-stringify';
 import dayjs, {Dayjs, OpUnitType} from 'dayjs';
-import {FormattedRuleResult, isRuleSetResult, RulePremise, RuleResult, RuleSetResult, UserNoteCriteria} from "./Rule";
+import {FormattedRuleResult, isRuleSetResult, RuleResult, RuleSetResult, UserNoteCriteria} from "./Rule";
 import deepEqual from "fast-deep-equal";
 import {Duration} from 'dayjs/plugin/duration.js';
 import Ajv from "ajv";
@@ -31,7 +31,7 @@ import {
     ImageDetection, ItemCritPropHelper,
     //ImageDownloadOptions,
     LogInfo,
-    NamedGroup,
+    NamedGroup, ObjectPremise,
     OperatorJsonConfig,
     PollingOptionsStrong,
     RedditEntity,
@@ -311,7 +311,7 @@ export function sleep(ms: number) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-export const findResultByPremise = (premise: RulePremise, results: RuleResult[]): (RuleResult | undefined) => {
+export const findResultByPremise = (premise: ObjectPremise, results: RuleResult[]): (RuleResult | undefined) => {
     if (results.length === 0) {
         return undefined;
     }

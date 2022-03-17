@@ -67,6 +67,16 @@ export class BanAction extends Action {
             touchedEntities
         };
     }
+
+    protected getSpecificPremise(): object {
+        return {
+            message: this.message,
+            duration: this.duration,
+            reason: this.reason,
+            note: this.note,
+            footer: this.footer
+        }
+    }
 }
 
 export interface BanActionConfig extends ActionConfig, Footer {

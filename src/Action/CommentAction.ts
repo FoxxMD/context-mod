@@ -86,6 +86,16 @@ export class CommentAction extends Action {
             touchedEntities,
         };
     }
+
+    protected getSpecificPremise(): object {
+        return {
+            content: this.content,
+            lock: this.lock,
+            sticky: this.sticky,
+            distinguish: this.distinguish,
+            footer: this.footer
+        }
+    }
 }
 
 export interface CommentActionConfig extends RequiredRichContent, Footer {

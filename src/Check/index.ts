@@ -452,6 +452,7 @@ export abstract class Check implements ICheck {
                 runActions.push({
                     kind: a.getKind(),
                     name: a.getActionUniqueName(),
+                    premise: a.getPremise(),
                     run: false,
                     success: false,
                     runReason: 'Not enabled',

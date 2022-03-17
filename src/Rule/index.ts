@@ -3,7 +3,13 @@ import Submission from "snoowrap/dist/objects/Submission";
 import {Logger} from "winston";
 import {findResultByPremise, mergeArr} from "../util";
 import {checkAuthorFilter, checkItemFilter, SubredditResources} from "../Subreddit/SubredditResources";
-import {ChecksActivityState, FilterResult, TypedActivityState, TypedActivityStates} from "../Common/interfaces";
+import {
+    ChecksActivityState,
+    FilterResult,
+    ObjectPremise,
+    TypedActivityState,
+    TypedActivityStates
+} from "../Common/interfaces";
 import Author, {AuthorCriteria, AuthorOptions} from "../Author/Author";
 import {runCheckOptions} from "../Subreddit/Manager";
 
@@ -17,18 +23,13 @@ export interface RuleOptions {
     client: Snoowrap
 }
 
-export interface RulePremise {
-    kind: string
-    config: object
-}
-
 interface ResultContext {
     result?: string
     data?: any
 }
 
 export interface RuleResult extends ResultContext {
-    premise: RulePremise
+    premise: ObjectPremise
     kind: string
     name: string
     triggered: (boolean | null)
@@ -132,7 +133,7 @@ export abstract class Rule implements IRule, Triggerable {
 
     protected abstract getSpecificPremise(): object;
 
-    getPremise(): RulePremise {
+    getPremise(): ObjectPremise {
         const config = this.getSpecificPremise();
         return {
             kind: this.getKind(),

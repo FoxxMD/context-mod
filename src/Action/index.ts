@@ -2,7 +2,13 @@ import {Comment, Submission} from "snoowrap";
 import {Logger} from "winston";
 import {RuleResult} from "../Rule";
 import {checkAuthorFilter, checkItemFilter, SubredditResources} from "../Subreddit/SubredditResources";
-import {ActionProcessResult, ActionResult, ChecksActivityState, TypedActivityStates} from "../Common/interfaces";
+import {
+    ActionProcessResult,
+    ActionResult,
+    ChecksActivityState,
+    ObjectPremise,
+    TypedActivityStates
+} from "../Common/interfaces";
 import Author, {AuthorOptions} from "../Author/Author";
 import {mergeArr} from "../util";
 import LoggedError from "../Utils/LoggedError";
@@ -64,6 +70,20 @@ export abstract class Action {
         return this.name === this.getKind() ? this.getKind() : `${this.getKind()} - ${this.name}`;
     }
 
+    protected abstract getSpecificPremise(): object;
+
+    getPremise(): ObjectPremise {
+        const config = this.getSpecificPremise();
+        return {
+            kind: this.getKind(),
+            config: {
+                authorIs: this.authorIs,
+                itemIs: this.itemIs,
+                ...config,
+            },
+        };
+    }
+
     async handle(item: Comment | Submission, ruleResults: RuleResult[], options: runCheckOptions): Promise<ActionResult> {
         const {dryRun: runtimeDryrun} = options;
         const dryRun = runtimeDryrun || this.dryRun;
@@ -74,6 +94,7 @@ export abstract class Action {
             run: false,
             dryRun,
             success: false,
+            premise: this.getPremise(),
         };
         try {
             const [itemPass, itemFilterType, itemFilterResults] = await checkItemFilter(item, this.itemIs, this.resources, this.logger, options.source);

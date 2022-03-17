@@ -68,6 +68,14 @@ export class FlairAction extends Action {
             result: flairSummary
         }
     }
+
+    protected getSpecificPremise(): object {
+        return {
+            text: this.text,
+            css: this.css,
+            flair_template_id: this.flair_template_id
+        }
+    }
 }
 
 /**

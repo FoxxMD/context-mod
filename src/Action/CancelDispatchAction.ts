@@ -117,6 +117,13 @@ export class CancelDispatchAction extends Action {
             result: cancelledActivities.length === 0 ? 'No Dispatch Actions cancelled' : `Cancelled Dispatch Actions: ${cancelledActivities.join(', ')}`,
         }
     }
+
+    protected getSpecificPremise(): object {
+        return {
+            identifiers: this.identifiers,
+            targets: this.targets,
+        }
+    }
 }
 
 export interface CancelDispatchOptions extends CancelDispatchActionConfig, ActionOptions {

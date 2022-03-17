@@ -37,6 +37,10 @@ export class LockAction extends Action {
             touchedEntities
         }
     }
+
+    protected getSpecificPremise(): object {
+        return {};
+    }
 }
 
 export interface LockActionConfig extends ActionConfig {

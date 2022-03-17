@@ -1,4 +1,4 @@
-import {Rule, RuleJSONConfig, RuleOptions, RulePremise, RuleResult} from "./index";
+import {Rule, RuleJSONConfig, RuleOptions, RuleResult} from "./index";
 import {VoteableContent} from "snoowrap";
 import Submission from "snoowrap/dist/objects/Submission";
 import Comment from "snoowrap/dist/objects/Comment";

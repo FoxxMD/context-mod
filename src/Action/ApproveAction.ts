@@ -73,6 +73,12 @@ export class ApproveAction extends Action {
             touchedEntities
         }
     }
+
+    protected getSpecificPremise(): object {
+        return {
+            targets: this.targets
+        }
+    }
 }
 
 export interface ApproveOptions extends ApproveActionConfig, ActionOptions {}

@@ -46,6 +46,12 @@ export class ReportAction extends Action {
             touchedEntities
         };
     }
+
+    protected getSpecificPremise(): object {
+        return {
+            content: this.content
+        }
+    }
 }
 
 export interface ReportActionConfig extends RichContent {

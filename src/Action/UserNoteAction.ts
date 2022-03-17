@@ -61,6 +61,14 @@ export class UserNoteAction extends Action {
             result: `(${this.type}) ${renderedContent}`
         }
     }
+
+    protected getSpecificPremise(): object {
+        return {
+            content: this.content,
+            type: this.type,
+            allowDuplicate: this.allowDuplicate
+        }
+    }
 }
 
 export interface UserNoteActionConfig extends ActionConfig,UserNoteJson {

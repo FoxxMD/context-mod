@@ -98,6 +98,19 @@ export class MessageAction extends Action {
             result: truncateStringToLength(200)(msgPreview)
         }
     }
+
+    protected getSpecificPremise(): object {
+        return {
+            content: this.content,
+            lock: this.lock,
+            sticky: this.sticky,
+            distinguish: this.distinguish,
+            footer: this.footer,
+            title: this.title,
+            to: this.to,
+            asSubreddit: this.asSubreddit
+        }
+    }
 }
 
 export interface MessageActionConfig extends RequiredRichContent, Footer {
