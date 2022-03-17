@@ -15,11 +15,16 @@ import {BanActionJson} from "../Action/BanAction";
 import {RegexRuleJSONConfig} from "../Rule/RegexRule";
 import {MessageActionJson} from "../Action/MessageAction";
 import {RepostRuleJSONConfig} from "../Rule/RepostRule";
+import {DispatchActionJson} from "../Action/DispatchAction";
+import {CancelDispatchActionJson} from "../Action/CancelDispatchAction";
+import {SafeDictionary} from "ts-essentials";
+import {FilterCriteriaPropertyResult} from "./interfaces";
+import {AuthorCriteria} from "../Author/Author";
 
 export type RuleJson = RecentActivityRuleJSONConfig | RepeatActivityJSONConfig | AuthorRuleJSONConfig | AttributionJSONConfig | HistoryJSONConfig | RegexRuleJSONConfig | RepostRuleJSONConfig | string;
 export type RuleObjectJson = Exclude<RuleJson, string>
 
-export type ActionJson = CommentActionJson | FlairActionJson | ReportActionJson | LockActionJson | RemoveActionJson | ApproveActionJson | BanActionJson | UserNoteActionJson | MessageActionJson | UserFlairActionJson | string;
+export type ActionJson = CommentActionJson | FlairActionJson | ReportActionJson | LockActionJson | RemoveActionJson | ApproveActionJson | BanActionJson | UserNoteActionJson | MessageActionJson | UserFlairActionJson | DispatchActionJson | CancelDispatchActionJson | string;
 export type ActionObjectJson = Exclude<ActionJson, string>;
 
 // borrowed from https://github.com/jabacchetta/set-random-interval/blob/master/src/index.ts
@@ -28,3 +33,8 @@ export type SetRandomInterval = (
     minDelay: number,
     maxDelay: number,
 ) => { clear: () => void };
+
+export type ConfigFormat = 'json' | 'yaml';
+
+export type AuthorCritPropHelper = SafeDictionary<FilterCriteriaPropertyResult<AuthorCriteria>, keyof AuthorCriteria>;
+export type RequiredAuthorCrit = Required<AuthorCriteria>;

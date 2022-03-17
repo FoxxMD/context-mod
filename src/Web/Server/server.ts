@@ -14,20 +14,22 @@ import {
 } from "../../util";
 import {getLogger} from "../../Utils/loggerFactory";
 import LoggedError from "../../Utils/LoggedError";
-import {Invokee, LogInfo, OperatorConfig} from "../../Common/interfaces";
+import {Invokee, LogInfo, OperatorConfigWithFileContext, RUNNING, STOPPED} from "../../Common/interfaces";
 import http from "http";
-import SimpleError from "../../Utils/SimpleError";
 import {heartbeat} from "./routes/authenticated/applicationRoutes";
 import logs from "./routes/authenticated/user/logs";
 import status from './routes/authenticated/user/status';
-import {actionedEventsRoute, actionRoute, configRoute, configLocationRoute, deleteInviteRoute, addInviteRoute, getInvitesRoute} from "./routes/authenticated/user";
+import liveStats from './routes/authenticated/user/liveStats';
+import {actionedEventsRoute, actionRoute, configRoute, configLocationRoute, deleteInviteRoute, addInviteRoute, getInvitesRoute, cancelDelayedRoute} from "./routes/authenticated/user";
 import action from "./routes/authenticated/user/action";
 import {authUserCheck, botRoute} from "./middleware";
 import {opStats} from "../Common/util";
 import Bot from "../../Bot";
 import addBot from "./routes/authenticated/user/addBot";
-import dayjs from "dayjs";
 import ServerUser from "../Common/User/ServerUser";
+import {SimpleError} from "../../Utils/Errors";
+import {ErrorWithCause} from "pony-cause";
+import {Manager} from "../../Subreddit/Manager";
 
 const server = addAsync(express());
 server.use(bodyParser.json());
@@ -44,13 +46,9 @@ declare module 'express-session' {
     }
 }
 
-const subLogMap: Map<string, LogEntry[]> = new Map();
-const systemLogs: LogEntry[] = [];
-const botLogMap: Map<string, Map<string, LogEntry[]>> = new Map();
+let sysLogs: LogInfo[] = [];
 
-const botSubreddits: Map<string, string[]> = new Map();
-
-const rcbServer = async function (options: OperatorConfig) {
+const rcbServer = async function (options: OperatorConfigWithFileContext) {
 
     const {
         operator: {
@@ -70,36 +68,12 @@ const rcbServer = async function (options: OperatorConfig) {
     const logger = getLogger({...options.logging});
 
     logger.stream().on('log', (log: LogInfo) => {
-        const logEntry: LogEntry = [dayjs(log.timestamp).unix(), log];
 
         const {bot: botName, subreddit: subName} = log;
 
-        if(botName === undefined) {
-            systemLogs.unshift(logEntry);
-            systemLogs.slice(0, 201);
-        } else {
-            const botLog = botLogMap.get(botName) || new Map();
-
-            if(subName === undefined) {
-                const appLogs = botLog.get('app') || [];
-                appLogs.unshift(logEntry);
-                botLog.set('app', appLogs.slice(0, 200 + 1));
-            } else {
-                let botSubs = botSubreddits.get(botName) || [];
-                if(app !== undefined && (botSubs.length === 0 || !botSubs.includes(subName))) {
-                    const b = app.bots.find(x => x.botName === botName);
-                    if(b !== undefined) {
-                        botSubs = b.subManagers.map(x => x.displayLabel);
-                        botSubreddits.set(botName, botSubs);
-                    }
-                }
-                if(botSubs.length === 0 || botSubs.includes(subName)) {
-                    const subLogs = botLog.get(subName) || [];
-                    subLogs.unshift(logEntry);
-                    botLog.set(subName, subLogs.slice(0, 200 + 1));
-                }
-            }
-            botLogMap.set(botName, botLog);
+        if(botName === undefined && subName === undefined) {
+            sysLogs.unshift(log);
+            sysLogs = sysLogs.slice(0, 201);
         }
     })
 
@@ -114,9 +88,7 @@ const rcbServer = async function (options: OperatorConfig) {
         httpServer = await server.listen(port);
         io = new SocketServer(httpServer);
     } catch (err: any) {
-        logger.error('Error occurred while initializing web or socket.io server', err);
-        err.logged = true;
-        throw err;
+        throw new ErrorWithCause('[Server] Error occurred while initializing web or socket.io server', {cause: err});
     }
 
     logger.info(`API started => localhost:${port}`);
@@ -166,7 +138,7 @@ const rcbServer = async function (options: OperatorConfig) {
 
     server.getAsync('/heartbeat', ...heartbeat({name, display, friendly}));
 
-    server.getAsync('/logs', ...logs(subLogMap));
+    server.getAsync('/logs', ...logs());
 
     server.getAsync('/stats', [authUserCheck(), botRoute(false)], async (req: Request, res: Response) => {
         let bots: Bot[] = [];
@@ -176,19 +148,41 @@ const rcbServer = async function (options: OperatorConfig) {
             bots = req.user.accessibleBots(req.botApp.bots);
         }
         const resp = [];
+        let index = 1;
         for(const b of bots) {
-            resp.push({name: b.botName, data: await opStats(b)});
+            resp.push({name: b.botName ?? `Bot ${index}`, data: {
+                    status: b.running ? 'RUNNING' : 'NOT RUNNING',
+                    indicator: b.running ? 'green' : 'red',
+                    running: b.running,
+                    startedAt: b.startedAt.local().format('MMMM D, YYYY h:mm A Z'),
+                    error: b.error,
+                    subreddits: req.user?.accessibleSubreddits(b).map((manager: Manager) => {
+                        let indicator;
+                        if (manager.botState.state === RUNNING && manager.queueState.state === RUNNING && manager.eventsState.state === RUNNING) {
+                            indicator = 'green';
+                        } else if (manager.botState.state === STOPPED && manager.queueState.state === STOPPED && manager.eventsState.state === STOPPED) {
+                            indicator = 'red';
+                        } else {
+                            indicator = 'yellow';
+                        }
+                        return {
+                            name: manager.displayLabel,
+                            indicator,
+                        };
+                    }),
+                }});
+            index++;
         }
         return res.json(resp);
     });
     const passLogs = async (req: Request, res: Response, next: Function) => {
         // @ts-ignore
-        req.botLogs = botLogMap;
-        // @ts-ignore
-        req.systemLogs = systemLogs;
+        req.sysLogs = sysLogs;
         next();
     }
     server.getAsync('/status', passLogs, ...status())
+
+    server.getAsync('/liveStats', ...liveStats())
 
     server.getAsync('/config', ...configRoute);
 
@@ -200,13 +194,15 @@ const rcbServer = async function (options: OperatorConfig) {
 
     server.getAsync('/check', ...actionRoute);
 
-    server.getAsync('/addBot', ...addBot());
+    server.postAsync('/bot', ...addBot());
 
     server.getAsync('/bot/invite', ...getInvitesRoute);
 
     server.postAsync('/bot/invite', ...addInviteRoute);
 
     server.deleteAsync('/bot/invite', ...deleteInviteRoute);
+
+    server.deleteAsync('/delayed', ...cancelDelayedRoute);
 
     app = new App(options);
 

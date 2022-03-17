@@ -7,21 +7,17 @@
     "experimentalDecorators": true,
     "typeRoots": [
       "./node_modules/@types",
-      "./src/Web/types"
+      "./src/Web/types",
+      "./src/Common/typings"
     ]
   },
-//  "compilerOptions": {
-//    "module": "es6",
-//    "moduleResolution": "node",
-//    "target": "es6",
-//    "sourceMap": true,
-//    "allowSyntheticDefaultImports": true
-//  },
   "include": [
     "**/*.ts",
     "**/*.tsx"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "coverage",
+    "tests/*.ts"
   ]
 }

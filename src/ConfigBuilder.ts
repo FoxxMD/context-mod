@@ -1,12 +1,12 @@
 import {Logger} from "winston";
 import {
     buildCacheOptionsFromProvider, buildCachePrefix,
-    createAjvFactory,
-    mergeArr,
+    createAjvFactory, fileOrDirectoryIsWriteable,
+    mergeArr, mergeFilters,
     normalizeName,
     overwriteMerge,
-    parseBool, randomId,
-    readConfigFile,
+    parseBool, parseFromJsonOrYamlToObject, randomId,
+    readConfigFile, removeFromSourceIfKeysExistsInDestination,
     removeUndefinedKeys
 } from "./util";
 import {CommentCheck} from "./Check/CommentCheck";
@@ -35,11 +35,11 @@ import {
     RedditCredentials,
     BotCredentialsJsonConfig,
     BotCredentialsConfig,
-    FilterCriteriaDefaults, TypedActivityStates
+    FilterCriteriaDefaults, TypedActivityStates, OperatorFileConfig, PostBehavior
 } from "./Common/interfaces";
 import {isRuleSetJSON, RuleSetJson, RuleSetObjectJson} from "./Rule/RuleSet";
 import deepEqual from "fast-deep-equal";
-import {ActionJson, ActionObjectJson, RuleJson, RuleObjectJson} from "./Common/types";
+import {ActionJson, ActionObjectJson, ConfigFormat, RuleJson, RuleObjectJson} from "./Common/types";
 import {isActionJson} from "./Action";
 import {getLogger} from "./Utils/loggerFactory";
 import {GetEnvVars} from 'env-cmd';
@@ -50,6 +50,17 @@ import {cacheOptDefaults, cacheTTLDefaults, filterCriteriaDefault} from "./Commo
 import objectHash from "object-hash";
 import {AuthorCriteria, AuthorOptions} from "./Author/Author";
 import {createDatabaseConfig, createDatabaseConnection} from "./Utils/databaseUtils";
+import path from 'path';
+import {
+    JsonOperatorConfigDocument,
+    OperatorConfigDocumentInterface,
+    YamlOperatorConfigDocument
+} from "./Common/Config/Operator";
+import {ConfigDocumentInterface} from "./Common/Config/AbstractConfigDocument";
+import {Document as YamlDocument} from "yaml";
+import {SimpleError} from "./Utils/Errors";
+import {ErrorWithCause} from "pony-cause";
+import {RunStructuredJson} from "./Run";
 
 export interface ConfigBuilderOptions {
     logger: Logger,
@@ -121,49 +132,66 @@ export class ConfigBuilder {
         return validConfig as JSONConfig;
     }
 
-    parseToStructured(config: JSONConfig, filterCriteriaDefaultsFromBot?: FilterCriteriaDefaults): CheckStructuredJson[] {
+    parseToStructured(config: JSONConfig, filterCriteriaDefaultsFromBot?: FilterCriteriaDefaults, postCheckBehaviorDefaultsFromBot: PostBehavior = {}): RunStructuredJson[] {
         let namedRules: Map<string, RuleObjectJson> = new Map();
         let namedActions: Map<string, ActionObjectJson> = new Map();
-        const {checks = [], filterCriteriaDefaults} = config;
-        for (const c of checks) {
-            const {rules = []} = c;
-            namedRules = extractNamedRules(rules, namedRules);
-            namedActions = extractNamedActions(c.actions, namedActions);
+        const {checks = [], runs = [], filterCriteriaDefaults, postCheckBehaviorDefaults} = config;
+
+        if(checks.length > 0 && runs.length > 0) {
+            // cannot have both checks and runs at top-level
+            throw new Error(`Subreddit configuration cannot contain both 'checks' and 'runs' at top-level.`);
         }
 
-        const filterDefs = filterCriteriaDefaults ?? filterCriteriaDefaultsFromBot;
-        const {
-            authorIsBehavior = 'merge',
-            itemIsBehavior = 'merge',
-            authorIs: authorIsDefault = {},
-            itemIs: itemIsDefault = []
-        } = filterDefs || {};
-
-        const structuredChecks: CheckStructuredJson[] = [];
-        for (const c of checks) {
-            const {rules = [], authorIs = {}, itemIs = []} = c;
-            const strongRules = insertNamedRules(rules, namedRules);
-            const strongActions = insertNamedActions(c.actions, namedActions);
-
-            let derivedAuthorIs: AuthorOptions = authorIsDefault;
-            if(authorIsBehavior === 'merge') {
-                derivedAuthorIs = merge.all([authorIs, authorIsDefault], {arrayMerge: overwriteMerge});
-            } else if(Object.keys(authorIs).length > 0) {
-                derivedAuthorIs = authorIs;
-            }
-
-            let derivedItemIs: TypedActivityStates = itemIsDefault;
-            if(itemIsBehavior === 'merge') {
-                derivedItemIs = [...itemIs, ...itemIsDefault];
-            } else if(itemIs.length > 0) {
-                derivedItemIs = itemIs;
-            }
-
-            const strongCheck = {...c, authorIs: derivedAuthorIs, itemIs: derivedItemIs, rules: strongRules, actions: strongActions} as CheckStructuredJson;
-            structuredChecks.push(strongCheck);
+        const realRuns  = runs;
+        if(checks.length > 0) {
+            realRuns.push({name: 'Run1', checks: checks});
         }
 
-        return structuredChecks;
+        for(const r of realRuns) {
+            for (const c of r.checks) {
+                const {rules = [], actions = []} = c;
+                namedRules = extractNamedRules(rules, namedRules);
+                namedActions = extractNamedActions(actions, namedActions);
+            }
+        }
+
+        const structuredRuns: RunStructuredJson[] = [];
+
+        for(const r of realRuns) {
+
+            const {filterCriteriaDefaults: filterCriteriaDefaultsFromRun, postFail, postTrigger, authorIs, itemIs } = r;
+
+            const [derivedRunAuthorIs, derivedRunItemIs] = mergeFilters(r, filterCriteriaDefaults ?? filterCriteriaDefaultsFromBot);
+
+            const structuredChecks: CheckStructuredJson[] = [];
+            for (const c of r.checks) {
+                const {rules = [], actions = [], authorIs = {}, itemIs = []} = c;
+                const strongRules = insertNamedRules(rules, namedRules);
+                const strongActions = insertNamedActions(actions, namedActions);
+
+                const [derivedAuthorIs, derivedItemIs] = mergeFilters(c, filterCriteriaDefaultsFromRun ?? (filterCriteriaDefaults ?? filterCriteriaDefaultsFromBot));
+
+                const postCheckBehaviors = Object.assign({}, postCheckBehaviorDefaultsFromBot, removeUndefinedKeys({postFail, postTrigger}));
+
+                const strongCheck = {
+                    ...c,
+                    authorIs: derivedAuthorIs,
+                    itemIs: derivedItemIs,
+                    rules: strongRules,
+                    actions: strongActions,
+                    ...postCheckBehaviors
+                } as CheckStructuredJson;
+                structuredChecks.push(strongCheck);
+            }
+            structuredRuns.push({
+                ...r,
+                checks: structuredChecks,
+                authorIs: derivedRunAuthorIs,
+                itemIs: derivedRunItemIs
+            });
+        }
+
+        return structuredRuns;
     }
 }
 
@@ -322,7 +350,7 @@ export const parseDefaultBotInstanceFromArgs = (args: any): BotInstanceJsonConfi
             heartbeatInterval: heartbeat,
         },
         polling: {
-            shared: sharedMod ? ['unmoderated','modqueue'] : undefined,
+            shared: sharedMod ? ['unmoderated', 'modqueue'] : undefined,
         },
         nanny: {
             softLimit,
@@ -359,7 +387,16 @@ export const parseOpConfigFromArgs = (args: any): OperatorJsonConfig => {
         },
         logging: {
             level: logLevel,
-            path: logDir === true ? `${process.cwd()}/logs` : undefined,
+            file: {
+                level: logLevel,
+                dirName: logDir,
+            },
+            stream: {
+                level: logLevel,
+            },
+            console: {
+                level: logLevel,
+            }
         },
         caching: {
             provider: caching,
@@ -425,7 +462,7 @@ export const parseDefaultBotInstanceFromEnv = (): BotInstanceJsonConfig => {
             heartbeatInterval: process.env.HEARTBEAT !== undefined ? parseInt(process.env.HEARTBEAT) : undefined,
         },
         polling: {
-            shared: parseBool(process.env.SHARE_MOD) ? ['unmoderated','modqueue'] : undefined,
+            shared: parseBool(process.env.SHARE_MOD) ? ['unmoderated', 'modqueue'] : undefined,
         },
         nanny: {
             softLimit: process.env.SOFT_LIMIT !== undefined ? parseInt(process.env.SOFT_LIMIT) : undefined,
@@ -443,9 +480,17 @@ export const parseOpConfigFromEnv = (): OperatorJsonConfig => {
             display: process.env.OPERATOR_DISPLAY
         },
         logging: {
-            // @ts-ignore
             level: process.env.LOG_LEVEL,
-            path: process.env.LOG_DIR === 'true' ? `${process.cwd()}/logs` : undefined,
+            file: {
+                level: process.env.LOG_LEVEL,
+                dirname: process.env.LOG_DIR,
+            },
+            stream: {
+                level: process.env.LOG_LEVEL,
+            },
+            console: {
+                level: process.env.LOG_LEVEL,
+            }
         },
         caching: {
             provider: {
@@ -471,9 +516,9 @@ export const parseOpConfigFromEnv = (): OperatorJsonConfig => {
             },
         },
         credentials: {
-          youtube: {
-              apiKey: process.env.YOUTUBE_API_KEY
-          }
+            youtube: {
+                apiKey: process.env.YOUTUBE_API_KEY
+            }
         }
     }
 
@@ -486,12 +531,26 @@ export const parseOpConfigFromEnv = (): OperatorJsonConfig => {
 // Actual ENVs (from environment)
 // json config
 // args from cli
-export const parseOperatorConfigFromSources = async (args: any): Promise<OperatorJsonConfig> => {
-    const {logLevel = process.env.LOG_LEVEL, logDir = process.env.LOG_DIR || false} = args || {};
+export const parseOperatorConfigFromSources = async (args: any): Promise<[OperatorJsonConfig, OperatorFileConfig]> => {
+    const {logLevel = process.env.LOG_LEVEL ?? 'debug', logDir = process.env.LOG_DIR} = args || {};
     const envPath = process.env.OPERATOR_ENV;
+    const initLoggerOptions = {
+        level: logLevel,
+        console: {
+            level: logLevel
+        },
+        file: {
+            level: logLevel,
+            dirname: logDir,
+        },
+        stream: {
+            level: logLevel
+        }
+    }
 
     // create a pre config logger to help with debugging
-    const initLogger = getLogger({logLevel, logDir: logDir === true ? `${process.cwd()}/logs` : logDir}, 'init');
+    // default to debug if nothing is provided
+    const initLogger = getLogger(initLoggerOptions, 'init');
 
     try {
         const vars = await GetEnvVars({
@@ -517,25 +576,80 @@ export const parseOperatorConfigFromSources = async (args: any): Promise<Operato
         //swallow silently for now 😬
     }
 
-    const {operatorConfig = process.env.OPERATOR_CONFIG} = args;
+    const {operatorConfig = (process.env.OPERATOR_CONFIG ?? path.resolve(__dirname, '../config.yaml'))} = args;
     let configFromFile: OperatorJsonConfig = {};
-    if (operatorConfig !== undefined) {
-        let rawConfig;
-        try {
-            rawConfig = await readConfigFile(operatorConfig, {log: initLogger}) as object;
-        } catch (err: any) {
-            initLogger.error('Cannot continue app startup because operator config file was not parseable.');
-            err.logged = true;
-            throw err;
+    let fileConfigFormat: ConfigFormat | undefined = undefined;
+    let fileConfig: object = {};
+    let rawConfig: string = '';
+    let configDoc: YamlOperatorConfigDocument | JsonOperatorConfigDocument;
+    let writeable = false;
+    try {
+        writeable = await fileOrDirectoryIsWriteable(operatorConfig);
+    } catch (e) {
+        initLogger.warn(`Issue while parsing operator config file location: ${e} \n This is only a problem if you do not have a config file but are planning on adding bots interactively.`);
+    }
+
+    try {
+        const [rawConfigValue, format] = await readConfigFile(operatorConfig, {log: initLogger});
+        rawConfig = rawConfigValue ?? '';
+        fileConfigFormat = format as ConfigFormat;
+    } catch (err: any) {
+        const {code} = err;
+        if (code === 'ENOENT') {
+            initLogger.warn('No operator config file found but will continue');
+            if (err.extension !== undefined) {
+                fileConfigFormat = err.extension
+            }
+        } else {
+            throw new ErrorWithCause('Cannot continue app startup because operator config file exists but was not parseable.', {cause: err});
         }
+    }
+    const [format, doc, jsonErr, yamlErr] = parseFromJsonOrYamlToObject(rawConfig, {
+        location: operatorConfig,
+        jsonDocFunc: (content, location) => new JsonOperatorConfigDocument(content, location),
+        yamlDocFunc: (content, location) => new YamlOperatorConfigDocument(content, location)
+    });
+
+
+    if (format !== undefined && fileConfigFormat === undefined) {
+        fileConfigFormat = 'yaml';
+    }
+
+    if (doc === undefined && rawConfig !== '') {
+        initLogger.error(`Could not parse file contents at ${operatorConfig} as JSON or YAML (likely it is ${fileConfigFormat}):`);
+        initLogger.error(jsonErr);
+        initLogger.error(yamlErr);
+        throw new SimpleError(`Could not parse file contents at ${operatorConfig} as JSON or YAML`);
+    } else if (doc === undefined && rawConfig === '') {
+        // create an empty doc
+        if(fileConfigFormat === 'json') {
+            configDoc = new JsonOperatorConfigDocument('{}', operatorConfig);
+        } else {
+            configDoc = new YamlOperatorConfigDocument('', operatorConfig);
+            configDoc.parsed = new YamlDocument({});
+        }
+        configFromFile = {};
+    } else {
+        configDoc = doc as (YamlOperatorConfigDocument | JsonOperatorConfigDocument);
+
         try {
-            configFromFile = validateJson(rawConfig, operatorSchema, initLogger) as OperatorJsonConfig;
-            const {bots = []} = configFromFile || {};
-            for(const b of bots) {
-                const {polling: {
-                    sharedMod
-                } = {}} = b;
-                if(sharedMod !== undefined) {
+            configFromFile = validateJson(configDoc.toJS(), operatorSchema, initLogger) as OperatorJsonConfig;
+            const {
+                bots = [],
+                logging: {
+                    path = undefined
+                } = {}
+            } = configFromFile || {};
+            if(path !== undefined) {
+                initLogger.warn(`'path' property in top-level 'logging' object is DEPRECATED and will be removed in next minor version. Use 'logging.file.dirname' instead`);
+            }
+            for (const b of bots) {
+                const {
+                    polling: {
+                        sharedMod
+                    } = {}
+                } = b;
+                if (sharedMod !== undefined) {
                     initLogger.warn(`'sharedMod' bot config property is DEPRECATED and will be removed in next minor version. Use 'shared' property instead (see docs)`);
                     break;
                 }
@@ -545,6 +659,7 @@ export const parseOperatorConfigFromSources = async (args: any): Promise<Operato
             throw err;
         }
     }
+
     const opConfigFromArgs = parseOpConfigFromArgs(args);
     const opConfigFromEnv = parseOpConfigFromEnv();
 
@@ -564,14 +679,21 @@ export const parseOperatorConfigFromSources = async (args: any): Promise<Operato
         defaultBotInstance.caching = configFromFile.caching;
     }
 
-    let botInstances = [];
+    let botInstances: BotInstanceJsonConfig[] = [];
     if (botInstancesFromFile.length === 0) {
-        botInstances = [defaultBotInstance];
+        // only add default bot if user supplied any credentials
+        // otherwise its most likely just default, empty settings
+        if(defaultBotInstance.credentials !== undefined) {
+            botInstances = [defaultBotInstance];
+        }
     } else {
         botInstances = botInstancesFromFile.map(x => merge.all([defaultBotInstance, x], {arrayMerge: overwriteMerge}));
     }
 
-    return removeUndefinedKeys({...mergedConfig, bots: botInstances}) as OperatorJsonConfig;
+    return [removeUndefinedKeys({...mergedConfig, bots: botInstances}) as OperatorJsonConfig, {
+        document: configDoc,
+        isWriteable: writeable
+    }];
 }
 
 export const buildOperatorConfigWithDefaults = async (data: OperatorJsonConfig): Promise<OperatorConfig> => {
@@ -584,8 +706,12 @@ export const buildOperatorConfigWithDefaults = async (data: OperatorJsonConfig):
         logging: {
             level = 'verbose',
             path,
+            file = {},
+            console = {},
+            stream = {},
         } = {},
         caching: opCache,
+        userAgent,
         databaseConfig: {
             connection: dbConnection = 'sqljs',
             migrations = {},
@@ -661,176 +787,28 @@ export const buildOperatorConfigWithDefaults = async (data: OperatorJsonConfig):
         }
     }
 
-    const loggingOptions = {
-        level,
-        path
-    };
+    const defaultOperators = typeof name === 'string' ? [name] : name;
 
-    const logger = getLogger(loggingOptions);
+    const {
+        dirname = path,
+        ...fileRest
+    } = file;
+
+     const defaultWebCredentials = {
+         redirectUri: 'http://localhost:8085/callback'
+     };
+
+    // const loggingOptions = {
+    //     level,
+    //     path
+    // };
+    //
+    // const logger = getLogger(loggingOptions);
 
     const dbConfig = createDatabaseConfig(dbConnection);
 
     const database = await createDatabaseConnection(dbConfig);
 
-    let hydratedBots: BotInstanceConfig[] = bots.map(x => {
-        const {
-            name: botName,
-            filterCriteriaDefaults = filterCriteriaDefault,
-            polling: {
-                sharedMod,
-                shared = [],
-                stagger,
-                limit = 100,
-                interval = 30,
-            } = {},
-            queue: {
-                maxWorkers = 1,
-            } = {},
-            caching,
-            nanny: {
-                softLimit = 250,
-                hardLimit = 50
-            } = {},
-            snoowrap = snoowrapOp,
-            credentials = {},
-            subreddits: {
-                names = [],
-                exclude = [],
-                wikiConfig = 'botconfig/contextbot',
-                dryRun,
-                heartbeatInterval = 300,
-            } = {},
-        } = x;
-
-        let botCache: StrongCache;
-        let botActionedEventsDefault: number;
-
-        if (caching === undefined) {
-
-            botCache = {
-                ...cacheTTLDefaults,
-                actionedEventsDefault: opActionedEventsDefault,
-                actionedEventsMax: opActionedEventsMax,
-                provider: {...defaultProvider}
-            };
-        } else {
-            const {
-                provider,
-                actionedEventsMax = opActionedEventsMax,
-                actionedEventsDefault = opActionedEventsDefault,
-                ...restConfig
-            } = caching;
-
-            botActionedEventsDefault = actionedEventsDefault;
-            if (actionedEventsMax !== undefined) {
-                botActionedEventsDefault = Math.min(actionedEventsDefault, actionedEventsMax);
-            }
-
-            if (typeof provider === 'string') {
-                botCache = {
-                    ...cacheTTLDefaults,
-                    ...restConfig,
-                    actionedEventsDefault: botActionedEventsDefault,
-                    provider: {
-                        store: provider as CacheProvider,
-                        ...cacheOptDefaults
-                    }
-                }
-            } else {
-                const {ttl = 60, max = 500, store = 'memory', ...rest} = provider || {};
-                botCache = {
-                    ...cacheTTLDefaults,
-                    ...restConfig,
-                    actionedEventsDefault: botActionedEventsDefault,
-                    actionedEventsMax,
-                    provider: {
-                        store,
-                        ...cacheOptDefaults,
-                        ...rest,
-                    },
-                }
-            }
-        }
-
-        let botCreds: BotCredentialsConfig;
-
-        if((credentials as any).clientId !== undefined) {
-            const creds = credentials as RedditCredentials;
-            const {
-                clientId: ci,
-                clientSecret: cs,
-                ...restCred
-            } = creds;
-            botCreds = {
-                reddit: {
-                        clientId: (ci as string),
-                        clientSecret: (cs as string),
-                        ...restCred,
-                }
-            }
-        } else {
-            const creds = credentials as BotCredentialsJsonConfig;
-            const {
-                reddit: {
-                    clientId: ci,
-                    clientSecret: cs,
-                    ...restRedditCreds
-                },
-                ...rest
-            } = creds;
-            botCreds = {
-                reddit: {
-                    clientId: (ci as string),
-                    clientSecret: (cs as string),
-                    ...restRedditCreds,
-                },
-                ...rest
-            }
-        }
-
-        if (botCache.provider.prefix === undefined || botCache.provider.prefix === defaultProvider.prefix) {
-            // need to provide unique prefix to bot
-            botCache.provider.prefix = buildCachePrefix([botCache.provider.prefix, 'bot', (botName || objectHash.sha1(botCreds))]);
-        }
-
-        let realShared = shared === true ? ['unmoderated','modqueue','newComm','newSub'] : shared;
-        if(sharedMod === true) {
-            realShared.push('unmoderated');
-            realShared.push('modqueue');
-        }
-
-        return {
-            name: botName,
-            snoowrap,
-            filterCriteriaDefaults,
-            subreddits: {
-                names,
-                exclude,
-                wikiConfig,
-                heartbeatInterval,
-                dryRun,
-            },
-            credentials: botCreds,
-            database,
-            caching: botCache,
-            polling: {
-                shared: [...new Set(realShared)] as PollOn[],
-                stagger,
-                limit,
-                interval,
-            },
-            queue: {
-                maxWorkers,
-            },
-            nanny: {
-                softLimit,
-                hardLimit
-            }
-        }
-
-    });
-
-    const defaultOperators = typeof name === 'string' ? [name] : name;
 
     const config: OperatorConfig = {
         mode,
@@ -838,13 +816,30 @@ export const buildOperatorConfigWithDefaults = async (data: OperatorJsonConfig):
             name: defaultOperators,
             display,
         },
-        logging: loggingOptions,
+        logging: {
+            level,
+            file: {
+                level: level,
+                dirname,
+                ...fileRest,
+            },
+            stream: {
+                level: level,
+                ...stream,
+            },
+            console: {
+                level: level,
+                ...console,
+            }
+        },
         caching: cache,
+        snoowrap: snoowrapOp,
+        database,
         databaseConfig: {
             connection: dbConfig,
             migrations,
         },
-        database,
+        userAgent,
         web: {
             port,
             caching: {
@@ -860,7 +855,7 @@ export const buildOperatorConfigWithDefaults = async (data: OperatorJsonConfig):
             },
             maxLogs,
             clients: clients === undefined ? [{host: 'localhost:8095', secret: apiSecret}] : clients,
-            credentials: webCredentials as RequiredWebRedditCredentials,
+            credentials: {...defaultWebCredentials, ...webCredentials} as RequiredWebRedditCredentials,
             operators: operators || defaultOperators,
         },
         api: {
@@ -868,9 +863,185 @@ export const buildOperatorConfigWithDefaults = async (data: OperatorJsonConfig):
             secret: apiSecret,
             friendly
         },
-        bots: hydratedBots,
+        bots: [],
         credentials,
     };
 
+    config.bots = bots.map(x => buildBotConfig(x, config));
+
     return config;
+}
+
+export const buildBotConfig = (data: BotInstanceJsonConfig, opConfig: OperatorConfig): BotInstanceConfig => {
+    const {
+        snoowrap: snoowrapOp,
+        caching: {
+            actionedEventsMax: opActionedEventsMax,
+            actionedEventsDefault: opActionedEventsDefault = 25,
+            provider: defaultProvider,
+        } = {},
+        userAgent,
+        database,
+    } = opConfig;
+    const {
+        name: botName,
+        filterCriteriaDefaults = filterCriteriaDefault,
+        postCheckBehaviorDefaults,
+        polling: {
+            sharedMod,
+            shared = [],
+            stagger,
+            limit = 100,
+            interval = 30,
+        } = {},
+        queue: {
+            maxWorkers = 1,
+        } = {},
+        caching,
+        nanny: {
+            softLimit = 250,
+            hardLimit = 50
+        } = {},
+        snoowrap = snoowrapOp,
+        flowControlDefaults,
+        credentials = {},
+        subreddits: {
+            overrides = [],
+            names = [],
+            exclude = [],
+            wikiConfig = 'botconfig/contextbot',
+            dryRun,
+            heartbeatInterval = 300,
+        } = {},
+    } = data;
+
+    let botCache: StrongCache;
+    let botActionedEventsDefault: number;
+
+    if (caching === undefined) {
+
+        botCache = {
+            ...cacheTTLDefaults,
+            actionedEventsDefault: opActionedEventsDefault,
+            actionedEventsMax: opActionedEventsMax,
+            provider: {...defaultProvider as CacheOptions}
+        };
+    } else {
+        const {
+            provider,
+            actionedEventsMax = opActionedEventsMax,
+            actionedEventsDefault = opActionedEventsDefault,
+            ...restConfig
+        } = caching;
+
+        botActionedEventsDefault = actionedEventsDefault;
+        if (actionedEventsMax !== undefined) {
+            botActionedEventsDefault = Math.min(actionedEventsDefault, actionedEventsMax);
+        }
+
+        if (typeof provider === 'string') {
+            botCache = {
+                ...cacheTTLDefaults,
+                ...restConfig,
+                actionedEventsDefault: botActionedEventsDefault,
+                provider: {
+                    store: provider as CacheProvider,
+                    ...cacheOptDefaults
+                }
+            }
+        } else {
+            const {ttl = 60, max = 500, store = 'memory', ...rest} = provider || {};
+            botCache = {
+                ...cacheTTLDefaults,
+                ...restConfig,
+                actionedEventsDefault: botActionedEventsDefault,
+                actionedEventsMax,
+                provider: {
+                    store,
+                    ...cacheOptDefaults,
+                    ...rest,
+                },
+            }
+        }
+    }
+
+    let botCreds: BotCredentialsConfig;
+
+    if ((credentials as any).clientId !== undefined) {
+        const creds = credentials as RedditCredentials;
+        const {
+            clientId: ci,
+            clientSecret: cs,
+            ...restCred
+        } = creds;
+        botCreds = {
+            reddit: {
+                clientId: (ci as string),
+                clientSecret: (cs as string),
+                ...restCred,
+            }
+        }
+    } else {
+        const creds = credentials as BotCredentialsJsonConfig;
+        const {
+            reddit: {
+                clientId: ci,
+                clientSecret: cs,
+                ...restRedditCreds
+            },
+            ...rest
+        } = creds;
+        botCreds = {
+            reddit: {
+                clientId: (ci as string),
+                clientSecret: (cs as string),
+                ...restRedditCreds,
+            },
+            ...rest
+        }
+    }
+
+    if (botCache.provider.prefix === undefined || botCache.provider.prefix === (defaultProvider as CacheOptions).prefix) {
+        // need to provide unique prefix to bot
+        botCache.provider.prefix = buildCachePrefix([botCache.provider.prefix, 'bot', (botName || objectHash.sha1(botCreds))]);
+    }
+
+    let realShared = shared === true ? ['unmoderated', 'modqueue', 'newComm', 'newSub'] : shared;
+    if (sharedMod === true) {
+        realShared.push('unmoderated');
+        realShared.push('modqueue');
+    }
+
+    return {
+        name: botName,
+        snoowrap: snoowrap || {},
+        flowControlDefaults,
+        filterCriteriaDefaults,
+        postCheckBehaviorDefaults,
+        database,
+        subreddits: {
+            names,
+            exclude,
+            wikiConfig,
+            heartbeatInterval,
+            dryRun,
+            overrides,
+        },
+        credentials: botCreds,
+        caching: botCache,
+        userAgent,
+        polling: {
+            shared: [...new Set(realShared)] as PollOn[],
+            stagger,
+            limit,
+            interval,
+        },
+        queue: {
+            maxWorkers,
+        },
+        nanny: {
+            softLimit,
+            hardLimit
+        }
+    }
 }

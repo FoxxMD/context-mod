@@ -9,6 +9,19 @@
         <div class="grid">
             <div class="">
                 <div class="pb-6 md:px-7">
+                    <% if(isOperator) { %>
+                        <div class="sub" data-bot="system" data-subreddit="All">
+                            <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-3 gap-5">
+                            </div>
+                            <br/>
+                            <%- include('partials/loadingIcon') %>
+                            <div data-subreddit="All" class="logs font-mono text-sm">
+                                <% system.logs.forEach(function (logEntry){ %>
+                                    <%- logEntry %>
+                                <% }) %>
+                            </div>
+                        </div>
+                    <% } %>
                     <% bots.forEach(function (bot){ %>
                         <% bot.subreddits.forEach(function (data){ %>
                         <div class="sub <%= bot.system.running ? '' : 'offline' %>" data-subreddit="<%= data.name %>" data-bot="<%= bot.system.name %>">
@@ -68,7 +81,7 @@
                                                         </span>
                                                 </label>
                                                 <div class="flex items-center justify-between">
-                                                    <span class="font-semibold"><%= `${data.botState.state}${data.botState.causedBy === 'system' ? '' : ' (user)'}` %></span>
+                                                    <span class="font-semibold botState"><%= `${data.botState.state}${data.botState.causedBy === 'system' ? '' : ' (user)'}` %></span>
                                                     <div class="flex items-center flex-end">
                                                         <div>
                                                             <a class="action" data-action="start" data-type="bot"
@@ -101,7 +114,7 @@
                                                         </span>
                                                 </label>
                                                 <div class="flex items-center justify-between">
-                                                    <span class="font-semibold"><%= `${data.queueState.state}${data.queueState.causedBy === 'system' ? '' : ' (user)'}` %></span>
+                                                    <span class="font-semibold queueState"><%= `${data.queueState.state}${data.queueState.causedBy === 'system' ? '' : ' (user)'}` %></span>
                                                     <div class="flex items-center flex-end">
                                                         <div>
                                                             <a class="action" data-action="start" data-type="queue"
@@ -135,7 +148,7 @@
                                                         </span>
                                                 </label>
                                                 <div class="flex items-center justify-between">
-                                                    <span class="font-semibold"><%= `${data.eventsState.state}${data.eventsState.causedBy === 'system' ? '' : ' (user)'}` %></span>
+                                                    <span class="font-semibold eventsState"><%= `${data.eventsState.state}${data.eventsState.causedBy === 'system' ? '' : ' (user)'}` %></span>
                                                     <div class="flex items-center flex-end">
                                                         <div>
                                                             <a class="action" data-action="start" data-type="event"
@@ -147,12 +160,25 @@
                                                         </div>
                                                     </div>
                                                 </div>
+                                                <label>Mod Perms</label>
+                                                <span class="has-tooltip">
+                                                    <span class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2'>
+                                                        <span>
+                                                            <ul class="list-inside list-disc modPermissionsList">
+                                                                <% data.permissions.forEach(function (i){ %>
+                                                                    <li class="font-mono"><%= i %></li>
+                                                                <% }) %>
+                                                            </ul>
+                                                        </span>
+                                                    </span>
+                                                    <span class="cursor-help underline modPermissionsCount" style="text-decoration-style: dotted"><%= data.permissions.length %></span>
+                                                </span>
                                                 <label>Slow Mode</label>
-                                                <span><%= data.delayBy %></span>
+                                                <span class="delayBy"><%= data.delayBy %></span>
                                             <% } %>
                                             <% if (data.name === 'All') { %>
                                                     <label>Status</label>
-                                                    <span class="font-semibold"><%= bot.system.running ? 'ONLINE' : 'OFFLINE' %></span>
+                                                    <span class="font-semibold botStatus"><%= bot.system.running ? 'ONLINE' : 'OFFLINE' %></span>
                                                     <label>Account</label>
                                                     <span><a href="https://reddit.com/<%= bot.system.account %>"><%= bot.system.account %></a></span>
                                                 <label>Uptime</label>
@@ -204,16 +230,38 @@
                                                     </span>
                                                 </span>
                                             </label>
-                                            <span><%= `${data.runningActivities} Processing / ${data.queuedActivities} Queued` %></span>
+                                                <span>
+                                                    <span class="runningActivities"><%= data.runningActivities %></span> Processing /
+                                                    <span class="queuedActivities"><%= data.queuedActivities %></span> Queued /
+                                                    <span class="has-tooltip">
+                                                        <span style="margin-top:35px"
+                                                              class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2 space-y-3 p-2 text-left delayedItemsList'>
+                                                        </span>
+                                                    <span class="underline" style="text-decoration-style: dotted"><span class="delayedItemsCount"><%= data.delayedItems.length %></span> Delayed</span>
+                                                    </span>
+                                                </span>
                                                 <label>Operated By</label>
                                                 <span><%= operatorDisplay %></span>
                                             <% if (data.name === 'All' && isOperator) { %>
                                                 <label>Operators</label>
                                                 <span><%= operators %></span>
+                                                <label>Oauth Scopes</label>
+                                                    <span class="has-tooltip">
+                                                    <span class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2'>
+                                                        <span>
+                                                            <ul class="list-inside list-disc">
+                                                                <% data.scopes.forEach(function (i){ %>
+                                                                    <li class="font-mono"><%= i %></li>
+                                                                <% }) %>
+                                                            </ul>
+                                                        </span>
+                                                    </span>
+                                                    <span class="cursor-help underline" style="text-decoration-style: dotted"><%= data.scopes.length %></span>
+                                                </span>
                                             <% } else %>
                                         </div>
                                         <% if (data.name !== 'All') { %>
-                                            <ul class="list-disc list-inside mt-4">
+                                            <ul class="list-disc list-inside mt-4 pollingInfo">
                                                 <% data.pollingInfo.forEach(function (i){ %>
                                                     <li>Polling <%- i %></li>
                                                 <% }) %>
@@ -231,7 +279,7 @@
                                                 <label>Soft Limit</label>
                                                 <span>< <span id="softLimit"><%= data.softLimit %></span></span>
                                                 <label>Hard Limit</label>
-                                                <span>< <span id="softLimit"><%= data.hardLimit %></span></span>
+                                                <span>< <span id="hardLimit"><%= data.hardLimit %></span></span>
                                                 <label>Api Nanny</label>
                                                 <span><b><span id="nannyMode"><%= data.nannyMode %></span></b></span>
                                                 <label>Api Usage</label>
@@ -285,38 +333,36 @@
                                     <div class="bg-white shadow-md rounded my-3 bg-gray-600 ">
                                         <div class="space-x-4 px-4 p-2 leading-2 font-semibold bg-gray-700 ">
                                             <h4>Config
-                                                <span>
                                                     <span class="has-tooltip">
-                                                    <span class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2'>
+                                                    <span class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2 wikiRevision'>
                                                         <%= data.wikiRevision %>
                                                     </span>
-                                                    (Revised <%= data.wikiRevisionHuman %>)
+                                                        (Revised <span class="wikiRevisionHuman"><%= data.wikiRevisionHuman %></span>)
                                                 </span>
                                             </h4>
                                         </div>
                                         <div class="p-4">
                                             <div class="stats">
                                                 <label>Valid</label>
-                                                <span class="font-semibold"><%= data.validConfig %></span>
+                                                <span class="font-semibold validConfig"><%= data.validConfig %></span>
                                                 <label>Checks</label>
-                                                <span><%= data.checks.submissions %> Submission | <%= data.checks.comments %> Comment </span>
+                                                <span><span class="submissionCheckCount"><%= data.checks.submissions %></span> Submission | <span class="commentCheckCount"><%= data.checks.comments %></span> Comment </span>
                                                 <label>Dry Run</label>
                                                 <span><%= data.dryRun %></span>
                                                 <label>Updated</label>
                                                 <span class="has-tooltip">
-                                                    <span class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2'>
+                                                    <span class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2 startedAt'>
                                                         <%= data.startedAt %>
                                                     </span>
-                                                    <%= data.startedAtHuman %>
-                                                </span>
+                                                    <span class="startedAtHuman"><%= data.startedAtHuman %></span>
                                                 </span>
                                                 <label>Checked</label>
                                                 <span>
                                                 <span class="has-tooltip">
-                                                    <span class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2'>
+                                                    <span class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2 wikiLastCheck'>
                                                         <%= data.wikiLastCheck %>
                                                     </span>
-                                                    <%= data.wikiLastCheckHuman %>
+                                                    <span class="wikiLastCheckHuman"><%= data.wikiLastCheckHuman %></span>
                                                 </span>
                                                     <a class="action" data-action="reload"
                                                        data-subreddit="<%= data.name %>"
@@ -353,7 +399,7 @@
                                                     <div data-subreddit="<%= data.name %>"
                                                          class="stats botStats reloadStats mb-2">
                                                         <label>Events</label>
-                                                        <span>
+                                                        <span class="eventsCount">
                                                             <%= data.stats.historical.lastReload.eventsCheckedTotal === undefined ? '-' : data.stats.historical.lastReload.eventsCheckedTotal %>
                                                         </span>
                                                         <label>Checks</label>
@@ -361,7 +407,7 @@
                                                         <span class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2'>
                                                             <span><%= data.stats.historical.lastReload.checksTriggeredTotal %></span> Triggered / <span><%= data.stats.historical.lastReload.checksRunTotal %></span> Run / <span><%= data.stats.historical.lastReload.checksFromCacheTotal %></span> Cached
                                                         </span>
-                                                        <span class="cursor-help underline" style="text-decoration-style: dotted"><%= data.stats.historical.lastReload.checksTriggeredTotal %> Triggered</span>
+                                                            <span class="cursor-help underline" style="text-decoration-style: dotted"><span class="checksCount"><%= data.stats.historical.lastReload.checksTriggeredTotal %></span> Triggered</span>
                                                     </span>
 
                                                         <label>Rules</label>
@@ -370,16 +416,16 @@
                                                         <span><%= data.stats.historical.lastReload.rulesTriggeredTotal %></span> Triggered / <span><%= data.stats.historical.lastReload.rulesCachedTotal %></span> Cached / <span><%= data.stats.historical.lastReload.rulesRunTotal %></span> Run
                                                     </span>
                                                     <span class="cursor-help cursor-help underline" style="text-decoration-style: dotted">
-                                                        <span><%= data.stats.historical.lastReload.rulesTriggeredTotal %></span> Triggered</span>
+                                                        <span class="rulesCount"><%= data.stats.historical.lastReload.rulesTriggeredTotal %></span> Triggered</span>
                                                 </span>
 
                                                         <label>Actions</label>
-                                                        <span><%= data.stats.historical.lastReload.actionsRunTotal === undefined ? '0' : data.stats.historical.lastReload.actionsRunTotal %> Run</span>
+                                                        <span><span class="actionsCount"><%= data.stats.historical.lastReload.actionsRunTotal === undefined ? '0' : data.stats.historical.lastReload.actionsRunTotal %></span> Run</span>
                                                     </div>
                                                 <% } %>
                                                 <div data-subreddit="<%= data.name %>" class="stats botStats allStats mb-2">
                                                     <label>Events</label>
-                                                    <span>
+                                                    <span class="eventsCount">
                                                         <%= data.stats.historical.allTime.eventsCheckedTotal %>
                                                     </span>
                                                     <label>Checks</label>
@@ -387,7 +433,7 @@
                                                         <span class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2'>
                                                             <span><%= data.stats.historical.allTime.checksTriggeredTotal %></span> Triggered / <span><%= data.stats.historical.allTime.checksRunTotal %></span> Run / <span><%= data.stats.historical.allTime.checksFromCacheTotal %></span> Cached
                                                         </span>
-                                                        <span class="cursor-help underline" style="text-decoration-style: dotted"><%= data.stats.historical.allTime.checksTriggeredTotal %> Triggered</span>
+                                                        <span class="cursor-help underline" style="text-decoration-style: dotted"><span class="checksCount"><%= data.stats.historical.allTime.checksTriggeredTotal %></span> Triggered</span>
                                                     </span>
 
                                                     <label>Rules</label>
@@ -395,12 +441,12 @@
                                                         <span class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2'>
                                                             <span><%= data.stats.historical.allTime.rulesTriggeredTotal %></span> Triggered / <span><%= data.stats.historical.allTime.rulesCachedTotal %></span> Cached / <span><%= data.stats.historical.allTime.rulesRunTotal %></span> Run
                                                         </span>
-                                                        <span class="cursor-help underline" style="text-decoration-style: dotted"><span><%= data.stats.historical.allTime.rulesTriggeredTotal %></span> Triggered</span>
+                                                        <span class="cursor-help underline" style="text-decoration-style: dotted"><span class="rulesCount"><%= data.stats.historical.allTime.rulesTriggeredTotal %></span> Triggered</span>
                                                     </span>
 
                                                     <label>Actions</label>
                                                     <span>
-                                                        <span><%= data.stats.historical.allTime.actionsRunTotal === undefined ? '0' : data.stats.historical.allTime.actionsRunTotal %> Run</span>
+                                                        <span><span class="actionsCount"><%= data.stats.historical.allTime.actionsRunTotal === undefined ? '0' : data.stats.historical.allTime.actionsRunTotal %></span> Run</span>
                                                     </span>
                                                 </div>
                                                 <% if (data.name !== 'All') { %>
@@ -638,6 +684,54 @@
 </div>
 <%- include('partials/instanceTabJs') %>
 <%- include('partials/logSettingsJs') %>
+<script src="https://unpkg.com/autolinker@3.14.3/dist/Autolinker.min.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/dayjs@1.10.7/dayjs.min.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/dayjs@1.10.7/plugin/advancedFormat.js"></script>
+<script src="https://unpkg.com/dayjs@1.10.7/plugin/timezone.js"></script>
+<script src="https://unpkg.com/dayjs@1.10.7/plugin/duration.js"></script>
+<script src="https://unpkg.com/dayjs@1.10.7/plugin/relativeTime.js"></script>
+<script src="https://unpkg.com/dayjs@1.10.7/plugin/isSameOrAfter.js"></script>
+<script>
+    dayjs.extend(window.dayjs_plugin_timezone)
+    dayjs.extend(window.dayjs_plugin_advancedFormat)
+    dayjs.extend(window.dayjs_plugin_duration)
+    dayjs.extend(window.dayjs_plugin_relativeTime)
+    dayjs.extend(window.dayjs_plugin_isSameOrAfter)
+    window.formattedTime = (short, full) => `<span class="has-tooltip"><span style="margin-top:35px" class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black space-y-3 p-2 text-left'>${full}</span><span>${short}</span></span>`;
+    window.formatLogLineToHtml = (log, timestamp = undefined) => {
+        const val = typeof log === 'string' ? log : log['MESSAGE'];
+        const logContent = Autolinker.link(val, {
+            email: false,
+            phone: false,
+            mention: false,
+            hashtag: false,
+            stripPrefix: false,
+            sanitizeHtml: true,
+        })
+            .replace(/(\s*debug\s*):/i, '<span class="debug blue">$1</span>:')
+            .replace(/(\s*warn\s*):/i, '<span class="warn yellow">$1</span>:')
+            .replace(/(\s*info\s*):/i, '<span class="info green">$1</span>:')
+            .replace(/(\s*error\s*):/i, '<span class="error red">$1</span>:')
+            .replace(/(\s*verbose\s*):/i, '<span class="error purple">$1</span>:')
+            .replaceAll('\n', '<br />');
+        //.replace(HYPERLINK_REGEX, '<a target="_blank" href="$&">$&</a>');
+        let line = '';
+
+        let timestampString = timestamp;
+        if(timestamp === undefined && typeof log !== 'string') {
+            timestampString = log.timestamp;
+        }
+
+        if(timestampString !== undefined) {
+            const timeStampReplacement = formattedTime(dayjs(timestampString).format('HH:mm:ss z'), timestampString);
+            const splitLine = logContent.split(timestampString);
+            line = `<div class="logLine">${splitLine[0]}${timeStampReplacement}<span style="white-space: pre-wrap">${splitLine[1]}</span></div>`;
+        } else {
+            line = `<div style="white-space: pre-wrap" class="logLine">${logContent}</div>`
+        }
+        return line;
+    }
+</script>
 <script>
     window.sort = 'desc';
 
@@ -727,32 +821,47 @@
             const firstSub = document.querySelectorAll(`[data-bot="${bot}"].sub`)[0];
             firstSub.classList.add('active');
 
+            let firstSubWrapper;
             const firstSubTab = document.querySelector(`ul[data-bot="${bot}"] [data-subreddit="${firstSub.dataset.subreddit}"].tabSelect`);
-            firstSubTab.classList.add('font-bold', 'no-underline', 'pointer-events-none');
-            const firstSubWrapper = firstSubTab.closest('.tabSelectWrapper');
-            //document.querySelector(`[data-subreddit="${subreddit}"][data-bot="${bot}"].sub`).classList.add('active');
+            if(firstSubTab !== null) {
+                firstSubTab.classList.add('font-bold', 'no-underline', 'pointer-events-none');
+                firstSubWrapper = firstSubTab.closest('.tabSelectWrapper');
+                //document.querySelector(`[data-subreddit="${subreddit}"][data-bot="${bot}"].sub`).classList.add('active');
+            }
 
             document.querySelectorAll('.tabSelectWrapper').forEach(el => {
                 el.classList.remove('border-2');
                 el.classList.add('border');
             })
 
-            firstSubWrapper.classList.remove('border');
-            firstSubWrapper.classList.add('border-2');
+            if(firstSubWrapper !== undefined) {
+                firstSubWrapper.classList.remove('border');
+                firstSubWrapper.classList.add('border-2');
+            }
 
             document.querySelectorAll('[data-bot].subreddit.nestedTabs').forEach(el => {
                 el.classList.remove('active');
             })
-            document.querySelector(`[data-bot="${bot}"].subreddit.nestedTabs`).classList.add('active');
+            const nested = document.querySelector(`[data-bot="${bot}"].subreddit.nestedTabs`);
+            if(nested !== null) {
+                nested.classList.add('active');
+            }
 
             const wrapper = e.target.closest('.tabSelectWrapper');//document.querySelector(`[data-subreddit="${subreddit}"].tabSelectWrapper`);
             wrapper.classList.remove('border');
             wrapper.classList.add('border-2');
 
+            // special case for system
+            if(bot === 'system') {
+                document.querySelector('[data-bot="system"].sub').classList.add('seen');
+            }
+
             if ('URLSearchParams' in window) {
                 var searchParams = new URLSearchParams(window.location.search)
                 searchParams.set("bot", bot);
-                searchParams.set("sub", firstSub.dataset.subreddit);
+                if(firstSub.dataset.subreddit !== undefined) {
+                    searchParams.set("sub", firstSub.dataset.subreddit);
+                }
                 var newRelativePathQuery = window.location.pathname + '?' + searchParams.toString();
                 history.pushState(null, '', newRelativePathQuery);
             }
@@ -788,6 +897,44 @@
                 var newRelativePathQuery = window.location.pathname + '?' + searchParams.toString();
                 history.pushState(null, '', newRelativePathQuery);
             }
+            const activeSub = document.querySelector(`[data-subreddit="${subreddit}"][data-bot="${bot}"].sub`);
+            if(!activeSub.classList.contains('seen')) {
+                //firstSub.classList.add('seen');
+
+                //subreddit = firstSub.dataset.subreddit;
+                //bot = subSection.dataset.bot;
+                level = document.querySelector(`[data-subreddit="${subreddit}"] [data-type="level"]`).value;
+                sort = document.querySelector(`[data-subreddit="${subreddit}"] [data-type="sort"]`).value;
+                limitSel = document.querySelector(`[data-subreddit="${subreddit}"] [data-type="limit"]`).value;
+
+                fetch(`/api/logs?instance=<%= instanceId %>&bot=${bot}&subreddit=${subreddit}&level=${level}&sort=${sort}&limit=${limitSel}&stream=false&formatted=true`).then((resp) => {
+                    if (!resp.ok) {
+                        console.error('Response was not OK from logs GET');
+                    } else {
+                        resp.json().then((data) => {
+                            const logContainer = document.querySelector(`[data-subreddit="${subreddit}"] .logs`);
+                            const logLines = (subreddit.toLowerCase() === 'all' ? data[0].all : data[0].subreddits[0].logs).map(x => {
+                                let fString = x.formatted;
+                                if(x.bot !== undefined) {
+                                    fString = fString.replace(`~${x.bot}~ `, '');
+                                }
+                                if(x.subreddit !== undefined && subreddit !== 'All') {
+                                    fString = fString.replace(`{${x.subreddit}} `, '');
+                                }
+                                return window.formatLogLineToHtml(fString, x.timestamp)
+                            }).join('');
+                            logContainer.insertAdjacentHTML('afterbegin', logLines);
+                            activeSub.classList.add('seen');
+                        });
+                    }
+                }).catch((err) => {
+                    console.log(err);
+                });
+
+            }
+            if(window.socket !== undefined) {
+                window.socket.emit('viewing', {bot, subreddit});
+            }
         });
     });
 
@@ -797,7 +944,10 @@
     let shownBot = searchParams.get('bot');
     if(shownBot === null) {
         // show the first bot listed if none is specified
-        const firstBot = document.querySelector('.tabSelectWrapper[data-bot]');
+        let firstBot = document.querySelector('.real.tabSelectWrapper[data-bot]');
+        if(firstBot === null) {
+
+        }
         if(firstBot !== null) {
             shownBot = firstBot.dataset.bot;
             searchParams.set('bot', shownBot);
@@ -807,17 +957,27 @@
     }
 
     document.querySelector(`[data-bot="${shownBot}"].tabSelect`).classList.add('font-bold', 'no-underline', 'pointer-events-none');
-    document.querySelector(`ul[data-bot="${shownBot}"] [data-subreddit="${shownSub}"].tabSelect`).classList.add('font-bold', 'no-underline', 'pointer-events-none');
+    const tabSelect = document.querySelector(`ul[data-bot="${shownBot}"] [data-subreddit="${shownSub}"].tabSelect`);
+    if(tabSelect !== null) {
+        tabSelect.classList.add('font-bold', 'no-underline', 'pointer-events-none');
+    }
     document.querySelectorAll('.tabSelectWrapper').forEach(el => el.classList.add('border'));
-    document.querySelector(`[data-bot="${shownBot}"][data-subreddit="${shownSub}"].sub`).classList.add('active');
+    document.querySelector(`[data-bot="${shownBot}"][data-subreddit="${shownSub}"].sub`).classList.add('active', 'seen');
     const subWrapper = document.querySelector(`ul[data-bot="${shownBot}"] [data-subreddit="${shownSub}"].tabSelectWrapper`);
-    subWrapper.classList.remove('border');
-    subWrapper.classList.add('border-2');
+    if(subWrapper !== null) {
+        subWrapper.classList.remove('border');
+        subWrapper.classList.add('border-2');
+    }
     const wrapper = document.querySelector(`[data-bot="${shownBot}"].tabSelectWrapper`);
-    wrapper.classList.remove('border');
-    wrapper.classList.add('border-2');
+    if(wrapper !== null) {
+        wrapper.classList.remove('border');
+        wrapper.classList.add('border-2');
+    }
 
-    document.querySelector(`[data-bot="${shownBot}"].subreddit.nestedTabs`).classList.add('active');
+    const nestedTabs = document.querySelector(`[data-bot="${shownBot}"].subreddit.nestedTabs`);
+    if(nestedTabs !== null) {
+        nestedTabs.classList.add('active');
+    }
 
     document.querySelectorAll('.stats.reloadStats').forEach(el => el.classList.add('hidden'));
     document.querySelectorAll('.allStatsToggle').forEach(el => el.classList.add('font-bold', 'no-underline', 'pointer-events-none'));
@@ -825,23 +985,11 @@
 
 <script src="https://cdn.socket.io/4.1.2/socket.io.min.js" integrity="sha384-toS6mmwu70G0fw54EGlWWeA4z3dyJ+dlXBtSURSKN4vyRFOcxd3Bzjj/AoOwY+Rg" crossorigin="anonymous"></script>
 <script>
-    const SUBREDDIT_NAME_LOG_REGEX = /{(.+?)}/;
-    const BOT_NAME_LOG_REGEX = /~(.+?)~/;
-    const parseALogName = (reg) => {
-        return (val) => {
-            const matches = val.match(reg);
-            if (matches === null) {
-                return undefined;
-            }
-            return matches[1];
-        }
-    }
-    const parseSubredditLogName = parseALogName(SUBREDDIT_NAME_LOG_REGEX);
-    const parseBotLogName = parseALogName(BOT_NAME_LOG_REGEX);
 
     let socket = io({
         reconnectionAttempts: 5, // bail after 5 attempts
     });
+    window.socket = socket;
 
     // get all bots
     let bots = [];
@@ -859,26 +1007,35 @@
 
     socket.on("connect", () => {
         document.body.classList.add('connected')
-        socket.on("log", data => {
-            bufferedBot.set('All', bufferedBot.get('All').concat(data));
 
-            const bot = parseBotLogName(data);
+        const shownSub = searchParams.get('sub') || 'All'
+        let shownBot = searchParams.get('bot');
+        window.socket.emit('viewing', {bot: shownBot, subreddit: shownSub});
+
+        socket.on("log", data => {
+            const {
+                subreddit,
+                bot,
+                subredditMessage,
+                allMessage,
+                formattedMessage
+            } = data;
+            if(bot === undefined && subreddit === undefined) {
+                const sys = bufferedBot.get('system');
+                if(sys !== undefined) {
+                    sys.set('All', sys.get('All').concat(formattedMessage));
+                    bufferedBot.set('system', sys);
+                }
+            }
             if(bot !== undefined) {
+                bufferedBot.set('All', bufferedBot.get('All').concat(allMessage));
+
                 const buffBot = bufferedBot.get(bot) || newBufferedLogs();
-                buffBot.set('All', buffBot.get('All').concat(data));
-                const sub = parseSubredditLogName(data);
-                if (sub !== undefined) {
-                    buffBot.set(sub, (buffBot.get(sub) || []).concat(data));
+                buffBot.set('All', buffBot.get('All').concat(allMessage));
+                if (subreddit !== undefined) {
+                    buffBot.set(subreddit, (buffBot.get(subreddit) || []).concat(subredditMessage));
                 }
                 bufferedBot.set(bot, buffBot);
-            } else {
-                bufferedBot.forEach((logs, botName) => {
-                    if(botName === 'All') {
-                        return;
-                    }
-                    logs.set('All', logs.get('All').concat(data));
-                    bufferedBot.set(botName, logs);
-                });
             }
 
 
@@ -889,12 +1046,12 @@
                     }
                     subLogs.forEach((logs, subKey) => {
                         // check sub exists -- may be a web log
-                        const el = document.querySelector(`[data-subreddit="${subKey}"][data-bot="${botName}"].sub`);
+                        const el = document.querySelector(`[data-subreddit="${subKey}"][data-bot="${botName}"].sub.seen`);
                         if(null !== el) {
                             const limit = Number.parseInt(document.querySelector(`[data-subreddit="${subKey}"] [data-type="limit"]`).value);
                             const logContainer = el.querySelector(`.logs`);
                             let existingLogs;
-                            if(window.sort === 'desc') {
+                            if(window.sort === 'desc' || window.sort === 'descending') {
                                 logs.forEach((l) => {
                                     logContainer.insertAdjacentHTML('afterbegin', l);
                                 })
@@ -928,23 +1085,133 @@
                 bufferTimeout = setTimeout(() => {flushLogs();}, 1000);
             }
         });
-        socket.on("webLog", data => {
-           console.log(data);
-        });
         socket.on("logClear", data => {
             data.forEach((obj) => {
                 const n = obj.name === 'all' ? 'All' : obj.name;
                 document.querySelector(`[data-subreddit="${n}"].logs`).innerHTML = obj.logs;
             })
         });
+        const subIndicators = ['red', 'green', 'yellow'];
         socket.on('opStats', (resp) => {
             for(const b of resp) {
                 const {name, data} = b;
-                for (const [k, v] of Object.entries(data)) {
-                    document.querySelector(`[data-bot="${name}"].sub #${k}`).innerHTML = v;
+                const botTab = document.querySelector(`[data-bot="${name}"] .botTabStatus`);
+                if(botTab !== null) {
+                    const currentStatusClass = `bg-${data.running ? 'green' : 'red'}-400`;
+                    const oppositeStatusClass = `bg-${data.running ? 'red' : 'green'}-400`;
+                    if(!botTab.classList.contains(currentStatusClass)) {
+                        botTab.classList.remove(oppositeStatusClass);
+                        botTab.classList.add(currentStatusClass);
+                    }
+                }
+                for (const subData of data.subreddits) {
+                    const subredditTab = document.querySelector(`[data-bot="${name}"] [data-subreddit="${subData.name}"] .subredditTabStatus`);
+                    if(subredditTab !== null) {
+                        const currentSubIndicatorClass = `bg-${subData.indicator}-400`;
+                        const nonSubIndicatorClasses = subIndicators.filter(x => x !== subData.indicator).map(x => `bg-${x}-400`);
+                        if(!subredditTab.classList.contains(currentSubIndicatorClass)) {
+                            for(const nonIndicator of nonSubIndicatorClasses) {
+                                subredditTab.classList.remove(nonIndicator);
+                            }
+                            subredditTab.classList.add(currentSubIndicatorClass);
+                        }
+                    }
                 }
             }
 
+        });
+        socket.on('liveStats', (resp) => {
+            let el;
+            let isAll = resp.name.toLowerCase() === 'all';
+            if(isAll) {
+                // got all
+                el = document.querySelector(`[data-subreddit="All"][data-bot="${resp.bot}"].sub`);
+            } else {
+                // got subreddit
+                el = document.querySelector(`[data-subreddit="${resp.name}"].sub`);
+            }
+
+            if(resp.system.running && el.classList.contains('offline')) {
+                el.classList.remove('offline');
+            } else if(!resp.system.running && !el.classList.contains('offline')) {
+                el.classList.add('offline');
+            }
+
+            el.querySelector('.runningActivities').innerHTML = resp.runningActivities;
+            el.querySelector('.queuedActivities').innerHTML = resp.queuedActivities;
+            el.querySelector('.delayedItemsCount').innerHTML = resp.delayedItems.length;
+            el.querySelector('.delayedItemsList').innerHTML = 'No delayed Items!';
+            if(resp.delayedItems.length > 0) {
+                el.querySelector('.delayedItemsList').innerHTML = '';
+                const now = dayjs();
+                const sorted = resp.delayedItems.map(x => ({...x, dispatchAt: dayjs.unix(x.queuedAt + (x.durationMilli/1000))}));
+                sorted.sort((a, b) => {
+                    return a.dispatchAt.isSameOrAfter(b.dispatchAt) ? 1 : -1
+                });
+                const delayedItemDivs = sorted.map(x => {
+                    const diffUntilNow = x.dispatchAt.diff(now)
+                    const durationUntilNow = dayjs.duration(diffUntilNow);
+                    const cancelLink = `<a href="#" data-id="${x.id}" data-subreddit="${x.subreddit}" class="delayCancel">CANCEL</a>`;
+                    return `<div>A <a href="https://reddit.com${x.permalink}">${x.submissionId !== undefined ? 'Comment' : 'Submssion'}</a>${isAll ? ` in <a href="https://reddit.com${x.subreddit}">${x.subreddit}</a> ` : ''} by <a href="https://reddit.com/u/${x.author}">${x.author}</a> queued by ${x.source} at ${dayjs.unix(x.queuedAt).format('HH:mm:ss z')} for ${x.duration} (dispatches in ${durationUntilNow.humanize()}) -- ${cancelLink}</div>`;
+                });
+                el.querySelector('.delayedItemsList').insertAdjacentHTML('afterbegin', delayedItemDivs.join(''));
+                el.querySelectorAll('.delayedItemsList .delayCancel').forEach(elm => {
+                    elm.addEventListener('click', e => {
+                        e.preventDefault();
+                        const id = e.target.dataset.id;
+                        const subreddit = e.target.dataset.subreddit;
+                        fetch(`/api/delayed?instance=<%= instanceId %>&bot=${resp.bot}&subreddit=${subreddit}&id=${id}`, {
+                            method: 'DELETE'
+                        }).then((resp) => {
+                            if (!resp.ok) {
+                                console.error('Response was not OK from delay cancel');
+                            } else {
+                                console.log('Removed ok');
+                            }
+                        });
+                    });
+                });
+            }
+
+            el.querySelector('.allStats .eventsCount').innerHTML = resp.stats.historical.allTime.eventsCheckedTotal;
+            el.querySelector('.allStats .checksCount').innerHTML = resp.stats.historical.allTime.checksTriggeredTotal;
+            el.querySelector('.allStats .rulesCount').innerHTML = resp.stats.historical.allTime.rulesTriggeredTotal;
+            el.querySelector('.allStats .actionsCount').innerHTML = resp.stats.historical.allTime.actionsRunTotal;
+
+            if(isAll) {
+                for(const elm of ['apiAvg','apiLimit','apiDepletion','nextHeartbeat', 'nextHeartbeatHuman', 'limitReset', 'limitResetHuman', 'nannyMode', 'startedAtHuman']) {
+                    el.querySelector(`#${elm}`).innerHTML = resp[elm];
+                }
+                el.querySelector(`.botStatus`).innerHTML = resp.system.running ? 'ONLINE' : 'OFFLINE';
+            } else {
+                if(el.querySelector('.modPermissionsCount').innerHTML != resp.permissions.length) {
+                    el.querySelector('.modPermissionsCount').innerHTML = resp.permissions.length;
+                    el.querySelector('.modPermissionsList').innerHTML = '';
+                    el.querySelector('.modPermissionsList').insertAdjacentHTML('afterbegin', resp.permissions.map(x => `<li class="font-mono">${x}</li>`).join(''));
+                }
+
+                el.querySelector('.reloadStats .eventsCount').innerHTML = resp.stats.historical.lastReload.eventsCheckedTotal;
+                el.querySelector('.reloadStats .checksCount').innerHTML = resp.stats.historical.lastReload.checksTriggeredTotal;
+                el.querySelector('.reloadStats .rulesCount').innerHTML = resp.stats.historical.lastReload.rulesTriggeredTotal;
+                el.querySelector('.reloadStats .actionsCount').innerHTML = resp.stats.historical.lastReload.actionsRunTotal;
+
+                for(const elm of ['botState', 'queueState', 'eventsState']) {
+                    const state = resp[elm];
+                    el.querySelector(`.${elm}`).innerHTML = `${state.state}${state.causedBy === 'system' ? '' : ' (user)'}`;
+                }
+                for(const elm of ['startedAt', 'startedAtHuman', 'wikiLastCheck', 'wikiLastCheckHuman', 'wikiRevision', 'wikiRevisionHuman', 'validConfig', 'delayBy']) {
+                    el.querySelector(`.${elm}`).innerHTML = resp[elm];
+                }
+                el.querySelector(`.commentCheckCount`).innerHTML = resp.checks.comments;
+                el.querySelector(`.submissionCheckCount`).innerHTML = resp.checks.submissions;
+
+                const newInner = resp.pollingInfo.map(x => `<li>${x}</li>`).join('');
+                if(el.querySelector(`.pollingInfo`).innerHTML !== newInner) {
+                    el.querySelector(`.pollingInfo`).innerHTML = newInner;
+                }
+            }
+
+            //console.log(resp);
         });
     });
 

@@ -1,12 +1,15 @@
 import {Comment, Submission} from "snoowrap";
 import {Logger} from "winston";
 import {RuleResult} from "../Rule";
-import {checkAuthorFilter, SubredditResources} from "../Subreddit/SubredditResources";
+import {checkAuthorFilter, checkItemFilter, SubredditResources} from "../Subreddit/SubredditResources";
 import {ActionProcessResult, ActionResult, ChecksActivityState, TypedActivityStates} from "../Common/interfaces";
 import Author, {AuthorOptions} from "../Author/Author";
 import {mergeArr} from "../util";
 import LoggedError from "../Utils/LoggedError";
 import {ExtendedSnoowrap} from '../Utils/SnoowrapClients';
+import {ErrorWithCause} from "pony-cause";
+import EventEmitter from "events";
+import {runCheckOptions} from "../Subreddit/Manager";
 
 export abstract class Action {
     name?: string;
@@ -17,6 +20,7 @@ export abstract class Action {
     itemIs: TypedActivityStates;
     dryRun: boolean;
     enabled: boolean;
+    managerEmitter: EventEmitter;
 
     constructor(options: ActionOptions) {
         const {
@@ -33,6 +37,7 @@ export abstract class Action {
                 exclude = [],
             } = {},
             itemIs = [],
+            emitter,
         } = options;
 
         this.name = name;
@@ -41,6 +46,7 @@ export abstract class Action {
         this.resources = resources;
         this.client = client;
         this.logger = logger.child({labels: [`Action ${this.getActionUniqueName()}`]}, mergeArr);
+        this.managerEmitter = emitter;
 
         this.authorIs = {
             excludeCondition,
@@ -57,7 +63,8 @@ export abstract class Action {
         return this.name === this.getKind() ? this.getKind() : `${this.getKind()} - ${this.name}`;
     }
 
-    async handle(item: Comment | Submission, ruleResults: RuleResult[], runtimeDryrun?: boolean): Promise<ActionResult> {
+    async handle(item: Comment | Submission, ruleResults: RuleResult[], options: runCheckOptions): Promise<ActionResult> {
+        const {dryRun: runtimeDryrun} = options;
         const dryRun = runtimeDryrun || this.dryRun;
 
         let actRes: ActionResult = {
@@ -68,17 +75,24 @@ export abstract class Action {
             success: false,
         };
         try {
-            const itemPass = await this.resources.testItemCriteria(item, this.itemIs);
+            const [itemPass, itemFilterType, itemFilterResults] = await checkItemFilter(item, this.itemIs, this.resources, this.logger, options.source);
             if (!itemPass) {
                 this.logger.verbose(`Activity did not pass 'itemIs' test, Action not run`);
                 actRes.runReason = `Activity did not pass 'itemIs' test, Action not run`;
+                actRes.itemIs = itemFilterResults;
                 return actRes;
+            } else if(this.itemIs.length > 0) {
+                actRes.itemIs = itemFilterResults;
             }
-            const [authFilterResult, authFilterType] = await checkAuthorFilter(item, this.authorIs, this.resources, this.logger);
-            if(!authFilterResult) {
+
+            const [authPass, authFilterType, authorFilterResult] = await checkAuthorFilter(item, this.authorIs, this.resources, this.logger);
+            if(!authPass) {
                 this.logger.verbose(`${authFilterType} author criteria not matched, Action not run`);
                 actRes.runReason = `${authFilterType} author criteria not matched`;
+                actRes.authorIs = authorFilterResult;
                 return actRes;
+            } else if(authFilterType !== undefined) {
+                actRes.authorIs = authorFilterResult;
             }
 
             actRes.run = true;
@@ -86,7 +100,8 @@ export abstract class Action {
             return {...actRes, ...results};
         } catch (err: any) {
             if(!(err instanceof LoggedError)) {
-                this.logger.error(`Encountered error while running`, err);
+                const actionError = new ErrorWithCause('Action did not run successfully due to unexpected error', {cause: err});
+                this.logger.error(actionError);
             }
             actRes.success = false;
             actRes.result = err.message;
@@ -102,6 +117,7 @@ export interface ActionOptions extends ActionConfig {
     subredditName: string;
     resources: SubredditResources;
     client: ExtendedSnoowrap;
+    emitter: EventEmitter
 }
 
 export interface ActionConfig extends ChecksActivityState {
@@ -148,7 +164,7 @@ export interface ActionJson extends ActionConfig {
     /**
      * The type of action that will be performed
      */
-    kind: 'comment' | 'lock' | 'remove' | 'report' | 'approve' | 'ban' | 'flair' | 'usernote' | 'message' | 'userflair'
+    kind: 'comment' | 'lock' | 'remove' | 'report' | 'approve' | 'ban' | 'flair' | 'usernote' | 'message' | 'userflair' | 'dispatch' | 'cancelDispatch'
 }
 
 export const isActionJson = (obj: object): obj is ActionJson => {

@@ -1,5 +1,5 @@
 import dayjs, {Dayjs} from "dayjs";
-import {Comment, RedditUser, WikiPage} from "snoowrap";
+import Snoowrap, {Comment, RedditUser, WikiPage} from "snoowrap";
 import {
     COMMENT_URL_ID,
     deflateUserNotes, getActivityAuthorName,
@@ -14,6 +14,7 @@ import Submission from "snoowrap/dist/objects/Submission";
 import {RichContent} from "../Common/interfaces";
 import {Cache} from 'cache-manager';
 import {isScopeError} from "../Utils/Errors";
+import {ErrorWithCause} from "pony-cause";
 
 interface RawUserNotesPayload {
     ver: number,
@@ -45,7 +46,7 @@ export interface RawNote {
     /**
      * Link shorthand
      * */
-    l: string;
+    l: (string | null);
     /**
      * type/color index from constants.warnings
      * */
@@ -57,12 +58,13 @@ export type UserNotesConstants = Pick<any, "users" | "warnings">;
 export class UserNotes {
     notesTTL: number | false;
     subreddit: Subreddit;
-    wiki: WikiPage;
+    client: Snoowrap;
     moderators?: RedditUser[];
     logger: Logger;
     identifier: string;
     cache: Cache
     cacheCB: Function;
+    mod?: RedditUser;
 
     users: Map<string, UserNote[]> = new Map();
 
@@ -70,14 +72,14 @@ export class UserNotes {
     debounceCB: any;
     batchCount: number = 0;
 
-    constructor(ttl: number | boolean, subreddit: Subreddit, logger: Logger, cache: Cache, cacheCB: Function) {
+    constructor(ttl: number | boolean, subreddit: Subreddit, client: Snoowrap, logger: Logger, cache: Cache, cacheCB: Function) {
         this.notesTTL = ttl === true ? 0 : ttl;
         this.subreddit = subreddit;
         this.logger = logger;
-        this.wiki = subreddit.getWikiPage('usernotes');
         this.identifier = `${this.subreddit.display_name}-usernotes`;
         this.cache = cache;
         this.cacheCB = cacheCB;
+        this.client = client;
     }
 
     async getUserNotes(user: RedditUser): Promise<UserNote[]> {
@@ -98,7 +100,7 @@ export class UserNotes {
             if (this.moderators === undefined) {
                 this.moderators = await this.subreddit.getModerators();
             }
-            const notes = rawNotes.ns.map(x => UserNote.fromRaw(x, payload.constants, this.moderators as RedditUser[]));
+            const notes = rawNotes.ns.map(x => UserNote.fromRaw(x, payload.constants, this.moderators as RedditUser[], this.logger));
             // sort in ascending order by time
             notes.sort((a, b) => a.time.isBefore(b.time) ? -1 : 1);
             if (this.notesTTL > 0 && this.cache !== undefined) {
@@ -110,35 +112,43 @@ export class UserNotes {
         }
     }
 
+    // @ts-ignore
+    async getMod() {
+        if(this.mod === undefined) {
+            // idgaf
+            // @ts-ignore
+            this.mod = await this.subreddit._r.getMe();
+        }
+        return this.mod as RedditUser;
+    }
+
     async addUserNote(item: (Submission|Comment), type: string | number, text: string = ''): Promise<UserNote>
     {
         const payload = await this.retrieveData();
         const userName = getActivityAuthorName(item.author);
 
-        // idgaf
-        // @ts-ignore
-        const mod = await this.subreddit._r.getMe();
+        const mod = await this.getMod();
         if(!payload.constants.users.includes(mod.name)) {
             this.logger.info(`Mod ${mod.name} does not exist in UserNote constants, adding them`);
             payload.constants.users.push(mod.name);
         }
+        const modIndex = payload.constants.users.findIndex((x: string) => x === mod.name);
         if(!payload.constants.warnings.find((x: string) => x === type)) {
             this.logger.warn(`UserNote type '${type}' does not exist, adding it but make sure spelling and letter case is correct`);
             payload.constants.warnings.push(type);
-            //throw new LoggedError(`UserNote type '${type}' does not exist. If you meant to use this please add it through Toolbox first.`);
         }
-        const newNote = new UserNote(dayjs(), text, mod, type, `https://reddit.com${item.permalink}`);
+        const newNote = new UserNote(dayjs(), text, modIndex, type, `https://reddit.com${item.permalink}`, mod);
 
         if(payload.blob[userName] === undefined) {
             payload.blob[userName] = {ns: []};
         }
         payload.blob[userName].ns.push(newNote.toRaw(payload.constants));
 
+        const existingNotes = await this.getUserNotes(item.author);
         await this.saveData(payload);
         if(this.notesTTL > 0) {
-            const currNotes = this.users.get(userName) || [];
-            currNotes.push(newNote);
-            this.users.set(userName, currNotes);
+            existingNotes.push(newNote);
+            this.users.set(userName, existingNotes);
         }
         return newNote;
     }
@@ -150,7 +160,6 @@ export class UserNotes {
     }
 
     async retrieveData(): Promise<RawUserNotesPayload> {
-        let cacheMiss;
         if (this.notesTTL > 0) {
             const cachedPayload = await this.cache.get(this.identifier);
             if (cachedPayload !== undefined && cachedPayload !== null) {
@@ -158,22 +167,12 @@ export class UserNotes {
                 return cachedPayload as unknown as RawUserNotesPayload;
             }
             this.cacheCB(true);
-            cacheMiss = true;
         }
 
         try {
-            // DISABLED for now because I think its causing issues
-            // if(cacheMiss && this.debounceCB !== undefined) {
-            //     // timeout is still delayed. its our wiki data and we want it now! cm cacheworth 877 cache now
-            //     this.logger.debug(`Detected missed cache on usernotes retrieval while batch (${this.batchCount}) save is in progress, executing save immediately before retrieving new notes...`);
-            //     clearTimeout(this.saveDebounce);
-            //     await this.debounceCB();
-            //     this.debounceCB = undefined;
-            //     this.saveDebounce = undefined;
-            // }
             // @ts-ignore
-            this.wiki = await this.subreddit.getWikiPage('usernotes').fetch();
-            const wikiContent = this.wiki.content_md;
+            const wiki = this.client.getSubreddit(this.subreddit.display_name).getWikiPage('usernotes');
+            const wikiContent = await wiki.content_md;
             // TODO don't handle for versions lower than 6
             const userNotes = JSON.parse(wikiContent);
 
@@ -197,54 +196,27 @@ export class UserNotes {
         const blob = deflateUserNotes(payload.blob);
         const wikiPayload = {text: JSON.stringify({...payload, blob}), reason: 'ContextBot edited usernotes'};
         try {
+            const wiki = this.client.getSubreddit(this.subreddit.display_name).getWikiPage('usernotes');
             if (this.notesTTL !== false) {
-                // DISABLED for now because if it fails throws an uncaught rejection
-                // and need to figured out how to handle this other than just logging (want to interrupt action flow too?)
-                //
-                // debounce usernote save by 5 seconds -- effectively batch usernote saves
-                //
-                // so that if we are processing a ton of checks that write user notes we aren't calling to save the wiki page on every call
-                // since we also have everything in cache (most likely...)
-                //
-                // TODO might want to increase timeout to 10 seconds
-                // if(this.saveDebounce !== undefined) {
-                //     clearTimeout(this.saveDebounce);
-                // }
-                // this.debounceCB = (async function () {
-                //     const p = wikiPayload;
-                //     // @ts-ignore
-                //     const self = this as UserNotes;
-                //     // @ts-ignore
-                //     self.wiki = await self.subreddit.getWikiPage('usernotes').edit(p);
-                //     self.logger.debug(`Batch saved ${self.batchCount} usernotes`);
-                //     self.debounceCB = undefined;
-                //     self.saveDebounce = undefined;
-                //     self.batchCount = 0;
-                // }).bind(this);
-                // this.saveDebounce = setTimeout(this.debounceCB,5000);
-                // this.batchCount++;
-                // this.logger.debug(`Saving Usernotes has been debounced for 5 seconds (${this.batchCount} batched)`)
-
                 // @ts-ignore
-                await this.subreddit.getWikiPage('usernotes').edit(wikiPayload);
+                await wiki.edit(wikiPayload);
                 await this.cache.set(this.identifier, payload, {ttl: this.notesTTL});
                 this.users = new Map();
             } else {
                 // @ts-ignore
-                this.wiki = await this.subreddit.getWikiPage('usernotes').edit(wikiPayload);
+                await wiki.edit(wikiPayload);
             }
 
             return payload as RawUserNotesPayload;
         } catch (err: any) {
-            let msg = 'Could not edit usernotes.';
+            let msg = 'Could not edit usernotes!';
             // Make sure at least one moderator has used toolbox and usernotes before and that this account has editing permissions`;
             if(isScopeError(err)) {
                 msg = `${msg} The bot account did not have sufficient OAUTH scope to perform this action. You must re-authenticate the bot and ensure it has has 'wikiedit' permissions.`
             } else {
                 msg = `${msg} Make sure at least one moderator has used toolbox, created a usernote, and that this account has editing permissions for the wiki page.`;
             }
-            this.logger.error(msg, err);
-            throw new LoggedError(msg);
+            throw new ErrorWithCause(msg, {cause: err});
         }
     }
 }
@@ -265,31 +237,46 @@ export class UserNote {
     // noteType: string | null;
     // link: string;
 
-    constructor(public time: Dayjs, public text: string, public moderator: RedditUser, public noteType: string | number, public link: string) {
+    constructor(public time: Dayjs, public text: string, public modIndex: number, public noteType: string | number, public link: (string | null) = null, public moderator?: RedditUser) {
 
     }
 
     public toRaw(constants: UserNotesConstants): RawNote {
+        let m = this.modIndex;
+        if(m === undefined && this.moderator !== undefined) {
+            m = constants.users.findIndex((x: string) => x === this.moderator?.name);
+        }
         return {
             t: this.time.unix(),
             n: this.text,
-            m: constants.users.findIndex((x: string) => x === this.moderator.name),
+            m,
             w: typeof this.noteType === 'number' ? this.noteType : constants.warnings.findIndex((x: string) => x === this.noteType),
             l: usernoteLinkShorthand(this.link)
         }
     }
 
-    public static fromRaw(obj: RawNote, constants: UserNotesConstants, mods: RedditUser[]) {
-        const mod = mods.find(x => x.name === constants.users[obj.m]);
-        if (mod === undefined) {
-            throw new Error('Could not find moderator for Usernote');
+    public static fromRaw(obj: RawNote, constants: UserNotesConstants, mods: RedditUser[], logger?: Logger) {
+        const modName = constants.users[obj.m];
+        let mod;
+        if(modName === undefined) {
+            if(logger !== undefined) {
+                logger.warn(`Usernote says a moderator should be present at index ${obj.m} but none exists there! May need to clean up usernotes in toolbox.`);
+            }
+        } else {
+            mod = mods.find(x => x.name === constants.users[obj.m]);
         }
-        return new UserNote(dayjs.unix(obj.t), obj.n, mod, constants.warnings[obj.w] === null ? obj.w : constants.warnings[obj.w], usernoteLinkExpand(obj.l))
+        if (mod === undefined && logger !== undefined) {
+            logger.warn(`Usernote says it was created by user u/${modName} but they are not currently a moderator! You should cleanup usernotes in toolbox.`);
+        }
+        return new UserNote(dayjs.unix(obj.t), obj.n, obj.m, constants.warnings[obj.w] === null ? obj.w : constants.warnings[obj.w], usernoteLinkExpand(obj.l), mod)
     }
 }
 
 // https://github.com/toolbox-team/reddit-moderator-toolbox/wiki/Subreddit-Wikis%3A-usernotes#link-string-formats
-export const usernoteLinkExpand = (link: string) => {
+export const usernoteLinkExpand = (link: (string | null)): (string | null) => {
+    if(link === null || link === '') {
+        return null;
+    }
     if (link.charAt(0) === 'l') {
         const pieces = link.split(',');
         if (pieces.length === 3) {
@@ -303,7 +290,11 @@ export const usernoteLinkExpand = (link: string) => {
         return `https://www.reddit.com/message/messages/${link.split(',')[1]}`;
     }
 }
-export const usernoteLinkShorthand = (link: string) => {
+export const usernoteLinkShorthand = (link: (string | null)) => {
+
+    if(link === null || link === '') {
+        return '';
+    }
 
     const commentReg = parseLinkIdentifier([COMMENT_URL_ID]);
     const submissionReg = parseLinkIdentifier([SUBMISSION_URL_ID]);

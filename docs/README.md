@@ -5,6 +5,7 @@
 * [Getting Started](#getting-started)
 * [How It Works](#how-it-works)
 * [Concepts](#concepts)
+  * [Run](#runs)
   * [Check](#checks)
   * [Rule](#rule)
     * [Examples](#available-rules)
@@ -36,30 +37,60 @@ Review **at least** the **How It Works** and **Concepts** below, then:
 
 Where possible Context Mod (CM) uses the same terminology as, and emulates the behavior, of **automoderator** so if you are familiar with that much of this may seem familiar to you.
 
+### Diagram
+
+Expand the section below for a simplified flow diagram of how CM processes an incoming Activity. Then refer the text description of the diagram below as well as [Concepts](#Concepts) for descriptions of individual components.
+
+<details>
+<summary>Diagram</summary>
+
+![Flow Diagram](/docs/images/diagram-highlevel.jpg)
+
+</details>
+
 CM's lifecycle looks like this:
 
 #### 1) A new event in your subreddit is received by CM
 
 The events CM watches for are configured by you. These can be new modqueue/unmoderated items, submissions, or comments.
 
-#### 2) CM sequentially processes each Check in your configuration
+#### 2) CM sequentially processes each Run in your configuration
+
+A [**Run**](#Runs) is made up of a set of [**Checks**](#Checks)
+
+#### 3) CM sequentially processes each Check in the current Run
 
 A **Check** is a set of:
 
-* One or more **Rules** that define what conditions should **trigger** this Check
-* One or more **Actions** that define what the bot should do once the Check is **triggered**
+* One or more [**Rules**](#Rule) that define what conditions should **trigger** this Check
+* One or more [**Actions**](#Action) that define what the bot should do once the Check is **triggered**
 
-#### 3) Each Check is processed, *in order*, until a Check is triggered
+#### 4) Each Check is processed, *in order*, until a Check is **triggered**
 
-Once a Check is **triggered** no more Checks will be processed. This means all subsequent Checks in your configuration (in the order you listed them) are basically skipped.
+In CM's default configuration, once a Check is **triggered** no more Checks will be processed. This means all subsequent Checks in this Run (in the order you listed them) are skipped.
 
-#### 4) All Actions from that Check are executed
+#### 5) All Actions from the triggered Check are executed
 
-After all Actions are executed CM returns to waiting for the next Event.
+After all **Actions** from the triggered **Check** are executed CM begins processing the next **Run**
+
+#### 6) Rinse and Repeat from #3
+
+Until all Runs have been processed.
 
 ## Concepts
 
 Core, high-level concepts regarding how CM works.
+
+### Runs
+
+A **Run** is made up of a set of **Checks** that represent a group of related behaviors the bot should check for or perform -- that are independent of any other behaviors the Bot should perform.
+
+An example of Runs:
+
+* A group of Checks that look for missing flairs on a user or a new submission and flair accordingly
+* A group of Checks that detect spam or self-promotion and then remove those activities
+
+Both group of Checks are independent of each other (don't have any patterns or actions in common). Learn more about using [Runs and **Flow Control** to control how CM behaves.](/docs/examples/advancedConcepts/flowControl.md)
 
 ### Checks
 
@@ -68,7 +99,7 @@ A **Check** is the main logical unit of behavior for the bot. It is equivalent t
 * One or more **Rules** that are tested against an **Activity**
 * One of more **Actions** that are performed when the **Rules** are satisfied
 
-The bot's configuration can be made up of one or more **Checks** that are processed **in the order they are listed in the configuration.**
+A Run can be made up of one or more **Checks** that are processed **in the order they are listed in the Run.**
 
 Once a Check is **triggered** (its Rules are satisfied and Actions performed) all subsequent Checks are skipped.
 
@@ -87,7 +118,7 @@ A **Rule** is some set of **criteria** (conditions) that are tested against an A
 
 There are generally three main properties for a Rule:
 
-* **Critiera** -- The conditions/values you want to test for.
+* **Criteria** -- The conditions/values you want to test for.
 * **Activities Window** -- If applicable, the range of activities that the **criteria** will be tested against.
 * **Rule-specific options** -- Any number of options that modify how the **criteria** are tested.
 
@@ -149,6 +180,7 @@ An **Action** is some action the bot can take against the checked Activity (comm
 
 * Remove (Comment/Submission)
 * Flair (Submission)
+* User Flair (Submission/Comment)
 * Ban (User)
 * Approve (Comment/Submission)
 * Comment (Reply to Comment/Submission)
@@ -160,12 +192,12 @@ For detailed explanation and options of what individual Actions can do [see the 
 
 ### Filters
 
-**Checks, Rules, and Actions** all have two additional (optional) criteria "tests". These tests behave differently than rule/check triggers in that:
+**Runs, Checks, Rules, and Actions** all have two additional (optional) criteria "tests". These tests behave differently than rule/check triggers in that:
 
 * When they **pass** the thing being tested continues to process as usual
 * When they **fail** the thing being tested **is skipped, not failed.**
 
-For **Checks** and **Actions** skipping means that the thing is not processed. The Action is not run, the Check is not triggered.
+For **Runs**, **Checks**, and **Actions** skipping means that the thing is not processed. The Action is not run, the Check is not triggered.
 
 In the context of **Rules** (in a Check) skipping means the Rule does not get run BUT it does not fail. The Check will continue processing as if the Rule did not exist. However, if ALL Rules in a Check are skipped then the Check does "fail" (is not triggered).
 

@@ -1,66 +1,84 @@
 import winston, {Logger} from "winston";
 import jsonStringify from 'safe-stable-stringify';
 import dayjs, {Dayjs, OpUnitType} from 'dayjs';
-import {FormattedRuleResult, isRuleSetResult, RulePremise, RuleResult, RuleSetResult} from "./Rule";
+import {FormattedRuleResult, isRuleSetResult, RulePremise, RuleResult, RuleSetResult, UserNoteCriteria} from "./Rule";
 import deepEqual from "fast-deep-equal";
 import {Duration} from 'dayjs/plugin/duration.js';
 import Ajv from "ajv";
 import {InvalidOptionArgumentError} from "commander";
-import Submission from "snoowrap/dist/objects/Submission";
-import {Comment} from "snoowrap";
 import {inflateSync, deflateSync} from "zlib";
 import pixelmatch from 'pixelmatch';
 import os from 'os';
 import {createHash} from 'crypto';
 import {
-    ActivityWindowCriteria, ActivityWindowType,
+    ActionResult, ActivitySource,
+    ActivityWindowCriteria,
+    ActivityWindowType,
     CacheOptions,
     CacheProvider,
-    DurationComparison, DurationVal,
+    CheckSummary, CommentState,
+    DurationComparison,
+    DurationVal,
+    FilterCriteriaDefaults,
+    FilterCriteriaPropertyResult,
+    FilterCriteriaResult,
+    FilterResult,
     GenericComparison,
     HistoricalStats,
-    HistoricalStatsDisplay, ImageComparisonResult,
+    HistoricalStatsDisplay,
+    ImageComparisonResult,
     //ImageData,
-    ImageDetection,
+    ImageDetection, ItemCritPropHelper,
     //ImageDownloadOptions,
     LogInfo,
     NamedGroup,
+    OperatorJsonConfig,
     PollingOptionsStrong,
     RedditEntity,
     RedditEntityType,
-    RegExResult, RepostItem, RepostItemResult,
-    ResourceStats, SearchAndReplaceRegExp,
-    StatusCodeError, StringComparisonOptions,
+    RegExResult,
+    RepostItem,
+    RepostItemResult, RequiredItemCrit,
+    ResourceStats,
+    RunResult,
+    SearchAndReplaceRegExp,
+    StringComparisonOptions,
     StringOperator,
-    StrongSubredditState,
-    SubredditState
+    StrongSubredditState, SubmissionState,
+    SubredditState, TypedActivityState,
+    TypedActivityStates
 } from "./Common/interfaces";
-import JSON5 from "json5";
-import yaml, {JSON_SCHEMA} from "js-yaml";
-import SimpleError from "./Utils/SimpleError";
+import { Document as YamlDocument } from 'yaml'
 import InvalidRegexError from "./Utils/InvalidRegexError";
 import {constants, promises} from "fs";
-import {cacheOptDefaults} from "./Common/defaults";
+import {cacheOptDefaults, VERSION} from "./Common/defaults";
 import cacheManager, {Cache} from "cache-manager";
 import redisStore from "cache-manager-redis-store";
 import crypto from "crypto";
 import Autolinker from 'autolinker';
 import {create as createMemoryStore} from './Utils/memoryStore';
-import {MESSAGE} from "triple-beam";
-import {RedditUser} from "snoowrap/dist/objects";
+import {MESSAGE, LEVEL} from "triple-beam";
+import {RedditUser,Comment,Submission} from "snoowrap/dist/objects";
 import reRegExp from '@stdlib/regexp-regexp';
 import fetch, {Response} from "node-fetch";
 import { URL } from "url";
 import ImageData from "./Common/ImageData";
 import {Sharp, SharpOptions} from "sharp";
-// @ts-ignore
-import {blockhashData, hammingDistance} from 'blockhash';
-import {SetRandomInterval} from "./Common/types";
+import {ErrorWithCause, stackWithCauses} from "pony-cause";
+import {ConfigFormat, SetRandomInterval} from "./Common/types";
 import stringSimilarity from 'string-similarity';
 import calculateCosineSimilarity from "./Utils/StringMatching/CosineSimilarity";
 import levenSimilarity from "./Utils/StringMatching/levenSimilarity";
-import {isRequestError, isStatusError} from "./Utils/Errors";
+import {SimpleError, isRateLimitError, isRequestError, isScopeError, isStatusError, CMError} from "./Utils/Errors";
 import {parse} from "path";
+import JsonConfigDocument from "./Common/Config/JsonConfigDocument";
+import YamlConfigDocument from "./Common/Config/YamlConfigDocument";
+import AbstractConfigDocument, {ConfigDocumentInterface} from "./Common/Config/AbstractConfigDocument";
+import LoggedError from "./Utils/LoggedError";
+import {AuthorOptions} from "./Author/Author";
+import merge from "deepmerge";
+
+
 //import {ResembleSingleCallbackComparisonResult} from "resemblejs";
 
 // want to guess how many concurrent image comparisons we should be doing
@@ -87,36 +105,78 @@ const CWD = process.cwd();
 //     }
 // }
 const errorAwareFormat = {
-    transform: (info: any, opts: any) => {
-        // don't need to log stack trace if we know the error is just a simple message (we handled it)
-        const stack = !(info instanceof SimpleError) && !(info.message instanceof SimpleError);
-        const {name, response, message, stack: errStack, error, statusCode} = info;
-        if(name === 'StatusCodeError' && response !== undefined && response.headers !== undefined && response.headers['content-type'].includes('html')) {
-            // reddit returns html even when we specify raw_json in the querystring (via snoowrap)
-            // which means the html gets set as the message for the error AND gets added to the stack as the message
-            // and we end up with a h u g e log statement full of noisy html >:(
+    transform: (einfo: any, {stack = true}: any = {}) => {
 
-            const errorSample = error.slice(0, 10);
-            const messageBeforeIndex = message.indexOf(errorSample);
-            let newMessage = `Status Error ${statusCode} from Reddit`;
-            if(messageBeforeIndex > 0) {
-                newMessage = `${message.slice(0, messageBeforeIndex)} - ${newMessage}`;
-            }
-            let cleanStack = errStack;
+        // because winston logger.child() re-assigns its input to an object ALWAYS the object we recieve here will never actually be of type Error
+        const includeStack = stack && (!isProbablyError(einfo, 'simpleerror') && !isProbablyError(einfo.message, 'simpleerror'));
 
-            // try to get just stacktrace by finding beginning of what we assume is the actual trace
-            if(errStack) {
-                cleanStack = `${newMessage}\n${errStack.slice(errStack.indexOf('at new StatusCodeError'))}`;
-            }
-            // now put it all together so its nice and clean
-            info.message = newMessage;
-            info.stack = cleanStack;
+        if (!isProbablyError(einfo.message) && !isProbablyError(einfo)) {
+            return einfo;
         }
-        return errors().transform(info, { stack });
+
+        let info: any = {};
+
+        if (isProbablyError(einfo)) {
+            const tinfo = transformError(einfo);
+            info = Object.assign({}, tinfo, {
+                // @ts-ignore
+                level: einfo.level,
+                // @ts-ignore
+                [LEVEL]: einfo[LEVEL] || einfo.level,
+                message: tinfo.message,
+                // @ts-ignore
+                [MESSAGE]: tinfo[MESSAGE] || tinfo.message
+            });
+            if(includeStack) {
+                // so we have to create a dummy error and re-assign all error properties from our info object to it so we can get a proper stack trace
+                const dummyErr = new ErrorWithCause('');
+                for(const k in tinfo) {
+                    if(dummyErr.hasOwnProperty(k) || k === 'cause') {
+                        // @ts-ignore
+                        dummyErr[k] = tinfo[k];
+                    }
+                }
+                // @ts-ignore
+                info.stack = stackWithCauses(dummyErr);
+            }
+        } else {
+            const err = transformError(einfo.message);
+            info = Object.assign(einfo, err);
+            // @ts-ignore
+            info.message = err.message;
+            // @ts-ignore
+            info[MESSAGE] = err.message;
+
+            if(includeStack) {
+                const dummyErr = new ErrorWithCause('');
+                for(const k in err) {
+                    if(dummyErr.hasOwnProperty(k) || k === 'cause') {
+                        // @ts-ignore
+                        dummyErr[k] = info[k];
+                    }
+                }
+                // @ts-ignore
+                info.stack = stackWithCauses(dummyErr);
+            }
+        }
+
+        // remove redundant message from stack and make stack causes easier to read
+        if(info.stack !== undefined) {
+            let cleanedStack = info.stack.replace(info.message, '');
+            cleanedStack = `${cleanedStack}`;
+            cleanedStack = cleanedStack.replaceAll('caused by:', '\ncaused by:');
+            info.stack = cleanedStack;
+        }
+
+        return info;
     }
 }
 
-export const PASS = '✔';
+const isProbablyError = (val: any, errName = 'error') => {
+    return typeof val === 'object' && val.name !== undefined && val.name.toLowerCase().includes(errName);
+}
+
+export const PASS = '✓';
 export const FAIL = '✘';
 
 export const truncateStringToLength = (length: number, truncStr = '...') => (str: string) => str.length > length ? `${str.slice(0, length - truncStr.length - 1)}${truncStr}` : str;
@@ -291,13 +351,39 @@ export const mergeArr = (objValue: [], srcValue: []): (any[] | undefined) => {
     }
 }
 
+export const removeFromSourceIfKeysExistsInDestination = (destinationArray: any[], sourceArray: any[], options: any): any[] => {
+    // get all keys from objects in destination
+    const destKeys = destinationArray.reduce((acc: string[], curr) => {
+        // can only get keys for objects, skip for everything else
+        if(curr !== null && typeof curr === 'object') {
+            const keys = Object.keys(curr).map(x => x.toLowerCase());
+            for(const k of keys) {
+                if(!acc.includes(k)) {
+                    acc.push(k);
+                }
+            }
+        }
+        return acc;
+    }, []);
+    const sourceItemsToKeep = sourceArray.filter(x => {
+        if(x !== null && typeof x === 'object') {
+            const sourceKeys = Object.keys(x).map(x => x.toLowerCase());
+            // only keep if keys from this object do not appear anywhere in destination items
+            return intersect(sourceKeys, destKeys).length === 0;
+        }
+        // keep if item is not an object since we can't test for keys anyway
+        return true;
+    });
+    return sourceItemsToKeep.concat(destinationArray);
+}
+
 export const ruleNamesFromResults = (results: RuleResult[]) => {
     return results.map(x => x.name || x.premise.kind).join(' | ')
 }
 
-export const triggeredIndicator = (val: boolean | null): string => {
+export const triggeredIndicator = (val: boolean | null, nullResultIndicator = '-'): string => {
     if(val === null) {
-        return '-';
+        return nullResultIndicator;
     }
     return val ? PASS : FAIL;
 }
@@ -312,6 +398,68 @@ export const resultsSummary = (results: (RuleResult|RuleSetResult)[], topLevelCo
     });
     return parts.join(` ${topLevelCondition} `)
     //return results.map(x => x.name || x.premise.kind).join(' | ')
+}
+
+export const filterCriteriaSummary = <T>(val: FilterCriteriaResult<T>): [string, string[]] => {
+    // summarize properties relevant to result
+    const passedProps = {props: val.propertyResults.filter(x => x.passed === true), name: 'Passed'};
+    const failedProps = {props: val.propertyResults.filter(x => x.passed === false), name: 'Failed'};
+    const skippedProps = {props: val.propertyResults.filter(x => x.passed === null), name: 'Skipped'};
+    const dnrProps = {props: val.propertyResults.filter(x => x.passed === undefined), name: 'DNR'};
+
+    const propSummary = [passedProps, failedProps];
+    if (skippedProps.props.length > 0) {
+        propSummary.push(skippedProps);
+    }
+    if (dnrProps.props.length > 0) {
+        propSummary.push(dnrProps);
+    }
+    const propSummaryStrArr = propSummary.map(x => `${x.props.length} ${x.name}${x.props.length > 0 ? ` (${x.props.map(y => y.property as string)})` : ''}`);
+    return [propSummaryStrArr.join(' | '), val.propertyResults.map(x => filterCriteriaPropertySummary(x, val.criteria))]
+}
+
+export const filterCriteriaPropertySummary = <T>(val: FilterCriteriaPropertyResult<T>, criteria: T): string => {
+    let passResult: string;
+    switch (val.passed) {
+        case undefined:
+            passResult = 'DNR'
+            break;
+        case null:
+        case true:
+        case false:
+            passResult = triggeredIndicator(val.passed, 'Skipped');
+            break;
+    }
+    let found;
+    if(val.passed === null || val.passed === undefined) {
+        found = '';
+    } else if(val.property === 'submissionState') {
+        const foundResult = val.found as FilterResult<SubmissionState>;
+        const criteriaResults = foundResult.criteriaResults.map((x, index) => `Criteria #${index + 1} => ${triggeredIndicator(x.passed)}\n   ${x.propertyResults.map(y => filterCriteriaPropertySummary(y, x.criteria)).join('\n    ')}`).join('\n  ');
+        found = `\n  ${criteriaResults}`;
+    } else {
+        found = ` => Found: ${val.found}`;
+    }
+
+    let expected = '';
+    if(val.property !== 'submissionState') {
+        let crit: T[keyof T][];
+        if(Array.isArray(criteria[val.property])) {
+            // @ts-ignore
+            crit = criteria[val.property];
+        } else {
+            crit = [criteria[val.property]];
+        }
+        const expectedStrings = crit.map((x: any) => {
+            if (asUserNoteCriteria(x)) {
+                return userNoteCriteriaSummary(x);
+            }
+            return x;
+        }).join(' OR ');
+        expected = ` => Expected: ${expectedStrings}`;
+    }
+
+    return `${val.property as string} => ${passResult}${expected}${found}${val.reason !== undefined ? ` -- ${val.reason}` : ''}${val.behavior === 'exclude' ? ' (Exclude passes when Expected is not Found)' : ''}`;
 }
 
 export const createAjvFactory = (logger: Logger) => {
@@ -460,34 +608,64 @@ export const isActivityWindowCriteria = (val: any): val is ActivityWindowCriteri
     return false;
 }
 
-export const parseFromJsonOrYamlToObject = (content: string): [object?, Error?, Error?] => {
+export interface ConfigToObjectOptions {
+    location?: string,
+    jsonDocFunc?: (content: string, location?: string) => AbstractConfigDocument<OperatorJsonConfig>,
+    yamlDocFunc?: (content: string, location?: string) => AbstractConfigDocument<YamlDocument>
+}
+
+export const parseFromJsonOrYamlToObject = (content: string, options?: ConfigToObjectOptions): [ConfigFormat, ConfigDocumentInterface<YamlDocument | object>?, Error?, Error?] => {
     let obj;
+    let configFormat: ConfigFormat = 'yaml';
     let jsonErr,
         yamlErr;
 
+    const likelyType = likelyJson5(content) ? 'json' : 'yaml';
+
+    const {
+        location,
+        jsonDocFunc = (content: string, location?: string) => new JsonConfigDocument(content, location),
+        yamlDocFunc = (content: string, location?: string) => new YamlConfigDocument(content, location),
+    } = options || {};
+
     try {
-        obj = JSON5.parse(content);
-        const oType = obj === null ? 'null' : typeof obj;
+        const jsonObj = jsonDocFunc(content, location);
+        const output = jsonObj.toJS();
+        const oType = output === null ? 'null' : typeof output;
         if (oType !== 'object') {
             jsonErr = new SimpleError(`Parsing as json produced data of type '${oType}' (expected 'object')`);
             obj = undefined;
+        } else {
+            obj = jsonObj;
+            configFormat = 'json';
         }
     } catch (err: any) {
         jsonErr = err;
     }
-    if (obj === undefined) {
-        try {
-            obj = yaml.load(content, {schema: JSON_SCHEMA, json: true});
-            const oType = obj === null ? 'null' : typeof obj;
-            if (oType !== 'object') {
-                yamlErr = new SimpleError(`Parsing as yaml produced data of type '${oType}' (expected 'object')`);
-                obj = undefined;
+
+    try {
+        const yamlObj = yamlDocFunc(content, location)
+        const output = yamlObj.toJS();
+        const oType = output === null ? 'null' : typeof output;
+        if (oType !== 'object') {
+            yamlErr = new SimpleError(`Parsing as yaml produced data of type '${oType}' (expected 'object')`);
+            obj = undefined;
+        } else if (obj === undefined && (likelyType !== 'json' || yamlObj.parsed.errors.length === 0)) {
+            configFormat = 'yaml';
+            if(yamlObj.parsed.errors.length !== 0) {
+                yamlErr = new Error(yamlObj.parsed.errors.join('\n'))
+            } else {
+                obj = yamlObj;
             }
-        } catch (err: any) {
-            yamlErr = err;
         }
+    } catch (err: any) {
+        yamlErr = err;
     }
-    return [obj, jsonErr, yamlErr];
+
+    if (obj === undefined) {
+        configFormat = likelyType;
+    }
+    return [configFormat, obj, jsonErr, yamlErr];
 }
 
 export const comparisonTextOp = (val1: number, strOp: string, val2: number): boolean => {
@@ -807,6 +985,11 @@ export const createRetryHandler = (opts: RetryOptions, logger: Logger) => {
 
         lastErrorAt = dayjs();
 
+        if(isRateLimitError(err)) {
+            logger.error('Will not retry because error was due to ratelimit exhaustion');
+            return false;
+        }
+
         const redditApiError = isRequestError(err) || isStatusError(err);
 
         if(redditApiError) {
@@ -843,6 +1026,135 @@ export const createRetryHandler = (opts: RetryOptions, logger: Logger) => {
         return true;
     }
 }
+
+type StringReturn = (err:any) => string;
+
+export interface LogMatch {
+    [key: string | number]: string | StringReturn
+}
+
+export interface logExceptionOptions {
+    context?: string
+    logIfNotMatched?: boolean
+    logStackTrace?: boolean
+    match?: LogMatch
+}
+
+export const parseMatchMessage = (err: any, match: LogMatch, matchTypes: (string | number)[], defaultMatch: string): [string, boolean] => {
+    for(const m of matchTypes) {
+        if(match[m] !== undefined) {
+            if(typeof match[m] === 'string') {
+                return [match[m] as string, true];
+            }
+            return [(match[m] as Function)(err), true];
+        }
+    }
+    return [defaultMatch, false];
+}
+
+export const getExceptionMessage = (err: any, match: LogMatch = {}): string | undefined => {
+
+    let matched = false,
+        matchMsg;
+
+    if (isRequestError(err)) {
+        if (isRateLimitError(err)) {
+            ([matchMsg, matched] = parseMatchMessage(err, match, ['ratelimit', err.statusCode], 'Ratelimit Exhausted'));
+        } else if (isScopeError(err)) {
+            ([matchMsg, matched] = parseMatchMessage(err, match, ['scope', err.statusCode], 'Missing OAUTH scope required for this request'));
+        } else {
+            ([matchMsg, matched] = parseMatchMessage(err, match, [err.statusCode], err.message));
+        }
+    } else {
+        ([matchMsg, matched] = parseMatchMessage(err, match, ['any'], err.message));
+    }
+
+    if (matched) {
+        return matchMsg;
+    }
+}
+
+const _transformError = (err: Error, seen: Set<Error>, matchOptions?: LogMatch) => {
+    if (!err || !isProbablyError(err)) {
+        return '';
+    }
+    if (seen.has(err)) {
+        return err;
+    }
+
+    try {
+
+        // @ts-ignore
+        let mOpts = err.matchOptions ?? matchOptions;
+
+        if (isRequestError(err)) {
+            const errMsgParts = [`Reddit responded with a NOT OK status (${err.statusCode})`];
+
+            if (err.response.headers !== undefined && (typeof err.response.headers['content-type'] === 'string' || Array.isArray(err.response.headers['content-type'])) && err.response.headers['content-type'].includes('html')) {
+                // reddit returns html even when we specify raw_json in the querystring (via snoowrap)
+                // which means the html gets set as the message for the error AND gets added to the stack as the message
+                // and we end up with a h u g e log statement full of noisy html >:(
+
+                const {error, statusCode, message, stack: errStack} = err;
+
+                let newMessage = `Status Error ${statusCode} from Reddit`;
+
+                if (error !== undefined) {
+                    if (typeof error === 'string') {
+                        const errorSample = (error as unknown as string).slice(0, 10);
+                        const messageBeforeIndex = message.indexOf(errorSample);
+                        if (messageBeforeIndex > 0) {
+                            newMessage = `${message.slice(0, messageBeforeIndex)} - ${newMessage}`;
+                        }
+                    } else if (error !== null && (error instanceof Error || (typeof error === 'object' && (error as any).message !== undefined))) {
+                        newMessage = `${newMessage} with error: ${truncateStringToLength(100)(error.message)}`;
+                    }
+                } else if (message !== undefined) {
+                    newMessage = `${newMessage} with message: ${truncateStringToLength(100)(message)}`;
+                }
+                let cleanStack = errStack;
+
+                // try to get just stacktrace by finding beginning of what we assume is the actual trace
+                if (errStack) {
+                    cleanStack = `${newMessage}\n${errStack.slice(errStack.indexOf('at new StatusCodeError'))}`;
+                }
+                // now put it all together so its nice and clean
+                err.message = newMessage;
+                err.stack = cleanStack;
+            }
+
+            const msg = getExceptionMessage(err, mOpts);
+            if (msg !== undefined) {
+                errMsgParts.push(msg);
+            }
+
+            // we don't care about stack trace for this error because we know where it came from so truncate to two lines for now...maybe remove all together later
+            if (err.stack !== undefined) {
+                err.stack = err.stack.split('\n').slice(0, 2).join('\n');
+            }
+
+            const normalizedError = new ErrorWithCause(errMsgParts.join(' => '), {cause: err});
+            normalizedError.stack = normalizedError.message;
+            return normalizedError;
+        }
+
+        // @ts-ignore
+        const cause = err.cause as unknown;
+
+        if (cause !== undefined && cause instanceof Error) {
+            // @ts-ignore
+            err.cause = _transformError(cause, seen, mOpts);
+        }
+
+        return err;
+    } catch (e: any) {
+        // oops :(
+        // we're gonna swallow silently instead of reporting to avoid any infinite nesting and hopefully the original error looks funny enough to provide clues as to what to fix here
+        return err;
+    }
+}
+
+export const transformError = (err: Error): any => _transformError(err, new Set());
 
 const LABELS_REGEX: RegExp = /(\[.+?])*/g;
 export const parseLabels = (log: string): string[] => {
@@ -889,7 +1201,8 @@ export const isLogLineMinLevel = (log: string | LogInfo, minLevelText: string): 
 
 // https://regexr.com/3e6m0
 const HYPERLINK_REGEX: RegExp = /(http(s)?:\/\/.)?(www\.)?[-a-zA-Z0-9@:%._\+~#=]{2,256}\.[a-z]{2,6}\b([-a-zA-Z0-9@:%_\+.~#?&//=]*)/;
-export const formatLogLineToHtml = (log: string | LogInfo) => {
+const formattedTime = (short: string, full: string) => `<span class="has-tooltip"><span style="margin-top:35px" class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black space-y-3 p-2 text-left'>${full}</span><span>${short}</span></span>`;
+export const formatLogLineToHtml = (log: string | LogInfo, timestamp?: string) => {
     const val = typeof log === 'string' ? log : log[MESSAGE];
     const logContent = Autolinker.link(val, {
         email: false,
@@ -906,31 +1219,48 @@ export const formatLogLineToHtml = (log: string | LogInfo) => {
         .replace(/(\s*verbose\s*):/i, '<span class="error purple">$1</span>:')
         .replaceAll('\n', '<br />');
         //.replace(HYPERLINK_REGEX, '<a target="_blank" href="$&">$&</a>');
-    return `<div class="logLine">${logContent}</div>`
+    let line = '';
+
+    let timestampString = timestamp;
+    if(timestamp === undefined && typeof log !== 'string') {
+        timestampString = (log as LogInfo).timestamp;
+    }
+
+    if(timestampString !== undefined) {
+        const timeStampReplacement = formattedTime(dayjs(timestampString).format('HH:mm:ss z'), timestampString);
+        const splitLine = logContent.split(timestampString);
+        line = `<div class="logLine">${splitLine[0]}${timeStampReplacement}<span style="white-space: pre-wrap">${splitLine[1]}</span></div>`;
+    } else {
+        line = `<div style="white-space: pre-wrap" class="logLine">${logContent}</div>`
+    }
+    return line;
 }
 
 export type LogEntry = [number, LogInfo];
 export interface LogOptions {
-    limit: number,
+    limit: number | string,
     level: string,
     sort: 'ascending' | 'descending',
     operator?: boolean,
     user?: string,
     allLogsParser?: Function
-    allLogName?: string
+    allLogName?: string,
+    returnType?: 'string' | 'object'
 }
 
-export const filterLogBySubreddit = (logs: Map<string, LogEntry[]>, validLogCategories: string[] = [], options: LogOptions): Map<string, string[]> => {
+export const filterLogBySubreddit = (logs: Map<string, LogEntry[]>, validLogCategories: string[] = [], options: LogOptions): Map<string, (string|LogInfo)[]> => {
     const {
-        limit,
+        limit: limitVal,
         level,
         sort,
         operator = false,
         user,
         allLogsParser = parseSubredditLogInfoName,
-        allLogName = 'app'
+        allLogName = 'app',
+        returnType = 'string',
     } = options;
 
+    let limit = typeof limitVal === 'number' ? limitVal : Number.parseInt(limitVal);
     // get map of valid logs categories
     const validSubMap: Map<string, LogEntry[]> = new Map();
     for(const [k, v] of logs) {
@@ -962,17 +1292,51 @@ export const filterLogBySubreddit = (logs: Map<string, LogEntry[]>, validLogCate
 
     const sortFunc = sort === 'ascending' ? (a: LogEntry, b: LogEntry) => a[0] - b[0] : (a: LogEntry, b: LogEntry) => b[0] - a[0];
 
-    const preparedMap: Map<string, string[]> = new Map();
+    const preparedMap: Map<string, (string|LogInfo)[]> = new Map();
     // iterate each entry and
     // sort, filter by level, slice to limit, then map to html string
     for(const [k,v] of validSubMap.entries()) {
         let preparedEntries = v.filter(([time, l]) => isLogLineMinLevel(l, level));
         preparedEntries.sort(sortFunc);
-        preparedMap.set(k, preparedEntries.slice(0, limit + 1).map(([time, l]) => formatLogLineToHtml(l)));
+        const entriesSlice = preparedEntries.slice(0, limit + 1);
+        if(returnType === 'string') {
+            preparedMap.set(k, entriesSlice.map(([time, l]) => formatLogLineToHtml(l)));
+        } else {
+            preparedMap.set(k, entriesSlice.map(([time, l]) => l));
+        }
     }
 
 
     return preparedMap;
+}
+
+export const logSortFunc = (sort: string = 'ascending') => sort === 'ascending' ? (a: LogInfo, b: LogInfo) => (dayjs(a.timestamp).isSameOrAfter(b.timestamp) ? 1 : -1) : (a: LogInfo, b: LogInfo) => (dayjs(a.timestamp).isSameOrBefore(b.timestamp) ? 1 : -1);
+
+export const filterLogs= (logs: LogInfo[], options: LogOptions): LogInfo[] | string[] => {
+    const {
+        limit: limitVal,
+        level,
+        sort,
+        operator = false,
+        user,
+        allLogsParser = parseSubredditLogInfoName,
+        allLogName = 'app',
+        returnType = 'string',
+    } = options;
+
+    let limit = typeof limitVal === 'number' ? limitVal : Number.parseInt(limitVal);
+    let leveledLogs = logs.filter(x => isLogLineMinLevel(x, level));
+    if(user !== undefined) {
+        leveledLogs = logs.filter(x => x.user !== undefined && x.user === user);
+    }
+    leveledLogs.sort(logSortFunc(sort));
+    leveledLogs = leveledLogs.slice(0, limit + 1);
+
+    if(returnType === 'string') {
+        return leveledLogs.map(x => formatLogLineToHtml(x));
+    } else {
+        return leveledLogs;
+    }
 }
 
 export const logLevels = {
@@ -1065,6 +1429,17 @@ export const parseRegex = (reg: RegExp, val: string): RegExResult => {
     }
 }
 
+export const testMaybeStringRegex = (test: string, subject: string, defaultFlags: string = 'i'): [boolean, string] => {
+    let reg = parseStringToRegex(test, defaultFlags);
+    if (reg === undefined) {
+        reg = parseStringToRegex(`/.*${escapeRegex(test.trim())}.*/`, 'i');
+        if (reg === undefined) {
+            throw new SimpleError(`Could not convert test value to a valid regex: ${test}`);
+        }
+    }
+    return [reg.test(subject), reg.toString()];
+}
+
 export const isStrongSubredditState = (value: SubredditState | StrongSubredditState) => {
     return value.name === undefined || value.name instanceof RegExp;
 }
@@ -1132,19 +1507,25 @@ export const convertSubredditsRawToStrong = (x: (SubredditState | string), opts:
     return toStrongSubredditState(x, opts);
 }
 
-export async function readConfigFile(path: string, opts: any) {
+export async function readConfigFile(path: string, opts: any): Promise<[string?, ConfigFormat?]> {
     const {log, throwOnNotFound = true} = opts;
+    let extensionHint: ConfigFormat | undefined;
+    const fileInfo = parse(path);
+    if(fileInfo.ext !== undefined) {
+        switch(fileInfo.ext) {
+            case '.json':
+            case '.json5':
+                extensionHint = 'json';
+                break;
+            case '.yaml':
+                extensionHint = 'yaml';
+                break;
+        }
+    }
     try {
         await promises.access(path, constants.R_OK);
         const data = await promises.readFile(path);
-        const [configObj, jsonErr, yamlErr] = parseFromJsonOrYamlToObject(data as unknown as string);
-        if(configObj !== undefined) {
-            return configObj as object;
-        }
-        log.error(`Could not parse file contents at ${path} as JSON or YAML:`);
-        log.error(jsonErr);
-        log.error(yamlErr);
-        throw new SimpleError(`Could not parse file contents at ${path} as JSON or YAML`);
+        return [(data as any).toString(), extensionHint]
     } catch (e: any) {
         const {code} = e;
         if (code === 'ENOENT') {
@@ -1152,14 +1533,16 @@ export async function readConfigFile(path: string, opts: any) {
                 if (log) {
                     log.warn('No file found at given path', {filePath: path});
                 }
+                e.extension = extensionHint;
                 throw e;
             } else {
-                return;
+                return [];
             }
         } else if (log) {
             log.warn(`Encountered error while parsing file`, {filePath: path});
             log.error(e);
         }
+        e.extension = extensionHint;
         throw e;
     }
 }
@@ -1286,6 +1669,28 @@ export const intersect = (a: Array<any>, b: Array<any>) => {
     const intersection = new Set([...setA].filter(x => setB.has(x)));
     return Array.from(intersection);
 }
+/**
+ * @see https://stackoverflow.com/a/64245521/1469797
+ * */
+function *setMinus(A: Array<any>, B: Array<any>) {
+    const setA = new Set(A);
+    const setB = new Set(B);
+
+    for (const v of setB.values()) {
+        if (!setA.delete(v)) {
+            yield v;
+        }
+    }
+
+    for (const v of setA.values()) {
+        yield v;
+    }
+}
+
+
+export const difference = (a: Array<any>, b: Array<any>) => {
+    return Array.from(setMinus(a, b));
+}
 
 export const snooLogWrapper = (logger: Logger) => {
     return {
@@ -1300,11 +1705,55 @@ export const snooLogWrapper = (logger: Logger) => {
  * Cached activities lose type information when deserialized so need to check properties as well to see if the object is the shape of a Submission
  * */
 export const isSubmission = (value: any) => {
-    return value instanceof Submission || value.domain !== undefined;
+    try {
+        return value !== null && typeof value === 'object' && (value instanceof Submission || (value.name !== undefined && value.name.includes('t3_')) || value.domain !== undefined);
+    } catch (e) {
+        return false;
+    }
 }
 
 export const asSubmission = (value: any): value is Submission => {
     return isSubmission(value);
+}
+
+export const isComment = (value: any) => {
+    try {
+        return value !== null && typeof value === 'object' && (value instanceof Comment || value.name.includes('t1_'));
+    } catch (e) {
+        return false;
+    }
+}
+
+export const asComment = (value: any): value is Comment => {
+    return isComment(value);
+}
+
+export const asActivity = (value: any): value is (Submission | Comment) => {
+    return asComment(value) || asSubmission(value);
+}
+
+export const isUser = (value: any) => {
+    try {
+        return value !== null && typeof value === 'object' && (value instanceof RedditUser || value.name.includes('t2_'));
+    } catch(e) {
+        return false;
+    }
+}
+
+export const asUser = (value: any): value is RedditUser => {
+    return isUser(value);
+}
+
+export const isUserNoteCriteria = (value: any) => {
+    return value !== null && typeof value === 'object' && value.type !== undefined;
+}
+
+export const asUserNoteCriteria = (value: any): value is UserNoteCriteria => {
+    return isUserNoteCriteria(value);
+}
+
+export const userNoteCriteriaSummary = (val: UserNoteCriteria): string => {
+    return `${val.count === undefined ? '>= 1' : val.count} of ${val.search === undefined ? 'current' : val.search} notes is ${val.type}`;
 }
 
 /**
@@ -1740,4 +2189,159 @@ export const hashString = (val: any): string => {
         hash.update(val);
     }
     return hash.digest('hex');
+}
+
+const defaultScanOptions = {
+    COUNT: '100',
+    MATCH: '*'
+}
+/**
+ * Frankenstein redis scan generator
+ *
+ * Cannot use the built-in scan iterator because it is only available in > v4 of redis client but node-cache-manager-redis is using v3.x --
+ * So combining the async iterator defined in v4 from here https://github.com/redis/node-redis/blob/master/packages/client/lib/client/index.ts#L587
+ * with the scan example from v3 https://github.com/redis/node-redis/blob/8a43dea9bee11e41d33502850f6989943163020a/examples/scan.js
+ *
+ * */
+export async function* redisScanIterator(client: any, options: any = {}): AsyncIterable<string> {
+    let cursor: string = '0';
+    const scanOpts = {...defaultScanOptions, ...options};
+    do {
+        const iterScan = new Promise((resolve, reject) => {
+            client.scan(cursor, 'MATCH', scanOpts.MATCH, 'COUNT', scanOpts.COUNT, (err: any, res: any) => {
+                if(err) {
+                    return reject(err);
+                } else {
+                    const newCursor = res[0];
+                    let keys = res[1];
+                    resolve([newCursor, keys]);
+                }
+            });
+        }) as Promise<[any, string[]]>;
+        const [newCursor, keys] = await iterScan;
+        cursor = newCursor;
+        for (const key of keys) {
+            yield key;
+        }
+    } while (cursor !== '0');
+}
+
+export const mergeFilters = (objectConfig: any, filterDefs: FilterCriteriaDefaults | undefined): [AuthorOptions, TypedActivityStates] => {
+    const {authorIs: aisVal = {}, itemIs: iisVal = []} = objectConfig || {};
+    const authorIs = aisVal as AuthorOptions;
+    const itemIs = iisVal as TypedActivityStates;
+
+    const {
+        authorIsBehavior = 'merge',
+        itemIsBehavior = 'merge',
+        authorIs: authorIsDefault = {},
+        itemIs: itemIsDefault = []
+    } = filterDefs || {};
+
+    let derivedAuthorIs: AuthorOptions = authorIsDefault;
+    if (authorIsBehavior === 'merge') {
+        derivedAuthorIs = merge.all([authorIs, authorIsDefault], {arrayMerge: removeFromSourceIfKeysExistsInDestination});
+    } else if (Object.keys(authorIs).length > 0) {
+        derivedAuthorIs = authorIs;
+    }
+
+    let derivedItemIs: TypedActivityStates = itemIsDefault;
+    if (itemIsBehavior === 'merge') {
+        derivedItemIs = [...itemIs, ...itemIsDefault];
+    } else if (itemIs.length > 0) {
+        derivedItemIs = itemIs;
+    }
+
+    return [derivedAuthorIs, derivedItemIs];
+}
+
+export const formatFilterData = (result: (RunResult | CheckSummary | RuleResult | ActionResult)) => {
+
+    const formattedResult: any = {};
+
+    const {authorIs, itemIs} = result;
+
+    if (authorIs !== undefined) {
+        formattedResult.authorIs = {
+            ...authorIs,
+            passed: triggeredIndicator(authorIs.passed),
+            criteriaResults: authorIs.criteriaResults.map(x => filterCriteriaSummary(x))
+        }
+    }
+    if (itemIs !== undefined) {
+        formattedResult.itemIs = {
+            ...itemIs,
+            passed: triggeredIndicator(itemIs.passed),
+            criteriaResults: itemIs.criteriaResults.map(x => filterCriteriaSummary(x))
+        }
+    }
+
+    return formattedResult;
+}
+
+export const getUserAgent = (val: string, fragment?: string) => {
+    return `${replaceApplicationIdentifier(val, fragment)} (developed by /u/FoxxMD)`;
+}
+
+export const replaceApplicationIdentifier = (val: string, fragment?: string) => {
+    return val.replace('{VERSION}', `v${VERSION}`).replace('{FRAG}', (fragment !== undefined ? `-${fragment}` : ''));
+}
+
+export const parseDurationValToDuration = (val: DurationVal): Duration => {
+    let duration: Duration;
+    if (typeof val === 'object') {
+        duration = dayjs.duration(val);
+        if (!dayjs.isDuration(duration)) {
+            throw new Error('window value given was not a well-formed Duration object');
+        }
+    } else {
+        try {
+            duration = parseDuration(val);
+        } catch (e) {
+            if (e instanceof InvalidRegexError) {
+                throw new Error(`duration value of '${val}' could not be parsed as a valid ISO8601 duration or DayJS duration shorthand (see Schema)`);
+            }
+            throw e;
+        }
+    }
+    return duration;
+}
+
+export const generateItemFilterHelpers = (stateCriteria: TypedActivityState): [ItemCritPropHelper, RequiredItemCrit] => {
+    const definedStateCriteria = (removeUndefinedKeys(stateCriteria) as RequiredItemCrit);
+
+    if(definedStateCriteria === undefined) {
+        return [{}, {} as RequiredItemCrit];
+    }
+
+    const propResultsMap = Object.entries(definedStateCriteria).reduce((acc: ItemCritPropHelper, [k, v]) => {
+        const key = (k as keyof (SubmissionState & CommentState));
+        acc[key] = {
+            property: key,
+            behavior: 'include',
+        };
+        return acc;
+    }, {});
+
+    return [propResultsMap, definedStateCriteria];
+}
+
+export const isCommentState = (state: TypedActivityState): state is CommentState => {
+    return 'op' in state || 'depth' in state || 'submissionState' in state;
+}
+const DISPATCH_REGEX: RegExp = /^dispatch:/i;
+const POLL_REGEX: RegExp = /^poll:/i;
+export const asActivitySource = (val: string): val is ActivitySource => {
+    if(['dispatch','poll','user'].some(x => x === val)) {
+        return true;
+    }
+    return DISPATCH_REGEX.test(val) || POLL_REGEX.test(val);
+}
+
+export const strToActivitySource = (val: string): ActivitySource => {
+    const cleanStr = val.trim();
+    if (asActivitySource(cleanStr)) {
+        return cleanStr;
+    }
+    throw new SimpleError(`'${cleanStr}' is not a valid ActivitySource. Must be one of: dispatch, dispatch:[identifier], poll, poll:[identifier], user`);
 }

@@ -46,7 +46,43 @@
                                class="text-black placeholder-gray-500 rounded mt-2 mb-3 p-2"
                                placeholder="<%= locals.clientSecret !== undefined ? 'Use Provided Client Secret' : 'Client Secret Not Provided' %>">
                     </div>
-                    <div class="text-lg text-semibold my-3">3. Select permissions</div>
+                    <div class="text-lg text-semibold my-3">3. Select Instance</div>
+                    <div class="my-2 ml-5">
+                        <div class="space-y-3">
+                            <div>Specify the ContextMod instance to add this bot to.</div>
+                            <select id="instanceSelect" style="max-width:400px;" class="form-select
+      block
+      w-full
+      px-3
+      py-1.5
+      text-base
+      font-normal
+      text-gray-700
+      bg-white bg-clip-padding bg-no-repeat
+      border border-solid border-gray-300
+      rounded
+      transition
+      ease-in-out
+      m-0
+      focus:text-gray-700 focus:bg-white focus:border-blue-600 focus:outline-none" aria-label="Default select example">
+                                <% instances.forEach(function (name, index){ %>
+                                    <option selected="<%= index === 0 ? 'true' : 'false' %>" value="<%= name %>"><%= name %></option>
+                                    <%= name %>
+                                <% }) %>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="text-lg text-semibold my-3">4. Optionally, restrict to Subreddits</div>
+                    <div class="my-2 ml-5">
+                        <div class="space-y-3">
+                        <div>Specify which subreddits, out of all the subreddits the bot moderates, CM should run on.</div>
+                        <div>Subreddits should be seperated with a comma. Leave blank to run on all moderated subreddits</div>
+                        <input id="subreddits" style="max-width:800px; display: block;"
+                               class="text-black placeholder-gray-500 rounded mt-2 mb-3 p-2 w-full"
+                               placeholder="aSubreddit,aSecondSubreddit,aThirdSubreddit">
+                        </div>
+                    </div>
+                    <div class="text-lg text-semibold my-3">5. Select permissions</div>
                     <div class="my-2 ml-5">
                         <div class="space-y-3">
                             <div>These are permissions to allow the bot account to perform these actions, <b>in
@@ -175,8 +211,13 @@
                                     to be able to accept moderator invitations programmatically</label>
                             </div>
                             <div>
+                                <input class="permissionToggle" type="checkbox" id="modnote" name="modnote" checked>
+                                <label for="modnote"><span class="font-mono font-semibold">modnote</span> for the bot to
+                                    be able to read and write Mod Notes<</label>
+                            </div>
+                            <div>
                                 <input class="permissionToggle" type="checkbox" id="modlog" name="modlog">
-                                <label for="modlog"><span class="font-mono font-semibold">modlog</span> for the bot to
+                                <label for="modlog"><span class="font-mono font-semibold">modlog</span> for the bot to be
                                     able to read the moderation log (not currently implemented)</label>
                             </div>
                         </div>
@@ -220,6 +261,8 @@
                 clientSecret: document.querySelector('#clientSecret').value,
                 code: document.querySelector("#inviteCode").value === '' ? undefined : document.querySelector("#inviteCode").value,
                 permissions,
+                instance: document.querySelector('#instanceSelect').value,
+                subreddits: document.querySelector('#subreddits').value
             })
         }).then((resp) => {
             if(!resp.ok) {

@@ -19,7 +19,7 @@ const action = async (req: Request, res: Response) => {
 
     for (const manager of subreddits) {
         const mLogger = manager.logger;
-        mLogger.info(`/u/${userName} invoked '${action}' action for ${type} on ${manager.displayLabel}`);
+        mLogger.info(`/u/${userName} invoked '${action}' action for ${type} on ${manager.displayLabel}`, {user: userName});
         try {
             switch (action) {
                 case 'start':
@@ -62,9 +62,9 @@ const action = async (req: Request, res: Response) => {
                         const activities = await manager.subreddit.getUnmoderated({limit: 100});
                         for (const a of activities.reverse()) {
                             await manager.firehose.push({
-                                checkType: a instanceof Submission ? 'Submission' : 'Comment',
                                 activity: a,
                                 options: {
+                                    source: 'user',
                                     force: true,
                                 }
                             });
@@ -73,9 +73,9 @@ const action = async (req: Request, res: Response) => {
                         const activities = await manager.subreddit.getModqueue({limit: 100});
                         for (const a of activities.reverse()) {
                             await manager.firehose.push({
-                                checkType: a instanceof Submission ? 'Submission' : 'Comment',
                                 activity: a,
                                 options: {
+                                    source: 'user',
                                     force: true
                                 }
                             });

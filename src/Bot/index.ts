@@ -1,4 +1,4 @@
-import Snoowrap, {Comment, Submission, Subreddit} from "snoowrap";
+import Snoowrap, {Comment, ConfigOptions, Submission, Subreddit} from "snoowrap";
 import {Logger} from "winston";
 import dayjs, {Dayjs} from "dayjs";
 import {Duration} from "dayjs/plugin/duration";
@@ -6,7 +6,7 @@ import EventEmitter from "events";
 import {
     BotInstanceConfig,
     FilterCriteriaDefaults,
-    Invokee,
+    Invokee, LogInfo,
     PAUSED,
     PollOn,
     RUNNING,
@@ -15,11 +15,11 @@ import {
     USER
 } from "../Common/interfaces";
 import {
-    createRetryHandler,
-    formatNumber,
+    createRetryHandler, difference,
+    formatNumber, getExceptionMessage, getUserAgent,
     mergeArr,
     parseBool,
-    parseDuration,
+    parseDuration, parseMatchMessage, parseRedditEntity,
     parseSubredditName, RetryOptions,
     sleep,
     snooLogWrapper
@@ -30,14 +30,15 @@ import {CommentStream, ModQueueStream, SPoll, SubmissionStream, UnmoderatedStrea
 import {BotResourcesManager} from "../Subreddit/SubredditResources";
 import LoggedError from "../Utils/LoggedError";
 import pEvent from "p-event";
-import SimpleError from "../Utils/SimpleError";
-import {isRateLimitError, isStatusError} from "../Utils/Errors";
+import {SimpleError, isRateLimitError, isRequestError, isScopeError, isStatusError, CMError} from "../Utils/Errors";
+import {ErrorWithCause} from "pony-cause";
 
 
 class Bot {
 
     client!: ExtendedSnoowrap;
     logger!: Logger;
+    logs: LogInfo[] = [];
     wikiLocation: string;
     dryRun?: true | undefined;
     running: boolean = false;
@@ -78,6 +79,8 @@ class Bot {
 
     cacheManager: BotResourcesManager;
 
+    config: BotInstanceConfig;
+
     getBotName = () => {
         return this.botName;
     }
@@ -98,6 +101,7 @@ class Bot {
                 dryRun,
                 heartbeatInterval,
             },
+            userAgent,
             credentials: {
                 reddit: {
                     clientId,
@@ -109,6 +113,9 @@ class Bot {
             snoowrap: {
                 proxy,
                 debug,
+                maxRetryAttempts = 2,
+                retryErrorCodes,
+                timeoutCodes,
             },
             polling: {
                 shared = [],
@@ -129,8 +136,7 @@ class Bot {
             }
         } = config;
 
-        this.cacheManager = new BotResourcesManager(config);
-
+        this.config = config;
         this.dryRun = parseBool(dryRun) === true ? true : undefined;
         this.softLimit = softLimit;
         this.hardLimit = hardLimit;
@@ -151,6 +157,14 @@ class Bot {
             }
         }, mergeArr);
 
+        this.logger.stream().on('log', (log: LogInfo) => {
+            if(log.bot !== undefined && log.bot === this.getBotName() && log.subreddit === undefined) {
+                this.logs = [log, ...this.logs].slice(0, 301);
+            }
+        });
+
+        this.cacheManager = new BotResourcesManager(config, this.logger);
+
         let mw = maxWorkers;
         if(maxWorkers < 1) {
             this.logger.warn(`Max queue workers must be greater than or equal to 1 (Specified: ${maxWorkers})`);
@@ -166,7 +180,9 @@ class Bot {
         this.excludeSubreddits = exclude.map(parseSubredditName);
 
         let creds: any = {
-            get userAgent() { return getUserName() },
+            get userAgent() {
+                return getUserAgent(`web:contextBot:{VERSION}{FRAG}:BOT-${getBotName()}`, userAgent)
+            },
             clientId,
             clientSecret,
             refreshToken,
@@ -189,14 +205,20 @@ class Bot {
         }
 
         try {
-            this.client = proxy === undefined ? new ExtendedSnoowrap(creds) : new ProxiedSnoowrap({...creds, proxy});
-            this.client.config({
+            this.client = proxy === undefined ? new ExtendedSnoowrap({...creds, timeoutCodes}) : new ProxiedSnoowrap({...creds, proxy, timeoutCodes});
+            const snoowrapConfigData: ConfigOptions = {
                 warnings: true,
-                maxRetryAttempts: 2,
+                maxRetryAttempts,
                 debug,
                 logger: snooLogWrapper(this.logger.child({labels: ['Snoowrap']}, mergeArr)),
                 continueAfterRatelimitError: false,
-            });
+            };
+
+            if(retryErrorCodes !== undefined) {
+                snoowrapConfigData.retryErrorCodes = retryErrorCodes;
+            }
+
+            this.client.config(snoowrapConfigData);
         } catch (err: any) {
             if(this.error === undefined) {
                 this.error = err.message;
@@ -234,10 +256,9 @@ class Bot {
     }
 
     createSharedStreamErrorListener = (name: string) => async (err: any) => {
-        this.logger.error(`Polling error occurred on stream ${name.toUpperCase()}`, err);
         const shouldRetry = await this.sharedStreamRetryHandler(err);
         if(shouldRetry) {
-            (this.cacheManager.modStreams.get(name) as SPoll<any>).startInterval(false);
+            (this.cacheManager.modStreams.get(name) as SPoll<any>).startInterval(false, 'Within retry limits');
         } else {
             for(const m of this.subManagers) {
                 if(m.sharedStreamCallbacks.size > 0) {
@@ -255,7 +276,7 @@ class Bot {
             return;
         }
         for(const i of listing) {
-            const foundManager = this.subManagers.find(x => x.subreddit.display_name === i.subreddit.display_name && x.sharedStreamCallbacks.get(name) !== undefined);
+            const foundManager = this.subManagers.find(x => x.subreddit.display_name === i.subreddit.display_name && x.sharedStreamCallbacks.get(name) !== undefined && x.eventsState.state === RUNNING);
             if(foundManager !== undefined) {
                 foundManager.sharedStreamCallbacks.get(name)(i);
                 if(this.stagger !== undefined) {
@@ -280,22 +301,16 @@ class Bot {
             if (initial) {
                 this.logger.error('An error occurred while trying to initialize the Reddit API Client which would prevent the entire application from running.');
             }
-            if (err.name === 'StatusCodeError') {
-                const authHeader = err.response.headers['www-authenticate'];
-                if (authHeader !== undefined && authHeader.includes('insufficient_scope')) {
-                    this.logger.error('Reddit responded with a 403 insufficient_scope. Please ensure you have chosen the correct scopes when authorizing your account.');
-                } else if (err.statusCode === 401) {
-                    this.logger.error('It is likely a credential is missing or incorrect. Check clientId, clientSecret, refreshToken, and accessToken');
-                } else if(err.statusCode === 400) {
-                    this.logger.error('Credentials may have been invalidated due to prior behavior. The error message may contain more information.');
-                }
-                this.logger.error(`Error Message: ${err.message}`);
-            } else {
-                this.logger.error(err);
-            }
-            this.error = `Error occurred while testing Reddit API client: ${err.message}`;
-            err.logged = true;
-            throw err;
+            const hint = getExceptionMessage(err, {
+                401: 'Likely a credential is missing or incorrect. Check clientId, clientSecret, refreshToken, and accessToken',
+                400: 'Credentials may have been invalidated manually or by reddit due to behavior',
+            });
+            let msg = `Error occurred while testing Reddit API client${hint !== undefined ? `: ${hint}` : ''}`;
+            this.error = msg;
+            const clientError = new CMError(msg, {cause: err});
+            clientError.logged = true;
+            this.logger.error(clientError);
+            throw clientError;
         }
     }
 
@@ -348,6 +363,31 @@ class Bot {
             }
         }
 
+        const {
+            subreddits: {
+                overrides = [],
+            } = {}
+        } = this.config;
+        if(overrides.length > 0) {
+            // check for overrides that don't match subs to run and warn operator
+            const subsToRunNames = subsToRun.map(x => x.display_name.toLowerCase());
+
+            const normalizedOverrideNames = overrides.reduce((acc: string[], curr) => {
+                try {
+                    const ent = parseRedditEntity(curr.name);
+                    return acc.concat(ent.name.toLowerCase());
+                } catch (e) {
+                    this.logger.warn(new ErrorWithCause(`Could not use subreddit override because name was not valid: ${curr.name}`, {cause: e}));
+                    return acc;
+                }
+            }, []);
+            const notMatched = difference(normalizedOverrideNames, subsToRunNames);
+            if(notMatched.length > 0) {
+                this.logger.warn(`There are overrides defined for subreddits the bot is not running. Check your spelling! Overrides not matched: ${notMatched.join(', ')}`);
+            }
+        }
+
+
         // get configs for subs we want to run on and build/validate them
         for (const sub of subsToRun) {
             try {
@@ -376,7 +416,7 @@ class Bot {
                 let processed;
                 if (stream !== undefined) {
                     this.logger.info('Restarting SHARED COMMENT STREAM due to a subreddit config change');
-                    stream.end();
+                    stream.end('Replacing with a new stream with updated subreddits');
                     processed = stream.processed;
                 }
                 if (sharedCommentsSubreddits.length > 100) {
@@ -398,7 +438,7 @@ class Bot {
         } else {
             const stream = this.cacheManager.modStreams.get('newComm');
             if (stream !== undefined) {
-                stream.end();
+                stream.end('Determined no managers are listening on shared stream parsing');
             }
         }
 
@@ -409,7 +449,7 @@ class Bot {
                 let processed;
                 if (stream !== undefined) {
                     this.logger.info('Restarting SHARED SUBMISSION STREAM due to a subreddit config change');
-                    stream.end();
+                    stream.end('Replacing with a new stream with updated subreddits');
                     processed = stream.processed;
                 }
                 if (sharedSubmissionsSubreddits.length > 100) {
@@ -431,7 +471,7 @@ class Bot {
         } else {
             const stream = this.cacheManager.modStreams.get('newSub');
             if (stream !== undefined) {
-                stream.end();
+                stream.end('Determined no managers are listening on shared stream parsing');
             }
         }
 
@@ -449,7 +489,7 @@ class Bot {
             defaultUnmoderatedStream.on('listing', this.createSharedStreamListingListener('unmoderated'));
             this.cacheManager.modStreams.set('unmoderated', defaultUnmoderatedStream);
         } else if (!isUnmoderatedShared && unmoderatedstream !== undefined) {
-            unmoderatedstream.end();
+            unmoderatedstream.end('Determined no managers are listening on shared stream parsing');
         }
 
         const isModqueueShared = !this.sharedStreams.includes('modqueue') ? false : this.subManagers.some(x => x.isPollingShared('modqueue'));
@@ -466,7 +506,7 @@ class Bot {
             defaultModqueueStream.on('listing', this.createSharedStreamListingListener('modqueue'));
             this.cacheManager.modStreams.set('modqueue', defaultModqueueStream);
         } else if (isModqueueShared && modqueuestream !== undefined) {
-            modqueuestream.end();
+            modqueuestream.end('Determined no managers are listening on shared stream parsing');
         }
     }
 
@@ -474,15 +514,40 @@ class Bot {
         try {
             await manager.parseConfiguration('system', true, {suppressNotification: true, suppressChangeEvent: true});
         } catch (err: any) {
-            if (!(err instanceof LoggedError)) {
-                this.logger.error(`Config was not valid:`, {subreddit: manager.subreddit.display_name_prefixed});
-                this.logger.error(err, {subreddit: manager.subreddit.display_name_prefixed});
-                err.logged = true;
+            if(err.logged !== true) {
+                const normalizedError = new ErrorWithCause(`Bot could not start manager because config was not valid`, {cause: err});
+                // @ts-ignore
+                this.logger.error(normalizedError, {subreddit: manager.subreddit.display_name_prefixed});
+            } else {
+                this.logger.error('Bot could not start manager because config was not valid', {subreddit: manager.subreddit.display_name_prefixed});
             }
         }
     }
 
     createManager(sub: Subreddit): Manager {
+        const {
+            flowControlDefaults: {
+                maxGotoDepth: botMaxDefault
+            } = {},
+            subreddits: {
+                overrides = [],
+            } = {}
+        } = this.config;
+
+        const override = overrides.find(x => {
+            const configName = parseRedditEntity(x.name).name;
+            if(configName !== undefined) {
+                return configName.toLowerCase() === sub.display_name.toLowerCase();
+            }
+            return false;
+        });
+
+        const {
+            flowControlDefaults: {
+                maxGotoDepth: subMax = undefined,
+            } = {}
+        } = override || {};
+
         const manager = new Manager(sub, this.client, this.logger, this.cacheManager, {
             dryRun: this.dryRun,
             sharedStreams: this.sharedStreams,
@@ -490,6 +555,7 @@ class Bot {
             botName: this.botName as string,
             maxWorkers: this.maxWorkers,
             filterCriteriaDefaults: this.filterCriteriaDefaults,
+            maxGotoDepth: subMax ?? botMaxDefault
         });
         // all errors from managers will count towards bot-level retry count
         manager.on('error', async (err) => await this.panicOnRetries(err));
@@ -667,9 +733,11 @@ class Bot {
                     }
                 }
             } catch (err: any) {
-                this.logger.info('Stopping event polling to prevent activity processing queue from backing up. Will be restarted when config update succeeds.')
-                await s.stopEvents('system', {reason: 'Invalid config will cause events to pile up in queue. Will be restarted when config update succeeds (next heartbeat).'});
-                if(!(err instanceof LoggedError)) {
+                if(s.eventsState.state === RUNNING) {
+                    this.logger.info('Stopping event polling to prevent activity processing queue from backing up. Will be restarted when config update succeeds.')
+                    await s.stopEvents('system', {reason: 'Invalid config will cause events to pile up in queue. Will be restarted when config update succeeds (next heartbeat).'});
+                }
+                if(err.logged !== true) {
                     this.logger.error(err, {subreddit: s.displayLabel});
                 }
                 if(this.nextHeartbeat !== undefined) {
@@ -745,6 +813,10 @@ class Bot {
                     m.notificationManager.handle('runStateChanged', 'Hard Limit Triggered', `Hard Limit of ${this.hardLimit} hit (API Remaining: ${this.client.ratelimitRemaining}). Subreddit event polling has been paused.`, 'system', 'warn');
                 }
 
+                for(const [k,v] of this.cacheManager.modStreams) {
+                    v.end('Hard limit cutoff');
+                }
+
                 this.nannyMode = 'hard';
                 return;
             }
@@ -811,6 +883,7 @@ class Bot {
                         await m.startEvents('system', {reason: 'API Nanny has been turned off due to better API conditions'});
                     }
                 }
+                await this.runSharedStreams(true);
                 this.nannyMode = undefined;
             }
 

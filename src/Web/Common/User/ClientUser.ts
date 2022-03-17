@@ -1,14 +1,14 @@
-import {BotInstance, CMInstance} from "../../interfaces";
+import {BotInstance, CMInstanceInterface} from "../../interfaces";
 import CMUser from "./CMUser";
 import {intersect, parseRedditEntity} from "../../../util";
 
-class ClientUser extends CMUser<CMInstance, BotInstance, string> {
+class ClientUser extends CMUser<CMInstanceInterface, BotInstance, string> {
 
-    isInstanceOperator(val: CMInstance): boolean {
+    isInstanceOperator(val: CMInstanceInterface): boolean {
         return val.operators.map(x=> x.toLowerCase()).includes(this.name.toLowerCase());
     }
 
-    canAccessInstance(val: CMInstance): boolean {
+    canAccessInstance(val: CMInstanceInterface): boolean {
         return this.isInstanceOperator(val) || intersect(this.subreddits, val.subreddits.map(x => parseRedditEntity(x).name)).length > 0;
     }
 

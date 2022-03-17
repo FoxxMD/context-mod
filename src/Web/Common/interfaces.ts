@@ -1,5 +1,6 @@
 import {RunningState} from "../../Subreddit/Manager";
-import {ManagerStats} from "../../Common/interfaces";
+import {LogInfo, ManagerStats} from "../../Common/interfaces";
+import {BotInstance} from "../interfaces";
 
 export interface BotStats {
     startedAtHuman: string,
@@ -15,13 +16,14 @@ export interface BotStats {
 
 export interface SubredditDataResponse {
     name: string
-    logs: string[]
+    logs: (string|LogInfo)[]
     botState: RunningState
     eventsState: RunningState
     queueState: RunningState
     indicator: string
     queuedActivities: number
     runningActivities: number
+    delayedItems: any[]
     maxWorkers: number
     subMaxWorkers: number
     globalMaxWorkers: number
@@ -72,4 +74,12 @@ export interface IUser {
     scope?: string[]
     token?: string
     tokenExpiresAt?: number
+}
+
+export interface HeartbeatResponse {
+    subreddits: string[]
+    operators: string[]
+    operatorDisplay?: string
+    friendly?: string
+    bots: BotInstance[]
 }

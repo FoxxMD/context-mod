@@ -1,0 +1,24 @@
+{
+  "extends": "@istanbuljs/nyc-config-typescript",
+  "exclude": [
+    "node_modules/",
+    "**/src/Schema/**",
+    "**/src/Web/assets/**",
+    "**/tests/**",
+    "register.js",
+    "**/src/**/*.d.ts"
+  ],
+  "include": [
+    "**/src/**/*.ts",
+    "**/src/**/*.js",
+    "**/src/**/*.js.map"
+  ],
+  "extension": [
+    ".ts"
+  ],
+  "reporter": [
+    "text-summary",
+    "html"
+  ],
+  "report-dir": "./coverage"
+}

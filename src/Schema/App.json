@@ -31,6 +31,15 @@
                         }
                     ]
                 },
+                "subredditThreshold": {
+                    "default": ">= 1",
+                    "description": "A string containing a comparison operator and a value to compare the **number of subreddits that have valid activities** against\n\nThe syntax is `(< OR > OR <= OR >=) <number>[percent sign]`\n\n* EX `> 3`  => greater than 3 Subreddits found with valid activities\n* EX `<= 75%` => number of Subreddits with valid activities are equal to or less than 75% of all Subreddits found\n\n**Note:** If you use percentage comparison here as well as `useSubmissionAsReference` then \"all Subreddits found\" is only pertains to Subreddits that had the Link of the Submission, rather than all Subreddits from this window.",
+                    "examples": [
+                        ">= 1"
+                    ],
+                    "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
+                    "type": "string"
+                },
                 "subreddits": {
                     "description": "Activities will be counted if they are found in this list of Subreddits\n\nEach value in the list can be either:\n\n * string (name of subreddit)\n * regular expression to run on the subreddit name\n * `SubredditState`\n\nEX `[\"mealtimevideos\",\"askscience\", \"/onlyfans*\\/i\", {\"over18\": true}]`",
                     "examples": [
@@ -192,21 +201,18 @@
                     "type": "boolean"
                 },
                 "itemIs": {
-                    "anyOf": [
-                        {
-                            "items": {
+                    "description": "A list of criteria to test the state of the `Activity` against before running the Action.\n\nIf any set of criteria passes the Action will be run.",
+                    "items": {
+                        "anyOf": [
+                            {
                                 "$ref": "#/definitions/SubmissionState"
                             },
-                            "type": "array"
-                        },
-                        {
-                            "items": {
+                            {
                                 "$ref": "#/definitions/CommentState"
-                            },
-                            "type": "array"
-                        }
-                    ],
-                    "description": "A list of criteria to test the state of the `Activity` against before running the Action.\n\nIf any set of criteria passes the Action will be run."
+                            }
+                        ]
+                    },
+                    "type": "array"
                 },
                 "kind": {
                     "description": "The type of action that will be performed",
@@ -222,6 +228,17 @@
                     ],
                     "pattern": "^[a-zA-Z]([\\w -]*[\\w])?$",
                     "type": "string"
+                },
+                "targets": {
+                    "description": "Specify which Activities to approve\n\nThis setting is only applicable if the Activity being acted on is a **comment**. On a **submission** the setting does nothing\n\n* self => approve activity being checked (comment)\n* parent => approve parent (submission) of activity being checked (comment)",
+                    "items": {
+                        "enum": [
+                            "parent",
+                            "self"
+                        ],
+                        "type": "string"
+                    },
+                    "type": "array"
                 }
             },
             "required": [
@@ -235,8 +252,7 @@
                     "default": "undefined",
                     "description": "This list determines which categories of domains should be aggregated on. All aggregated domains will be tested against `threshold`\n\n* If `media` is included then aggregate author's submission history which reddit recognizes as media (youtube, vimeo, etc.)\n* If `redditMedia` is included then aggregate on author's submissions history which are media hosted on reddit: galleries, videos, and images (i.redd.it / v.redd.it)\n* If `self` is included then aggregate on author's submission history which are self-post (`self.[subreddit]`) or domain is `reddit.com`\n* If `link` is included then aggregate author's submission history which is external links and not recognized as `media` by reddit\n\nIf nothing is specified or list is empty (default) rule will only aggregate on `link` and `media` (ignores reddit-hosted content and self-posts)",
                     "examples": [
-                        [
-                        ]
+                        []
                     ],
                     "items": {
                         "enum": [
@@ -269,8 +285,7 @@
                 },
                 "domains": {
                     "default": [
-                        [
-                        ]
+                        []
                     ],
                     "description": "A list of domains whose Activities will be tested against `threshold`.\n\nThe values are tested as partial strings so you do not need to include full URLs, just the part that matters.\n\nEX `[\"youtube\"]` will match submissions with the domain `https://youtube.com/c/aChannel`\nEX `[\"youtube.com/c/bChannel\"]` will NOT match submissions with the domain `https://youtube.com/c/aChannel`\n\nIf you wish to aggregate on self-posts for a subreddit use the syntax `self.[subreddit]` EX `self.AskReddit`\n\n**If this Rule is part of a Check for a Submission and you wish to aggregate on the domain of the Submission use the special string `AGG:SELF`**\n\nIf nothing is specified or list is empty (default) aggregate using `aggregateOn`",
                     "items": {
@@ -419,21 +434,18 @@
                     "type": "string"
                 },
                 "itemIs": {
-                    "anyOf": [
-                        {
-                            "items": {
+                    "description": "A list of criteria to test the state of the `Activity` against before running the Rule.\n\nIf any set of criteria passes the Rule will be run. If the criteria fails then the Rule is skipped.",
+                    "items": {
+                        "anyOf": [
+                            {
                                 "$ref": "#/definitions/SubmissionState"
                             },
-                            "type": "array"
-                        },
-                        {
-                            "items": {
+                            {
                                 "$ref": "#/definitions/CommentState"
-                            },
-                            "type": "array"
-                        }
-                    ],
-                    "description": "A list of criteria to test the state of the `Activity` against before running the Rule.\n\nIf any set of criteria passes the Rule will be run. If the criteria fails then the Rule is skipped."
+                            }
+                        ]
+                    },
+                    "type": "array"
                 },
                 "kind": {
                     "description": "The kind of rule to run",
@@ -505,24 +517,61 @@
                     ]
                 },
                 "flairCssClass": {
-                    "description": "A list of (user) flair css class values from the subreddit to match against",
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
+                        }
+                    ],
+                    "description": "A (user) flair css class (or list of) from the subreddit to match against\n\n* If `true` then passes if ANY css is assigned\n* If `false` then passes if NO css is assigned",
                     "examples": [
                         "red"
+                    ]
+                },
+                "flairTemplate": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
+                        }
                     ],
-                    "items": {
-                        "type": "string"
-                    },
-                    "type": "array"
+                    "description": "A (user) flair template id (or list of) from the subreddit to match against\n\n* If `true` then passes if ANY template is assigned\n* If `false` then passed if NO template is assigned"
                 },
                 "flairText": {
-                    "description": "A list of (user) flair text values from the subreddit to match against",
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
+                        }
+                    ],
+                    "description": "A (user) flair text value (or list of) from the subreddit to match against\n\n* If `true` then passes if ANY text is assigned\n* If `false` then passes if NO text is assigned",
                     "examples": [
                         "Approved"
-                    ],
-                    "items": {
-                        "type": "string"
-                    },
-                    "type": "array"
+                    ]
                 },
                 "isMod": {
                     "description": "Is the author a moderator?",
@@ -647,21 +696,18 @@
                     "type": "array"
                 },
                 "itemIs": {
-                    "anyOf": [
-                        {
-                            "items": {
+                    "description": "A list of criteria to test the state of the `Activity` against before running the Rule.\n\nIf any set of criteria passes the Rule will be run. If the criteria fails then the Rule is skipped.",
+                    "items": {
+                        "anyOf": [
+                            {
                                 "$ref": "#/definitions/SubmissionState"
                             },
-                            "type": "array"
-                        },
-                        {
-                            "items": {
+                            {
                                 "$ref": "#/definitions/CommentState"
-                            },
-                            "type": "array"
-                        }
-                    ],
-                    "description": "A list of criteria to test the state of the `Activity` against before running the Rule.\n\nIf any set of criteria passes the Rule will be run. If the criteria fails then the Rule is skipped."
+                            }
+                        ]
+                    },
+                    "type": "array"
                 },
                 "kind": {
                     "description": "The kind of rule to run",
@@ -747,21 +793,18 @@
                     "description": "Customize the footer for Actions that send replies (Comment/Ban)\n\nIf `false` no footer is appended\n\nIf `string` the value is rendered as markdown or will use `wiki:` parser the same way `content` properties on Actions are rendered with [templating](https://github.com/FoxxMD/context-mod#action-templating).\n\nIf footer is `undefined` (not set) the default footer will be used:\n\n> *****\n> This action was performed by [a bot.] Mention a moderator or [send a modmail] if you any ideas, questions, or concerns about this action.\n\n*****\n\nThe following properties are available for [templating](https://github.com/FoxxMD/context-mod#action-templating):\n```\nsubName    => name of subreddit Action was performed in (EX 'mealtimevideos')\npermaLink  => The permalink for the Activity the Action was performed on EX https://reddit.com/r/yourSub/comments/o1h0i0/title_name/1v3b7x\nmodmaiLink => An encoded URL that will open a new message to your subreddit with the Action permalink appended to the body\nbotLink    => A permalink to the FAQ for this bot.\n```\nIf you use your own footer or no footer **please link back to the bot FAQ** using the `{{botLink}}` property in your content :)"
                 },
                 "itemIs": {
-                    "anyOf": [
-                        {
-                            "items": {
+                    "description": "A list of criteria to test the state of the `Activity` against before running the Action.\n\nIf any set of criteria passes the Action will be run.",
+                    "items": {
+                        "anyOf": [
+                            {
                                 "$ref": "#/definitions/SubmissionState"
                             },
-                            "type": "array"
-                        },
-                        {
-                            "items": {
+                            {
                                 "$ref": "#/definitions/CommentState"
-                            },
-                            "type": "array"
-                        }
-                    ],
-                    "description": "A list of criteria to test the state of the `Activity` against before running the Action.\n\nIf any set of criteria passes the Action will be run."
+                            }
+                        ]
+                    },
+                    "type": "array"
                 },
                 "kind": {
                     "description": "The type of action that will be performed",
@@ -924,8 +967,7 @@
             "type": "object"
         },
         "CacheOptions": {
-            "additionalProperties": {
-            },
+            "additionalProperties": {},
             "description": "Configure granular settings for a cache provider with this object",
             "properties": {
                 "auth_pass": {
@@ -990,6 +1032,120 @@
             ],
             "type": "string"
         },
+        "CancelDispatchActionJson": {
+            "description": "Remove the Activity",
+            "properties": {
+                "authorIs": {
+                    "$ref": "#/definitions/AuthorOptions",
+                    "description": "If present then these Author criteria are checked before running the Action. If criteria fails then the Action is not run.",
+                    "examples": [
+                        {
+                            "include": [
+                                {
+                                    "flairText": [
+                                        "Contributor",
+                                        "Veteran"
+                                    ]
+                                },
+                                {
+                                    "isMod": true
+                                }
+                            ]
+                        }
+                    ]
+                },
+                "dryRun": {
+                    "default": false,
+                    "description": "If `true` the Action will not make the API request to Reddit to perform its action.",
+                    "examples": [
+                        false,
+                        true
+                    ],
+                    "type": "boolean"
+                },
+                "enable": {
+                    "default": true,
+                    "description": "If set to `false` the Action will not be run",
+                    "examples": [
+                        true
+                    ],
+                    "type": "boolean"
+                },
+                "identifier": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": [
+                                "null",
+                                "string"
+                            ]
+                        }
+                    ]
+                },
+                "itemIs": {
+                    "description": "A list of criteria to test the state of the `Activity` against before running the Action.\n\nIf any set of criteria passes the Action will be run.",
+                    "items": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/definitions/SubmissionState"
+                            },
+                            {
+                                "$ref": "#/definitions/CommentState"
+                            }
+                        ]
+                    },
+                    "type": "array"
+                },
+                "kind": {
+                    "description": "The type of action that will be performed",
+                    "enum": [
+                        "cancelDispatch"
+                    ],
+                    "type": "string"
+                },
+                "name": {
+                    "description": "An optional, but highly recommended, friendly name for this Action. If not present will default to `kind`.\n\nCan only contain letters, numbers, underscore, spaces, and dashes",
+                    "examples": [
+                        "myDescriptiveAction"
+                    ],
+                    "pattern": "^[a-zA-Z]([\\w -]*[\\w])?$",
+                    "type": "string"
+                },
+                "target": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "enum": [
+                                    "any",
+                                    "parent",
+                                    "self"
+                                ],
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "enum": [
+                                "any",
+                                "parent",
+                                "self"
+                            ],
+                            "type": "string"
+                        }
+                    ]
+                }
+            },
+            "required": [
+                "kind",
+                "target"
+            ],
+            "type": "object"
+        },
         "CommentActionJson": {
             "description": "Reply to the Activity. For a submission the reply will be a top-level comment.",
             "properties": {
@@ -1052,21 +1208,18 @@
                     "description": "Customize the footer for Actions that send replies (Comment/Ban)\n\nIf `false` no footer is appended\n\nIf `string` the value is rendered as markdown or will use `wiki:` parser the same way `content` properties on Actions are rendered with [templating](https://github.com/FoxxMD/context-mod#action-templating).\n\nIf footer is `undefined` (not set) the default footer will be used:\n\n> *****\n> This action was performed by [a bot.] Mention a moderator or [send a modmail] if you any ideas, questions, or concerns about this action.\n\n*****\n\nThe following properties are available for [templating](https://github.com/FoxxMD/context-mod#action-templating):\n```\nsubName    => name of subreddit Action was performed in (EX 'mealtimevideos')\npermaLink  => The permalink for the Activity the Action was performed on EX https://reddit.com/r/yourSub/comments/o1h0i0/title_name/1v3b7x\nmodmaiLink => An encoded URL that will open a new message to your subreddit with the Action permalink appended to the body\nbotLink    => A permalink to the FAQ for this bot.\n```\nIf you use your own footer or no footer **please link back to the bot FAQ** using the `{{botLink}}` property in your content :)"
                 },
                 "itemIs": {
-                    "anyOf": [
-                        {
-                            "items": {
+                    "description": "A list of criteria to test the state of the `Activity` against before running the Action.\n\nIf any set of criteria passes the Action will be run.",
+                    "items": {
+                        "anyOf": [
+                            {
                                 "$ref": "#/definitions/SubmissionState"
                             },
-                            "type": "array"
-                        },
-                        {
-                            "items": {
+                            {
                                 "$ref": "#/definitions/CommentState"
-                            },
-                            "type": "array"
-                        }
-                    ],
-                    "description": "A list of criteria to test the state of the `Activity` against before running the Action.\n\nIf any set of criteria passes the Action will be run."
+                            }
+                        ]
+                    },
+                    "type": "array"
                 },
                 "kind": {
                     "description": "The type of action that will be performed",
@@ -1117,22 +1270,16 @@
                     "items": {
                         "anyOf": [
                             {
-                                "$ref": "#/definitions/FlairActionJson"
-                            },
-                            {
-                                "$ref": "#/definitions/UserFlairActionJson"
-                            },
-                            {
                                 "$ref": "#/definitions/CommentActionJson"
-                            },
-                            {
-                                "$ref": "#/definitions/ReportActionJson"
                             },
                             {
                                 "$ref": "#/definitions/LockActionJson"
                             },
                             {
                                 "$ref": "#/definitions/RemoveActionJson"
+                            },
+                            {
+                                "$ref": "#/definitions/ReportActionJson"
                             },
                             {
                                 "$ref": "#/definitions/UserNoteActionJson"
@@ -1147,11 +1294,22 @@
                                 "$ref": "#/definitions/MessageActionJson"
                             },
                             {
+                                "$ref": "#/definitions/UserFlairActionJson"
+                            },
+                            {
+                                "$ref": "#/definitions/DispatchActionJson"
+                            },
+                            {
+                                "$ref": "#/definitions/CancelDispatchActionJson"
+                            },
+                            {
+                                "$ref": "#/definitions/FlairActionJson"
+                            },
+                            {
                                 "type": "string"
                             }
                         ]
                     },
-                    "minItems": 1,
                     "type": "array"
                 },
                 "authorIs": {
@@ -1238,6 +1396,16 @@
                     "description": "If notifications are configured and this is `true` then an `eventActioned` event will be sent when this check is triggered.",
                     "type": "boolean"
                 },
+                "postFail": {
+                    "default": "next",
+                    "description": "Do this behavior if a Check is NOT triggered",
+                    "type": "string"
+                },
+                "postTrigger": {
+                    "default": "nextRun",
+                    "description": "Do this behavior if a Check is triggered",
+                    "type": "string"
+                },
                 "rules": {
                     "description": "A list of Rules to run.\n\nIf `Rule` objects are triggered based on `condition` then `actions` will be performed.\n\nCan be `Rule`, `RuleSet`, or the `name` of any **named** `Rule` in your subreddit's configuration.\n\n**If `rules` is an empty array or not present then `actions` are performed immediately.**",
                     "items": {
@@ -1275,7 +1443,6 @@
                 }
             },
             "required": [
-                "actions",
                 "kind",
                 "name"
             ],
@@ -1306,6 +1473,23 @@
                     "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(days|weeks|months|years|hours|minutes|seconds|milliseconds)\\s*$",
                     "type": "string"
                 },
+                "dispatched": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
+                        }
+                    ],
+                    "description": "Test whether the activity is present in dispatched/delayed activities\n\nNOTE: This is DOES NOT mean that THIS activity is from dispatch -- just that it exists there. To test whether THIS activity is from dispatch use `source`\n\n* `true` => activity exists in delayed activities\n* `false` => activity DOES NOT exist in delayed activities\n* `string` => activity exists in delayed activities with given identifier\n* `string[]` => activity exists in delayed activities with any of the given identifiers"
+                },
                 "distinguished": {
                     "type": "boolean"
                 },
@@ -1331,6 +1515,20 @@
                     "description": "A string containing a comparison operator and a value to compare against\n\nThe syntax is `(< OR > OR <= OR >=) <number>`\n\n* EX `> 100`  => greater than 100",
                     "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
                     "type": "string"
+                },
+                "source": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "string"
+                        }
+                    ],
+                    "description": "Test where the current activity was sourced from.\n\nA source can be any of:\n\n* `poll` => activity was retrieved from polling a queue (unmoderated, modqueue, etc...)\n* `poll:[pollSource]` => activity was retrieved from specific polling source IE `poll:unmoderated` activity comes from unmoderated queue\n  * valid sources: unmoderated modqueue newComm newSub\n* `dispatch` => activity is from Dispatch Action\n* `dispatch:[identifier]` => activity is from Dispatch Action with specific identifier\n* `user` => activity was from user input (web dashboard)"
                 },
                 "spam": {
                     "type": "boolean"
@@ -1367,6 +1565,157 @@
                 "name",
                 "type",
                 "url"
+            ],
+            "type": "object"
+        },
+        "DispatchActionJson": {
+            "description": "Remove the Activity",
+            "properties": {
+                "authorIs": {
+                    "$ref": "#/definitions/AuthorOptions",
+                    "description": "If present then these Author criteria are checked before running the Action. If criteria fails then the Action is not run.",
+                    "examples": [
+                        {
+                            "include": [
+                                {
+                                    "flairText": [
+                                        "Contributor",
+                                        "Veteran"
+                                    ]
+                                },
+                                {
+                                    "isMod": true
+                                }
+                            ]
+                        }
+                    ]
+                },
+                "cancelIfQueued": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "enum": [
+                                    "poll",
+                                    "poll:modqueue",
+                                    "poll:newComm",
+                                    "poll:newSub",
+                                    "poll:unmoderated",
+                                    "user"
+                                ],
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "enum": [
+                                false,
+                                "poll",
+                                "poll:modqueue",
+                                "poll:newComm",
+                                "poll:newSub",
+                                "poll:unmoderated",
+                                true,
+                                "user"
+                            ]
+                        }
+                    ]
+                },
+                "delay": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/definitions/DurationObject"
+                        },
+                        {
+                            "type": "string"
+                        }
+                    ]
+                },
+                "dryRun": {
+                    "default": false,
+                    "description": "If `true` the Action will not make the API request to Reddit to perform its action.",
+                    "examples": [
+                        false,
+                        true
+                    ],
+                    "type": "boolean"
+                },
+                "enable": {
+                    "default": true,
+                    "description": "If set to `false` the Action will not be run",
+                    "examples": [
+                        true
+                    ],
+                    "type": "boolean"
+                },
+                "goto": {
+                    "type": "string"
+                },
+                "identifier": {
+                    "type": "string"
+                },
+                "itemIs": {
+                    "description": "A list of criteria to test the state of the `Activity` against before running the Action.\n\nIf any set of criteria passes the Action will be run.",
+                    "items": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/definitions/SubmissionState"
+                            },
+                            {
+                                "$ref": "#/definitions/CommentState"
+                            }
+                        ]
+                    },
+                    "type": "array"
+                },
+                "kind": {
+                    "description": "The type of action that will be performed",
+                    "enum": [
+                        "dispatch"
+                    ],
+                    "type": "string"
+                },
+                "name": {
+                    "description": "An optional, but highly recommended, friendly name for this Action. If not present will default to `kind`.\n\nCan only contain letters, numbers, underscore, spaces, and dashes",
+                    "examples": [
+                        "myDescriptiveAction"
+                    ],
+                    "pattern": "^[a-zA-Z]([\\w -]*[\\w])?$",
+                    "type": "string"
+                },
+                "onExistingFound": {
+                    "enum": [
+                        "ignore",
+                        "replace",
+                        "skip"
+                    ],
+                    "type": "string"
+                },
+                "target": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "enum": [
+                                    "parent",
+                                    "self"
+                                ],
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "enum": [
+                                "parent",
+                                "self"
+                            ],
+                            "type": "string"
+                        }
+                    ]
+                }
+            },
+            "required": [
+                "delay",
+                "kind",
+                "target"
             ],
             "type": "object"
         },
@@ -1455,20 +1804,17 @@
                     "type": "string"
                 },
                 "itemIs": {
-                    "anyOf": [
-                        {
-                            "items": {
+                    "items": {
+                        "anyOf": [
+                            {
                                 "$ref": "#/definitions/SubmissionState"
                             },
-                            "type": "array"
-                        },
-                        {
-                            "items": {
+                            {
                                 "$ref": "#/definitions/CommentState"
-                            },
-                            "type": "array"
-                        }
-                    ]
+                            }
+                        ]
+                    },
+                    "type": "array"
                 },
                 "itemIsBehavior": {
                     "description": "Determine how itemIs defaults behave when itemIs is present on the check\n\n* merge => adds defaults to check's itemIs\n* replace => check itemIs will replace defaults (no defaults used)",
@@ -1529,21 +1875,18 @@
                     "type": "string"
                 },
                 "itemIs": {
-                    "anyOf": [
-                        {
-                            "items": {
+                    "description": "A list of criteria to test the state of the `Activity` against before running the Action.\n\nIf any set of criteria passes the Action will be run.",
+                    "items": {
+                        "anyOf": [
+                            {
                                 "$ref": "#/definitions/SubmissionState"
                             },
-                            "type": "array"
-                        },
-                        {
-                            "items": {
+                            {
                                 "$ref": "#/definitions/CommentState"
-                            },
-                            "type": "array"
-                        }
-                    ],
-                    "description": "A list of criteria to test the state of the `Activity` against before running the Action.\n\nIf any set of criteria passes the Action will be run."
+                            }
+                        ]
+                    },
+                    "type": "array"
                 },
                 "kind": {
                     "description": "The type of action that will be performed",
@@ -1709,21 +2052,18 @@
                     "type": "array"
                 },
                 "itemIs": {
-                    "anyOf": [
-                        {
-                            "items": {
+                    "description": "A list of criteria to test the state of the `Activity` against before running the Rule.\n\nIf any set of criteria passes the Rule will be run. If the criteria fails then the Rule is skipped.",
+                    "items": {
+                        "anyOf": [
+                            {
                                 "$ref": "#/definitions/SubmissionState"
                             },
-                            "type": "array"
-                        },
-                        {
-                            "items": {
+                            {
                                 "$ref": "#/definitions/CommentState"
-                            },
-                            "type": "array"
-                        }
-                    ],
-                    "description": "A list of criteria to test the state of the `Activity` against before running the Rule.\n\nIf any set of criteria passes the Rule will be run. If the criteria fails then the Rule is skipped."
+                            }
+                        ]
+                    },
+                    "type": "array"
                 },
                 "kind": {
                     "description": "The kind of rule to run",
@@ -1858,21 +2198,18 @@
                     "type": "boolean"
                 },
                 "itemIs": {
-                    "anyOf": [
-                        {
-                            "items": {
+                    "description": "A list of criteria to test the state of the `Activity` against before running the Action.\n\nIf any set of criteria passes the Action will be run.",
+                    "items": {
+                        "anyOf": [
+                            {
                                 "$ref": "#/definitions/SubmissionState"
                             },
-                            "type": "array"
-                        },
-                        {
-                            "items": {
+                            {
                                 "$ref": "#/definitions/CommentState"
-                            },
-                            "type": "array"
-                        }
-                    ],
-                    "description": "A list of criteria to test the state of the `Activity` against before running the Action.\n\nIf any set of criteria passes the Action will be run."
+                            }
+                        ]
+                    },
+                    "type": "array"
                 },
                 "kind": {
                     "description": "The type of action that will be performed",
@@ -1957,21 +2294,18 @@
                     "description": "Customize the footer for Actions that send replies (Comment/Ban)\n\nIf `false` no footer is appended\n\nIf `string` the value is rendered as markdown or will use `wiki:` parser the same way `content` properties on Actions are rendered with [templating](https://github.com/FoxxMD/context-mod#action-templating).\n\nIf footer is `undefined` (not set) the default footer will be used:\n\n> *****\n> This action was performed by [a bot.] Mention a moderator or [send a modmail] if you any ideas, questions, or concerns about this action.\n\n*****\n\nThe following properties are available for [templating](https://github.com/FoxxMD/context-mod#action-templating):\n```\nsubName    => name of subreddit Action was performed in (EX 'mealtimevideos')\npermaLink  => The permalink for the Activity the Action was performed on EX https://reddit.com/r/yourSub/comments/o1h0i0/title_name/1v3b7x\nmodmaiLink => An encoded URL that will open a new message to your subreddit with the Action permalink appended to the body\nbotLink    => A permalink to the FAQ for this bot.\n```\nIf you use your own footer or no footer **please link back to the bot FAQ** using the `{{botLink}}` property in your content :)"
                 },
                 "itemIs": {
-                    "anyOf": [
-                        {
-                            "items": {
+                    "description": "A list of criteria to test the state of the `Activity` against before running the Action.\n\nIf any set of criteria passes the Action will be run.",
+                    "items": {
+                        "anyOf": [
+                            {
                                 "$ref": "#/definitions/SubmissionState"
                             },
-                            "type": "array"
-                        },
-                        {
-                            "items": {
+                            {
                                 "$ref": "#/definitions/CommentState"
-                            },
-                            "type": "array"
-                        }
-                    ],
-                    "description": "A list of criteria to test the state of the `Activity` against before running the Action.\n\nIf any set of criteria passes the Action will be run."
+                            }
+                        ]
+                    },
+                    "type": "array"
                 },
                 "kind": {
                     "description": "The type of action that will be performed",
@@ -2191,6 +2525,21 @@
             ],
             "type": "object"
         },
+        "PostBehavior": {
+            "properties": {
+                "postFail": {
+                    "default": "next",
+                    "description": "Do this behavior if a Check is NOT triggered",
+                    "type": "string"
+                },
+                "postTrigger": {
+                    "default": "nextRun",
+                    "description": "Do this behavior if a Check is triggered",
+                    "type": "string"
+                }
+            },
+            "type": "object"
+        },
         "RecentActivityRuleJSONConfig": {
             "description": "Checks a user's history for any Activity (Submission/Comment) in the subreddits specified in thresholds\n\nAvailable data for [Action templating](https://github.com/FoxxMD/context-mod#action-templating):\n\n```\nsummary    => comma-deliminated list of subreddits that hit the threshold and their count EX subredditA(1), subredditB(4),...\nsubCount   => Total number of subreddits that hit the threshold\ntotalCount => Total number of all activity occurrences in subreddits\n```",
             "properties": {
@@ -2218,21 +2567,18 @@
                     "description": "When comparing submissions detect if the reference submission is an image and do a pixel-comparison to other detected image submissions.\n\n**Note:** This is an **experimental feature**"
                 },
                 "itemIs": {
-                    "anyOf": [
-                        {
-                            "items": {
+                    "description": "A list of criteria to test the state of the `Activity` against before running the Rule.\n\nIf any set of criteria passes the Rule will be run. If the criteria fails then the Rule is skipped.",
+                    "items": {
+                        "anyOf": [
+                            {
                                 "$ref": "#/definitions/SubmissionState"
                             },
-                            "type": "array"
-                        },
-                        {
-                            "items": {
+                            {
                                 "$ref": "#/definitions/CommentState"
-                            },
-                            "type": "array"
-                        }
-                    ],
-                    "description": "A list of criteria to test the state of the `Activity` against before running the Rule.\n\nIf any set of criteria passes the Rule will be run. If the criteria fails then the Rule is skipped."
+                            }
+                        ]
+                    },
+                    "type": "array"
                 },
                 "kind": {
                     "description": "The kind of rule to run",
@@ -2377,6 +2723,11 @@
                     "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)(\\s+.*)*$",
                     "type": "string"
                 },
+                "mustMatchCurrent": {
+                    "default": false,
+                    "description": "When `true` the Activity being checked MUST pass the `matchThreshold` before the Rule considers any history\n\nFor use with `activityMatchThreshold`/`totalMatchThreshold` -- useful to conserve API calls",
+                    "type": "boolean"
+                },
                 "name": {
                     "description": "A descriptive name that will be used in logging and be available for templating",
                     "examples": [
@@ -2488,21 +2839,18 @@
                     "type": "array"
                 },
                 "itemIs": {
-                    "anyOf": [
-                        {
-                            "items": {
+                    "description": "A list of criteria to test the state of the `Activity` against before running the Rule.\n\nIf any set of criteria passes the Rule will be run. If the criteria fails then the Rule is skipped.",
+                    "items": {
+                        "anyOf": [
+                            {
                                 "$ref": "#/definitions/SubmissionState"
                             },
-                            "type": "array"
-                        },
-                        {
-                            "items": {
+                            {
                                 "$ref": "#/definitions/CommentState"
-                            },
-                            "type": "array"
-                        }
-                    ],
-                    "description": "A list of criteria to test the state of the `Activity` against before running the Rule.\n\nIf any set of criteria passes the Rule will be run. If the criteria fails then the Rule is skipped."
+                            }
+                        ]
+                    },
+                    "type": "array"
                 },
                 "kind": {
                     "description": "The kind of rule to run",
@@ -2569,21 +2917,18 @@
                     "type": "boolean"
                 },
                 "itemIs": {
-                    "anyOf": [
-                        {
-                            "items": {
+                    "description": "A list of criteria to test the state of the `Activity` against before running the Action.\n\nIf any set of criteria passes the Action will be run.",
+                    "items": {
+                        "anyOf": [
+                            {
                                 "$ref": "#/definitions/SubmissionState"
                             },
-                            "type": "array"
-                        },
-                        {
-                            "items": {
+                            {
                                 "$ref": "#/definitions/CommentState"
-                            },
-                            "type": "array"
-                        }
-                    ],
-                    "description": "A list of criteria to test the state of the `Activity` against before running the Action.\n\nIf any set of criteria passes the Action will be run."
+                            }
+                        ]
+                    },
+                    "type": "array"
                 },
                 "kind": {
                     "description": "The type of action that will be performed",
@@ -2599,6 +2944,9 @@
                     ],
                     "pattern": "^[a-zA-Z]([\\w -]*[\\w])?$",
                     "type": "string"
+                },
+                "spam": {
+                    "type": "boolean"
                 }
             },
             "required": [
@@ -2627,6 +2975,11 @@
                             ]
                         }
                     ]
+                },
+                "caseSensitive": {
+                    "default": false,
+                    "description": "Should text matching be case sensitive?\n\nDefaults to false",
+                    "type": "boolean"
                 },
                 "exclude": {
                     "description": "If present, activities will be counted only if they are **NOT** found in this list of Subreddits\n\nEach value in the list can be either:\n\n * string (name of subreddit)\n * regular expression to run on the subreddit name\n * `SubredditState`\n\nEX `[\"mealtimevideos\",\"askscience\", \"/onlyfans*\\/i\", {\"over18\": true}]`",
@@ -2681,21 +3034,18 @@
                     "type": "array"
                 },
                 "itemIs": {
-                    "anyOf": [
-                        {
-                            "items": {
+                    "description": "A list of criteria to test the state of the `Activity` against before running the Rule.\n\nIf any set of criteria passes the Rule will be run. If the criteria fails then the Rule is skipped.",
+                    "items": {
+                        "anyOf": [
+                            {
                                 "$ref": "#/definitions/SubmissionState"
                             },
-                            "type": "array"
-                        },
-                        {
-                            "items": {
+                            {
                                 "$ref": "#/definitions/CommentState"
-                            },
-                            "type": "array"
-                        }
-                    ],
-                    "description": "A list of criteria to test the state of the `Activity` against before running the Rule.\n\nIf any set of criteria passes the Rule will be run. If the criteria fails then the Rule is skipped."
+                            }
+                        ]
+                    },
+                    "type": "array"
                 },
                 "keepRemoved": {
                     "default": false,
@@ -2718,9 +3068,14 @@
                     ],
                     "type": "string"
                 },
+                "matchScore": {
+                    "default": 85,
+                    "description": "The percentage, as a whole number, of a repost title/comment that must match the title/comment being checked in order to consider both a match\n\nNote: Setting to 0 will make every candidate considered a match -- useful if you want to match if the URL has been reposted anywhere\n\nDefaults to `85` (85%)",
+                    "type": "number"
+                },
                 "minWordCount": {
-                    "default": 1,
-                    "description": "For activities that are text-based this is the minimum number of words required for the activity to be considered for a repeat\n\nEX if `minimumWordCount=5` and a comment is `what about you` then it is ignored because `3 is less than 5`\n\n**For self-text submissions** -- title + body text\n\n**For comments* -- body text",
+                    "default": 2,
+                    "description": "The minimum number of words in the activity being checked for which this rule will run on\n\nIf the word count is below the minimum the rule fails\n\nDefaults to 2",
                     "type": "number"
                 },
                 "name": {
@@ -2735,6 +3090,13 @@
                     "default": ">= 5",
                     "description": "The number of repeat submissions that will trigger the rule",
                     "type": "string"
+                },
+                "transformations": {
+                    "description": "A set of search-and-replace operations to perform on text values before performing a match. Transformations are performed in the order they are defined.",
+                    "items": {
+                        "$ref": "#/definitions/SearchAndReplaceRegExp"
+                    },
+                    "type": "array"
                 },
                 "useSubmissionAsReference": {
                     "default": true,
@@ -2816,21 +3178,18 @@
                     "type": "boolean"
                 },
                 "itemIs": {
-                    "anyOf": [
-                        {
-                            "items": {
+                    "description": "A list of criteria to test the state of the `Activity` against before running the Action.\n\nIf any set of criteria passes the Action will be run.",
+                    "items": {
+                        "anyOf": [
+                            {
                                 "$ref": "#/definitions/SubmissionState"
                             },
-                            "type": "array"
-                        },
-                        {
-                            "items": {
+                            {
                                 "$ref": "#/definitions/CommentState"
-                            },
-                            "type": "array"
-                        }
-                    ],
-                    "description": "A list of criteria to test the state of the `Activity` against before running the Action.\n\nIf any set of criteria passes the Action will be run."
+                            }
+                        ]
+                    },
+                    "type": "array"
                 },
                 "kind": {
                     "description": "The type of action that will be performed",
@@ -3031,21 +3390,18 @@
                     "type": "array"
                 },
                 "itemIs": {
-                    "anyOf": [
-                        {
-                            "items": {
+                    "description": "A list of criteria to test the state of the `Activity` against before running the Rule.\n\nIf any set of criteria passes the Rule will be run. If the criteria fails then the Rule is skipped.",
+                    "items": {
+                        "anyOf": [
+                            {
                                 "$ref": "#/definitions/SubmissionState"
                             },
-                            "type": "array"
-                        },
-                        {
-                            "items": {
+                            {
                                 "$ref": "#/definitions/CommentState"
-                            },
-                            "type": "array"
-                        }
-                    ],
-                    "description": "A list of criteria to test the state of the `Activity` against before running the Rule.\n\nIf any set of criteria passes the Rule will be run. If the criteria fails then the Rule is skipped."
+                            }
+                        ]
+                    },
+                    "type": "array"
                 },
                 "kind": {
                     "description": "The kind of rule to run",
@@ -3122,6 +3478,98 @@
             },
             "required": [
                 "rules"
+            ],
+            "type": "object"
+        },
+        "RunJson": {
+            "properties": {
+                "authorIs": {
+                    "$ref": "#/definitions/AuthorOptions",
+                    "description": "If present then these Author criteria are checked before running the Check. If criteria fails then the Check will fail.",
+                    "examples": [
+                        {
+                            "include": [
+                                {
+                                    "flairText": [
+                                        "Contributor",
+                                        "Veteran"
+                                    ]
+                                },
+                                {
+                                    "isMod": true
+                                }
+                            ]
+                        }
+                    ]
+                },
+                "checks": {
+                    "items": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/definitions/SubmissionCheckJson"
+                            },
+                            {
+                                "$ref": "#/definitions/CommentCheckJson"
+                            }
+                        ]
+                    },
+                    "type": "array"
+                },
+                "dryRun": {
+                    "description": "Use this option to override the `dryRun` setting for all Actions of all Checks in this Run",
+                    "examples": [
+                        false,
+                        true
+                    ],
+                    "type": "boolean"
+                },
+                "enable": {
+                    "default": true,
+                    "description": "Should this Run be executed by the bot?",
+                    "examples": [
+                        true
+                    ],
+                    "type": "boolean"
+                },
+                "filterCriteriaDefaults": {
+                    "$ref": "#/definitions/FilterCriteriaDefaults",
+                    "description": "Set the default filter criteria for all checks. If this property is specified it will override any defaults passed from the bot's config\n\nDefault behavior is to exclude all mods and automoderator from checks"
+                },
+                "itemIs": {
+                    "description": "A list of criteria to test the state of the `Activity` against before running the check.\n\nIf any set of criteria passes the Check will be run. If the criteria fails then the Check will fail.\n\n* @examples [[{\"over_18\": true, \"removed': false}]]",
+                    "items": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/definitions/SubmissionState"
+                            },
+                            {
+                                "$ref": "#/definitions/CommentState"
+                            }
+                        ]
+                    },
+                    "type": "array"
+                },
+                "name": {
+                    "description": "Friendly name for this Run EX \"flairsRun\"\n\nCan only contain letters, numbers, underscore, spaces, and dashes",
+                    "examples": [
+                        "myNewRun"
+                    ],
+                    "pattern": "^[a-zA-Z]([\\w -]*[\\w])?$",
+                    "type": "string"
+                },
+                "postFail": {
+                    "default": "next",
+                    "description": "Do this behavior if a Check is NOT triggered",
+                    "type": "string"
+                },
+                "postTrigger": {
+                    "default": "nextRun",
+                    "description": "Do this behavior if a Check is triggered",
+                    "type": "string"
+                }
+            },
+            "required": [
+                "checks"
             ],
             "type": "object"
         },
@@ -3249,22 +3697,16 @@
                     "items": {
                         "anyOf": [
                             {
-                                "$ref": "#/definitions/FlairActionJson"
-                            },
-                            {
-                                "$ref": "#/definitions/UserFlairActionJson"
-                            },
-                            {
                                 "$ref": "#/definitions/CommentActionJson"
-                            },
-                            {
-                                "$ref": "#/definitions/ReportActionJson"
                             },
                             {
                                 "$ref": "#/definitions/LockActionJson"
                             },
                             {
                                 "$ref": "#/definitions/RemoveActionJson"
+                            },
+                            {
+                                "$ref": "#/definitions/ReportActionJson"
                             },
                             {
                                 "$ref": "#/definitions/UserNoteActionJson"
@@ -3279,11 +3721,22 @@
                                 "$ref": "#/definitions/MessageActionJson"
                             },
                             {
+                                "$ref": "#/definitions/UserFlairActionJson"
+                            },
+                            {
+                                "$ref": "#/definitions/DispatchActionJson"
+                            },
+                            {
+                                "$ref": "#/definitions/CancelDispatchActionJson"
+                            },
+                            {
+                                "$ref": "#/definitions/FlairActionJson"
+                            },
+                            {
                                 "type": "string"
                             }
                         ]
                     },
-                    "minItems": 1,
                     "type": "array"
                 },
                 "authorIs": {
@@ -3370,6 +3823,16 @@
                     "description": "If notifications are configured and this is `true` then an `eventActioned` event will be sent when this check is triggered.",
                     "type": "boolean"
                 },
+                "postFail": {
+                    "default": "next",
+                    "description": "Do this behavior if a Check is NOT triggered",
+                    "type": "string"
+                },
+                "postTrigger": {
+                    "default": "nextRun",
+                    "description": "Do this behavior if a Check is triggered",
+                    "type": "string"
+                },
                 "rules": {
                     "description": "A list of Rules to run.\n\nIf `Rule` objects are triggered based on `condition` then `actions` will be performed.\n\nCan be `Rule`, `RuleSet`, or the `name` of any **named** `Rule` in your subreddit's configuration.\n\n**If `rules` is an empty array or not present then `actions` are performed immediately.**",
                     "items": {
@@ -3407,7 +3870,6 @@
                 }
             },
             "required": [
-                "actions",
                 "kind",
                 "name"
             ],
@@ -3433,20 +3895,86 @@
                 "deleted": {
                     "type": "boolean"
                 },
+                "dispatched": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
+                        }
+                    ],
+                    "description": "Test whether the activity is present in dispatched/delayed activities\n\nNOTE: This is DOES NOT mean that THIS activity is from dispatch -- just that it exists there. To test whether THIS activity is from dispatch use `source`\n\n* `true` => activity exists in delayed activities\n* `false` => activity DOES NOT exist in delayed activities\n* `string` => activity exists in delayed activities with given identifier\n* `string[]` => activity exists in delayed activities with any of the given identifiers"
+                },
                 "distinguished": {
                     "type": "boolean"
                 },
                 "filtered": {
                     "type": "boolean"
                 },
+                "flairTemplate": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
+                        }
+                    ],
+                    "description": "* If `true` then passes if there is ANY flair template id\n* If `false` then passes if there is NO flair template id"
+                },
+                "isRedditMediaDomain": {
+                    "description": "Is the submission a reddit-hosted image or video?",
+                    "type": "boolean"
+                },
                 "is_self": {
                     "type": "boolean"
                 },
                 "link_flair_css_class": {
-                    "type": "string"
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
+                        }
+                    ],
+                    "description": "* If `true` then passes if flair has ANY css\n* If `false` then passes if flair has NO css"
                 },
                 "link_flair_text": {
-                    "type": "string"
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
+                        }
+                    ],
+                    "description": "* If `true` then passes if flair has ANY text\n* If `false` then passes if flair has NO text"
                 },
                 "locked": {
                     "type": "boolean"
@@ -3470,6 +3998,20 @@
                     "description": "A string containing a comparison operator and a value to compare against\n\nThe syntax is `(< OR > OR <= OR >=) <number>`\n\n* EX `> 100`  => greater than 100",
                     "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
                     "type": "string"
+                },
+                "source": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "string"
+                        }
+                    ],
+                    "description": "Test where the current activity was sourced from.\n\nA source can be any of:\n\n* `poll` => activity was retrieved from polling a queue (unmoderated, modqueue, etc...)\n* `poll:[pollSource]` => activity was retrieved from specific polling source IE `poll:unmoderated` activity comes from unmoderated queue\n  * valid sources: unmoderated modqueue newComm newSub\n* `dispatch` => activity is from Dispatch Action\n* `dispatch:[identifier]` => activity is from Dispatch Action with specific identifier\n* `user` => activity was from user input (web dashboard)"
                 },
                 "spam": {
                     "type": "boolean"
@@ -3529,8 +4071,7 @@
             "type": "object"
         },
         "ThirdPartyCredentialsJsonConfig": {
-            "additionalProperties": {
-            },
+            "additionalProperties": {},
             "properties": {
                 "youtube": {
                     "properties": {
@@ -3603,21 +4144,18 @@
                     "type": "string"
                 },
                 "itemIs": {
-                    "anyOf": [
-                        {
-                            "items": {
+                    "description": "A list of criteria to test the state of the `Activity` against before running the Action.\n\nIf any set of criteria passes the Action will be run.",
+                    "items": {
+                        "anyOf": [
+                            {
                                 "$ref": "#/definitions/SubmissionState"
                             },
-                            "type": "array"
-                        },
-                        {
-                            "items": {
+                            {
                                 "$ref": "#/definitions/CommentState"
-                            },
-                            "type": "array"
-                        }
-                    ],
-                    "description": "A list of criteria to test the state of the `Activity` against before running the Action.\n\nIf any set of criteria passes the Action will be run."
+                            }
+                        ]
+                    },
+                    "type": "array"
                 },
                 "kind": {
                     "description": "The type of action that will be performed",
@@ -3701,21 +4239,18 @@
                     "type": "boolean"
                 },
                 "itemIs": {
-                    "anyOf": [
-                        {
-                            "items": {
+                    "description": "A list of criteria to test the state of the `Activity` against before running the Action.\n\nIf any set of criteria passes the Action will be run.",
+                    "items": {
+                        "anyOf": [
+                            {
                                 "$ref": "#/definitions/SubmissionState"
                             },
-                            "type": "array"
-                        },
-                        {
-                            "items": {
+                            {
                                 "$ref": "#/definitions/CommentState"
-                            },
-                            "type": "array"
-                        }
-                    ],
-                    "description": "A list of criteria to test the state of the `Activity` against before running the Action.\n\nIf any set of criteria passes the Action will be run."
+                            }
+                        ]
+                    },
+                    "type": "array"
                 },
                 "kind": {
                     "description": "The type of action that will be performed",
@@ -3883,6 +4418,10 @@
             },
             "type": "array"
         },
+        "postCheckBehaviorDefaults": {
+            "$ref": "#/definitions/PostBehavior",
+            "description": "Set the default post-check behavior for all checks. If this property is specified it will override any defaults passed from the bot's config\n\nDefault behavior is:\n\n* postFail => next\n* postTrigger => nextRun"
+        },
         "queue": {
             "properties": {
                 "maxWorkers": {
@@ -3896,11 +4435,16 @@
                 }
             },
             "type": "object"
+        },
+        "runs": {
+            "description": "A list of sets of Checks to run",
+            "items": {
+                "$ref": "#/definitions/RunJson"
+            },
+            "minItems": 1,
+            "type": "array"
         }
     },
-    "required": [
-        "checks"
-    ],
     "type": "object"
 }
 

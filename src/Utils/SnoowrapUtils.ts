@@ -8,30 +8,32 @@ import he from "he";
 import {RuleResult, UserNoteCriteria} from "../Rule";
 import {
     ActivityWindowType, CommentState, DomainInfo,
-    DurationVal,
+    DurationVal, FilterCriteriaPropertyResult, FilterCriteriaResult,
     SubmissionState,
     TypedActivityStates
 } from "../Common/interfaces";
 import {
+    asSubmission,
+    asUserNoteCriteria,
     compareDurationValue,
-    comparisonTextOp, escapeRegex, getActivityAuthorName,
-    isActivityWindowCriteria,
+    comparisonTextOp, escapeRegex, formatNumber, getActivityAuthorName,
+    isActivityWindowCriteria, isSubmission, isUserNoteCriteria,
     normalizeName,
     parseDuration,
-    parseDurationComparison,
+    parseDurationComparison, parseDurationValToDuration,
     parseGenericValueComparison,
     parseGenericValueOrPercentComparison,
     parseRuleResultsToMarkdownSummary, parseStringToRegex,
-    parseSubredditName,
-    truncateStringToLength, windowToActivityWindowCriteria
+    parseSubredditName, removeUndefinedKeys,
+    truncateStringToLength, userNoteCriteriaSummary, windowToActivityWindowCriteria
 } from "../util";
 import UserNotes from "../Subreddit/UserNotes";
 import {Logger} from "winston";
 import InvalidRegexError from "./InvalidRegexError";
-import SimpleError from "./SimpleError";
 import {AuthorCriteria} from "../Author/Author";
 import {URL} from "url";
-import {isStatusError} from "./Errors";
+import {SimpleError, isStatusError} from "./Errors";
+import {Dictionary, ElementOf, SafeDictionary} from "ts-essentials";
 
 export const BOT_LINK = 'https://www.reddit.com/r/ContextModBot/comments/otz396/introduction_to_contextmodbot';
 
@@ -124,21 +126,7 @@ export async function getActivities(listingFunc: (limit: number) => Promise<List
 
     if (durVal !== undefined) {
         const endTime = dayjs();
-        if (typeof durVal === 'object') {
-            duration = dayjs.duration(durVal);
-            if (!dayjs.isDuration(duration)) {
-                throw new Error('window value given was not a well-formed Duration object');
-            }
-        } else {
-            try {
-                duration = parseDuration(durVal);
-            } catch (e) {
-                if (e instanceof InvalidRegexError) {
-                    throw new Error(`window value of '${durVal}' could not be parsed as a valid ISO8601 duration or DayJS duration shorthand (see Schema)`);
-                }
-                throw e;
-            }
-        }
+        const duration = parseDurationValToDuration(durVal);
         satisfiedEndtime = endTime.subtract(duration.asMilliseconds(), 'milliseconds');
     }
 
@@ -354,236 +342,6 @@ export const renderContent = async (template: string, data: (Submission | Commen
     return he.decode(rendered);
 }
 
-export const testAuthorCriteria = async (item: (Comment | Submission), authorOpts: AuthorCriteria, include = true, userNotes: UserNotes) => {
-    const {shadowBanned, ...rest} = authorOpts;
-
-    if(shadowBanned !== undefined) {
-        try {
-            // @ts-ignore
-            await item.author.fetch();
-            // user is not shadowbanned
-            // if criteria specifies they SHOULD be shadowbanned then return false now
-            if(shadowBanned) {
-                return false;
-            }
-        } catch (err: any) {
-            if(isStatusError(err) && err.statusCode === 404) {
-                // user is shadowbanned
-                // if criteria specifies they should not be shadowbanned then return false now
-                if(!shadowBanned) {
-                    return false;
-                }
-            } else {
-                throw err;
-            }
-        }
-    }
-
-    try {
-        const authorName = getActivityAuthorName(item.author);
-
-        for (const k of Object.keys(rest)) {
-            // @ts-ignore
-            if (authorOpts[k] !== undefined) {
-                switch (k) {
-                    case 'name':
-                        const authPass = () => {
-                            // @ts-ignore
-                            for (const n of authorOpts[k]) {
-                                if (n.toLowerCase() === authorName.toLowerCase()) {
-                                    return true;
-                                }
-                            }
-                            return false;
-                        }
-                        const authResult = authPass();
-                        if ((include && !authResult) || (!include && authResult)) {
-                            return false;
-                        }
-                        break;
-                    case 'flairCssClass':
-                        const css = await item.author_flair_css_class;
-                        const cssPass = () => {
-                            // @ts-ignore
-                            for (const c of authorOpts[k]) {
-                                if (c === css) {
-                                    return true;
-                                }
-                            }
-                            return false;
-                        }
-                        const cssResult = cssPass();
-                        if ((include && !cssResult) || (!include && cssResult)) {
-                            return false;
-                        }
-                        break;
-                    case 'flairText':
-                        const text = await item.author_flair_text;
-                        const textPass = () => {
-                            // @ts-ignore
-                            for (const c of authorOpts[k]) {
-                                if (c === text) {
-                                    return true;
-                                }
-                            }
-                            return false;
-                        };
-                        const textResult = textPass();
-                        if ((include && !textResult) || (!include && textResult)) {
-                            return false;
-                        }
-                        break;
-                    case 'isMod':
-                        const mods: RedditUser[] = await item.subreddit.getModerators();
-                        const isModerator = mods.some(x => x.name === authorName);
-                        const modMatch = authorOpts.isMod === isModerator;
-                        if ((include && !modMatch) || (!include && modMatch)) {
-                            return false;
-                        }
-                        break;
-                    case 'age':
-                        const ageTest = compareDurationValue(parseDurationComparison(await authorOpts.age as string), dayjs.unix(await item.author.created));
-                        if ((include && !ageTest) || (!include && ageTest)) {
-                            return false;
-                        }
-                        break;
-                    case 'linkKarma':
-                        const lkCompare = parseGenericValueOrPercentComparison(await authorOpts.linkKarma as string);
-                        let lkMatch;
-                        if (lkCompare.isPercent) {
-                            // @ts-ignore
-                            const tk = await item.author.total_karma as number;
-                            lkMatch = comparisonTextOp(item.author.link_karma / tk, lkCompare.operator, lkCompare.value / 100);
-                        } else {
-                            lkMatch = comparisonTextOp(item.author.link_karma, lkCompare.operator, lkCompare.value);
-                        }
-                        if ((include && !lkMatch) || (!include && lkMatch)) {
-                            return false;
-                        }
-                        break;
-                    case 'commentKarma':
-                        const ckCompare = parseGenericValueOrPercentComparison(await authorOpts.commentKarma as string);
-                        let ckMatch;
-                        if (ckCompare.isPercent) {
-                            // @ts-ignore
-                            const ck = await item.author.total_karma as number;
-                            ckMatch = comparisonTextOp(item.author.comment_karma / ck, ckCompare.operator, ckCompare.value / 100);
-                        } else {
-                            ckMatch = comparisonTextOp(item.author.comment_karma, ckCompare.operator, ckCompare.value);
-                        }
-                        if ((include && !ckMatch) || (!include && ckMatch)) {
-                            return false;
-                        }
-                        break;
-                    case 'totalKarma':
-                        const tkCompare = parseGenericValueComparison(await authorOpts.totalKarma as string);
-                        if (tkCompare.isPercent) {
-                            throw new SimpleError(`'totalKarma' value on AuthorCriteria cannot be a percentage`);
-                        }
-                        // @ts-ignore
-                        const totalKarma = await item.author.total_karma as number;
-                        const tkMatch = comparisonTextOp(totalKarma, tkCompare.operator, tkCompare.value);
-                        if ((include && !tkMatch) || (!include && tkMatch)) {
-                            return false;
-                        }
-                        break;
-                    case 'verified':
-                        const vMatch = await item.author.has_verified_mail === authorOpts.verified as boolean;
-                        if ((include && !vMatch) || (!include && vMatch)) {
-                            return false;
-                        }
-                        break;
-                    case 'description':
-                        // @ts-ignore
-                        const desc = await item.author.subreddit?.display_name.public_description;
-                        const dVals = authorOpts[k] as string[];
-                        let passed = false;
-                        for(const val of dVals) {
-                            let reg = parseStringToRegex(val, 'i');
-                            if(reg === undefined) {
-                                reg = parseStringToRegex(`/.*${escapeRegex(val.trim())}.*/`, 'i');
-                                if(reg === undefined) {
-                                    throw new SimpleError(`Could not convert 'description' value to a valid regex: ${authorOpts[k] as string}`);
-                                }
-                            }
-                            if(reg.test(desc)) {
-                                passed = true;
-                                break;
-                            }
-                        }
-                        if(!passed) {
-                            return false;
-                        }
-                        break;
-                    case 'userNotes':
-                        const notes = await userNotes.getUserNotes(item.author);
-                        const notePass = () => {
-                            for (const noteCriteria of authorOpts[k] as UserNoteCriteria[]) {
-                                const {count = '>= 1', search = 'current', type} = noteCriteria;
-                                const {
-                                    value,
-                                    operator,
-                                    isPercent,
-                                    extra = ''
-                                } = parseGenericValueOrPercentComparison(count);
-                                const order = extra.includes('asc') ? 'ascending' : 'descending';
-                                switch (search) {
-                                    case 'current':
-                                        if (notes.length > 0 && notes[notes.length - 1].noteType === type) {
-                                            return true;
-                                        }
-                                        break;
-                                    case 'consecutive':
-                                        let orderedNotes = notes;
-                                        if (order === 'descending') {
-                                            orderedNotes = [...notes];
-                                            orderedNotes.reverse();
-                                        }
-                                        let currCount = 0;
-                                        for (const note of orderedNotes) {
-                                            if (note.noteType === type) {
-                                                currCount++;
-                                            } else {
-                                                currCount = 0;
-                                            }
-                                            if (isPercent) {
-                                                throw new SimpleError(`When comparing UserNotes with 'consecutive' search 'count' cannot be a percentage. Given: ${count}`);
-                                            }
-                                            if (comparisonTextOp(currCount, operator, value)) {
-                                                return true;
-                                            }
-                                        }
-                                        break;
-                                    case 'total':
-                                        if (isPercent) {
-                                            if (comparisonTextOp(notes.filter(x => x.noteType === type).length / notes.length, operator, value / 100)) {
-                                                return true;
-                                            }
-                                        } else if (comparisonTextOp(notes.filter(x => x.noteType === type).length, operator, value)) {
-                                            return true;
-                                        }
-                                }
-                            }
-                            return false;
-                        }
-                        const noteResult = notePass();
-                        if ((include && !noteResult) || (!include && noteResult)) {
-                            return false;
-                        }
-                        break;
-                }
-            }
-        }
-        return true;
-    } catch (err: any) {
-        if(isStatusError(err) && err.statusCode === 404) {
-            throw new SimpleError('Reddit returned a 404 while trying to retrieve User profile. It is likely this user is shadowbanned.');
-        } else {
-            throw err;
-        }
-    }
-}
-
 export interface ItemContent {
     submissionTitle: string,
     content: string,
@@ -596,9 +354,10 @@ export const itemContentPeek = async (item: (Comment | Submission), peekLength =
     let content = '';
     let submissionTitle = '';
     let peek = '';
-    const author = item.author.name;
-    if (item instanceof Submission) {
+    const author = getActivityAuthorName(item.author);
+    if (asSubmission(item)) {
         submissionTitle = item.title;
+        content = truncatePeek(item.title);
         peek = `${truncatePeek(item.title)} by ${author} https://reddit.com${item.permalink}`;
 
     } else {
@@ -731,13 +490,17 @@ export const activityIsRemoved = (item: Submission | Comment): boolean => {
 }
 
 export const activityIsFiltered = (item: Submission | Comment): boolean => {
-    if (item instanceof Submission) {
-        // when automod filters a post it gets this category
-        return item.banned_at_utc !== null && item.removed_by_category === 'automod_filtered';
+    if(item.can_mod_post) {
+        if (item instanceof Submission) {
+            // when automod filters a post it gets this category
+            return item.banned_at_utc !== null && item.removed_by_category === 'automod_filtered';
+        }
+        // when automod filters a comment item.removed === false
+        // so if we want to processing filtered comments we need to check for this
+        return item.banned_at_utc !== null && !item.removed;
     }
-    // when automod filters a comment item.removed === false
-    // so if we want to processing filtered comments we need to check for this
-    return item.banned_at_utc !== null && !item.removed;
+    // not possible to know if its filtered if user isn't a mod so always return false
+    return false;
 }
 
 export const activityIsDeleted = (item: Submission | Comment): boolean => {

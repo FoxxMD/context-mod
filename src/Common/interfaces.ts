@@ -9,12 +9,21 @@ import Submission from "snoowrap/dist/objects/Submission";
 import Comment from "snoowrap/dist/objects/Comment";
 import RedditUser from "snoowrap/dist/objects/RedditUser";
 import Subreddit from "snoowrap/dist/objects/Subreddit";
-import {AuthorOptions} from "../Author/Author";
 import {SqljsConnectionOptions} from "typeorm/driver/sqljs/SqljsConnectionOptions";
 import {MysqlConnectionOptions} from "typeorm/driver/mysql/MysqlConnectionOptions";
 import {MongoConnectionOptions} from "typeorm/driver/mongodb/MongoConnectionOptions";
 import {PostgresConnectionOptions} from "typeorm/driver/postgres/PostgresConnectionOptions";
 import {Connection} from "typeorm";
+import {AuthorCriteria, AuthorOptions} from "../Author/Author";
+import {ConfigFormat} from "./types";
+import AbstractConfigDocument, {ConfigDocumentInterface} from "./Config/AbstractConfigDocument";
+import {Document as YamlDocument} from 'yaml';
+import {JsonOperatorConfigDocument, YamlOperatorConfigDocument} from "./Config/Operator";
+import {ConsoleTransportOptions} from "winston/lib/winston/transports";
+import {DailyRotateFileTransportOptions} from "winston-daily-rotate-file";
+import {DuplexTransportOptions} from "winston-duplex/dist/DuplexTransport";
+import {CommentCheckJson, SubmissionCheckJson} from "../Check";
+import {SafeDictionary} from "ts-essentials";
 
 /**
  * An ISO 8601 Duration
@@ -838,6 +847,16 @@ export interface ManagerOptions {
      * Default behavior is to exclude all mods and automoderator from checks
      * */
     filterCriteriaDefaults?: FilterCriteriaDefaults
+
+    /**
+     * Set the default post-check behavior for all checks. If this property is specified it will override any defaults passed from the bot's config
+     *
+     * Default behavior is:
+     *
+     * * postFail => next
+     * * postTrigger => nextRun
+     * */
+    postCheckBehaviorDefaults?: PostBehavior
 }
 
 /**
@@ -929,6 +948,35 @@ export interface ActivityState {
      * */
     reports?: CompareValue
     age?: DurationComparor
+    /**
+     * Test whether the activity is present in dispatched/delayed activities
+     *
+     * NOTE: This is DOES NOT mean that THIS activity is from dispatch -- just that it exists there. To test whether THIS activity is from dispatch use `source`
+     *
+     * * `true` => activity exists in delayed activities
+     * * `false` => activity DOES NOT exist in delayed activities
+     * * `string` => activity exists in delayed activities with given identifier
+     * * `string[]` => activity exists in delayed activities with any of the given identifiers
+     *
+     * */
+    dispatched?: boolean | string | string[]
+
+
+    // can use ActivitySource | ActivitySource[] here because of issues with generating json schema, see ActivitySource comments
+    /**
+     * Test where the current activity was sourced from.
+     *
+     * A source can be any of:
+     *
+     * * `poll` => activity was retrieved from polling a queue (unmoderated, modqueue, etc...)
+     * * `poll:[pollSource]` => activity was retrieved from specific polling source IE `poll:unmoderated` activity comes from unmoderated queue
+     *   * valid sources: unmoderated modqueue newComm newSub
+     * * `dispatch` => activity is from Dispatch Action
+     * * `dispatch:[identifier]` => activity is from Dispatch Action with specific identifier
+     * * `user` => activity was from user input (web dashboard)
+     *
+     * */
+    source?: string | string[]
 }
 
 /**
@@ -948,8 +996,25 @@ export interface SubmissionState extends ActivityState {
      * */
     title?: string
 
-    link_flair_text?: string
-    link_flair_css_class?: string
+    /**
+     * * If `true` then passes if flair has ANY text
+     * * If `false` then passes if flair has NO text
+     * */
+    link_flair_text?: boolean | string | string[]
+    /**
+     * * If `true` then passes if flair has ANY css
+     * * If `false` then passes if flair has NO css
+     * */
+    link_flair_css_class?: boolean | string | string[]
+    /**
+     * * If `true` then passes if there is ANY flair template id
+     * * If `false` then passes if there is NO flair template id
+     * */
+    flairTemplate?: boolean | string | string[]
+    /**
+     * Is the submission a reddit-hosted image or video?
+     * */
+    isRedditMediaDomain?: boolean
 }
 
 // properties calculated/derived by CM -- not provided as plain values by reddit
@@ -1015,7 +1080,9 @@ export interface StrongSubredditState extends SubredditState {
     name?: RegExp
 }
 
-export type TypedActivityStates = SubmissionState[] | CommentState[];
+export type TypedActivityState = SubmissionState | CommentState;
+
+export type TypedActivityStates = TypedActivityState[];
 
 export interface DomainInfo {
     display: string,
@@ -1075,6 +1142,92 @@ export interface RegExResult {
 }
 
 type LogLevel = "error" | "warn" | "info" | "verbose" | "debug";
+
+export type LogConsoleOptions = Pick<ConsoleTransportOptions, 'silent' | 'eol' | 'stderrLevels' | 'consoleWarnLevels'> & {
+    level?: LogLevel
+}
+
+export type LogFileOptions = Omit<DailyRotateFileTransportOptions, 'stream' | 'handleRejections' | 'options' | 'handleExceptions' | 'format' | 'log' | 'logv' | 'close' | 'dirname'> & {
+    level?: LogLevel
+    /**
+     * The absolute path to a directory where rotating log files should be stored.
+     *
+     * * If not present or `null` or `false` no log files will be created
+     * * If `true` logs will be stored at `[working directory]/logs`
+     *
+     * * ENV => `LOG_DIR`
+     * * ARG => `--logDir [dir]`
+     *
+     * @examples ["/var/log/contextmod"]
+     * */
+    dirname?: string | boolean | null
+}
+
+// export type StrongFileOptions = LogFileOptions & {
+//     dirname?: string
+// }
+
+export type LogStreamOptions = Omit<DuplexTransportOptions, 'name' | 'stream' | 'handleRejections' | 'handleExceptions' | 'format' | 'log' | 'logv' | 'close'> & {
+    level?: LogLevel
+}
+
+export interface LoggingOptions  {
+    /**
+     * The minimum log level to output. The log level set will output logs at its level **and all levels above it:**
+     *
+     *  * `error`
+     *  * `warn`
+     *  * `info`
+     *  * `verbose`
+     *  * `debug`
+     *
+     *  Note: `verbose` will display *a lot* of information on the status/result of run rules/checks/actions etc. which is very useful for testing configurations. Once your bot is stable changing the level to `info` will reduce log noise.
+     *
+     *  * ENV => `LOG_LEVEL`
+     *  * ARG => `--logLevel <level>`
+     *
+     *  @default "verbose"
+     *  @examples ["verbose"]
+     * */
+    level?: LogLevel,
+    /**
+     * **DEPRECATED** - Use `file.dirname` instead
+     * The absolute path to a directory where rotating log files should be stored.
+     *
+     * * If not present or `null` or `false` no log files will be created
+     * * If `true` logs will be stored at `[working directory]/logs`
+     *
+     * * ENV => `LOG_DIR`
+     * * ARG => `--logDir [dir]`
+     *
+     * @examples ["/var/log/contextmod"]
+     * @deprecated
+     * @see logging.file.dirname
+     * */
+    path?: string | boolean | null
+
+    /**
+     * Options for Rotating File logging
+     * */
+    file?: LogFileOptions
+    /**
+     * Options for logging to api/web
+     * */
+    stream?: LogStreamOptions
+    /**
+     * Options for logging to console
+     * */
+    console?: LogConsoleOptions
+}
+
+export type StrongLoggingOptions = Required<Pick<LoggingOptions, 'stream' | 'console' | 'file'>> & {
+    level?: LogLevel
+};
+
+export type LoggerFactoryOptions = StrongLoggingOptions & {
+    additionalTransports?: any[]
+    defaultLabel?: string
+}
 /**
  * Available cache providers
  * */
@@ -1160,6 +1313,14 @@ export interface CacheOptions {
 export type NotificationProvider = 'discord';
 
 export type NotificationEventType = 'runStateChanged' | 'pollingError' | 'eventActioned' | 'configUpdated'
+
+export interface NotificationEventPayload  {
+    type: NotificationEventType,
+    title: string
+    body?: string
+    causedBy?: string
+    logLevel?: string
+}
 
 export interface NotificationProviderConfig {
     name: string
@@ -1333,6 +1494,38 @@ export interface SnoowrapOptions {
      * * ARG => `--snooDebug`
      * */
     debug?: boolean,
+
+    /**
+     * Set the maximum number of times snoowrap will retry a request if it encounters one of the codes specified in either retryErrorCodes or timeoutCodes
+     *
+     * Each retry attempt is delayed by an exponential falloff timer
+     *
+     * @default 2
+     * @examples [2]
+     * */
+    maxRetryAttempts?: number
+
+    /**
+     * Specify the HTTP Status codes that should be valid for retrying a request
+     *
+     * Defaults: 502, 503, 504, 522
+     *
+     * @default [502, 503, 504, 522]
+     * */
+    retryErrorCodes?: number[]
+
+    /**
+     * Specify the error codes that should be valid for retrying a request.
+     *
+     * These are used to make snoowrap retry if a request times out or reddit's api response times out -- which happens occasionally for no reason.
+     *
+     * You most likely do not need to change these. However, if you want snoowrap to always fail on a network issue set this to an empty array
+     *
+     * Defaults: 'ESOCKETTIMEDOUT', 'ETIMEDOUT', 'ECONNRESET'
+     *
+     * @default ['ESOCKETTIMEDOUT', 'ETIMEDOUT', 'ECONNRESET']
+     * */
+    timeoutCodes?: string[]
 }
 
 export type FilterCriteriaDefaultBehavior = 'replace' | 'merge';
@@ -1354,6 +1547,13 @@ export interface FilterCriteriaDefaults {
      * */
     authorIs?: AuthorOptions
     authorIsBehavior?: FilterCriteriaDefaultBehavior
+}
+
+export interface SubredditOverrides {
+    name: string
+    flowControlDefaults?: {
+        maxGotoDepth?: number
+    }
 }
 
 /**
@@ -1390,6 +1590,12 @@ export interface BotInstanceJsonConfig {
      * Defaults to exclude mods and automoderator from checks
      * */
     filterCriteriaDefaults?: FilterCriteriaDefaults
+
+    postCheckBehaviorDefaults?: PostBehavior
+
+    flowControlDefaults?: {
+        maxGotoDepth?: number
+    }
 
     /**
      * Settings related to bot behavior for subreddits it is managing
@@ -1451,6 +1657,8 @@ export interface BotInstanceJsonConfig {
          * @examples [300]
          * */
         heartbeatInterval?: number,
+
+        overrides?: SubredditOverrides[]
     }
 
     /**
@@ -1487,22 +1695,23 @@ export interface BotInstanceJsonConfig {
          * Useful when running many subreddits and rules are potentially cpu/memory/traffic heavy -- allows spreading out load
          * */
         stagger?: number,
-    },
+    }
+
     /**
      * Settings related to default configurations for queue behavior for subreddits
      * */
     queue?: {
-        /**
-         * Set the number of maximum concurrent workers any subreddit can use.
-         *
-         * Subreddits may define their own number of max workers in their config but the application will never allow any subreddit's max workers to be larger than the operator
-         *
-         * NOTE: Do not increase this unless you are certain you know what you are doing! The default is suitable for the majority of use cases.
-         *
-         * @default 1
-         * @examples [1]
-         * */
-        maxWorkers?: number,
+    /**
+     * Set the number of maximum concurrent workers any subreddit can use.
+     *
+     * Subreddits may define their own number of max workers in their config but the application will never allow any subreddit's max workers to be larger than the operator
+     *
+     * NOTE: Do not increase this unless you are certain you know what you are doing! The default is suitable for the majority of use cases.
+     *
+     * @default 1
+     * @examples [1]
+     * */
+    maxWorkers?: number,
     }
 
     /**
@@ -1585,38 +1794,7 @@ export interface OperatorJsonConfig {
     /**
      * Settings to configure global logging defaults
      * */
-    logging?: {
-        /**
-         * The minimum log level to output. The log level set will output logs at its level **and all levels above it:**
-         *
-         *  * `error`
-         *  * `warn`
-         *  * `info`
-         *  * `verbose`
-         *  * `debug`
-         *
-         *  Note: `verbose` will display *a lot* of information on the status/result of run rules/checks/actions etc. which is very useful for testing configurations. Once your bot is stable changing the level to `info` will reduce log noise.
-         *
-         *  * ENV => `LOG_LEVEL`
-         *  * ARG => `--logLevel <level>`
-         *
-         *  @default "verbose"
-         *  @examples ["verbose"]
-         * */
-        level?: LogLevel,
-        /**
-         * The absolute path to a directory where rotating log files should be stored.
-         *
-         * * If not present or `null` no log files will be created
-         * * If `true` logs will be stored at `[working directory]/logs`
-         *
-         * * ENV => `LOG_DIR`
-         * * ARG => `--logDir [dir]`
-         *
-         * @examples ["/var/log/contextmod"]
-         * */
-        path?: string,
-    },
+    logging?: LoggingOptions,
 
     /**
      * Settings to configure the default caching behavior globally
@@ -1641,6 +1819,17 @@ export interface OperatorJsonConfig {
     snoowrap?: SnoowrapOptions
 
     bots?: BotInstanceJsonConfig[]
+
+    /**
+     * Added to the User-Agent information sent to reddit
+     *
+     * This string will be added BETWEEN version and your bot name.
+     *
+     * EX: `myBranch` => `web:contextMod:v1.0.0-myBranch:BOT-/u/MyBotUser`
+     *
+     * * ENV => `USER_AGENT`
+     * */
+    userAgent?: string
 
     /**
      * Settings for the web interface
@@ -1792,17 +1981,15 @@ export interface BotCredentialsConfig extends ThirdPartyCredentialsJsonConfig {
 
 export interface BotInstanceConfig extends BotInstanceJsonConfig {
     credentials: BotCredentialsJsonConfig
-    snoowrap: {
-        proxy?: string,
-        debug?: boolean,
-    }
     database: Connection
+    snoowrap: SnoowrapOptions
     subreddits: {
         names?: string[],
         exclude?: string[],
         dryRun?: boolean,
         wikiConfig: string,
         heartbeatInterval: number,
+        overrides?: SubredditOverrides[]
     },
     polling: {
         shared: PollOn[],
@@ -1818,6 +2005,7 @@ export interface BotInstanceConfig extends BotInstanceJsonConfig {
         softLimit: number,
         hardLimit: number,
     }
+    userAgent?: string
 }
 
 export interface OperatorConfig extends OperatorJsonConfig {
@@ -1827,10 +2015,7 @@ export interface OperatorConfig extends OperatorJsonConfig {
         display?: string,
     },
     notifications?: NotificationConfig
-    logging: {
-        level: LogLevel,
-        path?: string,
-    },
+    logging: StrongLoggingOptions,
     caching: StrongCache,
     databaseConfig: {
         connection: DatabaseConfig,
@@ -1862,6 +2047,15 @@ export interface OperatorConfig extends OperatorJsonConfig {
     credentials: ThirdPartyCredentialsJsonConfig
 }
 
+export interface OperatorFileConfig {
+    document: YamlOperatorConfigDocument | JsonOperatorConfigDocument
+    isWriteable?: boolean
+}
+
+export interface OperatorConfigWithFileContext extends OperatorConfig {
+    fileConfig: OperatorFileConfig
+}
+
 //export type OperatorConfig = Required<OperatorJsonConfig>;
 
 interface CacheTypeStat {
@@ -1887,6 +2081,7 @@ export interface LogInfo {
     instance?: string
     labels?: string[]
     bot?: string
+    user?: string
 }
 
 export interface ActionResult extends ActionProcessResult {
@@ -1894,6 +2089,8 @@ export interface ActionResult extends ActionProcessResult {
     name: string,
     run: boolean,
     runReason?: string,
+    itemIs?: FilterResult<TypedActivityState>
+    authorIs?: FilterResult<AuthorCriteria>
 }
 
 export interface ActionProcessResult {
@@ -1903,22 +2100,50 @@ export interface ActionProcessResult {
     touchedEntities?: (Submission | Comment | RedditUser | string)[]
 }
 
+export interface EventActivity {
+    peek: string
+    link: string
+    type: ActivityType
+    id: string
+    subreddit: string
+    author: string
+}
+
 export interface ActionedEvent {
-    activity: {
-        peek: string
-        link: string
-        id: string,
-        title: string,
-        type: string,
-        submission: string | undefined
-    }
-    author: RedditUser
+    activity: EventActivity
+    parentSubmission?: EventActivity
     timestamp: number
-    check: string
-    ruleSummary: string,
-    subreddit: Subreddit,
+    subreddit: string,
+    triggered: boolean,
+    runResults: RunResult[]
+    dispatchSource?: DispatchAudit
+}
+
+export interface CheckResult {
+    triggered: boolean
     ruleResults: RuleResult[]
+    itemIs?: FilterResult<TypedActivityState>
+    authorIs?: FilterResult<AuthorCriteria>
+    fromCache?: boolean
+}
+
+export interface CheckSummary extends CheckResult {
+    name: string
+    run: string
+    postBehavior: string
+    error?: string
     actionResults: ActionResult[]
+    condition: 'AND' | 'OR'
+}
+
+export interface RunResult {
+    name: string
+    triggered: boolean
+    reason?: string
+    error?: string
+    itemIs?: FilterResult<TypedActivityState>
+    authorIs?: FilterResult<AuthorCriteria>
+    checkResults: CheckSummary[]
 }
 
 export interface UserResultCache {
@@ -1931,22 +2156,6 @@ export type RedditEntityType = 'user' | 'subreddit';
 export interface RedditEntity {
     name: string
     type: RedditEntityType
-}
-
-export interface StatusCodeError extends Error {
-    name: 'StatusCodeError',
-    statusCode: number,
-    message: string,
-    response: IncomingMessage,
-    error: Error
-}
-
-export interface RequestError extends Error {
-    name: 'RequestError',
-    statusCode: number,
-    message: string,
-    response: IncomingMessage,
-    error: Error
 }
 
 export interface HistoricalStatsDisplay extends HistoricalStats {
@@ -2020,13 +2229,13 @@ export interface ManagerStats {
 export interface HistoricalStatUpdateData {
     eventsCheckedTotal?: number
     eventsActionedTotal?: number
-    checksRun: string[] | string
-    checksTriggered: string[] | string
-    checksFromCache: string[] | string
-    actionsRun: string[] | string
-    rulesRun: string[] | string
-    rulesCachedTotal: number
-    rulesTriggered: string[] | string
+    checksRun?: string[] | string
+    checksTriggered?: string[] | string
+    checksFromCache?: string[] | string
+    actionsRun?: string[] | string
+    rulesRun?: string[] | string
+    rulesCachedTotal?: number
+    rulesTriggered?: string[] | string
 }
 
 export type SearchFacetType = 'title' | 'url' | 'duplicates' | 'crossposts' | 'external';
@@ -2056,3 +2265,171 @@ export interface StringComparisonOptions {
 export interface DatabaseMigrationOptions {
     force?: boolean
 }
+
+export interface FilterCriteriaPropertyResult<T> {
+    property: keyof T
+    found?: string | boolean | number | null | FilterResult<any>
+    passed?: null | boolean
+    reason?: string
+    behavior: FilterBehavior
+}
+
+export interface FilterCriteriaResult<T> {
+    behavior: FilterBehavior
+    criteria: T//AuthorCriteria | TypedActivityStates
+    propertyResults: FilterCriteriaPropertyResult<T>[]
+    passed: boolean
+}
+
+export type FilterBehavior = 'include' | 'exclude'
+
+export interface FilterResult<T> {
+    criteriaResults: FilterCriteriaResult<T>[]
+    join: JoinOperands
+    passed: boolean
+}
+
+export interface TextTransformOptions {
+    /**
+     * A set of search-and-replace operations to perform on text values before performing a match. Transformations are performed in the order they are defined.
+     *
+     * * If `transformationsActivity` IS NOT defined then these transformations will be performed on BOTH the activity text (submission title or comment) AND the repost candidate text
+     * * If `transformationsActivity` IS defined then these transformations are only performed on repost candidate text
+     * */
+    transformations?: SearchAndReplaceRegExp[]
+
+    /**
+     * Specify a separate set of transformations for the activity text (submission title or comment)
+     *
+     * To perform no transformations when `transformations` is defined set this to an empty array (`[]`)
+     * */
+    transformationsActivity?: SearchAndReplaceRegExp[]
+}
+
+export interface TextMatchOptions {
+    /**
+     * The percentage, as a whole number, of a repost title/comment that must match the title/comment being checked in order to consider both a match
+     *
+     * Note: Setting to 0 will make every candidate considered a match -- useful if you want to match if the URL has been reposted anywhere
+     *
+     * Defaults to `85` (85%)
+     *
+     * @default 85
+     * @example [85]
+     * */
+    matchScore?: number
+
+    /**
+     * The minimum number of words in the activity being checked for which this rule will run on
+     *
+     * If the word count is below the minimum the rule fails
+     *
+     * Defaults to 2
+     *
+     * @default 2
+     * @example [2]
+     * */
+    minWordCount?: number
+
+    /**
+     * Should text matching be case sensitive?
+     *
+     * Defaults to false
+     *
+     * @default false
+     * @example [false]
+     **/
+    caseSensitive?: boolean
+}
+
+export type ActivityCheckJson = SubmissionCheckJson | CommentCheckJson;
+
+export type GotoPath = `goto:${string}`;
+/**
+ * The possible behaviors that can occur after a check has run
+ *
+ * * next => continue to next Check/Run
+ * * stop => stop CM lifecycle for this activity (immediately end)
+ * * nextRun => skip any remaining Checks in this Run and start the next Run
+ * * goto:[path] => specify a run[.check] to jump to
+ *
+ * */
+export type PostBehaviorTypes = 'next' | 'stop' | 'nextRun' | string;
+
+export interface PostBehavior {
+    /**
+     * Do this behavior if a Check is triggered
+     *
+     * @default nextRun
+     * @example ["nextRun"]
+     * */
+    postTrigger?: PostBehaviorTypes
+    /**
+     * Do this behavior if a Check is NOT triggered
+     *
+     * @default next
+     * @example ["next"]
+     * */
+    postFail?: PostBehaviorTypes
+}
+
+export type ActivityType = 'submission' | 'comment';
+
+export type ItemCritPropHelper = SafeDictionary<FilterCriteriaPropertyResult<(CommentState & SubmissionState)>, keyof (CommentState & SubmissionState)>;
+export type RequiredItemCrit = Required<(CommentState & SubmissionState)>;
+
+export type onExistingFoundBehavior = 'replace' | 'skip' | 'ignore';
+
+export interface ActivityDispatchConfig {
+    identifier?: string
+    cancelIfQueued?: boolean | NonDispatchActivitySource | NonDispatchActivitySource[]
+    goto?: string
+    onExistingFound?: onExistingFoundBehavior
+    delay: DurationVal
+}
+
+export interface ActivityDispatch extends ActivityDispatchConfig {
+    id: string
+    queuedAt: number
+    activity: Submission | Comment
+    duration: Duration
+    processing: boolean
+    action: string
+}
+
+export interface DispatchAudit {
+    goto?: string
+    queuedAt: number
+    action: string,
+    delay: string,
+    id: string
+    identifier?: string
+}
+
+export type ActionTarget = 'self' | 'parent';
+
+export type InclusiveActionTarget = ActionTarget | 'any';
+
+export type DispatchSource = 'dispatch' | `dispatch:${string}`;
+
+export type NonDispatchActivitySource = 'poll' | `poll:${PollOn}` | 'user';
+
+// TODO
+// https://github.com/YousefED/typescript-json-schema/issues/426
+// https://github.com/YousefED/typescript-json-schema/issues/425
+// @pattern ^(((poll|dispatch)(:\w+)?)|user)$
+// @type string
+/**
+ * Where an Activity was retrieved from
+ *
+ * Source can be any of:
+ *
+ * * `poll` => activity was retrieved from polling a queue (unmoderated, modqueue, etc...)
+ * * `poll:[pollSource]` => activity was retrieved from specific polling source IE `poll:unmoderated` activity comes from unmoderated queue
+ * * `dispatch` => activity is from Dispatch Action
+ * * `dispatch:[identifier]` => activity is from Dispatch Action with specific identifier
+ * * `user` => activity was from user input (web dashboard)
+ *
+ *
+ * */
+export type ActivitySource = NonDispatchActivitySource | DispatchSource;

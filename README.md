@@ -1,7 +1,7 @@
-[![Latest Release](https://img.shields.io/github/v/release/foxxmd/context-mod)](https://github.com/FoxxMD/context-mod/releases)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Docker Pulls](https://img.shields.io/docker/pulls/foxxmd/context-mod)](https://hub.docker.com/r/foxxmd/context-mod)
-[![Discord Support](https://img.shields.io/badge/Support-Discord-blue)](https://discord.gg/YgehbC8pXW)
+# ContextMod [![Latest Release](https://img.shields.io/github/v/release/foxxmd/context-mod)](https://github.com/FoxxMD/context-mod/releases) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) [![Docker Pulls](https://img.shields.io/docker/pulls/foxxmd/context-mod)](https://hub.docker.com/r/foxxmd/context-mod)
+
+<img src="/docs/logo.png" align="right"
+alt="ContextMod logo" width="180" height="176">
 
 **Context Mod** (CM) is an event-based, [reddit](https://reddit.com) moderation bot built on top of [snoowrap](https://github.com/not-an-aardvark/snoowrap) and written in [typescript](https://www.typescriptlang.org/).
 
@@ -109,7 +109,7 @@ CM comes equipped with a dashboard designed for use by both moderators and bot o
   * View **real-time logs** of what the bot is doing on your subreddit
   * **Run bot on any permalink**
 
-![Subreddit View](docs/screenshots/subredditStatus.jpg)
+![Subreddit View](docs/images/subredditStatus.jpg)
 
 ### Bot Setup/Authentication
 
@@ -117,11 +117,11 @@ A bot oauth helper allows operators to define oauth credentials/permissions and 
 
 Operator view/invite link generation:
 
-![Oauth View](docs/screenshots/oauth.jpg)
+![Oauth View](docs/images/oauth.jpg)
 
 Moderator view/invite and authorization:
 
-![Invite View](docs/screenshots/oauth-invite.jpg)
+![Invite View](docs/images/oauth-invite.jpg)
 
 ### Configuration Editor
 
@@ -134,7 +134,7 @@ A built-in editor using [monaco-editor](https://microsoft.github.io/monaco-edito
 * Authenticated view loads subreddit configurations by simple link found on the subreddit dashboard
 * Switch schemas to edit either subreddit or operator configurations
 
-![Configuration View](docs/screenshots/editor.jpg)
+![Configuration View](docs/images/editor.jpg)
 
 ## License
 

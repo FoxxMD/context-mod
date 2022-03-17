@@ -1,17 +1,28 @@
 import {Rule, RuleJSONConfig, RuleOptions, RuleResult} from "./index";
 import {Comment} from "snoowrap";
 import {
-    activityWindowText, asSubmission,
-    comparisonTextOp, FAIL, getActivitySubredditName, isExternalUrlSubmission, isRedditMedia,
-    parseGenericValueComparison, parseSubredditName,
-    parseUsableLinkIdentifier as linkParser, PASS, subredditStateIsNameOnly, toStrongSubredditState
+    activityWindowText,
+    asSubmission,
+    comparisonTextOp,
+    FAIL,
+    getActivitySubredditName,
+    isExternalUrlSubmission,
+    isRedditMedia,
+    parseGenericValueComparison,
+    parseSubredditName,
+    parseUsableLinkIdentifier as linkParser,
+    PASS,
+    searchAndReplace,
+    stringSameness,
+    subredditStateIsNameOnly,
+    toStrongSubredditState
 } from "../util";
 import {
     ActivityWindow,
     ActivityWindowType,
-    ReferenceSubmission,
+    ReferenceSubmission, SearchAndReplaceRegExp,
     StrongSubredditState,
-    SubredditState
+    SubredditState, TextMatchOptions, TextTransformOptions
 } from "../Common/interfaces";
 import Submission from "snoowrap/dist/objects/Submission";
 import dayjs from "dayjs";
@@ -29,27 +40,6 @@ interface RepeatActivityReducer {
     allSets: RepeatActivityData[]
 }
 
-const getActivityIdentifier = (activity: (Submission | Comment), length = 200) => {
-    let identifier: string;
-    if (asSubmission(activity)) {
-        if (activity.is_self) {
-            identifier = `${activity.title}${activity.selftext.slice(0, length)}`;
-        } else if(isRedditMedia(activity)) {
-            identifier = activity.title;
-        } else {
-            identifier = parseUsableLinkIdentifier(activity.url) as string;
-        }
-    } else {
-        identifier = activity.body.slice(0, length);
-    }
-    return identifier;
-}
-
-const fuzzyOptions = {
-    includeScore: true,
-    distance: 15
-};
-
 export class RepeatActivityRule extends Rule {
     threshold: string;
     window: ActivityWindowType;
@@ -62,6 +52,9 @@ export class RepeatActivityRule extends Rule {
     activityFilterFunc: (x: Submission|Comment) => Promise<boolean> = async (x) => true;
     keepRemoved: boolean;
     minWordCount: number;
+    transformations: SearchAndReplaceRegExp[]
+    caseSensitive: boolean
+    matchScore: number
 
     constructor(options: RepeatActivityOptions) {
         super(options);
@@ -75,7 +68,13 @@ export class RepeatActivityRule extends Rule {
             include = [],
             exclude = [],
             keepRemoved = false,
+            transformations = [],
+            caseSensitive = true,
+            matchScore = 85,
         } = options;
+        this.matchScore = matchScore;
+        this.transformations = transformations;
+        this.caseSensitive = caseSensitive;
         this.minWordCount = minWordCount;
         this.keepRemoved = keepRemoved;
         this.threshold = threshold;
@@ -136,6 +135,37 @@ export class RepeatActivityRule extends Rule {
         }
     }
 
+    getActivityIdentifier(activity: (Submission | Comment), length = 200, transform = true) {
+        let identifier: string;
+        if (asSubmission(activity)) {
+            if (activity.is_self) {
+                identifier = `${activity.title}${activity.selftext.slice(0, length)}`;
+            } else if(isRedditMedia(activity)) {
+                identifier = activity.title;
+            } else {
+                identifier = parseUsableLinkIdentifier(activity.url) as string;
+            }
+        } else {
+            identifier = activity.body.slice(0, length);
+        }
+
+        if(!transform) {
+            return identifier;
+        }
+
+        // apply any transforms
+        if (this.transformations.length > 0) {
+            identifier = searchAndReplace(identifier, this.transformations);
+        }
+
+        // perform after transformations so as not to mess up regex's depending on case
+        if(!this.caseSensitive) {
+            identifier = identifier.toLowerCase();
+        }
+
+        return identifier;
+    }
+
     async process(item: Submission|Comment): Promise<[boolean, RuleResult]> {
         let referenceUrl;
         if(asSubmission(item) && this.useSubmissionAsReference) {
@@ -162,9 +192,10 @@ export class RepeatActivityRule extends Rule {
             const acc = await accProm;
             const {openSets = [], allSets = []} = acc;
 
-            let identifier = getActivityIdentifier(activity);
+            let identifier = this.getActivityIdentifier(activity);
+
             const isUrl = isExternalUrlSubmission(activity);
-            let fu = new Fuse([identifier], !isUrl ? fuzzyOptions : {...fuzzyOptions, distance: 5});
+            //let fu = new Fuse([identifier], !isUrl ? fuzzyOptions : {...fuzzyOptions, distance: 5});
             const validSub = await this.activityFilterFunc(activity);
             let minMet = identifier.length >= this.minWordCount;
 
@@ -174,12 +205,15 @@ export class RepeatActivityRule extends Rule {
             let currIdentifierInOpen = false;
             const bufferedActivities = this.gapAllowance === undefined || this.gapAllowance === 0 ? [] : activities.slice(Math.max(0, index - this.gapAllowance), Math.max(0, index));
             for (const o of openSets) {
-                const res = fu.search(o.identifier);
-                const match = res.length > 0;
-                if (match && validSub && minMet) {
+                const strMatchResults = stringSameness(o.identifier, identifier);
+                if (strMatchResults.highScoreWeighted >= this.matchScore && minMet) {
                     updatedOpenSets.push({...o, sets: [...o.sets, activity]});
                     currIdentifierInOpen = true;
-                } else if (bufferedActivities.some(x => fu.search(getActivityIdentifier(x)).length > 0) && validSub && minMet) {
+                } else if (bufferedActivities.some(x => {
+                    let buffIdentifier = this.getActivityIdentifier(x);
+                    const buffMatch = stringSameness(identifier, buffIdentifier);
+                    return buffMatch.highScoreWeighted >= this.matchScore;
+                }) && validSub && minMet) {
                     updatedOpenSets.push(o);
                 } else if(!currIdentifierInOpen && !isUrl) {
                     updatedAllSets.push(o);
@@ -193,15 +227,18 @@ export class RepeatActivityRule extends Rule {
                     // could be that a spammer is using different URLs for each submission but similar submission titles so search by title as well
                     const sub = activity as Submission;
                     identifier = sub.title;
-                    fu = new Fuse([identifier], !isUrl ? fuzzyOptions : {...fuzzyOptions, distance: 5});
+                    //fu = new Fuse([identifier], !isUrl ? fuzzyOptions : {...fuzzyOptions, distance: 5});
                     minMet = identifier.length >= this.minWordCount;
                     for (const o of openSets) {
-                        const res = fu.search(o.identifier);
-                        const match = res.length > 0;
-                        if (match && validSub && minMet) {
+                        const strMatchResults = stringSameness(o.identifier, identifier);
+                        if (strMatchResults.highScoreWeighted >= this.matchScore && minMet) {
                             updatedOpenSets.push({...o, sets: [...o.sets, activity]});
                             currIdentifierInOpen = true;
-                        } else if (bufferedActivities.some(x => fu.search(getActivityIdentifier(x)).length > 0) && validSub && minMet && !updatedOpenSets.includes(o)) {
+                        } else if (bufferedActivities.some(x => {
+                            let buffIdentifier = this.getActivityIdentifier(x);
+                            const buffMatch = stringSameness(identifier, buffIdentifier);
+                            return buffMatch.highScoreWeighted >= this.matchScore;
+                        }) && validSub && minMet && !updatedOpenSets.includes(o)) {
                             updatedOpenSets.push(o);
                         } else if(!updatedAllSets.includes(o)) {
                             updatedAllSets.push(o);
@@ -232,7 +269,7 @@ export class RepeatActivityRule extends Rule {
         let applicableGroupedActivities = identifierGroupedActivities;
         if (this.useSubmissionAsReference) {
             applicableGroupedActivities = new Map();
-            let identifier = getActivityIdentifier(item);
+            let identifier = this.getActivityIdentifier(item);
             let referenceSubmissions = identifierGroupedActivities.get(identifier);
             if(referenceSubmissions === undefined && isExternalUrlSubmission(item)) {
                 // if external url sub then try by title
@@ -240,7 +277,7 @@ export class RepeatActivityRule extends Rule {
                 referenceSubmissions = identifierGroupedActivities.get(identifier);
                 if(referenceSubmissions === undefined) {
                     // didn't get by title so go back to url since that's the default
-                    identifier = getActivityIdentifier(item);
+                    identifier = this.getActivityIdentifier(item);
                 }
             }
 
@@ -265,7 +302,7 @@ export class RepeatActivityRule extends Rule {
             };
             for (let set of value) {
                 const test = comparisonTextOp(set.length, operator, thresholdValue);
-                const md = set.map((x: (Comment | Submission)) => `[${asSubmission(x) ? x.title : getActivityIdentifier(x, 50)}](https://reddit.com${x.permalink}) in ${x.subreddit_name_prefixed} on ${dayjs(x.created_utc * 1000).utc().format()}`);
+                const md = set.map((x: (Comment | Submission)) => `[${asSubmission(x) ? x.title : this.getActivityIdentifier(x, 50)}](https://reddit.com${x.permalink}) in ${x.subreddit_name_prefixed} on ${dayjs(x.created_utc * 1000).utc().format()}`);
 
                 summaryData.sets.push(set);
                 summaryData.largestTrigger = Math.max(summaryData.largestTrigger, set.length);
@@ -325,7 +362,7 @@ interface SummaryData {
     triggeringSetsMarkdown: string[]
 }
 
-interface RepeatActivityConfig extends ActivityWindow, ReferenceSubmission {
+interface RepeatActivityConfig extends ActivityWindow, ReferenceSubmission, TextMatchOptions {
     /**
      * The number of repeat submissions that will trigger the rule
      * @default ">= 5"
@@ -383,18 +420,9 @@ interface RepeatActivityConfig extends ActivityWindow, ReferenceSubmission {
     keepRemoved?: boolean
 
     /**
-     * For activities that are text-based this is the minimum number of words required for the activity to be considered for a repeat
-     *
-     * EX if `minimumWordCount=5` and a comment is `what about you` then it is ignored because `3 is less than 5`
-     *
-     * **For self-text submissions** -- title + body text
-     *
-     * **For comments* -- body text
-     *
-     * @default 1
-     * @example [1]
+     * A set of search-and-replace operations to perform on text values before performing a match. Transformations are performed in the order they are defined.
      * */
-    minWordCount?: number,
+    transformations?: SearchAndReplaceRegExp[]
 }
 
 export interface RepeatActivityOptions extends RepeatActivityConfig, RuleOptions {

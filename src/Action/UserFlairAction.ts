@@ -12,7 +12,7 @@ export class UserFlairAction extends Action {
     super(options);
 
     this.text = options.text === null || options.text === '' ? undefined : options.text;
-    this.css = options.css === null || options.text === '' ? undefined : options.text;
+    this.css = options.css === null || options.css === '' ? undefined : options.css;
     this.flair_template_id = options.flair_template_id === null || options.flair_template_id === '' ? undefined : options.flair_template_id;
   }
 
@@ -41,7 +41,7 @@ export class UserFlairAction extends Action {
     const flairSummary = flairParts.length === 0 ? 'Unflair user' : flairParts.join(' | ');
     this.logger.verbose(flairSummary);
 
-    if (!this.dryRun) {
+    if (!dryRun) {
       if (this.flair_template_id !== undefined) {
         try {
           // @ts-ignore
@@ -50,6 +50,7 @@ export class UserFlairAction extends Action {
             flairTemplateId: this.flair_template_id,
             username: item.author.name,
           });
+          item.author_flair_template_id = this.flair_template_id
         } catch (err: any) {
           this.logger.error('Either the flair template ID is incorrect or you do not have permission to access it.');
           throw err;
@@ -57,6 +58,9 @@ export class UserFlairAction extends Action {
       } else if (this.text === undefined && this.css === undefined) {
         // @ts-ignore
         await item.subreddit.deleteUserFlair(item.author.name);
+        item.author_flair_css_class = null;
+        item.author_flair_text = null;
+        item.author_flair_template_id = null;
       } else {
         // @ts-ignore
         await item.author.assignFlair({
@@ -64,6 +68,12 @@ export class UserFlairAction extends Action {
           cssClass: this.css,
           text: this.text,
         });
+        item.author_flair_text = this.text ?? null;
+        item.author_flair_css_class = this.css ?? null;
+      }
+      await this.resources.resetCacheForItem(item);
+      if(typeof item.author !== 'string') {
+          await this.resources.resetCacheForItem(item.author);
       }
     }
 

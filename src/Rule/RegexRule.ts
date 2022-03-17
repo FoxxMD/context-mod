@@ -11,7 +11,7 @@ import {
     ActivityWindowType, JoinOperands,
 } from "../Common/interfaces";
 import dayjs from 'dayjs';
-import SimpleError from "../Utils/SimpleError";
+import {SimpleError} from "../Utils/Errors";
 
 export interface RegexCriteria {
     /**
@@ -95,6 +95,15 @@ export interface RegexCriteria {
      * */
     totalMatchThreshold?: string,
 
+    /**
+     * When `true` the Activity being checked MUST pass the `matchThreshold` before the Rule considers any history
+     *
+     * For use with `activityMatchThreshold`/`totalMatchThreshold` -- useful to conserve API calls
+     *
+     * @default false
+     * */
+    mustMatchCurrent?: boolean
+
     window?: ActivityWindowType
 }
 
@@ -140,6 +149,7 @@ export class RegexRule extends Rule {
                 matchThreshold = '> 0',
                 activityMatchThreshold = '> 0',
                 totalMatchThreshold = null,
+                mustMatchCurrent = false,
                 window,
             } = criteria;
 
@@ -184,6 +194,8 @@ export class RegexRule extends Rule {
             if (singleMatched) {
                 activitiesMatchedCount++;
             }
+            const singleCriteriaPass = !mustMatchCurrent || (mustMatchCurrent && singleMatched);
+
             if (activityMatchComparison !== undefined) {
                 activityThresholdMet = !activityMatchComparison.isPercent && comparisonTextOp(activitiesMatchedCount, activityMatchComparison.operator, activityMatchComparison.value);
             }
@@ -192,7 +204,7 @@ export class RegexRule extends Rule {
             }
 
             let history: (Submission | Comment)[] = [];
-            if ((activityThresholdMet === false || totalThresholdMet === false) && window !== undefined) {
+            if ((activityThresholdMet === false || totalThresholdMet === false) && window !== undefined && singleCriteriaPass) {
                 // our checking activity didn't meet threshold requirements and criteria does define window
                 // leh go
 
@@ -263,7 +275,8 @@ export class RegexRule extends Rule {
                     matchThreshold,
                     activityMatchThreshold,
                     totalMatchThreshold,
-                    window: humanWindow
+                    window: humanWindow,
+                    mustMatchCurrent,
                 },
                 matches,
                 matchCount,

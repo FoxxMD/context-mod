@@ -46,15 +46,31 @@ export interface AuthorCriteria {
      * */
     name?: string[],
     /**
-     * A list of (user) flair css class values from the subreddit to match against
+     * A (user) flair css class (or list of) from the subreddit to match against
+     *
+     * * If `true` then passes if ANY css is assigned
+     * * If `false` then passes if NO css is assigned
      * @examples ["red"]
      * */
-    flairCssClass?: string[],
+    flairCssClass?: boolean | string | string[],
     /**
-     * A list of (user) flair text values from the subreddit to match against
+     * A (user) flair text value (or list of) from the subreddit to match against
+     *
+     * * If `true` then passes if ANY text is assigned
+     * * If `false` then passes if NO text is assigned
+     *
      * @examples ["Approved"]
      * */
-    flairText?: string[],
+    flairText?: boolean | string | string[],
+
+    /**
+     * A (user) flair template id (or list of) from the subreddit to match against
+     *
+     * * If `true` then passes if ANY template is assigned
+     * * If `false` then passed if NO template is assigned
+     *
+     * */
+    flairTemplate?: boolean | string | string[]
     /**
      * Is the author a moderator?
      * */
@@ -132,8 +148,8 @@ export interface AuthorCriteria {
 
 export class Author implements AuthorCriteria {
     name?: string[];
-    flairCssClass?: string[];
-    flairText?: string[];
+    flairCssClass?: boolean | string[];
+    flairText?: boolean | string[];
     isMod?: boolean;
     userNotes?: UserNoteCriteria[];
     age?: string;
@@ -146,8 +162,12 @@ export class Author implements AuthorCriteria {
 
     constructor(options: AuthorCriteria) {
         this.name = options.name;
-        this.flairCssClass = options.flairCssClass;
-        this.flairText = options.flairText;
+        if(options.flairCssClass !== undefined) {
+            this.flairCssClass = typeof options.flairCssClass === 'string' ? [options.flairCssClass] : options.flairCssClass;
+        }
+        if(options.flairText !== undefined) {
+            this.flairText = typeof options.flairText === 'string' ? [options.flairText] : options.flairText;
+        }
         this.isMod = options.isMod;
         this.userNotes = options.userNotes;
         this.age = options.age;

@@ -31,6 +31,15 @@
                         }
                     ]
                 },
+                "subredditThreshold": {
+                    "default": ">= 1",
+                    "description": "A string containing a comparison operator and a value to compare the **number of subreddits that have valid activities** against\n\nThe syntax is `(< OR > OR <= OR >=) <number>[percent sign]`\n\n* EX `> 3`  => greater than 3 Subreddits found with valid activities\n* EX `<= 75%` => number of Subreddits with valid activities are equal to or less than 75% of all Subreddits found\n\n**Note:** If you use percentage comparison here as well as `useSubmissionAsReference` then \"all Subreddits found\" is only pertains to Subreddits that had the Link of the Submission, rather than all Subreddits from this window.",
+                    "examples": [
+                        ">= 1"
+                    ],
+                    "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
+                    "type": "string"
+                },
                 "subreddits": {
                     "description": "Activities will be counted if they are found in this list of Subreddits\n\nEach value in the list can be either:\n\n * string (name of subreddit)\n * regular expression to run on the subreddit name\n * `SubredditState`\n\nEX `[\"mealtimevideos\",\"askscience\", \"/onlyfans*\\/i\", {\"over18\": true}]`",
                     "examples": [
@@ -158,8 +167,7 @@
                     "default": "undefined",
                     "description": "This list determines which categories of domains should be aggregated on. All aggregated domains will be tested against `threshold`\n\n* If `media` is included then aggregate author's submission history which reddit recognizes as media (youtube, vimeo, etc.)\n* If `redditMedia` is included then aggregate on author's submissions history which are media hosted on reddit: galleries, videos, and images (i.redd.it / v.redd.it)\n* If `self` is included then aggregate on author's submission history which are self-post (`self.[subreddit]`) or domain is `reddit.com`\n* If `link` is included then aggregate author's submission history which is external links and not recognized as `media` by reddit\n\nIf nothing is specified or list is empty (default) rule will only aggregate on `link` and `media` (ignores reddit-hosted content and self-posts)",
                     "examples": [
-                        [
-                        ]
+                        []
                     ],
                     "items": {
                         "enum": [
@@ -192,8 +200,7 @@
                 },
                 "domains": {
                     "default": [
-                        [
-                        ]
+                        []
                     ],
                     "description": "A list of domains whose Activities will be tested against `threshold`.\n\nThe values are tested as partial strings so you do not need to include full URLs, just the part that matters.\n\nEX `[\"youtube\"]` will match submissions with the domain `https://youtube.com/c/aChannel`\nEX `[\"youtube.com/c/bChannel\"]` will NOT match submissions with the domain `https://youtube.com/c/aChannel`\n\nIf you wish to aggregate on self-posts for a subreddit use the syntax `self.[subreddit]` EX `self.AskReddit`\n\n**If this Rule is part of a Check for a Submission and you wish to aggregate on the domain of the Submission use the special string `AGG:SELF`**\n\nIf nothing is specified or list is empty (default) aggregate using `aggregateOn`",
                     "items": {
@@ -342,21 +349,18 @@
                     "type": "string"
                 },
                 "itemIs": {
-                    "anyOf": [
-                        {
-                            "items": {
+                    "description": "A list of criteria to test the state of the `Activity` against before running the Rule.\n\nIf any set of criteria passes the Rule will be run. If the criteria fails then the Rule is skipped.",
+                    "items": {
+                        "anyOf": [
+                            {
                                 "$ref": "#/definitions/SubmissionState"
                             },
-                            "type": "array"
-                        },
-                        {
-                            "items": {
+                            {
                                 "$ref": "#/definitions/CommentState"
-                            },
-                            "type": "array"
-                        }
-                    ],
-                    "description": "A list of criteria to test the state of the `Activity` against before running the Rule.\n\nIf any set of criteria passes the Rule will be run. If the criteria fails then the Rule is skipped."
+                            }
+                        ]
+                    },
+                    "type": "array"
                 },
                 "kind": {
                     "description": "The kind of rule to run",
@@ -428,24 +432,61 @@
                     ]
                 },
                 "flairCssClass": {
-                    "description": "A list of (user) flair css class values from the subreddit to match against",
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
+                        }
+                    ],
+                    "description": "A (user) flair css class (or list of) from the subreddit to match against\n\n* If `true` then passes if ANY css is assigned\n* If `false` then passes if NO css is assigned",
                     "examples": [
                         "red"
+                    ]
+                },
+                "flairTemplate": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
+                        }
                     ],
-                    "items": {
-                        "type": "string"
-                    },
-                    "type": "array"
+                    "description": "A (user) flair template id (or list of) from the subreddit to match against\n\n* If `true` then passes if ANY template is assigned\n* If `false` then passed if NO template is assigned"
                 },
                 "flairText": {
-                    "description": "A list of (user) flair text values from the subreddit to match against",
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
+                        }
+                    ],
+                    "description": "A (user) flair text value (or list of) from the subreddit to match against\n\n* If `true` then passes if ANY text is assigned\n* If `false` then passes if NO text is assigned",
                     "examples": [
                         "Approved"
-                    ],
-                    "items": {
-                        "type": "string"
-                    },
-                    "type": "array"
+                    ]
                 },
                 "isMod": {
                     "description": "Is the author a moderator?",
@@ -570,21 +611,18 @@
                     "type": "array"
                 },
                 "itemIs": {
-                    "anyOf": [
-                        {
-                            "items": {
+                    "description": "A list of criteria to test the state of the `Activity` against before running the Rule.\n\nIf any set of criteria passes the Rule will be run. If the criteria fails then the Rule is skipped.",
+                    "items": {
+                        "anyOf": [
+                            {
                                 "$ref": "#/definitions/SubmissionState"
                             },
-                            "type": "array"
-                        },
-                        {
-                            "items": {
+                            {
                                 "$ref": "#/definitions/CommentState"
-                            },
-                            "type": "array"
-                        }
-                    ],
-                    "description": "A list of criteria to test the state of the `Activity` against before running the Rule.\n\nIf any set of criteria passes the Rule will be run. If the criteria fails then the Rule is skipped."
+                            }
+                        ]
+                    },
+                    "type": "array"
                 },
                 "kind": {
                     "description": "The kind of rule to run",
@@ -632,6 +670,23 @@
                     "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(days|weeks|months|years|hours|minutes|seconds|milliseconds)\\s*$",
                     "type": "string"
                 },
+                "dispatched": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
+                        }
+                    ],
+                    "description": "Test whether the activity is present in dispatched/delayed activities\n\nNOTE: This is DOES NOT mean that THIS activity is from dispatch -- just that it exists there. To test whether THIS activity is from dispatch use `source`\n\n* `true` => activity exists in delayed activities\n* `false` => activity DOES NOT exist in delayed activities\n* `string` => activity exists in delayed activities with given identifier\n* `string[]` => activity exists in delayed activities with any of the given identifiers"
+                },
                 "distinguished": {
                     "type": "boolean"
                 },
@@ -657,6 +712,20 @@
                     "description": "A string containing a comparison operator and a value to compare against\n\nThe syntax is `(< OR > OR <= OR >=) <number>`\n\n* EX `> 100`  => greater than 100",
                     "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
                     "type": "string"
+                },
+                "source": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "string"
+                        }
+                    ],
+                    "description": "Test where the current activity was sourced from.\n\nA source can be any of:\n\n* `poll` => activity was retrieved from polling a queue (unmoderated, modqueue, etc...)\n* `poll:[pollSource]` => activity was retrieved from specific polling source IE `poll:unmoderated` activity comes from unmoderated queue\n  * valid sources: unmoderated modqueue newComm newSub\n* `dispatch` => activity is from Dispatch Action\n* `dispatch:[identifier]` => activity is from Dispatch Action with specific identifier\n* `user` => activity was from user input (web dashboard)"
                 },
                 "spam": {
                     "type": "boolean"
@@ -869,21 +938,18 @@
                     "type": "array"
                 },
                 "itemIs": {
-                    "anyOf": [
-                        {
-                            "items": {
+                    "description": "A list of criteria to test the state of the `Activity` against before running the Rule.\n\nIf any set of criteria passes the Rule will be run. If the criteria fails then the Rule is skipped.",
+                    "items": {
+                        "anyOf": [
+                            {
                                 "$ref": "#/definitions/SubmissionState"
                             },
-                            "type": "array"
-                        },
-                        {
-                            "items": {
+                            {
                                 "$ref": "#/definitions/CommentState"
-                            },
-                            "type": "array"
-                        }
-                    ],
-                    "description": "A list of criteria to test the state of the `Activity` against before running the Rule.\n\nIf any set of criteria passes the Rule will be run. If the criteria fails then the Rule is skipped."
+                            }
+                        ]
+                    },
+                    "type": "array"
                 },
                 "kind": {
                     "description": "The kind of rule to run",
@@ -1075,21 +1141,18 @@
                     "description": "When comparing submissions detect if the reference submission is an image and do a pixel-comparison to other detected image submissions.\n\n**Note:** This is an **experimental feature**"
                 },
                 "itemIs": {
-                    "anyOf": [
-                        {
-                            "items": {
+                    "description": "A list of criteria to test the state of the `Activity` against before running the Rule.\n\nIf any set of criteria passes the Rule will be run. If the criteria fails then the Rule is skipped.",
+                    "items": {
+                        "anyOf": [
+                            {
                                 "$ref": "#/definitions/SubmissionState"
                             },
-                            "type": "array"
-                        },
-                        {
-                            "items": {
+                            {
                                 "$ref": "#/definitions/CommentState"
-                            },
-                            "type": "array"
-                        }
-                    ],
-                    "description": "A list of criteria to test the state of the `Activity` against before running the Rule.\n\nIf any set of criteria passes the Rule will be run. If the criteria fails then the Rule is skipped."
+                            }
+                        ]
+                    },
+                    "type": "array"
                 },
                 "kind": {
                     "description": "The kind of rule to run",
@@ -1234,6 +1297,11 @@
                     "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)(\\s+.*)*$",
                     "type": "string"
                 },
+                "mustMatchCurrent": {
+                    "default": false,
+                    "description": "When `true` the Activity being checked MUST pass the `matchThreshold` before the Rule considers any history\n\nFor use with `activityMatchThreshold`/`totalMatchThreshold` -- useful to conserve API calls",
+                    "type": "boolean"
+                },
                 "name": {
                     "description": "A descriptive name that will be used in logging and be available for templating",
                     "examples": [
@@ -1345,21 +1413,18 @@
                     "type": "array"
                 },
                 "itemIs": {
-                    "anyOf": [
-                        {
-                            "items": {
+                    "description": "A list of criteria to test the state of the `Activity` against before running the Rule.\n\nIf any set of criteria passes the Rule will be run. If the criteria fails then the Rule is skipped.",
+                    "items": {
+                        "anyOf": [
+                            {
                                 "$ref": "#/definitions/SubmissionState"
                             },
-                            "type": "array"
-                        },
-                        {
-                            "items": {
+                            {
                                 "$ref": "#/definitions/CommentState"
-                            },
-                            "type": "array"
-                        }
-                    ],
-                    "description": "A list of criteria to test the state of the `Activity` against before running the Rule.\n\nIf any set of criteria passes the Rule will be run. If the criteria fails then the Rule is skipped."
+                            }
+                        ]
+                    },
+                    "type": "array"
                 },
                 "kind": {
                     "description": "The kind of rule to run",
@@ -1407,6 +1472,11 @@
                             ]
                         }
                     ]
+                },
+                "caseSensitive": {
+                    "default": false,
+                    "description": "Should text matching be case sensitive?\n\nDefaults to false",
+                    "type": "boolean"
                 },
                 "exclude": {
                     "description": "If present, activities will be counted only if they are **NOT** found in this list of Subreddits\n\nEach value in the list can be either:\n\n * string (name of subreddit)\n * regular expression to run on the subreddit name\n * `SubredditState`\n\nEX `[\"mealtimevideos\",\"askscience\", \"/onlyfans*\\/i\", {\"over18\": true}]`",
@@ -1461,21 +1531,18 @@
                     "type": "array"
                 },
                 "itemIs": {
-                    "anyOf": [
-                        {
-                            "items": {
+                    "description": "A list of criteria to test the state of the `Activity` against before running the Rule.\n\nIf any set of criteria passes the Rule will be run. If the criteria fails then the Rule is skipped.",
+                    "items": {
+                        "anyOf": [
+                            {
                                 "$ref": "#/definitions/SubmissionState"
                             },
-                            "type": "array"
-                        },
-                        {
-                            "items": {
+                            {
                                 "$ref": "#/definitions/CommentState"
-                            },
-                            "type": "array"
-                        }
-                    ],
-                    "description": "A list of criteria to test the state of the `Activity` against before running the Rule.\n\nIf any set of criteria passes the Rule will be run. If the criteria fails then the Rule is skipped."
+                            }
+                        ]
+                    },
+                    "type": "array"
                 },
                 "keepRemoved": {
                     "default": false,
@@ -1498,9 +1565,14 @@
                     ],
                     "type": "string"
                 },
+                "matchScore": {
+                    "default": 85,
+                    "description": "The percentage, as a whole number, of a repost title/comment that must match the title/comment being checked in order to consider both a match\n\nNote: Setting to 0 will make every candidate considered a match -- useful if you want to match if the URL has been reposted anywhere\n\nDefaults to `85` (85%)",
+                    "type": "number"
+                },
                 "minWordCount": {
-                    "default": 1,
-                    "description": "For activities that are text-based this is the minimum number of words required for the activity to be considered for a repeat\n\nEX if `minimumWordCount=5` and a comment is `what about you` then it is ignored because `3 is less than 5`\n\n**For self-text submissions** -- title + body text\n\n**For comments* -- body text",
+                    "default": 2,
+                    "description": "The minimum number of words in the activity being checked for which this rule will run on\n\nIf the word count is below the minimum the rule fails\n\nDefaults to 2",
                     "type": "number"
                 },
                 "name": {
@@ -1515,6 +1587,13 @@
                     "default": ">= 5",
                     "description": "The number of repeat submissions that will trigger the rule",
                     "type": "string"
+                },
+                "transformations": {
+                    "description": "A set of search-and-replace operations to perform on text values before performing a match. Transformations are performed in the order they are defined.",
+                    "items": {
+                        "$ref": "#/definitions/SearchAndReplaceRegExp"
+                    },
+                    "type": "array"
                 },
                 "useSubmissionAsReference": {
                     "default": true,
@@ -1725,21 +1804,18 @@
                     "type": "array"
                 },
                 "itemIs": {
-                    "anyOf": [
-                        {
-                            "items": {
+                    "description": "A list of criteria to test the state of the `Activity` against before running the Rule.\n\nIf any set of criteria passes the Rule will be run. If the criteria fails then the Rule is skipped.",
+                    "items": {
+                        "anyOf": [
+                            {
                                 "$ref": "#/definitions/SubmissionState"
                             },
-                            "type": "array"
-                        },
-                        {
-                            "items": {
+                            {
                                 "$ref": "#/definitions/CommentState"
-                            },
-                            "type": "array"
-                        }
-                    ],
-                    "description": "A list of criteria to test the state of the `Activity` against before running the Rule.\n\nIf any set of criteria passes the Rule will be run. If the criteria fails then the Rule is skipped."
+                            }
+                        ]
+                    },
+                    "type": "array"
                 },
                 "kind": {
                     "description": "The kind of rule to run",
@@ -1890,20 +1966,86 @@
                 "deleted": {
                     "type": "boolean"
                 },
+                "dispatched": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
+                        }
+                    ],
+                    "description": "Test whether the activity is present in dispatched/delayed activities\n\nNOTE: This is DOES NOT mean that THIS activity is from dispatch -- just that it exists there. To test whether THIS activity is from dispatch use `source`\n\n* `true` => activity exists in delayed activities\n* `false` => activity DOES NOT exist in delayed activities\n* `string` => activity exists in delayed activities with given identifier\n* `string[]` => activity exists in delayed activities with any of the given identifiers"
+                },
                 "distinguished": {
                     "type": "boolean"
                 },
                 "filtered": {
                     "type": "boolean"
                 },
+                "flairTemplate": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
+                        }
+                    ],
+                    "description": "* If `true` then passes if there is ANY flair template id\n* If `false` then passes if there is NO flair template id"
+                },
+                "isRedditMediaDomain": {
+                    "description": "Is the submission a reddit-hosted image or video?",
+                    "type": "boolean"
+                },
                 "is_self": {
                     "type": "boolean"
                 },
                 "link_flair_css_class": {
-                    "type": "string"
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
+                        }
+                    ],
+                    "description": "* If `true` then passes if flair has ANY css\n* If `false` then passes if flair has NO css"
                 },
                 "link_flair_text": {
-                    "type": "string"
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
+                        }
+                    ],
+                    "description": "* If `true` then passes if flair has ANY text\n* If `false` then passes if flair has NO text"
                 },
                 "locked": {
                     "type": "boolean"
@@ -1927,6 +2069,20 @@
                     "description": "A string containing a comparison operator and a value to compare against\n\nThe syntax is `(< OR > OR <= OR >=) <number>`\n\n* EX `> 100`  => greater than 100",
                     "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
                     "type": "string"
+                },
+                "source": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "string"
+                        }
+                    ],
+                    "description": "Test where the current activity was sourced from.\n\nA source can be any of:\n\n* `poll` => activity was retrieved from polling a queue (unmoderated, modqueue, etc...)\n* `poll:[pollSource]` => activity was retrieved from specific polling source IE `poll:unmoderated` activity comes from unmoderated queue\n  * valid sources: unmoderated modqueue newComm newSub\n* `dispatch` => activity is from Dispatch Action\n* `dispatch:[identifier]` => activity is from Dispatch Action with specific identifier\n* `user` => activity was from user input (web dashboard)"
                 },
                 "spam": {
                     "type": "boolean"

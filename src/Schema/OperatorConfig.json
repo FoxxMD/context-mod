@@ -50,24 +50,61 @@
                     ]
                 },
                 "flairCssClass": {
-                    "description": "A list of (user) flair css class values from the subreddit to match against",
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
+                        }
+                    ],
+                    "description": "A (user) flair css class (or list of) from the subreddit to match against\n\n* If `true` then passes if ANY css is assigned\n* If `false` then passes if NO css is assigned",
                     "examples": [
                         "red"
+                    ]
+                },
+                "flairTemplate": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
+                        }
                     ],
-                    "items": {
-                        "type": "string"
-                    },
-                    "type": "array"
+                    "description": "A (user) flair template id (or list of) from the subreddit to match against\n\n* If `true` then passes if ANY template is assigned\n* If `false` then passed if NO template is assigned"
                 },
                 "flairText": {
-                    "description": "A list of (user) flair text values from the subreddit to match against",
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
+                        }
+                    ],
+                    "description": "A (user) flair text value (or list of) from the subreddit to match against\n\n* If `true` then passes if ANY text is assigned\n* If `false` then passes if NO text is assigned",
                     "examples": [
                         "Approved"
-                    ],
-                    "items": {
-                        "type": "string"
-                    },
-                    "type": "array"
+                    ]
                 },
                 "isMod": {
                     "description": "Is the author a moderator?",
@@ -217,6 +254,14 @@
                     "$ref": "#/definitions/FilterCriteriaDefaults",
                     "description": "Define the default behavior for all filter criteria on all checks in all subreddits\n\nDefaults to exclude mods and automoderator from checks"
                 },
+                "flowControlDefaults": {
+                    "properties": {
+                        "maxGotoDepth": {
+                            "type": "number"
+                        }
+                    },
+                    "type": "object"
+                },
                 "name": {
                     "type": "string"
                 },
@@ -291,6 +336,9 @@
                     ],
                     "description": "Settings related to default polling configurations for subreddits"
                 },
+                "postCheckBehaviorDefaults": {
+                    "$ref": "#/definitions/PostBehavior"
+                },
                 "queue": {
                     "description": "Settings related to default configurations for queue behavior for subreddits",
                     "properties": {
@@ -354,6 +402,12 @@
                             },
                             "type": "array"
                         },
+                        "overrides": {
+                            "items": {
+                                "$ref": "#/definitions/SubredditOverrides"
+                            },
+                            "type": "array"
+                        },
                         "wikiConfig": {
                             "default": "botconfig/contextbot",
                             "description": "The default relative url to the ContextMod wiki page EX `https://reddit.com/r/subreddit/wiki/<path>`\n\n* ENV => `WIKI_CONFIG`\n* ARG => `--wikiConfig <path>`",
@@ -369,8 +423,7 @@
             "type": "object"
         },
         "CacheOptions": {
-            "additionalProperties": {
-            },
+            "additionalProperties": {},
             "description": "Configure granular settings for a cache provider with this object",
             "properties": {
                 "auth_pass": {
@@ -460,6 +513,23 @@
                     "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(days|weeks|months|years|hours|minutes|seconds|milliseconds)\\s*$",
                     "type": "string"
                 },
+                "dispatched": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
+                        }
+                    ],
+                    "description": "Test whether the activity is present in dispatched/delayed activities\n\nNOTE: This is DOES NOT mean that THIS activity is from dispatch -- just that it exists there. To test whether THIS activity is from dispatch use `source`\n\n* `true` => activity exists in delayed activities\n* `false` => activity DOES NOT exist in delayed activities\n* `string` => activity exists in delayed activities with given identifier\n* `string[]` => activity exists in delayed activities with any of the given identifiers"
+                },
                 "distinguished": {
                     "type": "boolean"
                 },
@@ -485,6 +555,20 @@
                     "description": "A string containing a comparison operator and a value to compare against\n\nThe syntax is `(< OR > OR <= OR >=) <number>`\n\n* EX `> 100`  => greater than 100",
                     "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
                     "type": "string"
+                },
+                "source": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "string"
+                        }
+                    ],
+                    "description": "Test where the current activity was sourced from.\n\nA source can be any of:\n\n* `poll` => activity was retrieved from polling a queue (unmoderated, modqueue, etc...)\n* `poll:[pollSource]` => activity was retrieved from specific polling source IE `poll:unmoderated` activity comes from unmoderated queue\n  * valid sources: unmoderated modqueue newComm newSub\n* `dispatch` => activity is from Dispatch Action\n* `dispatch:[identifier]` => activity is from Dispatch Action with specific identifier\n* `user` => activity was from user input (web dashboard)"
                 },
                 "spam": {
                     "type": "boolean"
@@ -553,20 +637,17 @@
                     "type": "string"
                 },
                 "itemIs": {
-                    "anyOf": [
-                        {
-                            "items": {
+                    "items": {
+                        "anyOf": [
+                            {
                                 "$ref": "#/definitions/SubmissionState"
                             },
-                            "type": "array"
-                        },
-                        {
-                            "items": {
+                            {
                                 "$ref": "#/definitions/CommentState"
-                            },
-                            "type": "array"
-                        }
-                    ]
+                            }
+                        ]
+                    },
+                    "type": "array"
                 },
                 "itemIsBehavior": {
                     "description": "Determine how itemIs defaults behave when itemIs is present on the check\n\n* merge => adds defaults to check's itemIs\n* replace => check itemIs will replace defaults (no defaults used)",
@@ -575,6 +656,117 @@
                         "replace"
                     ],
                     "type": "string"
+                }
+            },
+            "type": "object"
+        },
+        "LoggingOptions": {
+            "properties": {
+                "console": {
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/Pick<Transports.ConsoleTransportOptions,\"silent\"|\"eol\"|\"stderrLevels\"|\"consoleWarnLevels\">"
+                        },
+                        {
+                            "properties": {
+                                "level": {
+                                    "enum": [
+                                        "debug",
+                                        "error",
+                                        "info",
+                                        "verbose",
+                                        "warn"
+                                    ],
+                                    "type": "string"
+                                }
+                            },
+                            "type": "object"
+                        }
+                    ],
+                    "description": "Options for logging to console"
+                },
+                "file": {
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/Omit<DailyRotateFileTransportOptions,\"stream\"|\"dirname\"|\"options\"|\"handleRejections\"|\"format\"|\"handleExceptions\"|\"log\"|\"logv\"|\"close\">"
+                        },
+                        {
+                            "properties": {
+                                "dirname": {
+                                    "description": "The absolute path to a directory where rotating log files should be stored.\n\n* If not present or `null` or `false` no log files will be created\n* If `true` logs will be stored at `[working directory]/logs`\n\n* ENV => `LOG_DIR`\n* ARG => `--logDir [dir]`",
+                                    "examples": [
+                                        "/var/log/contextmod"
+                                    ],
+                                    "type": [
+                                        "null",
+                                        "string",
+                                        "boolean"
+                                    ]
+                                },
+                                "level": {
+                                    "enum": [
+                                        "debug",
+                                        "error",
+                                        "info",
+                                        "verbose",
+                                        "warn"
+                                    ],
+                                    "type": "string"
+                                }
+                            },
+                            "type": "object"
+                        }
+                    ],
+                    "description": "Options for Rotating File logging"
+                },
+                "level": {
+                    "default": "verbose",
+                    "description": "The minimum log level to output. The log level set will output logs at its level **and all levels above it:**\n\n * `error`\n * `warn`\n * `info`\n * `verbose`\n * `debug`\n\n Note: `verbose` will display *a lot* of information on the status/result of run rules/checks/actions etc. which is very useful for testing configurations. Once your bot is stable changing the level to `info` will reduce log noise.\n\n * ENV => `LOG_LEVEL`\n * ARG => `--logLevel <level>`",
+                    "enum": [
+                        "debug",
+                        "error",
+                        "info",
+                        "verbose",
+                        "warn"
+                    ],
+                    "examples": [
+                        "verbose"
+                    ],
+                    "type": "string"
+                },
+                "path": {
+                    "description": "**DEPRECATED** - Use `file.dirname` instead\nThe absolute path to a directory where rotating log files should be stored.\n\n* If not present or `null` or `false` no log files will be created\n* If `true` logs will be stored at `[working directory]/logs`\n\n* ENV => `LOG_DIR`\n* ARG => `--logDir [dir]`",
+                    "examples": [
+                        "/var/log/contextmod"
+                    ],
+                    "type": [
+                        "null",
+                        "string",
+                        "boolean"
+                    ]
+                },
+                "stream": {
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/Omit<DuplexTransportOptions,\"name\"|\"stream\"|\"handleRejections\"|\"format\"|\"handleExceptions\"|\"log\"|\"logv\"|\"close\">"
+                        },
+                        {
+                            "properties": {
+                                "level": {
+                                    "enum": [
+                                        "debug",
+                                        "error",
+                                        "info",
+                                        "verbose",
+                                        "warn"
+                                    ],
+                                    "type": "string"
+                                }
+                            },
+                            "type": "object"
+                        }
+                    ],
+                    "description": "Options for logging to api/web"
                 }
             },
             "type": "object"
@@ -642,6 +834,90 @@
                 "providers",
                 "types"
             ],
+            "type": "object"
+        },
+        "Omit<DailyRotateFileTransportOptions,\"stream\"|\"dirname\"|\"options\"|\"handleRejections\"|\"format\"|\"handleExceptions\"|\"log\"|\"logv\"|\"close\">": {
+            "properties": {
+                "auditFile": {
+                    "description": "A string representing the name of the name of the audit file. (default: './hash-audit.json')",
+                    "type": "string"
+                },
+                "createSymlink": {
+                    "description": "Create a tailable symlink to the current active log file. (default: false)",
+                    "type": "boolean"
+                },
+                "datePattern": {
+                    "description": "A string representing the moment.js date format to be used for rotating. The meta characters used in this string will dictate the frequency of the file rotation. For example, if your datePattern is simply 'HH' you will end up with 24 log files that are picked up and appended to every day. (default 'YYYY-MM-DD')",
+                    "type": "string"
+                },
+                "eol": {
+                    "type": "string"
+                },
+                "extension": {
+                    "description": "A string representing an extension to be added to the filename, if not included in the filename property. (default: '')",
+                    "type": "string"
+                },
+                "filename": {
+                    "description": "Filename to be used to log to. This filename can include the %DATE% placeholder which will include the formatted datePattern at that point in the filename. (default: 'winston.log.%DATE%)",
+                    "type": "string"
+                },
+                "frequency": {
+                    "description": "A string representing the frequency of rotation. (default: 'custom')",
+                    "type": "string"
+                },
+                "json": {
+                    "type": "boolean"
+                },
+                "level": {
+                    "type": "string"
+                },
+                "maxFiles": {
+                    "description": "Maximum number of logs to keep. If not set, no logs will be removed. This can be a number of files or number of days. If using days, add 'd' as the suffix. (default: null)",
+                    "type": [
+                        "string",
+                        "number"
+                    ]
+                },
+                "maxSize": {
+                    "description": "Maximum size of the file after which it will rotate. This can be a number of bytes, or units of kb, mb, and gb. If using the units, add 'k', 'm', or 'g' as the suffix. The units need to directly follow the number. (default: null)",
+                    "type": [
+                        "string",
+                        "number"
+                    ]
+                },
+                "silent": {
+                    "type": "boolean"
+                },
+                "symlinkName": {
+                    "description": "The name of the tailable symlink. (default: 'current.log')",
+                    "type": "string"
+                },
+                "utc": {
+                    "description": "A boolean whether or not to generate file name from \"datePattern\" in UTC format. (default: false)",
+                    "type": "boolean"
+                },
+                "zippedArchive": {
+                    "description": "A boolean to define whether or not to gzip archived log files. (default 'false')",
+                    "type": "boolean"
+                }
+            },
+            "type": "object"
+        },
+        "Omit<DuplexTransportOptions,\"name\"|\"stream\"|\"handleRejections\"|\"format\"|\"handleExceptions\"|\"log\"|\"logv\"|\"close\">": {
+            "properties": {
+                "dump": {
+                    "type": "boolean"
+                },
+                "eol": {
+                    "type": "string"
+                },
+                "level": {
+                    "type": "string"
+                },
+                "silent": {
+                    "type": "boolean"
+                }
+            },
             "type": "object"
         },
         "OperatorCacheConfig": {
@@ -763,6 +1039,29 @@
             },
             "type": "object"
         },
+        "Pick<Transports.ConsoleTransportOptions,\"silent\"|\"eol\"|\"stderrLevels\"|\"consoleWarnLevels\">": {
+            "properties": {
+                "consoleWarnLevels": {
+                    "items": {
+                        "type": "string"
+                    },
+                    "type": "array"
+                },
+                "eol": {
+                    "type": "string"
+                },
+                "silent": {
+                    "type": "boolean"
+                },
+                "stderrLevels": {
+                    "items": {
+                        "type": "string"
+                    },
+                    "type": "array"
+                }
+            },
+            "type": "object"
+        },
         "PollingDefaults": {
             "properties": {
                 "delayUntil": {
@@ -784,6 +1083,21 @@
                         50
                     ],
                     "type": "number"
+                }
+            },
+            "type": "object"
+        },
+        "PostBehavior": {
+            "properties": {
+                "postFail": {
+                    "default": "next",
+                    "description": "Do this behavior if a Check is NOT triggered",
+                    "type": "string"
+                },
+                "postTrigger": {
+                    "default": "nextRun",
+                    "description": "Do this behavior if a Check is triggered",
+                    "type": "string"
                 }
             },
             "type": "object"
@@ -867,20 +1181,86 @@
                 "deleted": {
                     "type": "boolean"
                 },
+                "dispatched": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
+                        }
+                    ],
+                    "description": "Test whether the activity is present in dispatched/delayed activities\n\nNOTE: This is DOES NOT mean that THIS activity is from dispatch -- just that it exists there. To test whether THIS activity is from dispatch use `source`\n\n* `true` => activity exists in delayed activities\n* `false` => activity DOES NOT exist in delayed activities\n* `string` => activity exists in delayed activities with given identifier\n* `string[]` => activity exists in delayed activities with any of the given identifiers"
+                },
                 "distinguished": {
                     "type": "boolean"
                 },
                 "filtered": {
                     "type": "boolean"
                 },
+                "flairTemplate": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
+                        }
+                    ],
+                    "description": "* If `true` then passes if there is ANY flair template id\n* If `false` then passes if there is NO flair template id"
+                },
+                "isRedditMediaDomain": {
+                    "description": "Is the submission a reddit-hosted image or video?",
+                    "type": "boolean"
+                },
                 "is_self": {
                     "type": "boolean"
                 },
                 "link_flair_css_class": {
-                    "type": "string"
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
+                        }
+                    ],
+                    "description": "* If `true` then passes if flair has ANY css\n* If `false` then passes if flair has NO css"
                 },
                 "link_flair_text": {
-                    "type": "string"
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
+                        }
+                    ],
+                    "description": "* If `true` then passes if flair has ANY text\n* If `false` then passes if flair has NO text"
                 },
                 "locked": {
                     "type": "boolean"
@@ -905,6 +1285,20 @@
                     "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
                     "type": "string"
                 },
+                "source": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "string"
+                        }
+                    ],
+                    "description": "Test where the current activity was sourced from.\n\nA source can be any of:\n\n* `poll` => activity was retrieved from polling a queue (unmoderated, modqueue, etc...)\n* `poll:[pollSource]` => activity was retrieved from specific polling source IE `poll:unmoderated` activity comes from unmoderated queue\n  * valid sources: unmoderated modqueue newComm newSub\n* `dispatch` => activity is from Dispatch Action\n* `dispatch:[identifier]` => activity is from Dispatch Action with specific identifier\n* `user` => activity was from user input (web dashboard)"
+                },
                 "spam": {
                     "type": "boolean"
                 },
@@ -921,9 +1315,27 @@
             },
             "type": "object"
         },
-        "ThirdPartyCredentialsJsonConfig": {
-            "additionalProperties": {
+        "SubredditOverrides": {
+            "properties": {
+                "flowControlDefaults": {
+                    "properties": {
+                        "maxGotoDepth": {
+                            "type": "number"
+                        }
+                    },
+                    "type": "object"
+                },
+                "name": {
+                    "type": "string"
+                }
             },
+            "required": [
+                "name"
+            ],
+            "type": "object"
+        },
+        "ThirdPartyCredentialsJsonConfig": {
+            "additionalProperties": {},
             "properties": {
                 "youtube": {
                     "properties": {
@@ -1049,32 +1461,8 @@
             "$ref": "#/definitions/ThirdPartyCredentialsJsonConfig"
         },
         "logging": {
-            "description": "Settings to configure global logging defaults",
-            "properties": {
-                "level": {
-                    "default": "verbose",
-                    "description": "The minimum log level to output. The log level set will output logs at its level **and all levels above it:**\n\n * `error`\n * `warn`\n * `info`\n * `verbose`\n * `debug`\n\n Note: `verbose` will display *a lot* of information on the status/result of run rules/checks/actions etc. which is very useful for testing configurations. Once your bot is stable changing the level to `info` will reduce log noise.\n\n * ENV => `LOG_LEVEL`\n * ARG => `--logLevel <level>`",
-                    "enum": [
-                        "debug",
-                        "error",
-                        "info",
-                        "verbose",
-                        "warn"
-                    ],
-                    "examples": [
-                        "verbose"
-                    ],
-                    "type": "string"
-                },
-                "path": {
-                    "description": "The absolute path to a directory where rotating log files should be stored.\n\n* If not present or `null` no log files will be created\n* If `true` logs will be stored at `[working directory]/logs`\n\n* ENV => `LOG_DIR`\n* ARG => `--logDir [dir]`",
-                    "examples": [
-                        "/var/log/contextmod"
-                    ],
-                    "type": "string"
-                }
-            },
-            "type": "object"
+            "$ref": "#/definitions/LoggingOptions",
+            "description": "Settings to configure global logging defaults"
         },
         "mode": {
             "default": "all",
@@ -1126,6 +1514,10 @@
         "snoowrap": {
             "$ref": "#/definitions/SnoowrapOptions",
             "description": "Set global snoowrap options as well as default snoowrap config for all bots that don't specify their own"
+        },
+        "userAgent": {
+            "description": "Added to the User-Agent information sent to reddit\n\nThis string will be added BETWEEN version and your bot name.\n\nEX: `myBranch` => `web:contextMod:v1.0.0-myBranch:BOT-/u/MyBotUser`\n\n* ENV => `USER_AGENT`",
+            "type": "string"
         },
         "web": {
             "description": "Settings for the web interface",

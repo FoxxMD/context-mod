@@ -1,16 +1,25 @@
 <div class="space-x-4 py-1 md:px-10 leading-6 font-semibold bg-gray-700">
     <div class="container mx-auto">
-        <% if(locals.bots !== undefined) { %>
         <ul id="botTabs" class="inline-flex flex-wrap">
+            <% if(locals.system !== undefined && locals.system.logs !== undefined) {%>
+                <li class="my-3 px-3">
+                        <span data-bot="system" class="rounded-md py-2 px-3 tabSelectWrapper">
+                        <a class="tabSelect instance font-normal pointer hover:font-bold" data-bot="system">
+                            System
+                        </a>
+                        </span>
+                </li>
+            <% } %>
+        <% if(locals.bots !== undefined) { %>
             <% bots.forEach(function (data){ %>
                 <li class="my-3 px-3">
-                        <span data-bot="<%= data.system.name %>" class="rounded-md py-2 px-3 tabSelectWrapper">
+                        <span data-bot="<%= data.system.name %>" class="rounded-md py-2 px-3 tabSelectWrapper real">
                         <a class="tabSelect font-normal pointer hover:font-bold"
                            data-bot="<%= data.system.name %>">
                             <%= data.system.name %>
                         </a>
                             <% if ((data.system.name === 'All' && isOperator) || data.system.name !== 'All') { %>
-                                <span class="inline-block mb-0.5 ml-0.5 w-2 h-2 bg-<%= data.system.running ? 'green' : 'red' %>-400 rounded-full"></span>
+                                <span data-bot="<%= data.system.name %>" class="botTabStatus inline-block mb-0.5 ml-0.5 w-2 h-2 bg-<%= data.system.running ? 'green' : 'red' %>-400 rounded-full"></span>
                             <% } %>
                         </span>
                 </li>
@@ -24,7 +33,7 @@
                         </span>
                     </li>
             <% } %>
-        </ul>
         <% } %>
+        </ul>
     </div>
 </div>

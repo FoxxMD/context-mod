@@ -1,7 +1,7 @@
 import winston, {Logger} from "winston";
 import dayjs, {Dayjs} from "dayjs";
 import {getLogger} from "./Utils/loggerFactory";
-import {DatabaseConfig, DatabaseMigrationOptions, Invokee, OperatorConfig} from "./Common/interfaces";
+import {DatabaseConfig, DatabaseMigrationOptions, Invokee, OperatorConfig, OperatorConfigWithFileContext, OperatorFileConfig} from "./Common/interfaces";
 import Bot from "./Bot";
 import LoggedError from "./Utils/LoggedError";
 import {mergeArr, sleep} from "./util";
@@ -23,7 +23,10 @@ export class App {
 
     error: any;
 
-    constructor(config: OperatorConfig) {
+    config: OperatorConfig;
+    fileConfig: OperatorFileConfig;
+
+    constructor(config: OperatorConfigWithFileContext) {
         const {
             database,
             operator: {
@@ -33,7 +36,11 @@ export class App {
             bots = [],
         } = config;
 
-        this.config = config;
+        const {fileConfig, ...rest} = config;
+
+        this.config = rest;
+        this.fileConfig = fileConfig;
+
         this.logger = getLogger(config.logging);
         this.dbLogger = this.logger.child({leaf: 'Database'}, mergeArr);
         this.database = database;
