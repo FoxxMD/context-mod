@@ -65,7 +65,7 @@ const program = new Command();
         runCommand = addOptions(runCommand, getUniversalWebOptions());
         runCommand.action(async (interfaceVal, opts) => {
             const [opConfig, fileConfig] = await parseOperatorConfigFromSources({...opts, mode: interfaceVal});
-            const config = buildOperatorConfigWithDefaults(opConfig);
+            const config = await buildOperatorConfigWithDefaults(opConfig);
             const {
                 mode,
             } = config;
@@ -94,7 +94,7 @@ const program = new Command();
             .addOption(checks)
             .action(async (activityIdentifier, type, botVal, commandOptions = {}) => {
                 const [opConfig, fileConfig] = await parseOperatorConfigFromSources(commandOptions);
-                const config = buildOperatorConfigWithDefaults(opConfig);
+                const config = await buildOperatorConfigWithDefaults(opConfig);
                 const {checks = []} = commandOptions;
                 app = new App({...config, fileConfig});
 
@@ -171,7 +171,7 @@ const program = new Command();
             .addOption(checks)
             .action(async (subreddits = [], botVal, opts = {}) => {
                 const [opConfig, fileConfig] = await parseOperatorConfigFromSources(opts);
-                const config = buildOperatorConfigWithDefaults(opConfig);
+                const config = await buildOperatorConfigWithDefaults(opConfig);
                 const {checks = []} = opts;
                 const logger = winston.loggers.get('app');
                 let bots: Bot[] = [];

@@ -788,7 +788,7 @@ export class Manager extends EventEmitter {
 
         let actionedEvent: ActionedEvent = {
             triggered: false,
-            subreddit: this.subreddit,
+            subreddit: this.subreddit.display_name,
             activity: {
                 peek: ePeek,
                 link: item.permalink,

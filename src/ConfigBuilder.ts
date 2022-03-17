@@ -1,4 +1,4 @@
-import {Logger} from "winston";
+import winston, {Logger} from "winston";
 import {
     buildCacheOptionsFromProvider, buildCachePrefix,
     createAjvFactory, fileOrDirectoryIsWriteable,
@@ -710,6 +710,7 @@ export const buildOperatorConfigWithDefaults = async (data: OperatorJsonConfig):
             console = {},
             stream = {},
         } = {},
+        logging,
         caching: opCache,
         userAgent,
         databaseConfig: {
@@ -807,7 +808,7 @@ export const buildOperatorConfigWithDefaults = async (data: OperatorJsonConfig):
 
     const dbConfig = createDatabaseConfig(dbConnection);
 
-    const database = await createDatabaseConnection(dbConfig);
+    const database = await createDatabaseConnection(dbConfig, winston.loggers.get('init'));
 
 
     const config: OperatorConfig = {

@@ -8,6 +8,7 @@ import "reflect-metadata";
 import {Connection, createConnection} from "typeorm";
 import {getDatabaseLogger, getLogger} from "./loggerFactory";
 import {fileOrDirectoryIsWriteable} from "../util";
+import {Logger} from "winston";
 
 export const isDatabaseDriver = (val: any): val is DatabaseDriver => {
     if (typeof val !== 'string') {
@@ -61,11 +62,9 @@ export const createDatabaseConfig = (val: DatabaseDriver | any): DatabaseConfig 
     return val as DatabaseConfig;
 }
 
-export const createDatabaseConnection = async (rawConfig: DatabaseConfig): Promise<Connection> => {
+export const createDatabaseConnection = async (rawConfig: DatabaseConfig, logger: Logger): Promise<Connection> => {
 
     let config = {...rawConfig};
-
-    const logger = getLogger({}, 'app');
 
     let realLocation: undefined | string = undefined;
 

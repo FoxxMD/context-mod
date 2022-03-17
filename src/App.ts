@@ -23,7 +23,6 @@ export class App {
 
     error: any;
 
-    config: OperatorConfig;
     fileConfig: OperatorFileConfig;
 
     constructor(config: OperatorConfigWithFileContext) {

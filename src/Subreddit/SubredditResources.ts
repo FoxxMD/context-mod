@@ -5,8 +5,7 @@ import {
     activityIsRemoved,
     AuthorActivitiesOptions,
     AuthorTypedActivitiesOptions, BOT_LINK,
-    getAuthorActivities, itemContentPeek,
-    testAuthorCriteria
+    getAuthorActivities
 } from "../Utils/SnoowrapUtils";
 import winston, {Logger} from "winston";
 import as from 'async';
