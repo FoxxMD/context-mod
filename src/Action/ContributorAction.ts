@@ -64,6 +64,12 @@ export class ContributorAction extends Action {
             result: this.actionType === 'add' ? 'Added Author to contributors' : 'Remove Author from contributors'
         };
     }
+
+    protected getSpecificPremise(): object {
+        return {
+            actionType: this.actionType
+        }
+    }
 }
 
 export interface ContributorOptions extends ContributorActionConfig, ActionOptions {}

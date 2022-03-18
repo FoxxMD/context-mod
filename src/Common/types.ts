@@ -40,4 +40,4 @@ export type ConfigFormat = 'json' | 'yaml';
 export type AuthorCritPropHelper = SafeDictionary<FilterCriteriaPropertyResult<AuthorCriteria>, keyof AuthorCriteria>;
 export type RequiredAuthorCrit = Required<AuthorCriteria>;
 
-export type ActionTypes = 'comment' | 'lock' | 'remove' | 'report' | 'approve' | 'ban' | 'flair' | 'usernote' | 'message' | 'userflair' | 'dispatch' | 'cancelDispatch';
+export type ActionTypes = 'comment' | 'lock' | 'remove' | 'report' | 'approve' | 'ban' | 'flair' | 'usernote' | 'message' | 'userflair' | 'dispatch' | 'cancelDispatch' | 'contributor';
