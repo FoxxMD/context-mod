@@ -1,6 +1,11 @@
 import {Entity, Column, PrimaryColumn, OneToMany} from "typeorm";
 import {Activity} from "./Activity";
 
+export interface SubredditEntityOptions {
+    id: string
+    name: string
+}
+
 @Entity()
 export class Subreddit {
 
@@ -11,5 +16,12 @@ export class Subreddit {
     name!: string;
 
     @OneToMany(type => Activity, act => act.subreddit) // note: we will create author property in the Photo class below
-    activities!: Activity[]
+    activities!: Promise<Activity[]>
+
+    constructor(data?: SubredditEntityOptions) {
+        if (data !== undefined) {
+            this.id = data.id;
+            this.name = data.name;
+        }
+    }
 }

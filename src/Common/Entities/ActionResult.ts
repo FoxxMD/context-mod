@@ -1,19 +1,14 @@
 import {Entity, Column, PrimaryGeneratedColumn, ManyToOne, OneToOne} from "typeorm";
-import {RulePremise} from "./RulePremise";
-import {Action} from "./Action";
 import {ActivityStateFilterResult} from "./FilterCriteria/ActivityStateFilterResult";
 import {AuthorFilterResult} from "./FilterCriteria/AuthorFilterResult";
 import {CheckResult} from "./CheckResult";
-import {ActionResult as IActionResult} from "../interfaces";
+import {ActionPremise} from "./ActionPremise";
 
 @Entity()
 export class ActionResult {
 
     @PrimaryGeneratedColumn()
     id!: number;
-
-    @ManyToOne(type => Action, act => act.results, {cascade: ['insert']})
-    action!: Action;
 
     @Column("boolean")
     run!: boolean;
@@ -38,4 +33,7 @@ export class ActionResult {
 
     @ManyToOne(type => CheckResult, act => act.actionResults, {cascade: ['insert']})
     checkResult!: CheckResult;
+
+    @ManyToOne(type => ActionPremise, act => act.actionResults, {cascade: ['insert']})
+    premise!: ActionPremise;
 }

@@ -7,6 +7,13 @@ import {Rule} from "./Rule";
 import {Action} from "./Action";
 import {Check} from "./Check";
 import {Run} from "./Run";
+import {Bot} from "./Bot";
+
+export interface ManagerEntityOptions {
+    name: string
+    bot: Bot
+    subreddit: Subreddit
+}
 
 @Entity()
 export class Manager {
@@ -17,21 +24,32 @@ export class Manager {
     @Column("varchar", {length: 200})
     name!: string;
 
-    @ManyToOne(type => Subreddit, sub => sub.activities, {cascade: ['insert']})
+    @ManyToOne(type => Bot, sub => sub.managers, {cascade: ['insert'], eager: true})
+    bot!: Bot;
+
+    @ManyToOne(type => Subreddit, sub => sub.activities, {cascade: ['insert'], eager: true})
     subreddit!: Subreddit;
 
     @OneToMany(type => CMEvent, obj => obj.manager)
-    events!: CMEvent[]
+    events!: Promise<CMEvent[]>
 
     @OneToMany(type => Rule, obj => obj.manager)
-    rules!: Rule[]
+    rules!: Promise<Rule[]>
 
     @OneToMany(type => Action, obj => obj.manager)
-    actions!: Action[]
+    actions!: Promise<Action[]>
 
     @OneToMany(type => Check, obj => obj.manager) // note: we will create author property in the Photo class below
-    checks!: Check[]
+    checks!: Promise<Check[]>
 
     @OneToMany(type => Run, obj => obj.manager) // note: we will create author property in the Photo class below
-    runs!: Run[]
+    runs!: Promise<Run[]>
+
+    constructor(data?: ManagerEntityOptions) {
+        if (data !== undefined) {
+            this.name = data.name;
+            this.bot = data.bot;
+            this.subreddit = data.subreddit;
+        }
+    }
 }

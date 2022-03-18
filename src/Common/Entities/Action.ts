@@ -19,7 +19,4 @@ export class Action  {
 
     @ManyToOne(type => Manager, act => act.actions, {cascade: ['insert']})
     manager!: Activity;
-
-    @OneToMany(type => ActionResult, obj => obj.action) // note: we will create author property in the Photo class below
-    results!: ActionResult[]
 }

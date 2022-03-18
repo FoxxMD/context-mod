@@ -11,12 +11,6 @@ export class CMEvent {
     @PrimaryGeneratedColumn("uuid")
     id!: string;
 
-    @Column("varchar", {length: 300})
-    check!: string;
-
-    @Column("text")
-    ruleSummary!: string;
-
     @Column("integer")
     timestamp!: number;
 
