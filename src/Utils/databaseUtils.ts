@@ -83,10 +83,10 @@ export const createDatabaseConnection = async (rawConfig: DatabaseConfig, logger
     return await createConnection({
         ...config,
         synchronize: false,
-        entities: [`${resolve(__dirname, '../Common/Entities')}/*.js`],
-        migrations: [`${resolve(__dirname, '../Common/Migrations')}/*.js`],
+        entities: [`${resolve(__dirname, '../Common/Entities')}/**/*.js`],
+        migrations: [`${resolve(__dirname, '../Common/Migrations')}/Database/*.js`],
         migrationsRun: false,
         logging: ['error','warn','migration'],
-        logger: getDatabaseLogger({}, 'app', ['error','warn','migration', 'schema'])
+        logger: getDatabaseLogger(logger, ['error','warn','migration', 'schema'])
     });
 }

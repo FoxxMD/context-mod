@@ -16,9 +16,9 @@ export const getLogger = (options: LoggerFactoryOptions, name = 'app'): Logger =
             additionalTransports = [],
             defaultLabel = 'App',
             file: {
-                dirname,
+                dirname = undefined,
                 ...fileRest
-            },
+            } = {},
             console,
             stream
         } = options || {};
@@ -92,8 +92,7 @@ export const getLogger = (options: LoggerFactoryOptions, name = 'app'): Logger =
     return winston.loggers.get(name);
 }
 
-export const getDatabaseLogger = (options: any, name = 'app', typeOptions: LoggerOptions) => {
-    const logger = getLogger(options, name);
+export const getDatabaseLogger = (logger: Logger, typeOptions: LoggerOptions) => {
     const dbLogger = logger.child({leaf: 'Database'}, mergeArr);
     return new WinstonAdaptor(dbLogger, typeOptions)
 };

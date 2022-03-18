@@ -35,7 +35,7 @@ import {
     RedditCredentials,
     BotCredentialsJsonConfig,
     BotCredentialsConfig,
-    FilterCriteriaDefaults, TypedActivityStates, OperatorFileConfig, PostBehavior
+    FilterCriteriaDefaults, TypedActivityStates, OperatorFileConfig, PostBehavior, StrongLoggingOptions
 } from "./Common/interfaces";
 import {isRuleSetJSON, RuleSetJson, RuleSetObjectJson} from "./Rule/RuleSet";
 import deepEqual from "fast-deep-equal";
@@ -799,16 +799,26 @@ export const buildOperatorConfigWithDefaults = async (data: OperatorJsonConfig):
          redirectUri: 'http://localhost:8085/callback'
      };
 
-    // const loggingOptions = {
-    //     level,
-    //     path
-    // };
-    //
-    // const logger = getLogger(loggingOptions);
+    const loggingOptions: StrongLoggingOptions = {
+        level,
+        file: {
+            level: level,
+            dirname,
+            ...fileRest,
+        },
+        stream: {
+            level: level,
+            ...stream,
+        },
+        console: {
+            level: level,
+            ...console,
+        }
+    };
 
     const dbConfig = createDatabaseConfig(dbConnection);
 
-    const database = await createDatabaseConnection(dbConfig, winston.loggers.get('init'));
+    const database = await createDatabaseConnection(dbConfig, getLogger(loggingOptions, 'app'));
 
 
     const config: OperatorConfig = {
@@ -817,22 +827,7 @@ export const buildOperatorConfigWithDefaults = async (data: OperatorJsonConfig):
             name: defaultOperators,
             display,
         },
-        logging: {
-            level,
-            file: {
-                level: level,
-                dirname,
-                ...fileRest,
-            },
-            stream: {
-                level: level,
-                ...stream,
-            },
-            console: {
-                level: level,
-                ...console,
-            }
-        },
+        logging: loggingOptions,
         caching: cache,
         snoowrap: snoowrapOp,
         database,
