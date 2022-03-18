@@ -1,6 +1,7 @@
 import Snoowrap, {Listing, RedditUser} from "snoowrap";
 import {Submission, Subreddit, Comment} from "snoowrap/dist/objects";
 import {parseSubredditName} from "../util";
+import {ModNoteLabel} from "../Common/types";
 
 // const proxyFactory = (endpoint: string) => {
 //     return class ProxiedSnoowrap extends Snoowrap {
@@ -13,8 +14,6 @@ import {parseSubredditName} from "../util";
 //         }
 //     }
 // }
-
-export type ModNoteLabel = 'BOT_BAN' | 'PERMA_BAN' | 'BAN' | 'ABUSE_WARNING' | 'SPAM_WARNING' | 'SPAM_WATCH' | 'SOLID_CONTRIBUTOR' | 'HELPFUL_USER';
 
 export interface ModNoteData {
     user: RedditUser
@@ -64,18 +63,25 @@ export class ExtendedSnoowrap extends Snoowrap {
         });
     }
 
+    /**
+     * Add a Mod Note
+     *
+     * @see https://www.reddit.com/dev/api#POST_api_mod_notes
+     * */
     async addModNote(data: ModNoteData): Promise<any> {
         const {note, label} = data;
-        const userId = await data.user.id;
+
+        // can't use label or reddit_id (activity) on POST yet
+        // https://www.reddit.com/r/redditdev/comments/t8w861/comment/i0wk46b/?utm_source=reddit&utm_medium=web2x&context=3
         const requestData: any = {
             note,
-            label,
-            subreddit_id: await data.subreddit.name,
-            user_id: `t2_${userId}`,
+            //label,
+            subreddit: await data.subreddit.display_name,
+            user: data.user.name,
         }
-        if(data.activity !== undefined) {
-            requestData.reddit_id = await data.activity.name;
-        }
+        // if(data.activity !== undefined) {
+        //     requestData.reddit_id = await data.activity.name;
+        // }
 
         return await this.oauthRequest({
             uri: `/api/mod/notes`,

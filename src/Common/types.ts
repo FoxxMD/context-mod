@@ -20,11 +20,12 @@ import {CancelDispatchActionJson} from "../Action/CancelDispatchAction";
 import {SafeDictionary} from "ts-essentials";
 import {FilterCriteriaPropertyResult} from "./interfaces";
 import {AuthorCriteria} from "../Author/Author";
+import {ModNoteActionJson} from "../Action/ModNoteAction";
 
 export type RuleJson = RecentActivityRuleJSONConfig | RepeatActivityJSONConfig | AuthorRuleJSONConfig | AttributionJSONConfig | HistoryJSONConfig | RegexRuleJSONConfig | RepostRuleJSONConfig | string;
 export type RuleObjectJson = Exclude<RuleJson, string>
 
-export type ActionJson = CommentActionJson | FlairActionJson | ReportActionJson | LockActionJson | RemoveActionJson | ApproveActionJson | BanActionJson | UserNoteActionJson | MessageActionJson | UserFlairActionJson | DispatchActionJson | CancelDispatchActionJson | string;
+export type ActionJson = CommentActionJson | FlairActionJson | ReportActionJson | LockActionJson | RemoveActionJson | ApproveActionJson | BanActionJson | UserNoteActionJson | MessageActionJson | UserFlairActionJson | DispatchActionJson | CancelDispatchActionJson | ModNoteActionJson | string;
 export type ActionObjectJson = Exclude<ActionJson, string>;
 
 // borrowed from https://github.com/jabacchetta/set-random-interval/blob/master/src/index.ts
@@ -38,3 +39,15 @@ export type ConfigFormat = 'json' | 'yaml';
 
 export type AuthorCritPropHelper = SafeDictionary<FilterCriteriaPropertyResult<AuthorCriteria>, keyof AuthorCriteria>;
 export type RequiredAuthorCrit = Required<AuthorCriteria>;
+
+export type ModNoteLabel =
+    'BOT_BAN'
+    | 'PERMA_BAN'
+    | 'BAN'
+    | 'ABUSE_WARNING'
+    | 'SPAM_WARNING'
+    | 'SPAM_WATCH'
+    | 'SOLID_CONTRIBUTOR'
+    | 'HELPFUL_USER';
+
+export const modNoteLabels = ['BOT_BAN', 'PERMA_BAN', 'BAN', 'ABUSE_WARNING', 'SPAM_WARNING', 'SPAM_WATCH', 'SOLID_CONTRIBUTOR', 'HELPFUL_USER'];

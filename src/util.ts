@@ -64,7 +64,7 @@ import { URL } from "url";
 import ImageData from "./Common/ImageData";
 import {Sharp, SharpOptions} from "sharp";
 import {ErrorWithCause, stackWithCauses} from "pony-cause";
-import {ConfigFormat, SetRandomInterval} from "./Common/types";
+import {ConfigFormat, ModNoteLabel, modNoteLabels, SetRandomInterval} from "./Common/types";
 import stringSimilarity from 'string-similarity';
 import calculateCosineSimilarity from "./Utils/StringMatching/CosineSimilarity";
 import levenSimilarity from "./Utils/StringMatching/levenSimilarity";
@@ -2333,4 +2333,17 @@ export const strToActivitySource = (val: string): ActivitySource => {
         return cleanStr;
     }
     throw new SimpleError(`'${cleanStr}' is not a valid ActivitySource. Must be one of: dispatch, dispatch:[identifier], poll, poll:[identifier], user`);
+}
+
+export const toModNoteLabel = (val: string): ModNoteLabel => {
+    const cleanVal = val.trim().toUpperCase();
+    if (asModNoteLabel(cleanVal)) {
+        return cleanVal;
+    }
+    throw new Error(`${val} is not a valid mod note label. Must be one of: ${modNoteLabels.join(', ')}`);
+}
+
+
+export const asModNoteLabel = (val: string): val is ModNoteLabel => {
+    return modNoteLabels.includes(val);
 }

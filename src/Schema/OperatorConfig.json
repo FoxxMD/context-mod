@@ -896,6 +896,10 @@
                     "description": "A boolean whether or not to generate file name from \"datePattern\" in UTC format. (default: false)",
                     "type": "boolean"
                 },
+                "watchLog": {
+                    "description": "Watch the current file being written to and recreate it in case of accidental deletion. (default: FALSE)",
+                    "type": "boolean"
+                },
                 "zippedArchive": {
                     "description": "A boolean to define whether or not to gzip archived log files. (default 'false')",
                     "type": "boolean"
@@ -1151,12 +1155,41 @@
                     "description": "Manually set the debug status for snoowrap\n\nWhen snoowrap has `debug: true` it will log the http status response of reddit api requests to at the `debug` level\n\n* Set to `true` to always output\n* Set to `false` to never output\n\nIf not present or `null` will be set based on `logLevel`\n\n* ENV => `SNOO_DEBUG`\n* ARG => `--snooDebug`",
                     "type": "boolean"
                 },
+                "maxRetryAttempts": {
+                    "default": 2,
+                    "description": "Set the maximum number of times snoowrap will retry a request if it encounters one of the codes specified in either retryErrorCodes or timeoutCodes\n\nEach retry attempt is delayed by an exponential falloff timer",
+                    "examples": [
+                        2
+                    ],
+                    "type": "number"
+                },
                 "proxy": {
                     "description": "Proxy all requests to Reddit's API through this endpoint\n\n* ENV => `PROXY`\n* ARG => `--proxy <proxyEndpoint>`",
                     "examples": [
                         "http://localhost:4443"
                     ],
                     "type": "string"
+                },
+                "retryErrorCodes": {
+                    "default": [
+                        502,
+                        503,
+                        504,
+                        522
+                    ],
+                    "description": "Specify the HTTP Status codes that should be valid for retrying a request\n\nDefaults: 502, 503, 504, 522",
+                    "items": {
+                        "type": "number"
+                    },
+                    "type": "array"
+                },
+                "timeoutCodes": {
+                    "default": "['ESOCKETTIMEDOUT', 'ETIMEDOUT', 'ECONNRESET']",
+                    "description": "Specify the error codes that should be valid for retrying a request.\n\nThese are used to make snoowrap retry if a request times out or reddit's api response times out -- which happens occasionally for no reason.\n\nYou most likely do not need to change these. However, if you want snoowrap to always fail on a network issue set this to an empty array\n\nDefaults: 'ESOCKETTIMEDOUT', 'ETIMEDOUT', 'ECONNRESET'",
+                    "items": {
+                        "type": "string"
+                    },
+                    "type": "array"
                 }
             },
             "type": "object"
