@@ -25,6 +25,14 @@ export interface ModNoteData {
 }
 
 export class ExtendedSnoowrap extends Snoowrap {
+
+    constructor(args: any) {
+        super(args);
+        const {timeoutCodes = ['ESOCKETTIMEDOUT', 'ETIMEDOUT', 'ECONNRESET']} = args;
+        // @ts-ignore
+        this._config.timeoutCodes = timeoutCodes;
+    }
+
     /**
      * https://www.reddit.com/r/redditdev/comments/jfltfx/comment/g9le48w/?utm_source=reddit&utm_medium=web2x&context=3
      * */

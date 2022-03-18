@@ -939,6 +939,35 @@ export interface ActivityState {
      * */
     reports?: CompareValue
     age?: DurationComparor
+    /**
+     * Test whether the activity is present in dispatched/delayed activities
+     *
+     * NOTE: This is DOES NOT mean that THIS activity is from dispatch -- just that it exists there. To test whether THIS activity is from dispatch use `source`
+     *
+     * * `true` => activity exists in delayed activities
+     * * `false` => activity DOES NOT exist in delayed activities
+     * * `string` => activity exists in delayed activities with given identifier
+     * * `string[]` => activity exists in delayed activities with any of the given identifiers
+     *
+     * */
+    dispatched?: boolean | string | string[]
+
+
+    // can use ActivitySource | ActivitySource[] here because of issues with generating json schema, see ActivitySource comments
+    /**
+     * Test where the current activity was sourced from.
+     *
+     * A source can be any of:
+     *
+     * * `poll` => activity was retrieved from polling a queue (unmoderated, modqueue, etc...)
+     * * `poll:[pollSource]` => activity was retrieved from specific polling source IE `poll:unmoderated` activity comes from unmoderated queue
+     *   * valid sources: unmoderated modqueue newComm newSub
+     * * `dispatch` => activity is from Dispatch Action
+     * * `dispatch:[identifier]` => activity is from Dispatch Action with specific identifier
+     * * `user` => activity was from user input (web dashboard)
+     *
+     * */
+    source?: string | string[]
 }
 
 /**
@@ -958,9 +987,21 @@ export interface SubmissionState extends ActivityState {
      * */
     title?: string
 
-    link_flair_text?: string | string[]
-    link_flair_css_class?: string | string[]
-    flairTemplate?: string | string[]
+    /**
+     * * If `true` then passes if flair has ANY text
+     * * If `false` then passes if flair has NO text
+     * */
+    link_flair_text?: boolean | string | string[]
+    /**
+     * * If `true` then passes if flair has ANY css
+     * * If `false` then passes if flair has NO css
+     * */
+    link_flair_css_class?: boolean | string | string[]
+    /**
+     * * If `true` then passes if there is ANY flair template id
+     * * If `false` then passes if there is NO flair template id
+     * */
+    flairTemplate?: boolean | string | string[]
     /**
      * Is the submission a reddit-hosted image or video?
      * */
@@ -1444,6 +1485,38 @@ export interface SnoowrapOptions {
      * * ARG => `--snooDebug`
      * */
     debug?: boolean,
+
+    /**
+     * Set the maximum number of times snoowrap will retry a request if it encounters one of the codes specified in either retryErrorCodes or timeoutCodes
+     *
+     * Each retry attempt is delayed by an exponential falloff timer
+     *
+     * @default 2
+     * @examples [2]
+     * */
+    maxRetryAttempts?: number
+
+    /**
+     * Specify the HTTP Status codes that should be valid for retrying a request
+     *
+     * Defaults: 502, 503, 504, 522
+     *
+     * @default [502, 503, 504, 522]
+     * */
+    retryErrorCodes?: number[]
+
+    /**
+     * Specify the error codes that should be valid for retrying a request.
+     *
+     * These are used to make snoowrap retry if a request times out or reddit's api response times out -- which happens occasionally for no reason.
+     *
+     * You most likely do not need to change these. However, if you want snoowrap to always fail on a network issue set this to an empty array
+     *
+     * Defaults: 'ESOCKETTIMEDOUT', 'ETIMEDOUT', 'ECONNRESET'
+     *
+     * @default ['ESOCKETTIMEDOUT', 'ETIMEDOUT', 'ECONNRESET']
+     * */
+    timeoutCodes?: string[]
 }
 
 export type FilterCriteriaDefaultBehavior = 'replace' | 'merge';
@@ -1889,10 +1962,7 @@ export interface BotCredentialsConfig extends ThirdPartyCredentialsJsonConfig {
 
 export interface BotInstanceConfig extends BotInstanceJsonConfig {
     credentials: BotCredentialsJsonConfig
-    snoowrap: {
-        proxy?: string,
-        debug?: boolean,
-    }
+    snoowrap: SnoowrapOptions
     subreddits: {
         names?: string[],
         exclude?: string[],
@@ -2021,6 +2091,7 @@ export interface ActionedEvent {
     subreddit: string,
     triggered: boolean,
     runResults: RunResult[]
+    dispatchSource?: DispatchAudit
 }
 
 export interface CheckResult {
@@ -2277,3 +2348,59 @@ export type ActivityType = 'submission' | 'comment';
 
 export type ItemCritPropHelper = SafeDictionary<FilterCriteriaPropertyResult<(CommentState & SubmissionState)>, keyof (CommentState & SubmissionState)>;
 export type RequiredItemCrit = Required<(CommentState & SubmissionState)>;
+
+export type onExistingFoundBehavior = 'replace' | 'skip' | 'ignore';
+
+export interface ActivityDispatchConfig {
+    identifier?: string
+    cancelIfQueued?: boolean | NonDispatchActivitySource | NonDispatchActivitySource[]
+    goto?: string
+    onExistingFound?: onExistingFoundBehavior
+    delay: DurationVal
+}
+
+export interface ActivityDispatch extends ActivityDispatchConfig {
+    id: string
+    queuedAt: number
+    activity: Submission | Comment
+    duration: Duration
+    processing: boolean
+    action: string
+}
+
+export interface DispatchAudit {
+    goto?: string
+    queuedAt: number
+    action: string,
+    delay: string,
+    id: string
+    identifier?: string
+}
+
+export type ActionTarget = 'self' | 'parent';
+
+export type InclusiveActionTarget = ActionTarget | 'any';
+
+export type DispatchSource = 'dispatch' | `dispatch:${string}`;
+
+export type NonDispatchActivitySource = 'poll' | `poll:${PollOn}` | 'user';
+
+// TODO
+// https://github.com/YousefED/typescript-json-schema/issues/426
+// https://github.com/YousefED/typescript-json-schema/issues/425
+// @pattern ^(((poll|dispatch)(:\w+)?)|user)$
+// @type string
+/**
+ * Where an Activity was retrieved from
+ *
+ * Source can be any of:
+ *
+ * * `poll` => activity was retrieved from polling a queue (unmoderated, modqueue, etc...)
+ * * `poll:[pollSource]` => activity was retrieved from specific polling source IE `poll:unmoderated` activity comes from unmoderated queue
+ * * `dispatch` => activity is from Dispatch Action
+ * * `dispatch:[identifier]` => activity is from Dispatch Action with specific identifier
+ * * `user` => activity was from user input (web dashboard)
+ *
+ *
+ * */
+export type ActivitySource = NonDispatchActivitySource | DispatchSource;

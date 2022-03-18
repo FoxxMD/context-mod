@@ -1,6 +1,6 @@
 import {Cache} from 'cache-manager';
 import {ActionedEvent, CheckSummary, RunResult} from "../../interfaces";
-import {parseStringToRegex, redisScanIterator} from "../../../util";
+import {escapeRegex, parseStringToRegex, redisScanIterator} from "../../../util";
 
 export const up = async (context: any, next: any) => {
     const client = context.client as Cache;
@@ -16,7 +16,7 @@ export const up = async (context: any, next: any) => {
             subredditEventMap[nonPrefixedKey] = await client.get(nonPrefixedKey);
         }
     } else if(client.store.keys !== undefined) {
-        const eventsReg = parseStringToRegex(`/${prefix !== undefined ? prefix : ''}actionedEvents-.*/i`) as RegExp;
+        const eventsReg = parseStringToRegex(`/${prefix !== undefined ? escapeRegex(prefix) : ''}actionedEvents-.*/i`) as RegExp;
         for (const key of await client.store.keys()) {
             if(eventsReg.test(key)) {
                 const nonPrefixedKey = prefix !== undefined ? key.replace(prefix, '') : key;

@@ -1,12 +1,11 @@
-import Snoowrap, {RedditUser} from "snoowrap";
+import Snoowrap from "snoowrap";
 import objectHash from 'object-hash';
 import {
     activityIsDeleted, activityIsFiltered,
     activityIsRemoved,
     AuthorActivitiesOptions,
     AuthorTypedActivitiesOptions, BOT_LINK,
-    getAuthorActivities,
-    testAuthorCriteria
+    getAuthorActivities
 } from "../Utils/SnoowrapUtils";
 import winston, {Logger} from "winston";
 import as from 'async';
@@ -22,19 +21,19 @@ import {
     createCacheManager,
     createHistoricalStatsDisplay, escapeRegex, FAIL,
     fetchExternalUrl, filterCriteriaSummary,
-    formatNumber,
+    formatNumber, generateItemFilterHelpers,
     getActivityAuthorName,
-    getActivitySubredditName,
+    getActivitySubredditName, isComment, isCommentState,
     isStrongSubredditState, isSubmission, isUser,
     mergeArr,
     parseDurationComparison,
     parseExternalUrl,
-    parseGenericValueComparison,
+    parseGenericValueComparison, parseGenericValueOrPercentComparison,
     parseRedditEntity, parseStringToRegex,
     parseWikiContext, PASS, redisScanIterator, removeUndefinedKeys,
-    shouldCacheSubredditStateCriteriaResult,
+    shouldCacheSubredditStateCriteriaResult, strToActivitySource,
     subredditStateIsNameOnly, testMaybeStringRegex,
-    toStrongSubredditState, userNoteCriteriaSummary
+    toStrongSubredditState, truncateStringToLength, userNoteCriteriaSummary
 } from "../util";
 import LoggedError from "../Utils/LoggedError";
 import {
@@ -60,7 +59,12 @@ import {
     ThirdPartyCredentialsJsonConfig,
     FilterCriteriaResult,
     FilterResult,
-    TypedActivityState, RequiredItemCrit, ItemCritPropHelper,
+    TypedActivityState,
+    RequiredItemCrit,
+    ItemCritPropHelper,
+    ActivityDispatch,
+    FilterCriteriaPropertyResult,
+    ActivitySource,
 } from "../Common/interfaces";
 import UserNotes from "./UserNotes";
 import Mustache from "mustache";
@@ -68,7 +72,7 @@ import he from "he";
 import {AuthorCriteria, AuthorOptions} from "../Author/Author";
 import {SPoll} from "./Streams";
 import {Cache} from 'cache-manager';
-import {Submission, Comment, Subreddit} from "snoowrap/dist/objects";
+import {Submission, Comment, Subreddit, RedditUser} from "snoowrap/dist/objects";
 import {cacheTTLDefaults, createHistoricalDefaults, historicalDefaults} from "../Common/defaults";
 import {check} from "tcp-port-used";
 import {ExtendedSnoowrap} from "../Utils/SnoowrapClients";
@@ -78,6 +82,8 @@ import globrex from 'globrex';
 import {runMigrations} from "../Common/Migrations/CacheMigrationUtils";
 import {isStatusError, SimpleError} from "../Utils/Errors";
 import {ErrorWithCause} from "pony-cause";
+import {UserNoteCriteria} from "../Rule";
+import {AuthorCritPropHelper, RequiredAuthorCrit} from "../Common/types";
 
 export const DEFAULT_FOOTER = '\r\n*****\r\nThis action was performed by [a bot.]({{botLink}}) Mention a moderator or [send a modmail]({{modmailLink}}) if you any ideas, questions, or concerns about this action.';
 
@@ -100,6 +106,7 @@ interface SubredditResourceOptions extends Footer {
     prefix?: string;
     actionedEventsMax: number;
     thirdPartyCredentials: ThirdPartyCredentialsJsonConfig
+    delayedItems?: ActivityDispatch[]
 }
 
 export interface SubredditResourceSetOptions extends CacheConfig, Footer {
@@ -129,6 +136,7 @@ export class SubredditResources {
     prefix?: string
     actionedEventsMax: number;
     thirdPartyCredentials: ThirdPartyCredentialsJsonConfig;
+    delayedItems: ActivityDispatch[] = [];
 
     stats: {
         cache: ResourceStats
@@ -156,8 +164,10 @@ export class SubredditResources {
             cacheSettingsHash,
             client,
             thirdPartyCredentials,
+            delayedItems = [],
         } = options || {};
 
+        this.delayedItems = delayedItems;
         this.cacheSettingsHash = cacheSettingsHash;
         this.cache = cache;
         this.prefix = prefix;
@@ -603,6 +613,33 @@ export class SubredditResources {
         }
     }
 
+    async getSubredditModerators(subredditVal: Subreddit | string) {
+        const subName = typeof subredditVal === 'string' ? subredditVal : subredditVal.display_name;
+        const hash = `sub-${subName}-moderators`;
+        if (this.subredditTTL !== false) {
+            const cachedSubredditMods = await this.cache.get(hash);
+            if (cachedSubredditMods !== undefined && cachedSubredditMods !== null) {
+                this.logger.debug(`Cache Hit: Subreddit Moderators ${subName}`);
+                return (cachedSubredditMods as string[]).map(x => new RedditUser({name: x}, this.client, false));
+            }
+        }
+
+        let sub: Subreddit;
+        if (typeof subredditVal !== 'string') {
+            sub = subredditVal;
+        } else {
+            sub = this.client.getSubreddit(subredditVal);
+        }
+        const mods = await sub.getModerators();
+
+        if (this.subredditTTL !== false) {
+            // @ts-ignore
+            await this.cache.set(hash, mods.map(x => x.name), {ttl: this.subredditTTL});
+        }
+
+        return mods;
+    }
+
     async hasSubreddit(name: string) {
         if (this.subredditTTL !== false) {
             const hash = `sub-${name}`;
@@ -616,6 +653,44 @@ export class SubredditResources {
             return val !== undefined && val !== null;
         }
         return false;
+    }
+
+    // @ts-ignore
+    async getAuthor(val: RedditUser | string) {
+        const authorName = typeof val === 'string' ? val : val.name;
+        const hash = `author-${authorName}`;
+        if (this.authorTTL !== false) {
+            const cachedAuthorData = await this.cache.get(hash);
+            if (cachedAuthorData !== undefined && cachedAuthorData !== null) {
+                this.logger.debug(`Cache Hit: Author ${authorName}`);
+                const {subreddit, ...rest} = cachedAuthorData as any;
+                const snoowrapConformedData = {...rest};
+                if(subreddit !== null) {
+                    snoowrapConformedData.subreddit = {
+                        display_name: subreddit
+                    };
+                } else {
+                    snoowrapConformedData.subreddit = null;
+                }
+                return new RedditUser(snoowrapConformedData, this.client, true);
+            }
+        }
+
+        let user: RedditUser;
+        if (typeof val !== 'string') {
+            user = val;
+        } else {
+            user = this.client.getUser(val);
+        }
+        // @ts-ignore
+        user = await user.fetch();
+
+        if (this.authorTTL !== false) {
+            // @ts-ignore
+            await this.cache.set(hash, user, {ttl: this.authorTTL});
+        }
+
+        return user;
     }
 
     async getAuthorActivities(user: RedditUser, options: AuthorTypedActivitiesOptions): Promise<Array<Submission | Comment>> {
@@ -861,16 +936,16 @@ export class SubredditResources {
                 return cachedAuthorTest;
             } else {
                 this.stats.cache.authorCrit.miss++;
-                cachedAuthorTest = await testAuthorCriteria(item, authorOpts, include, this.userNotes);
+                cachedAuthorTest = await this.isAuthor(item, authorOpts, include);
                 await this.cache.set(hash, cachedAuthorTest, {ttl: this.filterCriteriaTTL});
                 return cachedAuthorTest;
             }
         }
 
-        return await testAuthorCriteria(item, authorOpts, include, this.userNotes);
+        return await this.isAuthor(item, authorOpts, include);
     }
 
-    async testItemCriteria(i: (Comment | Submission), activityState: TypedActivityState, logger: Logger): Promise<FilterCriteriaResult<TypedActivityState>> {
+    async testItemCriteria(i: (Comment | Submission), activityState: TypedActivityState, logger: Logger, source?: ActivitySource): Promise<FilterCriteriaResult<TypedActivityState>> {
         if(Object.keys(activityState).length === 0) {
             return {
                 behavior: 'include',
@@ -881,21 +956,60 @@ export class SubredditResources {
         }
         if (this.filterCriteriaTTL !== false) {
             let item = i;
-            let state = activityState;
+            const {dispatched, source: stateSource, ...rest} = activityState;
+            let state = rest;
+
+            // if using cache and dispatched is present we want to test for it separately from the rest of the state
+            // because it can change independently from the rest of the activity criteria (its only related to CM!) so storing in cache would make everything potentially stale
+            // -- additionally we keep that data in-memory (for now??) so its always accessible and doesn't need to be stored in cache
+            let runtimeRes: FilterCriteriaResult<(SubmissionState & CommentState)> | undefined;
+            if(dispatched !== undefined || stateSource !== undefined) {
+                runtimeRes = await this.isItem(item, {dispatched, source: stateSource}, logger, source);
+                if(!runtimeRes.passed) {
+                    // if dispatched does not pass can return early and avoid testing the rest of the item
+                    const [propResultsMap, definedStateCriteria] = generateItemFilterHelpers(rest);
+                    if(dispatched !== undefined) {
+                        propResultsMap.dispatched = runtimeRes.propertyResults.find(x => x.property === 'dispatched');
+                    }
+                    if(stateSource !== undefined) {
+                        propResultsMap.source = runtimeRes.propertyResults.find(x => x.property === 'source');
+                    }
+
+                    return {
+                        behavior: 'include',
+                        criteria: activityState,
+                        propertyResults: Object.values(propResultsMap),
+                        passed: false
+                    }
+                }
+            }
 
             try {
+                // only cache non-runtime state and results
                 const hash = `itemCrit-${item.name}-${objectHash.sha1(state)}`;
                 await this.stats.cache.itemCrit.identifierRequestCount.set(hash, (await this.stats.cache.itemCrit.identifierRequestCount.wrap(hash, () => 0) as number) + 1);
                 this.stats.cache.itemCrit.requestTimestamps.push(Date.now());
                 this.stats.cache.itemCrit.requests++;
-                const cachedItem = await this.cache.get(hash);
-                if (cachedItem !== undefined && cachedItem !== null) {
+                let itemResult = await this.cache.get(hash) as FilterCriteriaResult<TypedActivityState> | undefined | null;
+                if (itemResult !== undefined && itemResult !== null) {
                     this.logger.debug(`Cache Hit: Item Check on ${item.name} (Hash ${hash})`);
                     //return cachedItem as boolean;
+                } else {
+                    itemResult = await this.isItem(item, state, logger);
                 }
-                const itemResult = await this.isItem(item, state, logger);
                 this.stats.cache.itemCrit.miss++;
                 await this.cache.set(hash, itemResult, {ttl: this.filterCriteriaTTL});
+
+                // add in runtime results, if present
+                if(runtimeRes !== undefined) {
+                    if(dispatched !== undefined) {
+                        itemResult.propertyResults.push(runtimeRes.propertyResults.find(x => x.property === 'dispatched') as FilterCriteriaPropertyResult<TypedActivityState>);
+                    }
+                    if(stateSource !== undefined) {
+                        itemResult.propertyResults.push(runtimeRes.propertyResults.find(x => x.property === 'source') as FilterCriteriaPropertyResult<TypedActivityState>);
+                    }
+                }
+
                 return itemResult;
             } catch (err: any) {
                 if (err.logged !== true) {
@@ -905,7 +1019,7 @@ export class SubredditResources {
             }
         }
 
-        return await this.isItem(i, activityState, logger);
+        return await this.isItem(i, activityState, logger, source);
     }
 
     async isSubreddit (subreddit: Subreddit, stateCriteriaRaw: SubredditState | StrongSubredditState, logger: Logger) {
@@ -971,9 +1085,11 @@ export class SubredditResources {
         })() as boolean;
     }
 
-    async isItem (item: Submission | Comment, stateCriteria: TypedActivityState, logger: Logger): Promise<FilterCriteriaResult<(SubmissionState & CommentState)>> {
+    async isItem (item: Submission | Comment, stateCriteria: TypedActivityState, logger: Logger, source?: ActivitySource): Promise<FilterCriteriaResult<(SubmissionState & CommentState)>> {
 
-        const definedStateCriteria = (removeUndefinedKeys(stateCriteria) as RequiredItemCrit);
+        //const definedStateCriteria = (removeUndefinedKeys(stateCriteria) as RequiredItemCrit);
+
+        const [propResultsMap, definedStateCriteria] = generateItemFilterHelpers(stateCriteria);
 
         const log = logger.child({leaf: 'Item Check'}, mergeArr);
 
@@ -986,24 +1102,20 @@ export class SubredditResources {
             }
         }
 
-        const propResultsMap = Object.entries(definedStateCriteria).reduce((acc: ItemCritPropHelper, [k, v]) => {
-            const key = (k as keyof (SubmissionState & CommentState));
-            acc[key] = {
-                property: key,
-                behavior: 'include',
-            };
-            return acc;
-        }, {});
+        // const propResultsMap = Object.entries(definedStateCriteria).reduce((acc: ItemCritPropHelper, [k, v]) => {
+        //     const key = (k as keyof (SubmissionState & CommentState));
+        //     acc[key] = {
+        //         property: key,
+        //         behavior: 'include',
+        //     };
+        //     return acc;
+        // }, {});
 
         const keys = Object.keys(propResultsMap) as (keyof (SubmissionState & CommentState))[]
-
-        let shouldContinue;
 
         try {
             for(const k of keys) {
                 const itemOptVal = definedStateCriteria[k];
-
-                shouldContinue = undefined;
 
                 switch(k) {
                     case 'submissionState':
@@ -1014,25 +1126,62 @@ export class SubredditResources {
                             propResultsMap.submissionState!.reason = subMsg;
                             break;
                         }
-                        // get submission
-                        // @ts-ignore
-                        const subProxy = await this.client.getSubmission(await item.link_id);
-                        // @ts-ignore
-                        const sub = await this.getActivity(subProxy);
-
-                        const subStates = itemOptVal as RequiredItemCrit['submissionState'];
-                        // @ts-ignore
-                        const subResults = [];
-                        for(const subState of subStates) {
-                            subResults.push(await this.testItemCriteria(sub, subState as SubmissionState, logger))
+                    //     // get submission
+                    //     // @ts-ignore
+                    //     const subProxy = await this.client.getSubmission(await item.link_id);
+                    //     // @ts-ignore
+                    //     const sub = await this.getActivity(subProxy);
+                    //
+                    //     const subStates = itemOptVal as RequiredItemCrit['submissionState'];
+                    //     // @ts-ignore
+                    //     const subResults = [];
+                    //     for(const subState of subStates) {
+                    //         subResults.push(await this.testItemCriteria(sub, subState as SubmissionState, logger))
+                    //     }
+                    //     propResultsMap.submissionState!.passed = subResults.length === 0 || subResults.some(x => x.passed);
+                    //     propResultsMap.submissionState!.found = {
+                    //         join: 'OR',
+                    //         criteriaResults: subResults,
+                    //         passed: propResultsMap.submissionState!.passed
+                    //     };
+                         break;
+                    case 'dispatched':
+                        const matchingDelayedActivities = this.delayedItems.filter(x => x.activity.name === item.name);
+                        let found: string | boolean = matchingDelayedActivities.length > 0;
+                        let reason: string | undefined;
+                        let identifiers: string[] | undefined;
+                        if(found && typeof itemOptVal !== 'boolean') {
+                            identifiers = Array.isArray(itemOptVal) ? (itemOptVal as string[]) : [itemOptVal];
+                            for(const i of identifiers) {
+                                const matchingDelayedIdentifier = matchingDelayedActivities.find(x => x.identifier === i);
+                                if(matchingDelayedIdentifier !== undefined) {
+                                    found = matchingDelayedIdentifier.identifier as string;
+                                    break;
+                                }
+                            }
+                            if(found === true) {
+                                reason = 'Found delayed activities but none matched dispatch identifier';
+                            }
                         }
-                        propResultsMap.submissionState!.passed = subResults.length === 0 || subResults.some(x => x.passed);
-                        propResultsMap.submissionState!.found = {
-                            join: 'OR',
-                            criteriaResults: subResults,
-                            passed: propResultsMap.submissionState!.passed
-                        };
+                        propResultsMap.dispatched!.passed = found === itemOptVal || typeof found === 'string';
+                        propResultsMap.dispatched!.found = found;
+                        propResultsMap.dispatched!.reason = reason;
                         break;
+                    case 'source':
+                        if(source === undefined) {
+                            propResultsMap.source!.passed = false;
+                            propResultsMap.source!.found = 'Not From Source';
+                            propResultsMap.source!.reason = 'Activity was not retrieved from a source (may be from cache)';
+                            break;
+                        } else {
+                            propResultsMap.source!.found = source;
+
+                            const requestedSourcesVal: string[] = !Array.isArray(itemOptVal) ? [itemOptVal] as string[] : itemOptVal as string[];
+                            const requestedSources = requestedSourcesVal.map(x => strToActivitySource(x).toLowerCase());
+
+                            propResultsMap.source!.passed = requestedSources.some(x => source.toLowerCase().includes(x))
+                            break;
+                        }
                     case 'score':
                         const scoreCompare = parseGenericValueComparison(itemOptVal as string);
                         propResultsMap.score!.passed = comparisonTextOp(item.score, scoreCompare.operator, scoreCompare.value);
@@ -1179,45 +1328,52 @@ export class SubredditResources {
 
                             propResultsMap[k]!.found = propertyValue;
 
-                            const expectedValues = typeof itemOptVal === 'string' ? [itemOptVal] : (itemOptVal as string[]);
-                            const VALUEPass = () => {
-                                for (const c of expectedValues) {
-                                    if (c === propertyValue) {
-                                        return true;
-                                    }
+                            if (typeof itemOptVal === 'boolean') {
+                                if (itemOptVal === true) {
+                                    propResultsMap[k]!.passed = propertyValue !== undefined && propertyValue !== null && propertyValue !== '';
+                                } else {
+                                    propResultsMap[k]!.passed = propertyValue === undefined || propertyValue === null || propertyValue === '';
                                 }
-                                return false;
-                            };
-                            propResultsMap[k]!.passed = VALUEPass();
+                            } else if (propertyValue === undefined || propertyValue === null || propertyValue === '') {
+                                // if crit is not a boolean but property is "empty" then it'll never pass anyway
+                                propResultsMap[k]!.passed = false;
+                            } else {
+                                const expectedValues = typeof itemOptVal === 'string' ? [itemOptVal] : (itemOptVal as string[]);
+                                propResultsMap[k]!.passed = expectedValues.some(x => x.trim().toLowerCase() === propertyValue?.trim().toLowerCase());
+                            }
                             break;
                         } else {
+                            propResultsMap[k]!.passed = true;
+                            propResultsMap[k]!.reason = `Cannot test for ${k} on Comment`;
                             log.warn(`Cannot test for ${k} on Comment`);
                             break;
                         }
                     default:
+
                         // @ts-ignore
                         const val = item[k];
 
-                        if (val !== undefined && propResultsMap[k] !== undefined) {
-                            propResultsMap[k]!.found = val;
-                            propResultsMap[k]!.passed = val === itemOptVal;
-                        } else {
+                        // this shouldn't happen
+                        if(propResultsMap[k] === undefined) {
+                            log.warn(`State criteria property ${k} was not found in property map?? This shouldn't happen`);
+                        } else if(val === undefined) {
+
                             let defaultWarn = `Tried to test for Activity property '${k}' but it did not exist. Check the spelling of the property.`;
                             if(!item.can_mod_post) {
                                 defaultWarn =`Tried to test for Activity property '${k}' but it did not exist. This Activity is not in a subreddit the bot can mod so it may be that this property is only available to mods of that subreddit. Or the property may be misspelled.`;
                             }
-                            propResultsMap.depth!.passed = true;
-                            propResultsMap.depth!.reason = defaultWarn;
                             log.debug(defaultWarn);
+                            propResultsMap[k]!.found = 'undefined';
+                            propResultsMap[k]!.reason = defaultWarn;
+
+                        } else {
+                            propResultsMap[k]!.found = val;
+                            propResultsMap[k]!.passed = val === itemOptVal;
                         }
                         break;
                 }
 
-                if(!propResultsMap[k]!.passed && shouldContinue === undefined) {
-                    shouldContinue = false;
-                }
-
-                if(!shouldContinue) {
+                if(propResultsMap[k] !== undefined && propResultsMap[k]!.passed === false) {
                     break;
                 }
             }
@@ -1232,6 +1388,381 @@ export class SubredditResources {
         return {
             behavior: 'include',
             criteria: stateCriteria,
+            propertyResults: propResults,
+            passed,
+        };
+    }
+
+    async isAuthor(item: (Comment | Submission), authorOpts: AuthorCriteria, include = true): Promise<FilterCriteriaResult<AuthorCriteria>> {
+        const definedAuthorOpts = (removeUndefinedKeys(authorOpts) as RequiredAuthorCrit);
+
+        let fetchedUser: RedditUser | undefined;
+        // @ts-ignore
+        const user = async (): Promise<RedditUser> => {
+            if(fetchedUser === undefined) {
+                fetchedUser = await this.getAuthor(item.author);
+            }
+            // @ts-ignore
+            return fetchedUser;
+        }
+
+        const propResultsMap = Object.entries(definedAuthorOpts).reduce((acc: AuthorCritPropHelper, [k, v]) => {
+            const key = (k as keyof AuthorCriteria);
+            let ex;
+            if (Array.isArray(v)) {
+                ex = v.map(x => {
+                    if (asUserNoteCriteria(x)) {
+                        return userNoteCriteriaSummary(x);
+                    }
+                    return x;
+                });
+            } else {
+                ex = [v];
+            }
+            acc[key] = {
+                property: key,
+                behavior: include ? 'include' : 'exclude',
+            };
+            return acc;
+        }, {});
+
+        const {shadowBanned} = authorOpts;
+
+        if (shadowBanned !== undefined) {
+            try {
+                // @ts-ignore
+                await item.author.fetch();
+                // user is not shadowbanned
+                // if criteria specifies they SHOULD be shadowbanned then return false now
+                if (shadowBanned) {
+                    propResultsMap.shadowBanned!.found = false;
+                    propResultsMap.shadowBanned!.passed = false;
+                }
+            } catch (err: any) {
+                if (isStatusError(err) && err.statusCode === 404) {
+                    // user is shadowbanned
+                    // if criteria specifies they should not be shadowbanned then return false now
+                    if (!shadowBanned) {
+                        propResultsMap.shadowBanned!.found = true;
+                        propResultsMap.shadowBanned!.passed = false;
+                    }
+                } else {
+                    throw err;
+                }
+            }
+        }
+
+
+
+        if (propResultsMap.shadowBanned === undefined || propResultsMap.shadowBanned.passed === undefined) {
+            try {
+                const authorName = getActivityAuthorName(item.author);
+
+                const keys = Object.keys(propResultsMap) as (keyof AuthorCriteria)[]
+
+                let shouldContinue = true;
+                for (const k of keys) {
+                    if (k === 'shadowBanned') {
+                        // we have already taken care of this with shadowban check above
+                        continue;
+                    }
+
+                    const authorOptVal = definedAuthorOpts[k];
+
+                    //if (authorOpts[k] !== undefined) {
+                    switch (k) {
+                        case 'name':
+                            const nameVal = authorOptVal as RequiredAuthorCrit['name'];
+                            const authPass = () => {
+
+                                for (const n of nameVal) {
+                                    if (n.toLowerCase() === authorName.toLowerCase()) {
+                                        return true;
+                                    }
+                                }
+                                return false;
+                            }
+                            const authResult = authPass();
+                            propResultsMap.name!.found = authorName;
+                            propResultsMap.name!.passed = !((include && !authResult) || (!include && authResult));
+                            if (!propResultsMap.name!.passed) {
+                                shouldContinue = false;
+                            }
+                            break;
+                        case 'flairCssClass':
+                            const css = await item.author_flair_css_class;
+                            propResultsMap.flairCssClass!.found = css;
+
+                            let cssResult:boolean;
+
+                            if (typeof authorOptVal === 'boolean') {
+                                if (authorOptVal === true) {
+                                    cssResult = css !== undefined && css !== null && css !== '';
+                                } else {
+                                    cssResult = css === undefined || css === null || css === '';
+                                }
+                            } else if (css === undefined || css === null || css === '') {
+                                // if crit is not a boolean but property is "empty" then it'll never pass anyway
+                                cssResult = false;
+                            } else {
+                                const opts = Array.isArray(authorOptVal) ? authorOptVal as string[] : [authorOptVal] as string[];
+                                cssResult = opts.some(x => x.trim().toLowerCase() === css.trim().toLowerCase())
+                            }
+
+                            propResultsMap.flairCssClass!.passed = !((include && !cssResult) || (!include && cssResult));
+                            if (!propResultsMap.flairCssClass!.passed) {
+                                shouldContinue = false;
+                            }
+                            break;
+                        case 'flairText':
+
+                            const text = await item.author_flair_text;
+                            propResultsMap.flairText!.found = text;
+
+                            let textResult: boolean;
+                            if (typeof authorOptVal === 'boolean') {
+                                if (authorOptVal === true) {
+                                    textResult = text !== undefined && text !== null && text !== '';
+                                } else {
+                                    textResult = text === undefined || text === null || text === '';
+                                }
+                            } else if (text === undefined || text === null) {
+                                // if crit is not a boolean but property is "empty" then it'll never pass anyway
+                                textResult = false;
+                            } else {
+                                const opts = Array.isArray(authorOptVal) ? authorOptVal as string[] : [authorOptVal] as string[];
+                                textResult = opts.some(x => x.trim().toLowerCase() === text.trim().toLowerCase())
+                            }
+                            propResultsMap.flairText!.passed = !((include && !textResult) || (!include && textResult));
+                            if (!propResultsMap.flairText!.passed) {
+                                shouldContinue = false;
+                            }
+                            break;
+                        case 'flairTemplate':
+                            const templateId = await item.author_flair_template_id;
+                            propResultsMap.flairTemplate!.found = templateId;
+
+                            let templateResult: boolean;
+                            if (typeof authorOptVal === 'boolean') {
+                                if (authorOptVal === true) {
+                                    templateResult = templateId !== undefined && templateId !== null && templateId !== '';
+                                } else {
+                                    templateResult = templateId === undefined || templateId === null || templateId === '';
+                                }
+                            } else if (templateId === undefined || templateId === null || templateId === '') {
+                                // if crit is not a boolean but property is "empty" then it'll never pass anyway
+                                templateResult = false;
+                            } else {
+                                const opts = Array.isArray(authorOptVal) ? authorOptVal as string[] : [authorOptVal] as string[];
+                                templateResult = opts.some(x => x.trim() === templateId);
+                            }
+
+                            propResultsMap.flairTemplate!.passed = !((include && !templateResult) || (!include && templateResult));
+                            if (!propResultsMap.flairTemplate!.passed) {
+                                shouldContinue = false;
+                            }
+                            break;
+                        case 'isMod':
+                            const mods: RedditUser[] = await this.getSubredditModerators(item.subreddit);
+                            const isModerator = mods.some(x => x.name === authorName) || authorName.toLowerCase() === 'automoderator';
+                            const modMatch = authorOpts.isMod === isModerator;
+                            propResultsMap.isMod!.found = isModerator;
+                            propResultsMap.isMod!.passed = !((include && !modMatch) || (!include && modMatch));
+                            if (!propResultsMap.isMod!.passed) {
+                                shouldContinue = false;
+                            }
+                            break;
+                        case 'age':
+                            // @ts-ignore
+                            const authorAge = dayjs.unix((await user()).created);
+                            const ageTest = compareDurationValue(parseDurationComparison(await authorOpts.age as string), authorAge);
+                            propResultsMap.age!.found = authorAge.fromNow(true);
+                            propResultsMap.age!.passed = !((include && !ageTest) || (!include && ageTest));
+                            if (!propResultsMap.age!.passed) {
+                                shouldContinue = false;
+                            }
+                            break;
+                        case 'linkKarma':
+                            // @ts-ignore
+                            const tk = (await user()).total_karma as number;
+                            const lkCompare = parseGenericValueOrPercentComparison(await authorOpts.linkKarma as string);
+                            let lkMatch;
+                            if (lkCompare.isPercent) {
+
+                                lkMatch = comparisonTextOp(item.author.link_karma / tk, lkCompare.operator, lkCompare.value / 100);
+                            } else {
+                                lkMatch = comparisonTextOp(item.author.link_karma, lkCompare.operator, lkCompare.value);
+                            }
+                            propResultsMap.linkKarma!.found = tk;
+                            propResultsMap.linkKarma!.passed = !((include && !lkMatch) || (!include && lkMatch));
+                            if (!propResultsMap.linkKarma!.passed) {
+                                shouldContinue = false;
+                            }
+                            break;
+                        case 'commentKarma':
+                            // @ts-ignore
+                            const ck = (await user()).comment_karma as number;
+                            const ckCompare = parseGenericValueOrPercentComparison(await authorOpts.commentKarma as string);
+                            let ckMatch;
+                            if (ckCompare.isPercent) {
+                                ckMatch = comparisonTextOp(item.author.comment_karma / ck, ckCompare.operator, ckCompare.value / 100);
+                            } else {
+                                ckMatch = comparisonTextOp(item.author.comment_karma, ckCompare.operator, ckCompare.value);
+                            }
+                            propResultsMap.commentKarma!.found = ck;
+                            propResultsMap.commentKarma!.passed = !((include && !ckMatch) || (!include && ckMatch));
+                            if (!propResultsMap.commentKarma!.passed) {
+                                shouldContinue = false;
+                            }
+                            break;
+                        case 'totalKarma':
+                            // @ts-ignore
+                            const totalKarma = (await user()).total_karma as number;
+                            const tkCompare = parseGenericValueComparison(await authorOpts.totalKarma as string);
+                            if (tkCompare.isPercent) {
+                                throw new SimpleError(`'totalKarma' value on AuthorCriteria cannot be a percentage`);
+                            }
+                            const tkMatch = comparisonTextOp(totalKarma, tkCompare.operator, tkCompare.value);
+                            propResultsMap.totalKarma!.found = totalKarma;
+                            propResultsMap.totalKarma!.passed = !((include && !tkMatch) || (!include && tkMatch));
+                            if (!propResultsMap.totalKarma!.passed) {
+                                shouldContinue = false;
+                            }
+                            break;
+                        case 'verified':
+                            // @ts-ignore
+                            const verified = (await user()).has_verified_mail;
+                            const vMatch = verified === authorOpts.verified as boolean;
+                            propResultsMap.verified!.found = verified;
+                            propResultsMap.verified!.passed = !((include && !vMatch) || (!include && vMatch));
+                            if (!propResultsMap.verified!.passed) {
+                                shouldContinue = false;
+                            }
+                            break;
+                        case 'description':
+                            // @ts-ignore
+                            const desc = (await user()).subreddit?.display_name.public_description;
+                            const dVals = authorOpts[k] as string[];
+                            let passed = false;
+                            let passReg;
+                            for (const val of dVals) {
+                                let reg = parseStringToRegex(val, 'i');
+                                if (reg === undefined) {
+                                    reg = parseStringToRegex(`/.*${escapeRegex(val.trim())}.*/`, 'i');
+                                    if (reg === undefined) {
+                                        throw new SimpleError(`Could not convert 'description' value to a valid regex: ${authorOpts[k] as string}`);
+                                    }
+                                }
+                                if (reg.test(desc)) {
+                                    passed = true;
+                                    passReg = reg.toString();
+                                    break;
+                                }
+                            }
+                            propResultsMap.description!.found = typeof desc === 'string' ? truncateStringToLength(50)(desc) : desc;
+                            propResultsMap.description!.passed = !((include && !passed) || (!include && passed));
+                            if (!propResultsMap.description!.passed) {
+                                shouldContinue = false;
+                            } else {
+                                propResultsMap.description!.reason = `Matched with: ${passReg as string}`;
+                            }
+                            break;
+                        case 'userNotes':
+                            const notes = await this.userNotes.getUserNotes(item.author);
+                            let foundNoteResult: string[] = [];
+                            const notePass = () => {
+                                for (const noteCriteria of authorOpts[k] as UserNoteCriteria[]) {
+                                    const {count = '>= 1', search = 'current', type} = noteCriteria;
+                                    const {
+                                        value,
+                                        operator,
+                                        isPercent,
+                                        extra = ''
+                                    } = parseGenericValueOrPercentComparison(count);
+                                    const order = extra.includes('asc') ? 'ascending' : 'descending';
+                                    switch (search) {
+                                        case 'current':
+                                            if (notes.length > 0) {
+                                                const currentNoteType = notes[notes.length - 1].noteType;
+                                                foundNoteResult.push(`Current => ${currentNoteType}`);
+                                                if (currentNoteType === type) {
+                                                    return true;
+                                                }
+                                            } else {
+                                                foundNoteResult.push('No notes present');
+                                            }
+                                            break;
+                                        case 'consecutive':
+                                            let orderedNotes = notes;
+                                            if (order === 'descending') {
+                                                orderedNotes = [...notes];
+                                                orderedNotes.reverse();
+                                            }
+                                            let currCount = 0;
+                                            for (const note of orderedNotes) {
+                                                if (note.noteType === type) {
+                                                    currCount++;
+                                                } else {
+                                                    currCount = 0;
+                                                }
+                                                if (isPercent) {
+                                                    throw new SimpleError(`When comparing UserNotes with 'consecutive' search 'count' cannot be a percentage. Given: ${count}`);
+                                                }
+                                                foundNoteResult.push(`Found ${currCount} ${type} consecutively`);
+                                                if (comparisonTextOp(currCount, operator, value)) {
+                                                    return true;
+                                                }
+                                            }
+                                            break;
+                                        case 'total':
+                                            const filteredNotes = notes.filter(x => x.noteType === type);
+                                            if (isPercent) {
+                                                // avoid divide by zero
+                                                const percent = notes.length === 0 ? 0 : filteredNotes.length / notes.length;
+                                                foundNoteResult.push(`${formatNumber(percent)}% are ${type}`);
+                                                if (comparisonTextOp(percent, operator, value / 100)) {
+                                                    return true;
+                                                }
+                                            } else {
+                                                foundNoteResult.push(`${filteredNotes.length} are ${type}`);
+                                                if (comparisonTextOp(notes.filter(x => x.noteType === type).length, operator, value)) {
+                                                    return true;
+                                                }
+                                            }
+                                            break;
+                                    }
+                                }
+                                return false;
+                            }
+                            const noteResult = notePass();
+                            propResultsMap.userNotes!.found = foundNoteResult.join(' | ');
+                            propResultsMap.userNotes!.passed = !((include && !noteResult) || (!include && noteResult));
+                            if (!propResultsMap.userNotes!.passed) {
+                                shouldContinue = false;
+                            }
+                            break;
+                    }
+                    //}
+                    if (!shouldContinue) {
+                        break;
+                    }
+                }
+            } catch (err: any) {
+                if (isStatusError(err) && err.statusCode === 404) {
+                    throw new SimpleError('Reddit returned a 404 while trying to retrieve User profile. It is likely this user is shadowbanned.');
+                } else {
+                    throw err;
+                }
+            }
+        }
+
+        // gather values and determine overall passed
+        const propResults = Object.values(propResultsMap);
+        const passed = propResults.filter(x => typeof x.passed === 'boolean').every(x => x.passed === true);
+
+        return {
+            behavior: include ? 'include' : 'exclude',
+            criteria: authorOpts,
             propertyResults: propResults,
             passed,
         };
@@ -1436,7 +1967,7 @@ export class BotResourcesManager {
         let resource: SubredditResources;
         const res = this.get(subName);
         if(res === undefined || res.cacheSettingsHash !== hash) {
-            resource = new SubredditResources(subName, opts);
+            resource = new SubredditResources(subName, {...opts, delayedItems: res?.delayedItems});
             await resource.initHistoricalStats();
             resource.setHistoricalSaveInterval();
             this.resources.set(subName, resource);
@@ -1562,7 +2093,7 @@ export const checkAuthorFilter = async (item: (Submission | Comment), filter: Au
     return [true, undefined, {criteriaResults: allCritResults, join: 'OR', passed: true}];
 }
 
-export const checkItemFilter = async (item: (Submission | Comment), filter: TypedActivityStates, resources: SubredditResources, parentLogger: Logger): Promise<[boolean, ('inclusive' | 'exclusive' | undefined), FilterResult<TypedActivityState>]> => {
+export const checkItemFilter = async (item: (Submission | Comment), filter: TypedActivityStates, resources: SubredditResources, parentLogger: Logger, source?: ActivitySource): Promise<[boolean, ('inclusive' | 'exclusive' | undefined), FilterResult<TypedActivityState>]> => {
     const logger = parentLogger.child({labels: ['Item Filter']}, mergeArr);
 
     const allCritResults: FilterCriteriaResult<TypedActivityState>[] = [];
@@ -1570,7 +2101,51 @@ export const checkItemFilter = async (item: (Submission | Comment), filter: Type
     if(filter.length > 0) {
         let index = 1
         for(const state of filter) {
-            const critResult = await resources.testItemCriteria(item, state, parentLogger);
+            let critResult: FilterCriteriaResult<TypedActivityState>;
+
+            // need to determine if criteria is for comment or submission state
+            // and if its comment state WITH submission state then break apart testing into individual activity testing
+            if(isCommentState(state) && isComment(item) && state.submissionState !== undefined) {
+                const {submissionState, ...restCommentState} = state;
+                // test submission state first since it's more likely(??) we have crit results or cache data for this submission than for the comment
+
+                // get submission
+                // @ts-ignore
+                const subProxy = await resources.client.getSubmission(await item.link_id);
+                // @ts-ignore
+                const sub = await resources.getActivity(subProxy);
+                const [subPass, _, subFilterResults] = await checkItemFilter(sub, submissionState, resources, parentLogger);
+                const subPropertyResult: FilterCriteriaPropertyResult<CommentState> = {
+                    property: 'submissionState',
+                    behavior: 'include',
+                    passed: subPass,
+                    found: {
+                        join: 'OR',
+                        criteriaResults: subFilterResults.criteriaResults,
+                        passed: subPass,
+                    }
+                };
+
+                if(!subPass) {
+                    // generate dummy results for the rest of the comment state since we don't need to test it
+                    const [propResultsMap, definedStateCriteria] = generateItemFilterHelpers(restCommentState);
+                    propResultsMap.submissionState = subPropertyResult;
+                    critResult = {
+                        behavior: 'include',
+                        criteria: state,
+                        propertyResults: Object.values(propResultsMap),
+                        passed: false
+                    }
+                } else {
+                    critResult = await resources.testItemCriteria(item, restCommentState, parentLogger, source);
+                    critResult.criteria = state;
+                    critResult.propertyResults.unshift(subPropertyResult);
+                }
+            } else {
+                critResult = await resources.testItemCriteria(item, state, parentLogger, source);
+            }
+
+            //critResult = await resources.testItemCriteria(item, state, parentLogger);
             allCritResults.push(critResult);
             const [summary, details] = filterCriteriaSummary(critResult);
             if (critResult.passed) {

@@ -1,4 +1,4 @@
-import Snoowrap, {Comment, Submission, Subreddit} from "snoowrap";
+import Snoowrap, {Comment, ConfigOptions, Submission, Subreddit} from "snoowrap";
 import {Logger} from "winston";
 import dayjs, {Dayjs} from "dayjs";
 import {Duration} from "dayjs/plugin/duration";
@@ -113,6 +113,9 @@ class Bot {
             snoowrap: {
                 proxy,
                 debug,
+                maxRetryAttempts = 2,
+                retryErrorCodes,
+                timeoutCodes,
             },
             polling: {
                 shared = [],
@@ -202,14 +205,20 @@ class Bot {
         }
 
         try {
-            this.client = proxy === undefined ? new ExtendedSnoowrap(creds) : new ProxiedSnoowrap({...creds, proxy});
-            this.client.config({
+            this.client = proxy === undefined ? new ExtendedSnoowrap({...creds, timeoutCodes}) : new ProxiedSnoowrap({...creds, proxy, timeoutCodes});
+            const snoowrapConfigData: ConfigOptions = {
                 warnings: true,
-                maxRetryAttempts: 2,
+                maxRetryAttempts,
                 debug,
                 logger: snooLogWrapper(this.logger.child({labels: ['Snoowrap']}, mergeArr)),
                 continueAfterRatelimitError: false,
-            });
+            };
+
+            if(retryErrorCodes !== undefined) {
+                snoowrapConfigData.retryErrorCodes = retryErrorCodes;
+            }
+
+            this.client.config(snoowrapConfigData);
         } catch (err: any) {
             if(this.error === undefined) {
                 this.error = err.message;

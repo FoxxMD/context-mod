@@ -11,13 +11,13 @@ import tcpUsed from 'tcp-port-used';
 
 import {getLogger} from "../../Utils/loggerFactory";
 import LoggedError from "../../Utils/LoggedError";
-import {Invokee, LogInfo, OperatorConfigWithFileContext} from "../../Common/interfaces";
+import {Invokee, LogInfo, OperatorConfigWithFileContext, RUNNING, STOPPED} from "../../Common/interfaces";
 import http from "http";
 import {heartbeat} from "./routes/authenticated/applicationRoutes";
 import logs from "./routes/authenticated/user/logs";
 import status from './routes/authenticated/user/status';
 import liveStats from './routes/authenticated/user/liveStats';
-import {actionedEventsRoute, actionRoute, configRoute, configLocationRoute, deleteInviteRoute, addInviteRoute, getInvitesRoute} from "./routes/authenticated/user";
+import {actionedEventsRoute, actionRoute, configRoute, configLocationRoute, deleteInviteRoute, addInviteRoute, getInvitesRoute, cancelDelayedRoute} from "./routes/authenticated/user";
 import action from "./routes/authenticated/user/action";
 import {authUserCheck, botRoute} from "./middleware";
 import {opStats} from "../Common/util";
@@ -26,6 +26,7 @@ import addBot from "./routes/authenticated/user/addBot";
 import ServerUser from "../Common/User/ServerUser";
 import {SimpleError} from "../../Utils/Errors";
 import {ErrorWithCause} from "pony-cause";
+import {Manager} from "../../Subreddit/Manager";
 
 const server = addAsync(express());
 server.use(bodyParser.json());
@@ -146,7 +147,27 @@ const rcbServer = async function (options: OperatorConfigWithFileContext) {
         const resp = [];
         let index = 1;
         for(const b of bots) {
-            resp.push({name: b.botName ?? `Bot ${index}`, data: await opStats(b)});
+            resp.push({name: b.botName ?? `Bot ${index}`, data: {
+                    status: b.running ? 'RUNNING' : 'NOT RUNNING',
+                    indicator: b.running ? 'green' : 'red',
+                    running: b.running,
+                    startedAt: b.startedAt.local().format('MMMM D, YYYY h:mm A Z'),
+                    error: b.error,
+                    subreddits: req.user?.accessibleSubreddits(b).map((manager: Manager) => {
+                        let indicator;
+                        if (manager.botState.state === RUNNING && manager.queueState.state === RUNNING && manager.eventsState.state === RUNNING) {
+                            indicator = 'green';
+                        } else if (manager.botState.state === STOPPED && manager.queueState.state === STOPPED && manager.eventsState.state === STOPPED) {
+                            indicator = 'red';
+                        } else {
+                            indicator = 'yellow';
+                        }
+                        return {
+                            name: manager.displayLabel,
+                            indicator,
+                        };
+                    }),
+                }});
             index++;
         }
         return res.json(resp);
@@ -177,6 +198,8 @@ const rcbServer = async function (options: OperatorConfigWithFileContext) {
     server.postAsync('/bot/invite', ...addInviteRoute);
 
     server.deleteAsync('/bot/invite', ...deleteInviteRoute);
+
+    server.deleteAsync('/delayed', ...cancelDelayedRoute);
 
     const initBot = async (causedBy: Invokee = 'system') => {
         if (app !== undefined) {

@@ -35,6 +35,19 @@
                                 <div>
                                     <a class="activityLink font-semibold" target="_blank" href="https://reddit.com<%= eRes.activity.link%>"><%= eRes.activity.type === 'comment' ? 'Comment' : 'Submission' %></a>
                                     by <a class="activityLink" target="_blank" href="https://reddit.com/u/<%= eRes.activity.author%>"><%= eRes.activity.author%></a>
+                                    <% if(eRes.dispatchSource !== undefined) { %>
+                                        <span class="has-tooltip ml-2">
+                                            <span class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2 space-y-3 p-2 text-left'>
+                                                <ul class="list-inside list-disc">
+                                                    <li>Dispatched By: <i><%= eRes.dispatchSource.action %><%= eRes.dispatchSource.identifier !== undefined ? ` | ${eRes.dispatchSource.identifier}` : ''%></i></li>
+                                                    <li>Queued At: <i><%= eRes.dispatchSource.queuedAt %></i></li>
+                                                    <li>Delayed For: <i><%= eRes.dispatchSource.delay %></i></li>
+                                                    <li>Initial Goto:<i><%= eRes.dispatchSource.goto %></i></li>
+                                                </ul>
+                                            </span>
+                                            (<span class="cursor-help underline" style="text-decoration-style: dotted">Dispatched by <%= eRes.dispatchSource.action%><%= eRes.dispatchSource.identifier !== undefined ? ` | ${eRes.dispatchSource.identifier}` : ''%></span>)
+                                        </span>
+                                    <% } %>
                                 </div>
                                 <div class="font-semibold flex items-center flex-end">
                                     <a class="activityLink mr-1" target="_blank" href="https://reddit.com/<%= eRes.activity.subreddit %>"><%= eRes.activity.subreddit %></a>
@@ -44,15 +57,18 @@
                         </div>
                         <div class="border-t-2 border-gray-500 triggeredState <%= eRes.triggered ? 'triggered' : 'notTriggered'%>">
                             <div class="m-4 p-2 px-4">
-                                <blockquote class="ml-3 italic" cite="https://reddit.com<%= eRes.activity.link%>">
-                                    "<%- eRes.activity.peek %>"
-                                </blockquote>
-                                <% if(eRes.parentSubmission !== undefined) { %>
-                                    <div class="my-3">in a <a class="activityLink inline" href="https://reddit.com<%= eRes.parentSubmission.link%>">Submission</a> by <a class="activityLink inline" target="_blank" href="https://reddit.com/u/<%= eRes.parentSubmission.author%>">/u/<%= eRes.parentSubmission.author%></a> titled:</div>
-                                <blockquote class="ml-3 mb-2 italic" cite="https://reddit.com<%= eRes.parentSubmission.link%>">
-                                    "<%= eRes.parentSubmission.peek%>"
-                                </blockquote>
-                                <% } %>
+                                <div class="ml-5">
+                                    <blockquote class="ml-4 italic" cite="https://reddit.com<%= eRes.activity.link%>">
+                                        "<%- eRes.activity.peek %>"
+                                    </blockquote>
+                                    <% if(eRes.parentSubmission !== undefined) { %>
+                                        <div class="my-3">in a <a class="activityLink inline" href="https://reddit.com<%= eRes.parentSubmission.link%>">Submission</a> by <a class="activityLink inline" target="_blank" href="https://reddit.com/u/<%= eRes.parentSubmission.author%>">/u/<%= eRes.parentSubmission.author%></a> titled:</div>
+                                    <blockquote class="ml-4 mb-2 italic" cite="https://reddit.com<%= eRes.parentSubmission.link%>">
+                                        "<%= eRes.parentSubmission.peek%>"
+                                    </blockquote>
+
+                                    <% } %>
+                                </div>
                             </div>
                         <% eRes.runResults.forEach(function (runSum, index) { %>
                         <div class="m-4 p-2 px-4 space-y-2 bg-gray-600 triggeredStateWrapper">

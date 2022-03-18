@@ -23,6 +23,7 @@ export interface SubredditDataResponse {
     indicator: string
     queuedActivities: number
     runningActivities: number
+    delayedItems: any[]
     maxWorkers: number
     subMaxWorkers: number
     globalMaxWorkers: number

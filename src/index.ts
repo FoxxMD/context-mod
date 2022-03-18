@@ -154,7 +154,7 @@ const program = new Command();
                     await b.buildManagers([sub]);
                     if(b.subManagers.length > 0) {
                        const manager = b.subManagers[0];
-                        await manager.handleActivity(activity, {checkNames: checks});
+                        await manager.handleActivity(activity, {checkNames: checks, source: 'user'});
                         break;
                     }
                 }
@@ -192,7 +192,7 @@ const program = new Command();
                         for (const a of activities.reverse()) {
                             manager.firehose.push({
                                 activity: a,
-                                options: {checkNames: checks}
+                                options: {checkNames: checks, source: 'user'}
                             });
                         }
                     }
