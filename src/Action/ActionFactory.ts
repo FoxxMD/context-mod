@@ -15,6 +15,7 @@ import {ExtendedSnoowrap} from '../Utils/SnoowrapClients';
 import EventEmitter from "events";
 import {DispatchAction, DispatchActionJson} from "./DispatchAction";
 import {CancelDispatchAction, CancelDispatchActionJson} from "./CancelDispatchAction";
+import ContributorAction, {ContributorActionJson} from "./ContributorAction";
 
 export function actionFactory
 (config: ActionJson, logger: Logger, subredditName: string, resources: SubredditResources, client: ExtendedSnoowrap, emitter: EventEmitter): Action {
@@ -43,6 +44,8 @@ export function actionFactory
             return new DispatchAction({...config as DispatchActionJson, logger, subredditName, resources, client, emitter});
         case 'cancelDispatch':
             return new CancelDispatchAction({...config as CancelDispatchActionJson, logger, subredditName, resources, client, emitter})
+        case 'contributor':
+            return new ContributorAction({...config as ContributorActionJson, logger, subredditName, resources, client, emitter})
         default:
             throw new Error('rule "kind" was not recognized.');
     }

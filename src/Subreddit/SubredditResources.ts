@@ -751,7 +751,8 @@ export class SubredditResources {
         }
     }
 
-    async getSubredditModerators(subredditVal: Subreddit | string) {
+    async getSubredditModerators(rawSubredditVal?: Subreddit | string) {
+        const subredditVal = rawSubredditVal ?? this.subreddit;
         const subName = typeof subredditVal === 'string' ? subredditVal : subredditVal.display_name;
         const hash = `sub-${subName}-moderators`;
         if (this.subredditTTL !== false) {
@@ -776,6 +777,59 @@ export class SubredditResources {
         }
 
         return mods;
+    }
+
+    async getSubredditContributors(): Promise<RedditUser[]> {
+        const subName = this.subreddit.display_name;
+        const hash = `sub-${subName}-contributors`;
+        if (this.subredditTTL !== false) {
+            const cachedSubredditMods = await this.cache.get(hash);
+            if (cachedSubredditMods !== undefined && cachedSubredditMods !== null) {
+                this.logger.debug(`Cache Hit: Subreddit Contributors ${subName}`);
+                return (cachedSubredditMods as string[]).map(x => new RedditUser({name: x}, this.client, false));
+            }
+        }
+
+        let contributors = await this.subreddit.getContributors();
+        while(!contributors.isFinished) {
+            contributors = await contributors.fetchMore({amount: 100});
+        }
+
+        if (this.subredditTTL !== false) {
+            // @ts-ignore
+            await this.cache.set(hash, contributors.map(x => x.name), {ttl: this.subredditTTL});
+        }
+
+        return contributors.map(x => new RedditUser({name: x.name}, this.client, false));
+    }
+
+    async addUserToSubredditContributorsCache(user: RedditUser) {
+        const subName = this.subreddit.display_name;
+        const hash = `sub-${subName}-contributors`;
+        if (this.subredditTTL !== false) {
+            const cachedVal = await this.cache.get(hash);
+            if (cachedVal !== undefined && cachedVal !== null) {
+                const cacheContributors = cachedVal as string[];
+                if(!cacheContributors.includes(user.name)) {
+                    cacheContributors.push(user.name);
+                    await this.cache.set(hash, cacheContributors, {ttl: this.subredditTTL});
+                }
+            }
+        }
+    }
+
+    async removeUserFromSubredditContributorsCache(user: RedditUser) {
+        const subName = this.subreddit.display_name;
+        const hash = `sub-${subName}-contributors`;
+        if (this.subredditTTL !== false) {
+            const cachedVal = await this.cache.get(hash);
+            if (cachedVal !== undefined && cachedVal !== null) {
+                const cacheContributors = cachedVal as string[];
+                if(cacheContributors.includes(user.name)) {
+                    await this.cache.set(hash, cacheContributors.filter(x => x !== user.name), {ttl: this.subredditTTL});
+                }
+            }
+        }
     }
 
     async hasSubreddit(name: string) {
@@ -1703,10 +1757,20 @@ export class SubredditResources {
                         case 'isMod':
                             const mods: RedditUser[] = await this.getSubredditModerators(item.subreddit);
                             const isModerator = mods.some(x => x.name === authorName) || authorName.toLowerCase() === 'automoderator';
-                            const modMatch = authorOpts.isMod === isModerator;
+                            const modMatch = authorOptVal === isModerator;
                             propResultsMap.isMod!.found = isModerator;
                             propResultsMap.isMod!.passed = !((include && !modMatch) || (!include && modMatch));
                             if (!propResultsMap.isMod!.passed) {
+                                shouldContinue = false;
+                            }
+                            break;
+                        case 'isContributor':
+                            const contributors: RedditUser[] = await this.getSubredditContributors();
+                            const isContributor= contributors.some(x => x.name === authorName);
+                            const contributorMatch = authorOptVal === isContributor;
+                            propResultsMap.isContributor!.found = isContributor;
+                            propResultsMap.isContributor!.passed = !((include && !contributorMatch) || (!include && contributorMatch));
+                            if (!propResultsMap.isContributor!.passed) {
                                 shouldContinue = false;
                             }
                             break;
