@@ -20,11 +20,12 @@ import {CancelDispatchActionJson} from "../Action/CancelDispatchAction";
 import {SafeDictionary} from "ts-essentials";
 import {FilterCriteriaPropertyResult} from "./interfaces";
 import {AuthorCriteria} from "../Author/Author";
+import {ContributorActionJson} from "../Action/ContributorAction";
 
 export type RuleJson = RecentActivityRuleJSONConfig | RepeatActivityJSONConfig | AuthorRuleJSONConfig | AttributionJSONConfig | HistoryJSONConfig | RegexRuleJSONConfig | RepostRuleJSONConfig | string;
 export type RuleObjectJson = Exclude<RuleJson, string>
 
-export type ActionJson = CommentActionJson | FlairActionJson | ReportActionJson | LockActionJson | RemoveActionJson | ApproveActionJson | BanActionJson | UserNoteActionJson | MessageActionJson | UserFlairActionJson | DispatchActionJson | CancelDispatchActionJson | string;
+export type ActionJson = CommentActionJson | FlairActionJson | ReportActionJson | LockActionJson | RemoveActionJson | ApproveActionJson | BanActionJson | UserNoteActionJson | MessageActionJson | UserFlairActionJson | DispatchActionJson | CancelDispatchActionJson | ContributorActionJson | string;
 export type ActionObjectJson = Exclude<ActionJson, string>;
 
 // borrowed from https://github.com/jabacchetta/set-random-interval/blob/master/src/index.ts

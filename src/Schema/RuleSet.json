@@ -488,6 +488,10 @@
                         "Approved"
                     ]
                 },
+                "isContributor": {
+                    "description": "Is the author an approved user (contributor)?",
+                    "type": "boolean"
+                },
                 "isMod": {
                     "description": "Is the author a moderator?",
                     "type": "boolean"

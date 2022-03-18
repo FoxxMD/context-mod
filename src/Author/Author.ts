@@ -144,6 +144,11 @@ export interface AuthorCriteria {
      * @examples [["/test$/i", "look for this string literal"]]
      * */
     description?: string | string[]
+
+    /**
+     * Is the author an approved user (contributor)?
+     * */
+    isContributor?: boolean
 }
 
 export class Author implements AuthorCriteria {
@@ -151,6 +156,7 @@ export class Author implements AuthorCriteria {
     flairCssClass?: boolean | string[];
     flairText?: boolean | string[];
     isMod?: boolean;
+    isContributor?: boolean;
     userNotes?: UserNoteCriteria[];
     age?: string;
     commentKarma?: string;
@@ -169,6 +175,7 @@ export class Author implements AuthorCriteria {
             this.flairText = typeof options.flairText === 'string' ? [options.flairText] : options.flairText;
         }
         this.isMod = options.isMod;
+        this.isContributor = options.isContributor;
         this.userNotes = options.userNotes;
         this.age = options.age;
         this.commentKarma = options.commentKarma;

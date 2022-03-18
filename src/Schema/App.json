@@ -573,6 +573,10 @@
                         "Approved"
                     ]
                 },
+                "isContributor": {
+                    "description": "Is the author an approved user (contributor)?",
+                    "type": "boolean"
+                },
                 "isMod": {
                     "description": "Is the author a moderator?",
                     "type": "boolean"
@@ -1303,6 +1307,9 @@
                                 "$ref": "#/definitions/CancelDispatchActionJson"
                             },
                             {
+                                "$ref": "#/definitions/ContributorActionJson"
+                            },
+                            {
                                 "$ref": "#/definitions/FlairActionJson"
                             },
                             {
@@ -1545,6 +1552,91 @@
                 }
             },
             "type": "object"
+        },
+        "ContributorActionJson": {
+            "description": "Ban the Author of the Activity this Check is run on",
+            "properties": {
+                "action": {
+                    "$ref": "#/definitions/ContributorActionType"
+                },
+                "authorIs": {
+                    "$ref": "#/definitions/AuthorOptions",
+                    "description": "If present then these Author criteria are checked before running the Action. If criteria fails then the Action is not run.",
+                    "examples": [
+                        {
+                            "include": [
+                                {
+                                    "flairText": [
+                                        "Contributor",
+                                        "Veteran"
+                                    ]
+                                },
+                                {
+                                    "isMod": true
+                                }
+                            ]
+                        }
+                    ]
+                },
+                "dryRun": {
+                    "default": false,
+                    "description": "If `true` the Action will not make the API request to Reddit to perform its action.",
+                    "examples": [
+                        false,
+                        true
+                    ],
+                    "type": "boolean"
+                },
+                "enable": {
+                    "default": true,
+                    "description": "If set to `false` the Action will not be run",
+                    "examples": [
+                        true
+                    ],
+                    "type": "boolean"
+                },
+                "itemIs": {
+                    "description": "A list of criteria to test the state of the `Activity` against before running the Action.\n\nIf any set of criteria passes the Action will be run.",
+                    "items": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/definitions/SubmissionState"
+                            },
+                            {
+                                "$ref": "#/definitions/CommentState"
+                            }
+                        ]
+                    },
+                    "type": "array"
+                },
+                "kind": {
+                    "description": "The type of action that will be performed",
+                    "enum": [
+                        "contributor"
+                    ],
+                    "type": "string"
+                },
+                "name": {
+                    "description": "An optional, but highly recommended, friendly name for this Action. If not present will default to `kind`.\n\nCan only contain letters, numbers, underscore, spaces, and dashes",
+                    "examples": [
+                        "myDescriptiveAction"
+                    ],
+                    "pattern": "^[a-zA-Z]([\\w -]*[\\w])?$",
+                    "type": "string"
+                }
+            },
+            "required": [
+                "action",
+                "kind"
+            ],
+            "type": "object"
+        },
+        "ContributorActionType": {
+            "enum": [
+                "add",
+                "remove"
+            ],
+            "type": "string"
         },
         "DiscordProviderConfig": {
             "properties": {
@@ -3728,6 +3820,9 @@
                             },
                             {
                                 "$ref": "#/definitions/CancelDispatchActionJson"
+                            },
+                            {
+                                "$ref": "#/definitions/ContributorActionJson"
                             },
                             {
                                 "$ref": "#/definitions/FlairActionJson"
