@@ -93,6 +93,8 @@ import {isStatusError, SimpleError} from "../Utils/Errors";
 import {ErrorWithCause} from "pony-cause";
 import {UserNoteCriteria} from "../Rule";
 import {AuthorCritPropHelper, RequiredAuthorCrit} from "../Common/types";
+import {Manager} from "../Common/Entities/Manager";
+import {Bot} from "../Common/Entities/Bot";
 
 export const DEFAULT_FOOTER = '\r\n*****\r\nThis action was performed by [a bot.]({{botLink}}) Mention a moderator or [send a modmail]({{modmailLink}}) if you any ideas, questions, or concerns about this action.';
 
@@ -102,6 +104,8 @@ export interface SubredditResourceConfig extends Footer {
     logger: Logger;
     client: ExtendedSnoowrap
     credentials?: ThirdPartyCredentialsJsonConfig
+    managerEntity: Manager
+    botEntity: Bot
 }
 
 interface SubredditResourceOptions extends Footer {
@@ -118,6 +122,8 @@ interface SubredditResourceOptions extends Footer {
     thirdPartyCredentials: ThirdPartyCredentialsJsonConfig
     delayedItems?: ActivityDispatch[]
     botName: string
+    managerEntity: Manager
+    botEntity: Bot
 }
 
 export interface SubredditResourceSetOptions extends CacheConfig, Footer {
@@ -150,6 +156,8 @@ export class SubredditResources {
     actionedEventsMax: number;
     thirdPartyCredentials: ThirdPartyCredentialsJsonConfig;
     delayedItems: ActivityDispatch[] = [];
+    managerEntity: Manager
+    botEntity: Bot
 
     stats: {
         cache: ResourceStats
@@ -180,8 +188,12 @@ export class SubredditResources {
             client,
             thirdPartyCredentials,
             delayedItems = [],
+            managerEntity,
+            botEntity,
         } = options || {};
 
+        this.managerEntity = managerEntity;
+        this.botEntity = botEntity;
         this.botName = botName;
         this.delayedItems = delayedItems;
         this.cacheSettingsHash = cacheSettingsHash;
@@ -477,7 +489,7 @@ export class SubredditResources {
         const eventRepo = this.database.getRepository(ActionedEventEntity);
         const events = await eventRepo.find({
             where: {
-                bot: this.botName,
+                //bot: this.botName,
                 activity: {
                     subreddit: {
                         id: this.subreddit.id
@@ -491,113 +503,113 @@ export class SubredditResources {
 
     async addActionedEvent(ae: ActionedEvent) {
 
-        // find any existing entities
-        const actRepo = this.database.getRepository(Activity);
-        const subRepo = this.database.getRepository(SubredditEntity);
-        const authorRepo = this.database.getRepository(Author);
-        const premRepo = this.database.getRepository(RulePremise);
-
-        let sub = await subRepo.findOne(ae.subreddit.id);
-        if(sub === undefined) {
-            sub = new SubredditEntity();
-            sub.id = ae.subreddit.id;
-            sub.name = ae.subreddit.display_name;
-            await subRepo.save(sub);
-        }
-
-        let author = await authorRepo.findOne({name: ae.author.name});
-        if(author === undefined) {
-            // @ts-ignore
-            const redditAuthor = await ae.author.fetch();
-            author = new Author();
-            author.id = redditAuthor.id;
-            author.name = redditAuthor.name;
-            await authorRepo.save(author);
-        }
-
-        let act = await actRepo.findOne({permalink: ae.activity.link});
-        if(act === undefined) {
-            act = new Activity();
-            act.id = ae.activity.id;
-            act.permalink = ae.activity.link;
-            act.title = ae.activity.title;
-            act.type = ae.activity.type as ('submission' | 'comment');
-            act.subreddit = sub;
-            act.author = author;
-            if(act.type === 'comment') {
-                let subAct = await actRepo.findOne({id: ae.activity.submission});
-                if(subAct === undefined) {
-                    const dummySub = new Submission({name: ae.activity.submission}, this.client, false);
-                    const sub = await this.getActivity(dummySub) as Submission;
-                    subAct = new Activity();
-                    subAct.id = sub.id;
-                    subAct.permalink = sub.permalink;
-                    subAct.title = sub.title;
-                    subAct.type = 'submission';
-                    let subAuthor = await authorRepo.findOne({name: sub.author.name});
-                    if(subAuthor === undefined) {
-                        // @ts-ignore
-                        const redditAuthor = await ae.author.fetch();
-                        subAuthor = new Author();
-                        subAuthor.id = redditAuthor.id;
-                        subAuthor.name = redditAuthor.name;
-                        await authorRepo.save(subAuthor);
-                    }
-                    subAct.author = subAuthor;
-                    await actRepo.save(subAct);
-                }
-                act.submission = subAct;
-            }
-            await actRepo.save(act);
-        }
-
-        const actionedEvent = new ActionedEventEntity();
-        actionedEvent.check = ae.check;
-        actionedEvent.ruleSummary = ae.ruleSummary;
-        actionedEvent.timestamp = ae.timestamp;
-        actionedEvent.activity = act;
-        actionedEvent.bot = this.botName;
-        const ruleResults: RuleResult[] = [];
-        for(const x of ae.ruleResults) {
-            const rr = new RuleResult();
-            rr.triggered = x.triggered;
-            rr.result = x.result;
-            rr.data = x.data;
-            let prem: RulePremise | undefined;
-            if(x.name !== undefined) {
-                prem = await premRepo.findOne({name: x.name, kind: x.kind});
-            }
-            if(prem === undefined) {
-                const hash = hashString(`${x.premise.kind}-${JSON.stringify(x.premise.config)}`);
-                prem = await premRepo.findOne({configHash: hash});
-                if(prem === undefined) {
-                    prem = new RulePremise();
-                    prem.name = x.name;
-                    prem.kind = x.kind;
-                    prem.configHash = hash;
-                    prem.config = x.premise.config;
-                    await premRepo.save(prem);
-                }
-            }
-            rr.premise = prem;
-            ruleResults.push(rr);
-        }
-        actionedEvent.ruleResults = ruleResults;
-
-        actionedEvent.actionResults = ae.actionResults.map(x => {
-            const ar = new ActionResult();
-            ar.kind = x.kind;
-            ar.name = x.name;
-            ar.run = x.run;
-            ar.runReason = x.runReason;
-            ar.dryRun = x.dryRun;
-            ar.result = x.result;
-            ar.success = x.success;
-            ar.actionedEvent = actionedEvent;
-            return ar;
-        })
-
-        await this.database.manager.save(actionedEvent);
+        // // find any existing entities
+        // const actRepo = this.database.getRepository(Activity);
+        // const subRepo = this.database.getRepository(SubredditEntity);
+        // const authorRepo = this.database.getRepository(Author);
+        // const premRepo = this.database.getRepository(RulePremise);
+        //
+        // let sub = await subRepo.findOne(ae.subreddit.id);
+        // if(sub === undefined) {
+        //     sub = new SubredditEntity();
+        //     sub.id = ae.subreddit.id;
+        //     sub.name = ae.subreddit.display_name;
+        //     await subRepo.save(sub);
+        // }
+        //
+        // let author = await authorRepo.findOne({name: ae.author.name});
+        // if(author === undefined) {
+        //     // @ts-ignore
+        //     const redditAuthor = await ae.author.fetch();
+        //     author = new Author();
+        //     author.id = redditAuthor.id;
+        //     author.name = redditAuthor.name;
+        //     await authorRepo.save(author);
+        // }
+        //
+        // let act = await actRepo.findOne({permalink: ae.activity.link});
+        // if(act === undefined) {
+        //     act = new Activity();
+        //     act.id = ae.activity.id;
+        //     act.permalink = ae.activity.link;
+        //     act.title = ae.activity.title;
+        //     act.type = ae.activity.type as ('submission' | 'comment');
+        //     act.subreddit = sub;
+        //     act.author = author;
+        //     if(act.type === 'comment') {
+        //         let subAct = await actRepo.findOne({id: ae.activity.submission});
+        //         if(subAct === undefined) {
+        //             const dummySub = new Submission({name: ae.activity.submission}, this.client, false);
+        //             const sub = await this.getActivity(dummySub) as Submission;
+        //             subAct = new Activity();
+        //             subAct.id = sub.id;
+        //             subAct.permalink = sub.permalink;
+        //             subAct.title = sub.title;
+        //             subAct.type = 'submission';
+        //             let subAuthor = await authorRepo.findOne({name: sub.author.name});
+        //             if(subAuthor === undefined) {
+        //                 // @ts-ignore
+        //                 const redditAuthor = await ae.author.fetch();
+        //                 subAuthor = new Author();
+        //                 subAuthor.id = redditAuthor.id;
+        //                 subAuthor.name = redditAuthor.name;
+        //                 await authorRepo.save(subAuthor);
+        //             }
+        //             subAct.author = subAuthor;
+        //             await actRepo.save(subAct);
+        //         }
+        //         act.submission = subAct;
+        //     }
+        //     await actRepo.save(act);
+        // }
+        //
+        // const actionedEvent = new ActionedEventEntity();
+        // actionedEvent.check = ae.check;
+        // actionedEvent.ruleSummary = ae.ruleSummary;
+        // actionedEvent.timestamp = ae.timestamp;
+        // actionedEvent.activity = act;
+        // actionedEvent.bot = this.botName;
+        // const ruleResults: RuleResult[] = [];
+        // for(const x of ae.ruleResults) {
+        //     const rr = new RuleResult();
+        //     rr.triggered = x.triggered;
+        //     rr.result = x.result;
+        //     rr.data = x.data;
+        //     let prem: RulePremise | undefined;
+        //     if(x.name !== undefined) {
+        //         prem = await premRepo.findOne({name: x.name, kind: x.kind});
+        //     }
+        //     if(prem === undefined) {
+        //         const hash = hashString(`${x.premise.kind}-${JSON.stringify(x.premise.config)}`);
+        //         prem = await premRepo.findOne({configHash: hash});
+        //         if(prem === undefined) {
+        //             prem = new RulePremise();
+        //             prem.name = x.name;
+        //             prem.kind = x.kind;
+        //             prem.configHash = hash;
+        //             prem.config = x.premise.config;
+        //             await premRepo.save(prem);
+        //         }
+        //     }
+        //     rr.premise = prem;
+        //     ruleResults.push(rr);
+        // }
+        // actionedEvent.ruleResults = ruleResults;
+        //
+        // actionedEvent.actionResults = ae.actionResults.map(x => {
+        //     const ar = new ActionResult();
+        //     ar.kind = x.kind;
+        //     ar.name = x.name;
+        //     ar.run = x.run;
+        //     ar.runReason = x.runReason;
+        //     ar.dryRun = x.dryRun;
+        //     ar.result = x.result;
+        //     ar.success = x.success;
+        //     ar.actionedEvent = actionedEvent;
+        //     return ar;
+        // })
+        //
+        // await this.database.manager.save(actionedEvent);
 
         //const events = await this.cache.wrap(`actionedEvents-${this.subreddit.display_name}`, () => []) as ActionedEvent[];
         //events.unshift(ae);
@@ -2125,6 +2137,18 @@ export class BotResourcesManager {
     async set(subName: string, initOptions: SubredditResourceConfig): Promise<SubredditResources> {
         let hash = 'default';
         const { caching, credentials, ...init } = initOptions;
+
+        // const bEntity = await this.defaultDatabase.getRepository(Bot).findOne({where: {name: this.botName}}) as Bot;
+        // //const subreddit = this.defaultDatabase.getRepository(SubredditEntity).findOne({name: initOptions.subreddit.display_name});
+        // const mEntity = await this.defaultDatabase.getRepository(Manager).findOne({
+        //     where: {
+        //         name: subName,
+        //         bot: {
+        //             id: bEntity.id
+        //         }
+        //     },
+        //     relations: ['bot']
+        // });
 
         let opts: SubredditResourceOptions = {
             cache: this.defaultCache,

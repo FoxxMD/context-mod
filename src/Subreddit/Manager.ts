@@ -75,6 +75,8 @@ import {CMError, isRateLimitError, isStatusError, RunProcessingError} from "../U
 import {ErrorWithCause, stackWithCauses} from "pony-cause";
 import {Run} from "../Run";
 import got from "got";
+import {Bot as BotEntity} from "../Common/Entities/Bot";
+import {Manager as ManagerEntity} from "../Common/Entities/Manager";
 
 export interface RunningState {
     state: RunState,
@@ -105,6 +107,8 @@ export interface RuntimeManagerOptions extends ManagerOptions {
     botName?: string;
     maxWorkers?: number;
     maxGotoDepth?: number
+    botEntity: BotEntity
+    managerEntity: ManagerEntity
 }
 
 interface QueuedIdentifier {
@@ -115,6 +119,8 @@ interface QueuedIdentifier {
 
 export class Manager extends EventEmitter {
     subreddit: Subreddit;
+    botEntity: BotEntity;
+    managerEntity: ManagerEntity;
     client: ExtendedSnoowrap;
     logger: Logger;
     logs: LogInfo[] = [];
@@ -265,7 +271,9 @@ export class Manager extends EventEmitter {
             maxWorkers = 1,
             maxGotoDepth = 1,
             filterCriteriaDefaults,
-            postCheckBehaviorDefaults
+            postCheckBehaviorDefaults,
+            botEntity,
+            managerEntity,
         } = opts || {};
         this.displayLabel = opts.nickname || `${sub.display_name_prefixed}`;
         const getLabels = this.getCurrentLabels;
@@ -292,6 +300,8 @@ export class Manager extends EventEmitter {
         this.sharedStreams = sharedStreams;
         this.pollingRetryHandler = createRetryHandler({maxRequestRetry: 3, maxOtherRetry: 2}, this.logger);
         this.subreddit = sub;
+        this.botEntity = botEntity;
+        this.managerEntity = managerEntity;
         this.client = client;
         this.botName = botName;
         this.maxGotoDepth = maxGotoDepth;
@@ -553,6 +563,8 @@ export class Manager extends EventEmitter {
                 caching,
                 credentials,
                 client: this.client,
+                botEntity: this.botEntity,
+                managerEntity: this.managerEntity,
             };
             this.resources = await this.cacheManager.set(this.subreddit.display_name, resourceConfig);
             this.resources.setLogger(this.logger);

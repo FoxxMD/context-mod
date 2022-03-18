@@ -32,7 +32,10 @@ import LoggedError from "../Utils/LoggedError";
 import pEvent from "p-event";
 import {SimpleError, isRateLimitError, isRequestError, isScopeError, isStatusError, CMError} from "../Utils/Errors";
 import {ErrorWithCause} from "pony-cause";
-
+import {Connection} from "typeorm";
+import {Bot as BotEntity} from '../Common/Entities/Bot';
+import {Manager as ManagerEntity} from '../Common/Entities/Manager';
+import {Subreddit as SubredditEntity} from '../Common/Entities/Subreddit';
 
 class Bot {
 
@@ -80,6 +83,9 @@ class Bot {
     cacheManager: BotResourcesManager;
 
     config: BotInstanceConfig;
+
+    database: Connection
+    botEntity!: BotEntity
 
     getBotName = () => {
         return this.botName;
@@ -133,9 +139,11 @@ class Bot {
             nanny: {
                 softLimit,
                 hardLimit,
-            }
+            },
+            database,
         } = config;
 
+        this.database = database;
         this.config = config;
         this.dryRun = parseBool(dryRun) === true ? true : undefined;
         this.softLimit = softLimit;
@@ -330,6 +338,17 @@ class Bot {
         }
         this.logger.info(`Bot Name${botNameFromConfig ? ' (from config)' : ''}: ${this.botName}`);
 
+        const botRepo = this.database.getRepository(BotEntity);
+
+        let b = await botRepo.findOne({where: {name: this.botName}});
+        if(b === undefined || b === null) {
+            b = new BotEntity();
+            b.name = this.botName;
+            this.botEntity = await botRepo.save(b);
+        } else {
+            this.botEntity = b;
+        }
+
         let subListing = await this.client.getModeratedSubreddits({count: 100});
         while(!subListing.isFinished) {
             subListing = await subListing.fetchMore({amount: 100});
@@ -391,7 +410,7 @@ class Bot {
         // get configs for subs we want to run on and build/validate them
         for (const sub of subsToRun) {
             try {
-                this.subManagers.push(this.createManager(sub));
+                this.subManagers.push(await this.createManager(sub));
             } catch (err: any) {
 
             }
@@ -524,7 +543,7 @@ class Bot {
         }
     }
 
-    createManager(sub: Subreddit): Manager {
+    async createManager(sub: Subreddit): Promise<Manager> {
         const {
             flowControlDefaults: {
                 maxGotoDepth: botMaxDefault
@@ -548,6 +567,26 @@ class Bot {
             } = {}
         } = override || {};
 
+        const managerRepo = this.database.getRepository(ManagerEntity);
+        const subRepo = this.database.getRepository(SubredditEntity)
+        let subreddit = await subRepo.findOne({where: {id: sub.name}});
+        if(subreddit === null) {
+            subreddit = await subRepo.save(new SubredditEntity({id: sub.name, name: sub.display_name}))
+        }
+        let managerEntity = await managerRepo.findOne({
+            where: {
+                bot: {
+                    id: this.botEntity.id
+                },
+                subreddit: {
+                    id: subreddit.id
+                }
+            },
+        });
+        if(managerEntity === undefined || managerEntity === null) {
+            managerEntity = await managerRepo.save(new ManagerEntity({name: sub.display_name, bot: this.botEntity, subreddit: subreddit as SubredditEntity}));
+        }
+
         const manager = new Manager(sub, this.client, this.logger, this.cacheManager, {
             dryRun: this.dryRun,
             sharedStreams: this.sharedStreams,
@@ -555,7 +594,9 @@ class Bot {
             botName: this.botName as string,
             maxWorkers: this.maxWorkers,
             filterCriteriaDefaults: this.filterCriteriaDefaults,
-            maxGotoDepth: subMax ?? botMaxDefault
+            maxGotoDepth: subMax ?? botMaxDefault,
+            botEntity: this.botEntity,
+            managerEntity: managerEntity as ManagerEntity,
         });
         // all errors from managers will count towards bot-level retry count
         manager.on('error', async (err) => await this.panicOnRetries(err));
@@ -599,7 +640,7 @@ class Bot {
                 const sub = await this.client.getSubreddit(name);
                 this.logger.info(`Attempting to add manager for r/${name}`);
                 try {
-                    const manager = this.createManager(sub);
+                    const manager =  await this.createManager(sub);
                     this.logger.info(`Starting manager for r/${name}`);
                     this.subManagers.push(manager);
                     await this.initManager(manager);

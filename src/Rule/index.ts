@@ -12,6 +12,10 @@ import {
 } from "../Common/interfaces";
 import Author, {AuthorCriteria, AuthorOptions} from "../Author/Author";
 import {runCheckOptions} from "../Subreddit/Manager";
+import {Rule as RuleEntity} from "../Common/Entities/Rule";
+import objectHash from "object-hash";
+import {RuleType} from "../Common/Entities/RuleType";
+import {RulePremise} from "../Common/Entities/RulePremise";
 
 export interface RuleOptions {
     name?: string;
@@ -58,16 +62,18 @@ export interface Triggerable {
 }
 
 export abstract class Rule implements IRule, Triggerable {
-    name: string;
+    name?: string;
     logger: Logger
     authorIs: AuthorOptions;
     itemIs: TypedActivityStates;
     resources: SubredditResources;
     client: Snoowrap;
+    ruleEntity?: RuleEntity | null;
+    rulePremiseEntity?: RulePremise
 
     constructor(options: RuleOptions) {
         const {
-            name = this.getKind(),
+            name,
             logger,
             authorIs: {
                 excludeCondition = 'OR',
@@ -95,11 +101,52 @@ export abstract class Rule implements IRule, Triggerable {
     }
 
     async run(item: Comment | Submission, existingResults: RuleResult[] = [], options: runCheckOptions): Promise<[(boolean | null), RuleResult]> {
+        if(this.ruleEntity === undefined || this.ruleEntity === null) {
+            const ruleRepo = this.resources.database.getRepository(RuleEntity);
+            try {
+                const identifier = this.name ?? objectHash.sha1(this.getPremise());
+                this.ruleEntity = await ruleRepo.findOne({
+                    where: {
+                        id: identifier,
+                        kind: {
+                            name: this.getKind()
+                        },
+                        manager: {
+                            id: this.resources.managerEntity.id
+                        }
+                    },
+                    //relations: ['kind', 'manager']
+                    relations: {
+                        kind: true,
+                        manager: true
+                    }
+                });
+                if(this.ruleEntity === undefined || this.ruleEntity === null) {
+                    const kind = await this.resources.database.getRepository(RuleType).findOne({where: {name: this.getKind()}});
+                    this.ruleEntity = await ruleRepo.save(new RuleEntity({premise: this.getPremise(), name: this.name, kind: kind as RuleType, manager: this.resources.managerEntity}))
+                }
+            } catch (err) {
+
+            }
+        }
+        if(this.rulePremiseEntity === undefined) {
+            const rulePremiseRepo = this.resources.database.getRepository(RulePremise);
+            try {
+                const premiseHash = objectHash.sha1(this.getPremise());
+                this.rulePremiseEntity = await rulePremiseRepo.preload({
+                    rule: this.ruleEntity as RuleEntity,
+                    configHash: premiseHash,
+                    config: this.getPremise(),
+                })
+            } catch (err) {
+
+            }
+        }
         try {
             const existingResult = findResultByPremise(this.getPremise(), existingResults);
             if (existingResult) {
                 this.logger.debug(`Returning existing result of ${existingResult.triggered ? '✔️' : '❌'}`);
-                return Promise.resolve([existingResult.triggered, {...existingResult, name: this.name, fromCache: true}]);
+                return Promise.resolve([existingResult.triggered, {...existingResult, name: this.getRuleUniqueName(), fromCache: true}]);
             }
             const [itemPass, itemFilterType, itemFilterResults] = await checkItemFilter(item, this.itemIs, this.resources, this.logger, options.source);
             if (!itemPass) {
@@ -149,7 +196,7 @@ export abstract class Rule implements IRule, Triggerable {
         return {
             premise: this.getPremise(),
             kind: this.getKind(),
-            name: this.name,
+            name: this.getRuleUniqueName(),
             triggered,
             ...context,
         };
