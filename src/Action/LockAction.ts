@@ -3,10 +3,11 @@ import Action from "./index";
 import Snoowrap, {Comment, Submission} from "snoowrap";
 import {RuleResult} from "../Rule";
 import {ActionProcessResult} from "../Common/interfaces";
+import {ActionTypes} from "../Common/types";
 
 export class LockAction extends Action {
-    getKind() {
-        return 'Lock';
+    getKind(): ActionTypes {
+        return 'lock';
     }
 
     async process(item: Comment | Submission, ruleResults: RuleResult[], runtimeDryrun?: boolean): Promise<ActionProcessResult> {

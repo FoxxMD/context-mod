@@ -5,6 +5,7 @@ import {renderContent} from "../Utils/SnoowrapUtils";
 import {ActionProcessResult, Footer, RequiredRichContent, RichContent} from "../Common/interfaces";
 import {RuleResult} from "../Rule";
 import {truncateStringToLength} from "../util";
+import {ActionTypes} from "../Common/types";
 
 export class CommentAction extends Action {
     content: string;
@@ -29,8 +30,8 @@ export class CommentAction extends Action {
         this.distinguish = distinguish;
     }
 
-    getKind() {
-        return 'Comment';
+    getKind(): ActionTypes {
+        return 'comment';
     }
 
     async process(item: Comment | Submission, ruleResults: RuleResult[], runtimeDryrun?: boolean): Promise<ActionProcessResult> {

@@ -4,6 +4,7 @@ import Snoowrap, {Comment, Submission} from "snoowrap";
 import {RuleResult} from "../Rule";
 import {renderContent} from "../Utils/SnoowrapUtils";
 import {ActionProcessResult, Footer} from "../Common/interfaces";
+import {ActionTypes} from "../Common/types";
 
 export class BanAction extends Action {
 
@@ -29,8 +30,8 @@ export class BanAction extends Action {
         this.note = note;
     }
 
-    getKind() {
-        return 'Ban';
+    getKind(): ActionTypes {
+        return 'ban';
     }
 
     async process(item: Comment | Submission, ruleResults: RuleResult[], runtimeDryrun?: boolean): Promise<ActionProcessResult> {

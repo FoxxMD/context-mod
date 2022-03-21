@@ -6,6 +6,7 @@ import {RuleResult} from "../Rule";
 import {UserNote, UserNoteJson} from "../Subreddit/UserNotes";
 import Submission from "snoowrap/dist/objects/Submission";
 import {ActionProcessResult} from "../Common/interfaces";
+import {ActionTypes} from "../Common/types";
 
 
 export class UserNoteAction extends Action {
@@ -21,8 +22,8 @@ export class UserNoteAction extends Action {
         this.allowDuplicate = allowDuplicate;
     }
 
-    getKind() {
-        return 'User Note';
+    getKind(): ActionTypes {
+        return 'usernote';
     }
 
     async process(item: Comment | Submission, ruleResults: RuleResult[], runtimeDryrun?: boolean): Promise<ActionProcessResult> {

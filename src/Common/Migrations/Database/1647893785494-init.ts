@@ -1,7 +1,7 @@
 import {MigrationInterface, QueryRunner} from "typeorm";
 
-export class init1647627977750 implements MigrationInterface {
-    name = 'init1647627977750'
+export class init1647893785494 implements MigrationInterface {
+    name = 'init1647893785494'
 
     public async up(queryRunner: QueryRunner): Promise<void> {
         await queryRunner.query(`CREATE TABLE "action_type" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "name" varchar(200) NOT NULL)`);
@@ -16,8 +16,8 @@ export class init1647627977750 implements MigrationInterface {
         await queryRunner.query(`CREATE TABLE "rule" ("id" varchar(300) PRIMARY KEY NOT NULL, "name" varchar(300), "kindId" integer, "managerId" integer)`);
         await queryRunner.query(`CREATE TABLE "rule_premise" ("ruleId" varchar NOT NULL, "configHash" varchar(300) NOT NULL, "config" text NOT NULL, "version" integer NOT NULL, "createdAt" datetime NOT NULL DEFAULT (datetime('now')), "updatedAt" datetime NOT NULL DEFAULT (datetime('now')), PRIMARY KEY ("ruleId", "configHash"))`);
         await queryRunner.query(`CREATE TABLE "rule_result" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "triggered" boolean, "result" text, "fromCache" boolean, "data" text, "premiseRuleId" varchar, "premiseConfigHash" varchar(300), "checkResultId" varchar)`);
-        await queryRunner.query(`CREATE TABLE "action_premise" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "config" text NOT NULL, "configHash" varchar(300) NOT NULL, "version" integer NOT NULL, "ruleId" varchar(300))`);
-        await queryRunner.query(`CREATE TABLE "action_result" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "run" boolean NOT NULL, "dryRun" boolean NOT NULL, "success" boolean NOT NULL, "runReason" text, "result" text, "checkResultId" varchar, "premiseId" integer)`);
+        await queryRunner.query(`CREATE TABLE "action_premise" ("actionId" varchar PRIMARY KEY NOT NULL, "config" text NOT NULL, "configHash" varchar(300) NOT NULL, "version" integer NOT NULL)`);
+        await queryRunner.query(`CREATE TABLE "action_result" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "run" boolean NOT NULL, "dryRun" boolean NOT NULL, "success" boolean NOT NULL, "runReason" text, "result" text, "checkResultId" varchar, "premiseActionId" varchar)`);
         await queryRunner.query(`CREATE TABLE "check_result" ("id" varchar PRIMARY KEY NOT NULL, "triggered" boolean NOT NULL, "fromCache" boolean NOT NULL, "condition" varchar(20) NOT NULL, "error" text, "postBehavior" varchar(50), "checkName" varchar(300), "runId" varchar)`);
         await queryRunner.query(`CREATE TABLE "check" ("name" varchar(300) PRIMARY KEY NOT NULL, "type" varchar(20) NOT NULL, "runName" varchar(300), "managerId" integer)`);
         await queryRunner.query(`CREATE TABLE "run" ("name" varchar(300) PRIMARY KEY NOT NULL, "managerId" integer)`);
@@ -46,12 +46,12 @@ export class init1647627977750 implements MigrationInterface {
         await queryRunner.query(`INSERT INTO "temporary_rule_result"("id", "triggered", "result", "fromCache", "data", "premiseRuleId", "premiseConfigHash", "checkResultId") SELECT "id", "triggered", "result", "fromCache", "data", "premiseRuleId", "premiseConfigHash", "checkResultId" FROM "rule_result"`);
         await queryRunner.query(`DROP TABLE "rule_result"`);
         await queryRunner.query(`ALTER TABLE "temporary_rule_result" RENAME TO "rule_result"`);
-        await queryRunner.query(`CREATE TABLE "temporary_action_premise" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "config" text NOT NULL, "configHash" varchar(300) NOT NULL, "version" integer NOT NULL, "ruleId" varchar(300), CONSTRAINT "FK_54cad0e45e11f6d75925c6567fc" FOREIGN KEY ("ruleId") REFERENCES "action" ("id") ON DELETE NO ACTION ON UPDATE NO ACTION)`);
-        await queryRunner.query(`INSERT INTO "temporary_action_premise"("id", "config", "configHash", "version", "ruleId") SELECT "id", "config", "configHash", "version", "ruleId" FROM "action_premise"`);
+        await queryRunner.query(`CREATE TABLE "temporary_action_premise" ("actionId" varchar PRIMARY KEY NOT NULL, "config" text NOT NULL, "configHash" varchar(300) NOT NULL, "version" integer NOT NULL, CONSTRAINT "FK_fb845f1bea0b39a5bdf9fd81399" FOREIGN KEY ("actionId") REFERENCES "action" ("id") ON DELETE NO ACTION ON UPDATE NO ACTION)`);
+        await queryRunner.query(`INSERT INTO "temporary_action_premise"("actionId", "config", "configHash", "version") SELECT "actionId", "config", "configHash", "version" FROM "action_premise"`);
         await queryRunner.query(`DROP TABLE "action_premise"`);
         await queryRunner.query(`ALTER TABLE "temporary_action_premise" RENAME TO "action_premise"`);
-        await queryRunner.query(`CREATE TABLE "temporary_action_result" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "run" boolean NOT NULL, "dryRun" boolean NOT NULL, "success" boolean NOT NULL, "runReason" text, "result" text, "checkResultId" varchar, "premiseId" integer, CONSTRAINT "FK_c6dcad869adbd75a5c822edf91e" FOREIGN KEY ("checkResultId") REFERENCES "check_result" ("id") ON DELETE NO ACTION ON UPDATE NO ACTION, CONSTRAINT "FK_4f8b238ca4aff6b33b7dae733c4" FOREIGN KEY ("premiseId") REFERENCES "action_premise" ("id") ON DELETE NO ACTION ON UPDATE NO ACTION)`);
-        await queryRunner.query(`INSERT INTO "temporary_action_result"("id", "run", "dryRun", "success", "runReason", "result", "checkResultId", "premiseId") SELECT "id", "run", "dryRun", "success", "runReason", "result", "checkResultId", "premiseId" FROM "action_result"`);
+        await queryRunner.query(`CREATE TABLE "temporary_action_result" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "run" boolean NOT NULL, "dryRun" boolean NOT NULL, "success" boolean NOT NULL, "runReason" text, "result" text, "checkResultId" varchar, "premiseActionId" varchar, CONSTRAINT "FK_c6dcad869adbd75a5c822edf91e" FOREIGN KEY ("checkResultId") REFERENCES "check_result" ("id") ON DELETE NO ACTION ON UPDATE NO ACTION, CONSTRAINT "FK_c18170946f17fab80a6188585e7" FOREIGN KEY ("premiseActionId") REFERENCES "action_premise" ("actionId") ON DELETE NO ACTION ON UPDATE NO ACTION)`);
+        await queryRunner.query(`INSERT INTO "temporary_action_result"("id", "run", "dryRun", "success", "runReason", "result", "checkResultId", "premiseActionId") SELECT "id", "run", "dryRun", "success", "runReason", "result", "checkResultId", "premiseActionId" FROM "action_result"`);
         await queryRunner.query(`DROP TABLE "action_result"`);
         await queryRunner.query(`ALTER TABLE "temporary_action_result" RENAME TO "action_result"`);
         await queryRunner.query(`CREATE TABLE "temporary_check_result" ("id" varchar PRIMARY KEY NOT NULL, "triggered" boolean NOT NULL, "fromCache" boolean NOT NULL, "condition" varchar(20) NOT NULL, "error" text, "postBehavior" varchar(50), "checkName" varchar(300), "runId" varchar, CONSTRAINT "FK_577537e8a1d25734c0431d78858" FOREIGN KEY ("checkName") REFERENCES "check" ("name") ON DELETE NO ACTION ON UPDATE NO ACTION, CONSTRAINT "FK_dc0622ea1452393104984ba925a" FOREIGN KEY ("runId") REFERENCES "run_result" ("id") ON DELETE NO ACTION ON UPDATE NO ACTION)`);
@@ -122,12 +122,12 @@ export class init1647627977750 implements MigrationInterface {
         await queryRunner.query(`INSERT INTO "check_result"("id", "triggered", "fromCache", "condition", "error", "postBehavior", "checkName", "runId") SELECT "id", "triggered", "fromCache", "condition", "error", "postBehavior", "checkName", "runId" FROM "temporary_check_result"`);
         await queryRunner.query(`DROP TABLE "temporary_check_result"`);
         await queryRunner.query(`ALTER TABLE "action_result" RENAME TO "temporary_action_result"`);
-        await queryRunner.query(`CREATE TABLE "action_result" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "run" boolean NOT NULL, "dryRun" boolean NOT NULL, "success" boolean NOT NULL, "runReason" text, "result" text, "checkResultId" varchar, "premiseId" integer)`);
-        await queryRunner.query(`INSERT INTO "action_result"("id", "run", "dryRun", "success", "runReason", "result", "checkResultId", "premiseId") SELECT "id", "run", "dryRun", "success", "runReason", "result", "checkResultId", "premiseId" FROM "temporary_action_result"`);
+        await queryRunner.query(`CREATE TABLE "action_result" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "run" boolean NOT NULL, "dryRun" boolean NOT NULL, "success" boolean NOT NULL, "runReason" text, "result" text, "checkResultId" varchar, "premiseActionId" varchar)`);
+        await queryRunner.query(`INSERT INTO "action_result"("id", "run", "dryRun", "success", "runReason", "result", "checkResultId", "premiseActionId") SELECT "id", "run", "dryRun", "success", "runReason", "result", "checkResultId", "premiseActionId" FROM "temporary_action_result"`);
         await queryRunner.query(`DROP TABLE "temporary_action_result"`);
         await queryRunner.query(`ALTER TABLE "action_premise" RENAME TO "temporary_action_premise"`);
-        await queryRunner.query(`CREATE TABLE "action_premise" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "config" text NOT NULL, "configHash" varchar(300) NOT NULL, "version" integer NOT NULL, "ruleId" varchar(300))`);
-        await queryRunner.query(`INSERT INTO "action_premise"("id", "config", "configHash", "version", "ruleId") SELECT "id", "config", "configHash", "version", "ruleId" FROM "temporary_action_premise"`);
+        await queryRunner.query(`CREATE TABLE "action_premise" ("actionId" varchar PRIMARY KEY NOT NULL, "config" text NOT NULL, "configHash" varchar(300) NOT NULL, "version" integer NOT NULL)`);
+        await queryRunner.query(`INSERT INTO "action_premise"("actionId", "config", "configHash", "version") SELECT "actionId", "config", "configHash", "version" FROM "temporary_action_premise"`);
         await queryRunner.query(`DROP TABLE "temporary_action_premise"`);
         await queryRunner.query(`ALTER TABLE "rule_result" RENAME TO "temporary_rule_result"`);
         await queryRunner.query(`CREATE TABLE "rule_result" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "triggered" boolean, "result" text, "fromCache" boolean, "data" text, "premiseRuleId" varchar, "premiseConfigHash" varchar(300), "checkResultId" varchar)`);

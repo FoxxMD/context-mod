@@ -5,6 +5,7 @@ import {truncateStringToLength} from "../util";
 import {renderContent} from "../Utils/SnoowrapUtils";
 import {RuleResult} from "../Rule";
 import {ActionProcessResult, RichContent} from "../Common/interfaces";
+import {ActionTypes} from "../Common/types";
 
 // https://www.reddit.com/dev/api/oauth#POST_api_report
 // denotes 100 characters maximum
@@ -19,8 +20,8 @@ export class ReportAction extends Action {
         this.content = options.content || '';
     }
 
-    getKind() {
-        return 'Report';
+    getKind(): ActionTypes {
+        return 'report';
     }
 
     async process(item: Comment | Submission, ruleResults: RuleResult[], runtimeDryrun?: boolean): Promise<ActionProcessResult> {

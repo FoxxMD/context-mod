@@ -1,20 +1,41 @@
-import {Entity, Column, PrimaryGeneratedColumn, OneToMany, VersionColumn, ManyToOne} from "typeorm";
+import {
+    Entity,
+    Column,
+    PrimaryGeneratedColumn,
+    OneToMany,
+    VersionColumn,
+    ManyToOne,
+    JoinColumn,
+    PrimaryColumn
+} from "typeorm";
 import {RuleResult} from "./RuleResult";
 import {Rule} from "./Rule";
 import {Action} from "./Action";
 import {ActionResult} from "./ActionResult";
+import objectHash from "object-hash";
+import {RulePremiseOptions} from "./RulePremise";
+import {ObjectPremise} from "../interfaces";
+
+export interface ActionPremiseOptions {
+    action: Action
+    config: ObjectPremise
+}
 
 @Entity()
 export class ActionPremise  {
 
-    @PrimaryGeneratedColumn()
-    id!: number;
+    // @PrimaryGeneratedColumn()
+    // id!: number;
 
     @ManyToOne(() => Action, undefined,{cascade: ['insert'], eager: true})
-    rule!: Action;
+    @JoinColumn({name: 'actionId'})
+    action!: Action;
+
+    @PrimaryColumn()
+    actionId!: string;
 
     @Column("simple-json")
-    config!: any
+    config!: ObjectPremise
 
     @Column("varchar", {length: 300})
     configHash!: string;
@@ -24,4 +45,12 @@ export class ActionPremise  {
 
     @VersionColumn()
     version!: number;
+
+    constructor(data?: ActionPremiseOptions) {
+        if(data !== undefined) {
+            this.action = data.action;
+            this.config = data.config;
+            this.configHash = objectHash.sha1(data.config);
+        }
+    }
 }

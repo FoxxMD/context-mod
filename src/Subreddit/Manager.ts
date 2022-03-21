@@ -623,16 +623,33 @@ export class Manager extends EventEmitter {
             this.validConfigLoaded = true;
 
             // make sure all db related stuff gets initialized
-            for(const r of this.runs) {
-                for(const c of r.submissionChecks) {
-                    for(const ru of c.rules) {
-                        if(isRuleSet(ru)) {
-                            for(const rule of ru.rules) {
+            for (const r of this.runs) {
+                for (const c of r.submissionChecks) {
+                    for (const ru of c.rules) {
+                        if (isRuleSet(ru)) {
+                            for (const rule of ru.rules) {
                                 await rule.initialize();
                             }
                         } else {
                             await ru.initialize();
                         }
+                    }
+                    for (const a of c.actions) {
+                        await a.initialize();
+                    }
+                }
+                for (const c of r.commentChecks) {
+                    for (const ru of c.rules) {
+                        if (isRuleSet(ru)) {
+                            for (const rule of ru.rules) {
+                                await rule.initialize();
+                            }
+                        } else {
+                            await ru.initialize();
+                        }
+                    }
+                    for (const a of c.actions) {
+                        await a.initialize();
                     }
                 }
             }

@@ -6,12 +6,13 @@ import {activityIsRemoved} from "../Utils/SnoowrapUtils";
 import {ActionProcessResult} from "../Common/interfaces";
 import dayjs from "dayjs";
 import {isSubmission} from "../util";
+import {ActionTypes} from "../Common/types";
 
 export class RemoveAction extends Action {
     spam: boolean;
 
-    getKind() {
-        return 'Remove';
+    getKind(): ActionTypes {
+        return 'remove';
     }
 
     constructor(options: RemoveOptions) {

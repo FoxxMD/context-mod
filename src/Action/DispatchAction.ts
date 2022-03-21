@@ -6,13 +6,14 @@ import {activityIsRemoved} from "../Utils/SnoowrapUtils";
 import {ActionProcessResult, ActionTarget, ActivityDispatchConfig} from "../Common/interfaces";
 import dayjs from "dayjs";
 import {isSubmission, parseDurationValToDuration, randomId} from "../util";
+import {ActionTypes} from "../Common/types";
 
 export class DispatchAction extends Action {
     dispatchData: ActivityDispatchConfig;
     targets: ActionTarget[];
 
-    getKind() {
-        return 'Dispatch';
+    getKind(): ActionTypes {
+        return 'dispatch';
     }
 
     constructor(options: DispatchOptions) {

@@ -17,6 +17,12 @@ import {ErrorWithCause} from "pony-cause";
 import EventEmitter from "events";
 import {runCheckOptions} from "../Subreddit/Manager";
 import {ActionTypes} from "../Common/types";
+import {Action as ActionEntity} from "../Common/Entities/Action";
+import {ActionPremise} from "../Common/Entities/ActionPremise";
+import objectHash from "object-hash";
+import {RuleType} from "../Common/Entities/RuleType";
+import {ActionType} from "../Common/Entities/ActionType";
+import { capitalize } from "lodash";
 
 export abstract class Action {
     name?: string;
@@ -28,6 +34,8 @@ export abstract class Action {
     dryRun: boolean;
     enabled: boolean;
     managerEmitter: EventEmitter;
+    actionEntity: ActionEntity | null = null;
+    actionPremiseEntity: ActionPremise | null = null;
 
     constructor(options: ActionOptions) {
         const {
@@ -64,10 +72,10 @@ export abstract class Action {
         this.itemIs = itemIs;
     }
 
-    abstract getKind(): string;
+    abstract getKind(): ActionTypes;
 
     getActionUniqueName() {
-        return this.name === this.getKind() ? this.getKind() : `${this.getKind()} - ${this.name}`;
+        return this.name === this.getKind() ? capitalize(this.getKind()) : `${capitalize(this.getKind())} - ${this.name}`;
     }
 
     protected abstract getSpecificPremise(): object;
@@ -82,6 +90,65 @@ export abstract class Action {
                 ...config,
             },
         };
+    }
+
+    async initialize() {
+        if (this.actionEntity === null) {
+            const actionRepo = this.resources.database.getRepository(ActionEntity);
+            const identifier = this.name ?? objectHash.sha1(this.getPremise());
+            try {
+                this.actionEntity = await actionRepo.findOne({
+                    where: {
+                        id: identifier,
+                        kind: {
+                            name: this.getKind()
+                        },
+                        manager: {
+                            id: this.resources.managerEntity.id
+                        }
+                    },
+                    //relations: ['kind', 'manager']
+                    relations: {
+                        kind: true,
+                        manager: true
+                    }
+                });
+                if (this.actionEntity === null) {
+                    const kind = await this.resources.database.getRepository(ActionType).findOne({where: {name: this.getKind()}});
+                    this.actionEntity = await actionRepo.save(new ActionEntity({
+                        premise: this.getPremise(),
+                        name: this.name,
+                        kind: kind as ActionType,
+                        manager: this.resources.managerEntity
+                    }))
+                }
+            } catch (err) {
+                const f = err;
+            }
+        }
+        if (this.actionPremiseEntity === null) {
+            const identifier = this.name ?? objectHash.sha1(this.getPremise());
+            const actionPremiseRepo = this.resources.database.getRepository(ActionPremise);
+            try {
+                const premiseHash = objectHash.sha1(this.getPremise());
+                this.actionPremiseEntity = await actionPremiseRepo.findOne({
+                    where: {
+                        action: {
+                            id: identifier
+                        },
+                        configHash: premiseHash,
+                    }
+                });
+                if (this.actionPremiseEntity === null) {
+                    this.actionPremiseEntity = await actionPremiseRepo.save(new ActionPremise({
+                        action: this.actionEntity as ActionEntity,
+                        config: this.getPremise()
+                    }));
+                }
+            } catch (err) {
+                const f = err;
+            }
+        }
     }
 
     async handle(item: Comment | Submission, ruleResults: RuleResult[], options: runCheckOptions): Promise<ActionResult> {

@@ -14,6 +14,7 @@ import {
 } from "../util";
 import {SimpleError} from "../Utils/Errors";
 import {ErrorWithCause} from "pony-cause";
+import {ActionTypes} from "../Common/types";
 
 export class MessageAction extends Action {
     content: string;
@@ -42,8 +43,8 @@ export class MessageAction extends Action {
         this.title = title;
     }
 
-    getKind() {
-        return 'Message';
+    getKind(): ActionTypes {
+        return 'message';
     }
 
     async process(item: Comment | Submission, ruleResults: RuleResult[], runtimeDryrun?: boolean): Promise<ActionProcessResult> {

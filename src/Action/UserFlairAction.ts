@@ -2,6 +2,7 @@ import Action, {ActionConfig, ActionJson, ActionOptions} from './index';
 import {Comment, RedditUser, Submission} from 'snoowrap';
 import {RuleResult} from '../Rule';
 import {ActionProcessResult} from '../Common/interfaces';
+import {ActionTypes} from "../Common/types";
 
 export class UserFlairAction extends Action {
   text?: string;
@@ -16,8 +17,8 @@ export class UserFlairAction extends Action {
     this.flair_template_id = options.flair_template_id === null || options.flair_template_id === '' ? undefined : options.flair_template_id;
   }
 
-  getKind() {
-    return 'User Flair';
+  getKind(): ActionTypes {
+    return 'userflair';
   }
 
   async process(item: Comment | Submission, ruleResults: RuleResult[], runtimeDryrun?: boolean): Promise<ActionProcessResult> {

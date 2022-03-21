@@ -4,6 +4,7 @@ import {RuleResult} from "../../Rule";
 import {ActionProcessResult} from "../../Common/interfaces";
 import Submission from 'snoowrap/dist/objects/Submission';
 import Comment from 'snoowrap/dist/objects/Comment';
+import {ActionTypes} from "../../Common/types";
 
 export class FlairAction extends Action {
     text: string;
@@ -20,8 +21,8 @@ export class FlairAction extends Action {
         this.flair_template_id = options.flair_template_id || '';
     }
 
-    getKind() {
-        return 'Flair';
+    getKind(): ActionTypes {
+        return 'flair';
     }
 
     async process(item: Comment | Submission, ruleResults: RuleResult[], runtimeDryrun?: boolean): Promise<ActionProcessResult> {

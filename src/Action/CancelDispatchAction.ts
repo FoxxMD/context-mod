@@ -6,13 +6,14 @@ import {activityIsRemoved} from "../Utils/SnoowrapUtils";
 import {ActionProcessResult, ActionTarget, ActivityDispatchConfig, InclusiveActionTarget} from "../Common/interfaces";
 import dayjs from "dayjs";
 import {isSubmission, parseDurationValToDuration} from "../util";
+import {ActionTypes} from "../Common/types";
 
 export class CancelDispatchAction extends Action {
     identifiers?: (string | null)[];
     targets: InclusiveActionTarget[];
 
-    getKind() {
-        return 'Cancel Dispatch';
+    getKind(): ActionTypes {
+        return 'cancelDispatch';
     }
 
     constructor(options: CancelDispatchOptions) {

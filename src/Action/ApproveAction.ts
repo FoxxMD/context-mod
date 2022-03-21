@@ -5,13 +5,14 @@ import {RuleResult} from "../Rule";
 import {ActionProcessResult, ActionTarget} from "../Common/interfaces";
 import Submission from "snoowrap/dist/objects/Submission";
 import Comment from "snoowrap/dist/objects/Comment";
+import {ActionTypes} from "../Common/types";
 
 export class ApproveAction extends Action {
 
     targets: ActionTarget[]
 
-    getKind() {
-        return 'Approve';
+    getKind(): ActionTypes {
+        return 'approve';
     }
 
     constructor(options: ApproveOptions) {
