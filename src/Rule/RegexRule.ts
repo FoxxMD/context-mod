@@ -125,7 +125,7 @@ export class RegexRule extends Rule {
     }
 
     getKind(): string {
-        return 'Regex';
+        return 'regex';
     }
 
     getSpecificPremise(): object {

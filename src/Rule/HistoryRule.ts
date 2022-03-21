@@ -140,7 +140,7 @@ export class HistoryRule extends Rule {
     }
 
     getKind(): string {
-        return "History";
+        return "history";
     }
 
     protected getSpecificPremise(): object {

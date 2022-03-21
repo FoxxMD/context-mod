@@ -101,7 +101,7 @@ export class RecentActivityRule extends Rule {
     }
 
     getKind(): string {
-        return 'Recent';
+        return 'recent';
     }
 
     getSpecificPremise(): object {

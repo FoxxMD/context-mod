@@ -8,7 +8,7 @@ import {RulePremise} from "./RulePremise";
 
 export interface RuleEntityOptions {
     name?: string
-    premise?: ObjectPremise
+    premise: ObjectPremise
     kind?: RuleType
     manager?: Manager
 }
@@ -39,10 +39,11 @@ export class Rule {
             if (data.manager !== undefined) {
                 this.manager = data.manager;
             }
-            if (data.name !== undefined && data.name !== this.kind.name) {
+            if(data.name !== undefined) {
                 this.name = data.name;
-            } else if (data.premise !== undefined) {
-                this.name = objectHash.sha1(data.premise);
+                this.id = data.name;
+            } else {
+                this.id = objectHash.sha1(data.premise);
             }
         }
     }

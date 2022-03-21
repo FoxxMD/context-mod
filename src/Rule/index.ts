@@ -16,6 +16,7 @@ import {Rule as RuleEntity} from "../Common/Entities/Rule";
 import objectHash from "object-hash";
 import {RuleType} from "../Common/Entities/RuleType";
 import {RulePremise} from "../Common/Entities/RulePremise";
+import {capitalize} from "lodash";
 
 export interface RuleOptions {
     name?: string;
@@ -68,8 +69,8 @@ export abstract class Rule implements IRule, Triggerable {
     itemIs: TypedActivityStates;
     resources: SubredditResources;
     client: Snoowrap;
-    ruleEntity?: RuleEntity | null;
-    rulePremiseEntity?: RulePremise
+    ruleEntity: RuleEntity | null = null;
+    rulePremiseEntity: RulePremise | null = null;
 
     constructor(options: RuleOptions) {
         const {
@@ -100,11 +101,11 @@ export abstract class Rule implements IRule, Triggerable {
         this.logger = logger.child({labels: [`Rule ${this.getRuleUniqueName()}`]}, mergeArr);
     }
 
-    async run(item: Comment | Submission, existingResults: RuleResult[] = [], options: runCheckOptions): Promise<[(boolean | null), RuleResult]> {
-        if(this.ruleEntity === undefined || this.ruleEntity === null) {
+    async initialize() {
+        if (this.ruleEntity === null) {
             const ruleRepo = this.resources.database.getRepository(RuleEntity);
+            const identifier = this.name ?? objectHash.sha1(this.getPremise());
             try {
-                const identifier = this.name ?? objectHash.sha1(this.getPremise());
                 this.ruleEntity = await ruleRepo.findOne({
                     where: {
                         id: identifier,
@@ -121,27 +122,45 @@ export abstract class Rule implements IRule, Triggerable {
                         manager: true
                     }
                 });
-                if(this.ruleEntity === undefined || this.ruleEntity === null) {
+                if (this.ruleEntity === null) {
                     const kind = await this.resources.database.getRepository(RuleType).findOne({where: {name: this.getKind()}});
-                    this.ruleEntity = await ruleRepo.save(new RuleEntity({premise: this.getPremise(), name: this.name, kind: kind as RuleType, manager: this.resources.managerEntity}))
+                    this.ruleEntity = await ruleRepo.save(new RuleEntity({
+                        premise: this.getPremise(),
+                        name: this.name,
+                        kind: kind as RuleType,
+                        manager: this.resources.managerEntity
+                    }))
                 }
             } catch (err) {
-
+                const f = err;
             }
         }
-        if(this.rulePremiseEntity === undefined) {
+        if (this.rulePremiseEntity === null) {
+            const identifier = this.name ?? objectHash.sha1(this.getPremise());
             const rulePremiseRepo = this.resources.database.getRepository(RulePremise);
             try {
                 const premiseHash = objectHash.sha1(this.getPremise());
-                this.rulePremiseEntity = await rulePremiseRepo.preload({
-                    rule: this.ruleEntity as RuleEntity,
-                    configHash: premiseHash,
-                    config: this.getPremise(),
-                })
+                this.rulePremiseEntity = await rulePremiseRepo.findOne({
+                    where: {
+                        rule: {
+                            id: identifier
+                        },
+                        configHash: premiseHash,
+                    }
+                });
+                if (this.rulePremiseEntity === null) {
+                    this.rulePremiseEntity = await rulePremiseRepo.save(new RulePremise({
+                        rule: this.ruleEntity as RuleEntity,
+                        config: this.getPremise()
+                    }));
+                }
             } catch (err) {
-
+                const f = err;
             }
         }
+    }
+
+    async run(item: Comment | Submission, existingResults: RuleResult[] = [], options: runCheckOptions): Promise<[(boolean | null), RuleResult]> {
         try {
             const existingResult = findResultByPremise(this.getPremise(), existingResults);
             if (existingResult) {
@@ -175,7 +194,7 @@ export abstract class Rule implements IRule, Triggerable {
     abstract getKind(): string;
 
     getRuleUniqueName() {
-        return this.name === undefined ? this.getKind() : `${this.getKind()} - ${this.name}`;
+        return this.name === undefined ? capitalize(this.getKind()) : `${capitalize(this.getKind())} - ${this.name}`;
     }
 
     protected abstract getSpecificPremise(): object;

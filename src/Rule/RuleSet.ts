@@ -109,3 +109,7 @@ export interface RuleSetObjectJson extends RuleSetJson {
 export const isRuleSetJSON = (obj: object): obj is RuleSetJson => {
     return (obj as RuleSetJson).rules !== undefined;
 }
+
+export const isRuleSet = (obj: object): obj is RuleSet => {
+    return (obj as RuleSet).rules !== undefined;
+}

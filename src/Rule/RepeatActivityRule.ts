@@ -121,7 +121,7 @@ export class RepeatActivityRule extends Rule {
     }
 
     getKind(): string {
-        return 'Repeat';
+        return 'repeat';
     }
 
     getSpecificPremise(): object {

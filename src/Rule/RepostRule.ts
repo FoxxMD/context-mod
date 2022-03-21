@@ -239,7 +239,7 @@ export class RepostRule extends Rule {
     }
 
     getKind(): string {
-        return 'Repost';
+        return 'repost';
     }
 
     protected getSpecificPremise(): object {

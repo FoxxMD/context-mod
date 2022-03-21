@@ -171,7 +171,7 @@ export class AttributionRule extends Rule {
     }
 
     getKind(): string {
-        return "Attr";
+        return "attribution";
     }
 
     protected getSpecificPremise(): object {

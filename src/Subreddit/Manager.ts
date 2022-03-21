@@ -77,6 +77,7 @@ import {Run} from "../Run";
 import got from "got";
 import {Bot as BotEntity} from "../Common/Entities/Bot";
 import {Manager as ManagerEntity} from "../Common/Entities/Manager";
+import {isRuleSet} from "../Rule/RuleSet";
 
 export interface RunningState {
     state: RunState,
@@ -620,6 +621,22 @@ export class Manager extends EventEmitter {
                 this.logger.info(checkSummary);
             }
             this.validConfigLoaded = true;
+
+            // make sure all db related stuff gets initialized
+            for(const r of this.runs) {
+                for(const c of r.submissionChecks) {
+                    for(const ru of c.rules) {
+                        if(isRuleSet(ru)) {
+                            for(const rule of ru.rules) {
+                                await rule.initialize();
+                            }
+                        } else {
+                            await ru.initialize();
+                        }
+                    }
+                }
+            }
+
             if(this.eventsState.state === RUNNING) {
                 // need to update polling, potentially
                 await this.buildPolling();
