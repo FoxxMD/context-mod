@@ -2,8 +2,7 @@ import Action, {ActionJson, ActionOptions} from "./index";
 import {Comment} from "snoowrap";
 import Submission from "snoowrap/dist/objects/Submission";
 import {renderContent} from "../Utils/SnoowrapUtils";
-import {ActionProcessResult, Footer, RequiredRichContent, RichContent} from "../Common/interfaces";
-import {RuleResult} from "../Rule";
+import {ActionProcessResult, Footer, RequiredRichContent, RichContent, RuleResult} from "../Common/interfaces";
 import {truncateStringToLength} from "../util";
 import {ActionTypes} from "../Common/types";
 

@@ -1,12 +1,11 @@
 import {Comment, Submission} from "snoowrap";
 import {Logger} from "winston";
-import {RuleResult} from "../Rule";
 import {checkAuthorFilter, checkItemFilter, SubredditResources} from "../Subreddit/SubredditResources";
 import {
     ActionProcessResult,
     ActionResult,
     ChecksActivityState,
-    ObjectPremise,
+    ObjectPremise, RuleResult,
     TypedActivityStates
 } from "../Common/interfaces";
 import Author, {AuthorOptions} from "../Author/Author";

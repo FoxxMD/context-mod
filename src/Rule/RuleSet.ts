@@ -1,9 +1,9 @@
-import {IRule, Triggerable, Rule, RuleJSONConfig, RuleResult, RuleSetResult} from "./index";
+import {IRule, Triggerable, Rule, RuleJSONConfig} from "./index";
 import Snoowrap, {Comment, Submission} from "snoowrap";
 import {ruleFactory} from "./RuleFactory";
 import {createAjvFactory, mergeArr} from "../util";
 import {Logger} from "winston";
-import {JoinCondition, JoinOperands} from "../Common/interfaces";
+import {JoinCondition, JoinOperands, RuleResult, RuleSetResult} from "../Common/interfaces";
 import * as RuleSchema from '../Schema/Rule.json';
 import Ajv from 'ajv';
 import {RuleJson, RuleObjectJson} from "../Common/types";

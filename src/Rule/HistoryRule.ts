@@ -1,6 +1,12 @@
 
-import {ActivityWindowType, CompareValueOrPercent, SubredditState, ThresholdCriteria} from "../Common/interfaces";
-import {Rule, RuleJSONConfig, RuleOptions, RuleResult} from "./index";
+import {
+    ActivityWindowType,
+    CompareValueOrPercent,
+    RuleResult,
+    SubredditState,
+    ThresholdCriteria
+} from "../Common/interfaces";
+import {Rule, RuleJSONConfig, RuleOptions} from "./index";
 import Submission from "snoowrap/dist/objects/Submission";
 import {getAuthorActivities} from "../Utils/SnoowrapUtils";
 import dayjs from "dayjs";

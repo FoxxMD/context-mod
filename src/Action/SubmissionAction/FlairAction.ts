@@ -1,7 +1,6 @@
 import {SubmissionActionConfig} from "./index";
 import Action, {ActionJson, ActionOptions} from "../index";
-import {RuleResult} from "../../Rule";
-import {ActionProcessResult} from "../../Common/interfaces";
+import {ActionProcessResult, RuleResult} from "../../Common/interfaces";
 import Submission from 'snoowrap/dist/objects/Submission';
 import Comment from 'snoowrap/dist/objects/Comment';
 import {ActionTypes} from "../../Common/types";

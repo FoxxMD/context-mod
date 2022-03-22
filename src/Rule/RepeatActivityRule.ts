@@ -1,4 +1,4 @@
-import {Rule, RuleJSONConfig, RuleOptions, RuleResult} from "./index";
+import {Rule, RuleJSONConfig, RuleOptions} from "./index";
 import {Comment} from "snoowrap";
 import {
     activityWindowText,
@@ -20,7 +20,7 @@ import {
 import {
     ActivityWindow,
     ActivityWindowType,
-    ReferenceSubmission, SearchAndReplaceRegExp,
+    ReferenceSubmission, RuleResult, SearchAndReplaceRegExp,
     StrongSubredditState,
     SubredditState, TextMatchOptions, TextTransformOptions
 } from "../Common/interfaces";

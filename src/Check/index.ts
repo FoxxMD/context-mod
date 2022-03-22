@@ -1,5 +1,5 @@
 import {RuleSet, IRuleSet, RuleSetJson, RuleSetObjectJson} from "../Rule/RuleSet";
-import {IRule, isRuleSetResult, Rule, RuleJSONConfig, RuleResult, RuleSetResult} from "../Rule";
+import {IRule, Rule, RuleJSONConfig} from "../Rule";
 import Action, {ActionConfig, ActionJson} from "../Action";
 import {Logger} from "winston";
 import Snoowrap, {Comment, Submission} from "snoowrap";
@@ -8,7 +8,7 @@ import {ruleFactory} from "../Rule/RuleFactory";
 import {
     boolToString,
     createAjvFactory, determineNewResults,
-    FAIL,
+    FAIL, isRuleSetResult,
     mergeArr,
     PASS,
     resultsSummary,
@@ -18,9 +18,8 @@ import {
 import {
     ActionResult, ActivityType, CheckResult,
     ChecksActivityState, CheckSummary,
-    CommentState,
-    JoinCondition,
-    JoinOperands, NotificationEventPayload, PostBehavior, PostBehaviorTypes,
+    CommentState, JoinCondition,
+    JoinOperands, NotificationEventPayload, PostBehavior, PostBehaviorTypes, RuleResult, RuleSetResult,
     SubmissionState,
     TypedActivityStates, UserResultCache
 } from "../Common/interfaces";

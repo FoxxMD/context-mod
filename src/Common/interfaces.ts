@@ -1,23 +1,15 @@
 import {Duration} from "dayjs/plugin/duration";
 import {Cache} from 'cache-manager';
 import {MESSAGE} from 'triple-beam';
-import Poll from "snoostorm/out/util/Poll";
-import Snoowrap from "snoowrap";
-import {RuleResult} from "../Rule";
-import {IncomingMessage} from "http";
 import Submission from "snoowrap/dist/objects/Submission";
 import Comment from "snoowrap/dist/objects/Comment";
 import RedditUser from "snoowrap/dist/objects/RedditUser";
-import Subreddit from "snoowrap/dist/objects/Subreddit";
 import {SqljsConnectionOptions} from "typeorm/driver/sqljs/SqljsConnectionOptions";
 import {MysqlConnectionOptions} from "typeorm/driver/mysql/MysqlConnectionOptions";
 import {MongoConnectionOptions} from "typeorm/driver/mongodb/MongoConnectionOptions";
 import {PostgresConnectionOptions} from "typeorm/driver/postgres/PostgresConnectionOptions";
 import {Connection} from "typeorm";
 import {AuthorCriteria, AuthorOptions} from "../Author/Author";
-import {ConfigFormat} from "./types";
-import AbstractConfigDocument, {ConfigDocumentInterface} from "./Config/AbstractConfigDocument";
-import {Document as YamlDocument} from 'yaml';
 import {JsonOperatorConfigDocument, YamlOperatorConfigDocument} from "./Config/Operator";
 import {ConsoleTransportOptions} from "winston/lib/winston/transports";
 import {DailyRotateFileTransportOptions} from "winston-daily-rotate-file";
@@ -2118,6 +2110,32 @@ export interface ActionedEvent {
     triggered: boolean,
     runResults: RunResult[]
     dispatchSource?: DispatchAudit
+}
+
+export interface ResultContext {
+    result?: string
+    data?: any
+}
+
+export interface RuleResult extends ResultContext {
+    premise: ObjectPremise
+    kind: string
+    name: string
+    triggered: (boolean | null)
+    fromCache?: boolean
+    itemIs?: FilterResult<TypedActivityState>
+    authorIs?: FilterResult<AuthorCriteria>
+}
+
+export type FormattedRuleResult = RuleResult & {
+    triggered: string
+    result: string
+}
+
+export interface RuleSetResult {
+    results: RuleResult[],
+    condition: 'OR' | 'AND',
+    triggered: boolean
 }
 
 export interface CheckResult {

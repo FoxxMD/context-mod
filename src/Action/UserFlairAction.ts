@@ -1,7 +1,6 @@
 import Action, {ActionConfig, ActionJson, ActionOptions} from './index';
 import {Comment, RedditUser, Submission} from 'snoowrap';
-import {RuleResult} from '../Rule';
-import {ActionProcessResult} from '../Common/interfaces';
+import {ActionProcessResult, RuleResult} from '../Common/interfaces';
 import {ActionTypes} from "../Common/types";
 
 export class UserFlairAction extends Action {

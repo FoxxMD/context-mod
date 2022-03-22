@@ -1,4 +1,4 @@
-import {Rule, RuleJSONConfig, RuleOptions, RuleResult} from "./index";
+import {Rule, RuleJSONConfig, RuleOptions} from "./index";
 import {VoteableContent} from "snoowrap";
 import Submission from "snoowrap/dist/objects/Submission";
 import Comment from "snoowrap/dist/objects/Comment";
@@ -32,7 +32,7 @@ import {
     ActivityWindowType, CommentState, CompareValueOrPercent,
     //ImageData,
     ImageDetection,
-    ReferenceSubmission, StrongImageDetection, StrongSubredditState, SubmissionState,
+    ReferenceSubmission, RuleResult, StrongImageDetection, StrongSubredditState, SubmissionState,
     SubredditCriteria, SubredditState
 } from "../Common/interfaces";
 import ImageData from "../Common/ImageData";

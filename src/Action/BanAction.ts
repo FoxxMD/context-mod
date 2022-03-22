@@ -1,9 +1,8 @@
 import {ActionJson, ActionConfig, ActionOptions} from "./index";
 import Action from "./index";
 import Snoowrap, {Comment, Submission} from "snoowrap";
-import {RuleResult} from "../Rule";
 import {renderContent} from "../Utils/SnoowrapUtils";
-import {ActionProcessResult, Footer} from "../Common/interfaces";
+import {ActionProcessResult, Footer, RuleResult} from "../Common/interfaces";
 import {ActionTypes} from "../Common/types";
 
 export class BanAction extends Action {

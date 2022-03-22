@@ -1,4 +1,4 @@
-import {Rule, RuleJSONConfig, RuleOptions, RuleResult} from "./index";
+import {Rule, RuleJSONConfig, RuleOptions} from "./index";
 import {Listing, SearchOptions} from "snoowrap";
 import Submission from "snoowrap/dist/objects/Submission";
 import Comment from "snoowrap/dist/objects/Comment";
@@ -16,7 +16,7 @@ import {
     CompareValue, DurationComparor,
     JoinOperands,
     RepostItem,
-    RepostItemResult,
+    RepostItemResult, RuleResult,
     SearchAndReplaceRegExp,
     SearchFacetType, TextMatchOptions, TextTransformOptions,
 } from "../Common/interfaces";

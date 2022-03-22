@@ -3,8 +3,7 @@ import Action from "./index";
 import Snoowrap, {Comment, Submission} from "snoowrap";
 import {truncateStringToLength} from "../util";
 import {renderContent} from "../Utils/SnoowrapUtils";
-import {RuleResult} from "../Rule";
-import {ActionProcessResult, RichContent} from "../Common/interfaces";
+import {ActionProcessResult, RichContent, RuleResult} from "../Common/interfaces";
 import {ActionTypes} from "../Common/types";
 
 // https://www.reddit.com/dev/api/oauth#POST_api_report

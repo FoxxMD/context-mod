@@ -1,7 +1,6 @@
 import {Check, CheckOptions} from "./index";
-import {SubmissionState, UserResultCache} from "../Common/interfaces";
+import {RuleResult, SubmissionState, UserResultCache} from "../Common/interfaces";
 import {Submission, Comment} from "snoowrap/dist/objects";
-import {RuleResult} from "../Rule";
 
 export class SubmissionCheck extends Check {
     itemIs: SubmissionState[];

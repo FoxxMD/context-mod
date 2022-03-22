@@ -1,9 +1,8 @@
 import {ActionJson, ActionConfig, ActionOptions} from "./index";
 import Action from "./index";
 import Snoowrap, {Comment, Submission} from "snoowrap";
-import {RuleResult} from "../Rule";
 import {activityIsRemoved} from "../Utils/SnoowrapUtils";
-import {ActionProcessResult, ActionTarget, ActivityDispatchConfig} from "../Common/interfaces";
+import {ActionProcessResult, ActionTarget, ActivityDispatchConfig, RuleResult} from "../Common/interfaces";
 import dayjs from "dayjs";
 import {isSubmission, parseDurationValToDuration, randomId} from "../util";
 import {ActionTypes} from "../Common/types";

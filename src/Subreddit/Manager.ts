@@ -20,7 +20,6 @@ import {
     totalFromMapStats,
     triggeredIndicator,
 } from "../util";
-import {RuleResult} from "../Rule";
 import {ConfigBuilder, buildPollingOptions} from "../ConfigBuilder";
 import {
     ActionedEvent,
@@ -49,7 +48,7 @@ import {
     RunState,
     STOPPED,
     SYSTEM,
-    USER
+    USER, RuleResult
 } from "../Common/interfaces";
 import Submission from "snoowrap/dist/objects/Submission";
 import {activityIsRemoved, ItemContent, itemContentPeek} from "../Utils/SnoowrapUtils";

@@ -212,3 +212,8 @@ const program = new Command();
 export {Author} from "./Author/Author";
 export {AuthorCriteria} from "./Author/Author";
 export {AuthorOptions} from "./Author/Author";
+export {RuleSetResult} from "./Common/interfaces";
+export {FormattedRuleResult} from "./Common/interfaces";
+export {RuleResult} from "./Common/interfaces";
+export {ResultContext} from "./Common/interfaces";
+export {isRuleSetResult} from "./util";

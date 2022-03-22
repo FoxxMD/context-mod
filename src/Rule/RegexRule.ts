@@ -1,4 +1,4 @@
-import {Rule, RuleJSONConfig, RuleOptions, RuleResult} from "./index";
+import {Rule, RuleJSONConfig, RuleOptions} from "./index";
 import {Comment} from "snoowrap";
 import Submission from "snoowrap/dist/objects/Submission";
 import {
@@ -8,7 +8,7 @@ import {
     PASS, triggeredIndicator
 } from "../util";
 import {
-    ActivityWindowType, JoinOperands,
+    ActivityWindowType, JoinOperands, RuleResult,
 } from "../Common/interfaces";
 import dayjs from 'dayjs';
 import {SimpleError} from "../Utils/Errors";

@@ -1,22 +1,24 @@
 import winston, {Logger} from "winston";
 import jsonStringify from 'safe-stable-stringify';
 import dayjs, {Dayjs, OpUnitType} from 'dayjs';
-import {FormattedRuleResult, isRuleSetResult, RuleResult, RuleSetResult, UserNoteCriteria} from "./Rule";
+import {UserNoteCriteria} from "./Rule";
 import deepEqual from "fast-deep-equal";
 import {Duration} from 'dayjs/plugin/duration.js';
 import Ajv from "ajv";
 import {InvalidOptionArgumentError} from "commander";
-import {inflateSync, deflateSync} from "zlib";
+import {deflateSync, inflateSync} from "zlib";
 import pixelmatch from 'pixelmatch';
 import os from 'os';
-import {createHash} from 'crypto';
+import crypto, {createHash} from 'crypto';
 import {
-    ActionResult, ActivitySource,
+    ActionResult,
+    ActivitySource,
     ActivityWindowCriteria,
     ActivityWindowType,
     CacheOptions,
     CacheProvider,
-    CheckSummary, CommentState,
+    CheckSummary,
+    CommentState,
     DurationComparison,
     DurationVal,
     FilterCriteriaDefaults,
@@ -27,54 +29,54 @@ import {
     HistoricalStats,
     HistoricalStatsDisplay,
     ImageComparisonResult,
-    //ImageData,
-    ImageDetection, ItemCritPropHelper,
-    //ImageDownloadOptions,
+    ItemCritPropHelper,
     LogInfo,
-    NamedGroup, ObjectPremise,
+    ObjectPremise,
     OperatorJsonConfig,
     PollingOptionsStrong,
     RedditEntity,
     RedditEntityType,
     RegExResult,
     RepostItem,
-    RepostItemResult, RequiredItemCrit,
+    RepostItemResult,
+    RequiredItemCrit,
     ResourceStats,
+    RuleResult,
+    RuleSetResult,
     RunResult,
     SearchAndReplaceRegExp,
     StringComparisonOptions,
     StringOperator,
-    StrongSubredditState, SubmissionState,
-    SubredditState, TypedActivityState,
+    StrongSubredditState,
+    SubmissionState,
+    SubredditState,
+    TypedActivityState,
     TypedActivityStates
 } from "./Common/interfaces";
-import { Document as YamlDocument } from 'yaml'
+import {Document as YamlDocument} from 'yaml'
 import InvalidRegexError from "./Utils/InvalidRegexError";
 import {constants, promises} from "fs";
 import {cacheOptDefaults, VERSION} from "./Common/defaults";
 import cacheManager, {Cache} from "cache-manager";
 import redisStore from "cache-manager-redis-store";
-import crypto from "crypto";
 import Autolinker from 'autolinker';
 import {create as createMemoryStore} from './Utils/memoryStore';
-import {MESSAGE, LEVEL} from "triple-beam";
-import {RedditUser,Comment,Submission} from "snoowrap/dist/objects";
+import {LEVEL, MESSAGE} from "triple-beam";
+import {Comment, RedditUser, Submission} from "snoowrap/dist/objects";
 import reRegExp from '@stdlib/regexp-regexp';
-import fetch, {Response} from "node-fetch";
-import { URL } from "url";
+import fetch from "node-fetch";
 import ImageData from "./Common/ImageData";
 import {Sharp, SharpOptions} from "sharp";
 import {ErrorWithCause, stackWithCauses} from "pony-cause";
-import {ConfigFormat, SetRandomInterval} from "./Common/types";
+import {ConfigFormat} from "./Common/types";
 import stringSimilarity from 'string-similarity';
 import calculateCosineSimilarity from "./Utils/StringMatching/CosineSimilarity";
 import levenSimilarity from "./Utils/StringMatching/levenSimilarity";
-import {SimpleError, isRateLimitError, isRequestError, isScopeError, isStatusError, CMError} from "./Utils/Errors";
+import {isRateLimitError, isRequestError, isScopeError, isStatusError, SimpleError} from "./Utils/Errors";
 import {parse} from "path";
 import JsonConfigDocument from "./Common/Config/JsonConfigDocument";
 import YamlConfigDocument from "./Common/Config/YamlConfigDocument";
 import AbstractConfigDocument, {ConfigDocumentInterface} from "./Common/Config/AbstractConfigDocument";
-import LoggedError from "./Utils/LoggedError";
 import {AuthorOptions} from "./Author/Author";
 import merge from "deepmerge";
 
@@ -386,6 +388,10 @@ export const triggeredIndicator = (val: boolean | null, nullResultIndicator = '-
         return nullResultIndicator;
     }
     return val ? PASS : FAIL;
+}
+
+export const isRuleSetResult = (obj: any): obj is RuleSetResult => {
+    return typeof obj === 'object' && Array.isArray(obj.results) && obj.condition !== undefined && obj.triggered !== undefined;
 }
 
 export const resultsSummary = (results: (RuleResult|RuleSetResult)[], topLevelCondition: 'OR' | 'AND'): string => {

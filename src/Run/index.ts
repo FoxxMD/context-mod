@@ -4,7 +4,7 @@ import {
     ActivityCheckJson, CheckResult, CheckSummary,
     FilterCriteriaDefaults, FilterResult,
     PostBehavior,
-    PostBehaviorTypes, RunResult,
+    PostBehaviorTypes, RuleResult, RunResult,
     TypedActivityStates
 } from "../Common/interfaces";
 import {SubmissionCheck} from "../Check/SubmissionCheck";
@@ -17,7 +17,6 @@ import {Author, AuthorCriteria, AuthorOptions} from "../Author/Author";
 import Submission from "snoowrap/dist/objects/Submission";
 import {Comment} from "snoowrap";
 import {runCheckOptions} from "../Subreddit/Manager";
-import {RuleResult} from "../Rule";
 import {ErrorWithCause, stackWithCauses} from "pony-cause";
 import EventEmitter from "events";
 import {CheckProcessingError, RunProcessingError} from "../Utils/Errors";

@@ -3,14 +3,8 @@ import Submission from "snoowrap/dist/objects/Submission";
 import {Logger} from "winston";
 import {findResultByPremise, mergeArr} from "../util";
 import {checkAuthorFilter, checkItemFilter, SubredditResources} from "../Subreddit/SubredditResources";
-import {
-    ChecksActivityState,
-    FilterResult,
-    ObjectPremise,
-    TypedActivityState,
-    TypedActivityStates
-} from "../Common/interfaces";
-import Author, {AuthorCriteria, AuthorOptions} from "../Author/Author";
+import {ChecksActivityState, ObjectPremise, ResultContext, RuleResult, TypedActivityStates} from "../Common/interfaces";
+import Author, {AuthorOptions} from "../Author/Author";
 import {runCheckOptions} from "../Subreddit/Manager";
 import {Rule as RuleEntity} from "../Common/Entities/Rule";
 import objectHash from "object-hash";
@@ -26,36 +20,6 @@ export interface RuleOptions {
     subredditName: string;
     resources: SubredditResources
     client: Snoowrap
-}
-
-interface ResultContext {
-    result?: string
-    data?: any
-}
-
-export interface RuleResult extends ResultContext {
-    premise: ObjectPremise
-    kind: string
-    name: string
-    triggered: (boolean | null)
-    fromCache?: boolean
-    itemIs?: FilterResult<TypedActivityState>
-    authorIs?: FilterResult<AuthorCriteria>
-}
-
-export type FormattedRuleResult = RuleResult & {
-    triggered: string
-    result: string
-}
-
-export interface RuleSetResult {
-    results: RuleResult[],
-    condition: 'OR' | 'AND',
-    triggered: boolean
-}
-
-export const isRuleSetResult = (obj: any): obj is RuleSetResult => {
-    return typeof obj === 'object' && Array.isArray(obj.results) && obj.condition !== undefined && obj.triggered !== undefined;
 }
 
 export interface Triggerable {

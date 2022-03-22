@@ -1,6 +1,13 @@
 import {SubmissionRule, SubmissionRuleJSONConfig} from "./SubmissionRule";
-import {ActivityWindowType, CommentState, DomainInfo, ReferenceSubmission, SubmissionState} from "../Common/interfaces";
-import {Rule, RuleOptions, RuleResult} from "./index";
+import {
+    ActivityWindowType,
+    CommentState,
+    DomainInfo,
+    ReferenceSubmission,
+    RuleResult,
+    SubmissionState
+} from "../Common/interfaces";
+import {Rule, RuleOptions} from "./index";
 import Submission from "snoowrap/dist/objects/Submission";
 import {getAttributionIdentifier} from "../Utils/SnoowrapUtils";
 import dayjs from "dayjs";

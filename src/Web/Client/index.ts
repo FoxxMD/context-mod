@@ -13,7 +13,7 @@ import {
     CheckSummary,
     RunResult,
     ActionedEvent,
-    ActionResult
+    ActionResult, RuleResult
 } from "../../Common/interfaces";
 import {
     buildCachePrefix,
@@ -58,7 +58,6 @@ import {BotStatusResponse} from "../Common/interfaces";
 import {TransformableInfo} from "logform";
 import {SimpleError} from "../../Utils/Errors";
 import {ErrorWithCause} from "pony-cause";
-import {RuleResult} from "../../Rule";
 import {CMInstance} from "./CMInstance";
 
 const emitter = new EventEmitter();

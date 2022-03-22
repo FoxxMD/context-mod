@@ -1,8 +1,7 @@
 import {ActionJson, ActionConfig} from "./index";
 import Action from "./index";
 import Snoowrap, {Comment, Submission} from "snoowrap";
-import {RuleResult} from "../Rule";
-import {ActionProcessResult} from "../Common/interfaces";
+import {ActionProcessResult, RuleResult} from "../Common/interfaces";
 import {ActionTypes} from "../Common/types";
 
 export class LockAction extends Action {

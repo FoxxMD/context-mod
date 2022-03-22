@@ -5,10 +5,10 @@ import {Duration, DurationUnitsObjectType} from "dayjs/plugin/duration";
 import dayjs, {Dayjs} from "dayjs";
 import Mustache from "mustache";
 import he from "he";
-import {RuleResult, UserNoteCriteria} from "../Rule";
+import {UserNoteCriteria} from "../Rule";
 import {
     ActivityWindowType, CommentState, DomainInfo,
-    DurationVal, FilterCriteriaPropertyResult, FilterCriteriaResult,
+    DurationVal, FilterCriteriaPropertyResult, FilterCriteriaResult, RuleResult,
     SubmissionState,
     TypedActivityStates
 } from "../Common/interfaces";

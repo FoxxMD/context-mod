@@ -2,10 +2,9 @@ import {ActionJson, ActionConfig, ActionOptions} from "./index";
 import Action from "./index";
 import {Comment} from "snoowrap";
 import {renderContent} from "../Utils/SnoowrapUtils";
-import {RuleResult} from "../Rule";
 import {UserNote, UserNoteJson} from "../Subreddit/UserNotes";
 import Submission from "snoowrap/dist/objects/Submission";
-import {ActionProcessResult} from "../Common/interfaces";
+import {ActionProcessResult, RuleResult} from "../Common/interfaces";
 import {ActionTypes} from "../Common/types";
 
 

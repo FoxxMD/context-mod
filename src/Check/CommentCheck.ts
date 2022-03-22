@@ -1,7 +1,6 @@
 import {Check, CheckOptions, userResultCacheDefault, UserResultCacheOptions} from "./index";
-import {CommentState, UserResultCache} from "../Common/interfaces";
+import {CommentState, RuleResult, UserResultCache} from "../Common/interfaces";
 import {Submission, Comment} from "snoowrap/dist/objects";
-import {RuleResult} from "../Rule";
 
 export interface CommentCheckOptions extends CheckOptions {
     cacheUserResult?: UserResultCacheOptions;
