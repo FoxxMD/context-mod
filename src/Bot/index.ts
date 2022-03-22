@@ -34,7 +34,7 @@ import {SimpleError, isRateLimitError, isRequestError, isScopeError, isStatusErr
 import {ErrorWithCause} from "pony-cause";
 import {Connection} from "typeorm";
 import {Bot as BotEntity} from '../Common/Entities/Bot';
-import {Manager as ManagerEntity} from '../Common/Entities/Manager';
+import {ManagerEntity as ManagerEntity} from '../Common/Entities/ManagerEntity';
 import {Subreddit as SubredditEntity} from '../Common/Entities/Subreddit';
 
 class Bot {

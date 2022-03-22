@@ -6,6 +6,7 @@ import {ActionProcessResult, RuleResult} from "../Common/interfaces";
 import dayjs from "dayjs";
 import {isSubmission} from "../util";
 import {ActionTypes} from "../Common/types";
+import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
 
 export class RemoveAction extends Action {
     spam: boolean;
@@ -22,7 +23,7 @@ export class RemoveAction extends Action {
         this.spam = spam;
     }
 
-    async process(item: Comment | Submission, ruleResults: RuleResult[], runtimeDryrun?: boolean): Promise<ActionProcessResult> {
+    async process(item: Comment | Submission, ruleResults: RuleResultEntity[], runtimeDryrun?: boolean): Promise<ActionProcessResult> {
         const dryRun = runtimeDryrun || this.dryRun;
         const touchedEntities = [];
         // issue with snoowrap typings, doesn't think prop exists on Submission

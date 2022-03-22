@@ -1,8 +1,12 @@
 import {Entity, Column, PrimaryColumn, OneToMany, PrimaryGeneratedColumn, TableInheritance, ManyToOne} from "typeorm";
-import {FilterCriteria} from "./FilterCriteria";
 import {FilterCriteriaPropertyResult} from "../../interfaces";
-import {Activity} from "../Activity";
 import {FilterResult} from "./FilterResult";
+
+export interface FilterCriteriaResultOptions<T> {
+    behavior: string
+    propertyResults: FilterCriteriaPropertyResult<T>[]
+    passed: boolean
+}
 
 @Entity()
 @TableInheritance({ column: { type: "varchar", name: "type" } })
@@ -25,4 +29,12 @@ export abstract class FilterCriteriaResult<T> {
 
     @ManyToOne(type => FilterResult)
     filterResult!: FilterResult<T>
+
+    constructor(data?: FilterCriteriaResultOptions<T>) {
+        if(data !== undefined) {
+            this.behavior = data.behavior;
+            this.passed = data.passed;
+            this.propertyResults = data.propertyResults;
+        }
+    }
 }

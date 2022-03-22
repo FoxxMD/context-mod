@@ -3,13 +3,14 @@ import Action from "./index";
 import Snoowrap, {Comment, Submission} from "snoowrap";
 import {ActionProcessResult, RuleResult} from "../Common/interfaces";
 import {ActionTypes} from "../Common/types";
+import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
 
 export class LockAction extends Action {
     getKind(): ActionTypes {
         return 'lock';
     }
 
-    async process(item: Comment | Submission, ruleResults: RuleResult[], runtimeDryrun?: boolean): Promise<ActionProcessResult> {
+    async process(item: Comment | Submission, ruleResults: RuleResultEntity[], runtimeDryrun?: boolean): Promise<ActionProcessResult> {
         const dryRun = runtimeDryrun || this.dryRun;
         const touchedEntities = [];
         //snoowrap typing issue, thinks comments can't be locked

@@ -8,12 +8,9 @@ import {
     JoinColumn,
     PrimaryColumn
 } from "typeorm";
-import {RuleResult} from "./RuleResult";
-import {Rule} from "./Rule";
 import {Action} from "./Action";
-import {ActionResult} from "./ActionResult";
+import {ActionResultEntity} from "./ActionResultEntity";
 import objectHash from "object-hash";
-import {RulePremiseOptions} from "./RulePremise";
 import {ObjectPremise} from "../interfaces";
 
 export interface ActionPremiseOptions {
@@ -40,8 +37,8 @@ export class ActionPremise  {
     @Column("varchar", {length: 300})
     configHash!: string;
 
-    @OneToMany(type => ActionResult, obj => obj.premise) // note: we will create author property in the Photo class below
-    actionResults!: ActionResult[]
+    @OneToMany(type => ActionResultEntity, obj => obj.premise) // note: we will create author property in the Photo class below
+    actionResults!: ActionResultEntity[]
 
     @VersionColumn()
     version!: number;

@@ -9,6 +9,7 @@ import Ajv from 'ajv';
 import {RuleJson, RuleObjectJson} from "../Common/types";
 import {SubredditResources} from "../Subreddit/SubredditResources";
 import {runCheckOptions} from "../Subreddit/Manager";
+import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
 
 export class RuleSet implements IRuleSet {
     rules: Rule[] = [];
@@ -34,11 +35,15 @@ export class RuleSet implements IRuleSet {
         }
     }
 
-    async run(item: Comment | Submission, existingResults: RuleResult[] = [], options: runCheckOptions): Promise<[boolean, RuleSetResult]> {
-        let results: RuleResult[] = [];
+    async run(item: Comment | Submission, existingResults: RuleResultEntity[] = [], options: runCheckOptions): Promise<[boolean, RuleSetResult]> {
+        let results: RuleResultEntity[] = [];
         let runOne = false;
+        const combinedResults = [...existingResults];
         for (const r of this.rules) {
-            const combinedResults = [...existingResults, ...results];
+            if(results.length > 0) {
+                combinedResults.push(results.slice(results.length - 1)[0]);
+            }
+            //const combinedResults = [...existingResults, ...results];
             const [passed, result] = await r.run(item, combinedResults, options);
             //results = results.concat(determineNewResults(combinedResults, result));
             results.push(result);
@@ -67,7 +72,7 @@ export class RuleSet implements IRuleSet {
         return [true, this.generateResultSet(true, results)];
     }
 
-    generateResultSet(triggered: boolean, results: RuleResult[]): RuleSetResult {
+    generateResultSet(triggered: boolean, results: RuleResultEntity[]): RuleSetResult {
         return {
             results,
             triggered,

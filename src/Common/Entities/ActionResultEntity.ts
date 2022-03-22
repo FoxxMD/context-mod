@@ -1,11 +1,11 @@
 import {Entity, Column, PrimaryGeneratedColumn, ManyToOne, OneToOne} from "typeorm";
 import {ActivityStateFilterResult} from "./FilterCriteria/ActivityStateFilterResult";
 import {AuthorFilterResult} from "./FilterCriteria/AuthorFilterResult";
-import {CheckResult} from "./CheckResult";
+import {CheckResultEntity} from "./CheckResultEntity";
 import {ActionPremise} from "./ActionPremise";
 
-@Entity()
-export class ActionResult {
+@Entity({name: 'ActionResult'})
+export class ActionResultEntity {
 
     @PrimaryGeneratedColumn()
     id!: number;
@@ -25,15 +25,15 @@ export class ActionResult {
     @Column("text", {nullable: true})
     result?: string
 
-    @OneToOne(() => ActivityStateFilterResult, {nullable: true})
+    @OneToOne(() => ActivityStateFilterResult, {nullable: true, cascade: ['insert']})
     itemIs?: ActivityStateFilterResult
 
-    @OneToOne(() => AuthorFilterResult, {nullable: true})
+    @OneToOne(() => AuthorFilterResult, {nullable: true, cascade: ['insert']})
     authorIs?: AuthorFilterResult
 
-    @ManyToOne(type => CheckResult, act => act.actionResults, {cascade: ['insert']})
-    checkResult!: CheckResult;
+    @ManyToOne(type => CheckResultEntity, act => act.actionResults, /*{cascade: ['insert']}*/)
+    checkResult!: CheckResultEntity;
 
-    @ManyToOne(type => ActionPremise, act => act.actionResults, {cascade: ['insert']})
+    @ManyToOne(type => ActionPremise, act => act.actionResults, /*{cascade: ['insert']}*/)
     premise!: ActionPremise;
 }

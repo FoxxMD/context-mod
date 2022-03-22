@@ -1,16 +1,17 @@
 import {Entity, Column, ManyToOne, PrimaryColumn, OneToMany} from "typeorm";
 import {RuleType} from "./RuleType";
-import {Manager} from "./Manager";
+import {ManagerEntity} from "./ManagerEntity";
 import {ObjectPremise} from "../interfaces";
 import objectHash from "object-hash";
-import {RuleResult} from "./RuleResult";
+import {RuleResultEntity} from "./RuleResultEntity";
 import {RulePremise} from "./RulePremise";
+import {capitalize} from "lodash";
 
 export interface RuleEntityOptions {
     name?: string
     premise: ObjectPremise
     kind?: RuleType
-    manager?: Manager
+    manager?: ManagerEntity
 }
 
 @Entity()
@@ -25,8 +26,8 @@ export class Rule {
     @ManyToOne(() => RuleType, undefined, {cascade: ['insert'], eager: true})
     kind!: RuleType;
 
-    @ManyToOne(type => Manager, act => act.rules, {cascade: ['insert']})
-    manager!: Manager;
+    @ManyToOne(type => ManagerEntity, act => act.rules, {cascade: ['insert']})
+    manager!: ManagerEntity;
 
     @OneToMany(type => RulePremise, obj => obj.rule) // note: we will create author property in the Photo class below
     premises!: RulePremise[]
@@ -46,5 +47,9 @@ export class Rule {
                 this.id = objectHash.sha1(data.premise);
             }
         }
+    }
+
+    getFriendlyIdentifier() {
+        return this.name === undefined ? capitalize(this.kind.name) : `${capitalize(this.kind.name)} - ${this.name}`;
     }
 }

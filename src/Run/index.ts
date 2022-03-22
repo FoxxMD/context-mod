@@ -20,6 +20,9 @@ import {runCheckOptions} from "../Subreddit/Manager";
 import {ErrorWithCause, stackWithCauses} from "pony-cause";
 import EventEmitter from "events";
 import {CheckProcessingError, RunProcessingError} from "../Utils/Errors";
+import {RunEntity} from "../Common/Entities/RunEntity";
+import {RunResultEntity} from "../Common/Entities/RunResultEntity";
+import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
 
 export class Run {
     name: string;
@@ -37,6 +40,7 @@ export class Run {
     authorIs: AuthorOptions;
     enabled: boolean;
     emitter: EventEmitter;
+    runEntity!: RunEntity
 
 
     constructor(options: RunOptions) {
@@ -97,7 +101,37 @@ export class Run {
         }
     }
 
-    async handle(activity: (Submission | Comment), initAllRuleResults: RuleResult[], existingRunResults: RunResult[] = [], options: runCheckOptions): Promise<[RunResult, string]> {
+    async initialize() {
+        if (this.runEntity === undefined) {
+            const runRepo = this.resources.database.getRepository(RunEntity);
+            const re = await runRepo.findOne({
+                where: {
+                    name: this.name,
+                    manager: {
+                        id: this.resources.managerEntity.id
+                    }
+                }, relations: {
+                    manager: true
+                }
+            });
+            if(re !== null) {
+                this.runEntity = re;
+            } else {
+                this.runEntity = await runRepo.save(new RunEntity({name: this.name, manager: this.resources.managerEntity}));
+            }
+        }
+        for(const c of this.commentChecks) {
+            c.runEntity = this.runEntity;
+        }
+        for(const c of this.submissionChecks) {
+            c.runEntity = this.runEntity;
+        }
+    }
+
+    async handle(activity: (Submission | Comment), initAllRuleResults: RuleResultEntity[], existingRunResults: RunResultEntity[] = [], options: runCheckOptions): Promise<[RunResultEntity, string]> {
+
+        const runResultEnt = new RunResultEntity({run: this.runEntity});
+        runResultEnt.checkResults = [];
 
         let allRuleResults = initAllRuleResults;
         let continueRunIteration = true;
@@ -114,20 +148,23 @@ export class Run {
         } = options;
 
         if(!this.enabled) {
+            runResultEnt.reason = 'Not enabled';
             runResult.error = 'Not enabled';
-            return [runResult, postBehavior];
+            return [runResultEnt, postBehavior];
         }
 
         if (isSubmission(activity)) {
             if (this.submissionChecks.length === 0) {
                 const msg = 'Skipping b/c Run did not contain any submission Checks';
                 this.logger.debug(msg);
-                return [{...runResult, reason: msg}, postBehavior];
+                runResultEnt.reason = msg;
+                return [runResultEnt, postBehavior];
             }
         } else if (this.commentChecks.length === 0) {
             const msg = 'Skipping b/c Run did not contain any comment Checks';
             this.logger.debug(msg);
-            return [{...runResult, reason: msg}, postBehavior];
+            runResultEnt.reason = msg;
+            return [runResultEnt, postBehavior];
         }
 
         let gotoContext = optGotoContext;
@@ -144,22 +181,19 @@ export class Run {
             const [itemPass, itemFilterType, itemFilterResults] = await checkItemFilter(activity, this.itemIs, this.resources, this.logger, source)
             if (!itemPass) {
                 this.logger.verbose(`${FAIL} => Item did not pass 'itemIs' test`);
-                return [{
-                    ...runResult,
-                    triggered: false,
-                    itemIs: itemFilterResults
-                }, postBehavior];
+                runResultEnt.itemIs = itemFilterResults;
+                return [runResultEnt, postBehavior];
             } else if (this.itemIs.length > 0) {
+                runResultEnt.itemIs = itemFilterResults;
                 runResult.itemIs = itemFilterResults;
             }
 
             const [authFilterPass, authFilterType, authorFilterResult] = await checkAuthorFilter(activity, this.authorIs, this.resources, this.logger);
             if (!authFilterPass) {
-                return [{
-                    ...runResult,
-                    authorIs: authorFilterResult
-                }, postBehavior];
+                runResultEnt.authorIs = authorFilterResult;
+                return [runResultEnt, postBehavior];
             } else if (authFilterType !== undefined) {
+                runResultEnt.authorIs = authorFilterResult;
                 runResult.authorIs = authorFilterResult;
             }
 
@@ -191,16 +225,18 @@ export class Run {
                     check = checks[checkIndex];
                 }
 
-                if(existingRunResults.some(x => x.checkResults?.map(y => y.name).includes(check.name))) {
+                if(existingRunResults.some(x => x.checkResults?.map(y => y.check.name).includes(check.name))) {
                     throw new Error(`The check "${check.name}" has already been run once. This indicates a possible endless loop may occur so CM will terminate processing this activity to save you from yourself!`);
                 }
 
                 const checkSummary = await check.handle(activity, allRuleResults, options);
                 postBehavior = checkSummary.postBehavior;
 
-                allRuleResults = allRuleResults.concat(determineNewResults(allRuleResults, checkSummary.ruleResults));
+                allRuleResults = allRuleResults.concat(determineNewResults(allRuleResults, checkSummary.ruleResults ?? []));
 
-                runResult.checkResults.push(checkSummary);
+                runResultEnt.checkResults.push(checkSummary);
+
+                //runResult.checkResults.push(checkSummary);
 
                 switch (checkSummary.postBehavior.toLowerCase()) {
                     case 'next':
@@ -233,18 +269,22 @@ export class Run {
                         }
                 }
             }
+            runResultEnt.triggered = runResult.checkResults.some(x => x.triggered);
             runResult.triggered = runResult.checkResults.some(x => x.triggered);
-            return [runResult, postBehavior]
+            return [runResultEnt, postBehavior]
         } catch (err: any) {
             if(err instanceof CheckProcessingError && err.result !== undefined) {
-                runResult.checkResults.push(err.result);
+                runResultEnt.checkResults.push(err.result);
+                //runResult.checkResults.push(err.result);
             }
             if(runResult.error === undefined) {
+                runResultEnt.error = `Run failed due to uncaught exception: ${err.message}`;
                 runResult.error = `Run failed due to uncaught exception: ${err.message}`;
             }
+            runResultEnt.triggered = runResult.checkResults.some(x => x.triggered);
             runResult.triggered = runResult.checkResults.some(x => x.triggered);
 
-            throw new RunProcessingError(`[RUN ${this.name}] An uncaught exception occurred while processing Run`, {cause: err}, runResult);
+            throw new RunProcessingError(`[RUN ${this.name}] An uncaught exception occurred while processing Run`, {cause: err}, runResultEnt);
         }
     }
 }

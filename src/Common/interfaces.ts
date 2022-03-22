@@ -16,6 +16,7 @@ import {DailyRotateFileTransportOptions} from "winston-daily-rotate-file";
 import {DuplexTransportOptions} from "winston-duplex/dist/DuplexTransport";
 import {CommentCheckJson, SubmissionCheckJson} from "../Check";
 import {SafeDictionary} from "ts-essentials";
+import {RuleResultEntity} from "./Entities/RuleResultEntity";
 
 /**
  * An ISO 8601 Duration
@@ -2133,14 +2134,14 @@ export type FormattedRuleResult = RuleResult & {
 }
 
 export interface RuleSetResult {
-    results: RuleResult[],
+    results: RuleResultEntity[],
     condition: 'OR' | 'AND',
     triggered: boolean
 }
 
 export interface CheckResult {
     triggered: boolean
-    ruleResults: RuleResult[]
+    ruleResults: RuleResultEntity[]
     itemIs?: FilterResult<TypedActivityState>
     authorIs?: FilterResult<AuthorCriteria>
     fromCache?: boolean
@@ -2167,7 +2168,7 @@ export interface RunResult {
 
 export interface UserResultCache {
     result: boolean,
-    ruleResults: RuleResult[]
+    ruleResults: RuleResultEntity[]
 }
 
 export type RedditEntityType = 'user' | 'subreddit';

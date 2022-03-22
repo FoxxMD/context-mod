@@ -3,11 +3,12 @@ import Submission from "snoowrap/dist/objects/Submission";
 import {Logger} from "winston";
 import {findResultByPremise, mergeArr} from "../util";
 import {checkAuthorFilter, checkItemFilter, SubredditResources} from "../Subreddit/SubredditResources";
-import {ChecksActivityState, ObjectPremise, ResultContext, RuleResult, TypedActivityStates} from "../Common/interfaces";
+import {ChecksActivityState, ObjectPremise, ResultContext, RuleResult as IRuleResult, TypedActivityStates} from "../Common/interfaces";
 import Author, {AuthorOptions} from "../Author/Author";
 import {runCheckOptions} from "../Subreddit/Manager";
 import {Rule as RuleEntity} from "../Common/Entities/Rule";
 import objectHash from "object-hash";
+import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
 import {RuleType} from "../Common/Entities/RuleType";
 import {RulePremise} from "../Common/Entities/RulePremise";
 import {capitalize} from "lodash";
@@ -23,7 +24,7 @@ export interface RuleOptions {
 }
 
 export interface Triggerable {
-    run(item: Comment | Submission, existingResults: RuleResult[], options: runCheckOptions): Promise<[(boolean | null), RuleResult?]>;
+    run(item: Comment | Submission, existingResults: RuleResultEntity[], options: runCheckOptions): Promise<[(boolean | null), RuleResultEntity?]>;
 }
 
 export abstract class Rule implements IRule, Triggerable {
@@ -124,36 +125,54 @@ export abstract class Rule implements IRule, Triggerable {
         }
     }
 
-    async run(item: Comment | Submission, existingResults: RuleResult[] = [], options: runCheckOptions): Promise<[(boolean | null), RuleResult]> {
+    async run(item: Comment | Submission, existingResults: RuleResultEntity[] = [], options: runCheckOptions): Promise<[(boolean | null), RuleResultEntity]> {
+
+        const res = new RuleResultEntity({
+            premise: this.rulePremiseEntity as RulePremise
+        });
+
         try {
-            const existingResult = findResultByPremise(this.getPremise(), existingResults);
-            if (existingResult) {
+            const existingResult = findResultByPremise(this.rulePremiseEntity as RulePremise, existingResults);
+            if (existingResult !== undefined) {
                 this.logger.debug(`Returning existing result of ${existingResult.triggered ? '✔️' : '❌'}`);
-                return Promise.resolve([existingResult.triggered, {...existingResult, name: this.getRuleUniqueName(), fromCache: true}]);
+                return Promise.resolve([existingResult.triggered ?? null, existingResult]);
             }
             const [itemPass, itemFilterType, itemFilterResults] = await checkItemFilter(item, this.itemIs, this.resources, this.logger, options.source);
+            if(this.itemIs.length > 0) {
+                res.itemIs = itemFilterResults;
+            }
             if (!itemPass) {
                 this.logger.verbose(`(Skipped) Item did not pass 'itemIs' test`);
-                return Promise.resolve([null, this.getResult(null, {result: `Item did not pass 'itemIs' test`})]);
+                res.result = `Item did not pass 'itemIs' test`;
+                return Promise.resolve([null, res]);
             }
-            const [authFilterResult, authFilterType] = await checkAuthorFilter(item, this.authorIs, this.resources, this.logger);
+            const [authFilterResult, authFilterType, authFilterRes] = await checkAuthorFilter(item, this.authorIs, this.resources, this.logger);
+            if(authFilterType !== undefined) {
+                res.authorIs = authFilterRes;
+            }
             if(!authFilterResult) {
                 this.logger.verbose(`(Skipped) ${authFilterType} Author criteria not matched`);
-                return Promise.resolve([null, this.getResult(null, {result: `${authFilterType} author criteria not matched`})]);
+                res.result = `${authFilterType} author criteria not matched`;
+                return Promise.resolve([null, res]);
             }
         } catch (err: any) {
             this.logger.error('Error occurred during Rule pre-process checks');
             throw err;
         }
         try {
-            return this.process(item);
+            const [triggered, plainRuleResult] = await this.process(item);
+            res.triggered = triggered;
+            res.result = plainRuleResult.result;
+            res.fromCache = false;
+            res.data = plainRuleResult.data;
+            return [triggered, res];
         } catch (err: any) {
             this.logger.error('Error occurred while processing rule');
             throw err;
         }
     }
 
-    protected abstract process(item: Comment | Submission): Promise<[boolean, RuleResult]>;
+    protected abstract process(item: Comment | Submission): Promise<[boolean, IRuleResult]>;
 
     abstract getKind(): string;
 
@@ -175,7 +194,7 @@ export abstract class Rule implements IRule, Triggerable {
         };
     }
 
-    protected getResult(triggered: (boolean | null) = null, context: ResultContext = {}): RuleResult {
+    protected getResult(triggered: (boolean | null) = null, context: ResultContext = {}): IRuleResult {
         return {
             premise: this.getPremise(),
             kind: this.getKind(),

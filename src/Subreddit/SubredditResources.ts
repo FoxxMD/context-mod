@@ -7,6 +7,7 @@ import {
     AuthorTypedActivitiesOptions, BOT_LINK,
     getAuthorActivities
 } from "../Utils/SnoowrapUtils";
+import {map as mapAsync} from 'async';
 import winston, {Logger} from "winston";
 import as from 'async';
 import fetch from 'node-fetch';
@@ -82,18 +83,18 @@ import ImageData from "../Common/ImageData";
 import {Connection} from "typeorm";
 import {Activity} from "../Common/Entities/Activity";
 import {Subreddit as SubredditEntity} from "../Common/Entities/Subreddit";
-import {Author} from "../Common/Entities/Author";
+import {AuthorEntity} from "../Common/Entities/AuthorEntity";
 import {RulePremise} from "../Common/Entities/RulePremise";
 import {CMEvent as ActionedEventEntity } from "../Common/Entities/CMEvent";
-import {RuleResult} from "../Common/Entities/RuleResult";
-import {ActionResult} from "../Common/Entities/ActionResult";
+import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
+import {ActionResultEntity} from "../Common/Entities/ActionResultEntity";
 import globrex from 'globrex';
 import {runMigrations} from "../Common/Migrations/CacheMigrationUtils";
 import {isStatusError, SimpleError} from "../Utils/Errors";
 import {ErrorWithCause} from "pony-cause";
 import {UserNoteCriteria} from "../Rule";
 import {AuthorCritPropHelper, RequiredAuthorCrit} from "../Common/types";
-import {Manager} from "../Common/Entities/Manager";
+import {ManagerEntity} from "../Common/Entities/ManagerEntity";
 import {Bot} from "../Common/Entities/Bot";
 
 export const DEFAULT_FOOTER = '\r\n*****\r\nThis action was performed by [a bot.]({{botLink}}) Mention a moderator or [send a modmail]({{modmailLink}}) if you any ideas, questions, or concerns about this action.';
@@ -104,7 +105,7 @@ export interface SubredditResourceConfig extends Footer {
     logger: Logger;
     client: ExtendedSnoowrap
     credentials?: ThirdPartyCredentialsJsonConfig
-    managerEntity: Manager
+    managerEntity: ManagerEntity
     botEntity: Bot
 }
 
@@ -122,7 +123,7 @@ interface SubredditResourceOptions extends Footer {
     thirdPartyCredentials: ThirdPartyCredentialsJsonConfig
     delayedItems?: ActivityDispatch[]
     botName: string
-    managerEntity: Manager
+    managerEntity: ManagerEntity
     botEntity: Bot
 }
 
@@ -156,7 +157,7 @@ export class SubredditResources {
     actionedEventsMax: number;
     thirdPartyCredentials: ThirdPartyCredentialsJsonConfig;
     delayedItems: ActivityDispatch[] = [];
-    managerEntity: Manager
+    managerEntity: ManagerEntity
     botEntity: Bot
 
     stats: {
@@ -1994,9 +1995,15 @@ export class SubredditResources {
         }
         if(result === undefined) {
             this.stats.cache.commentCheck.miss++;
+            return result;
         }
         this.logger.debug(`Cache Hit: Comment Check for ${userName} in Submission ${item.link_id} (Hash ${hash})`);
-        return result;
+        const results = await mapAsync(result.ruleResults, async (x: RuleResultEntity) => await this.database.getRepository(RuleResultEntity).findOne({where: {id: x.id}}) as RuleResultEntity);
+        return {
+            result: result?.result,
+            ruleResults: results
+        };
+        //return result;
     }
 
     async setCommentCheckCacheResult(item: Comment, checkConfig: object, result: UserResultCache, ttl: number) {

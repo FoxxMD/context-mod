@@ -1,11 +1,13 @@
 import {Entity, Column, PrimaryColumn, OneToMany, PrimaryGeneratedColumn, ManyToOne, TableInheritance} from "typeorm";
 import {FilterCriteriaResult as IFilterCriteriaResult, JoinOperands} from "../../interfaces";
-import {FilterCriteria} from "./FilterCriteria";
-import {FilterCriteriaResult} from "./FilterCriteriaResult";
-import {RuleResult} from "../RuleResult";
+
+export interface FilterResultOptions {
+    passed: boolean
+    join: JoinOperands
+}
 
 @Entity()
-@TableInheritance({ column: { type: "varchar", name: "type" } })
+@TableInheritance({column: {type: "varchar", name: "type"}})
 export abstract class FilterResult<T> {
 
     @PrimaryGeneratedColumn()
@@ -19,4 +21,11 @@ export abstract class FilterResult<T> {
 
     @Column("boolean")
     passed!: boolean
+
+    constructor(data?: FilterResultOptions) {
+        if (data !== undefined) {
+            this.join = data.join;
+            this.passed = data.passed
+        }
+    }
 }

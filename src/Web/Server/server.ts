@@ -230,7 +230,7 @@ const rcbServer = async function (options: OperatorConfigWithFileContext) {
             await initBot();
         }
     } catch (e: any) {
-        logger.error('Error occurred during database connection or migration. Cannot continue with starting bots.');
+        logger.error(new ErrorWithCause('Error occurred during database connection or migration. Cannot continue with starting bots.', {cause: e}));
     }
 };
 

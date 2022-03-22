@@ -1,9 +1,7 @@
-import {Entity, Column, PrimaryGeneratedColumn, ManyToOne, OneToMany} from "typeorm";
+import {Entity, Column, PrimaryGeneratedColumn, ManyToOne, OneToMany, CreateDateColumn} from "typeorm";
 import {Activity} from "./Activity";
-import {RuleResult} from "./RuleResult";
-import {ActionResult} from "./ActionResult";
-import {Manager} from "./Manager";
-import {RunResult} from "./RunResult";
+import {ManagerEntity} from "./ManagerEntity";
+import {RunResultEntity} from "./RunResultEntity";
 
 @Entity()
 export class CMEvent {
@@ -11,18 +9,18 @@ export class CMEvent {
     @PrimaryGeneratedColumn("uuid")
     id!: string;
 
-    @Column("integer")
-    timestamp!: number;
+    @CreateDateColumn()
+    createdAt!: number;
 
     @Column("boolean")
     triggered!: boolean;
 
-    @ManyToOne(type => Manager, act => act.events, {cascade: ['insert']})
-    manager!: Activity;
+    @ManyToOne(type => ManagerEntity, act => act.events, {cascade: ['insert']})
+    manager!: ManagerEntity;
 
     @ManyToOne(type => Activity, act => act.actionedEvents, {cascade: ['insert']})
     activity!: Activity;
 
-    @OneToMany(type => RunResult, obj => obj.event, {cascade: ['insert']})
-    runResults!: RunResult[]
+    @OneToMany(type => RunResultEntity, obj => obj.event, {cascade: ['insert']})
+    runResults!: RunResultEntity[]
 }

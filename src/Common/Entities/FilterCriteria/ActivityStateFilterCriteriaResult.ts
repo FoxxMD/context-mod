@@ -1,8 +1,6 @@
 import {ChildEntity, ManyToOne} from "typeorm";
 import {FilterCriteriaResult} from "./FilterCriteriaResult";
-import {AuthorCriteria} from "../../../Author/Author";
-import {TypedActivityState} from "../../interfaces";
-import {AuthorFilterCriteria} from "./AuthorFilterCriteria";
+import {TypedActivityState, FilterCriteriaResult as IFilterCriteriaResult} from "../../interfaces";
 import {ActivityStateFilterCriteria} from "./ActivityStateFilterCriteria";
 
 @ChildEntity()
@@ -10,6 +8,13 @@ export class ActivityStateFilterCriteriaResult extends FilterCriteriaResult<Type
 
     type: string = 'activityState';
 
-    @ManyToOne(type => ActivityStateFilterCriteria)
+    @ManyToOne(type => ActivityStateFilterCriteria, {cascade: ['insert']})
     criteria!: ActivityStateFilterCriteria
+
+    constructor(data?: IFilterCriteriaResult<TypedActivityState>) {
+        super(data);
+        if(data !== undefined) {
+            this.criteria = new ActivityStateFilterCriteria({criteria: data.criteria});
+        }
+    }
 }

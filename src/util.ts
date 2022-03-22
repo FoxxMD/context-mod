@@ -79,6 +79,8 @@ import YamlConfigDocument from "./Common/Config/YamlConfigDocument";
 import AbstractConfigDocument, {ConfigDocumentInterface} from "./Common/Config/AbstractConfigDocument";
 import {AuthorOptions} from "./Author/Author";
 import merge from "deepmerge";
+import {RulePremise} from "./Common/Entities/RulePremise";
+import {RuleResultEntity as RuleResultEntity} from "./Common/Entities/RuleResultEntity";
 
 
 //import {ResembleSingleCallbackComparisonResult} from "resemblejs";
@@ -313,16 +315,14 @@ export function sleep(ms: number) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-export const findResultByPremise = (premise: ObjectPremise, results: RuleResult[]): (RuleResult | undefined) => {
+export const findResultByPremise = (premise: RulePremise, results: RuleResultEntity[]): (RuleResultEntity | undefined) => {
     if (results.length === 0) {
         return undefined;
     }
-    return results.find((x) => {
-        return deepEqual(premise, x.premise);
-    })
+    return results.find(x => x.premise.configHash === premise.configHash);
 }
 
-export const determineNewResults = (existing: RuleResult[], val: RuleResult | RuleResult[]): RuleResult[] => {
+export const determineNewResults = (existing: RuleResultEntity[], val: RuleResultEntity | RuleResultEntity[]): RuleResultEntity[] => {
     const requestedResults = Array.isArray(val) ? val : [val];
     const combined = [...existing];
     const newResults = [];
@@ -338,7 +338,7 @@ export const determineNewResults = (existing: RuleResult[], val: RuleResult | Ru
     // }
 
     for (const result of requestedResults) {
-        const relevantExisting = combined.filter(x => x.premise.kind === result.premise.kind).find(x => deepEqual(x.premise, result.premise));
+        const relevantExisting = combined.filter(x => x.premise.rule.kind.name === result.premise.rule.kind.name).find(x => x.premise.configHash === result.premise.configHash);
         if (relevantExisting === undefined) {
             combined.push(result);
             newResults.push(result);
@@ -394,13 +394,13 @@ export const isRuleSetResult = (obj: any): obj is RuleSetResult => {
     return typeof obj === 'object' && Array.isArray(obj.results) && obj.condition !== undefined && obj.triggered !== undefined;
 }
 
-export const resultsSummary = (results: (RuleResult|RuleSetResult)[], topLevelCondition: 'OR' | 'AND'): string => {
+export const resultsSummary = (results: (RuleResultEntity|RuleSetResult)[], topLevelCondition: 'OR' | 'AND'): string => {
     const parts: string[] = results.map((x) => {
         if(isRuleSetResult(x)) {
             return `${triggeredIndicator(x.triggered)} (${resultsSummary(x.results, x.condition)}${x.results.length === 1 ? ` [${x.condition}]` : ''})`;
         }
-        const res = x as RuleResult;
-        return `${triggeredIndicator(x.triggered)} ${res.name}`;
+        const res = x as RuleResultEntity;
+        return `${triggeredIndicator(res.triggered ?? null)} ${res.premise.rule.getFriendlyIdentifier()}`;
     });
     return parts.join(` ${topLevelCondition} `)
     //return results.map(x => x.name || x.premise.kind).join(' | ')
@@ -1817,9 +1817,14 @@ export function findLastIndex<T>(array: Array<T>, predicate: (value: T, index: n
     return -1;
 }
 
-export const parseRuleResultsToMarkdownSummary = (ruleResults: RuleResult[]): string => {
-    const results = ruleResults.map((y: any) => {
-        const {triggered, result, name, ...restY} = y;
+export const parseRuleResultsToMarkdownSummary = (ruleResults: RuleResultEntity[]): string => {
+    const results = ruleResults.map((y) => {
+        let name = y.premise.rule.name;
+        const kind = y.premise.rule.kind.name;
+        if(name === undefined) {
+            name = kind;
+        }
+        const {triggered, result, ...restY} = y;
         let t = triggeredIndicator(false);
         if(triggered === null) {
             t = 'Skipped';

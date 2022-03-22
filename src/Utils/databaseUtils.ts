@@ -9,6 +9,7 @@ import {Connection, createConnection} from "typeorm";
 import {getDatabaseLogger, getLogger} from "./loggerFactory";
 import {fileOrDirectoryIsWriteable} from "../util";
 import {Logger} from "winston";
+import {SnakeNamingStrategy} from "./SnakeCaseNamingStrategy";
 
 export const isDatabaseDriver = (val: any): val is DatabaseDriver => {
     if (typeof val !== 'string') {
@@ -87,6 +88,7 @@ export const createDatabaseConnection = async (rawConfig: DatabaseConfig, logger
         migrations: [`${resolve(__dirname, '../Common/Migrations')}/Database/*.js`],
         migrationsRun: false,
         logging: ['error','warn','migration'],
-        logger: getDatabaseLogger(logger, ['error','warn','migration', 'schema'])
+        logger: getDatabaseLogger(logger, ['error','warn','migration', 'schema']),
+        //namingStrategy: new SnakeNamingStrategy(),
     });
 }

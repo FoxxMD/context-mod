@@ -75,8 +75,14 @@ import {ErrorWithCause, stackWithCauses} from "pony-cause";
 import {Run} from "../Run";
 import got from "got";
 import {Bot as BotEntity} from "../Common/Entities/Bot";
-import {Manager as ManagerEntity} from "../Common/Entities/Manager";
+import {ManagerEntity as ManagerEntity} from "../Common/Entities/ManagerEntity";
 import {isRuleSet} from "../Rule/RuleSet";
+import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
+import {RunResultEntity} from "../Common/Entities/RunResultEntity";
+import {Repository} from "typeorm";
+import {Activity} from "../Common/Entities/Activity";
+import { AuthorEntity } from "../Common/Entities/AuthorEntity";
+import {CMEvent} from "../Common/Entities/CMEvent";
 
 export interface RunningState {
     state: RunState,
@@ -199,6 +205,10 @@ export class Manager extends EventEmitter {
     actionedEvents: ActionedEvent[] = [];
 
     processEmitter: EventEmitter = new EventEmitter();
+
+    activityRepo!: Repository<Activity>;
+    authorRepo!: Repository<AuthorEntity>
+    eventRepo!: Repository<CMEvent>;
 
     getStats = async (): Promise<ManagerStats> => {
         const data: any = {
@@ -623,7 +633,9 @@ export class Manager extends EventEmitter {
 
             // make sure all db related stuff gets initialized
             for (const r of this.runs) {
+                await r.initialize();
                 for (const c of r.submissionChecks) {
+                    await c.initialize();
                     for (const ru of c.rules) {
                         if (isRuleSet(ru)) {
                             for (const rule of ru.rules) {
@@ -638,6 +650,7 @@ export class Manager extends EventEmitter {
                     }
                 }
                 for (const c of r.commentChecks) {
+                    await c.initialize();
                     for (const ru of c.rules) {
                         if (isRuleSet(ru)) {
                             for (const rule of ru.rules) {
@@ -808,6 +821,20 @@ export class Manager extends EventEmitter {
             }
         }
 
+        let activityEntity: Activity;
+        const existingEntity = await this.activityRepo.findOneBy({id: itemId});
+        if(existingEntity === null) {
+            activityEntity = Activity.fromSnoowrapActivity(this.managerEntity.subreddit, activity);
+        } else {
+            activityEntity = existingEntity;
+        }
+
+        const event = new CMEvent();
+        event.triggered = false;
+        event.manager = this.managerEntity;
+        event.activity = activityEntity;
+        event.runResults = [];
+
         const {
             delayUntil,
             refresh = false,
@@ -815,8 +842,8 @@ export class Manager extends EventEmitter {
             dispatchSource,
         } = options;
 
-        let allRuleResults: RuleResult[] = [];
-        const runResults: RunResult[] = [];
+        let allRuleResults: RuleResultEntity[] = [];
+        const runResults: RunResultEntity[] = [];
         const itemIdentifiers = [];
         itemIdentifiers.push(`${checkType === 'Submission' ? 'SUB' : 'COM'} ${itemId}`);
         this.currentLabels = itemIdentifiers;
@@ -919,10 +946,10 @@ export class Manager extends EventEmitter {
                     currRun = this.runs[runIndex];
                 }
 
-                const [runResult, postBehavior] = await currRun.handle(item,allRuleResults, runResults.filter(x => x.name === currRun.name), {...options, gotoContext, maxGotoDepth: this.maxGotoDepth});
+                const [runResult, postBehavior] = await currRun.handle(item,allRuleResults, runResults.filter(x => x.run.name === currRun.name), {...options, gotoContext, maxGotoDepth: this.maxGotoDepth});
                 runResults.push(runResult);
 
-                allRuleResults = allRuleResults.concat(determineNewResults(allRuleResults, (runResult.checkResults ?? []).map(x => x.ruleResults).flat()));
+                allRuleResults = allRuleResults.concat(determineNewResults(allRuleResults, (runResult.checkResults ?? []).map(x => x.ruleResults ?? []).flat()));
 
                 switch (postBehavior.toLowerCase()) {
                     case 'next':
@@ -949,13 +976,17 @@ export class Manager extends EventEmitter {
             this.logger.error(processError);
             this.emit('error', err);
         } finally {
+            event.triggered = runResults.some(x => x.triggered);
             actionedEvent.triggered = runResults.some(x => x.triggered);
+            event.runResults = runResults;
             if(!actionedEvent.triggered) {
                 this.logger.verbose('No checks triggered');
             }
+            await this.eventRepo.save(event);
             try {
                 //actionedEvent.actionResults = runActions;
-                actionedEvent.runResults = runResults;
+                event.runResults = runResults;
+                //actionedEvent.runResults = runResults;
                 if(actionedEvent.triggered) {
                     // only get parent submission info if we are actually going to use this event
                     if(checkType === 'Comment') {
@@ -1184,6 +1215,17 @@ export class Manager extends EventEmitter {
     }
 
     startQueue(causedBy: Invokee = 'system', options?: ManagerStateChangeOption) {
+
+        if(this.activityRepo === undefined) {
+            this.activityRepo = this.resources.database.getRepository(Activity);
+        }
+        if(this.authorRepo === undefined) {
+            this.authorRepo = this.resources.database.getRepository(AuthorEntity);
+        }
+        if(this.eventRepo === undefined) {
+            this.eventRepo = this.resources.database.getRepository(CMEvent);
+        }
+
         const {reason, suppressNotification = false} = options || {};
         if(this.queueState.state === RUNNING) {
             this.logger.info(`Activity processing queue is already RUNNING with (${this.queue.length()} queued activities)`);

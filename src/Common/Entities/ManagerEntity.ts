@@ -1,12 +1,12 @@
 import {Entity, Column, PrimaryColumn, OneToMany, PrimaryGeneratedColumn, ManyToOne} from "typeorm";
 import {Activity} from "./Activity";
 import {Subreddit} from "./Subreddit";
-import {RuleResult} from "./RuleResult";
+import {RuleResultEntity} from "./RuleResultEntity";
 import {CMEvent} from "./CMEvent";
 import {Rule} from "./Rule";
 import {Action} from "./Action";
-import {Check} from "./Check";
-import {Run} from "./Run";
+import {CheckEntity} from "./CheckEntity";
+import {RunEntity} from "./RunEntity";
 import {Bot} from "./Bot";
 
 export interface ManagerEntityOptions {
@@ -15,8 +15,8 @@ export interface ManagerEntityOptions {
     subreddit: Subreddit
 }
 
-@Entity()
-export class Manager {
+@Entity({name: 'Manager'})
+export class ManagerEntity {
 
     @PrimaryGeneratedColumn()
     id!: string;
@@ -39,11 +39,11 @@ export class Manager {
     @OneToMany(type => Action, obj => obj.manager)
     actions!: Promise<Action[]>
 
-    @OneToMany(type => Check, obj => obj.manager) // note: we will create author property in the Photo class below
-    checks!: Promise<Check[]>
+    @OneToMany(type => CheckEntity, obj => obj.manager) // note: we will create author property in the Photo class below
+    checks!: Promise<CheckEntity[]>
 
-    @OneToMany(type => Run, obj => obj.manager) // note: we will create author property in the Photo class below
-    runs!: Promise<Run[]>
+    @OneToMany(type => RunEntity, obj => obj.manager) // note: we will create author property in the Photo class below
+    runs!: Promise<RunEntity[]>
 
     constructor(data?: ManagerEntityOptions) {
         if (data !== undefined) {

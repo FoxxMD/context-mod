@@ -5,6 +5,7 @@ import {ActionProcessResult, ActionTarget, RuleResult} from "../Common/interface
 import Submission from "snoowrap/dist/objects/Submission";
 import Comment from "snoowrap/dist/objects/Comment";
 import {ActionTypes} from "../Common/types";
+import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
 
 export class ApproveAction extends Action {
 
@@ -23,7 +24,7 @@ export class ApproveAction extends Action {
         this.targets = targets;
     }
 
-    async process(item: Comment | Submission, ruleResults: RuleResult[], runtimeDryrun?: boolean): Promise<ActionProcessResult> {
+    async process(item: Comment | Submission, ruleResults: RuleResultEntity[], runtimeDryrun?: boolean): Promise<ActionProcessResult> {
         const dryRun = runtimeDryrun || this.dryRun;
         const touchedEntities = [];
 

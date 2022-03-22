@@ -10,10 +10,5 @@
    "migrations": [
       "src/Common/Migrations/Database/**/*.js"
    ],
-   "subscribers": [],
-   "cli": {
-      "entitiesDir": "src/Common/Entities",
-      "migrationsDir": "src/Common/Migrations/Database",
-      "subscribersDir": "src/Common/Subscriptions"
-   }
+   "subscribers": []
 }

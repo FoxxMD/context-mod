@@ -80,7 +80,7 @@ const actionedEvents = async (req: Request, res: Response) => {
         }
     }
 
-    events.sort((a, b) => b.timestamp - a.timestamp);
+    events.sort((a, b) => b.createdAt - a.createdAt);
 
     return res.json(events);
 };

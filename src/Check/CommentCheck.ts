@@ -1,5 +1,5 @@
 import {Check, CheckOptions, userResultCacheDefault, UserResultCacheOptions} from "./index";
-import {CommentState, RuleResult, UserResultCache} from "../Common/interfaces";
+import {ActivityType, CommentState, RuleResult, UserResultCache} from "../Common/interfaces";
 import {Submission, Comment} from "snoowrap/dist/objects";
 
 export interface CommentCheckOptions extends CheckOptions {
@@ -8,6 +8,7 @@ export interface CommentCheckOptions extends CheckOptions {
 
 export class CommentCheck extends Check {
     itemIs: CommentState[];
+    checkType = 'comment' as ActivityType;
 
     constructor(options: CommentCheckOptions) {
         super(options);
@@ -17,10 +18,6 @@ export class CommentCheck extends Check {
 
         this.itemIs = itemIs;
         this.logSummary();
-    }
-
-    logSummary() {
-        super.logSummary('comment');
     }
 
     async getCacheResult(item: Submission | Comment): Promise<UserResultCache | undefined> {

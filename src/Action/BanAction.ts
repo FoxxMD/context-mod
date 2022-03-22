@@ -4,6 +4,7 @@ import Snoowrap, {Comment, Submission} from "snoowrap";
 import {renderContent} from "../Utils/SnoowrapUtils";
 import {ActionProcessResult, Footer, RuleResult} from "../Common/interfaces";
 import {ActionTypes} from "../Common/types";
+import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
 
 export class BanAction extends Action {
 
@@ -33,7 +34,7 @@ export class BanAction extends Action {
         return 'ban';
     }
 
-    async process(item: Comment | Submission, ruleResults: RuleResult[], runtimeDryrun?: boolean): Promise<ActionProcessResult> {
+    async process(item: Comment | Submission, ruleResults: RuleResultEntity[], runtimeDryrun?: boolean): Promise<ActionProcessResult> {
         const dryRun = runtimeDryrun || this.dryRun;
         const content = this.message === undefined ? undefined : await this.resources.getContent(this.message, item.subreddit);
         const renderedBody = content === undefined ? undefined : await renderContent(content, item, ruleResults, this.resources.userNotes);

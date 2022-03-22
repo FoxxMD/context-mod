@@ -9,7 +9,7 @@ import {
     PrimaryColumn,
     CreateDateColumn, UpdateDateColumn
 } from "typeorm";
-import {RuleResult} from "./RuleResult";
+import {RuleResultEntity} from "./RuleResultEntity";
 import {Rule} from "./Rule";
 import {ObjectPremise} from "../interfaces";
 import objectHash from "object-hash";
@@ -39,8 +39,8 @@ export class RulePremise  {
     @Column("simple-json")
     config!: ObjectPremise
 
-    @OneToMany(type => RuleResult, obj => obj.premise) // note: we will create author property in the Photo class below
-    ruleResults!: RuleResult[]
+    @OneToMany(type => RuleResultEntity, obj => obj.premise) // note: we will create author property in the Photo class below
+    ruleResults!: RuleResultEntity[]
 
     @VersionColumn()
     version!: number;

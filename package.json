@@ -17,7 +17,8 @@
     "circular": "madge --circular --extensions ts src/index.ts",
     "circular-graph": "madge --image graph.svg --circular --extensions ts src/index.ts",
     "postinstall": "patch-package",
-    "typeorm": "node --require ts-node/register ./node_modules/typeorm/cli.js"
+    "typeorm": "node --require ts-node/register ./node_modules/typeorm/cli.js",
+    "initMigration": "npm run typeorm -- migration:generate -t 1642180264563 -d ormconfig.js \"src/Common/Migrations/Database/init\""
   },
   "engines": {
     "node": ">=15"

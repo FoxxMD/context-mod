@@ -22,6 +22,7 @@ import objectHash from "object-hash";
 import {RuleType} from "../Common/Entities/RuleType";
 import {ActionType} from "../Common/Entities/ActionType";
 import { capitalize } from "lodash";
+import { RuleResultEntity } from "../Common/Entities/RuleResultEntity";
 
 export abstract class Action {
     name?: string;
@@ -150,7 +151,7 @@ export abstract class Action {
         }
     }
 
-    async handle(item: Comment | Submission, ruleResults: RuleResult[], options: runCheckOptions): Promise<ActionResult> {
+    async handle(item: Comment | Submission, ruleResults: RuleResultEntity[], options: runCheckOptions): Promise<ActionResult> {
         const {dryRun: runtimeDryrun} = options;
         const dryRun = runtimeDryrun || this.dryRun;
 
@@ -197,7 +198,7 @@ export abstract class Action {
         }
     }
 
-    abstract process(item: Comment | Submission, ruleResults: RuleResult[], runtimeDryun?: boolean): Promise<ActionProcessResult>;
+    abstract process(item: Comment | Submission, ruleResults: RuleResultEntity[], runtimeDryun?: boolean): Promise<ActionProcessResult>;
 }
 
 export interface ActionOptions extends ActionConfig {

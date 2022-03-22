@@ -1,19 +1,14 @@
 import {Entity, Column, PrimaryGeneratedColumn, OneToMany, ManyToOne, PrimaryColumn} from "typeorm";
 import {ActionType} from "./ActionType";
-import {Manager} from "./Manager";
-import {Activity} from "./Activity";
-import {RuleResult} from "./RuleResult";
-import {ActionResult} from "./ActionResult";
+import {ManagerEntity} from "./ManagerEntity";
 import objectHash from "object-hash";
-import {RuleEntityOptions} from "./Rule";
 import {ObjectPremise} from "../interfaces";
-import {RuleType} from "./RuleType";
 
 export interface ActionEntityOptions {
     name?: string
     premise: ObjectPremise
     kind?: ActionType
-    manager?: Manager
+    manager?: ManagerEntity
 }
 
 @Entity()
@@ -28,8 +23,8 @@ export class Action  {
     @ManyToOne(() => ActionType, undefined,{cascade: ['insert'], eager: true})
     kind!: ActionType;
 
-    @ManyToOne(type => Manager, act => act.actions, {cascade: ['insert']})
-    manager!: Manager;
+    @ManyToOne(type => ManagerEntity, act => act.actions, {cascade: ['insert']})
+    manager!: ManagerEntity;
 
     constructor(data?: ActionEntityOptions) {
         if (data !== undefined) {

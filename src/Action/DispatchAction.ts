@@ -6,6 +6,7 @@ import {ActionProcessResult, ActionTarget, ActivityDispatchConfig, RuleResult} f
 import dayjs from "dayjs";
 import {isSubmission, parseDurationValToDuration, randomId} from "../util";
 import {ActionTypes} from "../Common/types";
+import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
 
 export class DispatchAction extends Action {
     dispatchData: ActivityDispatchConfig;
@@ -33,7 +34,7 @@ export class DispatchAction extends Action {
         this.targets = !Array.isArray(target) ? [target] : target;
     }
 
-    async process(item: Comment | Submission, ruleResults: RuleResult[], runtimeDryrun?: boolean): Promise<ActionProcessResult> {
+    async process(item: Comment | Submission, ruleResults: RuleResultEntity[], runtimeDryrun?: boolean): Promise<ActionProcessResult> {
         const dryRun = runtimeDryrun || this.dryRun;
 
         const realTargets = isSubmission(item) ? ['self'] : this.targets;

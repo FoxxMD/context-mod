@@ -14,6 +14,7 @@ import {
 import {SimpleError} from "../Utils/Errors";
 import {ErrorWithCause} from "pony-cause";
 import {ActionTypes} from "../Common/types";
+import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
 
 export class MessageAction extends Action {
     content: string;
@@ -46,7 +47,7 @@ export class MessageAction extends Action {
         return 'message';
     }
 
-    async process(item: Comment | Submission, ruleResults: RuleResult[], runtimeDryrun?: boolean): Promise<ActionProcessResult> {
+    async process(item: Comment | Submission, ruleResults: RuleResultEntity[], runtimeDryrun?: boolean): Promise<ActionProcessResult> {
         const dryRun = runtimeDryrun || this.dryRun;
         const content = await this.resources.getContent(this.content);
         const body = await renderContent(content, item, ruleResults, this.resources.userNotes);

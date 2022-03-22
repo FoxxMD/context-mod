@@ -18,9 +18,9 @@ import {
 import {
     ActionResult, ActivityType, CheckResult,
     ChecksActivityState, CheckSummary,
-    CommentState, JoinCondition,
+    CommentState, FilterResult, JoinCondition,
     JoinOperands, NotificationEventPayload, PostBehavior, PostBehaviorTypes, RuleResult, RuleSetResult,
-    SubmissionState,
+    SubmissionState, TypedActivityState,
     TypedActivityStates, UserResultCache
 } from "../Common/interfaces";
 import * as RuleSchema from '../Schema/Rule.json';
@@ -35,6 +35,10 @@ import {ErrorWithCause, stackWithCauses} from "pony-cause";
 import {runCheckOptions} from "../Subreddit/Manager";
 import EventEmitter from "events";
 import {itemContentPeek} from "../Utils/SnoowrapUtils";
+import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
+import {CheckResultEntity} from "../Common/Entities/CheckResultEntity";
+import {CheckEntity} from "../Common/Entities/CheckEntity";
+import {RunEntity} from "../Common/Entities/RunEntity";
 
 const checkLogName = truncateStringToLength(25);
 
@@ -56,6 +60,10 @@ export abstract class Check implements ICheck {
     postTrigger: PostBehaviorTypes;
     postFail: PostBehaviorTypes;
     emitter: EventEmitter;
+    runEntity!: RunEntity;
+    checkEntity!: CheckEntity;
+
+    abstract checkType: ActivityType;
 
     constructor(options: CheckOptions) {
         const {
@@ -157,7 +165,7 @@ export abstract class Check implements ICheck {
         }
     }
 
-    logSummary(type: string) {
+    logSummary() {
         const runStats = [];
         const ruleSetCount = this.rules.reduce((x, r) => r instanceof RuleSet ? x + 1 : x, 0);
         const rulesInSetsCount = this.rules.reduce((x, r) => r instanceof RuleSet ? x + r.rules.length : x, 0);
@@ -170,7 +178,7 @@ export abstract class Check implements ICheck {
         }
         runStats.push(`${this.actions.length} Actions`);
         // not sure if this should be info or verbose
-        this.logger.info(`=${this.enabled ? 'Enabled' : 'Disabled'}= ${type.toUpperCase()} (${this.condition})${this.notifyOnTrigger ? ' ||Notify on Trigger|| ' : ''} => ${runStats.join(' | ')}${this.description !== undefined ? ` => ${this.description}` : ''}`);
+        this.logger.info(`=${this.enabled ? 'Enabled' : 'Disabled'}= ${this.checkType.toUpperCase()} (${this.condition})${this.notifyOnTrigger ? ' ||Notify on Trigger|| ' : ''} => ${runStats.join(' | ')}${this.description !== undefined ? ` => ${this.description}` : ''}`);
         if (this.rules.length === 0 && this.itemIs.length === 0 && this.authorIs.exclude?.length === 0 && this.authorIs.include?.length === 0) {
             this.logger.warn('No rules, item tests, or author test found -- this check will ALWAYS PASS!');
         }
@@ -197,7 +205,37 @@ export abstract class Check implements ICheck {
     async setCacheResult(item: Submission | Comment, result: UserResultCache): Promise<void> {
     }
 
-    async handle(activity: (Submission | Comment), allRuleResults: RuleResult[], options: runCheckOptions): Promise<CheckSummary> {
+    async initialize() {
+        if (this.checkEntity === undefined) {
+            const checkRepo = this.resources.database.getRepository(CheckEntity);
+            const ce = await checkRepo.findOne({
+                where: {
+                    name: this.name,
+                    run: {
+                        name: this.runEntity.name,
+                    },
+                    manager: {
+                        id: this.resources.managerEntity.id,
+                    }
+                }, relations: {
+                    manager: true,
+                    run: true
+                }
+            });
+            if (ce !== null) {
+                this.checkEntity = ce;
+            } else {
+                this.checkEntity = await checkRepo.save(new CheckEntity({
+                    name: this.name,
+                    type: this.checkType,
+                    run: this.runEntity,
+                    manager: this.resources.managerEntity
+                }));
+            }
+        }
+    }
+
+    async handle(activity: (Submission | Comment), allRuleResults: RuleResultEntity[], options: runCheckOptions): Promise<CheckResultEntity> {
 
         let checkSum: CheckSummary = {
             name: this.name,
@@ -210,13 +248,22 @@ export abstract class Check implements ICheck {
             condition: this.condition
         }
 
-        let currentResults: RuleResult[] = [];
+        let checkResult = new CheckResultEntity();
+        checkResult.condition = this.condition;
+        checkResult.check = this.checkEntity;
+        checkResult.postBehavior = this.postFail;
+        checkResult.ruleResults = [];
+        checkResult.actionResults = [];
+        checkResult.triggered = false;
+
+        let currentResults: RuleResultEntity[] = [];
 
         try {
             if (!this.enabled) {
+                checkResult.error = 'Not enabled';
                 checkSum.error = 'Not enabled';
                 this.logger.info(`Not enabled, skipping...`);
-                return checkSum;
+                return checkResult;
             }
             //checksRunNames.push(check.name);
             //checksRun++;
@@ -224,46 +271,81 @@ export abstract class Check implements ICheck {
             let runActions: ActionResult[] = [];
             let checkRes: CheckResult;
             let checkError: string | undefined;
-            try {
-                checkRes = await this.runRules(activity, allRuleResults, options);
+            let cacheResult: UserResultCache | undefined;
 
+            try {
+                cacheResult = await this.getCacheResult(activity);
+            } catch (err) {
+                this.logger.warn(new ErrorWithCause('Error occurred while trying to retrieve check cache result. Will ignore and run full check', {cause: err}));
+            }
+
+            if(cacheResult !== undefined) {
+                this.logger.verbose(`Skipping rules run because result was found in cache, Check Triggered Result: ${cacheResult}`);
                 checkSum = {
                     ...checkSum,
-                    ...checkRes,
+                    triggered: cacheResult.result,
+                    ruleResults: cacheResult.ruleResults,
+                    fromCache: true
                 }
-                const {
-                    triggered: checkTriggered,
-                    ruleResults: checkResults,
-                    fromCache = false
-                } = checkRes;
-                //isFromCache = fromCache;
-                if (!fromCache) {
-                    await this.setCacheResult(activity, {result: checkTriggered, ruleResults: checkResults});
-                } else {
-                    checkRes.fromCache = true;
-                    //cachedCheckNames.push(check.name);
-                }
-                currentResults = checkResults;
-                //totalRulesRun += checkResults.length;
-                // allRuleResults = allRuleResults.concat(determineNewResults(allRuleResults, checkResults));
-                if (triggered && fromCache && !this.cacheUserResult.runActions) {
-                    this.logger.info('Check was triggered but cache result options specified NOT to run actions...counting as check NOT triggered');
+            } else {
+                checkResult.fromCache = false;
+                const filterResults = await this.runFilters(activity, options);
+                const [itemRes, authorRes] = filterResults;
+                checkResult.itemIs = itemRes;
+                checkResult.authorIs = authorRes;
+
+                const filtersPassed = filterResults.every(x => x === undefined || x.passed);
+                if(!filtersPassed) {
+                    checkResult.triggered = false;
                     checkSum.triggered = false;
-                    triggered = false;
+                } else {
+                    try {
+                        checkRes = await this.runRules(activity, allRuleResults, options);
+
+                        checkSum = {
+                            ...checkSum,
+                            ...checkRes,
+                        }
+                        const {
+                            triggered: checkTriggered,
+                            ruleResults: checkResults,
+                            fromCache = false
+                        } = checkRes;
+
+                        checkResult.triggered = checkTriggered;
+                        checkResult.ruleResults = checkResults;
+                        //isFromCache = fromCache;
+                        if (!fromCache) {
+                            await this.setCacheResult(activity, {result: checkTriggered, ruleResults: checkResults});
+                        } else {
+                            checkRes.fromCache = true;
+                            //cachedCheckNames.push(check.name);
+                        }
+                        currentResults = checkResults;
+                        //totalRulesRun += checkResults.length;
+                        // allRuleResults = allRuleResults.concat(determineNewResults(allRuleResults, checkResults));
+                        if (triggered && fromCache && !this.cacheUserResult.runActions) {
+                            this.logger.info('Check was triggered but cache result options specified NOT to run actions...counting as check NOT triggered');
+                            checkSum.triggered = false;
+                            triggered = false;
+                        }
+                    } catch (err: any) {
+                        checkResult.error = `Running rules failed due to uncaught exception: ${err.message}`;
+                        checkSum.error = `Running rules failed due to uncaught exception: ${err.message}`;
+                        const chkLogError = new ErrorWithCause(`[CHK ${this.name}] Running rules failed due to uncaught exception`, {cause: err});
+                        if (err.logged !== true) {
+                            this.logger.warn(chkLogError);
+                        }
+                        this.emitter.emit('error', chkLogError);
+                    }
                 }
-            } catch (err: any) {
-                checkSum.error = `Running rules failed due to uncaught exception: ${err.message}`;
-                const chkLogError = new ErrorWithCause(`[CHK ${this.name}] Running rules failed due to uncaught exception`, {cause: err});
-                if (err.logged !== true) {
-                    this.logger.warn(chkLogError);
-                }
-                this.emitter.emit('error', chkLogError);
             }
 
             let behaviorT: string;
 
             if (checkSum.triggered) {
                 try {
+                    checkResult.postBehavior = this.postTrigger;
                     checkSum.postBehavior = this.postTrigger;
 
                     checkSum.actionResults = await this.runActions(activity, currentResults.filter(x => x.triggered), options);
@@ -293,6 +375,7 @@ export abstract class Check implements ICheck {
                     }
                 }
             } else {
+                checkResult.postBehavior = this.postFail;
                 checkSum.postBehavior = this.postFail;
             }
 
@@ -316,29 +399,50 @@ export abstract class Check implements ICheck {
                         throw new Error(`Post ${behaviorT} Behavior "${checkSum.postBehavior}" was not a valid value. Must be one of => next | nextRun | stop | goto:[path]`);
                     }
             }
-            return checkSum;
+            return checkResult;
+            //return checkSum;
         } catch (err: any) {
             if(checkSum.error === undefined) {
+                checkResult.error = stackWithCauses(err);
                 checkSum.error = stackWithCauses(err);
             }
-            throw new CheckProcessingError(`[CHK ${this.name}] An uncaught exception occurred while processing Check`, {cause: err}, checkSum);
+            throw new CheckProcessingError(`[CHK ${this.name}] An uncaught exception occurred while processing Check`, {cause: err}, checkResult);
         } finally {
-            this.resources.updateHistoricalStats({
-                checksTriggered: checkSum.triggered ? [checkSum.name] : [],
-                checksRun: [checkSum.name],
-                checksFromCache: checkSum.fromCache ? [checkSum.name] : [],
-                actionsRun: checkSum.actionResults.map(x => x.name),
-                rulesRun: checkSum.ruleResults.map(x => x.name),
-                rulesTriggered: checkSum.ruleResults.filter(x => x.triggered).map(x => x.name),
-                rulesCachedTotal: checkSum.ruleResults.filter(x => x.fromCache).length
-            })
+            // this.resources.updateHistoricalStats({
+            //     checksTriggered: checkSum.triggered ? [checkSum.name] : [],
+            //     checksRun: [checkSum.name],
+            //     checksFromCache: checkSum.fromCache ? [checkSum.name] : [],
+            //     actionsRun: checkSum.actionResults.map(x => x.name),
+            //     rulesRun: checkSum.ruleResults.map(x => x.name),
+            //     rulesTriggered: checkSum.ruleResults.filter(x => x.triggered).map(x => x.name),
+            //     rulesCachedTotal: checkSum.ruleResults.filter(x => x.fromCache).length
+            // })
         }
     }
 
-    async runRules(item: Submission | Comment, existingResults: RuleResult[] = [], options: runCheckOptions): Promise<CheckResult> {
+    async runFilters(activity: (Submission | Comment), options: runCheckOptions): Promise<[(FilterResult<TypedActivityState> | undefined), (FilterResult<AuthorCriteria> | undefined)]> {
+        let itemRes: (FilterResult<TypedActivityState> | undefined);
+        let authorRes: (FilterResult<AuthorCriteria> | undefined);
+
+        const [itemPass, itemFilterType, itemFilterResults] = await checkItemFilter(activity, this.itemIs, this.resources, this.logger, options.source);
+        if (!itemPass) {
+            return [itemFilterResults, undefined];
+        } else if(this.itemIs.length > 0) {
+            itemRes = itemFilterResults;
+        }
+        const [authPass, authFilterType, authorFilterResults] = await checkAuthorFilter(activity, this.authorIs, this.resources, this.logger);
+        if(!authPass) {
+            return [itemRes, authorFilterResults];
+        } else if(authFilterType !== undefined) {
+            authorRes = authorFilterResults;
+        }
+        return [itemRes, authorRes];
+    }
+
+    async runRules(item: Submission | Comment, existingResults: RuleResultEntity[] = [], options: runCheckOptions): Promise<CheckResult> {
         try {
-            let allRuleResults: RuleResult[] = [];
-            let allResults: (RuleResult | RuleSetResult)[] = [];
+            let allRuleResults: RuleResultEntity[] = [];
+            let allResults: (RuleSetResult | RuleResultEntity)[] = [];
 
             const checkResult: CheckResult = {
                 triggered: false,
@@ -346,36 +450,36 @@ export abstract class Check implements ICheck {
             }
 
             // check cache results
-            const cacheResult = await this.getCacheResult(item);
-            if(cacheResult !== undefined) {
-                this.logger.verbose(`Skipping rules run because result was found in cache, Check Triggered Result: ${cacheResult}`);
-                return {
-                    triggered: cacheResult.result,
-                    ruleResults: cacheResult.ruleResults,
-                    fromCache: true
-                };
-            }
-
-            const [itemPass, itemFilterType, itemFilterResults] = await checkItemFilter(item, this.itemIs, this.resources, this.logger, options.source);
-            if (!itemPass) {
-                return {
-                    triggered: false,
-                    ruleResults: allRuleResults,
-                    itemIs: itemFilterResults
-                };
-            } else if(this.itemIs.length > 0) {
-                checkResult.itemIs = itemFilterResults;
-            }
-            const [authPass, authFilterType, authorFilterResults] = await checkAuthorFilter(item, this.authorIs, this.resources, this.logger);
-            if(!authPass) {
-                return {
-                    triggered: false,
-                    ruleResults: allRuleResults,
-                    authorIs: authorFilterResults
-                };
-            } else if(authFilterType !== undefined) {
-                checkResult.authorIs = authorFilterResults;
-            }
+            // const cacheResult = await this.getCacheResult(item);
+            // if(cacheResult !== undefined) {
+            //     this.logger.verbose(`Skipping rules run because result was found in cache, Check Triggered Result: ${cacheResult}`);
+            //     return {
+            //         triggered: cacheResult.result,
+            //         ruleResults: cacheResult.ruleResults,
+            //         fromCache: true
+            //     };
+            // }
+            //
+            // const [itemPass, itemFilterType, itemFilterResults] = await checkItemFilter(item, this.itemIs, this.resources, this.logger, options.source);
+            // if (!itemPass) {
+            //     return {
+            //         triggered: false,
+            //         ruleResults: allRuleResults,
+            //         itemIs: itemFilterResults
+            //     };
+            // } else if(this.itemIs.length > 0) {
+            //     checkResult.itemIs = itemFilterResults;
+            // }
+            // const [authPass, authFilterType, authorFilterResults] = await checkAuthorFilter(item, this.authorIs, this.resources, this.logger);
+            // if(!authPass) {
+            //     return {
+            //         triggered: false,
+            //         ruleResults: allRuleResults,
+            //         authorIs: authorFilterResults
+            //     };
+            // } else if(authFilterType !== undefined) {
+            //     checkResult.authorIs = authorFilterResults;
+            // }
 
             if (this.rules.length === 0) {
                 this.logger.info(`${PASS} => No rules to run, check auto-passes`);
@@ -393,7 +497,7 @@ export abstract class Check implements ICheck {
                 if (isRuleSetResult(results)) {
                     allRuleResults = allRuleResults.concat(results.results);
                 } else {
-                    allRuleResults = allRuleResults.concat(results as RuleResult);
+                    allRuleResults.push(results);
                 }
                 allResults.push(results);
                 if (passed === null) {
@@ -441,7 +545,7 @@ export abstract class Check implements ICheck {
         }
     }
 
-    async runActions(item: Submission | Comment, ruleResults: RuleResult[], options: runCheckOptions): Promise<ActionResult[]> {
+    async runActions(item: Submission | Comment, ruleResults: RuleResultEntity[], options: runCheckOptions): Promise<ActionResult[]> {
         const {dryRun} = options;
         const dr = dryRun || this.dryRun;
         this.logger.debug(`${dr ? 'DRYRUN - ' : ''}Running Actions`);

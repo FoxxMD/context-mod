@@ -5,6 +5,7 @@ import {renderContent} from "../Utils/SnoowrapUtils";
 import {ActionProcessResult, Footer, RequiredRichContent, RichContent, RuleResult} from "../Common/interfaces";
 import {truncateStringToLength} from "../util";
 import {ActionTypes} from "../Common/types";
+import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
 
 export class CommentAction extends Action {
     content: string;
@@ -33,7 +34,7 @@ export class CommentAction extends Action {
         return 'comment';
     }
 
-    async process(item: Comment | Submission, ruleResults: RuleResult[], runtimeDryrun?: boolean): Promise<ActionProcessResult> {
+    async process(item: Comment | Submission, ruleResults: RuleResultEntity[], runtimeDryrun?: boolean): Promise<ActionProcessResult> {
         const dryRun = runtimeDryrun || this.dryRun;
         const content = await this.resources.getContent(this.content, item.subreddit);
         const body = await renderContent(content, item, ruleResults, this.resources.userNotes);

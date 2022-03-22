@@ -6,6 +6,7 @@ import {UserNote, UserNoteJson} from "../Subreddit/UserNotes";
 import Submission from "snoowrap/dist/objects/Submission";
 import {ActionProcessResult, RuleResult} from "../Common/interfaces";
 import {ActionTypes} from "../Common/types";
+import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
 
 
 export class UserNoteAction extends Action {
@@ -25,7 +26,7 @@ export class UserNoteAction extends Action {
         return 'usernote';
     }
 
-    async process(item: Comment | Submission, ruleResults: RuleResult[], runtimeDryrun?: boolean): Promise<ActionProcessResult> {
+    async process(item: Comment | Submission, ruleResults: RuleResultEntity[], runtimeDryrun?: boolean): Promise<ActionProcessResult> {
         const dryRun = runtimeDryrun || this.dryRun;
         const content = await this.resources.getContent(this.content, item.subreddit);
         const renderedContent = await renderContent(content, item, ruleResults, this.resources.userNotes);

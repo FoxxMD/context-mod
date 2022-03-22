@@ -34,6 +34,7 @@ import {AuthorCriteria} from "../Author/Author";
 import {URL} from "url";
 import {SimpleError, isStatusError} from "./Errors";
 import {Dictionary, ElementOf, SafeDictionary} from "ts-essentials";
+import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
 
 export const BOT_LINK = 'https://www.reddit.com/r/ContextModBot/comments/otz396/introduction_to_contextmodbot';
 
@@ -251,7 +252,7 @@ export const getAuthorSubmissions = async (user: RedditUser, options: AuthorActi
     return await getAuthorActivities(user, {...options, type: 'submission'}) as unknown as Promise<Submission[]>;
 }
 
-export const renderContent = async (template: string, data: (Submission | Comment), ruleResults: RuleResult[] = [], usernotes: UserNotes) => {
+export const renderContent = async (template: string, data: (Submission | Comment), ruleResults: RuleResultEntity[] = [], usernotes: UserNotes) => {
     const templateData: any = {
         kind: data instanceof Submission ? 'submission' : 'comment',
         author: await data.author.name,
@@ -317,13 +318,19 @@ export const renderContent = async (template: string, data: (Submission | Commen
     // NOTE: we are relying on users to use unique names for rules. If they don't only the last rule run of kind X will have its results here
     const normalizedRuleResults = ruleResults.reduce((acc: object, ruleResult) => {
         const {
-            name, triggered,
+            //name,
+            triggered,
             data = {},
             result,
-            premise: {
-                kind
-            }
+            // premise: {
+            //     kind
+            // }
         } = ruleResult;
+        let name = ruleResult.premise.rule.name;
+        const kind = ruleResult.premise.rule.kind.name;
+        if(name === undefined) {
+            name = kind;
+        }
         // remove all non-alphanumeric characters (spaces, dashes, underscore) and set to lowercase
         // we will set this as the rule property name to make it easy to access results from mustache template
         const normalName = normalizeName(name);

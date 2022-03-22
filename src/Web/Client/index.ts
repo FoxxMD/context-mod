@@ -1014,6 +1014,7 @@ const webClient = async (options: OperatorConfig) => {
                 const formattedCheckResults = checkResults.map((y: CheckSummary) => {
                     const {actionResults = [], ruleResults = [], triggered: checkTriggered, authorIs, itemIs, ...rest} = y;
 
+                    // @ts-ignore
                     const formattedRuleResults = ruleResults.map((z: RuleResult) => {
                         const {triggered, result, ...restY} = z;
                         return {
