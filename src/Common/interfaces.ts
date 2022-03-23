@@ -2397,6 +2397,8 @@ export interface PostBehavior {
 
 export type ActivityType = 'submission' | 'comment';
 
+export type FullNameTypes = ActivityType | 'user' | 'subreddit' | 'message';
+
 export type ItemCritPropHelper = SafeDictionary<FilterCriteriaPropertyResult<(CommentState & SubmissionState)>, keyof (CommentState & SubmissionState)>;
 export type RequiredItemCrit = Required<(CommentState & SubmissionState)>;
 
@@ -2478,4 +2480,11 @@ export interface RunnableBaseOptions {
     authorIs?: AuthorOptions
 
     resources: SubredditResources
+}
+
+export interface RedditThing {
+    val: string
+    type: FullNameTypes
+    prefix: string
+    id: string
 }

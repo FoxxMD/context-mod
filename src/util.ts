@@ -24,7 +24,7 @@ import {
     FilterCriteriaDefaults,
     FilterCriteriaPropertyResult,
     FilterCriteriaResult,
-    FilterResult,
+    FilterResult, FullNameTypes,
     GenericComparison,
     HistoricalStats,
     HistoricalStatsDisplay,
@@ -36,6 +36,7 @@ import {
     PollingOptionsStrong,
     RedditEntity,
     RedditEntityType,
+    RedditThing,
     RegExResult,
     RepostItem,
     RepostItemResult,
@@ -2355,4 +2356,57 @@ export const strToActivitySource = (val: string): ActivitySource => {
         return cleanStr;
     }
     throw new SimpleError(`'${cleanStr}' is not a valid ActivitySource. Must be one of: dispatch, dispatch:[identifier], poll, poll:[identifier], user`);
+}
+
+export const prefixToReddThingType = (prefix: string): FullNameTypes => {
+    switch (prefix) {
+        case 't1':
+            return 'comment';
+        case 't2':
+            return 'user';
+        case 't3':
+            return 'submission';
+        case 't4':
+            return 'message';
+        case 't5':
+            return 'subreddit';
+        default:
+            throw new Error(`unrecognized prefix ${prefix}`);
+    }
+}
+
+export const redditThingTypeToPrefix = (type: FullNameTypes): string => {
+    switch (type) {
+        case 'comment':
+            return 't1';
+        case 'user':
+            return 't2';
+        case 'submission':
+            return 't3';
+        case 'message':
+            return 't4';
+        case 'subreddit':
+            return 't5';
+        default:
+            throw new Error(`unrecognized prefix ${type}`);
+    }
+}
+
+export const REDDIT_FULLNAME_REGEX: RegExp = /^(?<prefix>t\d)_(?<id>.+)/;
+export const parseRedditFullname = (str: string): RedditThing | undefined => {
+    const cleanStr = str.trim();
+    if (cleanStr.length === 0) {
+        throw new Error('Fullname cannot be empty or only whitespace');
+    }
+    const matches = cleanStr.match(REDDIT_FULLNAME_REGEX);
+    if (matches === null) {
+        return undefined;
+    }
+    const groups = matches.groups as any;
+    return {
+        val: cleanStr,
+        type: prefixToReddThingType(groups.prefix as string),
+        prefix: groups.prefix as string,
+        id: groups.id as string
+    }
 }

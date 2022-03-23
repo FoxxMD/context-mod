@@ -5,13 +5,13 @@ import {CMEvent} from "./CMEvent";
 import {ActivityType} from "../interfaces";
 import Submission from "snoowrap/dist/objects/Submission";
 import {Comment} from "snoowrap";
-import {asComment} from "../../util";
+import {asComment, parseRedditFullname, redditThingTypeToPrefix} from "../../util";
 
 export interface ActivityEntityOptions {
     id: string
     subreddit: Subreddit
     type: ActivityType
-    title: string
+    content: string
     permalink: string
     author: AuthorEntity
     submission?: Activity
@@ -20,8 +20,28 @@ export interface ActivityEntityOptions {
 @Entity()
 export class Activity {
 
-    @PrimaryColumn()
-    id!: string;
+    @PrimaryColumn({name: 'id', comment: 'A reddit fullname -- includes prefix'})
+    _id!: string;
+
+    set id(data: string) {
+        const thing = parseRedditFullname(data);
+        if(thing !== undefined) {
+            this._id = thing.val;
+            this.type = thing.type as ActivityType
+            this.name = thing.id;
+        } else if(this.type !== undefined) {
+            // assuming we accidentally used the non-prefixed id
+            this._id = `${redditThingTypeToPrefix(this.type)}_${data}`;
+            this.name = data;
+        }
+    }
+
+    get id() {
+        return this._id;
+    }
+
+    @Column({name: 'name'})
+    name!: string;
 
     @ManyToOne(type => Subreddit, sub => sub.activities, {cascade: ['insert']})
     subreddit!: Subreddit;
@@ -30,7 +50,7 @@ export class Activity {
     type!: ActivityType
 
     @Column("text")
-    title!: string;
+    content!: string;
 
     @Column("text")
     permalink!: string;
@@ -49,10 +69,10 @@ export class Activity {
 
     constructor(data?: ActivityEntityOptions) {
         if(data !== undefined) {
+            this.type = data.type;
             this.id = data.id;
             this.subreddit = data.subreddit;
-            this.type = data.type;
-            this.title = data.title;
+            this.content = data.content;
             this.permalink = data.permalink;
             this.author = data.author;
             this.submission = data.submission;
@@ -78,10 +98,10 @@ export class Activity {
         author.name = activity.author.name;
 
         return new Activity({
-            id: activity.id,
+            id: activity.name,
             subreddit,
             type,
-            title: content,
+            content: content,
             permalink: activity.permalink,
             author,
             submission

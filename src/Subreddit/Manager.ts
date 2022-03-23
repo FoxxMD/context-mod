@@ -822,7 +822,7 @@ export class Manager extends EventEmitter {
         }
 
         let activityEntity: Activity;
-        const existingEntity = await this.activityRepo.findOneBy({id: itemId});
+        const existingEntity = await this.activityRepo.findOneBy({_id: item.name});
         if(existingEntity === null) {
             activityEntity = Activity.fromSnoowrapActivity(this.managerEntity.subreddit, activity);
         } else {
@@ -991,7 +991,7 @@ export class Manager extends EventEmitter {
                     // only get parent submission info if we are actually going to use this event
                     if(checkType === 'Comment') {
                         try {
-                            let subActivity: Activity | null = await this.activityRepo.findOneBy({id: (item as Comment).link_id});
+                            let subActivity: Activity | null = await this.activityRepo.findOneBy({_id: (item as Comment).link_id});
                             if(subActivity === null) {
                                 // @ts-ignore
                                 const subProxy = await this.client.getSubmission((item as Comment).link_id);
