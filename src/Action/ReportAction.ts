@@ -37,6 +37,8 @@ export class ReportAction extends Action {
             // due to reddit not updating this in response (maybe)?? just increment stale activity
             item.num_reports++;
             await this.resources.resetCacheForItem(item);
+            // add to recent so we ignore activity when/if it is discovered by polling
+            await this.resources.setRecentSelf(item);
             touchedEntities.push(item);
         }
 

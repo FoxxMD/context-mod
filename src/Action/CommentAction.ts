@@ -58,6 +58,8 @@ export class CommentAction extends Action {
         if(!dryRun) {
             // @ts-ignore
            reply = await item.reply(renderedContent);
+           // add to recent so we ignore activity when/if it is discovered by polling
+           await this.resources.setRecentSelf(reply);
            touchedEntities.push(reply);
         }
         if (this.lock) {
