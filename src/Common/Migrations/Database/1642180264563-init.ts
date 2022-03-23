@@ -28,6 +28,7 @@ export class init1642180264563 implements MigrationInterface {
         await queryRunner.query(`CREATE TABLE "bot" ("id" varchar(20) PRIMARY KEY NOT NULL, "name" varchar(200) NOT NULL)`);
         await queryRunner.query(`CREATE TABLE "Manager" ("id" varchar(20) PRIMARY KEY NOT NULL, "name" varchar(200) NOT NULL, "botId" varchar(20), "subredditId" varchar)`);
         await queryRunner.query(`CREATE TABLE "action" ("id" varchar(300) PRIMARY KEY NOT NULL, "name" varchar(300), "kindId" integer, "managerId" varchar(20))`);
+        await queryRunner.query(`CREATE TABLE "DispatchedAction" ("id" varchar(20) PRIMARY KEY NOT NULL, "createdAt" integer NOT NULL, "activityId" varchar NOT NULL, "duration" varchar(70) NOT NULL, "action" varchar NOT NULL, "goto" varchar(200), "identifier" varchar(200), "cancelIfQueued" varchar(200), "onExistingFound" varchar, "tardyTolerant" varchar(200), "managerId" varchar(20))`);
         await queryRunner.query(`DROP INDEX "IDX_7476e64211ff8ab25b36358415"`);
         await queryRunner.query(`CREATE TABLE "temporary_filter_criteria_result" ("id" varchar(20) PRIMARY KEY NOT NULL, "behavior" varchar(20) NOT NULL, "propertyResults" text NOT NULL, "passed" boolean NOT NULL, "type" varchar NOT NULL, "filterResultId" varchar(20), "criteriaId" varchar(20), CONSTRAINT "FK_f5c38feb1f18dae5fb53403ba49" FOREIGN KEY ("filterResultId") REFERENCES "filter_result" ("id") ON DELETE NO ACTION ON UPDATE NO ACTION, CONSTRAINT "FK_fd1817a2e15e8f0e85196acf90b" FOREIGN KEY ("criteriaId") REFERENCES "filter_criteria" ("id") ON DELETE NO ACTION ON UPDATE NO ACTION)`);
         await queryRunner.query(`INSERT INTO "temporary_filter_criteria_result"("id", "behavior", "propertyResults", "passed", "type", "filterResultId", "criteriaId") SELECT "id", "behavior", "propertyResults", "passed", "type", "filterResultId", "criteriaId" FROM "filter_criteria_result"`);
@@ -86,9 +87,17 @@ export class init1642180264563 implements MigrationInterface {
         await queryRunner.query(`INSERT INTO "temporary_action"("id", "name", "kindId", "managerId") SELECT "id", "name", "kindId", "managerId" FROM "action"`);
         await queryRunner.query(`DROP TABLE "action"`);
         await queryRunner.query(`ALTER TABLE "temporary_action" RENAME TO "action"`);
+        await queryRunner.query(`CREATE TABLE "temporary_DispatchedAction" ("id" varchar(20) PRIMARY KEY NOT NULL, "createdAt" integer NOT NULL, "activityId" varchar NOT NULL, "duration" varchar(70) NOT NULL, "action" varchar NOT NULL, "goto" varchar(200), "identifier" varchar(200), "cancelIfQueued" varchar(200), "onExistingFound" varchar, "tardyTolerant" varchar(200), "managerId" varchar(20), CONSTRAINT "FK_ddffc78d76756587a3d1aa3f023" FOREIGN KEY ("managerId") REFERENCES "Manager" ("id") ON DELETE NO ACTION ON UPDATE NO ACTION)`);
+        await queryRunner.query(`INSERT INTO "temporary_DispatchedAction"("id", "createdAt", "activityId", "duration", "action", "goto", "identifier", "cancelIfQueued", "onExistingFound", "tardyTolerant", "managerId") SELECT "id", "createdAt", "activityId", "duration", "action", "goto", "identifier", "cancelIfQueued", "onExistingFound", "tardyTolerant", "managerId" FROM "DispatchedAction"`);
+        await queryRunner.query(`DROP TABLE "DispatchedAction"`);
+        await queryRunner.query(`ALTER TABLE "temporary_DispatchedAction" RENAME TO "DispatchedAction"`);
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {
+        await queryRunner.query(`ALTER TABLE "DispatchedAction" RENAME TO "temporary_DispatchedAction"`);
+        await queryRunner.query(`CREATE TABLE "DispatchedAction" ("id" varchar(20) PRIMARY KEY NOT NULL, "createdAt" integer NOT NULL, "activityId" varchar NOT NULL, "duration" varchar(70) NOT NULL, "action" varchar NOT NULL, "goto" varchar(200), "identifier" varchar(200), "cancelIfQueued" varchar(200), "onExistingFound" varchar, "tardyTolerant" varchar(200), "managerId" varchar(20))`);
+        await queryRunner.query(`INSERT INTO "DispatchedAction"("id", "createdAt", "activityId", "duration", "action", "goto", "identifier", "cancelIfQueued", "onExistingFound", "tardyTolerant", "managerId") SELECT "id", "createdAt", "activityId", "duration", "action", "goto", "identifier", "cancelIfQueued", "onExistingFound", "tardyTolerant", "managerId" FROM "temporary_DispatchedAction"`);
+        await queryRunner.query(`DROP TABLE "temporary_DispatchedAction"`);
         await queryRunner.query(`ALTER TABLE "action" RENAME TO "temporary_action"`);
         await queryRunner.query(`CREATE TABLE "action" ("id" varchar(300) PRIMARY KEY NOT NULL, "name" varchar(300), "kindId" integer, "managerId" varchar(20))`);
         await queryRunner.query(`INSERT INTO "action"("id", "name", "kindId", "managerId") SELECT "id", "name", "kindId", "managerId" FROM "temporary_action"`);
@@ -147,6 +156,7 @@ export class init1642180264563 implements MigrationInterface {
         await queryRunner.query(`INSERT INTO "filter_criteria_result"("id", "behavior", "propertyResults", "passed", "type", "filterResultId", "criteriaId") SELECT "id", "behavior", "propertyResults", "passed", "type", "filterResultId", "criteriaId" FROM "temporary_filter_criteria_result"`);
         await queryRunner.query(`DROP TABLE "temporary_filter_criteria_result"`);
         await queryRunner.query(`CREATE INDEX "IDX_7476e64211ff8ab25b36358415" ON "filter_criteria_result" ("type") `);
+        await queryRunner.query(`DROP TABLE "DispatchedAction"`);
         await queryRunner.query(`DROP TABLE "action"`);
         await queryRunner.query(`DROP TABLE "Manager"`);
         await queryRunner.query(`DROP TABLE "bot"`);

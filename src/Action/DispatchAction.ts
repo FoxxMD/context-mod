@@ -89,7 +89,9 @@ export class DispatchAction extends Action {
                 } else if (this.dispatchData.onExistingFound === 'replace') {
                     existingRes += ` and existing behavior is REPLACE so replaced existing`;
                     const existingIds = existing.map(x => x.id);
-                    this.resources.delayedItems = this.resources.delayedItems.filter(x => !existingIds.includes(x.id));
+                    for(const id of existingIds) {
+                        await this.resources.removeDelayedActivity(id);
+                    }
                 } else {
                     existingRes += ` but existing behavior is IGNORE so adding new dispatch activity anyway`;
                 }
@@ -99,12 +101,12 @@ export class DispatchAction extends Action {
             }
 
             if (!dryRun) {
-                this.resources.delayedItems.push({
+                await this.resources.addDelayedActivity({
                     ...dispatchPayload,
                     activity: act,
-                    id: randomId(),
+                    id: 'notUsed',
                     action: this.getActionUniqueName()
-                });
+                })
             }
         }
         let dispatchBehaviors = [];

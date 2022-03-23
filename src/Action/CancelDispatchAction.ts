@@ -114,7 +114,9 @@ export class CancelDispatchAction extends Action {
             this.logger.verbose(cancelResult);
             if (!dryRun) {
                 const activityIds = delayedItemsToRemove.map(x => x.id);
-                this.resources.delayedItems = this.resources.delayedItems.filter(x => !activityIds.includes(x.id));
+                for(const id of activityIds) {
+                    await this.resources.removeDelayedActivity(id);
+                }
             }
         }
 

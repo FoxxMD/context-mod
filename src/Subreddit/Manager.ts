@@ -452,7 +452,9 @@ export class Manager extends EventEmitter {
                 if(existingDelayedToCancel.length > 0) {
                     this.logger.debug(`Cancelling existing delayed activities due to activity being queued from non-dispatch sources: ${existingDelayedToCancel.map((x, index) => `[${index + 1}] Queued At ${dayjs.unix(x.queuedAt).format('YYYY-MM-DD HH:mm:ssZ')} for ${x.duration.humanize()}`).join(' ')}`);
                     const toCancelIds = existingDelayedToCancel.map(x => x.id);
-                    this.resources.delayedItems.filter(x => !toCancelIds.includes(x.id));
+                    for(const id of toCancelIds) {
+                        await this.resources.removeDelayedActivity(id);
+                    }
                 }
             }
         }
@@ -496,8 +498,7 @@ export class Manager extends EventEmitter {
                     // always remove item meta regardless of success or failure since we are done with it meow
                     this.queuedItemsMeta.splice(queuedItemIndex, 1);
                     if(task.options.dispatchSource?.id !== undefined) {
-                        const delayIndex = this.resources.delayedItems.findIndex(x => x.id === task.options.dispatchSource?.id);
-                        this.resources.delayedItems.splice(delayIndex, 1);
+                        await this.resources.removeDelayedActivity(task.options.dispatchSource?.id);
                     }
                 }
             }

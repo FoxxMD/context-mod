@@ -2409,6 +2409,7 @@ export interface ActivityDispatchConfig {
     cancelIfQueued?: boolean | NonDispatchActivitySource | NonDispatchActivitySource[]
     goto?: string
     onExistingFound?: onExistingFoundBehavior
+    tardyTolerant?: boolean | DurationVal
     delay: DurationVal
 }
 

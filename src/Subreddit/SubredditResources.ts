@@ -80,7 +80,7 @@ import {check} from "tcp-port-used";
 import {ExtendedSnoowrap} from "../Utils/SnoowrapClients";
 import dayjs from "dayjs";
 import ImageData from "../Common/ImageData";
-import {Connection} from "typeorm";
+import {Connection, Repository} from "typeorm";
 import {Activity} from "../Common/Entities/Activity";
 import {Subreddit as SubredditEntity} from "../Common/Entities/Subreddit";
 import {AuthorEntity} from "../Common/Entities/AuthorEntity";
@@ -96,6 +96,7 @@ import {UserNoteCriteria} from "../Rule";
 import {AuthorCritPropHelper, RequiredAuthorCrit} from "../Common/types";
 import {ManagerEntity} from "../Common/Entities/ManagerEntity";
 import {Bot} from "../Common/Entities/Bot";
+import {DispatchedEntity} from "../Common/Entities/DispatchedEntity";
 
 export const DEFAULT_FOOTER = '\r\n*****\r\nThis action was performed by [a bot.]({{botLink}}) Mention a moderator or [send a modmail]({{modmailLink}}) if you any ideas, questions, or concerns about this action.';
 
@@ -157,6 +158,7 @@ export class SubredditResources {
     actionedEventsMax: number;
     thirdPartyCredentials: ThirdPartyCredentialsJsonConfig;
     delayedItems: ActivityDispatch[] = [];
+    dispatchedActivityRepo: Repository<DispatchedEntity>
     managerEntity: ManagerEntity
     botEntity: Bot
 
@@ -200,6 +202,7 @@ export class SubredditResources {
         this.cacheSettingsHash = cacheSettingsHash;
         this.cache = cache;
         this.database = database;
+        this.dispatchedActivityRepo = this.database.getRepository(DispatchedEntity);
         this.prefix = prefix;
         this.client = client;
         this.cacheType = cacheType;
@@ -248,6 +251,59 @@ export class SubredditResources {
                 },min * 1000 * 2)
             }
         }
+    }
+
+    async initDatabaseDelayedActivities() {
+        if(this.delayedItems.length === 0) {
+            const dispatchedActivities = await this.dispatchedActivityRepo.find({
+                where: {
+                    manager: {
+                        id: this.managerEntity.id
+                    }
+                },
+                relations: {
+                    manager: true
+                }
+            });
+            const now = dayjs();
+            for(const dAct of dispatchedActivities) {
+                const shouldDispatchAt = dAct.createdAt.add(dAct.duration.asMilliseconds(), 'milliseconds');
+                if(shouldDispatchAt.isBefore(now)) {
+                    let tardyHint = `Activity ${dAct.activityId} queued at ${dAct.createdAt.format('YYYY-MM-DD HH:mm:ssZ')} for ${dAct.duration.humanize()} is now LATE`;
+                    if(dAct.tardyTolerant === true) {
+                        tardyHint += ` but was configured as ALWAYS 'tardy tolerant' so will be dispatched immediately`;
+                    } else if(dAct.tardyTolerant === false) {
+                        tardyHint += ` and was not configured as 'tardy tolerant' so will be dropped`;
+                        this.logger.warn(tardyHint);
+                        await this.removeDelayedActivity(dAct.id);
+                        continue;
+                    } else {
+                        // see if its within tolerance
+                        const latest = shouldDispatchAt.add(dAct.tardyTolerant.asMilliseconds(), 'milliseconds');
+                        if(latest.isBefore(now)) {
+                            tardyHint += `and IS NOT within tardy tolerance of ${dAct.tardyTolerant.humanize()} of planned dispatch time so will be dropped`;
+                            await this.removeDelayedActivity(dAct.id);
+                            continue;
+                        } else {
+                            tardyHint += `but is within tardy tolerance of ${dAct.tardyTolerant.humanize()} of planned dispatch time so will be dispatched immediately`;
+                        }
+                    }
+                }
+                // TODO make this less api heavy
+                this.delayedItems.push(await dAct.toActivityDispatch(this.client))
+            }
+        }
+    }
+
+    async addDelayedActivity(data: ActivityDispatch) {
+        const dEntity = await this.dispatchedActivityRepo.save(new DispatchedEntity({...data, manager: this.managerEntity}));
+        data.id = dEntity.id;
+        this.delayedItems.push(data);
+    }
+
+    async removeDelayedActivity(id: string) {
+        await this.dispatchedActivityRepo.delete(id);
+        this.delayedItems.filter(x => x.id !== id);
     }
 
     async initHistoricalStats() {
@@ -2147,6 +2203,7 @@ export class BotResourcesManager {
             resource.stats.cache = cacheStats();
         }
         resource.stats.historical.lastReload = createHistoricalDefaults();
+        await resource.initDatabaseDelayedActivities();
 
         return resource;
     }
