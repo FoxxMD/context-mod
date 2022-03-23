@@ -8,6 +8,7 @@ import {Action} from "./Action";
 import {CheckEntity} from "./CheckEntity";
 import {RunEntity} from "./RunEntity";
 import {Bot} from "./Bot";
+import {RandomIdBaseEntity} from "./RandomIdBaseEntity";
 
 export interface ManagerEntityOptions {
     name: string
@@ -16,10 +17,7 @@ export interface ManagerEntityOptions {
 }
 
 @Entity({name: 'Manager'})
-export class ManagerEntity {
-
-    @PrimaryGeneratedColumn()
-    id!: string;
+export class ManagerEntity extends RandomIdBaseEntity {
 
     @Column("varchar", {length: 200})
     name!: string;
@@ -46,6 +44,7 @@ export class ManagerEntity {
     runs!: Promise<RunEntity[]>
 
     constructor(data?: ManagerEntityOptions) {
+        super();
         if (data !== undefined) {
             this.name = data.name;
             this.bot = data.bot;

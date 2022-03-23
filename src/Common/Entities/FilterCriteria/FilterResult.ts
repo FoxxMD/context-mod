@@ -1,5 +1,6 @@
 import {Entity, Column, PrimaryColumn, OneToMany, PrimaryGeneratedColumn, ManyToOne, TableInheritance} from "typeorm";
 import {FilterCriteriaResult as IFilterCriteriaResult, JoinOperands} from "../../interfaces";
+import {RandomIdBaseEntity} from "../RandomIdBaseEntity";
 
 export interface FilterResultOptions {
     passed: boolean
@@ -8,10 +9,8 @@ export interface FilterResultOptions {
 
 @Entity()
 @TableInheritance({column: {type: "varchar", name: "type"}})
-export abstract class FilterResult<T> {
+export abstract class FilterResult<T> extends RandomIdBaseEntity {
 
-    @PrimaryGeneratedColumn()
-    id!: string;
 
     // @OneToMany(type => FilterCriteriaResult, obj => obj.filterResult, {cascade: ['insert']})
     // criteriaResults!: IFilterCriteriaResult<T>[]
@@ -23,6 +22,7 @@ export abstract class FilterResult<T> {
     passed!: boolean
 
     constructor(data?: FilterResultOptions) {
+        super();
         if (data !== undefined) {
             this.join = data.join;
             this.passed = data.passed

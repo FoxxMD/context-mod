@@ -2,12 +2,10 @@ import {Entity, Column, PrimaryColumn, OneToMany, PrimaryGeneratedColumn} from "
 import {Activity} from "./Activity";
 import {Action} from "./Action";
 import {ManagerEntity} from "./ManagerEntity";
+import {RandomIdBaseEntity} from "./RandomIdBaseEntity";
 
 @Entity()
-export class Bot {
-
-    @PrimaryGeneratedColumn()
-    id!: number;
+export class Bot extends RandomIdBaseEntity {
 
     @Column("varchar", {length: 200})
     name!: string;

@@ -8,6 +8,7 @@ import {AuthorCriteria} from "../../Author/Author";
 import Submission from "snoowrap/dist/objects/Submission";
 import Comment from "snoowrap/dist/objects/Comment";
 import RedditUser from "snoowrap/dist/objects/RedditUser";
+import {RandomIdBaseEntity} from "./RandomIdBaseEntity";
 
 export interface ActionResultEntityOptions {
     run: boolean
@@ -22,10 +23,7 @@ export interface ActionResultEntityOptions {
 }
 
 @Entity({name: 'ActionResult'})
-export class ActionResultEntity {
-
-    @PrimaryGeneratedColumn()
-    id!: number;
+export class ActionResultEntity extends RandomIdBaseEntity {
 
     @Column("boolean")
     run!: boolean;
@@ -90,6 +88,7 @@ export class ActionResultEntity {
     }
 
     constructor(data?: ActionResultEntityOptions) {
+        super();
         if (data !== undefined) {
             this.result = data.result;
             this.run = data.run;

@@ -2,12 +2,10 @@ import {Entity, Column, PrimaryGeneratedColumn, ManyToOne, OneToMany, CreateDate
 import {Activity} from "./Activity";
 import {ManagerEntity} from "./ManagerEntity";
 import {RunResultEntity} from "./RunResultEntity";
+import {RandomIdBaseEntity} from "./RandomIdBaseEntity";
 
 @Entity()
-export class CMEvent {
-
-    @PrimaryGeneratedColumn("uuid")
-    id!: string;
+export class CMEvent extends RandomIdBaseEntity {
 
     @CreateDateColumn()
     createdAt!: number;

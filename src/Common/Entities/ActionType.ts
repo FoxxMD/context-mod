@@ -5,7 +5,7 @@ import {ActionTypes} from "../types";
 export class ActionType  {
 
     @PrimaryGeneratedColumn()
-    id!: string;
+    id!: number;
 
     @Column("varchar", {length: 200})
     name!: ActionTypes

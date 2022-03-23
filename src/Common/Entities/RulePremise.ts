@@ -22,10 +22,6 @@ export interface RulePremiseOptions {
 @Entity()
 export class RulePremise  {
 
-    // @PrimaryGeneratedColumn()
-    // id!: number;
-
-
     @ManyToOne(() => Rule, undefined,{cascade: ['insert'], eager: true})
     @JoinColumn({name: 'ruleId'})
     rule!: Rule;

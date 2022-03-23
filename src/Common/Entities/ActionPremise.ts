@@ -21,9 +21,6 @@ export interface ActionPremiseOptions {
 @Entity()
 export class ActionPremise  {
 
-    // @PrimaryGeneratedColumn()
-    // id!: number;
-
     @ManyToOne(() => Action, undefined,{cascade: ['insert'], eager: true})
     @JoinColumn({name: 'actionId'})
     action!: Action;

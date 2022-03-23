@@ -5,6 +5,7 @@ import {ActivityStateFilterResult} from "./FilterCriteria/ActivityStateFilterRes
 import {AuthorFilterResult} from "./FilterCriteria/AuthorFilterResult";
 import {FilterResult as IFilterResult, FilterResult, TypedActivityState} from "../interfaces";
 import {AuthorCriteria} from "../../Author/Author";
+import {RandomIdBaseEntity} from "./RandomIdBaseEntity";
 
 export interface RuleResultEntityOptions {
     triggered?: boolean
@@ -17,10 +18,7 @@ export interface RuleResultEntityOptions {
 }
 
 @Entity({name: 'RuleResult'})
-export class RuleResultEntity {
-
-    @PrimaryGeneratedColumn()
-    id!: number;
+export class RuleResultEntity extends RandomIdBaseEntity {
 
     @Column("boolean", {nullable: true})
     triggered?: boolean;
@@ -80,6 +78,7 @@ export class RuleResultEntity {
     }
 
     constructor(data?: RuleResultEntityOptions) {
+        super();
         if (data !== undefined) {
             this.triggered = data.triggered;
             this.result = data.result;

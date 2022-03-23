@@ -4,7 +4,7 @@ import {Column, Entity, PrimaryGeneratedColumn} from "typeorm";
 export class RuleType  {
 
     @PrimaryGeneratedColumn()
-    id!: string;
+    id!: number;
 
     @Column("varchar", {length: 200})
     name!: string;

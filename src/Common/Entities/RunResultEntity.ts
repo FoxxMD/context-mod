@@ -18,6 +18,7 @@ import {RuleResultEntity} from "./RuleResultEntity";
 import {CMEvent} from "./CMEvent";
 import {FilterResult as IFilterResult, TypedActivityState} from "../interfaces";
 import {AuthorCriteria} from "../../Author/Author";
+import {RandomIdBaseEntity} from "./RandomIdBaseEntity";
 
 export interface RunResultEntityOptions {
     run: RunEntity
@@ -25,10 +26,7 @@ export interface RunResultEntityOptions {
 }
 
 @Entity({name: 'RunResult'})
-export class RunResultEntity {
-
-    @PrimaryGeneratedColumn("uuid")
-    id!: string;
+export class RunResultEntity extends RandomIdBaseEntity {
 
     @ManyToOne(type => RunEntity, act => act.results, /*{cascade: ['insert']}*/)
     run!: RunEntity;
@@ -88,6 +86,7 @@ export class RunResultEntity {
     }
 
     constructor(data?: RunResultEntityOptions) {
+        super();
         if (data !== undefined) {
             this.run = data.run;
             this.triggered = data.triggered ?? false;

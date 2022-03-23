@@ -16,6 +16,7 @@ import {RuleResultEntity} from "./RuleResultEntity";
 import {ActionResultEntity} from "./ActionResultEntity";
 import {FilterResult as IFilterResult, FilterResult, JoinOperands, TypedActivityState} from "../interfaces";
 import {AuthorCriteria} from "../../Author/Author";
+import {RandomIdBaseEntity} from "./RandomIdBaseEntity";
 
 export interface CheckResultEntityOptions {
     triggered: boolean
@@ -32,10 +33,7 @@ export interface CheckResultEntityOptions {
 }
 
 @Entity({name: 'CheckResult'})
-export class CheckResultEntity {
-
-    @PrimaryGeneratedColumn("uuid")
-    id!: string;
+export class CheckResultEntity extends RandomIdBaseEntity {
 
     @ManyToOne(type => CheckEntity, act => act.results, {eager: true})
     check!: CheckEntity;
@@ -104,6 +102,7 @@ export class CheckResultEntity {
     }
 
     constructor(data?: CheckResultEntityOptions) {
+        super();
         if(data !== undefined) {
             this.triggered = data.triggered;
             this.fromCache = data.fromCache;
