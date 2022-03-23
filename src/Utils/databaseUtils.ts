@@ -41,12 +41,6 @@ export const createDatabaseConfig = (val: DatabaseDriver | any): DatabaseConfig 
                     host: 'localhost',
                     port: 5432
                 } as PostgresConnectionOptions;
-            case 'mongodb':
-                return {
-                    type: 'mongodb',
-                    host: 'localhost',
-                    port: 27017
-                } as MongoConnectionOptions;
         }
     }
 
