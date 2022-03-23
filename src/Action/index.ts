@@ -4,11 +4,11 @@ import {checkAuthorFilter, checkItemFilter, SubredditResources} from "../Subredd
 import {
     ActionProcessResult,
     ActionResult,
-    ChecksActivityState,
-    ObjectPremise, RuleResult,
+    ChecksActivityState, FilterResult,
+    ObjectPremise, RuleResult, RunnableBaseOptions, TypedActivityState,
     TypedActivityStates
 } from "../Common/interfaces";
-import {AuthorOptions, normalizeAuthorCriteria} from "../Author/Author";
+import {AuthorCriteria, AuthorOptions, normalizeAuthorCriteria} from "../Author/Author";
 import {mergeArr} from "../util";
 import LoggedError from "../Utils/LoggedError";
 import {ExtendedSnoowrap} from '../Utils/SnoowrapClients';
@@ -23,14 +23,12 @@ import {RuleType} from "../Common/Entities/RuleType";
 import {ActionType} from "../Common/Entities/ActionType";
 import { capitalize } from "lodash";
 import { RuleResultEntity } from "../Common/Entities/RuleResultEntity";
+import { RunnableBase } from "../Common/RunnableBase";
 
-export abstract class Action {
+export abstract class Action extends RunnableBase {
     name?: string;
     logger: Logger;
-    resources: SubredditResources;
     client: ExtendedSnoowrap;
-    authorIs: AuthorOptions;
-    itemIs: TypedActivityStates;
     dryRun: boolean;
     enabled: boolean;
     managerEmitter: EventEmitter;
@@ -38,38 +36,23 @@ export abstract class Action {
     actionPremiseEntity: ActionPremise | null = null;
 
     constructor(options: ActionOptions) {
+        super(options);
         const {
             enable = true,
             name = this.getKind(),
-            resources,
             client,
             logger,
             subredditName,
             dryRun = false,
-            authorIs: {
-                excludeCondition = 'OR',
-                include = [],
-                exclude = [],
-            } = {},
-            itemIs = [],
             emitter,
         } = options;
 
         this.name = name;
         this.dryRun = dryRun;
         this.enabled = enable;
-        this.resources = resources;
         this.client = client;
         this.logger = logger.child({labels: [`Action ${this.getActionUniqueName()}`]}, mergeArr);
         this.managerEmitter = emitter;
-
-        this.authorIs = {
-            excludeCondition,
-            exclude: exclude.map(x => normalizeAuthorCriteria(x)),
-            include: include.map(x => normalizeAuthorCriteria(x)),
-        }
-
-        this.itemIs = itemIs;
     }
 
     abstract getKind(): ActionTypes;
@@ -201,10 +184,10 @@ export abstract class Action {
     abstract process(item: Comment | Submission, ruleResults: RuleResultEntity[], runtimeDryun?: boolean): Promise<ActionProcessResult>;
 }
 
-export interface ActionOptions extends ActionConfig {
-    logger: Logger;
+export interface ActionOptions extends ActionConfig, RunnableBaseOptions {
+    //logger: Logger;
     subredditName: string;
-    resources: SubredditResources;
+    //resources: SubredditResources;
     client: ExtendedSnoowrap;
     emitter: EventEmitter
 }

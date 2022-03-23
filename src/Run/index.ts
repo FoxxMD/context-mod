@@ -4,7 +4,7 @@ import {
     ActivityCheckJson, CheckResult, CheckSummary,
     FilterCriteriaDefaults, FilterResult,
     PostBehavior,
-    PostBehaviorTypes, RuleResult, RunResult,
+    PostBehaviorTypes, RuleResult, RunnableBaseOptions, RunResult,
     TypedActivityStates
 } from "../Common/interfaces";
 import {SubmissionCheck} from "../Check/SubmissionCheck";
@@ -23,8 +23,9 @@ import {CheckProcessingError, RunProcessingError} from "../Utils/Errors";
 import {RunEntity} from "../Common/Entities/RunEntity";
 import {RunResultEntity} from "../Common/Entities/RunResultEntity";
 import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
+import {RunnableBase} from "../Common/RunnableBase";
 
-export class Run {
+export class Run extends RunnableBase {
     name: string;
     submissionChecks: SubmissionCheck[] = [];
     commentChecks: CommentCheck[] = [];
@@ -34,16 +35,14 @@ export class Run {
     logger: Logger;
     client: ExtendedSnoowrap;
     subredditName: string;
-    resources: SubredditResources;
     dryRun?: boolean;
-    itemIs: TypedActivityStates;
-    authorIs: AuthorOptions;
     enabled: boolean;
     emitter: EventEmitter;
     runEntity!: RunEntity
 
 
     constructor(options: RunOptions) {
+        super(options);
         const {
             name,
             checks = [],
@@ -52,22 +51,14 @@ export class Run {
             postTrigger,
             filterCriteriaDefaults,
             logger,
-            resources,
             client,
             subredditName,
             dryRun,
-            authorIs: {
-                include = [],
-                excludeCondition,
-                exclude = [],
-            } = {},
-            itemIs = [],
             enable = true,
 
         } = options;
         this.name = name;
         this.logger = logger.child({labels: [`RUN ${name}`]}, mergeArr);
-        this.resources = resources;
         this.client = client;
         this.subredditName = subredditName;
         this.postFail = postFail;
@@ -75,12 +66,6 @@ export class Run {
         this.filterCriteriaDefaults = filterCriteriaDefaults;
         this.dryRun = dryRun;
         this.enabled = enable;
-        this.itemIs = itemIs;
-        this.authorIs = {
-            excludeCondition,
-            exclude: exclude.map(x => normalizeAuthorCriteria(x)),
-            include: include.map(x => normalizeAuthorCriteria(x)),
-        }
         this.emitter = emitter;
 
         for(const c of checks) {
@@ -336,13 +321,13 @@ export interface IRun extends PostBehavior {
     enable?: boolean,
 }
 
-export interface RunOptions extends IRun {
+export interface RunOptions extends IRun, RunnableBaseOptions {
     // submissionChecks?: SubmissionCheck[]
     // commentChecks?: CommentCheck[]
     checks: CheckStructuredJson[]
     name: string
-    logger: Logger
-    resources: SubredditResources
+    //logger: Logger
+    //resources: SubredditResources
     client: ExtendedSnoowrap
     subredditName: string;
     emitter: EventEmitter;

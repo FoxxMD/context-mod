@@ -17,6 +17,8 @@ import {DuplexTransportOptions} from "winston-duplex/dist/DuplexTransport";
 import {CommentCheckJson, SubmissionCheckJson} from "../Check";
 import {SafeDictionary} from "ts-essentials";
 import {RuleResultEntity} from "./Entities/RuleResultEntity";
+import {Logger} from "winston";
+import {SubredditResources} from "../Subreddit/SubredditResources";
 
 /**
  * An ISO 8601 Duration
@@ -2457,4 +2459,23 @@ export type ActivitySource = NonDispatchActivitySource | DispatchSource;
 export interface ObjectPremise {
     kind: string
     config: object
+}
+
+export interface RunnableBaseOptions {
+    logger: Logger;
+    /**
+     * A list of criteria to test the state of the `Activity` against before running the check.
+     *
+     * If any set of criteria passes the Check will be run. If the criteria fails then the Check will fail.
+     *
+     * * @examples [[{"over_18": true, "removed': false}]]
+     * */
+    itemIs?: TypedActivityStates
+
+    /**
+     * If present then these Author criteria are checked before running the Check. If criteria fails then the Check will fail.
+     * */
+    authorIs?: AuthorOptions
+
+    resources: SubredditResources
 }

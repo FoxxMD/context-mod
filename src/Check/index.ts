@@ -16,12 +16,25 @@ import {
     truncateStringToLength
 } from "../util";
 import {
-    ActionResult, ActivityType, CheckResult,
-    ChecksActivityState, CheckSummary,
-    CommentState, FilterResult, JoinCondition,
-    JoinOperands, NotificationEventPayload, PostBehavior, PostBehaviorTypes, RuleResult, RuleSetResult,
-    SubmissionState, TypedActivityState,
-    TypedActivityStates, UserResultCache
+    ActionResult,
+    ActivityType,
+    CheckResult,
+    ChecksActivityState,
+    CheckSummary,
+    CommentState,
+    FilterResult,
+    JoinCondition,
+    JoinOperands,
+    NotificationEventPayload,
+    PostBehavior,
+    PostBehaviorTypes,
+    RuleResult,
+    RuleSetResult,
+    RunnableBaseOptions,
+    SubmissionState,
+    TypedActivityState,
+    TypedActivityStates,
+    UserResultCache
 } from "../Common/interfaces";
 import * as RuleSchema from '../Schema/Rule.json';
 import * as RuleSetSchema from '../Schema/RuleSet.json';
@@ -39,11 +52,11 @@ import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
 import {CheckResultEntity} from "../Common/Entities/CheckResultEntity";
 import {CheckEntity} from "../Common/Entities/CheckEntity";
 import {RunEntity} from "../Common/Entities/RunEntity";
-import {normalizeAuthorCriteria} from "../Author/Author";
+import {RunnableBase} from "../Common/RunnableBase";
 
 const checkLogName = truncateStringToLength(25);
 
-export abstract class Check implements ICheck {
+export abstract class Check extends RunnableBase implements ICheck {
     actions: Action[] = [];
     description?: string;
     name: string;
@@ -51,12 +64,9 @@ export abstract class Check implements ICheck {
     condition: JoinOperands;
     rules: Array<RuleSet | Rule> = [];
     logger: Logger;
-    itemIs: TypedActivityStates;
-    authorIs: AuthorOptions;
     cacheUserResult: Required<UserResultCacheOptions>;
     dryRun?: boolean;
     notifyOnTrigger: boolean;
-    resources: SubredditResources;
     client: ExtendedSnoowrap;
     postTrigger: PostBehaviorTypes;
     postFail: PostBehaviorTypes;
@@ -67,11 +77,11 @@ export abstract class Check implements ICheck {
     abstract checkType: ActivityType;
 
     constructor(options: CheckOptions) {
+        super(options);
         const {
             emitter,
             enable = true,
             name,
-            resources,
             description,
             client,
             condition = 'AND',
@@ -82,12 +92,6 @@ export abstract class Check implements ICheck {
             cacheUserResult = {},
             postTrigger = 'nextRun',
             postFail = 'next',
-            itemIs = [],
-            authorIs: {
-                include = [],
-                excludeCondition,
-                exclude = [],
-            } = {},
             dryRun,
         } = options;
 
@@ -98,19 +102,12 @@ export abstract class Check implements ICheck {
 
         const ajv = createAjvFactory(this.logger);
 
-        this.resources = resources;
         this.client = client;
 
         this.name = name;
         this.description = description;
         this.notifyOnTrigger = notifyOnTrigger;
         this.condition = condition;
-        this.itemIs = itemIs;
-        this.authorIs = {
-            excludeCondition,
-            exclude: exclude.map(x => normalizeAuthorCriteria(x)),
-            include: include.map(x => normalizeAuthorCriteria(x)),
-        }
         this.postTrigger = postTrigger;
         this.postFail = postFail;
         this.cacheUserResult = {
@@ -344,18 +341,12 @@ export abstract class Check implements ICheck {
 
             let behaviorT: string;
 
-            if (checkSum.triggered) {
+            if (checkResult.triggered) {
                 try {
                     checkResult.postBehavior = this.postTrigger;
                     checkSum.postBehavior = this.postTrigger;
 
                     checkSum.actionResults = await this.runActions(activity, currentResults.filter(x => x.triggered), options);
-                    // we only can about report and comment actions since those can produce items for newComm and modqueue
-                    const recentCandidates = checkSum.actionResults.filter(x => ['report', 'comment'].includes(x.kind.toLocaleLowerCase())).map(x => x.touchedEntities === undefined ? [] : x.touchedEntities).flat();
-                    for (const recent of recentCandidates) {
-                        await this.resources.setRecentSelf(recent as (Submission | Comment));
-                    }
-                    //actionsRun = runActions.length;
 
                     if (this.notifyOnTrigger) {
                         const ar = checkSum.actionResults.filter(x => x.success).map(x => x.name).join(', ');
@@ -421,25 +412,6 @@ export abstract class Check implements ICheck {
         }
     }
 
-    async runFilters(activity: (Submission | Comment), options: runCheckOptions): Promise<[(FilterResult<TypedActivityState> | undefined), (FilterResult<AuthorCriteria> | undefined)]> {
-        let itemRes: (FilterResult<TypedActivityState> | undefined);
-        let authorRes: (FilterResult<AuthorCriteria> | undefined);
-
-        const [itemPass, itemFilterType, itemFilterResults] = await checkItemFilter(activity, this.itemIs, this.resources, this.logger, options.source);
-        if (!itemPass) {
-            return [itemFilterResults, undefined];
-        } else if(this.itemIs.length > 0) {
-            itemRes = itemFilterResults;
-        }
-        const [authPass, authFilterType, authorFilterResults] = await checkAuthorFilter(activity, this.authorIs, this.resources, this.logger);
-        if(!authPass) {
-            return [itemRes, authorFilterResults];
-        } else if(authFilterType !== undefined) {
-            authorRes = authorFilterResults;
-        }
-        return [itemRes, authorRes];
-    }
-
     async runRules(item: Submission | Comment, existingResults: RuleResultEntity[] = [], options: runCheckOptions): Promise<CheckResult> {
         try {
             let allRuleResults: RuleResultEntity[] = [];
@@ -449,38 +421,6 @@ export abstract class Check implements ICheck {
                 triggered: false,
                 ruleResults: [],
             }
-
-            // check cache results
-            // const cacheResult = await this.getCacheResult(item);
-            // if(cacheResult !== undefined) {
-            //     this.logger.verbose(`Skipping rules run because result was found in cache, Check Triggered Result: ${cacheResult}`);
-            //     return {
-            //         triggered: cacheResult.result,
-            //         ruleResults: cacheResult.ruleResults,
-            //         fromCache: true
-            //     };
-            // }
-            //
-            // const [itemPass, itemFilterType, itemFilterResults] = await checkItemFilter(item, this.itemIs, this.resources, this.logger, options.source);
-            // if (!itemPass) {
-            //     return {
-            //         triggered: false,
-            //         ruleResults: allRuleResults,
-            //         itemIs: itemFilterResults
-            //     };
-            // } else if(this.itemIs.length > 0) {
-            //     checkResult.itemIs = itemFilterResults;
-            // }
-            // const [authPass, authFilterType, authorFilterResults] = await checkAuthorFilter(item, this.authorIs, this.resources, this.logger);
-            // if(!authPass) {
-            //     return {
-            //         triggered: false,
-            //         ruleResults: allRuleResults,
-            //         authorIs: authorFilterResults
-            //     };
-            // } else if(authFilterType !== undefined) {
-            //     checkResult.authorIs = authorFilterResults;
-            // }
 
             if (this.rules.length === 0) {
                 this.logger.info(`${PASS} => No rules to run, check auto-passes`);
@@ -617,7 +557,7 @@ export interface ICheck extends JoinCondition, ChecksActivityState, PostBehavior
     enable?: boolean,
 }
 
-export interface CheckOptions extends ICheck {
+export interface CheckOptions extends ICheck, RunnableBaseOptions {
     rules: Array<IRuleSet | IRule>;
     actions: ActionConfig[];
     logger: Logger;

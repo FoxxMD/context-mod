@@ -3,7 +3,14 @@ import Submission from "snoowrap/dist/objects/Submission";
 import {Logger} from "winston";
 import {findResultByPremise, mergeArr} from "../util";
 import {checkAuthorFilter, checkItemFilter, SubredditResources} from "../Subreddit/SubredditResources";
-import {ChecksActivityState, ObjectPremise, ResultContext, RuleResult as IRuleResult, TypedActivityStates} from "../Common/interfaces";
+import {
+    ChecksActivityState,
+    ObjectPremise,
+    ResultContext,
+    RuleResult as IRuleResult,
+    RunnableBaseOptions,
+    TypedActivityStates
+} from "../Common/interfaces";
 import {AuthorOptions, normalizeAuthorCriteria} from "../Author/Author";
 import {runCheckOptions} from "../Subreddit/Manager";
 import {Rule as RuleEntity} from "../Common/Entities/Rule";
@@ -12,14 +19,11 @@ import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
 import {RuleType} from "../Common/Entities/RuleType";
 import {RulePremise} from "../Common/Entities/RulePremise";
 import {capitalize} from "lodash";
+import {RunnableBase} from "../Common/RunnableBase";
 
-export interface RuleOptions {
+export interface RuleOptions extends RunnableBaseOptions {
     name?: string;
-    authorIs?: AuthorOptions;
-    itemIs?: TypedActivityStates;
-    logger: Logger
     subredditName: string;
-    resources: SubredditResources
     client: Snoowrap
 }
 
@@ -27,41 +31,23 @@ export interface Triggerable {
     run(item: Comment | Submission, existingResults: RuleResultEntity[], options: runCheckOptions): Promise<[(boolean | null), RuleResultEntity?]>;
 }
 
-export abstract class Rule implements IRule, Triggerable {
+export abstract class Rule extends RunnableBase implements IRule, Triggerable {
     name?: string;
     logger: Logger
-    authorIs: AuthorOptions;
-    itemIs: TypedActivityStates;
-    resources: SubredditResources;
     client: Snoowrap;
     ruleEntity: RuleEntity | null = null;
     rulePremiseEntity: RulePremise | null = null;
 
     constructor(options: RuleOptions) {
+        super(options);
         const {
             name,
             logger,
-            authorIs: {
-                excludeCondition = 'OR',
-                include = [],
-                exclude = [],
-            } = {},
-            itemIs = [],
             subredditName,
-            resources,
             client,
         } = options;
         this.name = name;
-        this.resources = resources;
         this.client = client;
-
-        this.authorIs = {
-            excludeCondition,
-            exclude: exclude.map(x => normalizeAuthorCriteria(x)),
-            include: include.map(x => normalizeAuthorCriteria(x)),
-        }
-
-        this.itemIs = itemIs;
 
         this.logger = logger.child({labels: [`Rule ${this.getRuleUniqueName()}`]}, mergeArr);
     }
