@@ -8,7 +8,8 @@ import {AuthorCriteria} from "../../Author/Author";
 import Submission from "snoowrap/dist/objects/Submission";
 import Comment from "snoowrap/dist/objects/Comment";
 import RedditUser from "snoowrap/dist/objects/RedditUser";
-import {RandomIdBaseEntity} from "./RandomIdBaseEntity";
+import {RandomIdBaseEntity} from "./Base/RandomIdBaseEntity";
+import {TimeAwareRandomBaseEntity} from "./Base/TimeAwareRandomBaseEntity";
 
 export interface ActionResultEntityOptions {
     run: boolean
@@ -23,7 +24,7 @@ export interface ActionResultEntityOptions {
 }
 
 @Entity({name: 'ActionResult'})
-export class ActionResultEntity extends RandomIdBaseEntity {
+export class ActionResultEntity extends TimeAwareRandomBaseEntity {
 
     @Column("boolean")
     run!: boolean;
@@ -47,9 +48,6 @@ export class ActionResultEntity extends RandomIdBaseEntity {
     @OneToOne(() => AuthorFilterResult, {nullable: true, cascade: ['insert'], eager: true})
     @JoinColumn({name: 'authorIs'})
     _authorIs?: AuthorFilterResult
-
-    @CreateDateColumn()
-    createdAt!: number
 
     @ManyToOne(type => CheckResultEntity, act => act.actionResults, /*{cascade: ['insert']}*/)
     checkResult!: CheckResultEntity;

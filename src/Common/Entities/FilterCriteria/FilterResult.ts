@@ -1,6 +1,6 @@
 import {Entity, Column, PrimaryColumn, OneToMany, PrimaryGeneratedColumn, ManyToOne, TableInheritance} from "typeorm";
 import {FilterCriteriaResult as IFilterCriteriaResult, JoinOperands} from "../../interfaces";
-import {RandomIdBaseEntity} from "../RandomIdBaseEntity";
+import {RandomIdBaseEntity} from "../Base/RandomIdBaseEntity";
 
 export interface FilterResultOptions {
     passed: boolean

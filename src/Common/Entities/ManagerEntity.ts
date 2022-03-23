@@ -8,7 +8,7 @@ import {Action} from "./Action";
 import {CheckEntity} from "./CheckEntity";
 import {RunEntity} from "./RunEntity";
 import {Bot} from "./Bot";
-import {RandomIdBaseEntity} from "./RandomIdBaseEntity";
+import {RandomIdBaseEntity} from "./Base/RandomIdBaseEntity";
 
 export interface ManagerEntityOptions {
     name: string

@@ -5,7 +5,8 @@ import {ActivityStateFilterResult} from "./FilterCriteria/ActivityStateFilterRes
 import {AuthorFilterResult} from "./FilterCriteria/AuthorFilterResult";
 import {FilterResult as IFilterResult, FilterResult, TypedActivityState} from "../interfaces";
 import {AuthorCriteria} from "../../Author/Author";
-import {RandomIdBaseEntity} from "./RandomIdBaseEntity";
+import {RandomIdBaseEntity} from "./Base/RandomIdBaseEntity";
+import {TimeAwareRandomBaseEntity} from "./Base/TimeAwareRandomBaseEntity";
 
 export interface RuleResultEntityOptions {
     triggered?: boolean
@@ -18,7 +19,7 @@ export interface RuleResultEntityOptions {
 }
 
 @Entity({name: 'RuleResult'})
-export class RuleResultEntity extends RandomIdBaseEntity {
+export class RuleResultEntity extends TimeAwareRandomBaseEntity {
 
     @Column("boolean", {nullable: true})
     triggered?: boolean;
@@ -45,9 +46,6 @@ export class RuleResultEntity extends RandomIdBaseEntity {
     @OneToOne(() => AuthorFilterResult, {nullable: true, cascade: ['insert'], eager: true})
     @JoinColumn({name: 'authorIs'})
     _authorIs?: AuthorFilterResult
-
-    @CreateDateColumn()
-    createdAt!: number
 
     set itemIs(data: ActivityStateFilterResult | IFilterResult<TypedActivityState> | undefined) {
         if (data === undefined) {

@@ -2,7 +2,7 @@ import {Entity, Column, PrimaryColumn, OneToMany, PrimaryGeneratedColumn} from "
 import {Activity} from "./Activity";
 import {Action} from "./Action";
 import {ManagerEntity} from "./ManagerEntity";
-import {RandomIdBaseEntity} from "./RandomIdBaseEntity";
+import {RandomIdBaseEntity} from "./Base/RandomIdBaseEntity";
 
 @Entity()
 export class Bot extends RandomIdBaseEntity {

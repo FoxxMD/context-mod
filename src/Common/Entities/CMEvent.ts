@@ -1,14 +1,12 @@
-import {Entity, Column, PrimaryGeneratedColumn, ManyToOne, OneToMany, CreateDateColumn} from "typeorm";
+import {Entity, Column, PrimaryGeneratedColumn, ManyToOne, OneToMany, CreateDateColumn, AfterLoad} from "typeorm";
 import {Activity} from "./Activity";
 import {ManagerEntity} from "./ManagerEntity";
 import {RunResultEntity} from "./RunResultEntity";
-import {RandomIdBaseEntity} from "./RandomIdBaseEntity";
+import {RandomIdBaseEntity} from "./Base/RandomIdBaseEntity";
+import {TimeAwareRandomBaseEntity} from "./Base/TimeAwareRandomBaseEntity";
 
 @Entity()
-export class CMEvent extends RandomIdBaseEntity {
-
-    @CreateDateColumn()
-    createdAt!: number;
+export class CMEvent extends TimeAwareRandomBaseEntity {
 
     @Column("boolean")
     triggered!: boolean;
@@ -21,4 +19,9 @@ export class CMEvent extends RandomIdBaseEntity {
 
     @OneToMany(type => RunResultEntity, obj => obj.event, {cascade: ['insert']})
     runResults!: RunResultEntity[]
+
+    @AfterLoad()
+    sortRuns() {
+        this.runResults.sort((a, b) => a.createdAt.isSameOrBefore(b.createdAt) ?  -1 : 1);
+    }
 }

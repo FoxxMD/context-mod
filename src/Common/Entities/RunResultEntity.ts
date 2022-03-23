@@ -6,7 +6,7 @@ import {
     OneToOne,
     ManyToOne,
     PrimaryColumn,
-    JoinColumn, CreateDateColumn
+    JoinColumn, CreateDateColumn, AfterLoad
 } from "typeorm";
 import {ManagerEntity} from "./ManagerEntity";
 import {Activity} from "./Activity";
@@ -18,7 +18,7 @@ import {RuleResultEntity} from "./RuleResultEntity";
 import {CMEvent} from "./CMEvent";
 import {FilterResult as IFilterResult, TypedActivityState} from "../interfaces";
 import {AuthorCriteria} from "../../Author/Author";
-import {RandomIdBaseEntity} from "./RandomIdBaseEntity";
+import {TimeAwareRandomBaseEntity} from "./Base/TimeAwareRandomBaseEntity";
 
 export interface RunResultEntityOptions {
     run: RunEntity
@@ -26,7 +26,7 @@ export interface RunResultEntityOptions {
 }
 
 @Entity({name: 'RunResult'})
-export class RunResultEntity extends RandomIdBaseEntity {
+export class RunResultEntity extends TimeAwareRandomBaseEntity {
 
     @ManyToOne(type => RunEntity, act => act.results, /*{cascade: ['insert']}*/)
     run!: RunEntity;
@@ -54,8 +54,10 @@ export class RunResultEntity extends RandomIdBaseEntity {
     @OneToMany(type => CheckResultEntity, obj => obj.run, {cascade: ['insert', 'update'], eager: true})
     checkResults!: CheckResultEntity[]
 
-    @CreateDateColumn()
-    createdAt!: number
+    @AfterLoad()
+    sortRuns() {
+        this.checkResults.sort((a, b) => a.createdAt.isSameOrBefore(b.createdAt) ?  -1 : 1);
+    }
 
     set itemIs(data: ActivityStateFilterResult | IFilterResult<TypedActivityState> | undefined) {
         if (data === undefined) {

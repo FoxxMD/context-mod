@@ -1,7 +1,7 @@
 import {Entity, Column, PrimaryColumn, OneToMany, PrimaryGeneratedColumn, TableInheritance, ManyToOne} from "typeorm";
 import {FilterCriteriaPropertyResult} from "../../interfaces";
 import {FilterResult} from "./FilterResult";
-import {RandomIdBaseEntity} from "../RandomIdBaseEntity";
+import {RandomIdBaseEntity} from "../Base/RandomIdBaseEntity";
 
 export interface FilterCriteriaResultOptions<T> {
     behavior: string

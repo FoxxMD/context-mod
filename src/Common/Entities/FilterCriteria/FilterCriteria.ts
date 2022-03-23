@@ -1,7 +1,7 @@
 import {Entity, Column, PrimaryColumn, OneToMany, PrimaryGeneratedColumn, TableInheritance, BeforeInsert} from "typeorm";
 import objectHash from "object-hash";
 import {removeUndefinedKeys} from "../../../util";
-import {RandomIdBaseEntity} from "../RandomIdBaseEntity";
+import {RandomIdBaseEntity} from "../Base/RandomIdBaseEntity";
 
 export interface FilterCriteriaOptions<T> {
     criteria: T

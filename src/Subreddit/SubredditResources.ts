@@ -495,6 +495,7 @@ export class SubredditResources {
                 }
             },
             order: {
+                // @ts-ignore
                 createdAt: 'DESC'
             },
             relations: {
