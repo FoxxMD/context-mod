@@ -254,7 +254,7 @@ export class Run extends RunnableBase {
                         }
                 }
             }
-            runResultEnt.triggered = runResult.checkResults.some(x => x.triggered);
+            runResultEnt.triggered = runResultEnt.checkResults.some(x => x.triggered);
             runResult.triggered = runResult.checkResults.some(x => x.triggered);
             return [runResultEnt, postBehavior]
         } catch (err: any) {
