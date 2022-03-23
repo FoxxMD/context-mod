@@ -4,6 +4,7 @@ import {ErrorWithCause} from "pony-cause";
 import {CheckSummary, RunResult} from "../Common/interfaces";
 import {CheckResultEntity} from "../Common/Entities/CheckResultEntity";
 import {RunResultEntity} from "../Common/Entities/RunResultEntity";
+import {ActionResultEntity} from "../Common/Entities/ActionResultEntity";
 
 
 export const isRateLimitError = (err: any): err is RateLimitError => {
@@ -41,7 +42,7 @@ export class CMError extends ErrorWithCause {
     logged: boolean = false;
 }
 
-export class ProcessingError<T> extends ErrorWithCause {
+export class ProcessingError<T> extends ErrorWithCause<Error> {
     constructor(msg: string, cause?: any, result?: T) {
         super(msg, cause);
         this.result = result;
@@ -53,4 +54,7 @@ export class RunProcessingError extends ProcessingError<RunResultEntity> {
 }
 
 export class CheckProcessingError extends ProcessingError<CheckResultEntity> {
+}
+
+export class ActionProcessingError extends ProcessingError<ActionResultEntity[]> {
 }

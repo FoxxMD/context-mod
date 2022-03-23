@@ -43,7 +43,7 @@ import {ActionObjectJson, RuleJson, RuleObjectJson, ActionJson as ActionTypeJson
 import {checkAuthorFilter, checkItemFilter, SubredditResources} from "../Subreddit/SubredditResources";
 import {AuthorCriteria, AuthorOptions} from '..';
 import {ExtendedSnoowrap} from '../Utils/SnoowrapClients';
-import {CheckProcessingError, isRateLimitError} from "../Utils/Errors";
+import {ActionProcessingError, CheckProcessingError, isRateLimitError} from "../Utils/Errors";
 import {ErrorWithCause, stackWithCauses} from "pony-cause";
 import {runCheckOptions} from "../Subreddit/Manager";
 import EventEmitter from "events";
@@ -53,6 +53,7 @@ import {CheckResultEntity} from "../Common/Entities/CheckResultEntity";
 import {CheckEntity} from "../Common/Entities/CheckEntity";
 import {RunEntity} from "../Common/Entities/RunEntity";
 import {RunnableBase} from "../Common/RunnableBase";
+import {ActionResultEntity} from "../Common/Entities/ActionResultEntity";
 
 const checkLogName = truncateStringToLength(25);
 
@@ -342,14 +343,29 @@ export abstract class Check extends RunnableBase implements ICheck {
             let behaviorT: string;
 
             if (checkResult.triggered) {
+                checkResult.postBehavior = this.postTrigger;
+                checkSum.postBehavior = this.postTrigger;
+
                 try {
-                    checkResult.postBehavior = this.postTrigger;
-                    checkSum.postBehavior = this.postTrigger;
+                    checkResult.actionResults = await this.runActions(activity, currentResults.filter(x => x.triggered), options);
+                } catch (err: any) {
+                    checkResult.error = `Running actions failed due to uncaught exception: ${err.message}`;
+                    checkSum.error = checkResult.error;
+                    if (err instanceof ActionProcessingError) {
+                        checkResult.actionResults = err.result;
+                        if (err.cause !== undefined) {
+                            checkSum.error = `Running actions failed due to uncaught exception: ${err.cause.message}`;
+                        }
+                        this.logger.warn(err);
+                    } else if (err.logged !== true) {
+                        const chkLogError = new ErrorWithCause(`[CHK ${this.name}] Running actions failed due to uncaught exception`, {cause: err});
+                        this.logger.warn(chkLogError);
+                    }
 
-                    checkSum.actionResults = await this.runActions(activity, currentResults.filter(x => x.triggered), options);
-
-                    if (this.notifyOnTrigger) {
-                        const ar = checkSum.actionResults.filter(x => x.success).map(x => x.name).join(', ');
+                    this.emitter.emit('error', err);
+                } finally {
+                    if (this.notifyOnTrigger && checkResult.actionResults !== undefined && checkResult.actionResults.length > 0) {
+                        const ar = checkResult.actionResults.filter(x => x.success).map(x => x.premise.action.getFriendlyIdentifier()).join(', ');
                         const [peek, _] = await itemContentPeek(activity);
                         const notifPayload: NotificationEventPayload = {
                             type: 'eventActioned',
@@ -357,13 +373,6 @@ export abstract class Check extends RunnableBase implements ICheck {
                             body: `Check "${this.name}" was triggered on Event: \n\n ${peek} \n\n with the following actions run: ${ar}`
                         }
                         this.emitter.emit('notify', notifPayload)
-                    }
-                } catch (err: any) {
-                    this.emitter.emit('error', err);
-                    checkSum.error = `Running actions failed due to uncaught exception: ${err.message}`;
-                    if (err.logged !== true) {
-                        const chkLogError = new ErrorWithCause(`[CHK ${this.name}] Running actions failed due to uncaught exception`, {cause: err});
-                        this.logger.warn(chkLogError);
                     }
                 }
             } else {
@@ -486,30 +495,21 @@ export abstract class Check extends RunnableBase implements ICheck {
         }
     }
 
-    async runActions(item: Submission | Comment, ruleResults: RuleResultEntity[], options: runCheckOptions): Promise<ActionResult[]> {
-        const {dryRun} = options;
-        const dr = dryRun || this.dryRun;
-        this.logger.debug(`${dr ? 'DRYRUN - ' : ''}Running Actions`);
-        const runActions: ActionResult[] = [];
-        for (const a of this.actions) {
-            if(!a.enabled) {
-                runActions.push({
-                    kind: a.getKind(),
-                    name: a.getActionUniqueName(),
-                    premise: a.getPremise(),
-                    run: false,
-                    success: false,
-                    runReason: 'Not enabled',
-                    dryRun: (a.dryRun || dr) || false,
-                });
-                this.logger.info(`Action ${a.getActionUniqueName()} not run because it is not enabled.`);
-                continue;
+    async runActions(item: Submission | Comment, ruleResults: RuleResultEntity[], options: runCheckOptions): Promise<ActionResultEntity[]> {
+        const runActions: ActionResultEntity[] = [];
+        try {
+            const {dryRun} = options;
+            const dr = dryRun || this.dryRun;
+            this.logger.debug(`${dr ? 'DRYRUN - ' : ''}Running Actions`);
+            for (const a of this.actions) {
+                const res = await a.handle(item, ruleResults, options);
+                runActions.push(res);
             }
-            const res = await a.handle(item, ruleResults, options);
-            runActions.push(res);
+            this.logger.info(`${dr ? 'DRYRUN - ' : ''}Ran Actions: ${runActions.map(x => x.premise.action.getFriendlyIdentifier()).join(' | ')}`);
+            return runActions;
+        } catch (err: any) {
+            throw new ActionProcessingError(`[CHK ${this.name}] Running actions failed due to uncaught exception`, {cause: err}, runActions)
         }
-        this.logger.info(`${dr ? 'DRYRUN - ' : ''}Ran Actions: ${runActions.map(x => x.name).join(' | ')}`);
-        return runActions;
     }
 }
 

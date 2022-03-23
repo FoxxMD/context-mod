@@ -24,6 +24,7 @@ import {ActionType} from "../Common/Entities/ActionType";
 import { capitalize } from "lodash";
 import { RuleResultEntity } from "../Common/Entities/RuleResultEntity";
 import { RunnableBase } from "../Common/RunnableBase";
+import {ActionResultEntity} from "../Common/Entities/ActionResultEntity";
 
 export abstract class Action extends RunnableBase {
     name?: string;
@@ -134,42 +135,49 @@ export abstract class Action extends RunnableBase {
         }
     }
 
-    async handle(item: Comment | Submission, ruleResults: RuleResultEntity[], options: runCheckOptions): Promise<ActionResult> {
+    async handle(item: Comment | Submission, ruleResults: RuleResultEntity[], options: runCheckOptions): Promise<ActionResultEntity> {
         const {dryRun: runtimeDryrun} = options;
         const dryRun = runtimeDryrun || this.dryRun;
 
-        let actRes: ActionResult = {
-            kind: this.getKind(),
-            name: this.getActionUniqueName(),
+        const actRes = new ActionResultEntity({
             run: false,
-            dryRun,
+            premise: this.actionPremiseEntity as ActionPremise,
             success: false,
-            premise: this.getPremise(),
-        };
+            dryRun,
+        });
+
+        if(!this.enabled) {
+            this.logger.info(`Not run because it is not enabled.`);
+            actRes.runReason = 'Not enabled'
+            return actRes;
+        }
+
         try {
-            const [itemPass, itemFilterType, itemFilterResults] = await checkItemFilter(item, this.itemIs, this.resources, this.logger, options.source);
-            if (!itemPass) {
-                this.logger.verbose(`Activity did not pass 'itemIs' test, Action not run`);
-                actRes.runReason = `Activity did not pass 'itemIs' test, Action not run`;
-                actRes.itemIs = itemFilterResults;
-                return actRes;
-            } else if(this.itemIs.length > 0) {
-                actRes.itemIs = itemFilterResults;
-            }
+            const filterResults = await this.runFilters(item, options);
+            const [itemRes, authorRes] = filterResults;
+            actRes.itemIs = itemRes;
+            actRes.authorIs = authorRes;
 
-            const [authPass, authFilterType, authorFilterResult] = await checkAuthorFilter(item, this.authorIs, this.resources, this.logger);
-            if(!authPass) {
-                this.logger.verbose(`${authFilterType} author criteria not matched, Action not run`);
-                actRes.runReason = `${authFilterType} author criteria not matched`;
-                actRes.authorIs = authorFilterResult;
-                return actRes;
-            } else if(authFilterType !== undefined) {
-                actRes.authorIs = authorFilterResult;
-            }
+            const filtersPassed = filterResults.every(x => x === undefined || x.passed);
+            let runReason = undefined;
 
-            actRes.run = true;
+            actRes.run = filtersPassed;
+            if(!filtersPassed) {
+                if(itemRes !== undefined && !itemRes.passed) {
+                    runReason = `Activity did not pass 'itemIs' test, Action not run`;
+                } else {
+                    runReason = `Activity did not pass 'authorIs' test, Action not run`;
+                }
+                actRes.runReason = runReason;
+                return actRes;
+            }
             const results = await this.process(item, ruleResults, runtimeDryrun);
-            return {...actRes, ...results};
+            actRes.success = results.success;
+            actRes.dryRun = results.dryRun;
+            actRes.result = results.result;
+            actRes.touchedEntities = results.touchedEntities ?? [];
+
+            return actRes;
         } catch (err: any) {
             if(!(err instanceof LoggedError)) {
                 const actionError = new ErrorWithCause('Action did not run successfully due to unexpected error', {cause: err});

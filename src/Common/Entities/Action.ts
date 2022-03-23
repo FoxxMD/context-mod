@@ -3,6 +3,7 @@ import {ActionType} from "./ActionType";
 import {ManagerEntity} from "./ManagerEntity";
 import objectHash from "object-hash";
 import {ObjectPremise} from "../interfaces";
+import {capitalize} from "lodash";
 
 export interface ActionEntityOptions {
     name?: string
@@ -41,5 +42,9 @@ export class Action  {
                 this.id = objectHash.sha1(data.premise);
             }
         }
+    }
+
+    getFriendlyIdentifier() {
+        return this.name === undefined ? capitalize(this.kind.name) : `${capitalize(this.kind.name)} - ${this.name}`;
     }
 }

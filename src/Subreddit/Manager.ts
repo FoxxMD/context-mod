@@ -982,32 +982,38 @@ export class Manager extends EventEmitter {
             if(!actionedEvent.triggered) {
                 this.logger.verbose('No checks triggered');
             }
-            await this.eventRepo.save(event);
+
             try {
                 //actionedEvent.actionResults = runActions;
                 event.runResults = runResults;
                 //actionedEvent.runResults = runResults;
-                if(actionedEvent.triggered) {
+                if(event.triggered) {
                     // only get parent submission info if we are actually going to use this event
                     if(checkType === 'Comment') {
                         try {
-                            // @ts-ignore
-                            const subProxy = await this.client.getSubmission(await item.link_id);
-                            const sub = await this.resources.getActivity(subProxy);
-                            const [peek, { content: peekContent, author, permalink }] = await itemContentPeek(sub);
-                            actionedEvent.parentSubmission = {
-                                peek: peekContent,
-                                author,
-                                subreddit: item.subreddit_name_prefixed,
-                                id: (item as Comment).link_id,
-                                type: 'comment',
-                                link: permalink
+                            let subActivity: Activity | null = await this.activityRepo.findOneBy({id: (item as Comment).link_id});
+                            if(subActivity === null) {
+                                // @ts-ignore
+                                const subProxy = await this.client.getSubmission((item as Comment).link_id);
+                                const sub = await this.resources.getActivity(subProxy);
+                                subActivity = await this.activityRepo.save(Activity.fromSnoowrapActivity(this.managerEntity.subreddit, sub));
                             }
+                            event.activity.submission = subActivity;
+
+                            // const [peek, { content: peekContent, author, permalink }] = await itemContentPeek(sub);
+                            // actionedEvent.parentSubmission = {
+                            //     peek: peekContent,
+                            //     author,
+                            //     subreddit: item.subreddit_name_prefixed,
+                            //     id: (item as Comment).link_id,
+                            //     type: 'comment',
+                            //     link: permalink
+                            // }
                         } catch (err: any) {
                             this.logger.error(`Error occurred while generating item peek for ${checkType} Activity ${itemId}`, err);
                         }
                     }
-                    await this.resources.addActionedEvent(actionedEvent);
+                    await this.eventRepo.save(event);
                 }
 
                 const checksRun = actionedEvent.runResults.map(x => x.checkResults).flat().length;

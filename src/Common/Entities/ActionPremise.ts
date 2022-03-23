@@ -6,7 +6,7 @@ import {
     VersionColumn,
     ManyToOne,
     JoinColumn,
-    PrimaryColumn
+    PrimaryColumn, CreateDateColumn, UpdateDateColumn
 } from "typeorm";
 import {Action} from "./Action";
 import {ActionResultEntity} from "./ActionResultEntity";
@@ -34,7 +34,7 @@ export class ActionPremise  {
     @Column("simple-json")
     config!: ObjectPremise
 
-    @Column("varchar", {length: 300})
+    @PrimaryColumn("varchar", {length: 300})
     configHash!: string;
 
     @OneToMany(type => ActionResultEntity, obj => obj.premise) // note: we will create author property in the Photo class below
@@ -42,6 +42,12 @@ export class ActionPremise  {
 
     @VersionColumn()
     version!: number;
+
+    @CreateDateColumn()
+    createdAt!: number
+
+    @UpdateDateColumn()
+    updatedAt!: number
 
     constructor(data?: ActionPremiseOptions) {
         if(data !== undefined) {

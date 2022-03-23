@@ -18,7 +18,7 @@ export class CMEvent {
     @ManyToOne(type => ManagerEntity, act => act.events)
     manager!: ManagerEntity;
 
-    @ManyToOne(type => Activity, act => act.actionedEvents, {cascade: ['insert']})
+    @ManyToOne(type => Activity, act => act.actionedEvents, {cascade: ['insert', 'update']})
     activity!: Activity;
 
     @OneToMany(type => RunResultEntity, obj => obj.event, {cascade: ['insert']})
