@@ -15,7 +15,7 @@ export class CMEvent {
     @Column("boolean")
     triggered!: boolean;
 
-    @ManyToOne(type => ManagerEntity, act => act.events, {cascade: ['insert']})
+    @ManyToOne(type => ManagerEntity, act => act.events)
     manager!: ManagerEntity;
 
     @ManyToOne(type => Activity, act => act.actionedEvents, {cascade: ['insert']})

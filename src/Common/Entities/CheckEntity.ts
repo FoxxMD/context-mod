@@ -20,13 +20,13 @@ export class CheckEntity {
     @Column("varchar", {length: 20})
     type!: ActivityType
 
-    @OneToMany(type => CheckResultEntity, obj => obj.run, {cascade: ['insert']}) // note: we will create author property in the Photo class below
+    @OneToMany(type => CheckResultEntity, obj => obj.run, {cascade: ['insert']})
     results!: CheckResultEntity[]
 
-    @ManyToOne(type => RunEntity, act => act.checks, {cascade: ['insert']})
+    @ManyToOne(type => RunEntity, act => act.checks)
     run!: RunEntity;
 
-    @ManyToOne(type => ManagerEntity, act => act.checks, {cascade: ['insert']})
+    @ManyToOne(type => ManagerEntity, act => act.checks)
     manager!: ManagerEntity;
 
     constructor(data?: CheckEntityOptions) {

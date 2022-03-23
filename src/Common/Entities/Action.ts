@@ -20,10 +20,10 @@ export class Action  {
     @Column("varchar", {length: 300, nullable: true})
     name?: string;
 
-    @ManyToOne(() => ActionType, undefined,{cascade: ['insert'], eager: true})
+    @ManyToOne(() => ActionType, undefined,{eager: true})
     kind!: ActionType;
 
-    @ManyToOne(type => ManagerEntity, act => act.actions, {cascade: ['insert']})
+    @ManyToOne(type => ManagerEntity, act => act.actions)
     manager!: ManagerEntity;
 
     constructor(data?: ActionEntityOptions) {

@@ -23,10 +23,10 @@ export class Rule {
     @Column("varchar", {length: 300, nullable: true})
     name?: string;
 
-    @ManyToOne(() => RuleType, undefined, {cascade: ['insert'], eager: true})
+    @ManyToOne(() => RuleType, undefined, {eager: true})
     kind!: RuleType;
 
-    @ManyToOne(type => ManagerEntity, act => act.rules, {cascade: ['insert']})
+    @ManyToOne(type => ManagerEntity, act => act.rules)
     manager!: ManagerEntity;
 
     @OneToMany(type => RulePremise, obj => obj.rule) // note: we will create author property in the Photo class below

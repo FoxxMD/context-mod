@@ -15,13 +15,13 @@ export class RunEntity {
     @PrimaryColumn("varchar", {length: 300})
     name!: string;
 
-    @ManyToOne(type => ManagerEntity, act => act.runs, {cascade: ['insert']})
+    @ManyToOne(type => ManagerEntity, act => act.runs)
     manager!: ManagerEntity;
 
-    @OneToMany(type => RunResultEntity, obj => obj.run, {cascade: ['insert']}) // note: we will create author property in the Photo class below
+    @OneToMany(type => RunResultEntity, obj => obj.run, {cascade: ['insert']})
     results!: RunResultEntity[]
 
-    @OneToMany(type => CheckEntity, obj => obj.run, {cascade: ['insert']}) // note: we will create author property in the Photo class below
+    @OneToMany(type => CheckEntity, obj => obj.run)
     checks!: CheckEntity[]
 
     constructor(data?: RunEntityOptions) {
