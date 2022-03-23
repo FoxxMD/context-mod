@@ -34,19 +34,19 @@ export class RuleResultEntity {
     @Column("simple-json", {nullable: true})
     data?: any
 
-    @ManyToOne(type => RulePremise, act => act.ruleResults, /*{cascade: ['insert']}*/)
+    @ManyToOne(type => RulePremise, act => act.ruleResults, {eager: true})
     premise!: RulePremise;
 
     @ManyToOne(type => CheckResultEntity, act => act.ruleResults, /*{cascade: ['insert']}*/)
     checkResult!: CheckResultEntity;
 
-    @OneToOne(() => ActivityStateFilterResult, {nullable: true, cascade: ['insert']})
+    @OneToOne(() => ActivityStateFilterResult, {nullable: true, cascade: ['insert'], eager: true})
     @JoinColumn({name: 'itemIs'})
-    private _itemIs?: ActivityStateFilterResult
+    _itemIs?: ActivityStateFilterResult
 
-    @OneToOne(() => AuthorFilterResult, {nullable: true, cascade: ['insert']})
+    @OneToOne(() => AuthorFilterResult, {nullable: true, cascade: ['insert'], eager: true})
     @JoinColumn({name: 'authorIs'})
-    private _authorIs?: AuthorFilterResult
+    _authorIs?: AuthorFilterResult
 
     @CreateDateColumn()
     createdAt!: number

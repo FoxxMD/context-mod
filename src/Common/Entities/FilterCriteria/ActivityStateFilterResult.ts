@@ -8,7 +8,7 @@ export class ActivityStateFilterResult extends FilterResult<TypedActivityState> 
 
     type: string = 'activityState';
 
-    @OneToMany(type => ActivityStateFilterCriteriaResult, obj => obj.filterResult, {cascade: ['insert']})
+    @OneToMany(type => ActivityStateFilterCriteriaResult, obj => obj.filterResult, {cascade: ['insert'], eager: true})
     criteriaResults!: ActivityStateFilterCriteriaResult[]
 
     constructor(data?: IFilterResult<TypedActivityState>) {

@@ -490,14 +490,52 @@ export class SubredditResources {
         const eventRepo = this.database.getRepository(ActionedEventEntity);
         const events = await eventRepo.find({
             where: {
-                //bot: this.botName,
-                activity: {
-                    subreddit: {
-                        id: this.subreddit.id
-                    }
+                manager: {
+                        id: this.managerEntity.id
                 }
             },
-            relations: ['activity', 'activity.subreddit', 'activity.author', 'activity.submission', 'activity.submission.author', 'ruleResults', 'ruleResults.premise', 'actionResults']
+            order: {
+                createdAt: 'DESC'
+            },
+            relations: {
+                activity: {
+                    subreddit: true,
+                    author: true
+                },
+                runResults: {
+                    _authorIs: {
+                        criteriaResults: true
+                    },
+                    _itemIs: {
+                        criteriaResults: true
+                    },
+                    run: true,
+                    checkResults: {
+                        _authorIs: {
+                            criteriaResults: true
+                        },
+                        _itemIs: {
+                            criteriaResults: true
+                        },
+                        ruleResults: {
+                            _authorIs: {
+                                criteriaResults: true
+                            },
+                            _itemIs: {
+                                criteriaResults: true
+                            },
+                        },
+                        actionResults: {
+                            _authorIs: {
+                                criteriaResults: true
+                            },
+                            _itemIs: {
+                                criteriaResults: true
+                            },
+                        }
+                    }
+                },
+            }
         })
         return events;
     }

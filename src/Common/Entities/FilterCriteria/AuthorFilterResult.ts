@@ -12,7 +12,7 @@ export class AuthorFilterResult extends FilterResult<AuthorCriteria> {
 
     type: string = 'author';
 
-    @OneToMany(type => AuthorFilterCriteriaResult, obj => obj.filterResult, {cascade: ['insert']})
+    @OneToMany(type => AuthorFilterCriteriaResult, obj => obj.filterResult, {cascade: ['insert'], eager: true})
     criteriaResults!: AuthorFilterCriteriaResult[]
 
     constructor(data?: IFilterResult<AuthorCriteria>) {

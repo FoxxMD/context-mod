@@ -8,7 +8,7 @@ export class ActivityStateFilterCriteriaResult extends FilterCriteriaResult<Type
 
     type: string = 'activityState';
 
-    @ManyToOne(type => ActivityStateFilterCriteria, {cascade: ['insert']})
+    @ManyToOne(type => ActivityStateFilterCriteria, {cascade: ['insert'], eager: true})
     criteria!: ActivityStateFilterCriteria
 
     constructor(data?: IFilterCriteriaResult<TypedActivityState>) {

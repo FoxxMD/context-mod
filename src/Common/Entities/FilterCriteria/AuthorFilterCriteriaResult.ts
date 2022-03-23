@@ -9,7 +9,7 @@ export class AuthorFilterCriteriaResult extends FilterCriteriaResult<AuthorCrite
 
     type: string = 'author';
 
-    @ManyToOne(type => AuthorFilterCriteria, {cascade: ['insert']})
+    @ManyToOne(type => AuthorFilterCriteria, {cascade: ['insert'], eager: true})
     criteria!: AuthorFilterCriteria
 
     constructor(data?: IFilterCriteriaResult<AuthorCriteria>) {

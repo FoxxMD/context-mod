@@ -42,13 +42,13 @@ export class ActionResultEntity {
     @Column("text", {nullable: true})
     result?: string
 
-    @OneToOne(() => ActivityStateFilterResult, {nullable: true, cascade: ['insert']})
+    @OneToOne(() => ActivityStateFilterResult, {nullable: true, cascade: ['insert'], eager: true})
     @JoinColumn({name: 'itemIs'})
-    private _itemIs?: ActivityStateFilterResult
+    _itemIs?: ActivityStateFilterResult
 
-    @OneToOne(() => AuthorFilterResult, {nullable: true, cascade: ['insert']})
+    @OneToOne(() => AuthorFilterResult, {nullable: true, cascade: ['insert'], eager: true})
     @JoinColumn({name: 'authorIs'})
-    private _authorIs?: AuthorFilterResult
+    _authorIs?: AuthorFilterResult
 
     @CreateDateColumn()
     createdAt!: number
@@ -56,7 +56,7 @@ export class ActionResultEntity {
     @ManyToOne(type => CheckResultEntity, act => act.actionResults, /*{cascade: ['insert']}*/)
     checkResult!: CheckResultEntity;
 
-    @ManyToOne(type => ActionPremise, act => act.actionResults, /*{cascade: ['insert']}*/)
+    @ManyToOne(type => ActionPremise, act => act.actionResults, {eager: true})
     premise!: ActionPremise;
 
     touchedEntities: (Submission | Comment | RedditUser | string)[] = []

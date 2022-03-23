@@ -45,15 +45,15 @@ export class RunResultEntity {
     @Column("text", {nullable: true})
     error?: string;
 
-    @OneToOne(() => ActivityStateFilterResult, {nullable: true, cascade: ['insert']})
+    @OneToOne(() => ActivityStateFilterResult, {nullable: true, cascade: ['insert'], eager: true})
     @JoinColumn({name: 'itemIs'})
-    private _itemIs?: ActivityStateFilterResult
+    _itemIs?: ActivityStateFilterResult
 
-    @OneToOne(() => AuthorFilterResult, {nullable: true, cascade: ['insert']})
+    @OneToOne(() => AuthorFilterResult, {nullable: true, cascade: ['insert'], eager: true})
     @JoinColumn({name: 'authorIs'})
-    private _authorIs?: AuthorFilterResult
+    _authorIs?: AuthorFilterResult
 
-    @OneToMany(type => CheckResultEntity, obj => obj.run, {cascade: ['insert', 'update']})
+    @OneToMany(type => CheckResultEntity, obj => obj.run, {cascade: ['insert', 'update'], eager: true})
     checkResults!: CheckResultEntity[]
 
     @CreateDateColumn()

@@ -37,7 +37,7 @@ export class CheckResultEntity {
     @PrimaryGeneratedColumn("uuid")
     id!: string;
 
-    @ManyToOne(type => CheckEntity, act => act.results, /*{cascade: ['insert']}*/)
+    @ManyToOne(type => CheckEntity, act => act.results, {eager: true})
     check!: CheckEntity;
 
     @ManyToOne(type => RunResultEntity, act => act.checkResults, /*{cascade: ['insert']}*/)
@@ -55,21 +55,21 @@ export class CheckResultEntity {
     @Column("text", {nullable: true})
     error?: string;
 
-    @OneToOne(() => ActivityStateFilterResult, {nullable: true, cascade: ['insert']})
+    @OneToOne(() => ActivityStateFilterResult, {nullable: true, cascade: ['insert'], eager: true})
     @JoinColumn({name: 'itemIs'})
-    private _itemIs?: ActivityStateFilterResult
+    _itemIs?: ActivityStateFilterResult
 
-    @OneToOne(() => AuthorFilterResult, {nullable: true, cascade: ['insert']})
+    @OneToOne(() => AuthorFilterResult, {nullable: true, cascade: ['insert'], eager: true})
     @JoinColumn({name: 'authorIs'})
-    private _authorIs?: AuthorFilterResult
+    _authorIs?: AuthorFilterResult
 
     @Column("varchar", {length: 50, nullable: true})
     postBehavior!: string
 
-    @OneToMany(type => RuleResultEntity, obj => obj.checkResult, {cascade: ['insert', 'update'], nullable: true})
+    @OneToMany(type => RuleResultEntity, obj => obj.checkResult, {cascade: ['insert', 'update'], nullable: true, eager: true})
     ruleResults?: RuleResultEntity[]
 
-    @OneToMany(type => ActionResultEntity, obj => obj.checkResult, {cascade: ['insert', 'update'], nullable: true})
+    @OneToMany(type => ActionResultEntity, obj => obj.checkResult, {cascade: ['insert', 'update'], nullable: true, eager: true})
     actionResults?: ActionResultEntity[]
 
     @CreateDateColumn()
