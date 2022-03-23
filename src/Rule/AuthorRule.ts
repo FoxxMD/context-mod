@@ -1,7 +1,7 @@
 import {Rule, RuleJSONConfig, RuleOptions} from "./index";
 import {Comment} from "snoowrap";
 import Submission from "snoowrap/dist/objects/Submission";
-import {Author, AuthorCriteria} from "../Author/Author";
+import {AuthorCriteria, normalizeAuthorCriteria} from "../Author/Author";
 import {checkAuthorFilter} from "../Subreddit/SubredditResources";
 import {RuleResult} from "../Common/interfaces";
 
@@ -41,8 +41,8 @@ export class AuthorRule extends Rule {
             exclude,
         } = options;
 
-        this.include = include !== undefined ? include.map(x => new Author(x)) : [];
-        this.exclude = exclude !== undefined ? exclude.map(x => new Author(x)) : [];
+        this.include = include !== undefined ? include.map(x => normalizeAuthorCriteria(x)) : [];
+        this.exclude = exclude !== undefined ? exclude.map(x => normalizeAuthorCriteria(x)) : [];
 
         if(this.include.length === 0 && this.exclude.length === 0) {
             throw new Error('At least one of the properties [include,exclude] on Author Rule must not be empty');

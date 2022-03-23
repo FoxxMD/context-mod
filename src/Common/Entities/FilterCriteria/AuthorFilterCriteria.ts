@@ -1,10 +1,26 @@
 import {
-    ChildEntity
+    ChildEntity, DataSource
 } from "typeorm";
-import {FilterCriteria} from "./FilterCriteria";
+import {FilterCriteria, FilterCriteriaOptions, filterCriteriaTypeIdentifiers} from "./FilterCriteria";
 import {AuthorCriteria} from "../../../Author/Author";
+import objectHash from "object-hash";
 
 @ChildEntity()
 export class AuthorFilterCriteria extends FilterCriteria<AuthorCriteria> {
-    type: string = 'author';
+    type: string = filterCriteriaTypeIdentifiers.author;
+
+    static async getOrInsertCriteria(database: DataSource, config: AuthorCriteria) {
+        const repo = database.getRepository(this);
+        const existing = await repo.findOneBy({hash: objectHash.sha1(config), type: filterCriteriaTypeIdentifiers.author});
+        if(existing === null) {
+            return await repo.save(new this({criteria: config}));
+        }
+    }
+
+    constructor(data?: FilterCriteriaOptions<AuthorCriteria>) {
+        super(data);
+        if(data !== undefined) {
+            this.id = `${this.type}-${this.hash}`;
+        }
+    }
 }

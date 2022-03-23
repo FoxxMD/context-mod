@@ -28,7 +28,7 @@ import * as RuleSetSchema from '../Schema/RuleSet.json';
 import * as ActionSchema from '../Schema/Action.json';
 import {ActionObjectJson, RuleJson, RuleObjectJson, ActionJson as ActionTypeJson} from "../Common/types";
 import {checkAuthorFilter, checkItemFilter, SubredditResources} from "../Subreddit/SubredditResources";
-import {Author, AuthorCriteria, AuthorOptions} from '..';
+import {AuthorCriteria, AuthorOptions} from '..';
 import {ExtendedSnoowrap} from '../Utils/SnoowrapClients';
 import {CheckProcessingError, isRateLimitError} from "../Utils/Errors";
 import {ErrorWithCause, stackWithCauses} from "pony-cause";
@@ -39,6 +39,7 @@ import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
 import {CheckResultEntity} from "../Common/Entities/CheckResultEntity";
 import {CheckEntity} from "../Common/Entities/CheckEntity";
 import {RunEntity} from "../Common/Entities/RunEntity";
+import {normalizeAuthorCriteria} from "../Author/Author";
 
 const checkLogName = truncateStringToLength(25);
 
@@ -107,8 +108,8 @@ export abstract class Check implements ICheck {
         this.itemIs = itemIs;
         this.authorIs = {
             excludeCondition,
-            exclude: exclude.map(x => new Author(x)),
-            include: include.map(x => new Author(x)),
+            exclude: exclude.map(x => normalizeAuthorCriteria(x)),
+            include: include.map(x => normalizeAuthorCriteria(x)),
         }
         this.postTrigger = postTrigger;
         this.postFail = postFail;

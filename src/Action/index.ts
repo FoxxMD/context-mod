@@ -8,7 +8,7 @@ import {
     ObjectPremise, RuleResult,
     TypedActivityStates
 } from "../Common/interfaces";
-import Author, {AuthorOptions} from "../Author/Author";
+import {AuthorOptions, normalizeAuthorCriteria} from "../Author/Author";
 import {mergeArr} from "../util";
 import LoggedError from "../Utils/LoggedError";
 import {ExtendedSnoowrap} from '../Utils/SnoowrapClients';
@@ -65,8 +65,8 @@ export abstract class Action {
 
         this.authorIs = {
             excludeCondition,
-            exclude: exclude.map(x => new Author(x)),
-            include: include.map(x => new Author(x)),
+            exclude: exclude.map(x => normalizeAuthorCriteria(x)),
+            include: include.map(x => normalizeAuthorCriteria(x)),
         }
 
         this.itemIs = itemIs;

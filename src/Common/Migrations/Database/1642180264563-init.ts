@@ -8,9 +8,9 @@ export class init1642180264563 implements MigrationInterface {
         await queryRunner.query(`CREATE TABLE "Author" ("id" varchar(20), "name" varchar(200) PRIMARY KEY NOT NULL)`);
         await queryRunner.query(`CREATE TABLE "filter_result" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "join" varchar(200) NOT NULL, "passed" boolean NOT NULL, "type" varchar NOT NULL)`);
         await queryRunner.query(`CREATE INDEX "IDX_2096f3edd0a02a7de9933d8434" ON "filter_result" ("type") `);
-        await queryRunner.query(`CREATE TABLE "filter_criteria_result" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "behavior" varchar(20) NOT NULL, "propertyResults" text NOT NULL, "passed" boolean NOT NULL, "type" varchar NOT NULL, "filterResultId" integer, "criteriaId" integer)`);
+        await queryRunner.query(`CREATE TABLE "filter_criteria_result" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "behavior" varchar(20) NOT NULL, "propertyResults" text NOT NULL, "passed" boolean NOT NULL, "type" varchar NOT NULL, "filterResultId" integer, "criteriaId" varchar)`);
         await queryRunner.query(`CREATE INDEX "IDX_7476e64211ff8ab25b36358415" ON "filter_criteria_result" ("type") `);
-        await queryRunner.query(`CREATE TABLE "filter_criteria" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "criteria" text NOT NULL, "hash" varchar(300) NOT NULL, "type" varchar NOT NULL)`);
+        await queryRunner.query(`CREATE TABLE "filter_criteria" ("id" varchar PRIMARY KEY NOT NULL, "criteria" text NOT NULL, "hash" varchar(300) NOT NULL, "type" varchar NOT NULL)`);
         await queryRunner.query(`CREATE INDEX "IDX_abc266a02278dd358206ca131d" ON "filter_criteria" ("type") `);
         await queryRunner.query(`CREATE TABLE "rule_type" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "name" varchar(200) NOT NULL)`);
         await queryRunner.query(`CREATE TABLE "rule" ("id" varchar(300) PRIMARY KEY NOT NULL, "name" varchar(300), "kindId" integer, "managerId" integer)`);
@@ -29,7 +29,7 @@ export class init1642180264563 implements MigrationInterface {
         await queryRunner.query(`CREATE TABLE "Manager" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "name" varchar(200) NOT NULL, "botId" integer, "subredditId" varchar)`);
         await queryRunner.query(`CREATE TABLE "action" ("id" varchar(300) PRIMARY KEY NOT NULL, "name" varchar(300), "kindId" integer, "managerId" integer)`);
         await queryRunner.query(`DROP INDEX "IDX_7476e64211ff8ab25b36358415"`);
-        await queryRunner.query(`CREATE TABLE "temporary_filter_criteria_result" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "behavior" varchar(20) NOT NULL, "propertyResults" text NOT NULL, "passed" boolean NOT NULL, "type" varchar NOT NULL, "filterResultId" integer, "criteriaId" integer, CONSTRAINT "FK_f5c38feb1f18dae5fb53403ba49" FOREIGN KEY ("filterResultId") REFERENCES "filter_result" ("id") ON DELETE NO ACTION ON UPDATE NO ACTION, CONSTRAINT "FK_fd1817a2e15e8f0e85196acf90b" FOREIGN KEY ("criteriaId") REFERENCES "filter_criteria" ("id") ON DELETE NO ACTION ON UPDATE NO ACTION)`);
+        await queryRunner.query(`CREATE TABLE "temporary_filter_criteria_result" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "behavior" varchar(20) NOT NULL, "propertyResults" text NOT NULL, "passed" boolean NOT NULL, "type" varchar NOT NULL, "filterResultId" integer, "criteriaId" varchar, CONSTRAINT "FK_f5c38feb1f18dae5fb53403ba49" FOREIGN KEY ("filterResultId") REFERENCES "filter_result" ("id") ON DELETE NO ACTION ON UPDATE NO ACTION, CONSTRAINT "FK_fd1817a2e15e8f0e85196acf90b" FOREIGN KEY ("criteriaId") REFERENCES "filter_criteria" ("id") ON DELETE NO ACTION ON UPDATE NO ACTION)`);
         await queryRunner.query(`INSERT INTO "temporary_filter_criteria_result"("id", "behavior", "propertyResults", "passed", "type", "filterResultId", "criteriaId") SELECT "id", "behavior", "propertyResults", "passed", "type", "filterResultId", "criteriaId" FROM "filter_criteria_result"`);
         await queryRunner.query(`DROP TABLE "filter_criteria_result"`);
         await queryRunner.query(`ALTER TABLE "temporary_filter_criteria_result" RENAME TO "filter_criteria_result"`);
@@ -143,7 +143,7 @@ export class init1642180264563 implements MigrationInterface {
         await queryRunner.query(`DROP TABLE "temporary_rule"`);
         await queryRunner.query(`DROP INDEX "IDX_7476e64211ff8ab25b36358415"`);
         await queryRunner.query(`ALTER TABLE "filter_criteria_result" RENAME TO "temporary_filter_criteria_result"`);
-        await queryRunner.query(`CREATE TABLE "filter_criteria_result" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "behavior" varchar(20) NOT NULL, "propertyResults" text NOT NULL, "passed" boolean NOT NULL, "type" varchar NOT NULL, "filterResultId" integer, "criteriaId" integer)`);
+        await queryRunner.query(`CREATE TABLE "filter_criteria_result" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "behavior" varchar(20) NOT NULL, "propertyResults" text NOT NULL, "passed" boolean NOT NULL, "type" varchar NOT NULL, "filterResultId" integer, "criteriaId" varchar)`);
         await queryRunner.query(`INSERT INTO "filter_criteria_result"("id", "behavior", "propertyResults", "passed", "type", "filterResultId", "criteriaId") SELECT "id", "behavior", "propertyResults", "passed", "type", "filterResultId", "criteriaId" FROM "temporary_filter_criteria_result"`);
         await queryRunner.query(`DROP TABLE "temporary_filter_criteria_result"`);
         await queryRunner.query(`CREATE INDEX "IDX_7476e64211ff8ab25b36358415" ON "filter_criteria_result" ("type") `);

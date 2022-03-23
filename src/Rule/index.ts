@@ -4,7 +4,7 @@ import {Logger} from "winston";
 import {findResultByPremise, mergeArr} from "../util";
 import {checkAuthorFilter, checkItemFilter, SubredditResources} from "../Subreddit/SubredditResources";
 import {ChecksActivityState, ObjectPremise, ResultContext, RuleResult as IRuleResult, TypedActivityStates} from "../Common/interfaces";
-import Author, {AuthorOptions} from "../Author/Author";
+import {AuthorOptions, normalizeAuthorCriteria} from "../Author/Author";
 import {runCheckOptions} from "../Subreddit/Manager";
 import {Rule as RuleEntity} from "../Common/Entities/Rule";
 import objectHash from "object-hash";
@@ -57,8 +57,8 @@ export abstract class Rule implements IRule, Triggerable {
 
         this.authorIs = {
             excludeCondition,
-            exclude: exclude.map(x => new Author(x)),
-            include: include.map(x => new Author(x)),
+            exclude: exclude.map(x => normalizeAuthorCriteria(x)),
+            include: include.map(x => normalizeAuthorCriteria(x)),
         }
 
         this.itemIs = itemIs;

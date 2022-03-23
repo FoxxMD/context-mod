@@ -13,7 +13,7 @@ import {Logger} from "winston";
 import {determineNewResults, FAIL, isSubmission, mergeArr, normalizeName} from "../util";
 import {checkAuthorFilter, checkItemFilter, SubredditResources} from "../Subreddit/SubredditResources";
 import {ExtendedSnoowrap} from "../Utils/SnoowrapClients";
-import {Author, AuthorCriteria, AuthorOptions} from "../Author/Author";
+import {AuthorCriteria, AuthorOptions, normalizeAuthorCriteria} from "../Author/Author";
 import Submission from "snoowrap/dist/objects/Submission";
 import {Comment} from "snoowrap";
 import {runCheckOptions} from "../Subreddit/Manager";
@@ -78,8 +78,8 @@ export class Run {
         this.itemIs = itemIs;
         this.authorIs = {
             excludeCondition,
-            exclude: exclude.map(x => new Author(x)),
-            include: include.map(x => new Author(x)),
+            exclude: exclude.map(x => normalizeAuthorCriteria(x)),
+            include: include.map(x => normalizeAuthorCriteria(x)),
         }
         this.emitter = emitter;
 

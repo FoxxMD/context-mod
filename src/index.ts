@@ -209,7 +209,6 @@ const program = new Command();
         process.kill(process.pid, 'SIGTERM');
     }
 }());
-export {Author} from "./Author/Author";
 export {AuthorCriteria} from "./Author/Author";
 export {AuthorOptions} from "./Author/Author";
 export {RuleSetResult} from "./Common/interfaces";

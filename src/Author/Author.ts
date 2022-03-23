@@ -151,39 +151,11 @@ export interface AuthorCriteria {
     isContributor?: boolean
 }
 
-export class Author implements AuthorCriteria {
-    name?: string[];
-    flairCssClass?: boolean | string[];
-    flairText?: boolean | string[];
-    isMod?: boolean;
-    isContributor?: boolean;
-    userNotes?: UserNoteCriteria[];
-    age?: string;
-    commentKarma?: string;
-    linkKarma?: string;
-    totalKarma?: string;
-    verified?: boolean;
-    shadowBanned?: boolean;
-    description?: string[];
-
-    constructor(options: AuthorCriteria) {
-        this.name = options.name;
-        if(options.flairCssClass !== undefined) {
-            this.flairCssClass = typeof options.flairCssClass === 'string' ? [options.flairCssClass] : options.flairCssClass;
-        }
-        if(options.flairText !== undefined) {
-            this.flairText = typeof options.flairText === 'string' ? [options.flairText] : options.flairText;
-        }
-        this.isMod = options.isMod;
-        this.isContributor = options.isContributor;
-        this.userNotes = options.userNotes;
-        this.age = options.age;
-        this.commentKarma = options.commentKarma;
-        this.linkKarma = options.linkKarma;
-        this.totalKarma = options.totalKarma;
-        this.shadowBanned = options.shadowBanned;
-        this.description = options.description === undefined ? undefined : Array.isArray(options.description) ? options.description : [options.description];
+export const normalizeAuthorCriteria = (options: AuthorCriteria) => {
+    return {
+        ...options,
+        flairCssClass: typeof options.flairCssClass === 'string' ? [options.flairCssClass] : options.flairCssClass,
+        flairText: typeof options.flairText === 'string' ? [options.flairText] : options.flairText,
+        description: options.description === undefined ? undefined : Array.isArray(options.description) ? options.description : [options.description]
     }
 }
-
-export default Author;
