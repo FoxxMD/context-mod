@@ -1,8 +1,8 @@
 import {BotStats, BotStatusResponse, SubredditDataResponse} from "./interfaces";
 import {RunningState} from "../../Subreddit/Manager";
 import {Invokee, ManagerStats, RunState} from "../../Common/interfaces";
-import {cacheStats, createHistoricalStatsDisplay} from "../../util";
-import {createHistoricalDefaults, historicalDefaults} from "../../Common/defaults";
+import {cacheStats } from "../../util";
+import {createHistoricalDisplayDefaults} from "../../Common/defaults";
 
 const managerStats: ManagerStats = {
     cache: {
@@ -15,10 +15,7 @@ const managerStats: ManagerStats = {
         totalRequests: 0,
         types: cacheStats()
     },
-    historical: {
-        lastReload: createHistoricalStatsDisplay(createHistoricalDefaults()),
-        allTime: createHistoricalStatsDisplay(createHistoricalDefaults()),
-    },
+    historical: createHistoricalDisplayDefaults(),
     eventsAvg: 0,
     rulesAvg: 0,
 };

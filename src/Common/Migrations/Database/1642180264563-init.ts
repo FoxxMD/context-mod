@@ -35,6 +35,10 @@ export class init1642180264563 implements MigrationInterface {
         await queryRunner.query(`CREATE TABLE "Manager" ("id" varchar(20) PRIMARY KEY NOT NULL, "name" varchar(200) NOT NULL, "botId" varchar(20), "subredditId" varchar)`);
         await queryRunner.query(`CREATE TABLE "Action" ("id" varchar(300) PRIMARY KEY NOT NULL, "name" varchar(300), "kindId" integer, "managerId" varchar(20))`);
         await queryRunner.query(`CREATE TABLE "DispatchedAction" ("id" varchar(20) PRIMARY KEY NOT NULL, "createdAt" integer NOT NULL, "activityId" varchar NOT NULL, "delay" integer NOT NULL, "action" varchar, "goto" varchar(200), "type" varchar NOT NULL, "identifier" varchar(200), "cancelIfQueued" varchar(200), "onExistingFound" varchar, "tardyTolerant" varchar(200) NOT NULL, "managerId" varchar(20))`);
+        await queryRunner.query(`CREATE TABLE "TimeSeriesStat" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "createdAt" integer NOT NULL, "granularity" varchar NOT NULL, "metric" varchar(60) NOT NULL, "value" bigint NOT NULL, "managerId" varchar NOT NULL)`);
+        await queryRunner.query(`CREATE INDEX "IDX_842bf2abc463b163fdd4406031" ON "TimeSeriesStat" ("createdAt") `);
+        await queryRunner.query(`CREATE TABLE "TotalStat" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "createdAt" integer NOT NULL, "metric" varchar(60) NOT NULL, "value" bigint NOT NULL, "managerId" varchar NOT NULL)`);
+        await queryRunner.query(`CREATE INDEX "IDX_99faa3b1f539a14f095192a127" ON "TotalStat" ("createdAt") `);
         await queryRunner.query(`DROP INDEX "IDX_4cec0381d1eb9dedaf3ad68b56"`);
         await queryRunner.query(`CREATE TABLE "temporary_FilterCriteriaResult" ("id" varchar(20) PRIMARY KEY NOT NULL, "behavior" varchar(20) NOT NULL, "propertyResults" text NOT NULL, "passed" boolean NOT NULL, "type" varchar NOT NULL, "filterResultId" varchar(20), "criteriaId" varchar(20), CONSTRAINT "FK_dc19c7594354a1657b7df9112ec" FOREIGN KEY ("filterResultId") REFERENCES "FilterResult" ("id") ON DELETE NO ACTION ON UPDATE NO ACTION, CONSTRAINT "FK_8c43758c3347b6b5446fc329ec5" FOREIGN KEY ("criteriaId") REFERENCES "FilterCriteria" ("id") ON DELETE NO ACTION ON UPDATE NO ACTION)`);
         await queryRunner.query(`INSERT INTO "temporary_FilterCriteriaResult"("id", "behavior", "propertyResults", "passed", "type", "filterResultId", "criteriaId") SELECT "id", "behavior", "propertyResults", "passed", "type", "filterResultId", "criteriaId" FROM "FilterCriteriaResult"`);
@@ -109,9 +113,33 @@ export class init1642180264563 implements MigrationInterface {
         await queryRunner.query(`INSERT INTO "temporary_DispatchedAction"("id", "createdAt", "activityId", "delay", "action", "goto", "type", "identifier", "cancelIfQueued", "onExistingFound", "tardyTolerant", "managerId") SELECT "id", "createdAt", "activityId", "delay", "action", "goto", "type", "identifier", "cancelIfQueued", "onExistingFound", "tardyTolerant", "managerId" FROM "DispatchedAction"`);
         await queryRunner.query(`DROP TABLE "DispatchedAction"`);
         await queryRunner.query(`ALTER TABLE "temporary_DispatchedAction" RENAME TO "DispatchedAction"`);
+        await queryRunner.query(`DROP INDEX "IDX_842bf2abc463b163fdd4406031"`);
+        await queryRunner.query(`CREATE TABLE "temporary_TimeSeriesStat" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "createdAt" integer NOT NULL, "granularity" varchar NOT NULL, "metric" varchar(60) NOT NULL, "value" bigint NOT NULL, "managerId" varchar NOT NULL, CONSTRAINT "FK_3304748d37b3b31ec30a0fbc6ed" FOREIGN KEY ("managerId") REFERENCES "Manager" ("id") ON DELETE NO ACTION ON UPDATE NO ACTION)`);
+        await queryRunner.query(`INSERT INTO "temporary_TimeSeriesStat"("id", "createdAt", "granularity", "metric", "value", "managerId") SELECT "id", "createdAt", "granularity", "metric", "value", "managerId" FROM "TimeSeriesStat"`);
+        await queryRunner.query(`DROP TABLE "TimeSeriesStat"`);
+        await queryRunner.query(`ALTER TABLE "temporary_TimeSeriesStat" RENAME TO "TimeSeriesStat"`);
+        await queryRunner.query(`CREATE INDEX "IDX_842bf2abc463b163fdd4406031" ON "TimeSeriesStat" ("createdAt") `);
+        await queryRunner.query(`DROP INDEX "IDX_99faa3b1f539a14f095192a127"`);
+        await queryRunner.query(`CREATE TABLE "temporary_TotalStat" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "createdAt" integer NOT NULL, "metric" varchar(60) NOT NULL, "value" bigint NOT NULL, "managerId" varchar NOT NULL, CONSTRAINT "FK_59e9d2e2829119e2e4395b3bdde" FOREIGN KEY ("managerId") REFERENCES "Manager" ("id") ON DELETE NO ACTION ON UPDATE NO ACTION)`);
+        await queryRunner.query(`INSERT INTO "temporary_TotalStat"("id", "createdAt", "metric", "value", "managerId") SELECT "id", "createdAt", "metric", "value", "managerId" FROM "TotalStat"`);
+        await queryRunner.query(`DROP TABLE "TotalStat"`);
+        await queryRunner.query(`ALTER TABLE "temporary_TotalStat" RENAME TO "TotalStat"`);
+        await queryRunner.query(`CREATE INDEX "IDX_99faa3b1f539a14f095192a127" ON "TotalStat" ("createdAt") `);
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {
+        await queryRunner.query(`DROP INDEX "IDX_99faa3b1f539a14f095192a127"`);
+        await queryRunner.query(`ALTER TABLE "TotalStat" RENAME TO "temporary_TotalStat"`);
+        await queryRunner.query(`CREATE TABLE "TotalStat" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "createdAt" integer NOT NULL, "metric" varchar(60) NOT NULL, "value" bigint NOT NULL, "managerId" varchar NOT NULL)`);
+        await queryRunner.query(`INSERT INTO "TotalStat"("id", "createdAt", "metric", "value", "managerId") SELECT "id", "createdAt", "metric", "value", "managerId" FROM "temporary_TotalStat"`);
+        await queryRunner.query(`DROP TABLE "temporary_TotalStat"`);
+        await queryRunner.query(`CREATE INDEX "IDX_99faa3b1f539a14f095192a127" ON "TotalStat" ("createdAt") `);
+        await queryRunner.query(`DROP INDEX "IDX_842bf2abc463b163fdd4406031"`);
+        await queryRunner.query(`ALTER TABLE "TimeSeriesStat" RENAME TO "temporary_TimeSeriesStat"`);
+        await queryRunner.query(`CREATE TABLE "TimeSeriesStat" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "createdAt" integer NOT NULL, "granularity" varchar NOT NULL, "metric" varchar(60) NOT NULL, "value" bigint NOT NULL, "managerId" varchar NOT NULL)`);
+        await queryRunner.query(`INSERT INTO "TimeSeriesStat"("id", "createdAt", "granularity", "metric", "value", "managerId") SELECT "id", "createdAt", "granularity", "metric", "value", "managerId" FROM "temporary_TimeSeriesStat"`);
+        await queryRunner.query(`DROP TABLE "temporary_TimeSeriesStat"`);
+        await queryRunner.query(`CREATE INDEX "IDX_842bf2abc463b163fdd4406031" ON "TimeSeriesStat" ("createdAt") `);
         await queryRunner.query(`ALTER TABLE "DispatchedAction" RENAME TO "temporary_DispatchedAction"`);
         await queryRunner.query(`CREATE TABLE "DispatchedAction" ("id" varchar(20) PRIMARY KEY NOT NULL, "createdAt" integer NOT NULL, "activityId" varchar NOT NULL, "delay" integer NOT NULL, "action" varchar, "goto" varchar(200), "type" varchar NOT NULL, "identifier" varchar(200), "cancelIfQueued" varchar(200), "onExistingFound" varchar, "tardyTolerant" varchar(200) NOT NULL, "managerId" varchar(20))`);
         await queryRunner.query(`INSERT INTO "DispatchedAction"("id", "createdAt", "activityId", "delay", "action", "goto", "type", "identifier", "cancelIfQueued", "onExistingFound", "tardyTolerant", "managerId") SELECT "id", "createdAt", "activityId", "delay", "action", "goto", "type", "identifier", "cancelIfQueued", "onExistingFound", "tardyTolerant", "managerId" FROM "temporary_DispatchedAction"`);
@@ -186,6 +214,10 @@ export class init1642180264563 implements MigrationInterface {
         await queryRunner.query(`INSERT INTO "FilterCriteriaResult"("id", "behavior", "propertyResults", "passed", "type", "filterResultId", "criteriaId") SELECT "id", "behavior", "propertyResults", "passed", "type", "filterResultId", "criteriaId" FROM "temporary_FilterCriteriaResult"`);
         await queryRunner.query(`DROP TABLE "temporary_FilterCriteriaResult"`);
         await queryRunner.query(`CREATE INDEX "IDX_4cec0381d1eb9dedaf3ad68b56" ON "FilterCriteriaResult" ("type") `);
+        await queryRunner.query(`DROP INDEX "IDX_99faa3b1f539a14f095192a127"`);
+        await queryRunner.query(`DROP TABLE "TotalStat"`);
+        await queryRunner.query(`DROP INDEX "IDX_842bf2abc463b163fdd4406031"`);
+        await queryRunner.query(`DROP TABLE "TimeSeriesStat"`);
         await queryRunner.query(`DROP TABLE "DispatchedAction"`);
         await queryRunner.query(`DROP TABLE "Action"`);
         await queryRunner.query(`DROP TABLE "Manager"`);

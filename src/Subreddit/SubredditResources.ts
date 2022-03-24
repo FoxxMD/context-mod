@@ -20,7 +20,7 @@ import {
     compareDurationValue,
     comparisonTextOp,
     createCacheManager,
-    createHistoricalStatsDisplay, escapeRegex, FAIL,
+    escapeRegex, FAIL,
     fetchExternalUrl, filterCriteriaSummary,
     formatNumber, generateItemFilterHelpers,
     getActivityAuthorName,
@@ -54,10 +54,6 @@ import {
     ActionedEvent,
     SubredditState,
     StrongSubredditState,
-    HistoricalStats,
-    HistoricalStatUpdateData,
-    SubredditHistoricalStats,
-    SubredditHistoricalStatsDisplay,
     ThirdPartyCredentialsJsonConfig,
     FilterCriteriaResult,
     FilterResult,
@@ -66,7 +62,7 @@ import {
     ItemCritPropHelper,
     ActivityDispatch,
     FilterCriteriaPropertyResult,
-    ActivitySource,
+    ActivitySource, HistoricalStatsDisplay,
 } from "../Common/interfaces";
 import UserNotes from "./UserNotes";
 import Mustache from "mustache";
@@ -75,7 +71,10 @@ import {AuthorCriteria, AuthorOptions} from "../Author/Author";
 import {SPoll} from "./Streams";
 import {Cache} from 'cache-manager';
 import {Submission, Comment, Subreddit, RedditUser} from "snoowrap/dist/objects";
-import {cacheTTLDefaults, createHistoricalDefaults, historicalDefaults} from "../Common/defaults";
+import {
+    cacheTTLDefaults,
+    createHistoricalDisplayDefaults,
+} from "../Common/defaults";
 import {check} from "tcp-port-used";
 import {ExtendedSnoowrap} from "../Utils/SnoowrapClients";
 import dayjs from "dayjs";
@@ -98,8 +97,27 @@ import {ManagerEntity} from "../Common/Entities/ManagerEntity";
 import {Bot} from "../Common/Entities/Bot";
 import {DispatchedEntity} from "../Common/Entities/DispatchedEntity";
 import {ActivitySourceEntity} from "../Common/Entities/ActivitySourceEntity";
+import {TotalStat} from "../Common/Entities/Stats/TotalStat";
+import {TimeSeriesStat} from "../Common/Entities/Stats/TimeSeriesStat";
 
 export const DEFAULT_FOOTER = '\r\n*****\r\nThis action was performed by [a bot.]({{botLink}}) Mention a moderator or [send a modmail]({{modmailLink}}) if you any ideas, questions, or concerns about this action.';
+
+/**
+ * Only used for migrating stats from cache to db
+ * */
+interface OldHistoricalStats {
+    eventsCheckedTotal: number
+    eventsActionedTotal: number
+    checksRun: Map<string, number>
+    checksFromCache: Map<string, number>
+    checksTriggered: Map<string, number>
+    rulesRun: Map<string, number>
+    //rulesCached: Map<string, number>
+    rulesCachedTotal: number
+    rulesTriggered: Map<string, number>
+    actionsRun: Map<string, number>
+    [index: string]: any
+}
 
 export interface SubredditResourceConfig extends Footer {
     caching?: CacheConfig,
@@ -161,12 +179,15 @@ export class SubredditResources {
     delayedItems: ActivityDispatch[] = [];
     dispatchedActivityRepo: Repository<DispatchedEntity>
     activitySourceRepo: Repository<ActivitySourceEntity>
+    totalStatsRepo: Repository<TotalStat>
+    totalStatsEntities: TotalStat[] = [];
+    tsStatsRepo: Repository<TimeSeriesStat>
     managerEntity: ManagerEntity
     botEntity: Bot
 
     stats: {
         cache: ResourceStats
-        historical: SubredditHistoricalStats
+        historical: HistoricalStatsDisplay
     };
 
     constructor(name: string, options: SubredditResourceOptions) {
@@ -206,6 +227,8 @@ export class SubredditResources {
         this.database = database;
         this.dispatchedActivityRepo = this.database.getRepository(DispatchedEntity);
         this.activitySourceRepo = this.database.getRepository(ActivitySourceEntity);
+        this.totalStatsRepo = this.database.getRepository(TotalStat);
+        this.tsStatsRepo = this.database.getRepository(TimeSeriesStat);
         this.prefix = prefix;
         this.client = client;
         this.cacheType = cacheType;
@@ -229,10 +252,7 @@ export class SubredditResources {
 
         this.stats = {
             cache: cacheStats(),
-            historical: {
-                allTime: createHistoricalDefaults(),
-                lastReload: createHistoricalDefaults()
-            }
+            historical: createHistoricalDisplayDefaults(),
         };
 
         const cacheUseCB = (miss: boolean) => {
@@ -310,80 +330,85 @@ export class SubredditResources {
     }
 
     async initHistoricalStats() {
-         const at = await this.cache.wrap(`${this.name}-historical-allTime`, () => createHistoricalDefaults(), {ttl: 0}) as object;
-         const rehydratedAt: any = {};
-         for(const [k, v] of Object.entries(at)) {
-             const t = typeof v;
-             if(t === 'number') {
-                 // simple number stat like eventsCheckedTotal
-                 rehydratedAt[k] = v;
-             } else if(Array.isArray(v)) {
-                 // a map stat that we have data for is serialized as an array of KV pairs
-                rehydratedAt[k] = new Map(v);
-             } else if(v === null || v === undefined || (t === 'object' && Object.keys(v).length === 0)) {
-                 // a map stat that was not serialized (for some reason) or serialized without any data
-                 rehydratedAt[k] = new Map();
-             } else {
-                 // ???? shouldn't get here
-                 this.logger.warn(`Did not recognize rehydrated historical stat "${k}" of type ${t}`);
-                 rehydratedAt[k] = v;
-             }
-         }
-         this.stats.historical.allTime = rehydratedAt as HistoricalStats;
+        // temp migration strategy to transition from cache to db
+        let currentStats: HistoricalStatsDisplay = createHistoricalDisplayDefaults();
+        const totalStats = await this.totalStatsRepo.findBy({managerId: this.managerEntity.id});
+        if(totalStats.length === 0) {
+            const at = await this.cache.get(`${this.name}-historical-allTime`) as null | undefined | OldHistoricalStats;
+            if(at !== null && at !== undefined) {
+                // convert to historical stat object
+                const rehydratedAt: any = {};
+                for(const [k, v] of Object.entries(at)) {
+                    const t = typeof v;
+                    if(t === 'number') {
+                        // simple number stat like eventsCheckedTotal
+                        rehydratedAt[k] = v;
+                    } else if(Array.isArray(v)) {
+                        // a map stat that we have data for is serialized as an array of KV pairs
+                         const statMap = new Map(v);
+                        // @ts-ignore
+                        rehydratedAt[`${k}Total`] = Array.from(statMap.values()).reduce((acc, curr) => acc + curr, 0)
+                    } else if(v === null || v === undefined || (t === 'object' && Object.keys(v).length === 0)) {
+                        // a map stat that was not serialized (for some reason) or serialized without any data
+                        rehydratedAt[k] = 0;
+                    } else {
+                        // ???? shouldn't get here
+                        this.logger.warn(`Did not recognize rehydrated historical stat "${k}" of type ${t}`);
+                        rehydratedAt[k] = v;
+                    }
+                }
+                currentStats = rehydratedAt as HistoricalStatsDisplay;
+            }
+            const now = dayjs();
+            const statEntities: TotalStat[] = [];
+            for(const [k,v] of Object.entries(currentStats)) {
+                statEntities.push(new TotalStat({
+                    metric: k,
+                    value: v,
+                    manager: this.managerEntity,
+                    createdAt: now,
+                }));
+            }
+            await this.totalStatsRepo.save(statEntities);
+            this.totalStatsEntities = statEntities;
+        } else {
+            this.totalStatsEntities = totalStats;
+            for(const [k, v] of Object.entries(currentStats)) {
+                const matchedStat = totalStats.find(x => x.metric === k);
+                if(matchedStat !== undefined) {
+                    currentStats[k] = matchedStat.value;
+                } else {
+                    this.logger.warn(`Could not find stat matching '${k}' in the database, will default to 0`);
+                    currentStats[k] = v;
+                }
+            }
+        }
+        this.stats.historical = currentStats;
     }
 
-    updateHistoricalStats(data: HistoricalStatUpdateData) {
+    updateHistoricalStats(data: Partial<HistoricalStatsDisplay>) {
         for(const [k, v] of Object.entries(data)) {
-            if(this.stats.historical.lastReload[k] !== undefined) {
-                if(typeof v === 'number') {
-                    this.stats.historical.lastReload[k] += v;
-                } else if(this.stats.historical.lastReload[k] instanceof Map) {
-                    const keys = Array.isArray(v) ? v : [v];
-                    for(const key of keys) {
-                        this.stats.historical.lastReload[k].set(key, (this.stats.historical.lastReload[k].get(key) || 0) + 1);
-                    }
-                }
-            }
-            if(this.stats.historical.allTime[k] !== undefined) {
-                if(typeof v === 'number') {
-                    this.stats.historical.allTime[k] += v;
-                } else if(this.stats.historical.allTime[k] instanceof Map) {
-                    const keys = Array.isArray(v) ? v : [v];
-                    for(const key of keys) {
-                        this.stats.historical.allTime[k].set(key, (this.stats.historical.allTime[k].get(key) || 0) + 1);
-                    }
-                }
+            if(this.stats.historical[k] !== undefined && v !== undefined) {
+                this.stats.historical[k] += v;
             }
         }
     }
 
-    getHistoricalDisplayStats(): SubredditHistoricalStatsDisplay {
-        return {
-            allTime: createHistoricalStatsDisplay(this.stats.historical.allTime),
-            lastReload: createHistoricalStatsDisplay(this.stats.historical.lastReload)
-        }
+    getHistoricalDisplayStats(): HistoricalStatsDisplay {
+        return this.stats.historical;
     }
 
     async saveHistoricalStats() {
-        const atSerializable: any = {};
-        for(const [k, v] of Object.entries(this.stats.historical.allTime)) {
-            if(v instanceof Map) {
-                atSerializable[k] = Array.from(v.entries());
+        for(const [k, v] of Object.entries(this.stats.historical)) {
+            const matchedStatIndex = this.totalStatsEntities.findIndex(x => x.metric === k);
+            if(matchedStatIndex !== -1) {
+                this.totalStatsEntities[matchedStatIndex].value = v;
             } else {
-                atSerializable[k] = v;
+                this.logger.warn(`Could not find stat matching '${k}' in total stats??`);
             }
-        }
-        await this.cache.set(`${this.name}-historical-allTime`, atSerializable, {ttl: 0});
 
-        // const lrSerializable: any = {};
-        // for(const [k, v] of Object.entries(this.stats.historical.lastReload)) {
-        //     if(v instanceof Map) {
-        //         lrSerializable[k] = Array.from(v.entries());
-        //     } else {
-        //         lrSerializable[k] = v;
-        //     }
-        // }
-        // await this.cache.set(`${this.name}-historical-lastReload`, lrSerializable, {ttl: 0});
+        }
+        await this.totalStatsRepo.save(this.totalStatsEntities);
     }
 
     setHistoricalSaveInterval() {
@@ -2206,7 +2231,6 @@ export class BotResourcesManager {
             // reset cache stats when configuration is reloaded
             resource.stats.cache = cacheStats();
         }
-        resource.stats.historical.lastReload = createHistoricalDefaults();
         await resource.initDatabaseDelayedActivities();
 
         return resource;

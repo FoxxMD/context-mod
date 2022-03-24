@@ -1,34 +1,19 @@
-import {HistoricalStats, FilterCriteriaDefaults} from "./interfaces";
+import {FilterCriteriaDefaults, HistoricalStatsDisplay} from "./interfaces";
 
 export const cacheOptDefaults = {ttl: 60, max: 500, checkPeriod: 600};
 export const cacheTTLDefaults = {authorTTL: 60, userNotesTTL: 300, wikiTTL: 300, submissionTTL: 60, commentTTL: 60, filterCriteriaTTL: 60, subredditTTL: 600, selfTTL: 60};
-export const historicalDefaults: HistoricalStats = {
+
+export const createHistoricalDisplayDefaults = (): HistoricalStatsDisplay => ({
+    checksRunTotal: 0,
+    checksFromCacheTotal: 0,
+    checksTriggeredTotal: 0,
+    rulesRunTotal: 0,
+    rulesCachedTotal: 0,
+    rulesTriggeredTotal: 0,
+    actionsRunTotal: 0,
     eventsCheckedTotal: 0,
     eventsActionedTotal: 0,
-    checksRun: new Map(),
-    checksFromCache: new Map(),
-    checksTriggered: new Map(),
-    rulesRun: new Map(),
-    //rulesCached: new Map(),
-    rulesCachedTotal: 0,
-    rulesTriggered: new Map(),
-    actionsRun: new Map(),
-}
-
-export const createHistoricalDefaults = (): HistoricalStats => {
-    return {
-        eventsCheckedTotal: 0,
-        eventsActionedTotal: 0,
-        checksRun: new Map(),
-        checksFromCache: new Map(),
-        checksTriggered: new Map(),
-        rulesRun: new Map(),
-        //rulesCached: new Map(),
-        rulesCachedTotal: 0,
-        rulesTriggered: new Map(),
-        actionsRun: new Map(),
-    };
-}
+})
 
 export const filterCriteriaDefault: FilterCriteriaDefaults = {
     authorIs: {

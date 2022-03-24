@@ -409,15 +409,15 @@ export abstract class Check extends RunnableBase implements ICheck {
             }
             throw new CheckProcessingError(`[CHK ${this.name}] An uncaught exception occurred while processing Check`, {cause: err}, checkResult);
         } finally {
-            // this.resources.updateHistoricalStats({
-            //     checksTriggered: checkSum.triggered ? [checkSum.name] : [],
-            //     checksRun: [checkSum.name],
-            //     checksFromCache: checkSum.fromCache ? [checkSum.name] : [],
-            //     actionsRun: checkSum.actionResults.map(x => x.name),
-            //     rulesRun: checkSum.ruleResults.map(x => x.name),
-            //     rulesTriggered: checkSum.ruleResults.filter(x => x.triggered).map(x => x.name),
-            //     rulesCachedTotal: checkSum.ruleResults.filter(x => x.fromCache).length
-            // })
+            this.resources.updateHistoricalStats({
+                checksTriggeredTotal: checkResult.triggered ? 1 : 0,
+                checksRunTotal: 1,
+                checksFromCacheTotal: checkResult.fromCache ? 1 : 0,
+                actionsRunTotal: checkResult.actionResults !== undefined ? checkResult.actionResults.length : undefined,
+                rulesRunTotal: checkResult.ruleResults !== undefined ? checkResult.ruleResults.length : undefined,
+                rulesTriggeredTotal: checkResult.ruleResults !== undefined ? checkResult.ruleResults.filter(x => x.triggered).length : undefined,
+                rulesCachedTotal: checkResult.ruleResults !== undefined ? checkResult.ruleResults.filter(x => x.fromCache).length : undefined
+            })
         }
     }
 

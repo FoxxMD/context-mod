@@ -6,7 +6,6 @@ import {
     asComment,
     asSubmission,
     cacheStats,
-    createHistoricalStatsDisplay,
     createRetryHandler,
     determineNewResults,
     findLastIndex,
@@ -68,7 +67,7 @@ import {queue, QueueObject} from 'async';
 import {JSONConfig} from "../JsonConfig";
 import {Check, CheckStructuredJson} from "../Check";
 import NotificationManager from "../Notification/NotificationManager";
-import {createHistoricalDefaults, historicalDefaults} from "../Common/defaults";
+import {createHistoricalDisplayDefaults} from "../Common/defaults";
 import {ExtendedSnoowrap} from "../Utils/SnoowrapClients";
 import {CMError, isRateLimitError, isStatusError, RunProcessingError} from "../Utils/Errors";
 import {ErrorWithCause, stackWithCauses} from "pony-cause";
@@ -216,10 +215,7 @@ export class Manager extends EventEmitter {
         const data: any = {
             eventsAvg: formatNumber(this.eventsRollingAvg),
             rulesAvg: formatNumber(this.rulesUniqueRollingAvg),
-            historical: {
-                lastReload: createHistoricalStatsDisplay(createHistoricalDefaults()),
-                allTime: createHistoricalStatsDisplay(createHistoricalDefaults()),
-            },
+            historical: createHistoricalDisplayDefaults(),
             cache: {
                 provider: 'none',
                 currentKeyCount: 0,
@@ -329,7 +325,7 @@ export class Manager extends EventEmitter {
 
         this.eventsSampleInterval = setInterval((function(self) {
             return function() {
-                const et = self.resources !== undefined ? self.resources.stats.historical.allTime.eventsCheckedTotal : 0;
+                const et = self.resources !== undefined ? self.resources.stats.historical.eventsCheckedTotal : 0;
                 const rollingSample = self.eventsSample.slice(0, 7)
                 rollingSample.unshift(et)
                 self.eventsSample = rollingSample;
@@ -351,7 +347,7 @@ export class Manager extends EventEmitter {
         this.rulesUniqueSampleInterval = setInterval((function(self) {
             return function() {
                 const rollingSample = self.rulesUniqueSample.slice(0, 7)
-                const rt = self.resources !== undefined ? self.resources.stats.historical.allTime.rulesRunTotal - self.resources.stats.historical.allTime.rulesCachedTotal : 0;
+                const rt = self.resources !== undefined ? self.resources.stats.historical.rulesRunTotal - self.resources.stats.historical.rulesCachedTotal : 0;
                 rollingSample.unshift(rt);
                 self.rulesUniqueSample = rollingSample;
                 const diff = self.rulesUniqueSample.reduceRight((acc: number[], curr, index) => {
@@ -1064,7 +1060,7 @@ export class Manager extends EventEmitter {
             } finally {
                 this.resources.updateHistoricalStats({
                     eventsCheckedTotal: 1,
-                    eventsActionedTotal: actionedEvent.triggered ? 1 : 0,
+                    eventsActionedTotal: event.triggered ? 1 : 0,
                 });
             }
         }

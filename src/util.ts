@@ -26,8 +26,6 @@ import {
     FilterCriteriaResult,
     FilterResult, FullNameTypes,
     GenericComparison,
-    HistoricalStats,
-    HistoricalStatsDisplay,
     ImageComparisonResult,
     ItemCritPropHelper,
     LogInfo,
@@ -2004,20 +2002,6 @@ export const pixelImageCompare = async (data1: ImageData, data2: ImageData): Pro
 //         analysisTime: resResult.analysisTime
 //     };
 // }
-
-export const createHistoricalStatsDisplay = (data: HistoricalStats): HistoricalStatsDisplay => {
-    const display: any = {};
-    for(const [k, v] of Object.entries(data)) {
-        if(v instanceof Map) {
-            display[k] = v;
-            display[`${k}Total`] = Array.from(v.values()).reduce((acc, curr) => acc + curr, 0);
-        } else {
-            display[k] = v;
-        }
-    }
-
-    return display as HistoricalStatsDisplay;
-}
 
 /**
  * Determine if the state criteria being checked are
