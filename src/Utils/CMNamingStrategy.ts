@@ -5,13 +5,13 @@
 // https://gist.github.com/recurrence/b6a4cb04a8ddf42eda4e4be520921bd2
 
 import { DefaultNamingStrategy, NamingStrategyInterface } from 'typeorm';
-import { snakeCase } from 'typeorm/util/StringUtils';
+import { snakeCase, titleCase, camelCase } from 'typeorm/util/StringUtils';
 
-export class SnakeNamingStrategy
+export class CMNamingStrategy
     extends DefaultNamingStrategy
     implements NamingStrategyInterface {
     tableName(className: string, customName: string): string {
-        return customName ? customName : snakeCase(className);
+        return customName ?? className;
     }
 
     columnName(
@@ -20,17 +20,17 @@ export class SnakeNamingStrategy
         embeddedPrefixes: string[],
     ): string {
         return (
-            snakeCase(embeddedPrefixes.concat('').join('_')) +
-            (customName ? customName : snakeCase(propertyName))
+            camelCase(embeddedPrefixes.concat('').join('_')) +
+            (customName ? customName : camelCase(propertyName))
         );
     }
 
     relationName(propertyName: string): string {
-        return snakeCase(propertyName);
+        return camelCase(propertyName);
     }
 
     joinColumnName(relationName: string, referencedColumnName: string): string {
-        return snakeCase(relationName + '_' + referencedColumnName);
+        return camelCase(relationName + '_' + referencedColumnName);
     }
 
     joinTableName(
@@ -39,7 +39,7 @@ export class SnakeNamingStrategy
         firstPropertyName: string,
         secondPropertyName: string,
     ): string {
-        return snakeCase(
+        return camelCase(
             firstTableName +
             '_' +
             firstPropertyName.replace(/\./gi, '_') +
@@ -53,7 +53,7 @@ export class SnakeNamingStrategy
         propertyName: string,
         columnName?: string,
     ): string {
-        return snakeCase(
+        return camelCase(
             tableName + '_' + (columnName ? columnName : propertyName),
         );
     }
@@ -62,7 +62,7 @@ export class SnakeNamingStrategy
         parentTableName: any,
         parentTableIdPropertyName: any,
     ): string {
-        return snakeCase(parentTableName + '_' + parentTableIdPropertyName);
+        return camelCase(parentTableName + '_' + parentTableIdPropertyName);
     }
 
     eagerJoinRelationAlias(alias: string, propertyPath: string): string {

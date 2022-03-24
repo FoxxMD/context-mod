@@ -1,5 +1,5 @@
 const {DataSource} = require("typeorm");
-const {SnakeNamingStrategy} = require("./src/Utils/SnakeCaseNamingStrategy");
+const {CMNamingStrategy} = require("./src/Utils/CMNamingStrategy");
 
 const MyDataSource = new DataSource({
     type: "sqljs",
@@ -12,7 +12,7 @@ const MyDataSource = new DataSource({
     migrations: [
         "src/Common/Migrations/Database/**/*.js"
     ],
-    //namingStrategy: new SnakeNamingStrategy(),
+    namingStrategy: new CMNamingStrategy(),
 })
 
 exports.sqljs = MyDataSource;
