@@ -6,7 +6,8 @@ import {
     OneToMany,
     CreateDateColumn,
     AfterLoad,
-    BeforeInsert
+    BeforeInsert,
+    Index
 } from "typeorm";
 import {Activity} from "./Activity";
 import {ManagerEntity} from "./ManagerEntity";
@@ -33,9 +34,11 @@ export class CMEvent extends RandomIdBaseEntity {
     @ManyToOne(type => ActivitySourceEntity, act => act.events, {cascade: ['insert'], eager: true})
     source!: ActivitySourceEntity;
 
+    @Index()
     @Column({ type: 'int', width: 13, nullable: false, readonly: true, unsigned: true })
     queuedAt: Dayjs = dayjs();
 
+    @Index()
     @Column({ type: 'int', width: 13, nullable: false, readonly: true, unsigned: true })
     processedAt: Dayjs = dayjs();
 

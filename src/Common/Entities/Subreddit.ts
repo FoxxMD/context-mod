@@ -1,4 +1,4 @@
-import {Entity, Column, PrimaryColumn, OneToMany} from "typeorm";
+import {Entity, Column, PrimaryColumn, OneToMany, Index} from "typeorm";
 import {Activity} from "./Activity";
 
 export interface SubredditEntityOptions {
@@ -12,6 +12,7 @@ export class Subreddit {
     @PrimaryColumn()
     id!: string;
 
+    @Index({unique: true})
     @Column("varchar", {length: 200})
     name!: string;
 

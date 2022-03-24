@@ -1,4 +1,4 @@
-import {Entity, Column, PrimaryGeneratedColumn, ManyToOne, PrimaryColumn, OneToMany, OneToOne} from "typeorm";
+import {Entity, Column, PrimaryGeneratedColumn, ManyToOne, PrimaryColumn, OneToMany, OneToOne, Index} from "typeorm";
 import {AuthorEntity} from "./AuthorEntity";
 import {Subreddit} from "./Subreddit";
 import {CMEvent} from "./CMEvent";
@@ -18,6 +18,7 @@ export interface ActivityEntityOptions {
 }
 
 @Entity()
+@Index(['name', 'type'], {unique: true})
 export class Activity {
 
     @PrimaryColumn({name: 'id', comment: 'A reddit fullname -- includes prefix'})
@@ -52,6 +53,7 @@ export class Activity {
     @Column("text")
     content!: string;
 
+    @Index({unique: true})
     @Column("text")
     permalink!: string;
 
