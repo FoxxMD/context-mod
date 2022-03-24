@@ -79,12 +79,12 @@ import {check} from "tcp-port-used";
 import {ExtendedSnoowrap} from "../Utils/SnoowrapClients";
 import dayjs from "dayjs";
 import ImageData from "../Common/ImageData";
-import {Connection, Repository} from "typeorm";
+import {Connection, Repository, SelectQueryBuilder} from "typeorm";
 import {Activity} from "../Common/Entities/Activity";
 import {Subreddit as SubredditEntity} from "../Common/Entities/Subreddit";
 import {AuthorEntity} from "../Common/Entities/AuthorEntity";
 import {RulePremise} from "../Common/Entities/RulePremise";
-import {CMEvent as ActionedEventEntity } from "../Common/Entities/CMEvent";
+import {CMEvent as ActionedEventEntity, CMEvent } from "../Common/Entities/CMEvent";
 import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
 import {ActionResultEntity} from "../Common/Entities/ActionResultEntity";
 import globrex from 'globrex';
@@ -568,6 +568,30 @@ export class SubredditResources {
 
     setLogger(logger: Logger) {
         this.logger = logger.child({labels: ['Resource Cache']}, mergeArr);
+    }
+
+    async getActionedEventsBuilder(): Promise<SelectQueryBuilder<CMEvent>> {
+        const eventRepo = this.database.getRepository(ActionedEventEntity);
+        return eventRepo.createQueryBuilder("event")
+            .leftJoinAndSelect('event.source', 'source')
+            .leftJoinAndSelect('event.activity', 'activity')
+            .leftJoinAndSelect('activity.subreddit', 'subreddit')
+            .leftJoinAndSelect('activity.author', 'author')
+            .leftJoinAndSelect('event.runResults', 'runResults')
+            .leftJoinAndSelect('runResults._authorIs', 'rrAuthorIs')
+            .leftJoinAndSelect('runResults._itemIs', 'rrItemIs')
+            .leftJoinAndSelect('runResults.run', 'run')
+            .leftJoinAndSelect('runResults.checkResults', 'checkResults')
+            .leftJoinAndSelect('checkResults._authorIs', 'cAuthorIs')
+            .leftJoinAndSelect('checkResults._itemIs', 'cItemIs')
+            .leftJoinAndSelect('checkResults.ruleResults', 'ruleResults')
+            .leftJoinAndSelect('ruleResults._authorIs', 'rAuthorIs')
+            .leftJoinAndSelect('ruleResults._itemIs', 'rItemIs')
+            .leftJoinAndSelect('checkResults.actionResults', 'actionResults')
+            .leftJoinAndSelect('actionResults._authorIs', 'aAuthorIs')
+            .leftJoinAndSelect('actionResults._itemIs', 'aItemIs')
+            .andWhere('event.manager.id = :managerId', {managerId: this.managerEntity.id})
+            .orderBy('event.processedAt', 'DESC')
     }
 
     async getActionedEvents(): Promise<ActionedEventEntity[]> {

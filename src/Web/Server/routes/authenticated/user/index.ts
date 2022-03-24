@@ -6,9 +6,10 @@ import {COMMENT_URL_ID, parseLinkIdentifier, SUBMISSION_URL_ID} from "../../../.
 import {booleanMiddle} from "../../../../Common/middleware";
 import {Manager} from "../../../../../Subreddit/Manager";
 import {ActionedEvent} from "../../../../../Common/interfaces";
-import {CMEvent as ActionedEventEntity} from "../../../../../Common/Entities/CMEvent";
+import {CMEvent, CMEvent as ActionedEventEntity} from "../../../../../Common/Entities/CMEvent";
 import {nanoid} from "nanoid";
 import dayjs from "dayjs";
+import {paginateRequest} from "../../../../Common/util";
 
 const commentReg = parseLinkIdentifier([COMMENT_URL_ID]);
 const submissionReg = parseLinkIdentifier([SUBMISSION_URL_ID]);
@@ -75,14 +76,38 @@ const actionedEvents = async (req: Request, res: Response) => {
         }
     }
 
-    let events: ActionedEventEntity[] = [];
-    for(const m of managers) {
-        if(m.resources !== undefined) {
-            events = events.concat(await m.resources.getActionedEvents());
-        }
-    }
+    const query = req.serverBot.database.getRepository(CMEvent)
+        .createQueryBuilder("event")
+        .leftJoinAndSelect('event.source', 'source')
+        .leftJoinAndSelect('event.activity', 'activity')
+        .leftJoinAndSelect('activity.subreddit', 'subreddit')
+        .leftJoinAndSelect('activity.author', 'author')
+        .leftJoinAndSelect('event.runResults', 'runResults')
+        .leftJoinAndSelect('runResults._authorIs', 'rrAuthorIs')
+        .leftJoinAndSelect('runResults._itemIs', 'rrItemIs')
+        .leftJoinAndSelect('rrAuthorIs.criteriaResults', 'rrAuthorCritResults')
+        .leftJoinAndSelect('rrItemIs.criteriaResults', 'rrItemCritResults')
+        .leftJoinAndSelect('runResults.run', 'run')
+        .leftJoinAndSelect('runResults.checkResults', 'checkResults')
+        .leftJoinAndSelect('checkResults._authorIs', 'cAuthorIs')
+        .leftJoinAndSelect('checkResults._itemIs', 'cItemIs')
+        .leftJoinAndSelect('cAuthorIs.criteriaResults', 'cAuthorCritResults')
+        .leftJoinAndSelect('cItemIs.criteriaResults', 'cItemCritResults')
+        .leftJoinAndSelect('checkResults.ruleResults', 'ruleResults')
+        .leftJoinAndSelect('ruleResults._authorIs', 'rAuthorIs')
+        .leftJoinAndSelect('ruleResults._itemIs', 'rItemIs')
+        .leftJoinAndSelect('rAuthorIs.criteriaResults', 'rAuthorCritResults')
+        .leftJoinAndSelect('rItemIs.criteriaResults', 'rItemCritResults')
+        .leftJoinAndSelect('checkResults.actionResults', 'actionResults')
+        .leftJoinAndSelect('actionResults._authorIs', 'aAuthorIs')
+        .leftJoinAndSelect('actionResults._itemIs', 'aItemIs')
+        .leftJoinAndSelect('aAuthorIs.criteriaResults', 'aAuthorCritResults')
+        .leftJoinAndSelect('aItemIs.criteriaResults', 'aItemCritResults')
+        .andWhere('event.manager.id IN (:...managerIds)', {managerIds: managers.map(x => x.managerEntity.id)})
+        .orderBy('event.processedAt', 'DESC')
 
-    return res.json(events);
+    // TODO will need to refactor this if we switch to allowing subreddits to use their own datasources
+    return res.json(await paginateRequest(query, req));
 };
 export const actionedEventsRoute = [authUserCheck(), botRoute(), subredditRoute(false), actionedEvents];
 

@@ -3,6 +3,11 @@ import {BotStats} from "./interfaces";
 import dayjs from "dayjs";
 import {formatNumber} from "../../util";
 import Bot from "../../Bot";
+import {SelectQueryBuilder} from "typeorm";
+import {Request} from "express";
+import {PaginationAwareObject} from "typeorm-pagination/dist/helpers/pagination";
+import {getPage, getPerPage} from 'typeorm-pagination'
+import { paginate } from 'typeorm-pagination/dist/helpers/pagination';
 
 export const opStats = (bot: Bot): BotStats => {
     const limitReset = bot.client === undefined ? dayjs() : dayjs(bot.client.ratelimitExpiration);
@@ -20,3 +25,10 @@ export const opStats = (bot: Bot): BotStats => {
         limitResetHuman: `in ${dayjs.duration(limitReset.diff(dayjs())).humanize()}`,
     }
 }
+
+export const paginateRequest = async (builder: SelectQueryBuilder<any>, req: Request, defaultPerPage: number = 15, maxPerPage: number = 100): Promise<PaginationAwareObject> => await paginate(
+    // @ts-ignore
+    builder,
+    getPage(req),
+    Math.min(getPerPage(req, defaultPerPage), maxPerPage)
+);

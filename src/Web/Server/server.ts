@@ -8,6 +8,7 @@ import {Server as SocketServer} from 'socket.io';
 import {Strategy as JwtStrategy, ExtractJwt} from 'passport-jwt';
 import passport from 'passport';
 import tcpUsed from 'tcp-port-used';
+import {pagination} from 'typeorm-pagination'
 
 import {
     LogEntry
@@ -32,6 +33,7 @@ import {ErrorWithCause} from "pony-cause";
 import {Manager} from "../../Subreddit/Manager";
 
 const server = addAsync(express());
+server.use(pagination);
 server.use(bodyParser.json());
 server.use(bodyParser.urlencoded({extended: false}));
 
