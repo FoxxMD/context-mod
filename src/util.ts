@@ -11,8 +11,8 @@ import pixelmatch from 'pixelmatch';
 import os from 'os';
 import crypto, {createHash} from 'crypto';
 import {
-    ActionResult,
-    ActivitySource,
+    ActionResult, ActivityDispatch, ActivityDispatchConfig,
+    ActivitySource, ActivitySourceTypes,
     ActivityWindowCriteria,
     ActivityWindowType,
     CacheOptions,
@@ -82,6 +82,7 @@ import {AuthorOptions} from "./Author/Author";
 import merge from "deepmerge";
 import {RulePremise} from "./Common/Entities/RulePremise";
 import {RuleResultEntity as RuleResultEntity} from "./Common/Entities/RuleResultEntity";
+import {nanoid} from "nanoid";
 
 
 //import {ResembleSingleCallbackComparisonResult} from "resemblejs";
@@ -2408,5 +2409,27 @@ export const parseRedditFullname = (str: string): RedditThing | undefined => {
         type: prefixToReddThingType(groups.prefix as string),
         prefix: groups.prefix as string,
         id: groups.id as string
+    }
+}
+
+export const activityDispatchConfigToDispatch = (config: ActivityDispatchConfig, activity: (Comment | Submission), type: ActivitySourceTypes, action?: string): ActivityDispatch => {
+    let tolerantVal: boolean | number | undefined;
+    if (config.tardyTolerant !== undefined) {
+        if (typeof config.tardyTolerant === 'boolean') {
+            tolerantVal = config.tardyTolerant;
+        } else {
+            tolerantVal = parseDurationValToDuration(config.tardyTolerant).asMilliseconds();
+        }
+    }
+    return {
+        ...config,
+        delay: parseDurationValToDuration(config.delay).asMilliseconds(),
+        tardyTolerant: tolerantVal,
+        queuedAt: dayjs().valueOf(),
+        processing: false,
+        id: nanoid(16),
+        activity,
+        action,
+        type,
     }
 }

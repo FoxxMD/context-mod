@@ -4,7 +4,7 @@ import Snoowrap, {Comment, Submission} from "snoowrap";
 import {activityIsRemoved} from "../Utils/SnoowrapUtils";
 import {ActionProcessResult, ActionTarget, ActivityDispatchConfig, RuleResult} from "../Common/interfaces";
 import dayjs from "dayjs";
-import {isSubmission, parseDurationValToDuration, randomId} from "../util";
+import {activityDispatchConfigToDispatch, isSubmission, parseDurationValToDuration, randomId} from "../util";
 import {ActionTypes} from "../Common/types";
 import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
 
@@ -19,17 +19,13 @@ export class DispatchAction extends Action {
     constructor(options: DispatchOptions) {
         super(options);
         const {
-            identifier,
             cancelIfQueued = false,
-            goto,
-            delay,
-            target = ['self']
+            target = ['self'],
+            ...rest
         } = options;
         this.dispatchData = {
-            identifier: identifier,
+            ...rest,
             cancelIfQueued,
-            goto,
-            delay,
         }
         this.targets = !Array.isArray(target) ? [target] : target;
     }
@@ -50,14 +46,7 @@ export class DispatchAction extends Action {
             }
         }
 
-        const {delay, ...restDispatchData} = this.dispatchData;
-        const dispatchPayload = {
-            ...restDispatchData,
-            delay,
-            queuedAt: dayjs().unix(),
-            duration: parseDurationValToDuration(delay),
-            processing: false,
-        };
+        const dur = parseDurationValToDuration(this.dispatchData.delay);
 
         const dispatchActivitiesHints = [];
         for (const target of realTargets) {
@@ -77,12 +66,12 @@ export class DispatchAction extends Action {
 
             const existing = this.resources.delayedItems.filter(x => {
                 const matchedActivityId = x.activity.name === act.name;
-                const matchDispatchIdentifier = dispatchPayload.identifier === undefined ? true : dispatchPayload.identifier === x.identifier;
+                const matchDispatchIdentifier = this.dispatchData.identifier === undefined ? true : this.dispatchData.identifier === x.identifier;
                 return matchedActivityId && matchDispatchIdentifier;
             });
 
             if (existing.length > 0) {
-                let existingRes = `Dispatch activities (${existing.map((x, index) => `[${index + 1}] Queued At ${dayjs.unix(x.queuedAt).format('YYYY-MM-DD HH:mm:ssZ')} for ${x.duration.humanize()}`).join(' ')}}) already exist for ${actHint}`;
+                let existingRes = `Dispatch activities (${existing.map((x, index) => `[${index + 1}] Queued At ${dayjs.unix(x.queuedAt).format('YYYY-MM-DD HH:mm:ssZ')} for ${dayjs.duration(x.delay, 'millisecond').humanize()}`).join(' ')}}) already exist for ${actHint}`;
                 if (this.dispatchData.onExistingFound === 'skip') {
                     existingRes += ` and existing behavior is SKIP so nothing queued`;
                     continue;
@@ -101,22 +90,17 @@ export class DispatchAction extends Action {
             }
 
             if (!dryRun) {
-                await this.resources.addDelayedActivity({
-                    ...dispatchPayload,
-                    activity: act,
-                    id: 'notUsed',
-                    action: this.getActionUniqueName()
-                })
+                await this.resources.addDelayedActivity(activityDispatchConfigToDispatch(this.dispatchData, act, 'dispatch', this.getActionUniqueName()))
             }
         }
         let dispatchBehaviors = [];
-        if (dispatchPayload.identifier !== undefined) {
-            dispatchBehaviors.push(`Identifier: ${dispatchPayload.identifier}`);
+        if (this.dispatchData.identifier !== undefined) {
+            dispatchBehaviors.push(`Identifier: ${this.dispatchData.identifier}`);
         }
-        if (dispatchPayload.goto !== undefined) {
-            dispatchBehaviors.push(`Goto: ${dispatchPayload.goto}`);
+        if (this.dispatchData.goto !== undefined) {
+            dispatchBehaviors.push(`Goto: ${this.dispatchData.goto}`);
         }
-        let result = `Delay: ${dispatchPayload.duration.humanize()}${dispatchBehaviors.length > 0 ? ` | ${dispatchBehaviors.join(' | ')}` : ''} | Dispatch Results: ${dispatchActivitiesHints.join(' <<>> ')}`;
+        let result = `Delay: ${dur.humanize()}${dispatchBehaviors.length > 0 ? ` | ${dispatchBehaviors.join(' | ')}` : ''} | Dispatch Results: ${dispatchActivitiesHints.join(' <<>> ')}`;
 
         this.logger.verbose(result);
         return {

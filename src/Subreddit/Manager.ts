@@ -41,7 +41,7 @@ import {
     PollingOptionsStrong,
     PollOn,
     PostBehavior,
-    PostBehaviorTypes, DispatchAudit,
+    PostBehaviorTypes, ActivitySourceData,
     DispatchSource,
     RUNNING,
     RunResult,
@@ -83,6 +83,8 @@ import {Repository} from "typeorm";
 import {Activity} from "../Common/Entities/Activity";
 import { AuthorEntity } from "../Common/Entities/AuthorEntity";
 import {CMEvent} from "../Common/Entities/CMEvent";
+import {nanoid} from "nanoid";
+import {ActivitySourceEntity} from "../Common/Entities/ActivitySourceEntity";
 
 export interface RunningState {
     state: RunState,
@@ -99,7 +101,7 @@ export interface runCheckOptions {
     maxGotoDepth?: number
     source: ActivitySource
     initialGoto?: string
-    dispatchSource?: DispatchAudit
+    activitySource: ActivitySourceData
 }
 
 export interface CheckTask {
@@ -254,8 +256,8 @@ export class Manager extends EventEmitter {
                 submissionId: asComment(x.activity) ? x.activity.link_id : undefined,
                 author: getActivityAuthorName(x.activity.author),
                 queuedAt: x.queuedAt,
-                durationMilli: x.duration.asMilliseconds(),
-                duration: x.duration.humanize(),
+                durationMilli: x.delay,
+                duration: dayjs.duration(x.delay, 'millisecond').humanize(),
                 source: `${x.action}${x.identifier !== undefined ? ` (${x.identifier})` : ''}`,
                 subreddit: this.subreddit.display_name_prefixed
             }
@@ -450,7 +452,7 @@ export class Manager extends EventEmitter {
                     }
                 });
                 if(existingDelayedToCancel.length > 0) {
-                    this.logger.debug(`Cancelling existing delayed activities due to activity being queued from non-dispatch sources: ${existingDelayedToCancel.map((x, index) => `[${index + 1}] Queued At ${dayjs.unix(x.queuedAt).format('YYYY-MM-DD HH:mm:ssZ')} for ${x.duration.humanize()}`).join(' ')}`);
+                    this.logger.debug(`Cancelling existing delayed activities due to activity being queued from non-dispatch sources: ${existingDelayedToCancel.map((x, index) => `[${index + 1}] Queued At ${dayjs.unix(x.queuedAt).format('YYYY-MM-DD HH:mm:ssZ')} for ${dayjs.duration(x.delay, 'millisecond').humanize()}`).join(' ')}`);
                     const toCancelIds = existingDelayedToCancel.map(x => x.id);
                     for(const id of toCancelIds) {
                         await this.resources.removeDelayedActivity(id);
@@ -465,10 +467,25 @@ export class Manager extends EventEmitter {
         while(this.queueState.state === RUNNING) {
             let index = 0;
             for(const ar of this.resources.delayedItems) {
-                if(!ar.processing && dayjs.unix(ar.queuedAt).add(ar.duration.asMilliseconds(), 'milliseconds').isSameOrBefore(dayjs())) {
+                if(!ar.processing && dayjs(ar.queuedAt).add(ar.delay, 'milliseconds').isSameOrBefore(dayjs())) {
                     this.logger.info(`Delayed Activity ${ar.activity.name} is being queued.`);
-                    const dispatchStr: DispatchSource = ar.identifier === undefined ? 'dispatch' : `dispatch:${ar.identifier}`;
-                    await this.firehose.push({activity: ar.activity, options: {refresh: true, source: dispatchStr, initialGoto: ar.goto, dispatchSource: {id: ar.id, queuedAt: ar.queuedAt, delay: ar.duration.humanize(), action: ar.action, goto: ar.goto, identifier: ar.identifier}}});
+                    await this.firehose.push({
+                        activity: ar.activity, options: {
+                            refresh: true,
+                            // @ts-ignore
+                            source: ar.identifier === undefined ? ar.type : `${ar.type}:${ar.identifier}`,
+                            initialGoto: ar.goto,
+                            activitySource: {
+                                id: ar.id,
+                                queuedAt: ar.queuedAt,
+                                delay: ar.delay,
+                                action: ar.action,
+                                goto: ar.goto,
+                                identifier: ar.identifier,
+                                type: ar.type
+                            }
+                        }
+                    });
                     this.resources.delayedItems.splice(index, 1, {...ar, processing: true});
                 }
                 index++;
@@ -497,8 +514,8 @@ export class Manager extends EventEmitter {
                 } finally {
                     // always remove item meta regardless of success or failure since we are done with it meow
                     this.queuedItemsMeta.splice(queuedItemIndex, 1);
-                    if(task.options.dispatchSource?.id !== undefined) {
-                        await this.resources.removeDelayedActivity(task.options.dispatchSource?.id);
+                    if(task.options.activitySource?.id !== undefined) {
+                        await this.resources.removeDelayedActivity(task.options.activitySource?.id);
                     }
                 }
             }
@@ -808,11 +825,19 @@ export class Manager extends EventEmitter {
 
     async handleActivity(activity: (Submission | Comment), options: runCheckOptions): Promise<void> {
         const checkType = isSubmission(activity) ? 'Submission' : 'Comment';
-        let item = activity;
+        let item = activity,
+            runtimeShouldRefresh = false;
         const itemId = await item.id;
 
+        const {
+            delayUntil,
+            refresh = false,
+            initialGoto = '',
+            activitySource,
+            force = false,
+        } = options;
+
         if(await this.resources.hasRecentSelf(item)) {
-            const {force = false} = options;
             let recentMsg = `Found in Activities recently (last ${this.resources.selfTTL} seconds) modified/created by this bot`;
             if(force) {
                 this.logger.debug(`${recentMsg} but will run anyway because "force" option was true.`);
@@ -835,13 +860,9 @@ export class Manager extends EventEmitter {
         event.manager = this.managerEntity;
         event.activity = activityEntity;
         event.runResults = [];
+        event.queuedAt = dayjs(options.activitySource.queuedAt);
+        event.source = new ActivitySourceEntity({...options.activitySource, manager: this.managerEntity});
 
-        const {
-            delayUntil,
-            refresh = false,
-            initialGoto = '',
-            dispatchSource,
-        } = options;
 
         let allRuleResults: RuleResultEntity[] = [];
         const runResults: RunResultEntity[] = [];
@@ -853,7 +874,7 @@ export class Manager extends EventEmitter {
         try {
             const [peek, { content: peekContent }] = await itemContentPeek(item);
             ePeek = peekContent;
-            const dispatchStr = dispatchSource !== undefined ? ` (Dispatched by ${dispatchSource.action}${dispatchSource.identifier !== undefined ? ` | ${dispatchSource.identifier}` : ''}) ${peek}` : peek;
+            const dispatchStr = activitySource !== undefined ? ` (Dispatched by ${activitySource.action}${activitySource.identifier !== undefined ? ` | ${activitySource.identifier}` : ''}) ${peek}` : peek;
             this.logger.info(`<EVENT> ${dispatchStr}`);
         } catch (err: any) {
             this.logger.error(`Error occurred while generating item peek for ${checkType} Activity ${itemId}`, err);
@@ -870,13 +891,11 @@ export class Manager extends EventEmitter {
                 author: item.author.name,
                 subreddit: item.subreddit_name_prefixed
             },
-            dispatchSource: dispatchSource,
+            dispatchSource: activitySource,
             timestamp: Date.now(),
             runResults: []
         }
         const startingApiLimit = this.client.ratelimitRemaining;
-
-        let wasRefreshed = false;
 
         try {
 
@@ -884,17 +903,33 @@ export class Manager extends EventEmitter {
                 const created = dayjs.unix(item.created_utc);
                 const diff = dayjs().diff(created, 's');
                 if (diff < delayUntil) {
-                    this.logger.verbose(`Delaying processing until Activity is ${delayUntil} seconds old (${delayUntil - diff}s)`);
-                    await sleep(delayUntil - diff);
-                    // @ts-ignore
-                    item = await activity.refresh();
-                    wasRefreshed = true;
+                    let delayMsg = `Activity should be ${delayUntil} seconds old before processing but is only ${diff} seconds old.`;
+                    const remaining = delayUntil - diff;
+                    if(remaining > 2) {
+                        // if activity should be delayed and amount of time to wait is non-trivial then we don't want to block the worker
+                        // so instead we will dispatch activity and re-process it later
+                        this.logger.verbose(`${delayMsg} Delay time remaining (${remaining}s) is non-trivial (more than 2 seconds) so activity will be re-queued to prevent blocking worker.`);
+                        await this.resources.addDelayedActivity({
+                            ...options.activitySource,
+                            cancelIfQueued: true,
+                            delay: remaining * 1000,
+                            id: 'notUsed',
+                            queuedAt: dayjs().valueOf(),
+                            processing: false,
+                            activity,
+                        });
+                        return;
+                    } else {
+                        this.logger.verbose(`${delayMsg} Waiting ${remaining} second before processing, then refreshing data`);
+                        await sleep(remaining * 1000);
+                        runtimeShouldRefresh = true;
+                    }
                 }
             }
             // refresh signal from firehose if activity was ingested multiple times before processing or re-queued while processing
             // want to make sure we have the most recent data
-            if(!wasRefreshed && refresh === true) {
-                this.logger.verbose(`Refreshed data ${dispatchSource !== undefined ? 'b/c activity is from dispatch' : 'b/c activity was delayed'}`);
+            if(runtimeShouldRefresh || refresh) {
+                this.logger.verbose(`Refreshed data`);
                 // @ts-ignore
                 item = await activity.refresh();
             }
@@ -1152,7 +1187,19 @@ export class Manager extends EventEmitter {
                         checkType = 'Comment';
                     }
                     if (checkType !== undefined) {
-                        this.firehose.push({activity: item, options: {delayUntil, source: `poll:${source}`}})
+                        this.firehose.push({
+                            activity: item, options: {
+                                delayUntil,
+                                source: `poll:${source}`,
+                                activitySource: {
+                                    queuedAt: dayjs().valueOf(),
+                                    delay: 0,
+                                    type: 'poll',
+                                    identifier: source,
+                                    id: nanoid(16)
+                                }
+                            }
+                        })
                     }
                 };
 

@@ -7,6 +7,8 @@ import {booleanMiddle} from "../../../../Common/middleware";
 import {Manager} from "../../../../../Subreddit/Manager";
 import {ActionedEvent} from "../../../../../Common/interfaces";
 import {CMEvent as ActionedEventEntity} from "../../../../../Common/Entities/CMEvent";
+import {nanoid} from "nanoid";
+import dayjs from "dayjs";
 
 const commentReg = parseLinkIdentifier([COMMENT_URL_ID]);
 const submissionReg = parseLinkIdentifier([SUBMISSION_URL_ID]);
@@ -126,7 +128,20 @@ const action = async (req: Request, res: Response) => {
         // will run dryrun if specified or if running activity on subreddit it does not belong to
         const dr: boolean | undefined = (dryRun || manager.subreddit.display_name !== sub) ? true : undefined;
         manager.logger.info(`/u/${userName} Queued ${dr === true ? 'DRY RUN ' : ''}check on ${manager.subreddit.display_name !== sub ? 'FOREIGN ACTIVITY ' : ''}${url}`, {user: userName, subreddit});
-        await manager.firehose.push({activity, options: {dryRun: dr, force: true, source: 'user'}})
+        await manager.firehose.push({
+            activity, options: {
+                dryRun: dr,
+                force: true,
+                source: `user:${userName}`,
+                activitySource: {
+                    delay: 0,
+                    id: nanoid(16),
+                    type: 'user',
+                    identifier: userName,
+                    queuedAt: dayjs().valueOf(),
+                }
+            }
+        })
     }
     res.send('OK');
 };

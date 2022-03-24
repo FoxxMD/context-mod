@@ -97,6 +97,7 @@ import {AuthorCritPropHelper, RequiredAuthorCrit} from "../Common/types";
 import {ManagerEntity} from "../Common/Entities/ManagerEntity";
 import {Bot} from "../Common/Entities/Bot";
 import {DispatchedEntity} from "../Common/Entities/DispatchedEntity";
+import {ActivitySourceEntity} from "../Common/Entities/ActivitySourceEntity";
 
 export const DEFAULT_FOOTER = '\r\n*****\r\nThis action was performed by [a bot.]({{botLink}}) Mention a moderator or [send a modmail]({{modmailLink}}) if you any ideas, questions, or concerns about this action.';
 
@@ -159,6 +160,7 @@ export class SubredditResources {
     thirdPartyCredentials: ThirdPartyCredentialsJsonConfig;
     delayedItems: ActivityDispatch[] = [];
     dispatchedActivityRepo: Repository<DispatchedEntity>
+    activitySourceRepo: Repository<ActivitySourceEntity>
     managerEntity: ManagerEntity
     botEntity: Bot
 
@@ -203,6 +205,7 @@ export class SubredditResources {
         this.cache = cache;
         this.database = database;
         this.dispatchedActivityRepo = this.database.getRepository(DispatchedEntity);
+        this.activitySourceRepo = this.database.getRepository(ActivitySourceEntity);
         this.prefix = prefix;
         this.client = client;
         this.cacheType = cacheType;
@@ -267,9 +270,9 @@ export class SubredditResources {
             });
             const now = dayjs();
             for(const dAct of dispatchedActivities) {
-                const shouldDispatchAt = dAct.createdAt.add(dAct.duration.asMilliseconds(), 'milliseconds');
+                const shouldDispatchAt = dAct.createdAt.add(dAct.delay, 'milliseconds');
                 if(shouldDispatchAt.isBefore(now)) {
-                    let tardyHint = `Activity ${dAct.activityId} queued at ${dAct.createdAt.format('YYYY-MM-DD HH:mm:ssZ')} for ${dAct.duration.humanize()} is now LATE`;
+                    let tardyHint = `Activity ${dAct.activityId} queued at ${dAct.createdAt.format('YYYY-MM-DD HH:mm:ssZ')} for ${dAct.delayAsDuration().humanize()} is now LATE`;
                     if(dAct.tardyTolerant === true) {
                         tardyHint += ` but was configured as ALWAYS 'tardy tolerant' so will be dispatched immediately`;
                     } else if(dAct.tardyTolerant === false) {
@@ -279,13 +282,13 @@ export class SubredditResources {
                         continue;
                     } else {
                         // see if its within tolerance
-                        const latest = shouldDispatchAt.add(dAct.tardyTolerant.asMilliseconds(), 'milliseconds');
+                        const latest = shouldDispatchAt.add(dAct.tardyTolerant, 'milliseconds');
                         if(latest.isBefore(now)) {
-                            tardyHint += `and IS NOT within tardy tolerance of ${dAct.tardyTolerant.humanize()} of planned dispatch time so will be dropped`;
+                            tardyHint += `and IS NOT within tardy tolerance of ${dAct.tardyTolerantAsDuration().humanize()} of planned dispatch time so will be dropped`;
                             await this.removeDelayedActivity(dAct.id);
                             continue;
                         } else {
-                            tardyHint += `but is within tardy tolerance of ${dAct.tardyTolerant.humanize()} of planned dispatch time so will be dispatched immediately`;
+                            tardyHint += `but is within tardy tolerance of ${dAct.tardyTolerantAsDuration().humanize()} of planned dispatch time so will be dispatched immediately`;
                         }
                     }
                 }
@@ -552,9 +555,10 @@ export class SubredditResources {
             },
             order: {
                 // @ts-ignore
-                createdAt: 'DESC'
+                processedAt: 'DESC'
             },
             relations: {
+                source: true,
                 activity: {
                     subreddit: true,
                     author: true

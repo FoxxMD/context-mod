@@ -2112,7 +2112,7 @@ export interface ActionedEvent {
     subreddit: string,
     triggered: boolean,
     runResults: RunResult[]
-    dispatchSource?: DispatchAudit
+    dispatchSource?: ActivitySourceData
 }
 
 export interface ResultContext {
@@ -2413,20 +2413,23 @@ export interface ActivityDispatchConfig {
     delay: DurationVal
 }
 
-export interface ActivityDispatch extends ActivityDispatchConfig {
+export interface ActivityDispatch extends Omit<ActivityDispatchConfig, 'delay'| 'tardyTolerant'> {
     id: string
     queuedAt: number
     activity: Submission | Comment
-    duration: Duration
+    delay: number
+    tardyTolerant?: boolean | number
     processing: boolean
-    action: string
+    action?: string
+    type: ActivitySourceTypes
 }
 
-export interface DispatchAudit {
+export interface ActivitySourceData {
     goto?: string
     queuedAt: number
-    action: string,
-    delay: string,
+    action?: string,
+    delay?: number,
+    type: ActivitySourceTypes
     id: string
     identifier?: string
 }
@@ -2437,7 +2440,9 @@ export type InclusiveActionTarget = ActionTarget | 'any';
 
 export type DispatchSource = 'dispatch' | `dispatch:${string}`;
 
-export type NonDispatchActivitySource = 'poll' | `poll:${PollOn}` | 'user';
+export type NonDispatchActivitySource = 'poll' | `poll:${PollOn}` | 'user' | `user:${string}`;
+
+export type ActivitySourceTypes = 'poll' | 'dispatch' | 'user';
 
 // TODO
 // https://github.com/YousefED/typescript-json-schema/issues/426

@@ -6,6 +6,8 @@ import {authUserCheck, botRoute} from "../../../middleware";
 import {booleanMiddle} from "../../../../Common/middleware";
 import {Manager} from "../../../../../Subreddit/Manager";
 import {parseRedditEntity} from "../../../../../util";
+import {nanoid} from "nanoid";
+import dayjs from "dayjs";
 
 const action = async (req: Request, res: Response) => {
     const bot = req.serverBot;
@@ -64,8 +66,15 @@ const action = async (req: Request, res: Response) => {
                             await manager.firehose.push({
                                 activity: a,
                                 options: {
-                                    source: 'user',
+                                    source: `user:${userName}`,
                                     force: true,
+                                    activitySource: {
+                                        delay: 0,
+                                        id: nanoid(16),
+                                        type: 'user',
+                                        identifier: userName,
+                                        queuedAt: dayjs().valueOf(),
+                                    }
                                 }
                             });
                         }
@@ -75,8 +84,15 @@ const action = async (req: Request, res: Response) => {
                             await manager.firehose.push({
                                 activity: a,
                                 options: {
-                                    source: 'user',
-                                    force: true
+                                    source: `user:${userName}`,
+                                    force: true,
+                                    activitySource: {
+                                        delay: 0,
+                                        id: nanoid(16),
+                                        type: 'user',
+                                        identifier: userName,
+                                        queuedAt: dayjs().valueOf(),
+                                    }
                                 }
                             });
                         }

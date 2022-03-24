@@ -28,6 +28,7 @@ import {buildOperatorConfigWithDefaults, parseOperatorConfigFromSources} from ".
 import {getLogger} from "./Utils/loggerFactory";
 import Bot from "./Bot";
 import {isScopeError} from "./Utils/Errors";
+import {nanoid} from "nanoid";
 
 dayjs.extend(utc);
 dayjs.extend(dduration);
@@ -154,7 +155,16 @@ const program = new Command();
                     await b.buildManagers([sub]);
                     if(b.subManagers.length > 0) {
                        const manager = b.subManagers[0];
-                        await manager.handleActivity(activity, {checkNames: checks, source: 'user'});
+                        await manager.handleActivity(activity, {
+                            checkNames: checks,
+                            source: 'user',
+                            activitySource: {
+                                delay: 0,
+                                id: nanoid(16),
+                                type: 'user',
+                                queuedAt: dayjs().valueOf(),
+                            }
+                        });
                         break;
                     }
                 }
@@ -192,7 +202,16 @@ const program = new Command();
                         for (const a of activities.reverse()) {
                             manager.firehose.push({
                                 activity: a,
-                                options: {checkNames: checks, source: 'user'}
+                                options: {
+                                    checkNames: checks,
+                                    source: 'user',
+                                    activitySource: {
+                                        delay: 0,
+                                        id: nanoid(16),
+                                        type: 'user',
+                                        queuedAt: dayjs().valueOf(),
+                                    }
+                                }
                             });
                         }
                     }
