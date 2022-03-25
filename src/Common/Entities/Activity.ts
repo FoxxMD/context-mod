@@ -5,7 +5,7 @@ import {CMEvent} from "./CMEvent";
 import {ActivityType} from "../interfaces";
 import Submission from "snoowrap/dist/objects/Submission";
 import {Comment} from "snoowrap";
-import {asComment, parseRedditFullname, redditThingTypeToPrefix} from "../../util";
+import {asComment, getActivityAuthorName, parseRedditFullname, redditThingTypeToPrefix} from "../../util";
 
 export interface ActivityEntityOptions {
     id: string
@@ -97,7 +97,7 @@ export class Activity {
         }
 
         const author = new AuthorEntity();
-        author.name = activity.author.name;
+        author.name = getActivityAuthorName(activity.author);
 
         return new Activity({
             id: activity.name,
