@@ -2420,6 +2420,10 @@ export const checkItemFilter = async (item: (Submission | Comment), filter: Type
                 critResult = await resources.testItemCriteria(item, state, parentLogger, source);
             }
 
+            if(critResult.propertyResults.some(x => x.property === 'source')) {
+                critResult.criteria.source = source;
+            }
+
             //critResult = await resources.testItemCriteria(item, state, parentLogger);
             allCritResults.push(critResult);
             const [summary, details] = filterCriteriaSummary(critResult);
