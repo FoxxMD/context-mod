@@ -128,7 +128,7 @@ export class DispatchedEntity extends TimeAwareRandomBaseEntity {
         }
         return {
             id: this.id,
-            queuedAt: this.createdAt.unix(),
+            queuedAt: this.createdAt.valueOf(),
             activity,
             delay: this.delay,
             processing: false,
