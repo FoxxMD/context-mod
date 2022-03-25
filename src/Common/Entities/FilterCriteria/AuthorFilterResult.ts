@@ -5,7 +5,7 @@ import {
     FilterCriteriaResult as IFilterCriteriaResult,
     FilterResult as IFilterResult,
 } from "../../interfaces";
-import {AuthorFilterCriteriaResult} from "./AuthorFilterCriteriaResult";
+import {AuthorFilterCriteriaResult} from "./FilterCriteriaResult";
 
 @ChildEntity()
 export class AuthorFilterResult extends FilterResult<AuthorCriteria> {

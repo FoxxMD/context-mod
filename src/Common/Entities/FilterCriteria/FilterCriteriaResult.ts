@@ -1,7 +1,9 @@
-import {Entity, Column, PrimaryColumn, OneToMany, PrimaryGeneratedColumn, TableInheritance, ManyToOne} from "typeorm";
-import {FilterCriteriaPropertyResult} from "../../interfaces";
+import {ChildEntity, Column, Entity, ManyToOne, TableInheritance} from "typeorm";
+import {FilterCriteriaPropertyResult, FilterCriteriaResult as IFilterCriteriaResult} from "../../interfaces";
 import {FilterResult} from "./FilterResult";
 import {RandomIdBaseEntity} from "../Base/RandomIdBaseEntity";
+import {AuthorCriteria} from "../../../Author/Author";
+import {AuthorFilterCriteria} from "./AuthorFilterCriteria";
 
 export interface FilterCriteriaResultOptions<T> {
     behavior: string
@@ -34,6 +36,22 @@ export abstract class FilterCriteriaResult<T> extends RandomIdBaseEntity {
             this.behavior = data.behavior;
             this.passed = data.passed;
             this.propertyResults = data.propertyResults;
+        }
+    }
+}
+
+@ChildEntity()
+export class AuthorFilterCriteriaResult extends FilterCriteriaResult<AuthorCriteria> {
+
+    type: string = 'author';
+
+    @ManyToOne(type => AuthorFilterCriteria, {cascade: ['insert'], eager: true})
+    criteria!: AuthorFilterCriteria
+
+    constructor(data?: IFilterCriteriaResult<AuthorCriteria>) {
+        super(data);
+        if (data !== undefined) {
+            this.criteria = new AuthorFilterCriteria({criteria: data.criteria});
         }
     }
 }

@@ -1,7 +1,6 @@
 import {Entity, Column, PrimaryColumn, OneToMany, PrimaryGeneratedColumn, TableInheritance, BeforeInsert} from "typeorm";
 import objectHash from "object-hash";
 import {removeUndefinedKeys} from "../../../util";
-import {RandomIdBaseEntity} from "../Base/RandomIdBaseEntity";
 
 export interface FilterCriteriaOptions<T> {
     criteria: T
@@ -13,11 +12,11 @@ export const filterCriteriaTypeIdentifiers = {
 }
 
 @Entity()
-@TableInheritance({ column: { type: "varchar", name: "type", update: false } })
-export abstract class FilterCriteria<T> extends RandomIdBaseEntity {
+@TableInheritance({ column: { type: "varchar", name: "type" } })
+export abstract class FilterCriteria<T> {
 
-    // @PrimaryColumn()
-    // id!: string
+    @PrimaryColumn()
+    id!: string
 
     @Column("simple-json")
     criteria!: T;
@@ -37,7 +36,6 @@ export abstract class FilterCriteria<T> extends RandomIdBaseEntity {
     // }
 
     constructor(data?: FilterCriteriaOptions<T>) {
-        super();
         if(data !== undefined) {
             this.criteria = removeUndefinedKeys(data.criteria);
             this.hash = objectHash.sha1(this.criteria);
