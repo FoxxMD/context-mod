@@ -21,10 +21,18 @@ export class DispatchAction extends Action {
         const {
             cancelIfQueued = false,
             target = ['self'],
-            ...rest
+            goto,
+            delay,
+            identifier,
+            onExistingFound,
+            tardyTolerant,
         } = options;
         this.dispatchData = {
-            ...rest,
+            goto,
+            delay,
+            identifier,
+            onExistingFound,
+            tardyTolerant,
             cancelIfQueued,
         }
         this.targets = !Array.isArray(target) ? [target] : target;
