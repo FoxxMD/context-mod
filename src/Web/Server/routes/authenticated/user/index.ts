@@ -10,6 +10,7 @@ import {CMEvent, CMEvent as ActionedEventEntity} from "../../../../../Common/Ent
 import {nanoid} from "nanoid";
 import dayjs from "dayjs";
 import {paginateRequest} from "../../../../Common/util";
+import {filterResultsBuilder} from "../../../../../Utils/typeormUtils";
 
 const commentReg = parseLinkIdentifier([COMMENT_URL_ID]);
 const submissionReg = parseLinkIdentifier([SUBMISSION_URL_ID]);
@@ -76,35 +77,38 @@ const actionedEvents = async (req: Request, res: Response) => {
         }
     }
 
-    const query = req.serverBot.database.getRepository(CMEvent)
+    let query = req.serverBot.database.getRepository(CMEvent)
         .createQueryBuilder("event")
         .leftJoinAndSelect('event.source', 'source')
         .leftJoinAndSelect('event.activity', 'activity')
         .leftJoinAndSelect('activity.subreddit', 'subreddit')
         .leftJoinAndSelect('activity.author', 'author')
-        .leftJoinAndSelect('event.runResults', 'runResults')
-        .leftJoinAndSelect('runResults._authorIs', 'rrAuthorIs')
-        .leftJoinAndSelect('runResults._itemIs', 'rrItemIs')
-        .leftJoinAndSelect('rrAuthorIs.criteriaResults', 'rrAuthorCritResults')
-        .leftJoinAndSelect('rrItemIs.criteriaResults', 'rrItemCritResults')
-        .leftJoinAndSelect('runResults.run', 'run')
-        .leftJoinAndSelect('runResults.checkResults', 'checkResults')
-        .leftJoinAndSelect('checkResults._authorIs', 'cAuthorIs')
-        .leftJoinAndSelect('checkResults._itemIs', 'cItemIs')
-        .leftJoinAndSelect('cAuthorIs.criteriaResults', 'cAuthorCritResults')
-        .leftJoinAndSelect('cItemIs.criteriaResults', 'cItemCritResults')
-        .leftJoinAndSelect('checkResults.ruleResults', 'ruleResults')
-        .leftJoinAndSelect('ruleResults._authorIs', 'rAuthorIs')
-        .leftJoinAndSelect('ruleResults._itemIs', 'rItemIs')
-        .leftJoinAndSelect('rAuthorIs.criteriaResults', 'rAuthorCritResults')
-        .leftJoinAndSelect('rItemIs.criteriaResults', 'rItemCritResults')
-        .leftJoinAndSelect('checkResults.actionResults', 'actionResults')
-        .leftJoinAndSelect('actionResults._authorIs', 'aAuthorIs')
-        .leftJoinAndSelect('actionResults._itemIs', 'aItemIs')
-        .leftJoinAndSelect('aAuthorIs.criteriaResults', 'aAuthorCritResults')
-        .leftJoinAndSelect('aItemIs.criteriaResults', 'aItemCritResults')
-        .andWhere('event.manager.id IN (:...managerIds)', {managerIds: managers.map(x => x.managerEntity.id)})
+        .leftJoinAndSelect('event.runResults', 'runResults');
+
+    query = filterResultsBuilder<CMEvent>(query, 'runResults', 'rr');
+
+    query.leftJoinAndSelect('runResults.run', 'run')
+        .leftJoinAndSelect('runResults.checkResults', 'checkResults');
+
+    query = filterResultsBuilder<CMEvent>(query, 'checkResults', 'c');
+
+    query.leftJoinAndSelect('checkResults.ruleResults', 'ruleResults')
+        .leftJoinAndSelect('ruleResults.premise', 'rPremise')
+        .leftJoinAndSelect('rPremise.rule', 'rule')
+        .leftJoinAndSelect('rule.kind', 'ruleKind');
+
+    query = filterResultsBuilder<CMEvent>(query, 'ruleResults', 'r');
+
+    query.leftJoinAndSelect('checkResults.actionResults', 'actionResults')
+        .leftJoinAndSelect('actionResults.premise', 'aPremise')
+        .leftJoinAndSelect('aPremise.action', 'action')
+        .leftJoinAndSelect('action.kind', 'actionKind');
+
+    query = filterResultsBuilder<CMEvent>(query, 'actionResults', 'a');
+
+    query.andWhere('event.manager.id IN (:...managerIds)', {managerIds: managers.map(x => x.managerEntity.id)})
         .orderBy('event.processedAt', 'DESC')
+
 
     // TODO will need to refactor this if we switch to allowing subreddits to use their own datasources
     return res.json(await paginateRequest(query, req));
