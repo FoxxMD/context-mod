@@ -992,18 +992,19 @@ const webClient = async (options: OperatorConfig) => {
     });
 
     app.getAsync('/events', [ensureAuthenticatedApi, defaultSession, instanceWithPermissions, botWithPermissions(true), createUserToken], async (req: express.Request, res: express.Response) => {
-        const {subreddit} = req.query as any;
+        const {subreddit, page = 1} = req.query as any;
         const resp = await got.get(`${(req.instance as CMInstanceInterface).normalUrl}/events`, {
             headers: {
                 'Authorization': `Bearer ${req.token}`,
             },
             searchParams: {
                 subreddit,
-                bot: req.bot?.botName
+                bot: req.bot?.botName,
+                page
             }
         }).json() as PaginationAwareObject;
 
-        const eventData = resp.data as CMEvent[];
+        const {data: eventData, ...pagination} = resp;
 
         // for now just want to get this back in the same shape the ui expects so i don't have to refactor the entire events page
         // @ts-ignore
@@ -1168,6 +1169,7 @@ const webClient = async (options: OperatorConfig) => {
 
         return res.render('events', {
             data: actionedEvents,
+            pagination,
             title: `${subreddit !== undefined ? `${subreddit} ` : ''}Actioned Events`
         });
     });

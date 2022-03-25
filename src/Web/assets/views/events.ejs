@@ -27,6 +27,8 @@
             <div class="px-3 py-6 space-y-3">
                 <% if(data.length === 0) { %>
                     No events have been actioned yet!
+                <% } else { %>
+                <%- include('partials/pagination') %>
                 <% } %>
                 <% data.forEach(function (eRes) { %>
                     <div class="shadow-lg bg-gray-700 py-1 triggeredStateWrapper">
@@ -277,11 +279,13 @@
                         </div>
             </div>
                 <% }) %>
+            <%- include('partials/pagination') %>
             </div>
         </div>
     </div>
     <%- include('partials/footer') %>
 </div>
+<%- include('partials/paginationJs') %>
 <script>
     function toggleShowNonTriggered(val) {
         document.querySelectorAll('.triggeredState').forEach(el => {
