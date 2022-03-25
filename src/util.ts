@@ -451,11 +451,15 @@ export const filterCriteriaPropertySummary = <T>(val: FilterCriteriaPropertyResu
     let expected = '';
     if(val.property !== 'submissionState') {
         let crit: T[keyof T][];
-        if(Array.isArray(criteria[val.property])) {
+        let actualCriteria = ('criteria' in criteria) ?
             // @ts-ignore
-            crit = criteria[val.property];
+            criteria.criteria as T
+            : criteria;
+        if(Array.isArray(actualCriteria[val.property])) {
+            // @ts-ignore
+            crit = actualCriteria[val.property];
         } else {
-            crit = [criteria[val.property]];
+            crit = [actualCriteria[val.property]];
         }
         const expectedStrings = crit.map((x: any) => {
             if (asUserNoteCriteria(x)) {
@@ -2255,7 +2259,10 @@ export const mergeFilters = (objectConfig: any, filterDefs: FilterCriteriaDefaul
 
 export const formatFilterData = (result: (RunResult | CheckSummary | RuleResult | ActionResult)) => {
 
-    const formattedResult: any = {};
+    const formattedResult: any = {
+        authorIs: undefined,
+        itemIs: undefined
+    };
 
     const {authorIs, itemIs} = result;
 
