@@ -47,4 +47,10 @@ export class Action  {
     getFriendlyIdentifier() {
         return this.name === undefined ? capitalize(this.kind.name) : `${capitalize(this.kind.name)} - ${this.name}`;
     }
+
+    static getFriendlyIdentifier(actionLike: any) {
+        const action = actionLike as Action;
+
+        return action.name === undefined ? capitalize(action.kind.name) : `${capitalize(action.kind.name)} - ${action.name}`;
+    }
 }

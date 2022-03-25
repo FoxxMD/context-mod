@@ -34,23 +34,23 @@
                             <div class="flex items-center justify-between">
                                 <div>
                                     <a class="activityLink font-semibold" target="_blank" href="https://reddit.com<%= eRes.activity.link%>"><%= eRes.activity.type === 'comment' ? 'Comment' : 'Submission' %></a>
-                                    by <a class="activityLink" target="_blank" href="https://reddit.com/u/<%= eRes.activity.author%>"><%= eRes.activity.author%></a>
-                                    <% if(eRes.dispatchSource !== undefined) { %>
-                                        <span class="has-tooltip ml-2">
+                                    by <a class="activityLink" target="_blank" href="https://reddit.com/u/<%= eRes.activity.author%>">u/<%= eRes.activity.author%></a>
+
+                                        <span class="has-tooltip ml-1">
                                             <span class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2 space-y-3 p-2 text-left'>
                                                 <ul class="list-inside list-disc">
-                                                    <li>Dispatched By: <i><%= eRes.dispatchSource.action %><%= eRes.dispatchSource.identifier !== undefined ? ` | ${eRes.dispatchSource.identifier}` : ''%></i></li>
+                                                    <li>Source: <i><%= eRes.dispatchSource.type%><%= eRes.dispatchSource.identifier !== null ? ` | ${eRes.dispatchSource.identifier}` : ''%><%= eRes.dispatchSource.action !== null ? ` by ${eRes.dispatchSource.action}` : ''%></i></li>
                                                     <li>Queued At: <i><%= eRes.dispatchSource.queuedAt %></i></li>
-                                                    <li>Delayed For: <i><%= eRes.dispatchSource.delay %></i></li>
-                                                    <li>Initial Goto:<i><%= eRes.dispatchSource.goto %></i></li>
+                                                    <li>Delayed For: <i><%= eRes.dispatchSource.delay %>s</i></li>
+                                                    <li>Initial Goto:<i><%= eRes.dispatchSource.goto === null ? '-' : eRes.dispatchSource.goto %></i></li>
                                                 </ul>
                                             </span>
-                                            (<span class="cursor-help underline" style="text-decoration-style: dotted">Dispatched by <%= eRes.dispatchSource.action%><%= eRes.dispatchSource.identifier !== undefined ? ` | ${eRes.dispatchSource.identifier}` : ''%></span>)
+                                            from <span class="cursor-help underline" style="text-decoration-style: dotted"><%= eRes.dispatchSource.type%><%= eRes.dispatchSource.identifier !== null ? ` | ${eRes.dispatchSource.identifier}` : ''%><%= eRes.dispatchSource.action !== null ? ` (${eRes.dispatchSource.action})` : ''%></span>
                                         </span>
-                                    <% } %>
+
                                 </div>
                                 <div class="font-semibold flex items-center flex-end">
-                                    <a class="activityLink mr-1" target="_blank" href="https://reddit.com/<%= eRes.activity.subreddit %>"><%= eRes.activity.subreddit %></a>
+                                    <a class="activityLink mr-1" target="_blank" href="https://reddit.com/<%= eRes.activity.subreddit %>">r/<%= eRes.activity.subreddit %></a>
                                      @ <%= eRes.timestamp %>
                                 </div>
                             </div>
@@ -77,7 +77,7 @@
                                 <span class="px-1"><%= runSum.triggered %></span> <%= runSum.name %>
                             </div>
                             <div class="space-y-2 triggeredState <%= runSum.triggeredVal ? 'triggered' : 'notTriggered'%>">
-                                <% if (runSum.error !== undefined) { %>
+                                <% if (runSum.error !== undefined && runSum.error !== null) { %>
                                     <span class="font-semibold">Not Run</span> <span class="px-1">=> <%= runSum.error %></span>
                                 <% } %>
                                 <% if(runSum.authorIs !== undefined || runSum.itemIs !== undefined) { %>
@@ -119,10 +119,11 @@
                             <% runSum.checkResults.forEach(function (chkSum, index) { %>
                                 <div class="py-3 px-4 space-y-2 bg-gray-500 triggeredStateWrapper <%= chkSum.triggeredVal ? 'border-2 border-gray-100' : ''%>">
                                     <div class="triggeredStateToggle">
-                                        <span class="font-semibold">Check:</span><span class="px-1"><%= chkSum.triggered %></span><%= chkSum.name %><span class="px-3">&#10132;</span><%= chkSum.ruleSummary %>
+                                        <span class="font-semibold">Check:</span><span class="px-1"><%= chkSum.triggered %></span><%= chkSum.name %>
+                                        <% if (chkSum.ruleSummary !== '' && chkSum.ruleSummary !== null) { %><span class="px-3">&#10132;</span><%= chkSum.ruleSummary %><% } %>
                                     </div>
                                     <div class="space-y-2 triggeredState <%= chkSum.triggeredVal ? 'triggered' : 'notTriggered'%>">
-                                    <% if (chkSum.error !== undefined) { %>
+                                    <% if (chkSum.error !== undefined && chkSum.error !== null) { %>
                                         <span class="font-semibold">Not Run</span><span class="px-1"> => <%= chkSum.error %></span>
                                     <% } %>
                                     <% if(chkSum.authorIs !== undefined || chkSum.itemIs !== undefined) { %>
@@ -161,6 +162,7 @@
                                             <% } %>
                                         </ul>
                                     <% } %>
+                                    <% if(chkSum.ruleResults.length !== 0) { %>
                                     <div>
                                         <span class="font-semibold">Rules:</span>
                                         <ul class="list-inside list-disc">
@@ -209,6 +211,7 @@
                                             <% }) %>
                                         </ul>
                                     </div>
+                                    <% } %>
                                     <% if(chkSum.actionResults.length !== 0) { %>
                                     <div><span class="font-semibold">Actions</span>
 

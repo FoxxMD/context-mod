@@ -61,6 +61,8 @@ import {ErrorWithCause} from "pony-cause";
 import {CMInstance} from "./CMInstance";
 import {PaginationAwareObject} from "typeorm-pagination/dist/helpers/pagination";
 import {CMEvent} from "../../Common/Entities/CMEvent";
+import { Rule } from "../../Common/Entities/Rule";
+import {Action} from "../../Common/Entities/Action";
 
 const emitter = new EventEmitter();
 
@@ -1045,9 +1047,12 @@ const webClient = async (options: OperatorConfig) => {
                activity: ea,
                submission,
                subreddit: x.activity.subreddit.name,
-               timestamp: dayjs(x.processedAt).unix(),
+               timestamp: dayjs(x.processedAt).local().format('YY-MM-DD HH:mm:ss z'),
                triggered: x.triggered,
-               dispatchSource: x.source,
+               dispatchSource: {
+                   ...x.source,
+                   queuedAt: dayjs(x.queuedAt).local().format('YY-MM-DD HH:mm:ss z')
+               },
                runResults: x.runResults.map(y => {
                    return {
                        name: y.run.name,
@@ -1066,6 +1071,7 @@ const webClient = async (options: OperatorConfig) => {
                                        ...a,
                                        itemIs: a._itemIs,
                                        authorIs: a._authorIs,
+                                       name: Rule.getFriendlyIdentifier(a.premise.rule)
                                    }
                                }),
                                actionResults: z.actionResults?.map(a => {
@@ -1073,6 +1079,7 @@ const webClient = async (options: OperatorConfig) => {
                                        ...a,
                                        itemIs: a._itemIs,
                                        authorIs: a._authorIs,
+                                       name: Action.getFriendlyIdentifier(a.premise.action)
                                    }
                                })
                            }
@@ -1084,7 +1091,7 @@ const webClient = async (options: OperatorConfig) => {
 
         const actionedEvents = actionedEventsData.map((x: ActionedEvent) => {
             const {timestamp, activity: {peek, link, ...restAct}, runResults = [], dispatchSource, ...rest} = x;
-            const time = dayjs(timestamp).local().format('YY-MM-DD HH:mm:ss z');
+            //const time = dayjs(timestamp).local().format('YY-MM-DD HH:mm:ss z');
             const formattedPeek = Autolinker.link(peek.replace(`https://reddit.com${link}`, ''), {
                 email: false,
                 phone: false,
@@ -1144,14 +1151,10 @@ const webClient = async (options: OperatorConfig) => {
                     ...formatFilterData(summ)
                 }
             });
-            let rrSource = dispatchSource === undefined ? dispatchSource : {
-                ...dispatchSource,
-                queuedAt: dayjs.unix(dispatchSource.queuedAt).local().format('YY-MM-DD HH:mm:ss z')
-            }
             return {
-                dispatchSource: rrSource,
+                dispatchSource,
                 ...rest,
-                timestamp: time,
+                timestamp,
                 activity: {
                     link,
                     peek: formattedPeek,
