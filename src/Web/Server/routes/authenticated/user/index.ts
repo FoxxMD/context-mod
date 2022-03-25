@@ -2,15 +2,16 @@ import {Request, Response} from 'express';
 import {authUserCheck, botRoute, subredditRoute} from "../../../middleware";
 import Submission from "snoowrap/dist/objects/Submission";
 import winston from 'winston';
-import {COMMENT_URL_ID, parseLinkIdentifier, SUBMISSION_URL_ID} from "../../../../../util";
+import {COMMENT_URL_ID, parseLinkIdentifier, parseRedditThingsFromLink, SUBMISSION_URL_ID} from "../../../../../util";
 import {booleanMiddle} from "../../../../Common/middleware";
 import {Manager} from "../../../../../Subreddit/Manager";
-import {ActionedEvent} from "../../../../../Common/interfaces";
+import {ActionedEvent, RedditThing} from "../../../../../Common/interfaces";
 import {CMEvent, CMEvent as ActionedEventEntity} from "../../../../../Common/Entities/CMEvent";
 import {nanoid} from "nanoid";
 import dayjs from "dayjs";
 import {paginateRequest} from "../../../../Common/util";
 import {filterResultsBuilder} from "../../../../../Utils/typeormUtils";
+import {Brackets} from "typeorm";
 
 const commentReg = parseLinkIdentifier([COMMENT_URL_ID]);
 const submissionReg = parseLinkIdentifier([SUBMISSION_URL_ID]);
@@ -65,6 +66,11 @@ export const deleteInviteRoute = [authUserCheck(), botRoute(), deleteInvite];
 
 const actionedEvents = async (req: Request, res: Response) => {
 
+    const {
+        permalink,
+        includeRelated = false
+    } = req.query as any;
+
     let managers: Manager[] = [];
     const manager = req.manager as Manager | undefined;
     if(manager !== undefined) {
@@ -107,13 +113,36 @@ const actionedEvents = async (req: Request, res: Response) => {
     query = filterResultsBuilder<CMEvent>(query, 'actionResults', 'a');
 
     query.andWhere('event.manager.id IN (:...managerIds)', {managerIds: managers.map(x => x.managerEntity.id)})
-        .orderBy('event.processedAt', 'DESC')
+        .orderBy('event.processedAt', 'DESC');
+
+    if (permalink !== undefined) {
+        const things = parseRedditThingsFromLink(permalink);
+        if (things.comment !== undefined) {
+            if (includeRelated && things.submission !== undefined) {
+                query.andWhere(new Brackets((qb) => {
+                    qb.where('event.activity._id = :actId', {actId: (things.comment as RedditThing).val})
+                        .orWhere('event.activity._id = :subId', {subId: (things.submission as RedditThing).val})
+                }));
+            } else {
+                query.andWhere('event.activity._id = :actId', {actId: things.comment.val});
+            }
+        } else if (things.submission !== undefined) {
+            if (includeRelated) {
+                query.andWhere(new Brackets((qb) => {
+                    qb.where('event.activity._id = :actId', {actId: (things.submission as RedditThing).val})
+                        .orWhere('event.activity.submission._id = :subId', {subId: (things.submission as RedditThing).val})
+                }));
+            } else {
+                query.andWhere('event.activity._id = :actId', {actId: (things.submission as RedditThing).val});
+            }
+        }
+    }
 
 
     // TODO will need to refactor this if we switch to allowing subreddits to use their own datasources
     return res.json(await paginateRequest(query, req));
 };
-export const actionedEventsRoute = [authUserCheck(), botRoute(), subredditRoute(false), actionedEvents];
+export const actionedEventsRoute = [authUserCheck(), botRoute(), subredditRoute(false), booleanMiddle(['includeRelated']), actionedEvents];
 
 const action = async (req: Request, res: Response) => {
     const bot = req.serverBot;

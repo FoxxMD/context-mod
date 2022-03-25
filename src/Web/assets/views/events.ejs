@@ -20,14 +20,31 @@
     <%- include('partials/title') %>
     <div class="container mx-auto">
         <div class="grid">
-            <div class="pr-3 pt-3" style="text-align: right">
-                <input type="checkbox" id="showAll">
-                <label for="showAll">Show all non-triggered details</label>
-            </div>
+            <% if(pagination.total > 0) { %>
+                <div class="pr-3 pt-3 flex">
+                    <div class="flex flex-grow">
+                        <input data-subreddit="<%= data.name %>" style="width: 420px;"
+                               class="border-gray-50 mr-3 placeholder-gray-500 rounded mt-2 mb-3 p-2 text-black checkUrl"
+                               placeholder="Find events by permalink"/>
+                        <div>
+                            <div class="mb-2">
+                            <input type="checkbox" id="related">
+                            <label for="related">Include Related?</label>
+                            </div>
+                            <a id="checkEvents" class="hover:bg-gray-700 opacity-20 no-underline rounded-md py-2 px-3 border" href="">Fetch</a>
+                        </div>
+                    </div>
+                    <div class="flex" style="align-items: center">
+                        <input type="checkbox" id="showAll">
+                        <label for="showAll">Show all non-triggered details</label>
+                    </div>
+                </div>
+            <% } %>
             <div class="px-3 py-6 space-y-3">
-                <% if(data.length === 0) { %>
+                <% if(pagination.total == 0) { %>
                     No events have been actioned yet!
                 <% } else { %>
+
                 <%- include('partials/pagination') %>
                 <% } %>
                 <% data.forEach(function (eRes) { %>
@@ -327,7 +344,37 @@
                 }
             }
         });
-    })
+    });
+
+    document.querySelectorAll(".checkUrl").forEach(el => {
+        const toggleButtons = (e) => {
+            const inputVal = e.currentTarget.value;
+            if (inputVal.length > 0) {
+                document.querySelectorAll(`#checkEvents`).forEach(el => {
+                    el.classList.remove('pointer-events-none', 'opacity-20');
+                });
+            } else {
+                document.querySelectorAll(`#checkEvents`).forEach(el => {
+                    el.classList.add('pointer-events-none', 'opacity-20');
+                });
+            }
+        }
+        el.addEventListener('keyup', toggleButtons, false);
+        el.addEventListener('change', toggleButtons, false);
+    });
+
+    document.querySelector('#checkEvents').addEventListener('click', (e) => {
+        e.preventDefault();
+        const currParams = new URLSearchParams(window.location.search);
+        const includeRelated  = document.querySelector('#related').checked;
+        const permalink = document.querySelector('.checkUrl').value;
+
+        currParams.set('permalink', permalink);
+        currParams.set('includeRelated', includeRelated);
+
+        const newUrl = window.location.pathname + '?' + currParams.toString();
+        window.location.href = newUrl;
+    });
 </script>
 </body>
 </html>

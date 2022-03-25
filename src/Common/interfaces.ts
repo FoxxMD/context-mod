@@ -2443,3 +2443,8 @@ export interface RedditThing {
     prefix: string
     id: string
 }
+
+export interface PermalinkRedditThings {
+    comment?: RedditThing,
+    submission?: RedditThing
+}

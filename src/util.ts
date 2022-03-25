@@ -30,7 +30,7 @@ import {
     ItemCritPropHelper,
     LogInfo,
     ObjectPremise,
-    OperatorJsonConfig,
+    OperatorJsonConfig, PermalinkRedditThings,
     PollingOptionsStrong,
     RedditEntity,
     RedditEntityType,
@@ -311,6 +311,37 @@ export const parseLinkIdentifier = (regexes: RegExp[]) => {
 
 export const SUBMISSION_URL_ID: RegExp = /(?:^.+?)(?:reddit.com\/r)(?:\/[\w\d]+){2}(?:\/)([\w\d]*)/g;
 export const COMMENT_URL_ID: RegExp = /(?:^.+?)(?:reddit.com\/r)(?:\/[\w\d]+){4}(?:\/)([\w\d]*)/g;
+
+const commentReg = parseLinkIdentifier([COMMENT_URL_ID]);
+const submissionReg = parseLinkIdentifier([SUBMISSION_URL_ID]);
+
+export const parseRedditThingsFromLink = (val: string): PermalinkRedditThings => {
+    const commentId = commentReg(val);
+    const submissionId = submissionReg(val);
+    let comment: RedditThing | undefined;
+    let submission: RedditThing | undefined;
+
+    if (commentId !== undefined) {
+        comment = {
+            val: `t1_${commentId}`,
+            type: 'comment',
+            prefix: 't1',
+            id: commentId
+        }
+    }
+    if (submissionId !== undefined) {
+        submission = {
+            val: `t3_${submissionId}`,
+            type: 'submission',
+            prefix: 't3',
+            id: submissionId
+        }
+    }
+    return {
+        submission,
+        comment
+    }
+}
 
 export function sleep(ms: number) {
     return new Promise(resolve => setTimeout(resolve, ms));
