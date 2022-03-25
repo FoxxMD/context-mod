@@ -13,7 +13,7 @@ import {
     CheckSummary,
     RunResult,
     ActionedEvent,
-    ActionResult, RuleResult
+    ActionResult, RuleResult, EventActivity
 } from "../../Common/interfaces";
 import {
     buildCachePrefix,
@@ -22,7 +22,7 @@ import {
     intersect, isLogLineMinLevel,
     LogEntry, parseInstanceLogInfoName, parseInstanceLogName, parseRedditEntity,
     parseSubredditLogName, permissions,
-    randomId, replaceApplicationIdentifier, resultsSummary, sleep, triggeredIndicator
+    randomId, replaceApplicationIdentifier, resultsSummary, sleep, triggeredIndicator, truncateStringToLength
 } from "../../util";
 import {Cache} from "cache-manager";
 import session, {Session, SessionData} from "express-session";
@@ -59,6 +59,8 @@ import {TransformableInfo} from "logform";
 import {SimpleError} from "../../Utils/Errors";
 import {ErrorWithCause} from "pony-cause";
 import {CMInstance} from "./CMInstance";
+import {PaginationAwareObject} from "typeorm-pagination/dist/helpers/pagination";
+import {CMEvent} from "../../Common/Entities/CMEvent";
 
 const emitter = new EventEmitter();
 
@@ -133,6 +135,8 @@ const createToken = (bot: CMInstanceInterface, user?: Express.User | any, ) => {
         expiresIn: '1m'
     });
 }
+
+const peekTrunc = truncateStringToLength(200);
 
 const availableLevels = ['error', 'warn', 'info', 'verbose', 'debug'];
 
@@ -995,9 +999,90 @@ const webClient = async (options: OperatorConfig) => {
                 subreddit,
                 bot: req.bot?.botName
             }
-        }).json() as [any];
+        }).json() as PaginationAwareObject;
 
-        const actionedEvents = resp.map((x: ActionedEvent) => {
+        const eventData = resp.data as CMEvent[];
+
+        // for now just want to get this back in the same shape the ui expects so i don't have to refactor the entire events page
+        // @ts-ignore
+        const actionedEventsData: ActionedEvent[] = eventData.map((x: CMEvent) => {
+           const ea: EventActivity = {
+               peek: Autolinker.link(peekTrunc(x.activity.content), {
+                   email: false,
+                   phone: false,
+                   mention: false,
+                   hashtag: false,
+                   stripPrefix: false,
+                   sanitizeHtml: true,
+                   urls: false
+               }),
+               link: `https://reddit.com${x.activity.permalink}`,
+               type: x.activity.type,
+               subreddit: x.activity.subreddit.name,
+               id: x.activity.name,
+               author: x.activity.author.name
+           };
+           let submission: EventActivity | undefined;
+           if(x.activity.submission !== undefined) {
+               submission = {
+                   peek: Autolinker.link(peekTrunc(x.activity.submission.content), {
+                       email: false,
+                       phone: false,
+                       mention: false,
+                       hashtag: false,
+                       stripPrefix: false,
+                       sanitizeHtml: true,
+                       urls: false
+                   }),
+                   link: `https://reddit.com${x.activity.submission.permalink}`,
+                   type: 'submission',
+                   subreddit: x.activity.subreddit.name,
+                   id: x.activity.submission.name,
+                   author: x.activity.submission.author.name
+               };
+           }
+           return {
+               activity: ea,
+               submission,
+               subreddit: x.activity.subreddit.name,
+               timestamp: dayjs(x.processedAt).unix(),
+               triggered: x.triggered,
+               dispatchSource: x.source,
+               runResults: x.runResults.map(y => {
+                   return {
+                       name: y.run.name,
+                       triggered: y.triggered,
+                       reason: y.reason,
+                       error: y.error,
+                       itemIs: y._itemIs,
+                       authorIs: y._authorIs,
+                       checkResults: y.checkResults.map(z => {
+                           return {
+                               ...z,
+                               itemIs: z._itemIs,
+                               authorIs: z._authorIs,
+                               ruleResults: z.ruleResults?.map(a => {
+                                   return {
+                                       ...a,
+                                       itemIs: a._itemIs,
+                                       authorIs: a._authorIs,
+                                   }
+                               }),
+                               actionResults: z.actionResults?.map(a => {
+                                   return {
+                                       ...a,
+                                       itemIs: a._itemIs,
+                                       authorIs: a._authorIs,
+                                   }
+                               })
+                           }
+                       })
+                   }
+               })
+           }
+        });
+
+        const actionedEvents = actionedEventsData.map((x: ActionedEvent) => {
             const {timestamp, activity: {peek, link, ...restAct}, runResults = [], dispatchSource, ...rest} = x;
             const time = dayjs(timestamp).local().format('YY-MM-DD HH:mm:ss z');
             const formattedPeek = Autolinker.link(peek.replace(`https://reddit.com${link}`, ''), {

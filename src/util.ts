@@ -81,6 +81,7 @@ import merge from "deepmerge";
 import {RulePremise} from "./Common/Entities/RulePremise";
 import {RuleResultEntity as RuleResultEntity} from "./Common/Entities/RuleResultEntity";
 import {nanoid} from "nanoid";
+import {Rule} from "./Common/Entities/Rule";
 
 
 //import {ResembleSingleCallbackComparisonResult} from "resemblejs";
@@ -400,7 +401,7 @@ export const resultsSummary = (results: (RuleResultEntity|RuleSetResult)[], topL
             return `${triggeredIndicator(x.triggered)} (${resultsSummary(x.results, x.condition)}${x.results.length === 1 ? ` [${x.condition}]` : ''})`;
         }
         const res = x as RuleResultEntity;
-        return `${triggeredIndicator(res.triggered ?? null)} ${res.premise.rule.getFriendlyIdentifier()}`;
+        return `${triggeredIndicator(res.triggered ?? null)} ${Rule.getFriendlyIdentifier(res.premise.rule)}`;
     });
     return parts.join(` ${topLevelCondition} `)
     //return results.map(x => x.name || x.premise.kind).join(' | ')
@@ -2258,14 +2259,14 @@ export const formatFilterData = (result: (RunResult | CheckSummary | RuleResult 
 
     const {authorIs, itemIs} = result;
 
-    if (authorIs !== undefined) {
+    if (authorIs !== undefined && authorIs !== null) {
         formattedResult.authorIs = {
             ...authorIs,
             passed: triggeredIndicator(authorIs.passed),
             criteriaResults: authorIs.criteriaResults.map(x => filterCriteriaSummary(x))
         }
     }
-    if (itemIs !== undefined) {
+    if (itemIs !== undefined && itemIs !== null) {
         formattedResult.itemIs = {
             ...itemIs,
             passed: triggeredIndicator(itemIs.passed),

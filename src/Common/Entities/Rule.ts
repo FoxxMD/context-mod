@@ -52,4 +52,10 @@ export class Rule {
     getFriendlyIdentifier() {
         return this.name === undefined ? capitalize(this.kind.name) : `${capitalize(this.kind.name)} - ${this.name}`;
     }
+
+    static getFriendlyIdentifier(ruleLike: any) {
+        const rule = ruleLike as Rule;
+
+        return rule.name === undefined ? capitalize(rule.kind.name) : `${capitalize(rule.kind.name)} - ${rule.name}`;
+    }
 }
