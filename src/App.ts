@@ -129,7 +129,7 @@ export class App {
             await this.database.showMigrations();
             await this.doMigration();
             return true;
-        } else if (!tables.map(x => x.name).includes('migrations') && !force) {
+        } else if (!tables.map(x => x.name).some(x => x.includes('migrations')) && !force) {
             this.dbLogger.warn(`DANGER! Your database has existing tables but none of them include a 'migrations' table. 
             Are you sure this is the correct database? Continuing with migrations will most likely drop any existing data and recreate all tables.`);
             this.migrationBlocker = 'unknownTables';
