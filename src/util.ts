@@ -135,7 +135,8 @@ const errorAwareFormat = {
             if(includeStack) {
                 // so we have to create a dummy error and re-assign all error properties from our info object to it so we can get a proper stack trace
                 const dummyErr = new ErrorWithCause('');
-                for(const k in tinfo) {
+                const names = Object.getOwnPropertyNames(tinfo);
+                for(const k of names) {
                     if(dummyErr.hasOwnProperty(k) || k === 'cause') {
                         // @ts-ignore
                         dummyErr[k] = tinfo[k];
@@ -146,7 +147,7 @@ const errorAwareFormat = {
             }
         } else {
             const err = transformError(einfo.message);
-            info = Object.assign(einfo, err);
+            info = Object.assign({}, einfo, err);
             // @ts-ignore
             info.message = err.message;
             // @ts-ignore
@@ -154,10 +155,13 @@ const errorAwareFormat = {
 
             if(includeStack) {
                 const dummyErr = new ErrorWithCause('');
-                for(const k in err) {
+                // Error properties are not enumerable
+                // https://stackoverflow.com/a/18278145/1469797
+                const names = Object.getOwnPropertyNames(err);
+                for(const k of names) {
                     if(dummyErr.hasOwnProperty(k) || k === 'cause') {
                         // @ts-ignore
-                        dummyErr[k] = info[k];
+                        dummyErr[k] = err[k];
                     }
                 }
                 // @ts-ignore
