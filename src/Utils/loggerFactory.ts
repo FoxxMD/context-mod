@@ -93,6 +93,6 @@ export const getLogger = (options: LoggerFactoryOptions, name = 'app'): Logger =
 }
 
 export const getDatabaseLogger = (logger: Logger, typeOptions: LoggerOptions) => {
-    const dbLogger = logger.child({leaf: 'Database'}, mergeArr);
+    const dbLogger = logger.child({labels: ['Database']}, mergeArr);
     return new WinstonAdaptor(dbLogger, typeOptions)
 };
