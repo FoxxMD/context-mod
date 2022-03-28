@@ -165,9 +165,9 @@ const rcbServer = async function (options: OperatorConfigWithFileContext) {
                     error: b.error,
                     subreddits: req.user?.accessibleSubreddits(b).map((manager: Manager) => {
                         let indicator;
-                        if (manager.botState.state === RUNNING && manager.queueState.state === RUNNING && manager.eventsState.state === RUNNING) {
+                        if (manager.managerState.state === RUNNING && manager.queueState.state === RUNNING && manager.eventsState.state === RUNNING) {
                             indicator = 'green';
-                        } else if (manager.botState.state === STOPPED && manager.queueState.state === STOPPED && manager.eventsState.state === STOPPED) {
+                        } else if (manager.managerState.state === STOPPED && manager.queueState.state === STOPPED && manager.eventsState.state === STOPPED) {
                             indicator = 'red';
                         } else {
                             indicator = 'yellow';

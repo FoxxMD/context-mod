@@ -75,18 +75,12 @@ import {
     cacheTTLDefaults,
     createHistoricalDisplayDefaults,
 } from "../Common/defaults";
-import {check} from "tcp-port-used";
 import {ExtendedSnoowrap} from "../Utils/SnoowrapClients";
 import dayjs from "dayjs";
 import ImageData from "../Common/ImageData";
-import {Connection, Repository, SelectQueryBuilder} from "typeorm";
-import {Activity} from "../Common/Entities/Activity";
-import {Subreddit as SubredditEntity} from "../Common/Entities/Subreddit";
-import {AuthorEntity} from "../Common/Entities/AuthorEntity";
-import {RulePremise} from "../Common/Entities/RulePremise";
+import {DataSource, Repository, SelectQueryBuilder} from "typeorm";
 import {CMEvent as ActionedEventEntity, CMEvent } from "../Common/Entities/CMEvent";
 import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
-import {ActionResultEntity} from "../Common/Entities/ActionResultEntity";
 import globrex from 'globrex';
 import {runMigrations} from "../Common/Migrations/CacheMigrationUtils";
 import {isStatusError, SimpleError} from "../Utils/Errors";
@@ -99,6 +93,8 @@ import {DispatchedEntity} from "../Common/Entities/DispatchedEntity";
 import {ActivitySourceEntity} from "../Common/Entities/ActivitySourceEntity";
 import {TotalStat} from "../Common/Entities/Stats/TotalStat";
 import {TimeSeriesStat} from "../Common/Entities/Stats/TimeSeriesStat";
+import {InvokeeType} from "../Common/Entities/InvokeeType";
+import {RunStateType} from "../Common/Entities/RunStateType";
 
 export const DEFAULT_FOOTER = '\r\n*****\r\nThis action was performed by [a bot.]({{botLink}}) Mention a moderator or [send a modmail]({{modmailLink}}) if you any ideas, questions, or concerns about this action.';
 
@@ -135,7 +131,7 @@ interface SubredditResourceOptions extends Footer {
     cacheType: string;
     cacheSettingsHash: string
     subreddit: Subreddit,
-    database: Connection
+    database: DataSource
     logger: Logger;
     client: ExtendedSnoowrap;
     prefix?: string;
@@ -166,7 +162,7 @@ export class SubredditResources {
     userNotes: UserNotes;
     footer: false | string = DEFAULT_FOOTER;
     subreddit: Subreddit
-    database: Connection
+    database: DataSource
     client: ExtendedSnoowrap
     cache: Cache
     cacheType: string
@@ -182,6 +178,8 @@ export class SubredditResources {
     totalStatsRepo: Repository<TotalStat>
     totalStatsEntities: TotalStat[] = [];
     tsStatsRepo: Repository<TimeSeriesStat>
+    invokeeRepo: Repository<InvokeeType>
+    runTypeRepo: Repository<RunStateType>
     managerEntity: ManagerEntity
     botEntity: Bot
 
@@ -229,6 +227,8 @@ export class SubredditResources {
         this.activitySourceRepo = this.database.getRepository(ActivitySourceEntity);
         this.totalStatsRepo = this.database.getRepository(TotalStat);
         this.tsStatsRepo = this.database.getRepository(TimeSeriesStat);
+        this.invokeeRepo = this.database.getRepository(InvokeeType);
+        this.runTypeRepo = this.database.getRepository(RunStateType);
         this.prefix = prefix;
         this.client = client;
         this.cacheType = cacheType;
@@ -2110,7 +2110,7 @@ export class BotResourcesManager {
     pruneInterval: any;
     defaultThirdPartyCredentials: ThirdPartyCredentialsJsonConfig;
     logger: Logger;
-    defaultDatabase: Connection
+    defaultDatabase: DataSource
     botName!: string
 
     constructor(config: BotInstanceConfig, logger: Logger) {

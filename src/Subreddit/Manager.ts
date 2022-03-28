@@ -84,6 +84,9 @@ import { AuthorEntity } from "../Common/Entities/AuthorEntity";
 import {CMEvent} from "../Common/Entities/CMEvent";
 import {nanoid} from "nanoid";
 import {ActivitySourceEntity} from "../Common/Entities/ActivitySourceEntity";
+import {InvokeeType} from "../Common/Entities/InvokeeType";
+import {RunStateType} from "../Common/Entities/RunStateType";
+import {EntityRunState} from "../Common/Entities/EntityRunState/EntityRunState";
 
 export interface RunningState {
     state: RunState,
@@ -175,8 +178,7 @@ export class Manager extends EventEmitter {
 
     startedAt?: DayjsObj;
     validConfigLoaded: boolean = false;
-    running: boolean = false;
-    manuallyStopped: boolean = false;
+
     eventsState: RunningState = {
         state: STOPPED,
         causedBy: SYSTEM
@@ -185,7 +187,7 @@ export class Manager extends EventEmitter {
         state: STOPPED,
         causedBy: SYSTEM
     };
-    botState: RunningState = {
+    managerState: RunningState = {
         state: STOPPED,
         causedBy: SYSTEM
     }
@@ -309,7 +311,12 @@ export class Manager extends EventEmitter {
         this.pollingRetryHandler = createRetryHandler({maxRequestRetry: 3, maxOtherRetry: 2}, this.logger);
         this.subreddit = sub;
         this.botEntity = botEntity;
+
         this.managerEntity = managerEntity;
+        this.eventsState = managerEntity.eventsState.toRunningState();
+        this.queueState = managerEntity.queueState.toRunningState();
+        this.managerState = managerEntity.managerState.toRunningState();
+
         this.client = client;
         this.botName = botName;
         this.maxGotoDepth = maxGotoDepth;
@@ -1264,7 +1271,7 @@ export class Manager extends EventEmitter {
         }
     }
 
-    startQueue(causedBy: Invokee = 'system', options?: ManagerStateChangeOption) {
+    async startQueue(causedBy: Invokee = 'system', options?: ManagerStateChangeOption) {
 
         if(this.activityRepo === undefined) {
             this.activityRepo = this.resources.database.getRepository(Activity);
@@ -1297,6 +1304,7 @@ export class Manager extends EventEmitter {
             if(!suppressNotification) {
                 this.notificationManager.handle('runStateChanged', 'Queue Started', reason, causedBy);
             }
+            await this.syncRunningState('queueState');
         }
     }
 
@@ -1309,6 +1317,7 @@ export class Manager extends EventEmitter {
                     state: PAUSED,
                     causedBy
                 }
+                await this.syncRunningState('queueState');
             } else {
                 this.logger.info('Activity processing queue already PAUSED');
             }
@@ -1334,6 +1343,7 @@ export class Manager extends EventEmitter {
             if(!suppressNotification) {
                 this.notificationManager.handle('runStateChanged', 'Queue Paused', reason, causedBy)
             }
+            await this.syncRunningState('queueState');
         }
     }
 
@@ -1378,6 +1388,7 @@ export class Manager extends EventEmitter {
             if(!suppressNotification) {
                 this.notificationManager.handle('runStateChanged', 'Queue Stopped', reason, causedBy)
             }
+            await this.syncRunningState('queueState');
         }
     }
 
@@ -1392,7 +1403,6 @@ export class Manager extends EventEmitter {
         if(this.eventsState.state === RUNNING) {
             this.logger.info('Event polling already running');
         } else {
-
             if(this.eventsState.state === STOPPED) {
                 await this.buildPolling();
             }
@@ -1418,9 +1428,10 @@ export class Manager extends EventEmitter {
         if(!suppressNotification) {
             this.notificationManager.handle('runStateChanged', 'Events Polling Started', reason, causedBy)
         }
+        await this.syncRunningState('eventsState');
     }
 
-    pauseEvents(causedBy: Invokee = 'system', options?: ManagerStateChangeOption) {
+    async pauseEvents(causedBy: Invokee = 'system', options?: ManagerStateChangeOption) {
         const {reason, suppressNotification = false} = options || {};
         if(this.eventsState.state !== RUNNING) {
             this.logger.warn('Events must be in RUNNING state in order to be paused.');
@@ -1440,10 +1451,11 @@ export class Manager extends EventEmitter {
             if(!suppressNotification) {
                 this.notificationManager.handle('runStateChanged', 'Events Polling Paused', reason, causedBy)
             }
+            await this.syncRunningState('eventsState');
         }
     }
 
-    stopEvents(causedBy: Invokee = 'system', options?: ManagerStateChangeOption) {
+    async stopEvents(causedBy: Invokee = 'system', options?: ManagerStateChangeOption) {
         const {reason, suppressNotification = false} = options || {};
         if(this.eventsState.state !== STOPPED) {
             for (const s of this.streams.values()) {
@@ -1460,10 +1472,12 @@ export class Manager extends EventEmitter {
             if(!suppressNotification) {
                 this.notificationManager.handle('runStateChanged', 'Events Polling Stopped', reason, causedBy)
             }
+            await this.syncRunningState('eventsState');
         } else if(causedBy !== this.eventsState.causedBy) {
             this.logger.info(`Events STOPPED by ${causedBy}`);
             this.logger.info('Note: Polling behavior will be re-built from configuration when next started');
             this.eventsState.causedBy = causedBy;
+            await this.syncRunningState('eventsState');
         } else {
             this.logger.info('Events already STOPPED');
         }
@@ -1476,26 +1490,37 @@ export class Manager extends EventEmitter {
             return;
         }
         await this.startEvents(causedBy, {suppressNotification: true});
-        this.startQueue(causedBy, {suppressNotification: true});
-        this.botState = {
+        await this.startQueue(causedBy, {suppressNotification: true});
+        this.managerState = {
             state: RUNNING,
             causedBy
         }
         if(!suppressNotification) {
             this.notificationManager.handle('runStateChanged', 'Bot Started', reason, causedBy)
         }
+        await this.syncRunningState('managerState');
     }
 
     async stop(causedBy: Invokee = 'system', options?: ManagerStateChangeOption) {
         const {reason, suppressNotification = false} = options || {};
         this.stopEvents(causedBy, {suppressNotification: true});
         await this.stopQueue(causedBy, {suppressNotification: true});
-        this.botState = {
+        this.managerState = {
             state: STOPPED,
             causedBy
         }
         if(!suppressNotification) {
             this.notificationManager.handle('runStateChanged', 'Bot Stopped', reason, causedBy)
         }
+        await this.syncRunningState('managerState');
+    }
+
+    async syncRunningState(type: string) {
+        // @ts-ignore
+        this.managerEntity[type].invokee = await this.resources.invokeeRepo.findOneBy({name: this[type].causedBy}) as InvokeeType
+        // @ts-ignore
+        this.managerEntity[type].runType = await this.resources.runTypeRepo.findOneBy({name: this[type].state}) as RunStateType
+        // @ts-ignore
+        await this.resources.database.manager.save(this.managerEntity[type]);
     }
 }

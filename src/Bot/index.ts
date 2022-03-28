@@ -32,10 +32,15 @@ import LoggedError from "../Utils/LoggedError";
 import pEvent from "p-event";
 import {SimpleError, isRateLimitError, isRequestError, isScopeError, isStatusError, CMError} from "../Utils/Errors";
 import {ErrorWithCause} from "pony-cause";
-import {Connection} from "typeorm";
+import {DataSource, Repository} from "typeorm";
 import {Bot as BotEntity} from '../Common/Entities/Bot';
 import {ManagerEntity as ManagerEntity} from '../Common/Entities/ManagerEntity';
 import {Subreddit as SubredditEntity} from '../Common/Entities/Subreddit';
+import {InvokeeType} from "../Common/Entities/InvokeeType";
+import {RunStateType} from "../Common/Entities/RunStateType";
+import {QueueRunState} from "../Common/Entities/EntityRunState/QueueRunState";
+import {EventsRunState} from "../Common/Entities/EntityRunState/EventsRunState";
+import {ManagerRunState} from "../Common/Entities/EntityRunState/ManagerRunState";
 
 class Bot {
 
@@ -84,7 +89,9 @@ class Bot {
 
     config: BotInstanceConfig;
 
-    database: Connection
+    database: DataSource
+    invokeeRepo: Repository<InvokeeType>;
+    runTypeRepo: Repository<RunStateType>;
     botEntity!: BotEntity
 
     getBotName = () => {
@@ -144,6 +151,8 @@ class Bot {
         } = config;
 
         this.database = database;
+        this.invokeeRepo = this.database.getRepository(InvokeeType);
+        this.runTypeRepo = this.database.getRepository(RunStateType);
         this.config = config;
         this.dryRun = parseBool(dryRun) === true ? true : undefined;
         this.softLimit = softLimit;
@@ -534,11 +543,11 @@ class Bot {
             await manager.parseConfiguration('system', true, {suppressNotification: true, suppressChangeEvent: true});
         } catch (err: any) {
             if(err.logged !== true) {
-                const normalizedError = new ErrorWithCause(`Bot could not start manager because config was not valid`, {cause: err});
+                const normalizedError = new ErrorWithCause(`Bot could not initialize manager because config was not valid`, {cause: err});
                 // @ts-ignore
                 this.logger.error(normalizedError, {subreddit: manager.subreddit.display_name_prefixed});
             } else {
-                this.logger.error('Bot could not start manager because config was not valid', {subreddit: manager.subreddit.display_name_prefixed});
+                this.logger.error('Bot could not initialize manager because config was not valid', {subreddit: manager.subreddit.display_name_prefixed});
             }
         }
     }
@@ -584,7 +593,17 @@ class Bot {
             },
         });
         if(managerEntity === undefined || managerEntity === null) {
-            managerEntity = await managerRepo.save(new ManagerEntity({name: sub.display_name, bot: this.botEntity, subreddit: subreddit as SubredditEntity}));
+            const invokee = await this.invokeeRepo.findOneBy({name: SYSTEM}) as InvokeeType;
+            const runType = await this.runTypeRepo.findOneBy({name: STOPPED}) as RunStateType;
+
+            managerEntity = await managerRepo.save(new ManagerEntity({
+                name: sub.display_name,
+                bot: this.botEntity,
+                subreddit: subreddit as SubredditEntity,
+                queueState: new QueueRunState({invokee, runType}),
+                eventsState: new EventsRunState({invokee, runType}),
+                managerState: new ManagerRunState({invokee, runType})
+            }));
         }
 
         const manager = new Manager(sub, this.client, this.logger, this.cacheManager, {
@@ -688,8 +707,12 @@ class Bot {
             this.error = 'All managers have invalid configs';
         }
         for (const manager of this.subManagers) {
-            if (manager.validConfigLoaded && manager.botState.state !== RUNNING) {
-                await manager.start(causedBy, {reason: 'Caused by application startup'});
+            if (manager.validConfigLoaded && manager.managerState.state !== RUNNING) {
+                if(manager.managerState.causedBy === USER) {
+                    manager.logger.info('NOT starting automatically manager because last known state was caused by user input. Manager must be started manually by user.');
+                } else {
+                    await manager.start(causedBy, {reason: 'Caused by application startup'});
+                }
                 await sleep(this.stagger);
             }
         }
@@ -743,7 +766,7 @@ class Bot {
         let startedAny = false;
 
         for (const s of this.subManagers) {
-            if(s.botState.state === STOPPED && s.botState.causedBy === USER) {
+            if(s.managerState.state === STOPPED && s.managerState.causedBy === USER) {
                 this.logger.debug('Skipping config check/restart on heartbeat due to previously being stopped by user', {subreddit: s.displayLabel});
                 continue;
             }
@@ -767,11 +790,12 @@ class Bot {
                         await s.startEvents('system', {reason: newConfig ? 'Config updated on heartbeat triggered reload' : 'Heartbeat detected non-running events'});
                     }
                 }
-                if(s.botState.state !== RUNNING && s.eventsState.state === RUNNING && s.queueState.state === RUNNING) {
-                    s.botState = {
+                if(s.managerState.state !== RUNNING && s.eventsState.state === RUNNING && s.queueState.state === RUNNING) {
+                    s.managerState = {
                         state: RUNNING,
                         causedBy: 'system',
                     }
+                    await s.syncRunningState('managerState');
                 }
             } catch (err: any) {
                 if(s.eventsState.state === RUNNING) {

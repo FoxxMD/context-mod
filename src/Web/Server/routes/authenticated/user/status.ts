@@ -76,7 +76,7 @@ const status = () => {
                 name: m.displayLabel,
                 //linkName: s.replace(/\W/g, ''),
                 logs: logs || [], // provide a default empty value in case we truly have not logged anything for this subreddit yet
-                botState: m.botState,
+                botState: m.managerState,
                 eventsState: m.eventsState,
                 queueState: m.queueState,
                 indicator: 'gray',
@@ -108,9 +108,9 @@ const status = () => {
             };
             // TODO replace indicator data with js on client page
             let indicator;
-            if (m.botState.state === RUNNING && m.queueState.state === RUNNING && m.eventsState.state === RUNNING) {
+            if (m.managerState.state === RUNNING && m.queueState.state === RUNNING && m.eventsState.state === RUNNING) {
                 indicator = 'green';
-            } else if (m.botState.state === STOPPED && m.queueState.state === STOPPED && m.eventsState.state === STOPPED) {
+            } else if (m.managerState.state === STOPPED && m.queueState.state === STOPPED && m.eventsState.state === STOPPED) {
                 indicator = 'red';
             } else {
                 indicator = 'yellow';

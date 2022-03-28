@@ -215,7 +215,7 @@ const liveStats = () => {
             // getting specific subreddit stats
             const sd = {
                 name: manager.displayLabel,
-                botState: manager.botState,
+                botState: manager.managerState,
                 eventsState: manager.eventsState,
                 queueState: manager.queueState,
                 indicator: 'gray',
@@ -248,9 +248,9 @@ const liveStats = () => {
             };
             // TODO replace indicator data with js on client page
             let indicator;
-            if (manager.botState.state === RUNNING && manager.queueState.state === RUNNING && manager.eventsState.state === RUNNING) {
+            if (manager.managerState.state === RUNNING && manager.queueState.state === RUNNING && manager.eventsState.state === RUNNING) {
                 indicator = 'green';
-            } else if (manager.botState.state === STOPPED && manager.queueState.state === STOPPED && manager.eventsState.state === STOPPED) {
+            } else if (manager.managerState.state === STOPPED && manager.queueState.state === STOPPED && manager.eventsState.state === STOPPED) {
                 indicator = 'red';
             } else {
                 indicator = 'yellow';
