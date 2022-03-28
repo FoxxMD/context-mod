@@ -5,11 +5,12 @@ import {MongoConnectionOptions} from "typeorm/driver/mongodb/MongoConnectionOpti
 import {PostgresConnectionOptions} from "typeorm/driver/postgres/PostgresConnectionOptions";
 import {resolve} from 'path';
 import "reflect-metadata";
-import {Connection, createConnection} from "typeorm";
+import {DataSource} from "typeorm";
 import {getDatabaseLogger, getLogger} from "./loggerFactory";
 import {fileOrDirectoryIsWriteable} from "../util";
 import {Logger} from "winston";
 import {CMNamingStrategy} from "./CMNamingStrategy";
+import {ErrorWithCause} from "pony-cause";
 
 export const isDatabaseDriver = (val: any): val is DatabaseDriver => {
     if (typeof val !== 'string') {
@@ -45,11 +46,15 @@ export const createDatabaseConfig = (val: DatabaseDriver | any): DatabaseConfig 
     }
 
     // handle sqljs db location and autoSave default
-    const {type, location = resolve(`${__dirname}`, '../../database.sqlite'), ...rest} = val;
+    const {
+        type,
+        location = resolve(`${__dirname}`, '../../database.sqlite'),
+        ...rest
+    } = val;
     if (type === 'sqljs') {
         return {
             type,
-            location: resolve(location),
+            location: location.trim() === ':memory:' ? undefined : resolve(location),
             autoSave: true, // default autoSave to true since this is most likely the expected behavior
             ...rest,
         } as SqljsConnectionOptions;
@@ -57,25 +62,36 @@ export const createDatabaseConfig = (val: DatabaseDriver | any): DatabaseConfig 
     return val as DatabaseConfig;
 }
 
-export const createDatabaseConnection = async (rawConfig: DatabaseConfig, logger: Logger): Promise<Connection> => {
+export const createDatabaseConnection = async (rawConfig: DatabaseConfig, logger: Logger): Promise<DataSource> => {
 
     let config = {...rawConfig};
 
-    let realLocation: undefined | string = undefined;
-
     if (rawConfig.type === 'sqljs') {
-        const location = rawConfig.location as string;
 
-        try {
-            await fileOrDirectoryIsWriteable(location);
-            realLocation = location;
-        } catch (e: any) {
-            logger.error(`Falling back to IN-MEMORY database due to error while trying to access database file: ${e.message}`);
+        // if we can't write to a real file location then autosave can't be used in config options
+        // -- it tells typeorm to automatically write DB changes (after successfully commits/transactions) to file
+        let locationData: Pick<SqljsConnectionOptions, 'autoSave' | 'location'> = {
+            autoSave: false,
+            location: undefined,
+        };
+
+        if(typeof rawConfig.location === 'string' && rawConfig.location !== ':memory:') {
+            const location = rawConfig.location as string;
+            try {
+                await fileOrDirectoryIsWriteable(location);
+                locationData = {
+                    autoSave: true,
+                    location,
+                };
+            } catch (e: any) {
+                logger.error(new ErrorWithCause(`Falling back to IN-MEMORY database due to error while trying to access database file at ${location})`, {cause: e}));
+            }
         }
-        config = {...rawConfig, location: realLocation};
+
+        config = {...config, ...locationData};
     }
 
-    return await createConnection({
+    const source = new DataSource({
         ...config,
         synchronize: false,
         entities: [`${resolve(__dirname, '../Common/Entities')}/**/*.js`],
@@ -85,4 +101,6 @@ export const createDatabaseConnection = async (rawConfig: DatabaseConfig, logger
         logger: getDatabaseLogger(logger, ['error','warn','migration', 'schema']),
         namingStrategy: new CMNamingStrategy(),
     });
+    await source.initialize();
+    return source;
 }
