@@ -1,18 +1,12 @@
-import {addAsync, Router} from '@awaitjs/express';
-import express, {Request, Response, NextFunction, RequestHandler} from 'express';
+import {addAsync} from '@awaitjs/express';
+import express, {Request, Response} from 'express';
 import bodyParser from 'body-parser';
 import {App} from "../../App";
-import {Transform} from "stream";
-import winston from 'winston';
 import {Server as SocketServer} from 'socket.io';
-import {Strategy as JwtStrategy, ExtractJwt} from 'passport-jwt';
+import {ExtractJwt, Strategy as JwtStrategy} from 'passport-jwt';
 import passport from 'passport';
 import tcpUsed from 'tcp-port-used';
 import {pagination} from 'typeorm-pagination'
-
-import {
-    LogEntry
-} from "../../util";
 import {getLogger} from "../../Utils/loggerFactory";
 import LoggedError from "../../Utils/LoggedError";
 import {Invokee, LogInfo, OperatorConfigWithFileContext, RUNNING, STOPPED} from "../../Common/interfaces";
@@ -21,16 +15,27 @@ import {heartbeat} from "./routes/authenticated/applicationRoutes";
 import logs from "./routes/authenticated/user/logs";
 import status from './routes/authenticated/user/status';
 import liveStats from './routes/authenticated/user/liveStats';
-import {actionedEventsRoute, actionRoute, configRoute, configLocationRoute, deleteInviteRoute, addInviteRoute, getInvitesRoute, cancelDelayedRoute} from "./routes/authenticated/user";
+import {
+    actionedEventsRoute,
+    actionRoute,
+    addInviteRoute,
+    cancelDelayedRoute,
+    configLocationRoute,
+    configRoute,
+    deleteInviteRoute,
+    getInvitesRoute
+} from "./routes/authenticated/user";
 import action from "./routes/authenticated/user/action";
 import {authUserCheck, botRoute} from "./middleware";
-import {opStats} from "../Common/util";
 import Bot from "../../Bot";
 import addBot from "./routes/authenticated/user/addBot";
 import ServerUser from "../Common/User/ServerUser";
 import {SimpleError} from "../../Utils/Errors";
 import {ErrorWithCause} from "pony-cause";
 import {Manager} from "../../Subreddit/Manager";
+import {MESSAGE} from "triple-beam";
+import dayjs from "dayjs";
+import { sleep } from '../../util';
 
 const server = addAsync(express());
 server.use(pagination);
@@ -223,6 +228,54 @@ const rcbServer = async function (options: OperatorConfigWithFileContext) {
     server.postAsync('/init', authUserCheck(), async (req, res) => {
         logger.info(`${(req.user as Express.User).name} requested the app to be re-built. Starting rebuild now...`, {subreddit: (req.user as Express.User).name});
         await initBot('user');
+        res.send('OK');
+    });
+
+    server.postAsync('/database/migrate', authUserCheck(), async (req, res) => {
+        // because log timestamps are only granular to seconds we need to make sure "now" is actually "before" the log statements we are about to make
+        const now = dayjs().subtract(1, 'second');
+        logger.info(`${(req.user as Express.User).name} invoked migrations. Starting migrations now...`, {subreddit: (req.user as Express.User).name});
+        try {
+            await app.doMigration();
+        } finally {
+            // get all by leaf
+            const dbLogs = sysLogs.filter(x => x.labels?.includes('Database') && dayjs(x.timestamp).isSameOrAfter(now));
+
+            dbLogs.reverse();
+            res.status(app.ranMigrations ? 200 : 500).send(dbLogs.map(x => x[MESSAGE]).join('\r\n'));
+        }
+    });
+
+    server.getAsync('/database/logs', authUserCheck(), async (req, res) => {
+        const dbLogs = sysLogs.filter(x => {
+            return x.labels?.includes('Database');
+        });
+
+        dbLogs.reverse();
+        res.send(dbLogs.map(x => x[MESSAGE]).join('\r\n'));
+    });
+
+    server.postAsync('/database/backup', authUserCheck(), async (req, res) => {
+        logger.info(`${(req.user as Express.User).name} invoked database backup. Trying to backup now...`, {subreddit: (req.user as Express.User).name});
+        // because log timestamps are only granular to seconds we need to make sure "now" is actually "before" the log statements we are about to make
+        const now = dayjs().subtract(1, 'second');
+        let status = 200;
+        try {
+            await app.backupDatabase();
+        } catch (e) {
+            status = 500;
+            // @ts-ignore
+            app.dbLogger.error(e, {leaf: 'Backup'})
+        }
+
+        const dbLogs = sysLogs.filter(x => {
+            const logTime = dayjs(x.timestamp);
+            // @ts-ignore
+            return x.leaf === 'Backup' && logTime.isSameOrAfter(now)
+        });
+
+        dbLogs.reverse();
+        res.status(status).send(dbLogs.map(x => x[MESSAGE]).join('\r\n'));
     });
 
     logger.info('Beginning bot init...');

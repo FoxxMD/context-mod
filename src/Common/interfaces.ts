@@ -2234,7 +2234,14 @@ export interface StringComparisonOptions {
 }
 
 export interface DatabaseMigrationOptions {
-    force?: boolean
+    /**
+     * When pending migrations are present at startup force migrations to run regardless of backup attempt or outcome
+     * */
+    force?: boolean,
+    /**
+     * When pending migrations are present at startup and this is set to `true` it directs CM to try to make a backup and, if successful, run migrations.
+     * */
+    continueOnAutomatedBackup?: boolean
 }
 
 export interface FilterCriteriaPropertyResult<T> {

@@ -77,6 +77,8 @@ export interface IUser {
 }
 
 export interface HeartbeatResponse {
+    ranMigrations: boolean
+    migrationBlocker?: string
     subreddits: string[]
     operators: string[]
     operatorDisplay?: string
