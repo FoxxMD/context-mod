@@ -1,6 +1,24 @@
 {
     "$schema": "http://json-schema.org/draft-07/schema#",
     "definitions": {
+        "ActionTypes": {
+            "enum": [
+                "approve",
+                "ban",
+                "cancelDispatch",
+                "comment",
+                "contributor",
+                "dispatch",
+                "flair",
+                "lock",
+                "message",
+                "remove",
+                "report",
+                "userflair",
+                "usernote"
+            ],
+            "type": "string"
+        },
         "AuthorCriteria": {
             "additionalProperties": false,
             "description": "Criteria with which to test against the author of an Activity. The outcome of the test is based on:\n\n1. All present properties passing and\n2. If a property is a list then any value from the list matching",
@@ -539,23 +557,8 @@
             "type": "array"
         },
         "kind": {
-            "description": "The type of action that will be performed",
-            "enum": [
-                "approve",
-                "ban",
-                "cancelDispatch",
-                "comment",
-                "contributor",
-                "dispatch",
-                "flair",
-                "lock",
-                "message",
-                "remove",
-                "report",
-                "userflair",
-                "usernote"
-            ],
-            "type": "string"
+            "$ref": "#/definitions/ActionTypes",
+            "description": "The type of action that will be performed"
         },
         "name": {
             "description": "An optional, but highly recommended, friendly name for this Action. If not present will default to `kind`.\n\nCan only contain letters, numbers, underscore, spaces, and dashes",

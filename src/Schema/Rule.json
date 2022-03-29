@@ -2,9 +2,6 @@
     "$schema": "http://json-schema.org/draft-07/schema#",
     "anyOf": [
         {
-            "$ref": "#/definitions/RecentActivityRuleJSONConfig"
-        },
-        {
             "$ref": "#/definitions/RepeatActivityJSONConfig"
         },
         {
@@ -21,6 +18,9 @@
         },
         {
             "$ref": "#/definitions/RepostRuleJSONConfig"
+        },
+        {
+            "$ref": "#/definitions/RecentActivityRuleJSONConfig"
         },
         {
             "type": "string"

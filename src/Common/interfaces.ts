@@ -1805,7 +1805,9 @@ export interface OperatorJsonConfig {
      * Defaults to 'sqljs' which stores data in a file
      * */
     databaseConfig?: {
-        connection?: DatabaseDriver | DatabaseConfig,
+        // can't use DatabaseConfig here because generating the schema complains about unsupported symbol and a circular reference
+        // ...also including all those options makes the schema huge
+        connection?: DatabaseDriver | {type: DatabaseDriver, [key: string]: any},
         migrations?: DatabaseMigrationOptions
     }
 

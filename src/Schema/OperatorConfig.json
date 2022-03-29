@@ -590,6 +590,29 @@
             },
             "type": "object"
         },
+        "DatabaseDriver": {
+            "enum": [
+                "better-sqlite3",
+                "mariadb",
+                "mysql",
+                "postgres",
+                "sqljs"
+            ],
+            "type": "string"
+        },
+        "DatabaseMigrationOptions": {
+            "properties": {
+                "continueOnAutomatedBackup": {
+                    "description": "When pending migrations are present at startup and this is set to `true` it directs CM to try to make a backup and, if successful, run migrations.",
+                    "type": "boolean"
+                },
+                "force": {
+                    "description": "When pending migrations are present at startup force migrations to run regardless of backup attempt or outcome",
+                    "type": "boolean"
+                }
+            },
+            "type": "object"
+        },
         "DiscordProviderConfig": {
             "properties": {
                 "name": {
@@ -692,7 +715,7 @@
                 "file": {
                     "allOf": [
                         {
-                            "$ref": "#/definitions/Omit<DailyRotateFileTransportOptions,\"stream\"|\"dirname\"|\"options\"|\"handleRejections\"|\"format\"|\"handleExceptions\"|\"log\"|\"logv\"|\"close\">"
+                            "$ref": "#/definitions/Omit<DailyRotateFileTransportOptions,\"stream\"|\"log\"|\"dirname\"|\"options\"|\"handleRejections\"|\"format\"|\"handleExceptions\"|\"logv\"|\"close\">"
                         },
                         {
                             "properties": {
@@ -752,7 +775,7 @@
                 "stream": {
                     "allOf": [
                         {
-                            "$ref": "#/definitions/Omit<DuplexTransportOptions,\"name\"|\"stream\"|\"handleRejections\"|\"format\"|\"handleExceptions\"|\"log\"|\"logv\"|\"close\">"
+                            "$ref": "#/definitions/Omit<DuplexTransportOptions,\"name\"|\"stream\"|\"log\"|\"handleRejections\"|\"format\"|\"handleExceptions\"|\"logv\"|\"close\">"
                         },
                         {
                             "properties": {
@@ -840,7 +863,7 @@
             ],
             "type": "object"
         },
-        "Omit<DailyRotateFileTransportOptions,\"stream\"|\"dirname\"|\"options\"|\"handleRejections\"|\"format\"|\"handleExceptions\"|\"log\"|\"logv\"|\"close\">": {
+        "Omit<DailyRotateFileTransportOptions,\"stream\"|\"log\"|\"dirname\"|\"options\"|\"handleRejections\"|\"format\"|\"handleExceptions\"|\"logv\"|\"close\">": {
             "properties": {
                 "auditFile": {
                     "description": "A string representing the name of the name of the audit file. (default: './hash-audit.json')",
@@ -911,7 +934,7 @@
             },
             "type": "object"
         },
-        "Omit<DuplexTransportOptions,\"name\"|\"stream\"|\"handleRejections\"|\"format\"|\"handleExceptions\"|\"log\"|\"logv\"|\"close\">": {
+        "Omit<DuplexTransportOptions,\"name\"|\"stream\"|\"log\"|\"handleRejections\"|\"format\"|\"handleExceptions\"|\"logv\"|\"close\">": {
             "properties": {
                 "dump": {
                     "type": "boolean"
@@ -1496,6 +1519,41 @@
         },
         "credentials": {
             "$ref": "#/definitions/ThirdPartyCredentialsJsonConfig"
+        },
+        "databaseConfig": {
+            "description": "Database backend to use for persistent data\n\nDefaults to 'sqljs' which stores data in a file",
+            "properties": {
+                "connection": {
+                    "anyOf": [
+                        {
+                            "additionalProperties": {},
+                            "properties": {
+                                "type": {
+                                    "$ref": "#/definitions/DatabaseDriver"
+                                }
+                            },
+                            "required": [
+                                "type"
+                            ],
+                            "type": "object"
+                        },
+                        {
+                            "enum": [
+                                "better-sqlite3",
+                                "mariadb",
+                                "mysql",
+                                "postgres",
+                                "sqljs"
+                            ],
+                            "type": "string"
+                        }
+                    ]
+                },
+                "migrations": {
+                    "$ref": "#/definitions/DatabaseMigrationOptions"
+                }
+            },
+            "type": "object"
         },
         "logging": {
             "$ref": "#/definitions/LoggingOptions",

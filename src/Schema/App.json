@@ -1286,6 +1286,9 @@
                                 "$ref": "#/definitions/ReportActionJson"
                             },
                             {
+                                "$ref": "#/definitions/FlairActionJson"
+                            },
+                            {
                                 "$ref": "#/definitions/UserNoteActionJson"
                             },
                             {
@@ -1308,9 +1311,6 @@
                             },
                             {
                                 "$ref": "#/definitions/ContributorActionJson"
-                            },
-                            {
-                                "$ref": "#/definitions/FlairActionJson"
                             },
                             {
                                 "type": "string"
@@ -1418,9 +1418,6 @@
                     "items": {
                         "anyOf": [
                             {
-                                "$ref": "#/definitions/RecentActivityRuleJSONConfig"
-                            },
-                            {
                                 "$ref": "#/definitions/RepeatActivityJSONConfig"
                             },
                             {
@@ -1440,6 +1437,9 @@
                             },
                             {
                                 "$ref": "#/definitions/RuleSetJson"
+                            },
+                            {
+                                "$ref": "#/definitions/RecentActivityRuleJSONConfig"
                             },
                             {
                                 "type": "string"
@@ -1686,15 +1686,31 @@
                     "anyOf": [
                         {
                             "items": {
-                                "enum": [
-                                    "poll",
-                                    "poll:modqueue",
-                                    "poll:newComm",
-                                    "poll:newSub",
-                                    "poll:unmoderated",
-                                    "user"
-                                ],
                                 "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "items": {
+                                "anyOf": [
+                                    {
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "type": "array"
+                                    },
+                                    {
+                                        "enum": [
+                                            "poll",
+                                            "poll:modqueue",
+                                            "poll:newComm",
+                                            "poll:newSub",
+                                            "poll:unmoderated",
+                                            "user"
+                                        ],
+                                        "type": "string"
+                                    }
+                                ]
                             },
                             "type": "array"
                         },
@@ -1781,6 +1797,19 @@
                         "skip"
                     ],
                     "type": "string"
+                },
+                "tardyTolerant": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/definitions/DurationObject"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
+                        }
+                    ]
                 },
                 "target": {
                     "anyOf": [
@@ -3539,9 +3568,6 @@
                     "items": {
                         "anyOf": [
                             {
-                                "$ref": "#/definitions/RecentActivityRuleJSONConfig"
-                            },
-                            {
                                 "$ref": "#/definitions/RepeatActivityJSONConfig"
                             },
                             {
@@ -3558,6 +3584,9 @@
                             },
                             {
                                 "$ref": "#/definitions/RepostRuleJSONConfig"
+                            },
+                            {
+                                "$ref": "#/definitions/RecentActivityRuleJSONConfig"
                             },
                             {
                                 "type": "string"
@@ -3801,6 +3830,9 @@
                                 "$ref": "#/definitions/ReportActionJson"
                             },
                             {
+                                "$ref": "#/definitions/FlairActionJson"
+                            },
+                            {
                                 "$ref": "#/definitions/UserNoteActionJson"
                             },
                             {
@@ -3823,9 +3855,6 @@
                             },
                             {
                                 "$ref": "#/definitions/ContributorActionJson"
-                            },
-                            {
-                                "$ref": "#/definitions/FlairActionJson"
                             },
                             {
                                 "type": "string"
@@ -3933,9 +3962,6 @@
                     "items": {
                         "anyOf": [
                             {
-                                "$ref": "#/definitions/RecentActivityRuleJSONConfig"
-                            },
-                            {
                                 "$ref": "#/definitions/RepeatActivityJSONConfig"
                             },
                             {
@@ -3955,6 +3981,9 @@
                             },
                             {
                                 "$ref": "#/definitions/RuleSetJson"
+                            },
+                            {
+                                "$ref": "#/definitions/RecentActivityRuleJSONConfig"
                             },
                             {
                                 "type": "string"
