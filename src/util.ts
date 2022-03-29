@@ -2440,23 +2440,31 @@ export const parseRedditFullname = (str: string): RedditThing | undefined => {
 }
 
 export const activityDispatchConfigToDispatch = (config: ActivityDispatchConfig, activity: (Comment | Submission), type: ActivitySourceTypes, action?: string): ActivityDispatch => {
-    let tolerantVal: boolean | number | undefined;
+    let tolerantVal: boolean | Duration | undefined;
     if (config.tardyTolerant !== undefined) {
         if (typeof config.tardyTolerant === 'boolean') {
             tolerantVal = config.tardyTolerant;
         } else {
-            tolerantVal = parseDurationValToDuration(config.tardyTolerant).asMilliseconds();
+            tolerantVal = parseDurationValToDuration(config.tardyTolerant);
         }
     }
     return {
         ...config,
-        delay: parseDurationValToDuration(config.delay).asMilliseconds(),
+        delay: parseDurationValToDuration(config.delay),
         tardyTolerant: tolerantVal,
-        queuedAt: dayjs().valueOf(),
+        queuedAt: dayjs().utc(),
         processing: false,
         id: nanoid(16),
         activity,
         action,
         type,
+        author: activity.author,
     }
+}
+
+/**
+ * @see https://github.com/typeorm/typeorm/issues/873#issuecomment-502294597
+ */
+export const isNullOrUndefined = <T>(obj: T | null | undefined):obj is null | undefined => {
+    return typeof obj === "undefined" || obj === null
 }

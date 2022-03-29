@@ -3,6 +3,7 @@ import {ManagerEntity} from "../ManagerEntity";
 import dayjs, {Dayjs} from "dayjs";
 import {TotalStatOptions} from "./TotalStat";
 import {TimeAwareBaseEntity} from "../Base/TimeAwareBaseEntity";
+import {ColumnDecimalTransformer} from "../Transformers";
 
 export interface TimeSeriesStatOptions extends TotalStatOptions {
     granularity: string
@@ -20,7 +21,7 @@ export class TimeSeriesStat extends TimeAwareBaseEntity {
     @Column("varchar", {length: 60})
     metric!: string;
 
-    @Column({type: 'decimal', precision: 12, scale: 2})
+    @Column({type: 'decimal', precision: 12, scale: 2, transformer: new ColumnDecimalTransformer()})
     value!: number
 
     @ManyToOne(type => ManagerEntity)
