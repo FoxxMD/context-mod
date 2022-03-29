@@ -318,7 +318,7 @@ export class initApi1642180264563 implements MigrationInterface {
                     {
                         name: 'name',
                         type: 'varchar',
-                        length: '20',
+                        length: '200',
                         isNullable: false
                     },
                     {
