@@ -5,6 +5,9 @@ import {ActivitySourceData, ActivitySourceTypes, PollOn} from "../interfaces";
 import {CMEvent} from "./CMEvent";
 import {removeUndefinedKeys} from "../../util";
 import objectHash from "object-hash";
+import {Duration} from "dayjs/plugin/duration";
+import dayjs from "dayjs";
+import {ColumnDurationTransformer} from "./Transformers";
 
 export interface ActivitySourceEntityOptions extends ActivitySourceData {
     manager: ManagerEntity
@@ -25,8 +28,13 @@ export class ActivitySourceEntity {
     @Column("varchar", {length: 100, nullable: true})
     action?: string
 
-    @Column({type: 'int', width: 13, nullable: true, unsigned: true})
-    delay?: number
+    @Column({
+        type: 'int',
+        nullable: true,
+        unsigned: true,
+        transformer: new ColumnDurationTransformer()
+    })
+    delay?: Duration
 
     @Column("varchar", {length: 100, nullable: true})
     goto?: string

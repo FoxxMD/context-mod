@@ -159,10 +159,9 @@ const program = new Command();
                             checkNames: checks,
                             source: 'user',
                             activitySource: {
-                                delay: 0,
                                 id: nanoid(16),
                                 type: 'user',
-                                queuedAt: dayjs().valueOf(),
+                                queuedAt: dayjs(),
                             }
                         });
                         break;
@@ -206,10 +205,9 @@ const program = new Command();
                                     checkNames: checks,
                                     source: 'user',
                                     activitySource: {
-                                        delay: 0,
                                         id: nanoid(16),
                                         type: 'user',
-                                        queuedAt: dayjs().valueOf(),
+                                        queuedAt: dayjs(),
                                     }
                                 }
                             });

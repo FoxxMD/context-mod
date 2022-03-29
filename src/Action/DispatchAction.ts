@@ -79,7 +79,7 @@ export class DispatchAction extends Action {
             });
 
             if (existing.length > 0) {
-                let existingRes = `Dispatch activities (${existing.map((x, index) => `[${index + 1}] Queued At ${dayjs.unix(x.queuedAt).format('YYYY-MM-DD HH:mm:ssZ')} for ${dayjs.duration(x.delay, 'millisecond').humanize()}`).join(' ')}}) already exist for ${actHint}`;
+                let existingRes = `Dispatch activities (${existing.map((x, index) => `[${index + 1}] Queued At ${x.queuedAt.format('YYYY-MM-DD HH:mm:ssZ')} for ${x.delay.humanize()}`).join(' ')}}) already exist for ${actHint}`;
                 if (this.dispatchData.onExistingFound === 'skip') {
                     existingRes += ` and existing behavior is SKIP so nothing queued`;
                     continue;

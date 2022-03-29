@@ -20,6 +20,7 @@ import {RuleResultEntity} from "./Entities/RuleResultEntity";
 import {Logger} from "winston";
 import {SubredditResources} from "../Subreddit/SubredditResources";
 import {BetterSqlite3ConnectionOptions} from "typeorm/driver/better-sqlite3/BetterSqlite3ConnectionOptions";
+import {Dayjs} from "dayjs";
 
 /**
  * An ISO 8601 Duration
@@ -2374,10 +2375,11 @@ export interface ActivityDispatchConfig {
 
 export interface ActivityDispatch extends Omit<ActivityDispatchConfig, 'delay'| 'tardyTolerant'> {
     id: string
-    queuedAt: number
+    queuedAt: Dayjs
     activity: Submission | Comment
-    delay: number
-    tardyTolerant?: boolean | number
+    author: RedditUser
+    delay: Duration
+    tardyTolerant?: boolean | Duration
     processing: boolean
     action?: string
     type: ActivitySourceTypes
@@ -2385,9 +2387,9 @@ export interface ActivityDispatch extends Omit<ActivityDispatchConfig, 'delay'| 
 
 export interface ActivitySourceData {
     goto?: string
-    queuedAt: number
+    queuedAt: Dayjs
     action?: string,
-    delay?: number,
+    delay?: Duration,
     type: ActivitySourceTypes
     id: string
     identifier?: string

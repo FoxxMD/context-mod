@@ -19,10 +19,12 @@ import {TimeAwareRandomBaseEntity} from "./Base/TimeAwareRandomBaseEntity";
 import {Duration} from "dayjs/plugin/duration";
 import dayjs from "dayjs";
 import {ManagerEntity} from "./ManagerEntity";
-import {parseDuration, parseDurationValToDuration, parseRedditFullname} from "../../util";
+import {getActivityAuthorName, parseDuration, parseDurationValToDuration, parseRedditFullname} from "../../util";
 import {ExtendedSnoowrap} from "../../Utils/SnoowrapClients";
 import Submission from "snoowrap/dist/objects/Submission";
 import Comment from "snoowrap/dist/objects/Comment";
+import {ColumnDurationTransformer} from "./Transformers";
+import { RedditUser } from "snoowrap/dist/objects";
 
 @Entity({name: 'DispatchedAction'})
 export class DispatchedEntity extends TimeAwareRandomBaseEntity {
@@ -30,8 +32,13 @@ export class DispatchedEntity extends TimeAwareRandomBaseEntity {
     @Column()
     activityId!: string
 
-    @Column({type: 'int', width: 13, nullable: false, readonly: true, unsigned: true})
-    delay!: number
+    @Column({
+        type: 'int',
+        nullable: false,
+        unsigned: true,
+        transformer: new ColumnDurationTransformer()
+    })
+    delay!: Duration
 
     @Column({nullable: true})
     action?: string
@@ -54,14 +61,30 @@ export class DispatchedEntity extends TimeAwareRandomBaseEntity {
     @ManyToOne(type => ManagerEntity, act => act.events)
     manager!: ManagerEntity;
 
-    @Column("varchar", {length: 200})
-    tardyTolerant!: boolean | number
+    @Column("varchar", {
+        length: 200,
+        transformer: {
+            to: (val: boolean | Duration): string | undefined => {
+                if(typeof val === 'boolean') {
+                    return val ? 'true' : 'false';
+                }
+                return val.asSeconds().toString();
+            },
+            from: (val: string): boolean | Duration => {
+                if(val === 'true' || val === 'false') {
+                    return val === 'true';
+                }
+                return dayjs.duration(Number.parseInt(val), 'seconds');
+            }
+        }})
+    tardyTolerant!: boolean | Duration
 
     constructor(data?: ActivityDispatch & { manager: ManagerEntity }) {
         super();
         if (data !== undefined) {
             this.activityId = data.activity.name;
             this.delay = data.delay;
+            this.createdAt = data.queuedAt;
             this.type = data.type;
             this.action = data.action;
             this.goto = data.goto;
@@ -70,7 +93,7 @@ export class DispatchedEntity extends TimeAwareRandomBaseEntity {
             this.onExistingFound = data.onExistingFound;
             this.manager = data.manager;
             if (data.tardyTolerant === undefined) {
-                this.tardyTolerant = dayjs.duration(5, 'minutes').asMilliseconds();
+                this.tardyTolerant = dayjs.duration(5, 'minutes');
             } else {
                 this.tardyTolerant = data.tardyTolerant;
             }
@@ -88,10 +111,6 @@ export class DispatchedEntity extends TimeAwareRandomBaseEntity {
                 this.cancelIfQueued = JSON.stringify(this.cancelIfQueued);
             }
         }
-        if (typeof this.tardyTolerant === 'boolean') {
-            // @ts-ignore
-            this.tardyTolerant = this.tardyTolerant ? 'true' : 'false';
-        }
     }
 
     @AfterLoad()
@@ -106,14 +125,6 @@ export class DispatchedEntity extends TimeAwareRandomBaseEntity {
                 this.cancelIfQueued = JSON.parse(cVal) as NonDispatchActivitySource[];
             }
         }
-
-        // @ts-ignore
-        const tVal = this.tardyTolerant as string;
-        if (tVal === 'true' || tVal === 'false') {
-            this.tardyTolerant = tVal === 'true';
-        } else {
-            this.tardyTolerant = Number.parseInt(tVal);
-        }
     }
 
     async toActivityDispatch(client: ExtendedSnoowrap): Promise<ActivityDispatch> {
@@ -121,14 +132,14 @@ export class DispatchedEntity extends TimeAwareRandomBaseEntity {
         let activity: Comment | Submission;
         if (redditThing?.type === 'comment') {
             // @ts-ignore
-            activity = await client.getComment(redditThing.id);
+            activity = await client.getComment(redditThing.id).fetch();
         } else {
             // @ts-ignore
-            activity = await client.getSubmission(redditThing.id);
+            activity = await client.getSubmission(redditThing.id).fetch();
         }
         return {
             id: this.id,
-            queuedAt: this.createdAt.valueOf(),
+            queuedAt: this.createdAt,
             activity,
             delay: this.delay,
             processing: false,
@@ -138,14 +149,7 @@ export class DispatchedEntity extends TimeAwareRandomBaseEntity {
             cancelIfQueued: this.cancelIfQueued,
             identifier: this.identifier,
             type: this.type,
+            author: activity.author
         }
-    }
-
-    delayAsDuration() {
-        return dayjs.duration(this.delay, 'millisecond');
-    }
-
-    tardyTolerantAsDuration() {
-        return dayjs.duration(this.tardyTolerant as number, 'millisecond');
     }
 }

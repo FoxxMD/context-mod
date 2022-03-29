@@ -69,11 +69,10 @@ const action = async (req: Request, res: Response) => {
                                     source: `user:${userName}`,
                                     force: true,
                                     activitySource: {
-                                        delay: 0,
                                         id: nanoid(16),
                                         type: 'user',
                                         identifier: userName,
-                                        queuedAt: dayjs().valueOf(),
+                                        queuedAt: dayjs(),
                                     }
                                 }
                             });
@@ -87,11 +86,10 @@ const action = async (req: Request, res: Response) => {
                                     source: `user:${userName}`,
                                     force: true,
                                     activitySource: {
-                                        delay: 0,
                                         id: nanoid(16),
                                         type: 'user',
                                         identifier: userName,
-                                        queuedAt: dayjs().valueOf(),
+                                        queuedAt: dayjs(),
                                     }
                                 }
                             });

@@ -290,9 +290,9 @@ export class SubredditResources {
             });
             const now = dayjs();
             for(const dAct of dispatchedActivities) {
-                const shouldDispatchAt = dAct.createdAt.add(dAct.delay, 'milliseconds');
+                const shouldDispatchAt = dAct.createdAt.add(dAct.delay.asSeconds(), 'seconds');
                 if(shouldDispatchAt.isBefore(now)) {
-                    let tardyHint = `Activity ${dAct.activityId} queued at ${dAct.createdAt.format('YYYY-MM-DD HH:mm:ssZ')} for ${dAct.delayAsDuration().humanize()} is now LATE`;
+                    let tardyHint = `Activity ${dAct.activityId} queued at ${dAct.createdAt.format('YYYY-MM-DD HH:mm:ssZ')} for ${dAct.delay.humanize()} is now LATE`;
                     if(dAct.tardyTolerant === true) {
                         tardyHint += ` but was configured as ALWAYS 'tardy tolerant' so will be dispatched immediately`;
                     } else if(dAct.tardyTolerant === false) {
@@ -302,13 +302,13 @@ export class SubredditResources {
                         continue;
                     } else {
                         // see if its within tolerance
-                        const latest = shouldDispatchAt.add(dAct.tardyTolerant, 'milliseconds');
+                        const latest = shouldDispatchAt.add(dAct.tardyTolerant);
                         if(latest.isBefore(now)) {
-                            tardyHint += `and IS NOT within tardy tolerance of ${dAct.tardyTolerantAsDuration().humanize()} of planned dispatch time so will be dropped`;
+                            tardyHint += `and IS NOT within tardy tolerance of ${dAct.tardyTolerant.humanize()} of planned dispatch time so will be dropped`;
                             await this.removeDelayedActivity(dAct.id);
                             continue;
                         } else {
-                            tardyHint += `but is within tardy tolerance of ${dAct.tardyTolerantAsDuration().humanize()} of planned dispatch time so will be dispatched immediately`;
+                            tardyHint += `but is within tardy tolerance of ${dAct.tardyTolerant.humanize()} of planned dispatch time so will be dispatched immediately`;
                         }
                     }
                 }

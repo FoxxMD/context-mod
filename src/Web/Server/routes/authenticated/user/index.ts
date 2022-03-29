@@ -192,11 +192,10 @@ const action = async (req: Request, res: Response) => {
                 force: true,
                 source: `user:${userName}`,
                 activitySource: {
-                    delay: 0,
                     id: nanoid(16),
                     type: 'user',
                     identifier: userName,
-                    queuedAt: dayjs().valueOf(),
+                    queuedAt: dayjs(),
                 }
             }
         })

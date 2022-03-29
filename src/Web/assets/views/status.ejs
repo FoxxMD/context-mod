@@ -1109,7 +1109,7 @@
             if(resp.delayedItems.length > 0) {
                 el.querySelector('.delayedItemsList').innerHTML = '';
                 const now = dayjs();
-                const sorted = resp.delayedItems.map(x => ({...x, dispatchAt: dayjs.unix(x.queuedAt + (x.durationMilli/1000))}));
+                const sorted = resp.delayedItems.map(x => ({...x, dispatchAt: dayjs.unix(x.queuedAt + (x.durationMilli))}));
                 sorted.sort((a, b) => {
                     return a.dispatchAt.isSameOrAfter(b.dispatchAt) ? 1 : -1
                 });

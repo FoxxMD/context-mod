@@ -252,10 +252,10 @@ export class Manager extends EventEmitter {
                 activityId: x.activity.name,
                 permalink: x.activity.permalink,
                 submissionId: asComment(x.activity) ? x.activity.link_id : undefined,
-                author: getActivityAuthorName(x.activity.author),
-                queuedAt: x.queuedAt,
-                durationMilli: x.delay,
-                duration: dayjs.duration(x.delay, 'millisecond').humanize(),
+                author: x.author.name,
+                queuedAt: x.queuedAt.unix(),
+                durationMilli: x.delay.asSeconds(),
+                duration: x.delay.humanize(),
                 source: `${x.action}${x.identifier !== undefined ? ` (${x.identifier})` : ''}`,
                 subreddit: this.subreddit.display_name_prefixed
             }
@@ -313,9 +313,10 @@ export class Manager extends EventEmitter {
         this.botEntity = botEntity;
 
         this.managerEntity = managerEntity;
-        this.eventsState = managerEntity.eventsState.toRunningState();
-        this.queueState = managerEntity.queueState.toRunningState();
-        this.managerState = managerEntity.managerState.toRunningState();
+        // always init in stopped state but use last invokee to determine if we should start the manager automatically afterwards
+        this.eventsState = {state: STOPPED, causedBy: managerEntity.eventsState.invokee.name};
+        this.queueState = {state: STOPPED, causedBy: managerEntity.queueState.invokee.name};
+        this.managerState = {state: STOPPED, causedBy: managerEntity.managerState.invokee.name};
 
         this.client = client;
         this.botName = botName;
@@ -455,7 +456,7 @@ export class Manager extends EventEmitter {
                     }
                 });
                 if(existingDelayedToCancel.length > 0) {
-                    this.logger.debug(`Cancelling existing delayed activities due to activity being queued from non-dispatch sources: ${existingDelayedToCancel.map((x, index) => `[${index + 1}] Queued At ${dayjs.unix(x.queuedAt).format('YYYY-MM-DD HH:mm:ssZ')} for ${dayjs.duration(x.delay, 'millisecond').humanize()}`).join(' ')}`);
+                    this.logger.debug(`Cancelling existing delayed activities due to activity being queued from non-dispatch sources: ${existingDelayedToCancel.map((x, index) => `[${index + 1}] Queued At ${x.queuedAt.format('YYYY-MM-DD HH:mm:ssZ')} for ${x.delay.humanize()}`).join(' ')}`);
                     const toCancelIds = existingDelayedToCancel.map(x => x.id);
                     for(const id of toCancelIds) {
                         await this.resources.removeDelayedActivity(id);
@@ -470,7 +471,7 @@ export class Manager extends EventEmitter {
         while(this.queueState.state === RUNNING) {
             let index = 0;
             for(const ar of this.resources.delayedItems) {
-                if(!ar.processing && dayjs(ar.queuedAt).add(ar.delay, 'milliseconds').isSameOrBefore(dayjs())) {
+                if(!ar.processing && ar.queuedAt.add(ar.delay).isSameOrBefore(dayjs())) {
                     this.logger.info(`Delayed Activity ${ar.activity.name} is being queued.`);
                     await this.firehose.push({
                         activity: ar.activity, options: {
@@ -915,11 +916,12 @@ export class Manager extends EventEmitter {
                         await this.resources.addDelayedActivity({
                             ...options.activitySource,
                             cancelIfQueued: true,
-                            delay: remaining * 1000,
+                            delay: dayjs.duration(remaining, 'seconds'),
                             id: 'notUsed',
-                            queuedAt: dayjs().valueOf(),
+                            queuedAt: dayjs(),
                             processing: false,
                             activity,
+                            author: activity.author,
                         });
                         return;
                     } else {
@@ -1195,8 +1197,7 @@ export class Manager extends EventEmitter {
                                 delayUntil,
                                 source: `poll:${source}`,
                                 activitySource: {
-                                    queuedAt: dayjs().valueOf(),
-                                    delay: 0,
+                                    queuedAt: dayjs(),
                                     type: 'poll',
                                     identifier: source,
                                     id: nanoid(16)
