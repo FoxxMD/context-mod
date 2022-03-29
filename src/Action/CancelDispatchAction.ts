@@ -37,7 +37,8 @@ export class CancelDispatchAction extends Action {
     }
 
     async process(item: Comment | Submission, ruleResults: RuleResultEntity[], runtimeDryrun?: boolean): Promise<ActionProcessResult> {
-        const dryRun = runtimeDryrun || this.dryRun;
+        // see note in DispatchAction about missing runtimeDryrun
+        const dryRun = this.dryRun;
 
         const realTargets = isSubmission(item) ? this.targets.filter(x => x !== 'parent') : this.targets;
         if (this.targets.includes('parent') && isSubmission(item)) {

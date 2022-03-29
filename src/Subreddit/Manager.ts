@@ -514,7 +514,7 @@ export class Manager extends EventEmitter {
                 try {
                     const itemMeta = this.queuedItemsMeta[queuedItemIndex];
                     this.queuedItemsMeta.splice(queuedItemIndex, 1, {...itemMeta, state: 'processing'});
-                    await this.handleActivity(task.activity, {refresh: itemMeta.shouldRefresh, ...task.options});
+                    await this.handleActivity(task.activity, {refresh: itemMeta.shouldRefresh, dryRun: this.dryRun, ...task.options});
                 } finally {
                     // always remove item meta regardless of success or failure since we are done with it meow
                     this.queuedItemsMeta.splice(queuedItemIndex, 1);

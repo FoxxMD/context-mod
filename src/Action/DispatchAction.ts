@@ -39,7 +39,10 @@ export class DispatchAction extends Action {
     }
 
     async process(item: Comment | Submission, ruleResults: RuleResultEntity[], runtimeDryrun?: boolean): Promise<ActionProcessResult> {
-        const dryRun = runtimeDryrun || this.dryRun;
+        // ignore runtimeDryrun here because "real run" isn't causing any reddit api calls to happen
+        // -- basically if bot is in dryrun this should still run since we want the "full effect" of the bot
+        // BUT if the action explicitly sets 'dryRun: true' then do not dispatch as they probably don't want to it actually going (intention?)
+        const dryRun = this.dryRun;
 
         const realTargets = isSubmission(item) ? ['self'] : this.targets;
         if (this.targets.includes('parent') && isSubmission(item)) {
