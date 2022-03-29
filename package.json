@@ -142,6 +142,7 @@
     "typescript-json-schema": "~0.53"
   },
   "optionalDependencies": {
+    "better-sqlite3": "^7.5.0",
     "mongo": "^3.6.0",
     "mysql": "^2.18.1",
     "pg": "^8.7.1",

@@ -19,6 +19,7 @@ import {SafeDictionary} from "ts-essentials";
 import {RuleResultEntity} from "./Entities/RuleResultEntity";
 import {Logger} from "winston";
 import {SubredditResources} from "../Subreddit/SubredditResources";
+import {BetterSqlite3ConnectionOptions} from "typeorm/driver/better-sqlite3/BetterSqlite3ConnectionOptions";
 
 /**
  * An ISO 8601 Duration
@@ -707,8 +708,8 @@ export interface OperatorCacheConfig extends CacheConfig {
     actionedEventsDefault?: number
 }
 
-export type DatabaseDriver = 'sqljs' | 'mysql' | 'mariadb' | 'postgres';
-export type DatabaseConfig = SqljsConnectionOptions | MysqlConnectionOptions | PostgresConnectionOptions;
+export type DatabaseDriver = 'sqljs' | 'better-sqlite3' | 'mysql' | 'mariadb' | 'postgres';
+export type DatabaseConfig = SqljsConnectionOptions | MysqlConnectionOptions | PostgresConnectionOptions | BetterSqlite3ConnectionOptions;
 
 export interface Footer {
     /**

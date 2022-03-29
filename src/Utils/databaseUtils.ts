@@ -6,13 +6,14 @@ import {PostgresConnectionOptions} from "typeorm/driver/postgres/PostgresConnect
 import {resolve} from 'path';
 import "reflect-metadata";
 import {DataSource} from "typeorm";
-import {getDatabaseLogger, getLogger} from "./loggerFactory";
-import {fileOrDirectoryIsWriteable} from "../util";
+import {fileOrDirectoryIsWriteable, mergeArr} from "../util";
 import {Logger} from "winston";
 import {CMNamingStrategy} from "./CMNamingStrategy";
 import {ErrorWithCause} from "pony-cause";
+import {BetterSqlite3ConnectionOptions} from "typeorm/driver/better-sqlite3/BetterSqlite3ConnectionOptions";
+import {WinstonAdaptor} from "typeorm-logger-adaptor/logger/winston";
 
-const validDrivers = ['sqljs', 'mysql', 'mariadb', 'postgres'];
+const validDrivers = ['sqljs', 'better-sqlite3', 'mysql', 'mariadb', 'postgres'];
 
 export const isDatabaseDriver = (val: any): val is DatabaseDriver => {
     if (typeof val !== 'string') {
@@ -64,7 +65,17 @@ export const createDatabaseConfig = (val: DatabaseDriver | any): DatabaseConfig 
                     location: typeof location === 'string' && location.trim().toLocaleLowerCase() !== ':memory:' ? resolve(location) : location,
                     ...rest
                 } as SqljsConnectionOptions;
+            case 'better-sqlite3':
+                const {
+                    database = resolve(`${__dirname}`, '../../database.sqlite'),
+                    ...betterRest
+                } = userDbConfig;
 
+                return {
+                    type: dbType,
+                    database: typeof database === 'string' && database.trim().toLocaleLowerCase() !== ':memory:' ? resolve(database) : database,
+                    ...betterRest
+                } as BetterSqlite3ConnectionOptions;
             case 'mysql':
             case 'mariadb':
                 return {
@@ -91,29 +102,42 @@ export const createDatabaseConnection = async (rawConfig: DatabaseConfig, logger
 
     let config = {...rawConfig};
 
-    if (rawConfig.type === 'sqljs') {
+    const dbLogger = logger.child({labels: ['Database']}, mergeArr);
 
-        // if we can't write to a real file location then autosave can't be used in config options
-        // -- it tells typeorm to automatically write DB changes (after successfully commits/transactions) to file
-        let locationData: Pick<SqljsConnectionOptions, 'autoSave' | 'location'> = {
-            autoSave: false,
-            location: undefined,
-        };
+    dbLogger.info(`Using '${rawConfig.type}' database type`);
 
-        if(typeof rawConfig.location === 'string' && rawConfig.location.trim().toLocaleLowerCase() !== ':memory:') {
-            const location = rawConfig.location as string;
+    if (['sqljs', 'better-sqlite3'].includes(rawConfig.type)) {
+
+        let dbOptions: Pick<SqljsConnectionOptions, 'autoSave' | 'location'> | Pick<BetterSqlite3ConnectionOptions, 'database'>
+        let dbPath: string | undefined;
+
+        const rawPath = rawConfig.type === 'sqljs' ? rawConfig.location : rawConfig.database;
+
+        if (typeof rawPath !== 'string' || (typeof rawPath === 'string' && rawPath.trim().toLocaleLowerCase() === ':memory:')) {
+            dbLogger.info('Will use IN-MEMORY database');
+        } else if (typeof rawPath === 'string' && rawPath.trim().toLocaleLowerCase() !== ':memory:') {
             try {
-                await fileOrDirectoryIsWriteable(location);
-                locationData = {
-                    autoSave: true,
-                    location,
-                };
+                dbLogger.debug('Testing that database path is writeable...');
+                await fileOrDirectoryIsWriteable(rawPath);
+                dbPath = rawPath;
+                dbLogger.info(`Using database at path: ${dbPath}`);
             } catch (e: any) {
-                logger.error(new ErrorWithCause(`Falling back to IN-MEMORY database due to error while trying to access database file at ${location})`, {cause: e}));
+                dbLogger.error(new ErrorWithCause(`Falling back to IN-MEMORY database due to error while trying to access database file at ${rawPath})`, {cause: e}));
             }
         }
 
-        config = {...config, ...locationData};
+        if (rawConfig.type === 'sqljs') {
+            dbOptions = {
+                autoSave: dbPath !== undefined,
+                location: dbPath
+            };
+        } else {
+            dbOptions = {
+                database: dbPath ?? ':memory:'
+            }
+        }
+
+        config = {...config, ...dbOptions} as SqljsConnectionOptions | BetterSqlite3ConnectionOptions;
     }
 
     const source = new DataSource({
@@ -122,8 +146,8 @@ export const createDatabaseConnection = async (rawConfig: DatabaseConfig, logger
         entities: [`${resolve(__dirname, '../Common/Entities')}/**/*.js`],
         migrations: [`${resolve(__dirname, '../Common/Migrations')}/Database/*.js`],
         migrationsRun: false,
-        logging: ['error','warn','migration'],
-        logger: getDatabaseLogger(logger, ['error','warn','migration', 'schema']),
+        logging: ['error', 'warn', 'migration'],
+        logger: new WinstonAdaptor(dbLogger, ['error', 'warn', 'migration', 'schema']),
         namingStrategy: new CMNamingStrategy(),
     });
     await source.initialize();
