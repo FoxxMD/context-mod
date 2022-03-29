@@ -1,14 +1,13 @@
 import {BeforeInsert, Entity, Column, AfterLoad, BeforeUpdate} from "typeorm";
 import dayjs, {Dayjs} from "dayjs";
-import {RandomIdBaseEntity} from "./RandomIdBaseEntity";
 
 export abstract class TimeAwareBaseEntity {
 
-    @Column({ type: 'bigint', width: 13, nullable: false, readonly: true, unsigned: true })
+    @Column({ type: 'datetime', nullable: false })
     createdAt: Dayjs = dayjs();
 
     @AfterLoad()
-    convertToDayjs() {
+    convertToDomain() {
        if(this.createdAt !== undefined) {
            this.createdAt = dayjs(this.createdAt);
        }
@@ -16,8 +15,10 @@ export abstract class TimeAwareBaseEntity {
 
     @BeforeInsert()
     @BeforeUpdate()
-    public convertToUnix() {
-        // @ts-ignore
-        this.createdAt = this.createdAt.valueOf();
+    public convertToDatabase() {
+        if(dayjs.isDayjs(this.createdAt)) {
+            // @ts-ignore
+            this.createdAt = this.createdAt.toDate();
+        }
     }
 }

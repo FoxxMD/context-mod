@@ -43,10 +43,10 @@ export class RulePremise extends TimeAwareBaseEntity  {
     @VersionColumn()
     version!: number;
 
-    @Column({ type: 'bigint', width: 13, nullable: false, readonly: true, unsigned: true })
+    @Column({ type: 'datetime', nullable: false, readonly: true })
     updatedAt: Dayjs = dayjs();
 
-    convertToDayjs() {
+    convertToDomain() {
         if(this.createdAt !== undefined) {
             this.createdAt = dayjs(this.createdAt);
         }
@@ -55,16 +55,21 @@ export class RulePremise extends TimeAwareBaseEntity  {
         }
     }
 
-    public convertToUnix() {
-        // @ts-ignore
-        this.createdAt = this.createdAt.valueOf();
-        // @ts-ignore
-        this.updatedAt = this.updatedAt.valueOf();
+    public convertToDatabase() {
+        if(dayjs.isDayjs(this.createdAt)) {
+            // @ts-ignore
+            this.createdAt = this.createdAt.toDate();
+        }
+        if(dayjs.isDayjs(this.updatedAt)) {
+            // @ts-ignore
+            this.updatedAt = this.updatedAt.toDate();
+        }
     }
 
     @BeforeUpdate()
     public updateTimestamp() {
-        this.updatedAt = dayjs();
+        // @ts-ignore
+        this.updatedAt = dayjs().toDate();
     }
 
     constructor(data?: RulePremiseOptions) {

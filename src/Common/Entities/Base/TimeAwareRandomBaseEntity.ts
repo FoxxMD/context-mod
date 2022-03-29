@@ -4,19 +4,21 @@ import {RandomIdBaseEntity} from "./RandomIdBaseEntity";
 
 export abstract class TimeAwareRandomBaseEntity extends RandomIdBaseEntity {
 
-    @Column({ type: 'int', width: 13, nullable: false, readonly: true, unsigned: true })
+    @Column({ type: 'datetime', nullable: false, readonly: true })
     createdAt: Dayjs = dayjs();
 
     @AfterLoad()
-    convertToDayjs() {
+    convertToDomain() {
        if(this.createdAt !== undefined) {
            this.createdAt = dayjs(this.createdAt);
        }
     }
 
     @BeforeInsert()
-    public convertToUnix() {
-        // @ts-ignore
-        this.createdAt = this.createdAt.valueOf();
+    public convertToDatabase() {
+        if(dayjs.isDayjs(this.createdAt)) {
+            // @ts-ignore
+            this.createdAt = this.createdAt.toDate();
+        }
     }
 }

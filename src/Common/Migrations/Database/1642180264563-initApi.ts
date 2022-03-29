@@ -10,7 +10,11 @@ const randomIdColumn = () => ({
 
 const timeAtColumn = (columnName: string) => ({
     name: columnName,
-    type: 'bigint',
+    type: 'datetime',
+    // required to get millisecond precision on mysql/mariadb
+    // https://mariadb.com/kb/en/datetime/
+    // https://dev.mysql.com/doc/refman/8.0/en/fractional-seconds.html
+    length: '3',
     isNullable: false
 })
 
@@ -543,7 +547,7 @@ export class initApi1642180264563 implements MigrationInterface {
                     },
                     {
                         name: 'value',
-                        type: 'bigint',
+                        type: 'double',
                         isNullable: false,
                     },
                     {
@@ -582,7 +586,7 @@ export class initApi1642180264563 implements MigrationInterface {
                     },
                     {
                         name: 'value',
-                        type: 'bigint',
+                        type: 'double',
                         isNullable: false,
                     },
                     {
