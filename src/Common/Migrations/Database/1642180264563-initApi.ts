@@ -623,7 +623,7 @@ export class initApi1642180264563 implements MigrationInterface {
                         name: 'type',
                         type: 'varchar',
                         isNullable: false,
-                        length: '30'
+                        length: '50'
                     },
                 ],
                 indices: [
@@ -661,7 +661,7 @@ export class initApi1642180264563 implements MigrationInterface {
                         name: 'type',
                         type: 'varchar',
                         isNullable: false,
-                        length: '30'
+                        length: '50'
                     },
                 ],
                 indices: [
@@ -699,7 +699,7 @@ export class initApi1642180264563 implements MigrationInterface {
                         name: 'type',
                         type: 'varchar',
                         isNullable: false,
-                        length: '30'
+                        length: '50'
                     },
                     {
                         name: 'filterResultId',
@@ -1080,6 +1080,7 @@ export class initApi1642180264563 implements MigrationInterface {
                     {
                         name: 'fromCache',
                         type: 'boolean',
+                        isNullable: true
                     },
                     {
                         name: 'condition',
