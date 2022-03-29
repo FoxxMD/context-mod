@@ -21,7 +21,7 @@
     "initMigration": "npm run typeorm -- migration:generate -t 1642180264563 -d ormconfig.js \"src/Common/Migrations/Database/init\""
   },
   "engines": {
-    "node": ">=15"
+    "node": ">=16"
   },
   "keywords": [],
   "author": "",
