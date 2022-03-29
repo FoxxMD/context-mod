@@ -83,6 +83,9 @@ export const createDatabaseConfig = (val: DatabaseDriver | any): DatabaseConfig 
                     host: 'localhost',
                     port: 3306,
                     timezone: 'z',
+                    // to support emojis in text columns
+                    // https://stackoverflow.com/a/39465494/1469797
+                    charset: 'utf8mb4',
                     ...userDbConfig,
                 } as MysqlConnectionOptions;
             case 'postgres':
