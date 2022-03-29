@@ -1516,11 +1516,14 @@ export class Manager extends EventEmitter {
     }
 
     async syncRunningState(type: string) {
-        // @ts-ignore
-        this.managerEntity[type].invokee = await this.resources.invokeeRepo.findOneBy({name: this[type].causedBy}) as InvokeeType
-        // @ts-ignore
-        this.managerEntity[type].runType = await this.resources.runTypeRepo.findOneBy({name: this[type].state}) as RunStateType
-        // @ts-ignore
-        await this.resources.database.manager.save(this.managerEntity[type]);
+        // TODO provide resources earlier than config parsing, if possible, so database is available before we need this
+        if(this.resources !== undefined) {
+            // @ts-ignore
+            this.managerEntity[type].invokee = await this.resources.invokeeRepo.findOneBy({name: this[type].causedBy}) as InvokeeType
+            // @ts-ignore
+            this.managerEntity[type].runType = await this.resources.runTypeRepo.findOneBy({name: this[type].state}) as RunStateType
+            // @ts-ignore
+            await this.resources.database.manager.save(this.managerEntity[type]);
+        }
     }
 }
