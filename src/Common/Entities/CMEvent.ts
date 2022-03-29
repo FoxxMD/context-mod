@@ -35,29 +35,27 @@ export class CMEvent extends RandomIdBaseEntity {
     source!: ActivitySourceEntity;
 
     @Index()
-    @Column({ type: 'datetime', nullable: false, readonly: true })
-    queuedAt: Dayjs = dayjs();
+    @Column({ name: 'queuedAt', nullable: false })
+    _queuedAt: Date = new Date();
 
-    @Index()
-    @Column({ type: 'datetime', nullable: false, readonly: true })
-    processedAt: Dayjs = dayjs();
-
-    @AfterLoad()
-    convertToDomain() {
-        this.processedAt = dayjs(this.queuedAt)
-        this.queuedAt = dayjs(this.queuedAt)
+    public get queuedAt(): Dayjs {
+        return dayjs(this._queuedAt);
     }
 
-    @BeforeInsert()
-    public convertToDatabase() {
-        if(dayjs.isDayjs(this.processedAt)) {
-            // @ts-ignore
-            this.processedAt = this.processedAt.toDate();
-        }
-        if(dayjs.isDayjs(this.queuedAt)) {
-            // @ts-ignore
-            this.queuedAt = this.queuedAt.toDate();
-        }
+    public set queuedAt(d: Dayjs) {
+        this._queuedAt = d.utc().toDate();
+    }
+
+    @Index()
+    @Column({ name: 'processedAt', nullable: false })
+    _processedAt: Date = new Date();
+
+    public get processedAt(): Dayjs {
+        return dayjs(this._processedAt);
+    }
+
+    public set processedAt(d: Dayjs) {
+        this._processedAt = d.utc().toDate();
     }
 
     @AfterLoad()

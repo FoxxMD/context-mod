@@ -113,7 +113,7 @@ const actionedEvents = async (req: Request, res: Response) => {
     query = filterResultsBuilder<CMEvent>(query, 'actionResults', 'a');
 
     query.andWhere('event.manager.id IN (:...managerIds)', {managerIds: managers.map(x => x.managerEntity.id)})
-        .orderBy('event.processedAt', 'DESC');
+        .orderBy('event._processedAt', 'DESC');
 
     if (permalink !== undefined) {
         const things = parseRedditThingsFromLink(permalink);

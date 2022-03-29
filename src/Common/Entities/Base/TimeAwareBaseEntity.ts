@@ -3,22 +3,27 @@ import dayjs, {Dayjs} from "dayjs";
 
 export abstract class TimeAwareBaseEntity {
 
-    @Column({ type: 'datetime', nullable: false })
-    createdAt: Dayjs = dayjs();
+    @Column({ name: 'createdAt', nullable: false })
+    _createdAt: Date = new Date();
 
-    @AfterLoad()
-    convertToDomain() {
-       if(this.createdAt !== undefined) {
-           this.createdAt = dayjs(this.createdAt);
-       }
+    public get createdAt(): Dayjs {
+        return dayjs(this._createdAt);
     }
 
-    @BeforeInsert()
-    @BeforeUpdate()
-    public convertToDatabase() {
-        if(dayjs.isDayjs(this.createdAt)) {
-            // @ts-ignore
-            this.createdAt = this.createdAt.toDate();
+    public set createdAt(d: Dayjs) {
+        this._createdAt = d.utc().toDate();
+    }
+
+    toJSON() {
+        const jsonObj: any = Object.assign({}, this);
+        const proto = Object.getPrototypeOf(this);
+        for (const key of Object.getOwnPropertyNames(proto)) {
+            const desc = Object.getOwnPropertyDescriptor(proto, key);
+            const hasGetter = desc && typeof desc.get === 'function';
+            if (hasGetter) {
+                jsonObj[key] = (this as any)[key];
+            }
         }
+        return jsonObj;
     }
 }

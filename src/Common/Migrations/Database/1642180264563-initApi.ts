@@ -8,22 +8,29 @@ const randomIdColumn = () => ({
     isUnique: true,
 });
 
-const timeAtColumn = (columnName: string) => ({
-    name: columnName,
-    type: 'datetime',
-    // required to get millisecond precision on mysql/mariadb
-    // https://mariadb.com/kb/en/datetime/
-    // https://dev.mysql.com/doc/refman/8.0/en/fractional-seconds.html
-    length: '3',
-    isNullable: false
-})
+const timeAtColumn = (columnName: string, dbType: string) => {
+    const dbSpecifics = dbType === 'postgres' ? {
+        type: 'timestamptz'
+    } : {
+        type: 'datetime',
+        // required to get millisecond precision on mysql/mariadb
+        // https://mariadb.com/kb/en/datetime/
+        // https://dev.mysql.com/doc/refman/8.0/en/fractional-seconds.html
+        length: '3',
+    }
+    return {
+        name: columnName,
+        isNullable: false,
+        ...dbSpecifics
+    }
+}
 
-const createdAtColumn = () => timeAtColumn('createdAt');
-const updatedAtColumn = () => timeAtColumn('updatedAt');
+const createdAtColumn = (type: string) => timeAtColumn('createdAt', type);
+const updatedAtColumn = (type: string) => timeAtColumn('updatedAt', type);
 
-const createdUpdatedAtColumns = [
-    timeAtColumn('createdAt'),
-    timeAtColumn('updatedAt')
+const createdUpdatedAtColumns = (type: string) => [
+    timeAtColumn('createdAt', type),
+    timeAtColumn('updatedAt', type)
 ];
 
 
@@ -79,6 +86,8 @@ export class initApi1642180264563 implements MigrationInterface {
     name = 'initApi1642180264563'
 
     public async up(queryRunner: QueryRunner): Promise<void> {
+
+        const dbType = queryRunner.connection.driver.options.type;
 
         await queryRunner.createTable(
             new Table({
@@ -429,10 +438,10 @@ export class initApi1642180264563 implements MigrationInterface {
                         length: '20',
                         isNullable: false
                     },
-                    timeAtColumn('processedAt'),
-                    timeAtColumn('queuedAt')
+                    timeAtColumn('processedAt', dbType),
+                    timeAtColumn('queuedAt', dbType)
                 ],
-                indices:[
+                indices: [
                     new TableIndex({
                         name: `IDX_cmevent_processedAt`,
                         columnNames: ['processedAt']
@@ -513,7 +522,7 @@ export class initApi1642180264563 implements MigrationInterface {
                         length: '100',
                         isNullable: false
                     },
-                    createdAtColumn(),
+                    createdAtColumn(dbType),
                 ]
             }),
             true,
@@ -532,7 +541,7 @@ export class initApi1642180264563 implements MigrationInterface {
                         generationStrategy: 'increment',
                         isGenerated: true
                     },
-                    createdAtColumn(),
+                    createdAtColumn(dbType),
                     {
                         name: 'granularity',
                         type: 'varchar',
@@ -547,7 +556,9 @@ export class initApi1642180264563 implements MigrationInterface {
                     },
                     {
                         name: 'value',
-                        type: 'double',
+                        type: 'decimal',
+                        precision: 12,
+                        scale: 2,
                         isNullable: false,
                     },
                     {
@@ -577,7 +588,7 @@ export class initApi1642180264563 implements MigrationInterface {
                         generationStrategy: 'increment',
                         isGenerated: true
                     },
-                    createdAtColumn(),
+                    createdAtColumn(dbType),
                     {
                         name: 'metric',
                         type: 'varchar',
@@ -586,7 +597,9 @@ export class initApi1642180264563 implements MigrationInterface {
                     },
                     {
                         name: 'value',
-                        type: 'double',
+                        type: 'decimal',
+                        precision: 12,
+                        scale: 2,
                         isNullable: false,
                     },
                     {
@@ -813,7 +826,7 @@ export class initApi1642180264563 implements MigrationInterface {
                         type: 'integer',
                         isNullable: false
                     },
-                    ...createdUpdatedAtColumns
+                    ...createdUpdatedAtColumns(dbType)
                 ],
                 indices: [
                     ...createdUpdatedAtIndices('RulePremise')
@@ -851,7 +864,7 @@ export class initApi1642180264563 implements MigrationInterface {
                         type: 'text',
                         isNullable: true
                     },
-                    createdAtColumn(),
+                    createdAtColumn(dbType),
                     {
                         name: 'triggered',
                         type: 'boolean',
@@ -962,7 +975,7 @@ export class initApi1642180264563 implements MigrationInterface {
                         type: 'integer',
                         isNullable: false
                     },
-                    ...createdUpdatedAtColumns
+                    ...createdUpdatedAtColumns(dbType)
                 ],
                 indices: [
                     ...createdUpdatedAtIndices('ActionPremise')
@@ -1021,7 +1034,7 @@ export class initApi1642180264563 implements MigrationInterface {
                         type: 'text',
                         isNullable: true,
                     },
-                    createdAtColumn(),
+                    createdAtColumn(dbType),
                     ...filterColumns(),
                 ],
                 indices: [
@@ -1115,7 +1128,7 @@ export class initApi1642180264563 implements MigrationInterface {
                         length: '20',
                         isNullable: false
                     },
-                    createdAtColumn(),
+                    createdAtColumn(dbType),
                     ...filterColumns(),
                 ],
                 indices: [
@@ -1185,7 +1198,7 @@ export class initApi1642180264563 implements MigrationInterface {
                         length: '20',
                         isNullable: false
                     },
-                    createdAtColumn(),
+                    createdAtColumn(dbType),
                     ...filterColumns(),
                 ],
                 indices: [

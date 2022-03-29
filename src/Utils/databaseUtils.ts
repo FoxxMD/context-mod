@@ -12,54 +12,79 @@ import {Logger} from "winston";
 import {CMNamingStrategy} from "./CMNamingStrategy";
 import {ErrorWithCause} from "pony-cause";
 
+const validDrivers = ['sqljs', 'mysql', 'mariadb', 'postgres'];
+
 export const isDatabaseDriver = (val: any): val is DatabaseDriver => {
     if (typeof val !== 'string') {
         return false;
     }
-    return ['sqljs', 'mysql', 'mariadb', 'postgres', 'mongo'].some(x => x === val.toLocaleLowerCase());
+    return validDrivers.some(x => x === val.toLocaleLowerCase());
+}
+
+export const asDatabaseDriver = (val: string): DatabaseDriver => {
+    const cleanVal = val.trim().toLocaleLowerCase();
+    if(isDatabaseDriver(cleanVal)) {
+        return cleanVal;
+    }
+    throw new Error(`Value '${cleanVal}' is not a valid driver. Must be one of: ${validDrivers.join(', ')}`);
 }
 
 export const createDatabaseConfig = (val: DatabaseDriver | any): DatabaseConfig => {
-    // handle string value
-    if (isDatabaseDriver(val)) {
-        switch (val) {
+    try {
+        let dbType: DatabaseDriver;
+        let userDbConfig: any = {};
+        if (typeof val === 'string') {
+            dbType = asDatabaseDriver(val);
+        } else {
+            if (val === undefined) {
+                throw new Error(`databaseConfig.connection must be either a string or an object with 'type' of a valid database type: ${validDrivers.join(', ')}`);
+            }
+
+            // assuming they modified default connection params but forgot to include db type
+            const {
+                type = 'sqljs',
+                ...rest
+            } = val;
+
+            dbType = asDatabaseDriver(val.type);
+
+            userDbConfig = rest;
+        }
+
+        switch (dbType) {
             case 'sqljs':
+                const {
+                    location = resolve(`${__dirname}`, '../../database.sqlite'),
+                    ...rest
+                } = userDbConfig;
+
                 return {
-                    type: 'sqljs',
-                    autoSave: true,
-                    location: resolve(`${__dirname}`, '../../database.sqlite')
+                    type: dbType,
+                    autoSave: true, // default autoSave to true since this is most likely the expected behavior
+                    location: typeof location === 'string' && location.trim().toLocaleLowerCase() !== ':memory:' ? resolve(location) : location,
+                    ...rest
                 } as SqljsConnectionOptions;
+
             case 'mysql':
             case 'mariadb':
                 return {
-                    type: val,
+                    type: dbType,
                     host: 'localhost',
-                    port: 3306
+                    port: 3306,
+                    timezone: 'z',
+                    ...userDbConfig,
                 } as MysqlConnectionOptions;
             case 'postgres':
                 return {
-                    type: 'postgres',
+                    type: dbType,
                     host: 'localhost',
-                    port: 5432
+                    port: 5432,
+                    ...userDbConfig,
                 } as PostgresConnectionOptions;
         }
+    } catch (e) {
+        throw new ErrorWithCause('Could not parse a valid database configuration', {cause: e});
     }
-
-    // handle sqljs db location and autoSave default
-    const {
-        type,
-        location = resolve(`${__dirname}`, '../../database.sqlite'),
-        ...rest
-    } = val;
-    if (type === 'sqljs') {
-        return {
-            type,
-            location: location.trim() === ':memory:' ? undefined : resolve(location),
-            autoSave: true, // default autoSave to true since this is most likely the expected behavior
-            ...rest,
-        } as SqljsConnectionOptions;
-    }
-    return val as DatabaseConfig;
 }
 
 export const createDatabaseConnection = async (rawConfig: DatabaseConfig, logger: Logger): Promise<DataSource> => {
@@ -75,7 +100,7 @@ export const createDatabaseConnection = async (rawConfig: DatabaseConfig, logger
             location: undefined,
         };
 
-        if(typeof rawConfig.location === 'string' && rawConfig.location !== ':memory:') {
+        if(typeof rawConfig.location === 'string' && rawConfig.location.trim().toLocaleLowerCase() !== ':memory:') {
             const location = rawConfig.location as string;
             try {
                 await fileOrDirectoryIsWriteable(location);

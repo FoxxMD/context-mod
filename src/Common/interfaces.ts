@@ -707,8 +707,8 @@ export interface OperatorCacheConfig extends CacheConfig {
     actionedEventsDefault?: number
 }
 
-export type DatabaseDriver = 'sqljs' | 'mysql' | 'mariadb' | 'mongodb' | 'postgres';
-export type DatabaseConfig = SqljsConnectionOptions | MysqlConnectionOptions | MongoConnectionOptions | PostgresConnectionOptions;
+export type DatabaseDriver = 'sqljs' | 'mysql' | 'mariadb' | 'postgres';
+export type DatabaseConfig = SqljsConnectionOptions | MysqlConnectionOptions | PostgresConnectionOptions;
 
 export interface Footer {
     /**

@@ -18,4 +18,21 @@ export abstract class RandomIdBaseEntity {
     setId() {
         this.id = nanoid(16);
     }
+
+    toJSON() {
+        const jsonObj: any = Object.assign({}, this);
+        const proto = Object.getPrototypeOf(this);
+        for (const key of Object.getOwnPropertyNames(proto)) {
+            const desc = Object.getOwnPropertyDescriptor(proto, key);
+            const hasGetter = desc && typeof desc.get === 'function';
+            if (hasGetter) {
+                jsonObj[key] = (this as any)[key];
+                const regKey = `_${key}`;
+                if(jsonObj[regKey] !== undefined) {
+                    delete jsonObj[regKey];
+                }
+            }
+        }
+        return jsonObj;
+    }
 }

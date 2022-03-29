@@ -16,14 +16,10 @@ export class TotalStat extends TimeAwareBaseEntity{
     @PrimaryGeneratedColumn()
     id!: number;
 
-    // @Index()
-    // @Column({type: 'int', width: 13, nullable: false, readonly: true, unsigned: true})
-    // createdAt: number = dayjs().valueOf();
-
     @Column("varchar", {length: 60})
     metric!: string;
 
-    @Column({type: 'double'})
+    @Column({type: 'decimal', precision: 12, scale: 2})
     value!: number
 
     @ManyToOne(type => ManagerEntity)
