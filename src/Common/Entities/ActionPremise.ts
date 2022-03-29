@@ -6,12 +6,14 @@ import {
     VersionColumn,
     ManyToOne,
     JoinColumn,
-    PrimaryColumn, CreateDateColumn, UpdateDateColumn
+    PrimaryColumn, CreateDateColumn, UpdateDateColumn, BeforeInsert, BeforeUpdate
 } from "typeorm";
 import {Action} from "./Action";
 import {ActionResultEntity} from "./ActionResultEntity";
 import objectHash from "object-hash";
 import {ObjectPremise} from "../interfaces";
+import {TimeAwareBaseEntity} from "./Base/TimeAwareBaseEntity";
+import dayjs, {Dayjs} from "dayjs";
 
 export interface ActionPremiseOptions {
     action: Action
@@ -19,7 +21,7 @@ export interface ActionPremiseOptions {
 }
 
 @Entity()
-export class ActionPremise  {
+export class ActionPremise extends TimeAwareBaseEntity  {
 
     @ManyToOne(() => Action, undefined,{cascade: ['insert'], eager: true})
     @JoinColumn({name: 'actionId'})
@@ -40,13 +42,32 @@ export class ActionPremise  {
     @VersionColumn()
     version!: number;
 
-    @CreateDateColumn()
-    createdAt!: number
+    @Column({ type: 'bigint', width: 13, nullable: false, readonly: true, unsigned: true })
+    updatedAt: Dayjs = dayjs();
 
-    @UpdateDateColumn()
-    updatedAt!: number
+    convertToDayjs() {
+        if(this.createdAt !== undefined) {
+            this.createdAt = dayjs(this.createdAt);
+        }
+        if(this.updatedAt !== undefined) {
+            this.updatedAt = dayjs(this.createdAt);
+        }
+    }
+
+    public convertToUnix() {
+        // @ts-ignore
+        this.createdAt = this.createdAt.valueOf();
+        // @ts-ignore
+        this.updatedAt = this.updatedAt.valueOf();
+    }
+
+    @BeforeUpdate()
+    public updateTimestamp() {
+        this.updatedAt = dayjs();
+    }
 
     constructor(data?: ActionPremiseOptions) {
+        super();
         if(data !== undefined) {
             this.action = data.action;
             this.config = data.config;
