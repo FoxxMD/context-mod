@@ -8,4 +8,10 @@ export class RuleType  {
 
     @Column("varchar", {length: 200})
     name!: string;
+
+    constructor(name?: string) {
+        if(name !== undefined) {
+            this.name = name;
+        }
+    }
 }

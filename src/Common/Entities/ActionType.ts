@@ -9,4 +9,10 @@ export class ActionType  {
 
     @Column("varchar", {length: 200})
     name!: ActionTypes
+
+    constructor(name?: ActionTypes) {
+        if(name !== undefined) {
+            this.name = name;
+        }
+    }
 }

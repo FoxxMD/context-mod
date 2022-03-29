@@ -10,4 +10,10 @@ export class InvokeeType {
 
     @Column("varchar", {length: 50})
     name!: Invokee;
+
+    constructor(name?: Invokee) {
+        if(name !== undefined) {
+            this.name = name;
+        }
+    }
 }
