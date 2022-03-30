@@ -24,12 +24,12 @@ PROTIP: Using a container management tool like [Portainer.io CE](https://www.por
 
 An example of starting the container using the [minimum configuration](/docs/operatorConfiguration.md#minimum-config) with a [configuration file](/docs/operatorConfiguration.md#defining-configuration-via-file):
 
-* Bind the folder where the config is located on your host machine into the container `-v /host/path/folder:/config`
-* Tell CM where to find the config using an env `-e "OPERATOR_CONFIG=/config/myConfig.yaml"`
+* Bind the folder where your config, logs, and database are located on your host machine into the container `-v /host/path/folder:/config`
 * Expose the web interface using the container port `8085`
+* Specify the user or user:group to run the container with -- this is important to keep your host files usable
 
 ```
-docker run -d -e "OPERATOR_CONFIG=/config/myConfig.yaml" -v /host/path/folder:/config -p 8085:8085 foxxmd/context-mod
+docker run -d -e "OPERATOR_CONFIG=/config/myConfig.yaml" -v /host/path/folder:/config -p 8085:8085 --user=myHostUsername foxxmd/context-mod
 ```
 
 ### Locally
