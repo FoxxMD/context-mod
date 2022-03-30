@@ -735,7 +735,7 @@ export const buildOperatorConfigWithDefaults = async (data: OperatorJsonConfig):
         caching: opCache,
         userAgent,
         databaseConfig: {
-            connection: dbConnection = 'sqljs',
+            connection: dbConnection = process.env.DB_DRIVER ?? 'sqljs',
             migrations = {},
         } = {},
         web: {
