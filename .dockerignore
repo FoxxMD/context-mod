@@ -2,7 +2,7 @@ Dockerfile
 .dockerignore
 .gitignore
 .git
-src/logs
+logs
 .github
 /docs/
 /node_modules/

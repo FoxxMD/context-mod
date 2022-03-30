@@ -29,10 +29,10 @@ RUN npm install --production
 
 ENV NPM_CONFIG_LOGLEVEL debug
 
-ARG log_dir=/home/node/logs
-RUN mkdir -p $log_dir
-VOLUME $log_dir
-ENV LOG_DIR=$log_dir
+ARG data_dir=/home/node/data
+RUN mkdir -p data_dir
+VOLUME $data_dir
+ENV DATA_DIR=$data_dir
 
 ARG webPort=8085
 ENV PORT=$webPort
