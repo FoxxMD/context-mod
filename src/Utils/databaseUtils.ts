@@ -6,12 +6,14 @@ import {PostgresConnectionOptions} from "typeorm/driver/postgres/PostgresConnect
 import {resolve} from 'path';
 import "reflect-metadata";
 import {DataSource} from "typeorm";
-import {fileOrDirectoryIsWriteable, mergeArr} from "../util";
+import {fileOrDirectoryIsWriteable, mergeArr, resolvePath} from "../util";
 import {Logger} from "winston";
 import {CMNamingStrategy} from "./CMNamingStrategy";
 import {ErrorWithCause} from "pony-cause";
 import {BetterSqlite3ConnectionOptions} from "typeorm/driver/better-sqlite3/BetterSqlite3ConnectionOptions";
 import {WinstonAdaptor} from "typeorm-logger-adaptor/logger/winston";
+import process from "process";
+import {defaultDataDir} from "../Common/defaults";
 
 const validDrivers = ['sqljs', 'better-sqlite3', 'mysql', 'mariadb', 'postgres'];
 
@@ -55,25 +57,25 @@ export const createDatabaseConfig = (val: DatabaseDriver | any): DatabaseConfig 
         switch (dbType) {
             case 'sqljs':
                 const {
-                    location = resolve(`${__dirname}`, '../../database.sqlite'),
+                    location = 'database.sqlite',
                     ...rest
                 } = userDbConfig;
 
                 return {
                     type: dbType,
                     autoSave: true, // default autoSave to true since this is most likely the expected behavior
-                    location: typeof location === 'string' && location.trim().toLocaleLowerCase() !== ':memory:' ? resolve(location) : location,
+                    location: typeof location === 'string' && location.trim().toLocaleLowerCase() !== ':memory:' ? resolvePath(location, process.env.DATA_DIR ?? defaultDataDir) : location,
                     ...rest
                 } as SqljsConnectionOptions;
             case 'better-sqlite3':
                 const {
-                    database = resolve(`${__dirname}`, '../../database.sqlite'),
+                    database = 'database.sqlite',
                     ...betterRest
                 } = userDbConfig;
 
                 return {
                     type: dbType,
-                    database: typeof database === 'string' && database.trim().toLocaleLowerCase() !== ':memory:' ? resolve(database) : database,
+                    database: typeof database === 'string' && database.trim().toLocaleLowerCase() !== ':memory:' ? resolvePath(database, process.env.DATA_DIR ?? defaultDataDir) : database,
                     ...betterRest
                 } as BetterSqlite3ConnectionOptions;
             case 'mysql':

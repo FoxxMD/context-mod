@@ -7,7 +7,7 @@ import {
     overwriteMerge,
     parseBool, parseFromJsonOrYamlToObject, randomId,
     readConfigFile, removeFromSourceIfKeysExistsInDestination,
-    removeUndefinedKeys
+    removeUndefinedKeys, resolvePathFromEnvWithRelative
 } from "./util";
 import {CommentCheck} from "./Check/CommentCheck";
 import {SubmissionCheck} from "./Check/SubmissionCheck";
@@ -46,7 +46,13 @@ import {GetEnvVars} from 'env-cmd';
 import {operatorConfig} from "./Utils/CommandConfig";
 import merge from 'deepmerge';
 import * as process from "process";
-import {cacheOptDefaults, cacheTTLDefaults, filterCriteriaDefault} from "./Common/defaults";
+import {
+    cacheOptDefaults,
+    cacheTTLDefaults,
+    defaultConfigFilenames,
+    defaultDataDir,
+    filterCriteriaDefault
+} from "./Common/defaults";
 import objectHash from "object-hash";
 import {AuthorCriteria, AuthorOptions} from "./Author/Author";
 import {createDatabaseConfig, createDatabaseConnection} from "./Utils/databaseUtils";
@@ -532,8 +538,12 @@ export const parseOpConfigFromEnv = (): OperatorJsonConfig => {
 // json config
 // args from cli
 export const parseOperatorConfigFromSources = async (args: any): Promise<[OperatorJsonConfig, OperatorFileConfig]> => {
-    const {logLevel = process.env.LOG_LEVEL ?? 'debug', logDir = process.env.LOG_DIR} = args || {};
-    const envPath = process.env.OPERATOR_ENV;
+    const {
+        logLevel = process.env.LOG_LEVEL ?? 'debug',
+        logDir = process.env.LOG_DIR,
+        dataDir = process.env.DATA_DIR ?? defaultDataDir
+    } = args || {};
+    const envPath = resolvePathFromEnvWithRelative(process.env.OPERATOR_ENV, dataDir, path.resolve(dataDir, './.env'));
     const initLoggerOptions = {
         level: logLevel,
         console: {
@@ -556,7 +566,7 @@ export const parseOperatorConfigFromSources = async (args: any): Promise<[Operat
         const vars = await GetEnvVars({
             envFile: {
                 filePath: envPath,
-                fallback: true
+                //fallback: true
             }
         });
         // if we found variables in the file of at a fallback path then add them in before we do main arg parsing
@@ -567,43 +577,54 @@ export const parseOperatorConfigFromSources = async (args: any): Promise<[Operat
             }
         }
     } catch (err: any) {
-        let msg = 'No .env file found at default location (./env)';
-        if (envPath !== undefined) {
-            msg = `${msg} or OPERATOR_ENV path (${envPath})`;
-        }
+        let msg = `No .env file found at ${envPath}`;
         initLogger.warn(`${msg} -- this may be normal if neither was provided.`);
         // mimicking --silent from env-cmd
         //swallow silently for now 😬
     }
 
-    const {operatorConfig = (process.env.OPERATOR_CONFIG ?? path.resolve(__dirname, '../config.yaml'))} = args;
+    const {
+        operatorConfig: opConfigVal = process.env.OPERATOR_CONFIG
+    } = args;
+    const resolvedOpConfigVal = resolvePathFromEnvWithRelative(opConfigVal, dataDir);
+    //(process.env.OPERATOR_CONFIG ?? path.resolve(__dirname, '../config.yaml'))
+    const opConfigCandidates: string[] = resolvedOpConfigVal !== undefined ? [resolvedOpConfigVal] : defaultConfigFilenames.map(x => path.resolve(dataDir, './', x));
+
     let configFromFile: OperatorJsonConfig = {};
     let fileConfigFormat: ConfigFormat | undefined = undefined;
     let fileConfig: object = {};
     let rawConfig: string = '';
     let configDoc: YamlOperatorConfigDocument | JsonOperatorConfigDocument;
     let writeable = false;
-    try {
-        writeable = await fileOrDirectoryIsWriteable(operatorConfig);
-    } catch (e) {
-        initLogger.warn(`Issue while parsing operator config file location: ${e} \n This is only a problem if you do not have a config file but are planning on adding bots interactively.`);
-    }
+    let operatorConfig = '';
+    for(const opConfigPath of opConfigCandidates) {
 
-    try {
-        const [rawConfigValue, format] = await readConfigFile(operatorConfig, {log: initLogger});
-        rawConfig = rawConfigValue ?? '';
-        fileConfigFormat = format as ConfigFormat;
-    } catch (err: any) {
-        const {code} = err;
-        if (code === 'ENOENT') {
-            initLogger.warn('No operator config file found but will continue');
-            if (err.extension !== undefined) {
-                fileConfigFormat = err.extension
+        operatorConfig = opConfigPath;
+
+        try {
+            writeable = await fileOrDirectoryIsWriteable(opConfigPath);
+        } catch (e) {
+            initLogger.warn(`Issue while parsing operator config file location: ${e} \n This is only a problem if you do not have a config file but are planning on adding bots interactively.`);
+        }
+
+        try {
+            const [rawConfigValue, format] = await readConfigFile(opConfigPath, {log: initLogger});
+            rawConfig = rawConfigValue ?? '';
+            fileConfigFormat = format as ConfigFormat;
+            break;
+        } catch (err: any) {
+            const {code} = err;
+            if (code === 'ENOENT') {
+                initLogger.warn('No operator config file found but will continue');
+                if (err.extension !== undefined) {
+                    fileConfigFormat = err.extension
+                }
+            } else {
+                throw new ErrorWithCause('Cannot continue app startup because operator config file exists but was not parseable.', {cause: err});
             }
-        } else {
-            throw new ErrorWithCause('Cannot continue app startup because operator config file exists but was not parseable.', {cause: err});
         }
     }
+
     const [format, doc, jsonErr, yamlErr] = parseFromJsonOrYamlToObject(rawConfig, {
         location: operatorConfig,
         jsonDocFunc: (content, location) => new JsonOperatorConfigDocument(content, location),
@@ -746,6 +767,8 @@ export const buildOperatorConfigWithDefaults = async (data: OperatorJsonConfig):
     let defaultProvider: CacheOptions;
     let opActionedEventsMax: number | undefined;
     let opActionedEventsDefault: number = 25;
+
+    const dataDir = process.env.DATA_DIR ?? defaultDataDir;
 
     if (opCache === undefined) {
         defaultProvider = {

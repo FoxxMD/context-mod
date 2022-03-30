@@ -9,6 +9,7 @@ import {InvalidOptionArgumentError} from "commander";
 import {deflateSync, inflateSync} from "zlib";
 import pixelmatch from 'pixelmatch';
 import os from 'os';
+import pathUtil from 'path';
 import crypto, {createHash} from 'crypto';
 import {
     ActionResult, ActivityDispatch, ActivityDispatchConfig,
@@ -72,7 +73,6 @@ import stringSimilarity from 'string-similarity';
 import calculateCosineSimilarity from "./Utils/StringMatching/CosineSimilarity";
 import levenSimilarity from "./Utils/StringMatching/levenSimilarity";
 import {isRateLimitError, isRequestError, isScopeError, isStatusError, SimpleError} from "./Utils/Errors";
-import {parse} from "path";
 import JsonConfigDocument from "./Common/Config/JsonConfigDocument";
 import YamlConfigDocument from "./Common/Config/YamlConfigDocument";
 import AbstractConfigDocument, {ConfigDocumentInterface} from "./Common/Config/AbstractConfigDocument";
@@ -1556,7 +1556,7 @@ export const convertSubredditsRawToStrong = (x: (SubredditState | string), opts:
 export async function readConfigFile(path: string, opts: any): Promise<[string?, ConfigFormat?]> {
     const {log, throwOnNotFound = true} = opts;
     let extensionHint: ConfigFormat | undefined;
-    const fileInfo = parse(path);
+    const fileInfo = pathUtil.parse(path);
     if(fileInfo.ext !== undefined) {
         switch(fileInfo.ext) {
             case '.json':
@@ -1598,7 +1598,7 @@ export async function readConfigFile(path: string, opts: any): Promise<[string?,
 // }
 
 export const fileOrDirectoryIsWriteable = async (location: string) => {
-    const pathInfo = parse(location);
+    const pathInfo = pathUtil.parse(location);
     try {
         await promises.access(location, constants.R_OK | constants.W_OK);
         return true;
@@ -2467,4 +2467,67 @@ export const activityDispatchConfigToDispatch = (config: ActivityDispatchConfig,
  */
 export const isNullOrUndefined = <T>(obj: T | null | undefined):obj is null | undefined => {
     return typeof obj === "undefined" || obj === null
+}
+
+export const castToBool = (val: any, allowNumbers = true): boolean | undefined => {
+    if (val === null || val === undefined) {
+        return undefined;
+    }
+    if (typeof val === 'boolean') {
+        return val;
+    }
+    if (typeof val === 'number' && allowNumbers) {
+        if (val === 1) {
+            return true;
+        }
+        if (val === 0) {
+            return false;
+        }
+        return undefined;
+    } else if (typeof val === 'string') {
+        if (val.trim() === '') {
+            return undefined;
+        }
+        if(val.trim().toLocaleLowerCase() === 'true') {
+            return true;
+        }
+        if(val.trim().toLocaleLowerCase() === 'false') {
+            return false;
+        }
+        if(allowNumbers) {
+            if(Number.parseInt(val.trim()) === 1) {
+                return true;
+            }
+            if(Number.parseInt(val.trim()) === 0) {
+                return false;
+            }
+        }
+        return undefined;
+    }
+    return undefined;
+}
+
+export const resolvePath = (pathVal: string, relativeRoot: string) => {
+    const pathInfo = pathUtil.parse(pathVal);
+    // if path looks absolute then just resolve any relative parts and return as-is
+    if(pathInfo.root !== '') {
+        return pathUtil.resolve(pathVal);
+    }
+    // if there is no root then resolve it with relative root
+    if(pathInfo.dir === '') {
+        return pathUtil.resolve(relativeRoot, './', pathVal);
+    }
+    return pathUtil.resolve(relativeRoot, pathVal);
+}
+
+export const resolvePathFromEnvWithRelative = (pathVal: any, relativeRoot: string, defaultVal?: string) => {
+    if (pathVal === undefined || pathVal === null) {
+        return defaultVal;
+    } else if (typeof pathVal === 'string') {
+        if (pathVal.trim() === '') {
+            return defaultVal;
+        }
+        return resolvePath(pathVal.trim(), relativeRoot);
+    }
+    return defaultVal;
 }

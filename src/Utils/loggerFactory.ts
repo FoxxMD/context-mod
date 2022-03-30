@@ -1,16 +1,21 @@
-import {labelledFormat, logLevels, mergeArr} from "../util";
+import {castToBool, fileOrDirectoryIsWriteable, labelledFormat, logLevels, mergeArr, resolvePath} from "../util";
 import winston, {Logger} from "winston";
 import {DuplexTransport} from "winston-duplex";
-import { WinstonAdaptor } from 'typeorm-logger-adaptor/logger/winston';
+import {WinstonAdaptor} from 'typeorm-logger-adaptor/logger/winston';
 import {LoggerOptions} from 'typeorm';
 import {LoggerFactoryOptions} from "../Common/interfaces";
 import process from "process";
 import path from "path";
+import {defaultDataDir} from "../Common/defaults";
+import {ErrorWithCause} from "pony-cause";
 
 const {transports} = winston;
 
 export const getLogger = (options: LoggerFactoryOptions, name = 'app'): Logger => {
-    if(!winston.loggers.has(name)) {
+
+    const errors: (Error | string)[] = [];
+
+    if (!winston.loggers.has(name)) {
         const {
             level,
             additionalTransports = [],
@@ -33,7 +38,7 @@ export const getLogger = (options: LoggerFactoryOptions, name = 'app'): Logger =
             consoleTransport,
             new DuplexTransport({
                 stream: {
-                    transform(chunk,e, cb) {
+                    transform(chunk, e, cb) {
                         cb(null, chunk);
                     },
                     objectMode: true,
@@ -50,33 +55,37 @@ export const getLogger = (options: LoggerFactoryOptions, name = 'app'): Logger =
         if (dirname !== undefined && dirname !== '' && dirname !== null) {
 
             let realDir: string | undefined;
-            if(typeof dirname === 'boolean') {
-                if(!dirname) {
+
+            const dirBool = castToBool(dirname, false);
+            if (dirBool !== undefined) {
+                if (!dirBool) {
                     realDir = undefined;
                 } else {
-                    realDir = path.resolve(__dirname, '../../logs')
+                    realDir = path.resolve(process.env.DATA_DIR ?? defaultDataDir, './logs');
                 }
-            } else if(dirname === 'true') {
-                realDir = path.resolve(__dirname, '../../logs')
-            } else if(dirname === 'false') {
-                realDir = undefined;
             } else {
-                realDir = dirname;
+                realDir = resolvePath(dirname as string, process.env.DATA_DIR ?? defaultDataDir);
             }
 
-            const rotateTransport = new winston.transports.DailyRotateFile({
-                createSymlink: true,
-                symlinkName: 'contextBot-current.log',
-                filename: 'contextBot-%DATE%.log',
-                datePattern: 'YYYY-MM-DD',
-                maxSize: '5m',
-                dirname: realDir,
-                ...fileRest,
-                handleExceptions: true,
-                handleRejections: true,
-            });
-            // @ts-ignore
-            myTransports.push(rotateTransport);
+            if (realDir !== undefined) {
+
+                // TODO would like to do a check to make dir is writeable but will have to make this whole function async
+                // and getLogger is used in a lot of constructor functions so can't do this for now
+
+                const rotateTransport = new winston.transports.DailyRotateFile({
+                    createSymlink: true,
+                    symlinkName: 'contextBot-current.log',
+                    filename: 'contextBot-%DATE%.log',
+                    datePattern: 'YYYY-MM-DD',
+                    maxSize: '5m',
+                    dirname: realDir,
+                    ...fileRest,
+                    handleExceptions: true,
+                    handleRejections: true,
+                });
+                // @ts-ignore
+                myTransports.push(rotateTransport);
+            }
         }
 
         const loggerOptions = {
@@ -89,5 +98,11 @@ export const getLogger = (options: LoggerFactoryOptions, name = 'app'): Logger =
         winston.loggers.add(name, loggerOptions);
     }
 
-    return winston.loggers.get(name);
+    const logger = winston.loggers.get(name);
+    if (errors.length > 0) {
+        for (const e of errors) {
+            logger.error(e);
+        }
+    }
+    return logger;
 }
