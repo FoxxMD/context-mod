@@ -55,7 +55,7 @@ import {
 } from "./Common/interfaces";
 import {Document as YamlDocument} from 'yaml'
 import InvalidRegexError from "./Utils/InvalidRegexError";
-import {constants, promises} from "fs";
+import {constants, promises, accessSync} from "fs";
 import {cacheOptDefaults, VERSION} from "./Common/defaults";
 import cacheManager, {Cache} from "cache-manager";
 import redisStore from "cache-manager-redis-store";
@@ -1128,6 +1128,11 @@ const _transformError = (err: Error, seen: Set<Error>, matchOptions?: LogMatch) 
         return err;
     }
 
+    if(err instanceof SimpleError && err.stack !== undefined) {
+        // reduce stack to just error and originating line
+        err.stack = err.stack.split('\n').slice(0, 2).join('\n');
+    }
+
     try {
 
         // @ts-ignore
@@ -1553,12 +1558,12 @@ export const convertSubredditsRawToStrong = (x: (SubredditState | string), opts:
     return toStrongSubredditState(x, opts);
 }
 
-export async function readConfigFile(path: string, opts: any): Promise<[string?, ConfigFormat?]> {
-    const {log, throwOnNotFound = true} = opts;
+export async function readConfigFile(path: string, opts?: any): Promise<[string?, ConfigFormat?]> {
+    const {log, throwOnNotFound = true} = opts || {};
     let extensionHint: ConfigFormat | undefined;
     const fileInfo = pathUtil.parse(path);
-    if(fileInfo.ext !== undefined) {
-        switch(fileInfo.ext) {
+    if (fileInfo.ext !== undefined) {
+        switch (fileInfo.ext) {
             case '.json':
             case '.json5':
                 extensionHint = 'json';
@@ -1577,19 +1582,37 @@ export async function readConfigFile(path: string, opts: any): Promise<[string?,
         if (code === 'ENOENT') {
             if (throwOnNotFound) {
                 if (log) {
-                    log.warn('No file found at given path', {filePath: path});
+                    log.warn(`No file found at path: ${path}`, {filePath: path});
                 }
                 e.extension = extensionHint;
-                throw e;
+                const sError = new SimpleError(`No file found at path: ${path}`);
+                sError.code = e.code;
+                // @ts-ignore
+                sError.extension = extensionHint;
+                throw sError;
             } else {
                 return [];
             }
-        } else if (log) {
-            log.warn(`Encountered error while parsing file`, {filePath: path});
-            log.error(e);
+        } else if (code === 'EACCES') {
+            if (log) {
+                log.warn(`Unable to access file path due to permissions: ${path}`, {filePath: path});
+            }
+            e.extension = extensionHint;
+            const sError = new SimpleError(`Unable to access file path due to permissions: ${path}`);
+            sError.code = e.code;
+            // @ts-ignore
+            sError.extension = extensionHint;
+            throw sError;
+        } else {
+            const err = new ErrorWithCause(`Encountered error while parsing file at ${path}`, {cause: e})
+            if (log) {
+                log.error(e);
+            }
+            e.extension = extensionHint;
+            // @ts-ignore
+            err.extension = extensionHint;
+            throw err;
         }
-        e.extension = extensionHint;
-        throw e;
     }
 }
 
@@ -1597,25 +1620,32 @@ export async function readConfigFile(path: string, opts: any): Promise<[string?,
 //     return (item && typeof item === 'object' && !Array.isArray(item));
 // }
 
-export const fileOrDirectoryIsWriteable = async (location: string) => {
+export const fileOrDirectoryIsWriteable = (location: string) => {
     const pathInfo = pathUtil.parse(location);
+    const isDir = pathInfo.ext === '';
     try {
-        await promises.access(location, constants.R_OK | constants.W_OK);
+        accessSync(location, constants.R_OK | constants.W_OK);
         return true;
     } catch (err: any) {
         const {code} = err;
         if (code === 'ENOENT') {
             // file doesn't exist, see if we can write to directory in which case we are good
             try {
-                await promises.access(pathInfo.dir, constants.R_OK | constants.W_OK)
+                accessSync(pathInfo.dir, constants.R_OK | constants.W_OK)
                 // we can write to dir
                 return true;
             } catch (accessError: any) {
-                // also can't access directory :(
-                throw new SimpleError(`No file exists at ${location} and application does not have permission to write to that directory`);
+                if(accessError.code === 'EACCES') {
+                    // also can't access directory :(
+                    throw new SimpleError(`No ${isDir ? 'directory' : 'file'} exists at ${location} and application does not have permission to write to the parent directory`);
+                } else {
+                    throw new ErrorWithCause(`No ${isDir ? 'directory' : 'file'} exists at ${location} and application is unable to access the parent directory due to a system error`, {cause: accessError});
+                }
             }
+        } else if(code === 'EACCES') {
+            throw new SimpleError(`${isDir ? 'Directory' : 'File'} exists at ${location} but application does not have permission to write to it.`);
         } else {
-            throw new SimpleError(`File exists at ${location} but application does have permission to write to it.`);
+            throw new ErrorWithCause(`${isDir ? 'Directory' : 'File'} exists at ${location} but application is unable to access it due to a system error`, {cause: err});
         }
     }
 }

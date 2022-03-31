@@ -35,7 +35,7 @@ export const isRequestError = (err: any): err is RequestError => {
 }
 
 export class SimpleError extends ExtendableError {
-
+    code?: string | number;
 }
 
 export class CMError extends ErrorWithCause {

@@ -44,6 +44,9 @@ ARG webPort=8085
 ENV PORT=$webPort
 EXPOSE $PORT
 
+# convenience variable for more helpful error messages
+ENV IS_DOCKER=true
+
 USER node
 
 CMD [ "node", "src/index.js", "run" ]

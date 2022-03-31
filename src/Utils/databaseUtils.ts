@@ -6,14 +6,15 @@ import {PostgresConnectionOptions} from "typeorm/driver/postgres/PostgresConnect
 import {resolve} from 'path';
 import "reflect-metadata";
 import {DataSource} from "typeorm";
-import {fileOrDirectoryIsWriteable, mergeArr, resolvePath} from "../util";
-import {Logger} from "winston";
+import {castToBool, fileOrDirectoryIsWriteable, mergeArr, resolvePath} from "../util";
+import {LeveledLogMethod, Logger} from "winston";
 import {CMNamingStrategy} from "./CMNamingStrategy";
 import {ErrorWithCause} from "pony-cause";
 import {BetterSqlite3ConnectionOptions} from "typeorm/driver/better-sqlite3/BetterSqlite3ConnectionOptions";
 import {WinstonAdaptor} from "typeorm-logger-adaptor/logger/winston";
 import process from "process";
 import {defaultDataDir} from "../Common/defaults";
+import {LoggerOptions} from "typeorm/logger/LoggerOptions";
 
 const validDrivers = ['sqljs', 'better-sqlite3', 'mysql', 'mariadb', 'postgres'];
 
@@ -103,7 +104,7 @@ export const createDatabaseConfig = (val: DatabaseDriver | any): DatabaseConfig 
     }
 }
 
-export const createDatabaseConnection = async (rawConfig: DatabaseConfig, logger: Logger): Promise<DataSource> => {
+export const createDatabaseConnection = async (rawConfig: DatabaseConfig, logger: Logger, dbLogLevels?: LoggerOptions): Promise<DataSource> => {
 
     let config = {...rawConfig};
 
@@ -123,11 +124,14 @@ export const createDatabaseConnection = async (rawConfig: DatabaseConfig, logger
         } else if (typeof rawPath === 'string' && rawPath.trim().toLocaleLowerCase() !== ':memory:') {
             try {
                 dbLogger.debug('Testing that database path is writeable...');
-                await fileOrDirectoryIsWriteable(rawPath);
+                fileOrDirectoryIsWriteable(rawPath);
                 dbPath = rawPath;
                 dbLogger.info(`Using database at path: ${dbPath}`);
             } catch (e: any) {
-                dbLogger.error(new ErrorWithCause(`Falling back to IN-MEMORY database due to error while trying to access database file at ${rawPath})`, {cause: e}));
+                dbLogger.error(new ErrorWithCause(`Falling back to IN-MEMORY database due to error while trying to access database`, {cause: e}));
+                if(castToBool(process.env.IS_DOCKER) === true) {
+                    dbLogger.info(`Make sure you have specified user in docker run command! See https://github.com/FoxxMD/context-mod/blob/master/docs/gettingStartedOperator.md#docker-recommended`);
+                }
             }
         }
 
@@ -151,10 +155,23 @@ export const createDatabaseConnection = async (rawConfig: DatabaseConfig, logger
         entities: [`${resolve(__dirname, '../Common/Entities')}/**/*.js`],
         migrations: [`${resolve(__dirname, '../Common/Migrations')}/Database/*.js`],
         migrationsRun: false,
-        logging: ['error', 'warn', 'migration'],
-        logger: new WinstonAdaptor(dbLogger, ['error', 'warn', 'migration', 'schema']),
+        logging: ['error', 'warn', 'migration', 'schema', 'log'],
+        logger: new WinstonAdaptor(dbLogger, dbLogLevels ?? ['error', 'warn', 'schema'], false, ormLoggingAdaptorLevelMappings(dbLogger)),
         namingStrategy: new CMNamingStrategy(),
     });
     await source.initialize();
     return source;
 }
+
+const ormLoggingAdaptorLevelMappings = (logger: Logger) => ({
+    log: (first: any, ...rest: any) => logger.debug(first, ...rest),
+    info: (first: any, ...rest: any) => logger.info(first, ...rest),
+    warn: (first: any, ...rest: any) => logger.warn(first, ...rest),
+    error: (first: any, ...rest: any) => logger.error(first, ...rest),
+    schema: (first: any, ...rest: any) => logger.debug(first, ...rest),
+    schemaBuild: (first: any, ...rest: any) => logger.info(first, ...rest),
+    query: (first: any, ...rest: any) => logger.debug(first, ...rest),
+    queryError: (first: any, ...rest: any) => logger.debug(first, ...rest),
+    querySlow: (first: any, ...rest: any) => logger.debug(first, ...rest),
+    migration: (first: any, ...rest: any) => logger.info(first, ...rest),
+});

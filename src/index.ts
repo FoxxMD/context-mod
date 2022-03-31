@@ -25,7 +25,7 @@ import Submission from "snoowrap/dist/objects/Submission";
 import {COMMENT_URL_ID, parseLinkIdentifier, SUBMISSION_URL_ID} from "./util";
 import LoggedError from "./Utils/LoggedError";
 import {buildOperatorConfigWithDefaults, parseOperatorConfigFromSources} from "./ConfigBuilder";
-import {getLogger} from "./Utils/loggerFactory";
+import {getLogger, initLogger} from "./Utils/loggerFactory";
 import Bot from "./Bot";
 import {isScopeError} from "./Utils/Errors";
 import {nanoid} from "nanoid";
@@ -65,7 +65,9 @@ const program = new Command();
             .allowUnknownOption();
         runCommand = addOptions(runCommand, getUniversalWebOptions());
         runCommand.action(async (interfaceVal, opts) => {
-            const [opConfig, fileConfig] = await parseOperatorConfigFromSources({...opts, mode: interfaceVal});
+            const args = {...opts, mode: interfaceVal};
+            await initLogger(args)
+            const [opConfig, fileConfig] = await parseOperatorConfigFromSources(args);
             const config = await buildOperatorConfigWithDefaults(opConfig);
             const {
                 mode,
@@ -94,6 +96,7 @@ const program = new Command();
         checkCommand
             .addOption(checks)
             .action(async (activityIdentifier, type, botVal, commandOptions = {}) => {
+                await initLogger(commandOptions);
                 const [opConfig, fileConfig] = await parseOperatorConfigFromSources(commandOptions);
                 const config = await buildOperatorConfigWithDefaults(opConfig);
                 const {checks = []} = commandOptions;
@@ -179,6 +182,7 @@ const program = new Command();
         unmodCommand
             .addOption(checks)
             .action(async (subreddits = [], botVal, opts = {}) => {
+                await initLogger(opts);
                 const [opConfig, fileConfig] = await parseOperatorConfigFromSources(opts);
                 const config = await buildOperatorConfigWithDefaults(opConfig);
                 const {checks = []} = opts;

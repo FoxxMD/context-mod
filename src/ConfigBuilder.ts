@@ -1,6 +1,6 @@
 import winston, {Logger} from "winston";
 import {
-    buildCacheOptionsFromProvider, buildCachePrefix,
+    buildCacheOptionsFromProvider, buildCachePrefix, castToBool,
     createAjvFactory, fileOrDirectoryIsWriteable,
     mergeArr, mergeFilters,
     normalizeName,
@@ -41,7 +41,7 @@ import {isRuleSetJSON, RuleSetJson, RuleSetObjectJson} from "./Rule/RuleSet";
 import deepEqual from "fast-deep-equal";
 import {ActionJson, ActionObjectJson, ConfigFormat, RuleJson, RuleObjectJson} from "./Common/types";
 import {isActionJson} from "./Action";
-import {getLogger} from "./Utils/loggerFactory";
+import {getLogger, resolveLogDir} from "./Utils/loggerFactory";
 import {GetEnvVars} from 'env-cmd';
 import {operatorConfig} from "./Utils/CommandConfig";
 import merge from 'deepmerge';
@@ -539,28 +539,11 @@ export const parseOpConfigFromEnv = (): OperatorJsonConfig => {
 // args from cli
 export const parseOperatorConfigFromSources = async (args: any): Promise<[OperatorJsonConfig, OperatorFileConfig]> => {
     const {
-        logLevel = process.env.LOG_LEVEL ?? 'debug',
-        logDir = process.env.LOG_DIR,
         dataDir = process.env.DATA_DIR ?? defaultDataDir
     } = args || {};
     const envPath = resolvePathFromEnvWithRelative(process.env.OPERATOR_ENV, dataDir, path.resolve(dataDir, './.env'));
-    const initLoggerOptions = {
-        level: logLevel,
-        console: {
-            level: logLevel
-        },
-        file: {
-            level: logLevel,
-            dirname: logDir,
-        },
-        stream: {
-            level: logLevel
-        }
-    }
 
-    // create a pre config logger to help with debugging
-    // default to debug if nothing is provided
-    const initLogger = getLogger(initLoggerOptions, 'init');
+    const initLogger = winston.loggers.get('init');
 
     try {
         const vars = await GetEnvVars({
@@ -577,10 +560,11 @@ export const parseOperatorConfigFromSources = async (args: any): Promise<[Operat
             }
         }
     } catch (err: any) {
-        let msg = `No .env file found at ${envPath}`;
-        initLogger.warn(`${msg} -- this may be normal if neither was provided.`);
-        // mimicking --silent from env-cmd
-        //swallow silently for now 😬
+        if(err.message.includes('Failed to find .env file at path')) {
+            initLogger.warn(`${err.message} -- can be ignored if you didn't include one!`);
+        } else {
+            throw new ErrorWithCause('Error occurred while parsing .env file that preventing app from starting', {cause: err});
+        }
     }
 
     const {
@@ -588,34 +572,39 @@ export const parseOperatorConfigFromSources = async (args: any): Promise<[Operat
     } = args;
     const resolvedOpConfigVal = resolvePathFromEnvWithRelative(opConfigVal, dataDir);
     //(process.env.OPERATOR_CONFIG ?? path.resolve(__dirname, '../config.yaml'))
+    if(resolvedOpConfigVal === undefined) {
+        initLogger.debug(`No operator config explicitly specified. Will look for default configs (${defaultConfigFilenames.join(', ')}) at default path (${dataDir})`);
+    }
     const opConfigCandidates: string[] = resolvedOpConfigVal !== undefined ? [resolvedOpConfigVal] : defaultConfigFilenames.map(x => path.resolve(dataDir, './', x));
 
     let configFromFile: OperatorJsonConfig = {};
     let fileConfigFormat: ConfigFormat | undefined = undefined;
-    let fileConfig: object = {};
     let rawConfig: string = '';
     let configDoc: YamlOperatorConfigDocument | JsonOperatorConfigDocument;
     let writeable = false;
-    let operatorConfig = '';
+    let operatorConfig;
     for(const opConfigPath of opConfigCandidates) {
 
-        operatorConfig = opConfigPath;
-
         try {
-            writeable = await fileOrDirectoryIsWriteable(opConfigPath);
-        } catch (e) {
-            initLogger.warn(`Issue while parsing operator config file location: ${e} \n This is only a problem if you do not have a config file but are planning on adding bots interactively.`);
-        }
-
-        try {
-            const [rawConfigValue, format] = await readConfigFile(opConfigPath, {log: initLogger});
+            const [rawConfigValue, format] = await readConfigFile(opConfigPath);
             rawConfig = rawConfigValue ?? '';
             fileConfigFormat = format as ConfigFormat;
+            operatorConfig = opConfigPath;
+            initLogger.verbose(`Found operator config at ${operatorConfig}`);
             break;
         } catch (err: any) {
             const {code} = err;
-            if (code === 'ENOENT') {
-                initLogger.warn('No operator config file found but will continue');
+            if (code === 'ENOENT' || code === 'EACCES') {
+                if(code === 'ENOENT') {
+                    initLogger.warn(`No operator config file found at ${opConfigPath}`);
+                } else if(code === 'EACCES') {
+                    let msg = `Operator config location ${opConfigPath} is not accessible due to permissions.`;
+                    if(castToBool(process.env.IS_DOCKER) === true) {
+                        msg += `Make sure you have specified user in docker run command! See https://github.com/FoxxMD/context-mod/blob/master/docs/gettingStartedOperator.md#docker-recommended`;
+                    }
+                    initLogger.warn(msg);
+                }
+
                 if (err.extension !== undefined) {
                     fileConfigFormat = err.extension
                 }
@@ -623,6 +612,28 @@ export const parseOperatorConfigFromSources = async (args: any): Promise<[Operat
                 throw new ErrorWithCause('Cannot continue app startup because operator config file exists but was not parseable.', {cause: err});
             }
         }
+    }
+
+    if (operatorConfig === undefined) {
+        if (resolvedOpConfigVal !== undefined) {
+            // user specified a config location but we could not find it so exit
+            throw new Error(`ARG/ENV specified an operator config location but could not find it. Will not continue with app startup.`);
+        } else {
+            // no user specified config location! may be OK if only using ENVs or blank slate
+            // set a default location for op config (will be created here since it does not exist)
+            operatorConfig = opConfigCandidates.find(x => x.includes('.yaml'));
+            initLogger.verbose(`Defaulting to ${operatorConfig} as operator config location (in the event it needs to be written)`);
+        }
+    }
+
+    try {
+        writeable = fileOrDirectoryIsWriteable(operatorConfig as string);
+    } catch (e) {
+        let msg = `App does not have permission to WRITE to operator config location. This is only a problem if you plan on adding bots/subreddits via the UI.`;
+        if(castToBool(process.env.IS_DOCKER) === true) {
+            msg += `Make sure you have specified user in docker run command! See https://github.com/FoxxMD/context-mod/blob/master/docs/gettingStartedOperator.md#docker-recommended`;
+        }
+        initLogger.warn(msg);
     }
 
     const [format, doc, jsonErr, yamlErr] = parseFromJsonOrYamlToObject(rawConfig, {
@@ -725,7 +736,7 @@ export const buildOperatorConfigWithDefaults = async (data: OperatorJsonConfig):
             display = 'Anonymous',
         } = {},
         logging: {
-            level = 'verbose',
+            level = 'debug',
             path,
             file = {},
             console = {},
@@ -737,6 +748,7 @@ export const buildOperatorConfigWithDefaults = async (data: OperatorJsonConfig):
         databaseConfig: {
             connection: dbConnection = process.env.DB_DRIVER ?? 'sqljs',
             migrations = {},
+            logging: dbLogging,
         } = {},
         web: {
             port = 8085,
@@ -838,10 +850,11 @@ export const buildOperatorConfigWithDefaults = async (data: OperatorJsonConfig):
             ...console,
         }
     };
+    const appLogger = getLogger(loggingOptions, 'app');
 
     const dbConfig = createDatabaseConfig(dbConnection);
 
-    const database = await createDatabaseConnection(dbConfig, getLogger(loggingOptions, 'app'));
+    const database = await createDatabaseConnection(dbConfig, appLogger, dbLogging);
 
 
     const config: OperatorConfig = {

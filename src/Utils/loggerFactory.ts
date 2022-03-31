@@ -52,40 +52,36 @@ export const getLogger = (options: LoggerFactoryOptions, name = 'app'): Logger =
             ...additionalTransports,
         ];
 
-        if (dirname !== undefined && dirname !== '' && dirname !== null) {
+        let realDir = resolveLogDir(dirname);
 
-            let realDir: string | undefined;
-
-            const dirBool = castToBool(dirname, false);
-            if (dirBool !== undefined) {
-                if (!dirBool) {
-                    realDir = undefined;
-                } else {
-                    realDir = path.resolve(process.env.DATA_DIR ?? defaultDataDir, './logs');
+        if(realDir !== undefined) {
+            try {
+                fileOrDirectoryIsWriteable(realDir);
+            } catch (e: any) {
+                let msg = 'WILL NOT write logs to rotating file due to an error while trying to access the specified logging directory';
+                if(castToBool(process.env.IS_DOCKER) === true) {
+                    msg += `Make sure you have specified user in docker run command! See https://github.com/FoxxMD/context-mod/blob/master/docs/gettingStartedOperator.md#docker-recommended`;
                 }
-            } else {
-                realDir = resolvePath(dirname as string, process.env.DATA_DIR ?? defaultDataDir);
+                errors.push(new ErrorWithCause<Error>(msg, {cause: e}));
+                realDir = undefined;
             }
+        }
 
-            if (realDir !== undefined) {
 
-                // TODO would like to do a check to make dir is writeable but will have to make this whole function async
-                // and getLogger is used in a lot of constructor functions so can't do this for now
-
-                const rotateTransport = new winston.transports.DailyRotateFile({
-                    createSymlink: true,
-                    symlinkName: 'contextBot-current.log',
-                    filename: 'contextBot-%DATE%.log',
-                    datePattern: 'YYYY-MM-DD',
-                    maxSize: '5m',
-                    dirname: realDir,
-                    ...fileRest,
-                    handleExceptions: true,
-                    handleRejections: true,
-                });
-                // @ts-ignore
-                myTransports.push(rotateTransport);
-            }
+        if (realDir !== undefined) {
+            const rotateTransport = new winston.transports.DailyRotateFile({
+                createSymlink: true,
+                symlinkName: 'contextBot-current.log',
+                filename: 'contextBot-%DATE%.log',
+                datePattern: 'YYYY-MM-DD',
+                maxSize: '5m',
+                dirname: realDir,
+                ...fileRest,
+                handleExceptions: true,
+                handleRejections: true,
+            });
+            // @ts-ignore
+            myTransports.push(rotateTransport);
         }
 
         const loggerOptions = {
@@ -105,4 +101,49 @@ export const getLogger = (options: LoggerFactoryOptions, name = 'app'): Logger =
         }
     }
     return logger;
+}
+
+export const resolveLogDir = (dirname: any): undefined | string => {
+    let realDir: string | undefined;
+
+    if (dirname !== undefined && dirname !== '' && dirname !== null) {
+
+        const dirBool = castToBool(dirname, false);
+        if (dirBool !== undefined) {
+            if (!dirBool) {
+                realDir = undefined;
+            } else {
+                realDir = path.resolve(process.env.DATA_DIR ?? defaultDataDir, './logs');
+            }
+        } else {
+            realDir = resolvePath(dirname as string, process.env.DATA_DIR ?? defaultDataDir);
+        }
+    }
+
+    return realDir;
+}
+
+export const initLogger = async (args: any) => {
+    // create a pre config logger to help with debugging
+    // default to debug if nothing is provided
+    const {
+        logLevel = process.env.LOG_LEVEL ?? 'debug',
+        logDir = process.env.LOG_DIR,
+    } = args || {};
+
+    const initLoggerOptions = {
+        level: logLevel,
+        console: {
+            level: logLevel
+        },
+        file: {
+            level: logLevel,
+            dirname: logDir,
+        },
+        stream: {
+            level: logLevel
+        }
+    }
+
+    return getLogger(initLoggerOptions, 'init');
 }

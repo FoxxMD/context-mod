@@ -27,6 +27,6 @@ export const filterCriteriaDefault: FilterCriteriaDefaults = {
 }
 
 export const defaultDataDir = path.resolve(__dirname, '../..');
-export const defaultConfigFilenames = ['config.yaml', 'config.json'];
+export const defaultConfigFilenames = ['config.json', 'config.yaml'];
 
 export const VERSION = '0.10.12';

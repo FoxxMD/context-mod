@@ -21,6 +21,7 @@ import {Logger} from "winston";
 import {SubredditResources} from "../Subreddit/SubredditResources";
 import {BetterSqlite3ConnectionOptions} from "typeorm/driver/better-sqlite3/BetterSqlite3ConnectionOptions";
 import {Dayjs} from "dayjs";
+import {LoggerOptions} from "typeorm/logger/LoggerOptions";
 
 /**
  * An ISO 8601 Duration
@@ -1810,6 +1811,12 @@ export interface OperatorJsonConfig {
         // ...also including all those options makes the schema huge
         connection?: DatabaseDriver | {type: DatabaseDriver, [key: string]: any},
         migrations?: DatabaseMigrationOptions
+        /**
+         * Set the type of logging typeorm should output
+         *
+         * Defaults to errors, warnings, and schema (migration progress)
+         * */
+        logging?: LoggerOptions
     }
 
     /**
