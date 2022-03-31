@@ -278,10 +278,11 @@ const rcbServer = async function (options: OperatorConfigWithFileContext) {
         res.status(status).send(dbLogs.map(x => x[MESSAGE]).join('\r\n'));
     });
 
-    logger.info('Beginning bot init...');
+    logger.info('Initializing database...');
     try {
         const dbReady = await app.initDatabase();
         if(dbReady) {
+            logger.info('Initializing application...');
             await initBot();
         }
     } catch (e: any) {

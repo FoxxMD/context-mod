@@ -189,6 +189,12 @@ YOU SHOULD BACKUP YOUR EXISTING DATABASE BEFORE CONTINUING WITH MIGRATIONS.`);
             bots = [],
         } = this.config;
 
+        if(bots.length === 0) {
+            this.logger.warn('No bots were parsed from config! Add new bots from the web dashboard');
+        } else {
+            this.logger.verbose('Building bots...')
+        }
+
         this.bots = bots.map(x => new Bot(x, this.logger));
 
         for (const b of this.bots) {
