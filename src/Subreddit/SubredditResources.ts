@@ -178,8 +178,6 @@ export class SubredditResources {
     totalStatsRepo: Repository<TotalStat>
     totalStatsEntities: TotalStat[] = [];
     tsStatsRepo: Repository<TimeSeriesStat>
-    invokeeRepo: Repository<InvokeeType>
-    runTypeRepo: Repository<RunStateType>
     managerEntity: ManagerEntity
     botEntity: Bot
 
@@ -227,8 +225,6 @@ export class SubredditResources {
         this.activitySourceRepo = this.database.getRepository(ActivitySourceEntity);
         this.totalStatsRepo = this.database.getRepository(TotalStat);
         this.tsStatsRepo = this.database.getRepository(TimeSeriesStat);
-        this.invokeeRepo = this.database.getRepository(InvokeeType);
-        this.runTypeRepo = this.database.getRepository(RunStateType);
         this.prefix = prefix;
         this.client = client;
         this.cacheType = cacheType;
@@ -2113,6 +2109,9 @@ export class BotResourcesManager {
     defaultDatabase: DataSource
     botName!: string
 
+    invokeeRepo: Repository<InvokeeType>
+    runTypeRepo: Repository<RunStateType>
+
     constructor(config: BotInstanceConfig, logger: Logger) {
         const {
             caching: {
@@ -2145,6 +2144,8 @@ export class BotResourcesManager {
         this.ttlDefaults = {authorTTL, userNotesTTL, wikiTTL, commentTTL, submissionTTL, filterCriteriaTTL, subredditTTL, selfTTL};
         this.botName = name as string;
         this.logger = logger;
+        this.invokeeRepo = this.defaultDatabase.getRepository(InvokeeType);
+        this.runTypeRepo = this.defaultDatabase.getRepository(RunStateType);
 
         const options = provider;
         this.cacheType = options.store;
