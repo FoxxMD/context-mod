@@ -470,6 +470,12 @@ export class initApi1642180264563 implements MigrationInterface {
                         isNullable: false
                     },
                     {
+                        name: 'author',
+                        type: 'varchar',
+                        length: '150',
+                        isNullable: false
+                    },
+                    {
                         name: 'managerId',
                         type: 'varchar',
                         length: '20',

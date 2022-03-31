@@ -2458,7 +2458,7 @@ export const activityDispatchConfigToDispatch = (config: ActivityDispatchConfig,
         activity,
         action,
         type,
-        author: activity.author,
+        author: getActivityAuthorName(activity.author),
     }
 }
 

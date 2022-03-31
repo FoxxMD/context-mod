@@ -252,7 +252,7 @@ export class Manager extends EventEmitter {
                 activityId: x.activity.name,
                 permalink: x.activity.permalink,
                 submissionId: asComment(x.activity) ? x.activity.link_id : undefined,
-                author: x.author.name,
+                author: x.author,
                 queuedAt: x.queuedAt.unix(),
                 durationMilli: x.delay.asSeconds(),
                 duration: x.delay.humanize(),
@@ -921,7 +921,7 @@ export class Manager extends EventEmitter {
                             queuedAt: dayjs(),
                             processing: false,
                             activity,
-                            author: activity.author,
+                            author: getActivityAuthorName(activity.author),
                         });
                         return;
                     } else {

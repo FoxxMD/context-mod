@@ -2377,7 +2377,7 @@ export interface ActivityDispatch extends Omit<ActivityDispatchConfig, 'delay'| 
     id: string
     queuedAt: Dayjs
     activity: Submission | Comment
-    author: RedditUser
+    author: string
     delay: Duration
     tardyTolerant?: boolean | Duration
     processing: boolean

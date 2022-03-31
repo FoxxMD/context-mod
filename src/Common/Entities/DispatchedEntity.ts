@@ -32,6 +32,9 @@ export class DispatchedEntity extends TimeAwareRandomBaseEntity {
     @Column()
     activityId!: string
 
+    @Column()
+    author!: string
+
     @Column({
         type: 'int',
         nullable: false,
@@ -83,6 +86,7 @@ export class DispatchedEntity extends TimeAwareRandomBaseEntity {
         super();
         if (data !== undefined) {
             this.activityId = data.activity.name;
+            this.author = getActivityAuthorName(data.activity.author);
             this.delay = data.delay;
             this.createdAt = data.queuedAt;
             this.type = data.type;
@@ -132,11 +136,12 @@ export class DispatchedEntity extends TimeAwareRandomBaseEntity {
         let activity: Comment | Submission;
         if (redditThing?.type === 'comment') {
             // @ts-ignore
-            activity = await client.getComment(redditThing.id).fetch();
+            activity = await client.getComment(redditThing.id);
         } else {
             // @ts-ignore
-            activity = await client.getSubmission(redditThing.id).fetch();
+            activity = await client.getSubmission(redditThing.id);
         }
+        activity.author = new RedditUser({name: this.author}, client, false);
         return {
             id: this.id,
             queuedAt: this.createdAt,
@@ -149,7 +154,7 @@ export class DispatchedEntity extends TimeAwareRandomBaseEntity {
             cancelIfQueued: this.cancelIfQueued,
             identifier: this.identifier,
             type: this.type,
-            author: activity.author
+            author: this.author
         }
     }
 }
