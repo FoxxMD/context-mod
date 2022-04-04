@@ -365,7 +365,7 @@ export abstract class Check extends RunnableBase implements ICheck {
                     this.emitter.emit('error', err);
                 } finally {
                     if (this.notifyOnTrigger && checkResult.actionResults !== undefined && checkResult.actionResults.length > 0) {
-                        const ar = checkResult.actionResults.filter(x => x.success).map(x => x.premise.action.getFriendlyIdentifier()).join(', ');
+                        const ar = checkResult.actionResults.filter(x => x.success).map(x => x.premise.getFriendlyIdentifier()).join(', ');
                         const [peek, _] = await itemContentPeek(activity);
                         const notifPayload: NotificationEventPayload = {
                             type: 'eventActioned',
@@ -505,7 +505,7 @@ export abstract class Check extends RunnableBase implements ICheck {
                 const res = await a.handle(item, ruleResults, options);
                 runActions.push(res);
             }
-            this.logger.info(`${dr ? 'DRYRUN - ' : ''}Ran Actions: ${runActions.map(x => x.premise.action.getFriendlyIdentifier()).join(' | ')}`);
+            this.logger.info(`${dr ? 'DRYRUN - ' : ''}Ran Actions: ${runActions.map(x => x.premise.getFriendlyIdentifier()).join(' | ')}`);
             return runActions;
         } catch (err: any) {
             throw new ActionProcessingError(`[CHK ${this.name}] Running actions failed due to uncaught exception`, {cause: err}, runActions)

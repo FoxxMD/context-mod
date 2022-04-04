@@ -81,7 +81,6 @@ import merge from "deepmerge";
 import {RulePremise} from "./Common/Entities/RulePremise";
 import {RuleResultEntity as RuleResultEntity} from "./Common/Entities/RuleResultEntity";
 import {nanoid} from "nanoid";
-import {Rule} from "./Common/Entities/Rule";
 
 
 //import {ResembleSingleCallbackComparisonResult} from "resemblejs";
@@ -374,7 +373,7 @@ export const determineNewResults = (existing: RuleResultEntity[], val: RuleResul
     // }
 
     for (const result of requestedResults) {
-        const relevantExisting = combined.filter(x => x.premise.rule.kind.name === result.premise.rule.kind.name).find(x => x.premise.configHash === result.premise.configHash);
+        const relevantExisting = combined.filter(x => x.premise.kind.name === result.premise.kind.name).find(x => x.premise.configHash === result.premise.configHash);
         if (relevantExisting === undefined) {
             combined.push(result);
             newResults.push(result);
@@ -436,7 +435,7 @@ export const resultsSummary = (results: (RuleResultEntity|RuleSetResult)[], topL
             return `${triggeredIndicator(x.triggered)} (${resultsSummary(x.results, x.condition)}${x.results.length === 1 ? ` [${x.condition}]` : ''})`;
         }
         const res = x as RuleResultEntity;
-        return `${triggeredIndicator(res.triggered ?? null)} ${Rule.getFriendlyIdentifier(res.premise.rule)}`;
+        return `${triggeredIndicator(res.triggered ?? null)} ${RulePremise.getFriendlyIdentifier(res.premise)}`;
     });
     return parts.join(` ${topLevelCondition} `)
     //return results.map(x => x.name || x.premise.kind).join(' | ')
@@ -1889,8 +1888,8 @@ export function findLastIndex<T>(array: Array<T>, predicate: (value: T, index: n
 
 export const parseRuleResultsToMarkdownSummary = (ruleResults: RuleResultEntity[]): string => {
     const results = ruleResults.map((y) => {
-        let name = y.premise.rule.name;
-        const kind = y.premise.rule.kind.name;
+        let name = y.premise.name;
+        const kind = y.premise.kind.name;
         if(name === undefined) {
             name = kind;
         }

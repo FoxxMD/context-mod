@@ -1,6 +1,4 @@
 import {Entity, Column, PrimaryColumn, OneToMany, PrimaryGeneratedColumn} from "typeorm";
-import {Activity} from "./Activity";
-import {Action} from "./Action";
 import {ManagerEntity} from "./ManagerEntity";
 import {RandomIdBaseEntity} from "./Base/RandomIdBaseEntity";
 

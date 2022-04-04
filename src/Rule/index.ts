@@ -13,13 +13,12 @@ import {
 } from "../Common/interfaces";
 import {AuthorOptions, normalizeAuthorCriteria} from "../Author/Author";
 import {runCheckOptions} from "../Subreddit/Manager";
-import {Rule as RuleEntity} from "../Common/Entities/Rule";
-import objectHash from "object-hash";
 import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
 import {RuleType} from "../Common/Entities/RuleType";
 import {RulePremise} from "../Common/Entities/RulePremise";
 import {capitalize} from "lodash";
 import {RunnableBase} from "../Common/RunnableBase";
+import {FindOptionsWhere} from "typeorm/find-options/FindOptionsWhere";
 
 export interface RuleOptions extends RunnableBaseOptions {
     name?: string;
@@ -35,7 +34,6 @@ export abstract class Rule extends RunnableBase implements IRule, Triggerable {
     name?: string;
     logger: Logger
     client: Snoowrap;
-    ruleEntity: RuleEntity | null = null;
     rulePremiseEntity: RulePremise | null = null;
 
     constructor(options: RuleOptions) {
@@ -53,57 +51,41 @@ export abstract class Rule extends RunnableBase implements IRule, Triggerable {
     }
 
     async initialize() {
-        if (this.ruleEntity === null) {
-            const ruleRepo = this.resources.database.getRepository(RuleEntity);
-            const identifier = this.name ?? objectHash.sha1(this.getPremise());
-            try {
-                this.ruleEntity = await ruleRepo.findOne({
-                    where: {
-                        id: identifier,
-                        kind: {
-                            name: this.getKind()
-                        },
-                        manager: {
-                            id: this.resources.managerEntity.id
-                        }
-                    },
-                    //relations: ['kind', 'manager']
-                    relations: {
-                        kind: true,
-                        manager: true
-                    }
-                });
-                if (this.ruleEntity === null) {
-                    const kind = await this.resources.database.getRepository(RuleType).findOne({where: {name: this.getKind()}});
-                    this.ruleEntity = await ruleRepo.save(new RuleEntity({
-                        premise: this.getPremise(),
-                        name: this.name,
-                        kind: kind as RuleType,
-                        manager: this.resources.managerEntity
-                    }))
-                }
-            } catch (err) {
-                const f = err;
-            }
-        }
         if (this.rulePremiseEntity === null) {
-            const identifier = this.name ?? objectHash.sha1(this.getPremise());
+            const prem = this.getPremise();
+            const kind = await this.resources.database.getRepository(RuleType).findOne({where: {name: this.getKind()}});
+            const candidatePremise = new RulePremise({
+                kind: kind as RuleType,
+                config: prem,
+                manager: this.resources.managerEntity,
+                name: this.name,
+            });
+
             const rulePremiseRepo = this.resources.database.getRepository(RulePremise);
+
+            const searchCriteria: FindOptionsWhere<RulePremise> = {
+                kind: {
+                    id: kind?.id
+                },
+                configHash: candidatePremise.configHash,
+                manager: {
+                id: this.resources.managerEntity.id
+                },
+                itemIsConfigHash: candidatePremise.itemIsConfigHash,
+                authorIsConfigHash: candidatePremise.authorIsConfigHash,
+                name: this.name
+            };
+            if(this.name !== undefined) {
+                searchCriteria.name = this.name;
+            }
+
             try {
-                const premiseHash = objectHash.sha1(this.getPremise());
+
                 this.rulePremiseEntity = await rulePremiseRepo.findOne({
-                    where: {
-                        rule: {
-                            id: identifier
-                        },
-                        configHash: premiseHash,
-                    }
+                    where: searchCriteria
                 });
                 if (this.rulePremiseEntity === null) {
-                    this.rulePremiseEntity = await rulePremiseRepo.save(new RulePremise({
-                        rule: this.ruleEntity as RuleEntity,
-                        config: this.getPremise()
-                    }));
+                    this.rulePremiseEntity = await rulePremiseRepo.save(candidatePremise);
                 }
             } catch (err) {
                 const f = err;
@@ -172,11 +154,9 @@ export abstract class Rule extends RunnableBase implements IRule, Triggerable {
         const config = this.getSpecificPremise();
         return {
             kind: this.getKind(),
-            config: {
-                authorIs: this.authorIs,
-                itemIs: this.itemIs,
-                ...config,
-            },
+            config,
+            authorIs: this.authorIs,
+            itemIs: this.itemIs,
         };
     }
 

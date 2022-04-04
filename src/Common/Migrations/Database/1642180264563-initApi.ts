@@ -772,16 +772,43 @@ export class initApi1642180264563 implements MigrationInterface {
             }),
             true
         );
+        // await queryRunner.createTable(
+        //     new Table({
+        //         name: 'Rule',
+        //         columns: [
+        //             {
+        //                 name: 'id',
+        //                 type: 'varchar',
+        //                 isPrimary: true,
+        //                 length: '300'
+        //             },
+        //             {
+        //                 name: 'name',
+        //                 type: 'varchar',
+        //                 length: '300',
+        //                 isNullable: true
+        //             },
+        //             {
+        //                 name: 'kindId',
+        //                 type: 'integer',
+        //                 isNullable: false
+        //             },
+        //             {
+        //                 name: 'managerId',
+        //                 type: 'varchar',
+        //                 length: '20',
+        //                 isNullable: false
+        //             },
+        //         ]
+        //     }),
+        //     true
+        // );
+
         await queryRunner.createTable(
             new Table({
-                name: 'Rule',
+                name: 'RulePremise',
                 columns: [
-                    {
-                        name: 'id',
-                        type: 'varchar',
-                        isPrimary: true,
-                        length: '300'
-                    },
+                    randomIdColumn(),
                     {
                         name: 'name',
                         type: 'varchar',
@@ -799,28 +826,16 @@ export class initApi1642180264563 implements MigrationInterface {
                         length: '20',
                         isNullable: false
                     },
-                ]
-            }),
-            true
-        );
-
-        await queryRunner.createTable(
-            new Table({
-                name: 'RulePremise',
-                columns: [
                     {
-                        name: 'ruleId',
-                        type: 'varchar',
-                        length: '300',
-                        isPrimary: true,
-                        //isNullable: false
+                        name: 'active',
+                        type: 'boolean',
+                        isNullable: false,
                     },
                     {
                         name: 'configHash',
                         type: 'varchar',
                         length: '300',
-                        isPrimary: true
-                        //isNullable: false
+                        isNullable: false
                     },
                     {
                         name: 'config',
@@ -828,14 +843,36 @@ export class initApi1642180264563 implements MigrationInterface {
                         isNullable: false
                     },
                     {
-                        name: 'version',
-                        type: 'integer',
-                        isNullable: false
+                        name: 'itemIsConfigHash',
+                        type: 'varchar',
+                        length: '300',
+                        isNullable: true
                     },
-                    ...createdUpdatedAtColumns(dbType)
+                    {
+                        name: 'itemIsConfig',
+                        type: 'text',
+                        isNullable: true
+                    },
+                    {
+                        name: 'authorIsConfigHash',
+                        type: 'varchar',
+                        length: '300',
+                        isNullable: true
+                    },
+                    {
+                        name: 'authorIsConfig',
+                        type: 'text',
+                        isNullable: true
+                    },
+                    createdAtColumn(dbType)
                 ],
                 indices: [
-                    ...createdUpdatedAtIndices('RulePremise')
+                    createdAtIndex('RulePremise'),
+                    new TableIndex({
+                        name: `IDX_rulePremise_unique`,
+                        columnNames: ['name', 'kindId', 'managerId', 'configHash', 'authorIsConfigHash', 'itemIsConfigHash'],
+                        isUnique: true
+                    })
                 ]
             }),
             true,
@@ -849,14 +886,9 @@ export class initApi1642180264563 implements MigrationInterface {
                 columns: [
                     randomIdColumn(),
                     {
-                        name: 'premiseRuleId',
+                        name: 'premiseId',
                         type: 'varchar',
-                        isNullable: false
-                    },
-                    {
-                        name: 'premiseConfigHash',
-                        type: 'varchar',
-                        length: '300',
+                        length: '20',
                         isNullable: false
                     },
                     {
@@ -921,16 +953,21 @@ export class initApi1642180264563 implements MigrationInterface {
             }),
             true
         );
+        // await queryRunner.createTable(
+        //     new Table({
+        //         name: 'Action',
+        //         columns: [
+        //
+        //         ]
+        //     }),
+        //     true
+        // );
+
         await queryRunner.createTable(
             new Table({
-                name: 'Action',
+                name: 'ActionPremise',
                 columns: [
-                    {
-                        name: 'id',
-                        type: 'varchar',
-                        isPrimary: true,
-                        length: '300'
-                    },
+                    randomIdColumn(),
                     {
                         name: 'name',
                         type: 'varchar',
@@ -948,28 +985,16 @@ export class initApi1642180264563 implements MigrationInterface {
                         length: '20',
                         isNullable: false
                     },
-                ]
-            }),
-            true
-        );
-
-        await queryRunner.createTable(
-            new Table({
-                name: 'ActionPremise',
-                columns: [
                     {
-                        name: 'actionId',
-                        type: 'varchar',
-                        length: '300',
-                        isPrimary: true,
-                        //isNullable: false
+                        name: 'active',
+                        type: 'boolean',
+                        isNullable: false,
                     },
                     {
                         name: 'configHash',
                         type: 'varchar',
                         length: '300',
-                        isPrimary: true
-                        //isNullable: false
+                        isNullable: false
                     },
                     {
                         name: 'config',
@@ -977,14 +1002,36 @@ export class initApi1642180264563 implements MigrationInterface {
                         isNullable: false
                     },
                     {
-                        name: 'version',
-                        type: 'integer',
-                        isNullable: false
+                        name: 'itemIsConfigHash',
+                        type: 'varchar',
+                        length: '300',
+                        isNullable: true
                     },
-                    ...createdUpdatedAtColumns(dbType)
+                    {
+                        name: 'itemIsConfig',
+                        type: 'text',
+                        isNullable: true
+                    },
+                    {
+                        name: 'authorIsConfigHash',
+                        type: 'varchar',
+                        length: '300',
+                        isNullable: true
+                    },
+                    {
+                        name: 'authorIsConfig',
+                        type: 'text',
+                        isNullable: true
+                    },
+                    createdAtColumn(dbType)
                 ],
                 indices: [
-                    ...createdUpdatedAtIndices('ActionPremise')
+                    createdAtIndex('ActionPremise'),
+                    new TableIndex({
+                        name: `IDX_actionPremise_unique`,
+                        columnNames: ['name', 'kindId', 'managerId', 'configHash', 'authorIsConfigHash', 'itemIsConfigHash'],
+                        isUnique: true
+                    })
                 ]
             }),
             true,
@@ -1004,15 +1051,9 @@ export class initApi1642180264563 implements MigrationInterface {
                         isNullable: false
                     },
                     {
-                        name: 'premiseActionId',
+                        name: 'premiseId',
                         type: 'varchar',
-                        length: '150',
-                        isNullable: false
-                    },
-                    {
-                        name: 'premiseConfigHash',
-                        type: 'varchar',
-                        length: '150',
+                        length: '20',
                         isNullable: false
                     },
                     {

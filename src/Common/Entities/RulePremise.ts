@@ -7,47 +7,119 @@ import {
     VersionColumn,
     ManyToOne,
     PrimaryColumn,
-    CreateDateColumn, UpdateDateColumn, BeforeUpdate
+    CreateDateColumn, UpdateDateColumn, BeforeUpdate, OneToOne, Index
 } from "typeorm";
 import {RuleResultEntity} from "./RuleResultEntity";
-import {Rule} from "./Rule";
-import {ObjectPremise} from "../interfaces";
+import {
+    ObjectPremise,
+    TypedActivityStates
+} from "../interfaces";
 import objectHash from "object-hash";
 import {TimeAwareAndUpdatedBaseEntity} from "./Base/TimeAwareAndUpdatedBaseEntity";
+import {TimeAwareRandomBaseEntity} from "./Base/TimeAwareRandomBaseEntity";
+import {RuleType} from "./RuleType";
+import {ManagerEntity} from "./ManagerEntity";
+import {AuthorOptions} from "../../Author/Author";
+import {capitalize} from "lodash";
 
 export interface RulePremiseOptions {
-    rule: Rule
+    kind: RuleType
     config: ObjectPremise
+    active?: boolean
+    manager: ManagerEntity
+    name?: string
 }
 
 @Entity()
-export class RulePremise extends TimeAwareAndUpdatedBaseEntity  {
+@Index(['kindId','config', 'managerId', 'itemIsConfigHash','authorIsConfigHash', 'name'], { unique: true })
+export class RulePremise extends TimeAwareRandomBaseEntity {
 
-    @ManyToOne(() => Rule, undefined,{cascade: ['insert'], eager: true})
-    @JoinColumn({name: 'ruleId'})
-    rule!: Rule;
+    @Column("varchar", {length: 300, nullable: true})
+    name?: string;
 
-    @PrimaryColumn()
-    ruleId!: string;
+    @ManyToOne(() => RuleType, undefined, {eager: true})
+    @JoinColumn({name: 'kindId'})
+    kind!: RuleType;
 
-    @PrimaryColumn("varchar", {length: 300})
+    @Column()
+    kindId!: string
+
+    @Column("varchar", {length: 300})
     configHash!: string;
 
     @Column("simple-json")
-    config!: ObjectPremise
+    config!: any
+
+    @Column()
+    active!: boolean
 
     @OneToMany(type => RuleResultEntity, obj => obj.premise) // note: we will create author property in the Photo class below
     ruleResults!: RuleResultEntity[]
 
-    @VersionColumn()
-    version!: number;
+    @ManyToOne(type => ManagerEntity, act => act.rules)
+    @JoinColumn({name: 'managerId'})
+    manager!: ManagerEntity;
+
+    @Column()
+    managerId!: string
+
+    @Column("simple-json", {nullable: true})
+    itemIsConfig?: TypedActivityStates
+
+    @Column("varchar", {length: 300, nullable: true})
+    itemIsConfigHash?: string;
+
+    @Column("simple-json", {nullable: true})
+    authorIsConfig?: AuthorOptions
+
+    @Column("varchar", {length: 300, nullable: true})
+    authorIsConfigHash?: string;
 
     constructor(data?: RulePremiseOptions) {
         super();
-        if(data !== undefined) {
-            this.rule = data.rule;
-            this.config = data.config;
+        if (data !== undefined) {
+            this.kind = data.kind;
+            this.config = data.config.config;
+            this.active = data.active ?? true;
             this.configHash = objectHash.sha1(data.config);
+            this.manager = data.manager;
+            this.name = data.name;
+
+            const {
+                authorIs: {
+                    include = [],
+                    exclude = [],
+                } = {},
+                itemIs = [],
+            } = data.config;
+
+            if (itemIs.length > 0) {
+                this.itemIsConfig = itemIs;
+                this.itemIsConfigHash = objectHash.sha1(itemIs);
+            }
+            if (include.length > 0 || exclude.length > 0) {
+                if (include.length > 0) {
+                    this.authorIsConfig = {
+                        include
+                    };
+                } else {
+                    this.authorIsConfig = {
+                        excludeCondition: data.config.authorIs?.excludeCondition,
+                        exclude
+                    }
+                }
+                this.authorIsConfigHash = objectHash.sha1(this.authorIsConfig);
+            }
         }
+    }
+
+    getFriendlyIdentifier() {
+        return this.name === undefined ? capitalize(this.kind.name) : `${capitalize(this.kind.name)} - ${this.name}`;
+    }
+
+    static getFriendlyIdentifier(ruleLike: any) {
+        const rule = ruleLike as RulePremise;
+
+        return rule.name === undefined ? capitalize(rule.kind.name) : `${capitalize(rule.kind.name)} - ${rule.name}`;
     }
 }

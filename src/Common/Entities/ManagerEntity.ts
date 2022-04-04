@@ -10,8 +10,6 @@ import {
 } from "typeorm";
 import {Subreddit} from "./Subreddit";
 import {CMEvent} from "./CMEvent";
-import {Rule} from "./Rule";
-import {Action} from "./Action";
 import {CheckEntity} from "./CheckEntity";
 import {RunEntity} from "./RunEntity";
 import {Bot} from "./Bot";
@@ -19,6 +17,8 @@ import {RandomIdBaseEntity} from "./Base/RandomIdBaseEntity";
 import {ManagerRunState} from "./EntityRunState/ManagerRunState";
 import { QueueRunState } from "./EntityRunState/QueueRunState";
 import {EventsRunState} from "./EntityRunState/EventsRunState";
+import {RulePremise} from "./RulePremise";
+import {ActionPremise} from "./ActionPremise";
 
 export interface ManagerEntityOptions {
     name: string
@@ -44,11 +44,11 @@ export class ManagerEntity extends RandomIdBaseEntity {
     @OneToMany(type => CMEvent, obj => obj.manager)
     events!: Promise<CMEvent[]>
 
-    @OneToMany(type => Rule, obj => obj.manager)
-    rules!: Promise<Rule[]>
+    @OneToMany(type => RulePremise, obj => obj.manager)
+    rules!: Promise<RulePremise[]>
 
-    @OneToMany(type => Action, obj => obj.manager)
-    actions!: Promise<Action[]>
+    @OneToMany(type => ActionPremise, obj => obj.manager)
+    actions!: Promise<ActionPremise[]>
 
     @OneToMany(type => CheckEntity, obj => obj.manager) // note: we will create author property in the Photo class below
     checks!: Promise<CheckEntity[]>

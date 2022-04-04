@@ -326,8 +326,8 @@ export const renderContent = async (template: string, data: (Submission | Commen
             //     kind
             // }
         } = ruleResult;
-        let name = ruleResult.premise.rule.name;
-        const kind = ruleResult.premise.rule.kind.name;
+        let name = ruleResult.premise.name;
+        const kind = ruleResult.premise.kind.name;
         if(name === undefined) {
             name = kind;
         }

@@ -16,7 +16,6 @@ import {ErrorWithCause} from "pony-cause";
 import EventEmitter from "events";
 import {runCheckOptions} from "../Subreddit/Manager";
 import {ActionTypes} from "../Common/types";
-import {Action as ActionEntity} from "../Common/Entities/Action";
 import {ActionPremise} from "../Common/Entities/ActionPremise";
 import objectHash from "object-hash";
 import {RuleType} from "../Common/Entities/RuleType";
@@ -25,6 +24,8 @@ import { capitalize } from "lodash";
 import { RuleResultEntity } from "../Common/Entities/RuleResultEntity";
 import { RunnableBase } from "../Common/RunnableBase";
 import {ActionResultEntity} from "../Common/Entities/ActionResultEntity";
+import {FindOptionsWhere} from "typeorm/find-options/FindOptionsWhere";
+import {RulePremise} from "../Common/Entities/RulePremise";
 
 export abstract class Action extends RunnableBase {
     name?: string;
@@ -33,7 +34,7 @@ export abstract class Action extends RunnableBase {
     dryRun: boolean;
     enabled: boolean;
     managerEmitter: EventEmitter;
-    actionEntity: ActionEntity | null = null;
+    // actionEntity: ActionEntity | null = null;
     actionPremiseEntity: ActionPremise | null = null;
 
     constructor(options: ActionOptions) {
@@ -68,66 +69,49 @@ export abstract class Action extends RunnableBase {
         const config = this.getSpecificPremise();
         return {
             kind: this.getKind(),
-            config: {
-                authorIs: this.authorIs,
-                itemIs: this.itemIs,
-                ...config,
-            },
+            config: config,
+            authorIs: this.authorIs,
+            itemIs: this.itemIs,
         };
     }
 
     async initialize() {
-        if (this.actionEntity === null) {
-            const actionRepo = this.resources.database.getRepository(ActionEntity);
-            const identifier = this.name ?? objectHash.sha1(this.getPremise());
-            try {
-                this.actionEntity = await actionRepo.findOne({
-                    where: {
-                        id: identifier,
-                        kind: {
-                            name: this.getKind()
-                        },
-                        manager: {
-                            id: this.resources.managerEntity.id
-                        }
-                    },
-                    //relations: ['kind', 'manager']
-                    relations: {
-                        kind: true,
-                        manager: true
-                    }
-                });
-                if (this.actionEntity === null) {
-                    const kind = await this.resources.database.getRepository(ActionType).findOne({where: {name: this.getKind()}});
-                    this.actionEntity = await actionRepo.save(new ActionEntity({
-                        premise: this.getPremise(),
-                        name: this.name,
-                        kind: kind as ActionType,
-                        manager: this.resources.managerEntity
-                    }))
-                }
-            } catch (err) {
-                const f = err;
-            }
-        }
         if (this.actionPremiseEntity === null) {
-            const identifier = this.name ?? objectHash.sha1(this.getPremise());
+            const prem = this.getPremise();
+            const kind = await this.resources.database.getRepository(ActionType).findOne({where: {name: this.getKind()}});
+
+            const candidatePremise = new ActionPremise({
+                name: this.name,
+                kind: kind as ActionType,
+                config: prem,
+                manager: this.resources.managerEntity,
+            })
+
             const actionPremiseRepo = this.resources.database.getRepository(ActionPremise);
+
+            const searchCriteria: FindOptionsWhere<ActionPremise> = {
+                kind: {
+                    id: kind?.id
+                },
+                configHash: candidatePremise.configHash,
+                manager: {
+                    id: this.resources.managerEntity.id
+                },
+                itemIsConfigHash: candidatePremise.itemIsConfigHash,
+                authorIsConfigHash: candidatePremise.authorIsConfigHash,
+                name: this.name
+            };
+
+            if(this.name !== undefined) {
+                searchCriteria.name = this.name;
+            }
+
             try {
-                const premiseHash = objectHash.sha1(this.getPremise());
                 this.actionPremiseEntity = await actionPremiseRepo.findOne({
-                    where: {
-                        action: {
-                            id: identifier
-                        },
-                        configHash: premiseHash,
-                    }
+                    where: searchCriteria
                 });
                 if (this.actionPremiseEntity === null) {
-                    this.actionPremiseEntity = await actionPremiseRepo.save(new ActionPremise({
-                        action: this.actionEntity as ActionEntity,
-                        config: this.getPremise()
-                    }));
+                    this.actionPremiseEntity = await actionPremiseRepo.save(candidatePremise);
                 }
             } catch (err) {
                 const f = err;

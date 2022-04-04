@@ -53,6 +53,7 @@ export class ActionResultEntity extends TimeAwareRandomBaseEntity {
     checkResult!: CheckResultEntity;
 
     @ManyToOne(type => ActionPremise, act => act.actionResults, {eager: true})
+    @JoinColumn({name: 'premiseId'})
     premise!: ActionPremise;
 
     touchedEntities: (Submission | Comment | RedditUser | string)[] = []

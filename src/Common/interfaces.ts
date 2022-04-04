@@ -2435,6 +2435,8 @@ export type ActivitySource = NonDispatchActivitySource | DispatchSource;
 export interface ObjectPremise {
     kind: string
     config: object
+    itemIs?: TypedActivityStates
+    authorIs?: AuthorOptions
 }
 
 export interface RunnableBaseOptions {

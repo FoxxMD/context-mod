@@ -61,8 +61,8 @@ import {ErrorWithCause} from "pony-cause";
 import {CMInstance} from "./CMInstance";
 import {PaginationAwareObject} from "typeorm-pagination/dist/helpers/pagination";
 import {CMEvent} from "../../Common/Entities/CMEvent";
-import { Rule } from "../../Common/Entities/Rule";
-import {Action} from "../../Common/Entities/Action";
+import { RulePremise } from "../../Common/Entities/RulePremise";
+import { ActionPremise } from "../../Common/Entities/ActionPremise";
 
 const emitter = new EventEmitter();
 
@@ -1086,7 +1086,7 @@ const webClient = async (options: OperatorConfig) => {
                                        ...a,
                                        itemIs: a._itemIs,
                                        authorIs: a._authorIs,
-                                       name: Rule.getFriendlyIdentifier(a.premise.rule)
+                                       name: RulePremise.getFriendlyIdentifier(a.premise)
                                    }
                                }),
                                actionResults: z.actionResults?.map(a => {
@@ -1094,7 +1094,7 @@ const webClient = async (options: OperatorConfig) => {
                                        ...a,
                                        itemIs: a._itemIs,
                                        authorIs: a._authorIs,
-                                       name: Action.getFriendlyIdentifier(a.premise.action)
+                                       name: ActionPremise.getFriendlyIdentifier(a.premise)
                                    }
                                })
                            }

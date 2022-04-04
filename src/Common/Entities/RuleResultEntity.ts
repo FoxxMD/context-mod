@@ -34,6 +34,7 @@ export class RuleResultEntity extends TimeAwareRandomBaseEntity {
     data?: any
 
     @ManyToOne(type => RulePremise, act => act.ruleResults, {eager: true})
+    @JoinColumn({name: 'premiseId'})
     premise!: RulePremise;
 
     @ManyToOne(type => CheckResultEntity, act => act.ruleResults, /*{cascade: ['insert']}*/)
