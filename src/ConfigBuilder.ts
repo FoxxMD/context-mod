@@ -753,10 +753,11 @@ export const buildOperatorConfigWithDefaults = async (data: OperatorJsonConfig):
         web: {
             port = 8085,
             maxLogs = 200,
-            caching: webCaching = {},
+            storage: webStorage = undefined,
             session: {
                 secret = randomId(),
                 maxAge: sessionMaxAge = 86400,
+                storage: sessionStorage = undefined,
             } = {},
             invites: {
                 maxAge: inviteMaxAge = 0,
@@ -874,16 +875,14 @@ export const buildOperatorConfigWithDefaults = async (data: OperatorJsonConfig):
         userAgent,
         web: {
             port,
-            caching: {
-                ...defaultProvider,
-                ...webCaching
-            },
+            storage: webStorage,
             invites: {
                 maxAge: inviteMaxAge,
             },
             session: {
                 secret,
                 maxAge: sessionMaxAge,
+                storage: sessionStorage
             },
             maxLogs,
             clients: clients === undefined ? [{host: 'localhost:8095', secret: apiSecret}] : clients,

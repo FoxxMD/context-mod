@@ -121,6 +121,64 @@ export class initApi1642180264563 implements MigrationInterface {
             true
         );
 
+        await queryRunner.createTable(
+            new Table({
+                name: 'Invite',
+                columns: [
+                    {
+                        name: 'id',
+                        type: 'varchar',
+                        length: '255',
+                        isPrimary: true,
+                    },
+                    {
+                        name: 'clientId',
+                        type: 'varchar',
+                        length: '255',
+                    },
+                    {
+                        name: 'clientSecret',
+                        type: 'varchar',
+                        length: '255',
+                    },
+                    {
+                        name: 'redirectUri',
+                        type: 'text',
+                    },
+                    {
+                        name: 'creator',
+                        type: 'varchar',
+                        length: '255',
+                    },
+                    {
+                        name: 'permissions',
+                        type: 'text'
+                    },
+                    {
+                        name: 'instance',
+                        type: 'varchar',
+                        length: '255',
+                        isNullable: true
+                    },
+                    {
+                        name: 'overwrite',
+                        type: 'boolean',
+                        isNullable: true,
+                    },
+                    {
+                        name: 'subreddits',
+                        type: 'text',
+                        isNullable: true
+                    },
+                    createdAtColumn(dbType),
+                    timeAtColumn('expiresAt', dbType, true)
+                ],
+            }),
+            true,
+            true,
+            true
+        );
+
 
         await queryRunner.createTable(
             new Table({

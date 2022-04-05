@@ -54,7 +54,7 @@ import Autolinker from "autolinker";
 import path from "path";
 import {ExtendedSnoowrap} from "../../Utils/SnoowrapClients";
 import ClientUser from "../Common/User/ClientUser";
-import {BotStatusResponse} from "../Common/interfaces";
+import {BotStatusResponse, InviteData} from "../Common/interfaces";
 import {TransformableInfo} from "logform";
 import {SimpleError} from "../../Utils/Errors";
 import {ErrorWithCause} from "pony-cause";
@@ -65,6 +65,8 @@ import { RulePremise } from "../../Common/Entities/RulePremise";
 import { ActionPremise } from "../../Common/Entities/ActionPremise";
 import {TypeormStore} from "connect-typeorm";
 import {ClientSession} from "../../Common/Entities/ClientSession";
+import {CacheStorageProvider, DatabaseStorageProvider} from "./StorageProvider";
+import {nanoid} from "nanoid";
 
 const emitter = new EventEmitter();
 
@@ -151,18 +153,23 @@ const webClient = async (options: OperatorConfig) => {
             display,
         },
         userAgent: uaFragment,
+        caching: {
+            provider: caching
+        },
         web: {
             port,
-            caching,
-            caching: {
-                prefix
-            },
+            storage: webStorage = 'database',
+            // caching,
+            // caching: {
+            //     prefix
+            // },
             invites: {
               maxAge: invitesMaxAge,
             },
             session: {
                 secret,
                 maxAge: sessionMaxAge,
+                storage: sessionStorage = 'database',
             },
             maxLogs,
             clients,
@@ -195,14 +202,10 @@ const webClient = async (options: OperatorConfig) => {
         throw new SimpleError(`Specified port for web interface (${port}) is in use or not available. Cannot start web server.`);
     }
 
-    if (caching.store === 'none') {
-        logger.warn(`Cannot use 'none' for web caching or else no one can use the interface...falling back to 'memory'`);
-        caching.store = 'memory';
-    }
-    //const webCachePrefix = buildCachePrefix([prefix, 'web']);
-    const webCache = createCacheManager({...caching, prefix: buildCachePrefix([prefix, 'web'])}) as Cache;
+    //const webCache = createCacheManager({...caching, prefix: buildCachePrefix([prefix, 'web'])}) as Cache;
 
-    //const previousSessions = await webCache.get
+    const storage = webStorage === 'database' ? new DatabaseStorageProvider({database, invitesMaxAge, logger}) : new CacheStorageProvider({...caching, invitesMaxAge, logger});
+
     const connectedUsers: ConnectUserObj = {};
 
     //<editor-fold desc=Session and Auth>
@@ -212,19 +215,12 @@ const webClient = async (options: OperatorConfig) => {
 
     passport.serializeUser(async function (data: any, done) {
         const {user, subreddits, scope, token} = data;
-        //await webCache.set(`userSession-${user}`, { subreddits: subreddits.map((x: Subreddit) => x.display_name), isOperator: webOps.includes(user.toLowerCase()) }, {ttl: provider.ttl as number});
         done(null, { subreddits: subreddits.map((x: Subreddit) => x.display_name), isOperator: webOps.includes(user.toLowerCase()), name: user, scope, token, tokenExpiresAt: dayjs().unix() + (60 * 60) });
     });
 
     passport.deserializeUser(async function (obj: any, done) {
         const user = new ClientUser(obj.name, obj.subreddits, {token: obj.token, scope: obj.scope, webOperator: obj.isOperator, tokenExpiresAt: obj.tokenExpiresAt});
         done(null, user);
-        // const data = await webCache.get(`userSession-${obj}`) as object;
-        // if (data === undefined) {
-        //     done('Not Found');
-        // }
-        //
-        // done(null, {...data, name: obj as string} as Express.User);
     });
 
     passport.use('snoowrap', new CustomStrategy(
@@ -260,15 +256,19 @@ const webClient = async (options: OperatorConfig) => {
         }
     ));
 
+
+    let sessionStoreProvider = storage;
+    if(sessionStorage !== webStorage) {
+        sessionStoreProvider = sessionStorage === 'database' ? new DatabaseStorageProvider({database, invitesMaxAge, logger, loggerLabels: ['Session']}) : new CacheStorageProvider({...caching, invitesMaxAge, logger, loggerLabels: ['Session']});
+    }
     const sessionObj = session({
         cookie: {
             maxAge: sessionMaxAge * 1000,
         },
-        //store: new CacheManagerStore(webCache, {prefix: 'sess:'}),
-        store: new TypeormStore({
+        store: sessionStoreProvider.createSessionStore(sessionStorage === 'database' ? {
             cleanupLimit: 2,
             ttl: sessionMaxAge
-        }).connect(database.getRepository(ClientSession)),
+        } : {}),
         resave: false,
         saveUninitialized: false,
         secret,
@@ -338,7 +338,11 @@ const webClient = async (options: OperatorConfig) => {
                 return res.render('error', {error: errContent});
             }
             // @ts-ignore
-            const invite = await webCache.get(`invite:${req.session.inviteId}`) as InviteData;
+            const invite = await storage.inviteGet(req.session.inviteId);
+            if(invite === undefined) {
+                // @ts-ignore
+                return res.render('error', {error: `Could not find invite with id ${req.session.inviteId}?? This should happen!`});
+            }
             const client = await Snoowrap.fromAuthCode({
                 userAgent,
                 clientId: invite.clientId,
@@ -350,7 +354,7 @@ const webClient = async (options: OperatorConfig) => {
             const user = await client.getMe();
             const userName = `u/${user.name}`;
             // @ts-ignore
-            await webCache.del(`invite:${req.session.inviteId}`);
+            await storage.inviteDelete(req.session.inviteId);
             let data: any = {
                 accessToken: client.accessToken,
                 refreshToken: client.refreshToken,
@@ -422,16 +426,6 @@ const webClient = async (options: OperatorConfig) => {
     });
 
     let token = randomId();
-    interface InviteData {
-        permissions: string[],
-        subreddits?: string,
-        instance?: string,
-        clientId: string
-        clientSecret: string
-        redirectUri: string
-        creator: string
-        overwrite?: boolean
-    }
 
     const helperAuthed = async (req: express.Request, res: express.Response, next: Function) => {
 
@@ -469,7 +463,7 @@ const webClient = async (options: OperatorConfig) => {
         if(inviteId === undefined) {
             return res.render('error', {error: '`invite` param is missing from URL'});
         }
-        const invite = await webCache.get(`invite:${inviteId}`) as InviteData | undefined | null;
+        const invite = await storage.inviteGet(inviteId as string);
         if(invite === undefined || invite === null) {
             return res.render('error', {error: 'Invite with the given id does not exist'});
         }
@@ -505,8 +499,8 @@ const webClient = async (options: OperatorConfig) => {
             return res.status(400).send('redirectUrl is required');
         }
 
-        const inviteId = code || randomId();
-        await webCache.set(`invite:${inviteId}`, {
+        const inviteId = code || nanoid(20);
+        await storage.inviteCreate(inviteId, {
             permissions,
             clientId: (ci || clientId).trim(),
             clientSecret: (ce || clientSecret).trim(),
@@ -514,7 +508,7 @@ const webClient = async (options: OperatorConfig) => {
             instance,
             subreddits: subreddits.trim() === '' ? [] : subreddits.split(',').map((x: string) => parseRedditEntity(x).name),
             creator: (req.user as Express.User).name,
-        }, {ttl: invitesMaxAge * 1000});
+        });
         return res.send(inviteId);
     });
 
@@ -523,7 +517,7 @@ const webClient = async (options: OperatorConfig) => {
         if(inviteId === undefined) {
             return res.render('error', {error: '`invite` param is missing from URL'});
         }
-        const invite = await webCache.get(`invite:${inviteId}`) as InviteData | undefined | null;
+        const invite = await storage.inviteGet(inviteId as string);
         if(invite === undefined || invite === null) {
             return res.render('error', {error: 'Invite with the given id does not exist'});
         }

@@ -85,3 +85,15 @@ export interface HeartbeatResponse {
     friendly?: string
     bots: BotInstance[]
 }
+
+
+export interface InviteData {
+    permissions: string[],
+    subreddits?: string[],
+    instance?: string,
+    clientId: string
+    clientSecret: string
+    redirectUri: string
+    creator: string
+    overwrite?: boolean
+}

@@ -8,7 +8,7 @@ import {SqljsConnectionOptions} from "typeorm/driver/sqljs/SqljsConnectionOption
 import {MysqlConnectionOptions} from "typeorm/driver/mysql/MysqlConnectionOptions";
 import {MongoConnectionOptions} from "typeorm/driver/mongodb/MongoConnectionOptions";
 import {PostgresConnectionOptions} from "typeorm/driver/postgres/PostgresConnectionOptions";
-import {Connection} from "typeorm";
+import {Connection, DataSource} from "typeorm";
 import {AuthorCriteria, AuthorOptions} from "../Author/Author";
 import {JsonOperatorConfigDocument, YamlOperatorConfigDocument} from "./Config/Operator";
 import {ConsoleTransportOptions} from "winston/lib/winston/transports";
@@ -1853,11 +1853,17 @@ export interface OperatorJsonConfig {
         port?: number,
 
         /**
-         * Caching provider to use for session and invite data
+         * Storage provider to use for sessions and other web client specific data
          *
-         * If none is provided the top-level caching provider is used
+         * If none is provided the top-level database is used
+         *
+         * * Specify `database` to use top-level database
+         * * Specify `cache` to use top-level cache
+         *
+         * NOTE: `database` should almost always be used. Cache would only be necessary if this instance experiences heavy traffic
+         *
          * */
-        caching?: 'memory' | 'redis' | CacheOptions
+        storage?: 'database' | 'cache'
         /**
          * Settings to configure the behavior of user sessions -- the session is what the web interface uses to identify logged in users.
          * */
@@ -1881,6 +1887,13 @@ export interface OperatorJsonConfig {
              * @examples ["definitelyARandomString"]
              * */
             secret?: string,
+
+            /**
+             * Specify backend storage to use for persisting client sessions. If specified this will overwrite parent-level `storage` settings.
+             *
+             * May be useful if using `database` for general web client storage but have heavy traffic and want sessions to be more performant (using `cache`)
+             * */
+            storage?: 'database' | 'cache'
         }
 
         /**
@@ -2027,13 +2040,14 @@ export interface OperatorConfig extends OperatorJsonConfig {
         connection: DatabaseConfig,
         migrations: DatabaseMigrationOptions
     }
-    database: Connection
+    database: DataSource
     web: {
         port: number,
-        caching: CacheOptions,
+        storage?: 'database' | 'cache'
         session: {
             maxAge: number,
             secret: string,
+            storage?: 'database' | 'cache'
         },
         invites: {
           maxAge: number
