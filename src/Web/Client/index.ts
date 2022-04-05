@@ -63,6 +63,8 @@ import {PaginationAwareObject} from "typeorm-pagination/dist/helpers/pagination"
 import {CMEvent} from "../../Common/Entities/CMEvent";
 import { RulePremise } from "../../Common/Entities/RulePremise";
 import { ActionPremise } from "../../Common/Entities/ActionPremise";
+import {TypeormStore} from "connect-typeorm";
+import {ClientSession} from "../../Common/Entities/ClientSession";
 
 const emitter = new EventEmitter();
 
@@ -171,6 +173,7 @@ const webClient = async (options: OperatorConfig) => {
             },
             operators = [],
         },
+        database
     } = options;
 
     const userAgent = getUserAgent(`web:contextBot:{VERSION}{FRAG}:dashboard`, uaFragment);
@@ -261,7 +264,11 @@ const webClient = async (options: OperatorConfig) => {
         cookie: {
             maxAge: sessionMaxAge * 1000,
         },
-        store: new CacheManagerStore(webCache, {prefix: 'sess:'}),
+        //store: new CacheManagerStore(webCache, {prefix: 'sess:'}),
+        store: new TypeormStore({
+            cleanupLimit: 2,
+            ttl: sessionMaxAge
+        }).connect(database.getRepository(ClientSession)),
         resave: false,
         saveUninitialized: false,
         secret,
@@ -396,11 +403,13 @@ const webClient = async (options: OperatorConfig) => {
                 const useCloseRedir: boolean = req.session.closeOnSuccess as any
                 // @ts-ignore
                 delete req.session.closeOnSuccess;
-                if(useCloseRedir === true) {
-                    return res.render('close');
-                } else {
-                    return res.redirect('/');
-                }
+                req.session.save((err) => {
+                    if(useCloseRedir === true) {
+                        return res.render('close');
+                    } else {
+                        return res.redirect('/');
+                    }
+                })
             });
         })(req, res, next);
     });

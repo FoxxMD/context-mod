@@ -8,7 +8,7 @@ const randomIdColumn = () => ({
     isUnique: true,
 });
 
-const timeAtColumn = (columnName: string, dbType: string) => {
+const timeAtColumn = (columnName: string, dbType: string, nullable?: boolean) => {
     const dbSpecifics = dbType === 'postgres' ? {
         type: 'timestamptz'
     } : {
@@ -20,7 +20,7 @@ const timeAtColumn = (columnName: string, dbType: string) => {
     }
     return {
         name: columnName,
-        isNullable: false,
+        isNullable: nullable ?? false,
         ...dbSpecifics
     }
 }
@@ -88,6 +88,39 @@ export class initApi1642180264563 implements MigrationInterface {
     public async up(queryRunner: QueryRunner): Promise<void> {
 
         const dbType = queryRunner.connection.driver.options.type;
+
+        await queryRunner.createTable(
+            new Table({
+                name: 'ClientSession',
+                columns: [
+                    {
+                        name: 'id',
+                        type: 'varchar',
+                        length: '255',
+                        isNullable: false,
+                    },
+                    {
+                        name: 'json',
+                        type: 'text'
+                    },
+                    {
+                        name: 'expiredAt',
+                        type: 'bigint'
+                    },
+                    timeAtColumn('destroyedAt', dbType, true)
+                ],
+                indices: [
+                    new TableIndex({
+                        name: 'IDX_Session_expired',
+                        columnNames: ['expiredAt']
+                    }),
+                ]
+            }),
+            true,
+            true,
+            true
+        );
+
 
         await queryRunner.createTable(
             new Table({
