@@ -10,7 +10,7 @@
                     <div class="text-xl mb-4">Database migrations are required to run ContextMod</div>
                     <div class="space-y-3">
                         <% if(migrationBlocker === 'pending') { %>
-                            <div>There are new migrations for ContextMod that do not appear in your configured
+                            <div>There are new migrations for ContextMod (<%= type === 'app' ? 'Application' : 'Web'%>) that do not appear in your configured
                                 database.
                             </div>
                         <% } else { %>
@@ -46,7 +46,7 @@
 <script>
     document.querySelector('#run').addEventListener('click', e => {
         e.preventDefault();
-        fetch(`/api/database/migrate?instance=<%= instance %>`, {
+        fetch(`<%= type === 'app'  ? '/api' : ''%>/database/migrate<%= type === 'app'  ? '?instance=' + instance : ''%>`, {
             method: 'POST'
         }).then((resp) => {
             resp.text().then(data => {
@@ -56,15 +56,17 @@
                 document.querySelector('#outcome').innerHTML = 'Error occurred while running migrations';
             } else {
                 document.querySelector('#outcome').innerHTML = 'Migration completed successfully! The dashboard will be available within 10 seconds (keep refreshing the page)';
+                <% if(type === 'app') { %>
                 fetch(`/api/init?instance=<%= instance %>`, {
                     method: 'POST'
                 });
+                <% } %>
             }
         });
     });
     document.querySelector('#backup').addEventListener('click', e => {
         e.preventDefault();
-        fetch(`/api/database/backup?instance=<%= instance %>`, {
+        fetch(`<%= type === 'app'  ? '/api' : ''%>/database/backup<%= type === 'app'  ? '?instance=' + instance : ''%>`, {
             method: 'POST'
         }).then((resp) => {
             resp.text().then(data => {
@@ -78,7 +80,7 @@
         });
     });
 
-    fetch(`/api/database/logs?instance=<%= instance %>`).then((resp) => {
+    fetch(`<%= type === 'app'  ? '/api' : ''%>/database/logs<%= type === 'app'  ? '?instance=' + instance : ''%>`).then((resp) => {
         resp.text().then(data => {
             document.querySelector('#logs').innerHTML = data.split('\r\n').join('<br/>');
         });

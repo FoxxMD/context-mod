@@ -2042,11 +2042,12 @@ export interface OperatorConfig extends OperatorJsonConfig {
     }
     database: DataSource
     web: {
+        database: DataSource,
         port: number,
         storage?: 'database' | 'cache'
         session: {
             maxAge: number,
-            secret: string,
+            secret?: string,
             storage?: 'database' | 'cache'
         },
         invites: {

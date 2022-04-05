@@ -755,7 +755,7 @@ export const buildOperatorConfigWithDefaults = async (data: OperatorJsonConfig):
             maxLogs = 200,
             storage: webStorage = undefined,
             session: {
-                secret = randomId(),
+                secret: sessionSecretFromConfig = undefined,
                 maxAge: sessionMaxAge = 86400,
                 storage: sessionStorage = undefined,
             } = {},
@@ -855,9 +855,6 @@ export const buildOperatorConfigWithDefaults = async (data: OperatorJsonConfig):
 
     const dbConfig = createDatabaseConfig(dbConnection);
 
-    const database = await createDatabaseConnection(dbConfig, appLogger, dbLogging);
-
-
     const config: OperatorConfig = {
         mode,
         operator: {
@@ -867,20 +864,21 @@ export const buildOperatorConfigWithDefaults = async (data: OperatorJsonConfig):
         logging: loggingOptions,
         caching: cache,
         snoowrap: snoowrapOp,
-        database,
+        database: await createDatabaseConnection('app', dbConfig, appLogger, dbLogging),
         databaseConfig: {
             connection: dbConfig,
             migrations,
         },
         userAgent,
         web: {
+            database: await createDatabaseConnection('web', dbConfig, appLogger, dbLogging),
             port,
             storage: webStorage,
             invites: {
                 maxAge: inviteMaxAge,
             },
             session: {
-                secret,
+                secret: sessionSecretFromConfig,
                 maxAge: sessionMaxAge,
                 storage: sessionStorage
             },

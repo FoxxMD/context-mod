@@ -8,10 +8,10 @@ import CacheManagerStore from 'express-session-cache-manager'
 import {CacheOptions} from "../../Common/interfaces";
 import {Brackets, DataSource, IsNull, LessThanOrEqual} from "typeorm";
 import {DateUtils} from 'typeorm/util/DateUtils';
-import {ClientSession} from "../../Common/Entities/ClientSession";
-import {Invite} from "../../Common/Entities/Invite";
+import {ClientSession} from "../../Common/WebEntities/ClientSession";
 import dayjs from "dayjs";
 import {Logger} from "winston";
+import {Invite} from "../../Common/WebEntities/Invite";
 
 export interface CacheManagerStoreOptions {
     prefix?: string

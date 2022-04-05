@@ -63,10 +63,10 @@ import {PaginationAwareObject} from "typeorm-pagination/dist/helpers/pagination"
 import {CMEvent} from "../../Common/Entities/CMEvent";
 import { RulePremise } from "../../Common/Entities/RulePremise";
 import { ActionPremise } from "../../Common/Entities/ActionPremise";
-import {TypeormStore} from "connect-typeorm";
-import {ClientSession} from "../../Common/Entities/ClientSession";
 import {CacheStorageProvider, DatabaseStorageProvider} from "./StorageProvider";
 import {nanoid} from "nanoid";
+import {MigrationService} from "../../Common/MigrationService";
+import {WebSetting} from "../../Common/WebEntities/WebSetting";
 
 const emitter = new EventEmitter();
 
@@ -146,6 +146,8 @@ const peekTrunc = truncateStringToLength(200);
 
 const availableLevels = ['error', 'warn', 'info', 'verbose', 'debug'];
 
+let webLogs: LogInfo[] = [];
+
 const webClient = async (options: OperatorConfig) => {
     const {
         operator: {
@@ -157,6 +159,7 @@ const webClient = async (options: OperatorConfig) => {
             provider: caching
         },
         web: {
+            database,
             port,
             storage: webStorage = 'database',
             // caching,
@@ -167,7 +170,7 @@ const webClient = async (options: OperatorConfig) => {
               maxAge: invitesMaxAge,
             },
             session: {
-                secret,
+                secret: sessionSecretFromConfig,
                 maxAge: sessionMaxAge,
                 storage: sessionStorage = 'database',
             },
@@ -180,8 +183,10 @@ const webClient = async (options: OperatorConfig) => {
             },
             operators = [],
         },
-        database
+        //database
     } = options;
+
+    let sessionSecretSynced = false;
 
     const userAgent = getUserAgent(`web:contextBot:{VERSION}{FRAG}:dashboard`, uaFragment);
 
@@ -196,11 +201,65 @@ const webClient = async (options: OperatorConfig) => {
 
     logger.stream().on('log', (log: LogInfo) => {
         emitter.emit('log', log);
+        webLogs.unshift(log);
+        webLogs = webLogs.slice(0, 201);
+    });
+
+    const migrationService = new MigrationService({
+        type: 'web',
+        logger,
+        database,
+        options: options.databaseConfig.migrations
     });
 
     if (await tcpUsed.check(port)) {
         throw new SimpleError(`Specified port for web interface (${port}) is in use or not available. Cannot start web server.`);
     }
+
+    let [ranMigrations, migrationBlocker] = await migrationService.initDatabase();
+
+    app.use((req, res, next) => {
+
+        if(!ranMigrations && (req.url === '/' || req.url.indexOf('database') === -1)) {
+            return res.render('migrations', {
+                type: 'web',
+                ranMigrations: ranMigrations,
+                migrationBlocker: migrationBlocker,
+            });
+        } else {
+            next();
+        }
+    });
+
+    const settingRepo = database.getRepository(WebSetting);
+
+    let sessionSecret = sessionSecretFromConfig;
+    if (sessionSecret !== undefined) {
+        logger.debug('Using defined session secret from config');
+        sessionSecretSynced = true;
+    } else {
+        try {
+            const dbSessionSecret = await settingRepo.findOneBy({name: 'sessionSecret'});
+            if (null === dbSessionSecret) {
+                logger.debug('Generating new session secret and saving to database...');
+                sessionSecret = randomId();
+                await settingRepo.save(new WebSetting({name: 'sessionSecret', value: sessionSecret}));
+            } else {
+                logger.debug('Using session secret from database');
+                sessionSecret = dbSessionSecret.value as string;
+            }
+            sessionSecretSynced = true;
+        } catch (e) {
+            let msg = 'Unable to get/insert session secret from database.'
+            if(!ranMigrations) {
+                msg += '(Probably initial database creation is not done yet)';
+            }
+            msg += 'Will use random ID for now';
+            sessionSecret = randomId();
+            logger.warn(new ErrorWithCause(msg, {cause: e}));
+        }
+    }
+
 
     //const webCache = createCacheManager({...caching, prefix: buildCachePrefix([prefix, 'web'])}) as Cache;
 
@@ -271,7 +330,7 @@ const webClient = async (options: OperatorConfig) => {
         } : {}),
         resave: false,
         saveUninitialized: false,
-        secret,
+        secret: sessionSecret,
     });
     app.use(sessionObj);
     app.use(passport.initialize());
@@ -825,6 +884,7 @@ const webClient = async (options: OperatorConfig) => {
         const instance = req.instance as CMInstance;
         if(instance.bots.length === 0 && instance?.ranMigrations === false && instance?.migrationBlocker !== undefined) {
             return res.render('migrations', {
+                type: 'app',
                 ranMigrations: instance.ranMigrations,
                 migrationBlocker: instance.migrationBlocker,
                 instance: instance.friendly
@@ -1189,6 +1249,57 @@ const webClient = async (options: OperatorConfig) => {
             pagination,
             title: `${subreddit !== undefined ? `${subreddit} ` : ''}Actioned Events`
         });
+    });
+
+    app.postAsync('/database/migrate', [], async (req: express.Request, res: express.Response) => {
+        const now = dayjs().subtract(1, 'second');
+        logger.info(`${(req.user as Express.User).name} invoked migrations. Starting migrations now...`, {subreddit: (req.user as Express.User).name});
+
+        try {
+            await migrationService.doMigration();
+            ranMigrations = true;
+            migrationBlocker = undefined;
+        } finally {
+            if(ranMigrations && !sessionSecretSynced) {
+                // ensure session secret is synced
+                await settingRepo.save(new WebSetting({name: 'sessionSecret', value: sessionSecret}));
+            }
+            const dbLogs = webLogs.filter(x => x.labels?.includes('Database') && dayjs(x.timestamp).isSameOrAfter(now));
+            dbLogs.reverse();
+            res.status(ranMigrations ? 200 : 500).send(dbLogs.map(x => x[MESSAGE]).join('\r\n'));
+        }
+    });
+
+    app.postAsync('/database/logs', [], async (req: express.Request, res: express.Response) => {
+        const dbLogs = webLogs.filter(x => {
+            return x.labels?.includes('Database');
+        });
+
+        dbLogs.reverse();
+        res.send(dbLogs.map(x => x[MESSAGE]).join('\r\n'));
+    });
+
+    app.postAsync('/database/backup', [], async (req: express.Request, res: express.Response) => {
+        logger.info(`${(req.user as Express.User).name} invoked database backup. Trying to backup now...`, {subreddit: (req.user as Express.User).name});
+
+        const now = dayjs().subtract(1, 'second');
+        let status = 200;
+        try {
+            await migrationService.backupDatabase();
+        } catch (e) {
+            status = 500;
+            // @ts-ignore
+            app.dbLogger.error(e, {leaf: 'Backup'})
+        }
+
+        const dbLogs = webLogs.filter(x => {
+            const logTime = dayjs(x.timestamp);
+            // @ts-ignore
+            return x.leaf === 'Backup' && logTime.isSameOrAfter(now)
+        });
+
+        dbLogs.reverse();
+        res.status(status).send(dbLogs.map(x => x[MESSAGE]).join('\r\n'));
     });
 
     app.getAsync('/logs/settings/update',[ensureAuthenticated], async (req: express.Request, res: express.Response) => {

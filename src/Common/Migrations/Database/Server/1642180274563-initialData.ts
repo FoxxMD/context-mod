@@ -1,8 +1,8 @@
 import {MigrationInterface, QueryRunner} from "typeorm";
-import {RuleType} from "../../Entities/RuleType";
-import {ActionType} from "../../Entities/ActionType";
-import {InvokeeType} from "../../Entities/InvokeeType";
-import {RunStateType} from "../../Entities/RunStateType";
+import {RuleType} from "../../../Entities/RuleType";
+import {ActionType} from "../../../Entities/ActionType";
+import {InvokeeType} from "../../../Entities/InvokeeType";
+import {RunStateType} from "../../../Entities/RunStateType";
 
 export class initialData1642180274563 implements MigrationInterface {
 

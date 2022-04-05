@@ -3,7 +3,7 @@ import {SqljsConnectionOptions} from "typeorm/driver/sqljs/SqljsConnectionOption
 import {MysqlConnectionOptions} from "typeorm/driver/mysql/MysqlConnectionOptions";
 import {MongoConnectionOptions} from "typeorm/driver/mongodb/MongoConnectionOptions";
 import {PostgresConnectionOptions} from "typeorm/driver/postgres/PostgresConnectionOptions";
-import {resolve} from 'path';
+import {resolve, parse as parsePath} from 'path';
 import "reflect-metadata";
 import {DataSource} from "typeorm";
 import {castToBool, fileOrDirectoryIsWriteable, mergeArr, resolvePath} from "../util";
@@ -15,6 +15,7 @@ import {WinstonAdaptor} from "typeorm-logger-adaptor/logger/winston";
 import process from "process";
 import {defaultDataDir} from "../Common/defaults";
 import {LoggerOptions} from "typeorm/logger/LoggerOptions";
+
 
 const validDrivers = ['sqljs', 'better-sqlite3', 'mysql', 'mariadb', 'postgres'];
 
@@ -104,11 +105,11 @@ export const createDatabaseConfig = (val: DatabaseDriver | any): DatabaseConfig 
     }
 }
 
-export const createDatabaseConnection = async (rawConfig: DatabaseConfig, logger: Logger, dbLogLevels?: LoggerOptions): Promise<DataSource> => {
+export const createDatabaseConnection = async (type: 'app' | 'web', rawConfig: DatabaseConfig, logger: Logger, dbLogLevels?: LoggerOptions): Promise<DataSource> => {
 
     let config = {...rawConfig};
 
-    const dbLogger = logger.child({labels: ['Database']}, mergeArr);
+    const dbLogger = logger.child({labels: ['Database', (type === 'app' ? 'App' : 'Web')]}, mergeArr);
 
     dbLogger.info(`Using '${rawConfig.type}' database type`);
 
@@ -123,10 +124,16 @@ export const createDatabaseConnection = async (rawConfig: DatabaseConfig, logger
             dbLogger.info('Will use IN-MEMORY database');
         } else if (typeof rawPath === 'string' && rawPath.trim().toLocaleLowerCase() !== ':memory:') {
             try {
+                let sqlLitePath = rawPath;
+                if(rawConfig.type === 'sqljs') {
+                    const pathInfo = parsePath(rawPath);
+                    dbLogger.info(`Converting to domain-specific database file (${pathInfo.name}-${type}.sqlite) due to how sqljs works.`)
+                    sqlLitePath = resolve(pathInfo.dir, `${pathInfo.name}-${type}${pathInfo.ext}`);
+                }
                 dbLogger.debug('Testing that database path is writeable...');
-                fileOrDirectoryIsWriteable(rawPath);
-                dbPath = rawPath;
-                dbLogger.info(`Using database at path: ${dbPath}`);
+                fileOrDirectoryIsWriteable(sqlLitePath);
+                dbPath = sqlLitePath;
+                dbLogger.info(`Using database at path: ${sqlLitePath}`);
             } catch (e: any) {
                 dbLogger.error(new ErrorWithCause(`Falling back to IN-MEMORY database due to error while trying to access database`, {cause: e}));
                 if(castToBool(process.env.IS_DOCKER) === true) {
@@ -149,11 +156,16 @@ export const createDatabaseConnection = async (rawConfig: DatabaseConfig, logger
         config = {...config, ...dbOptions} as SqljsConnectionOptions | BetterSqlite3ConnectionOptions;
     }
 
+    const entitiesDir = type === 'app' ? '../Common/Entities' : '../Common/WebEntities'
+    const migrationsDir = type === 'app' ? '../Common/Migrations/Database/Server' : '../Common/Migrations/Database/Web';
+    const migrationTable = type === 'app' ? 'migrationsApp' : 'migrationsWeb';
+
     const source = new DataSource({
         ...config,
         synchronize: false,
-        entities: [`${resolve(__dirname, '../Common/Entities')}/**/*.js`],
-        migrations: [`${resolve(__dirname, '../Common/Migrations')}/Database/*.js`],
+        entities: [`${resolve(__dirname, entitiesDir)}/**/*.js`],
+        migrations: [`${resolve(__dirname, migrationsDir)}/*.js`],
+        migrationsTableName: migrationTable,
         migrationsRun: false,
         logging: ['error', 'warn', 'migration', 'schema', 'log'],
         logger: new WinstonAdaptor(dbLogger, dbLogLevels ?? ['error', 'warn', 'schema'], false, ormLoggingAdaptorLevelMappings(dbLogger)),

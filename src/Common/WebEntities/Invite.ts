@@ -1,5 +1,5 @@
-import {Entity, Column, PrimaryColumn} from "typeorm";
-import {TimeAwareBaseEntity} from "./Base/TimeAwareBaseEntity";
+import {Column, Entity, PrimaryColumn} from "typeorm";
+import {TimeAwareBaseEntity} from "../Entities/Base/TimeAwareBaseEntity";
 import {InviteData} from "../../Web/Common/interfaces";
 import dayjs, {Dayjs} from "dayjs";
 

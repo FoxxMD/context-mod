@@ -9,6 +9,7 @@ import {copyFile} from "fs/promises";
 import {constants} from "fs";
 import {Connection} from "typeorm";
 import {ErrorWithCause} from "pony-cause";
+import {MigrationService} from "./Common/MigrationService";
 
 export class App {
 
@@ -25,6 +26,8 @@ export class App {
     error: any;
 
     fileConfig: OperatorFileConfig;
+
+    migrationService: MigrationService;
 
     constructor(config: OperatorConfigWithFileContext) {
         const {
@@ -46,6 +49,13 @@ export class App {
         this.database = database;
 
         this.logger.info(`Operators: ${name.length === 0 ? 'None Specified' : name.join(', ')}`)
+
+        this.migrationService = new MigrationService({
+            type: 'app',
+            logger: this.logger,
+            database,
+            options: this.config.databaseConfig.migrations
+        });
 
         process.on('uncaughtException', (e) => {
             this.error = e;
@@ -80,99 +90,20 @@ export class App {
     }
 
     async doMigration() {
-        this.dbLogger.info('Beginning migrations...');
-        await this.database.runMigrations();
+        await this.migrationService.doMigration();
         this.migrationBlocker = undefined;
         this.ranMigrations = true;
     }
 
     async backupDatabase() {
-        // @ts-ignore
-        if (this.database.options.type === 'sqljs' && this.database.options.location !== undefined) {
-            try {
-                const ts = Date.now();
-                const backupLocation = `${this.database.options.location}.${ts}.bak`
-                this.dbLogger.info(`Detected sqljs (sqlite) database. Will try to make a backup at ${backupLocation}`, {leaf: 'Backup'});
-                await copyFile(this.database.options.location, backupLocation, constants.COPYFILE_EXCL);
-                this.dbLogger.info('Successfully created backup!', {leaf: 'Backup'});
-            } catch (err: any) {
-                throw new ErrorWithCause('Cannot make an automated backup of your configured database.', {cause: err});
-            }
-        } else {
-            let msg = 'Cannot make an automated backup of your configured database.';
-            if(this.database.options.type !== 'sqljs') {
-                msg += ' Only SQlite (sqljs database type) is implemented for automated backups right now, sorry :( You will need to manually backup your database.';
-            } else {
-                // TODO don't throw for this??
-                msg += ' Database location is not defined (probably in-memory).';
-            }
-            throw new Error(msg);
-        }
+        await this.migrationService.backupDatabase();
     }
 
     async initDatabase() {
-        const {
-            databaseConfig: {
-                migrations: {
-                    force = false,
-                    continueOnAutomatedBackup = false,
-                } = {}
-            } = {},
-        } = this.config;
-
-        this.dbLogger.info('Checking if migrations are required...');
-
-        const runner = this.database.createQueryRunner();
-        const tables = await runner.getTables();
-        if (tables.length === 0 || (tables.length === 1 && tables.map(x => x.name).includes('migrations'))) {
-            this.dbLogger.info('Detected a new database! Starting migrations...');
-            await this.database.showMigrations();
-            await this.doMigration();
-            return true;
-        } else if (!tables.map(x => x.name).some(x => x.includes('migrations')) && !force) {
-            this.dbLogger.warn(`DANGER! Your database has existing tables but none of them include a 'migrations' table. 
-            Are you sure this is the correct database? Continuing with migrations will most likely drop any existing data and recreate all tables.`);
-            this.migrationBlocker = 'unknownTables';
-            return false;
-        } else if (await this.database.showMigrations()) {
-            this.dbLogger.info('Detected pending migrations.');
-
-            // try sqlite backup path
-            let continueBCBackedup = false;
-            if (continueOnAutomatedBackup) {
-                this.dbLogger.info('Configuration specified migrations may be executed if automated backup is successful. Trying backup now...');
-                try {
-                    await this.backupDatabase();
-                    continueBCBackedup = true;
-                } catch (err) {
-                    // @ts-ignore
-                    this.dbLogger.error(err, {leaf: 'Backup'});
-                }
-            } else {
-                this.dbLogger.info('Configuration DID NOT specify migrations may be executed if automated backup is successful. Will not try to create a backup.');
-            }
-
-            if (continueBCBackedup) {
-                this.dbLogger.info('Automated backup was successful!');
-                await this.doMigration();
-                return true;
-            } else {
-                if (!force) {
-                    this.dbLogger.error(`You must confirm migrations. Either set 'force: true' in database config or confirm migrations from web interface.
-YOU SHOULD BACKUP YOUR EXISTING DATABASE BEFORE CONTINUING WITH MIGRATIONS.`);
-                    this.migrationBlocker = 'pending';
-                    return false;
-                } else {
-                    this.dbLogger.info('Migration was forced');
-                }
-                await this.doMigration();
-                return true;
-            }
-        } else {
-            this.dbLogger.info('No migrations required!');
-            this.ranMigrations = true;
-            return true;
-        }
+        const [migrated, blocker] = await this.migrationService.initDatabase();
+        this.migrationBlocker = blocker;
+        this.ranMigrations = migrated;
+        return this.ranMigrations;
     }
 
     async initBots(causedBy: Invokee = 'system') {

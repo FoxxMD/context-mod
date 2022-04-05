@@ -89,95 +89,30 @@ export class initApi1642180264563 implements MigrationInterface {
 
         const dbType = queryRunner.connection.driver.options.type;
 
-        await queryRunner.createTable(
+/*        await queryRunner.createTable(
             new Table({
-                name: 'ClientSession',
+                name: 'InstanceSetting',
                 columns: [
                     {
-                        name: 'id',
+                        name: 'name',
                         type: 'varchar',
                         length: '255',
                         isNullable: false,
                     },
                     {
-                        name: 'json',
-                        type: 'text'
-                    },
-                    {
-                        name: 'expiredAt',
-                        type: 'bigint'
-                    },
-                    timeAtColumn('destroyedAt', dbType, true)
+                        name: 'value',
+                        type: 'varchar',
+                        length: '255',
+                        isNullable: false,
+                    }
                 ],
-                indices: [
-                    new TableIndex({
-                        name: 'IDX_Session_expired',
-                        columnNames: ['expiredAt']
-                    }),
-                ]
             }),
             true,
             true,
             true
-        );
+        );*/
 
-        await queryRunner.createTable(
-            new Table({
-                name: 'Invite',
-                columns: [
-                    {
-                        name: 'id',
-                        type: 'varchar',
-                        length: '255',
-                        isPrimary: true,
-                    },
-                    {
-                        name: 'clientId',
-                        type: 'varchar',
-                        length: '255',
-                    },
-                    {
-                        name: 'clientSecret',
-                        type: 'varchar',
-                        length: '255',
-                    },
-                    {
-                        name: 'redirectUri',
-                        type: 'text',
-                    },
-                    {
-                        name: 'creator',
-                        type: 'varchar',
-                        length: '255',
-                    },
-                    {
-                        name: 'permissions',
-                        type: 'text'
-                    },
-                    {
-                        name: 'instance',
-                        type: 'varchar',
-                        length: '255',
-                        isNullable: true
-                    },
-                    {
-                        name: 'overwrite',
-                        type: 'boolean',
-                        isNullable: true,
-                    },
-                    {
-                        name: 'subreddits',
-                        type: 'text',
-                        isNullable: true
-                    },
-                    createdAtColumn(dbType),
-                    timeAtColumn('expiresAt', dbType, true)
-                ],
-            }),
-            true,
-            true,
-            true
-        );
+
 
 
         await queryRunner.createTable(
