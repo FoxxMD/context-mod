@@ -40,7 +40,7 @@
                   // for this to pass the Author of the Submission must not have the flair "Supreme Memer" and have the name "user1" or "user2"
                   {
                     "flairText": ["Supreme Memer"],
-                    "names": ["user1","user2"]
+                    "name": ["user1","user2"]
                   },
                   {
                     // for this to pass the Author of the Submission must not have the flair "Decent Memer"
