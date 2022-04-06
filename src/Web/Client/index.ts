@@ -1253,7 +1253,7 @@ const webClient = async (options: OperatorConfig) => {
 
     app.postAsync('/database/migrate', [], async (req: express.Request, res: express.Response) => {
         const now = dayjs().subtract(1, 'second');
-        logger.info(`${(req.user as Express.User).name} invoked migrations. Starting migrations now...`, {subreddit: (req.user as Express.User).name});
+        logger.info(`User invoked migrations. Starting migrations now...`);
 
         try {
             await migrationService.doMigration();
@@ -1270,7 +1270,7 @@ const webClient = async (options: OperatorConfig) => {
         }
     });
 
-    app.postAsync('/database/logs', [], async (req: express.Request, res: express.Response) => {
+    app.getAsync('/database/logs', [], async (req: express.Request, res: express.Response) => {
         const dbLogs = webLogs.filter(x => {
             return x.labels?.includes('Database');
         });
@@ -1280,7 +1280,7 @@ const webClient = async (options: OperatorConfig) => {
     });
 
     app.postAsync('/database/backup', [], async (req: express.Request, res: express.Response) => {
-        logger.info(`${(req.user as Express.User).name} invoked database backup. Trying to backup now...`, {subreddit: (req.user as Express.User).name});
+        logger.info(`User invoked database backup. Trying to backup now...`);
 
         const now = dayjs().subtract(1, 'second');
         let status = 200;
