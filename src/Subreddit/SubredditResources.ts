@@ -204,7 +204,7 @@ export class SubredditResources {
             this.stats.cache.userNotes.requests++;
             this.stats.cache.userNotes.miss += miss ? 1 : 0;
         }
-        this.userNotes = new UserNotes(userNotesTTL, this.subreddit, this.client, this.logger, this.cache, cacheUseCB)
+        this.userNotes = new UserNotes(userNotesTTL, this.subreddit.display_name, this.client, this.logger, this.cache, cacheUseCB)
 
         if(this.cacheType === 'memory' && this.cacheSettingsHash !== 'default') {
             const min = Math.min(...([this.wikiTTL, this.authorTTL, this.submissionTTL, this.commentTTL, this.filterCriteriaTTL].filter(x => typeof x === 'number' && x !== 0) as number[]));

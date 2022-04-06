@@ -72,11 +72,11 @@ export class UserNotes {
     debounceCB: any;
     batchCount: number = 0;
 
-    constructor(ttl: number | boolean, subreddit: Subreddit, client: Snoowrap, logger: Logger, cache: Cache, cacheCB: Function) {
+    constructor(ttl: number | boolean, subreddit: string, client: Snoowrap, logger: Logger, cache: Cache, cacheCB: Function) {
         this.notesTTL = ttl === true ? 0 : ttl;
-        this.subreddit = subreddit;
+        this.subreddit = client.getSubreddit(subreddit);
         this.logger = logger;
-        this.identifier = `${this.subreddit.display_name}-usernotes`;
+        this.identifier = `${subreddit}-usernotes`;
         this.cache = cache;
         this.cacheCB = cacheCB;
         this.client = client;
@@ -115,9 +115,8 @@ export class UserNotes {
     // @ts-ignore
     async getMod() {
         if(this.mod === undefined) {
-            // idgaf
             // @ts-ignore
-            this.mod = await this.subreddit._r.getMe();
+            this.mod = await this.client.getMe();
         }
         return this.mod as RedditUser;
     }
