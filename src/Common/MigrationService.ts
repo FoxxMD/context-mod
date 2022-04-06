@@ -17,7 +17,7 @@ export class MigrationService {
         database: DataSource,
         options: DatabaseMigrationOptions
     }) {
-        this.dbLogger = data.logger.child({labels: [(data.type === 'app' ? 'App' : 'Web'), `Database`]}, mergeArr);
+        this.dbLogger = data.logger.child({labels: [(data.type === 'app' ? 'App' : 'Web'), `Database`, 'Migration']}, mergeArr);
         this.database = data.database;
         this.options = data.options;
     }
@@ -98,26 +98,30 @@ YOU SHOULD BACKUP YOUR EXISTING DATABASE BEFORE CONTINUING WITH MIGRATIONS.`);
     }
 
     async backupDatabase() {
-        // @ts-ignore
-        if (this.database.options.type === 'sqljs' && this.database.options.location !== undefined) {
-            try {
-                const ts = Date.now();
-                const backupLocation = `${this.database.options.location}.${ts}.bak`
-                this.dbLogger.info(`Detected sqljs (sqlite) database. Will try to make a backup at ${backupLocation}`, {leaf: 'Backup'});
-                await copyFile(this.database.options.location, backupLocation, constants.COPYFILE_EXCL);
-                this.dbLogger.info('Successfully created backup!', {leaf: 'Backup'});
-            } catch (err: any) {
-                throw new ErrorWithCause('Cannot make an automated backup of your configured database.', {cause: err});
-            }
-        } else {
-            let msg = 'Cannot make an automated backup of your configured database.';
-            if (this.database.options.type !== 'sqljs') {
-                msg += ' Only SQlite (sqljs database type) is implemented for automated backups right now, sorry :( You will need to manually backup your database.';
+        try {
+            if (this.database.options.type === 'sqljs' && this.database.options.location !== undefined) {
+                try {
+                    const ts = Date.now();
+                    const backupLocation = `${this.database.options.location}.${ts}.bak`
+                    this.dbLogger.info(`Detected sqljs (sqlite) database. Will try to make a backup at ${backupLocation}`, {leaf: 'Backup'});
+                    await copyFile(this.database.options.location, backupLocation, constants.COPYFILE_EXCL);
+                    this.dbLogger.info('Successfully created backup!', {leaf: 'Backup'});
+                } catch (err: any) {
+                    throw new ErrorWithCause('Cannot make an automated backup of your configured database.', {cause: err});
+                }
             } else {
-                // TODO don't throw for this??
-                msg += ' Database location is not defined (probably in-memory).';
+                let msg = 'Cannot make an automated backup of your configured database.';
+                if (this.database.options.type !== 'sqljs') {
+                    msg += ' Only SQlite (sqljs database type) is implemented for automated backups right now, sorry :( You will need to manually backup your database.';
+                } else {
+                    // TODO don't throw for this??
+                    msg += ' Database location is not defined (probably in-memory).';
+                }
+                throw new Error(msg);
             }
-            throw new Error(msg);
+        } catch (e: any) {
+            this.dbLogger.error(e, {leaf: 'Backup'});
+            throw e;
         }
     }
 }

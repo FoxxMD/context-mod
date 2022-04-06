@@ -116,6 +116,10 @@ export const createDatabaseConnection = async (rawConfig: DatabaseConfig, domain
 
     dbLogger.info(`Using '${rawConfig.type}' database type`);
 
+    if(rawConfig.type === 'sqljs') {
+        dbLogger.warn(`sqljs SHOULD NOT be used in a production environment. Consider switching to 'better-sqlite3' for better performance. Preferably 'mysql', 'mariadb', or 'postgres' for best performance and security.`);
+    }
+
     if (['sqljs', 'better-sqlite3'].includes(rawConfig.type)) {
 
         let dbOptions: Pick<SqljsConnectionOptions, 'autoSave' | 'location'> | Pick<BetterSqlite3ConnectionOptions, 'database'>
@@ -164,7 +168,7 @@ export const createDatabaseConnection = async (rawConfig: DatabaseConfig, domain
     } else if (logTypes === false) {
         logTypes = ['NONE (logging=false)'];
     }
-    dbLogger.debug(`Will log the follow types from typeorm: ${logTypes.join(',')}`);
+    dbLogger.debug(`Will log the follow types from typeorm: ${logTypes.join(', ')}`);
 
     const source = new DataSource({
         ...rest,
@@ -180,10 +184,10 @@ export const createDatabaseConnection = async (rawConfig: DatabaseConfig, domain
 }
 
 export const convertSqlJsLocation = (suffix: string, rawConfig: DatabaseConfig, logger: Logger) => {
-    if (rawConfig.type === 'sqljs' && typeof rawConfig.location === 'string' && rawConfig.location.trim().toLocaleLowerCase() !== ':memory:') {
+    if (rawConfig.type === 'sqljs' && typeof rawConfig.location === 'string' && rawConfig.location.trim().toLocaleLowerCase() !== ':memory:' && !rawConfig.location.toLocaleLowerCase().includes(suffix)) {
         const pathInfo = parsePath(rawConfig.location);
         const suffixedFilename = `${pathInfo.name}-${suffix}${pathInfo.ext}`;
-        logger.debug(`Converting to domain-specific database file (${suffixedFilename}) due to how sqljs works.`, {leaf: 'Database'});
+        logger.debug(`To prevent web and app databases from overwriting each other (when using sqljs) the database location will be changed to be domain-specific: ${pathInfo.name}${pathInfo.ext} => ${suffixedFilename} -- this may be disabled by including the word '${suffix}' in your original filepath location.`, {leaf: 'Database'});
         return {...rawConfig, location: resolve(pathInfo.dir, suffixedFilename)}
     }
     return rawConfig;
@@ -220,15 +224,18 @@ export const createWebDatabaseConnection = async (rawConfig: DatabaseConfig, log
     }, domainLogger);
 }
 
-const ormLoggingAdaptorLevelMappings = (logger: Logger) => ({
-    log: (first: any, ...rest: any) => logger.debug(first, ...rest),
-    info: (first: any, ...rest: any) => logger.info(first, ...rest),
-    warn: (first: any, ...rest: any) => logger.warn(first, ...rest),
-    error: (first: any, ...rest: any) => logger.error(first, ...rest),
-    schema: (first: any, ...rest: any) => logger.debug(first, ...rest),
-    schemaBuild: (first: any, ...rest: any) => logger.info(first, ...rest),
-    query: (first: any, ...rest: any) => logger.debug(first, ...rest),
-    queryError: (first: any, ...rest: any) => logger.debug(first, ...rest),
-    querySlow: (first: any, ...rest: any) => logger.debug(first, ...rest),
-    migration: (first: any, ...rest: any) => logger.info(first, ...rest),
-});
+const ormLoggingAdaptorLevelMappings = (logger: Logger) => {
+    const migrationLogger = logger.child({labels: ['Migration']}, mergeArr);
+    return {
+        log: (first: any, ...rest: any) => logger.debug(first, ...rest),
+        info: (first: any, ...rest: any) => logger.info(first, ...rest),
+        warn: (first: any, ...rest: any) => logger.warn(first, ...rest),
+        error: (first: any, ...rest: any) => logger.error(first, ...rest),
+        schema: (first: any, ...rest: any) => logger.debug(first, ...rest),
+        schemaBuild: (first: any, ...rest: any) => migrationLogger.info(first, ...rest),
+        query: (first: any, ...rest: any) => logger.debug(first, ...rest),
+        queryError: (first: any, ...rest: any) => logger.debug(first, ...rest),
+        querySlow: (first: any, ...rest: any) => logger.debug(first, ...rest),
+        migration: (first: any, ...rest: any) => migrationLogger.info(first, ...rest),
+    }
+};

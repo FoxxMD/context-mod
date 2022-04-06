@@ -216,6 +216,7 @@ const webClient = async (options: OperatorConfig) => {
         throw new SimpleError(`Specified port for web interface (${port}) is in use or not available. Cannot start web server.`);
     }
 
+    logger.info('Initializing database...');
     let [ranMigrations, migrationBlocker] = await migrationService.initDatabase();
 
     app.use((req, res, next) => {
@@ -1288,8 +1289,6 @@ const webClient = async (options: OperatorConfig) => {
             await migrationService.backupDatabase();
         } catch (e) {
             status = 500;
-            // @ts-ignore
-            app.dbLogger.error(e, {leaf: 'Backup'})
         }
 
         const dbLogs = webLogs.filter(x => {

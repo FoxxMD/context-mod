@@ -264,8 +264,6 @@ const rcbServer = async function (options: OperatorConfigWithFileContext) {
             await app.backupDatabase();
         } catch (e) {
             status = 500;
-            // @ts-ignore
-            app.dbLogger.error(e, {leaf: 'Backup'})
         }
 
         const dbLogs = sysLogs.filter(x => {
