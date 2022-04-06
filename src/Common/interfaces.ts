@@ -710,8 +710,19 @@ export interface OperatorCacheConfig extends CacheConfig {
     actionedEventsDefault?: number
 }
 
-export type DatabaseDriver = 'sqljs' | 'better-sqlite3' | 'mysql' | 'mariadb' | 'postgres';
+export type DatabaseDriverType = 'sqljs' | 'better-sqlite3' | 'mysql' | 'mariadb' | 'postgres';
 export type DatabaseConfig = SqljsConnectionOptions | MysqlConnectionOptions | PostgresConnectionOptions | BetterSqlite3ConnectionOptions;
+export type DatabaseDriverConfig = {
+    type: DatabaseDriverType,
+    [key: string]: any
+    /**
+     * Set the type of logging typeorm should output
+     *
+     * Defaults to errors, warnings, and schema (migration progress)
+     * */
+    logging?: LoggerOptions
+}
+export type DatabaseDriver = DatabaseDriverType | DatabaseDriverConfig;
 
 export interface Footer {
     /**
@@ -1802,21 +1813,15 @@ export interface OperatorJsonConfig {
     caching?: OperatorCacheConfig
 
     /**
-     * Database backend to use for persistent data
+     * Database backend to use for persistent APPLICATION data
      *
      * Defaults to 'sqljs' which stores data in a file
      * */
     databaseConfig?: {
         // can't use DatabaseConfig here because generating the schema complains about unsupported symbol and a circular reference
         // ...also including all those options makes the schema huge
-        connection?: DatabaseDriver | {type: DatabaseDriver, [key: string]: any},
+        connection?: DatabaseDriverType | DatabaseDriverConfig,
         migrations?: DatabaseMigrationOptions
-        /**
-         * Set the type of logging typeorm should output
-         *
-         * Defaults to errors, warnings, and schema (migration progress)
-         * */
-        logging?: LoggerOptions
     }
 
     /**
@@ -1853,9 +1858,26 @@ export interface OperatorJsonConfig {
         port?: number,
 
         /**
-         * Storage provider to use for sessions and other web client specific data
+         * Database backend to use for persistent WEB data
          *
-         * If none is provided the top-level database is used
+         * If none is provided the top-level database provider is used
+         * */
+        databaseConfig?: {
+            connection?: DatabaseDriver,
+            migrations?: DatabaseMigrationOptions
+        }
+
+        /**
+         * Caching provider to use for session and invite data
+         *
+         * If none is provided the top-level caching provider is used
+         * */
+        caching?: 'memory' | 'redis' | CacheOptions
+
+        /**
+         * Storage provider type to use for sessions and other web client specific data
+         *
+         * Defaults to `database` if none is provided
          *
          * * Specify `database` to use top-level database
          * * Specify `cache` to use top-level cache
@@ -2043,6 +2065,11 @@ export interface OperatorConfig extends OperatorJsonConfig {
     database: DataSource
     web: {
         database: DataSource,
+        databaseConfig: {
+            connection: DatabaseConfig,
+            migrations: DatabaseMigrationOptions
+        }
+        caching: CacheOptions,
         port: number,
         storage?: 'database' | 'cache'
         session: {

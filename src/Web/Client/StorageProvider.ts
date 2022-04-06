@@ -52,7 +52,7 @@ abstract class StorageProvider {
             loggerLabels = [],
         } = data;
         this.invitesMaxAge = invitesMaxAge;
-        this.logger = logger.child({labels: ['Web Storage', ...loggerLabels]}, mergeArr);
+        this.logger = logger.child({labels: ['Web', 'Storage', ...loggerLabels]}, mergeArr);
     }
 
     protected abstract getInvite(id: string): Promise<InviteData | undefined | null>;

@@ -590,7 +590,7 @@
             },
             "type": "object"
         },
-        "DatabaseDriver": {
+        "DatabaseDriverType": {
             "enum": [
                 "better-sqlite3",
                 "mariadb",
@@ -1521,15 +1521,42 @@
             "$ref": "#/definitions/ThirdPartyCredentialsJsonConfig"
         },
         "databaseConfig": {
-            "description": "Database backend to use for persistent data\n\nDefaults to 'sqljs' which stores data in a file",
+            "description": "Database backend to use for persistent APPLICATION data\n\nDefaults to 'sqljs' which stores data in a file",
             "properties": {
                 "connection": {
                     "anyOf": [
                         {
                             "additionalProperties": {},
                             "properties": {
+                                "logging": {
+                                    "anyOf": [
+                                        {
+                                            "items": {
+                                                "enum": [
+                                                    "error",
+                                                    "info",
+                                                    "log",
+                                                    "migration",
+                                                    "query",
+                                                    "schema",
+                                                    "warn"
+                                                ],
+                                                "type": "string"
+                                            },
+                                            "type": "array"
+                                        },
+                                        {
+                                            "enum": [
+                                                "all",
+                                                false,
+                                                true
+                                            ]
+                                        }
+                                    ],
+                                    "description": "Set the type of logging typeorm should output\n\nDefaults to errors, warnings, and schema (migration progress)"
+                                },
                                 "type": {
-                                    "$ref": "#/definitions/DatabaseDriver"
+                                    "$ref": "#/definitions/DatabaseDriverType"
                                 }
                             },
                             "required": [
@@ -1658,6 +1685,68 @@
                         }
                     ]
                 },
+                "databaseConfig": {
+                    "description": "Database backend to use for persistent WEB data\n\nIf none is provided the top-level database provider is used",
+                    "properties": {
+                        "connection": {
+                            "anyOf": [
+                                {
+                                    "additionalProperties": {},
+                                    "properties": {
+                                        "logging": {
+                                            "anyOf": [
+                                                {
+                                                    "items": {
+                                                        "enum": [
+                                                            "error",
+                                                            "info",
+                                                            "log",
+                                                            "migration",
+                                                            "query",
+                                                            "schema",
+                                                            "warn"
+                                                        ],
+                                                        "type": "string"
+                                                    },
+                                                    "type": "array"
+                                                },
+                                                {
+                                                    "enum": [
+                                                        "all",
+                                                        false,
+                                                        true
+                                                    ]
+                                                }
+                                            ],
+                                            "description": "Set the type of logging typeorm should output\n\nDefaults to errors, warnings, and schema (migration progress)"
+                                        },
+                                        "type": {
+                                            "$ref": "#/definitions/DatabaseDriverType"
+                                        }
+                                    },
+                                    "required": [
+                                        "type"
+                                    ],
+                                    "type": "object"
+                                },
+                                {
+                                    "enum": [
+                                        "better-sqlite3",
+                                        "mariadb",
+                                        "mysql",
+                                        "postgres",
+                                        "sqljs"
+                                    ],
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "migrations": {
+                            "$ref": "#/definitions/DatabaseMigrationOptions"
+                        }
+                    },
+                    "type": "object"
+                },
                 "invites": {
                     "description": "Settings related to oauth flow invites",
                     "properties": {
@@ -1729,9 +1818,25 @@
                                 "definitelyARandomString"
                             ],
                             "type": "string"
+                        },
+                        "storage": {
+                            "description": "Specify backend storage to use for persisting client sessions. If specified this will overwrite parent-level `storage` settings.\n\nMay be useful if using `database` for general web client storage but have heavy traffic and want sessions to be more performant (using `cache`)",
+                            "enum": [
+                                "cache",
+                                "database"
+                            ],
+                            "type": "string"
                         }
                     },
                     "type": "object"
+                },
+                "storage": {
+                    "description": "Storage provider type to use for sessions and other web client specific data\n\nDefaults to `database` if none is provided\n\n* Specify `database` to use top-level database\n* Specify `cache` to use top-level cache\n\nNOTE: `database` should almost always be used. Cache would only be necessary if this instance experiences heavy traffic",
+                    "enum": [
+                        "cache",
+                        "database"
+                    ],
+                    "type": "string"
                 }
             },
             "type": "object"

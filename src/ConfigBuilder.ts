@@ -35,7 +35,13 @@ import {
     RedditCredentials,
     BotCredentialsJsonConfig,
     BotCredentialsConfig,
-    FilterCriteriaDefaults, TypedActivityStates, OperatorFileConfig, PostBehavior, StrongLoggingOptions
+    FilterCriteriaDefaults,
+    TypedActivityStates,
+    OperatorFileConfig,
+    PostBehavior,
+    StrongLoggingOptions,
+    DatabaseDriverConfig,
+    DatabaseDriver, DatabaseDriverType
 } from "./Common/interfaces";
 import {isRuleSetJSON, RuleSetJson, RuleSetObjectJson} from "./Rule/RuleSet";
 import deepEqual from "fast-deep-equal";
@@ -55,7 +61,12 @@ import {
 } from "./Common/defaults";
 import objectHash from "object-hash";
 import {AuthorCriteria, AuthorOptions} from "./Author/Author";
-import {createDatabaseConfig, createDatabaseConnection} from "./Utils/databaseUtils";
+import {
+    createAppDatabaseConnection,
+    createDatabaseConfig,
+    createDatabaseConnection,
+    createWebDatabaseConnection
+} from "./Utils/databaseUtils";
 import path from 'path';
 import {
     JsonOperatorConfigDocument,
@@ -746,13 +757,17 @@ export const buildOperatorConfigWithDefaults = async (data: OperatorJsonConfig):
         caching: opCache,
         userAgent,
         databaseConfig: {
-            connection: dbConnection = process.env.DB_DRIVER ?? 'sqljs',
+            connection: dbConnection = (process.env.DB_DRIVER ?? 'sqljs') as DatabaseDriverType,
             migrations = {},
-            logging: dbLogging,
         } = {},
         web: {
             port = 8085,
             maxLogs = 200,
+            databaseConfig: {
+                connection: dbConnectionWeb = dbConnection,
+                migrations: migrationsWeb = migrations,
+            } = {},
+            caching: webCaching = {},
             storage: webStorage = undefined,
             session: {
                 secret: sessionSecretFromConfig = undefined,
@@ -854,6 +869,13 @@ export const buildOperatorConfigWithDefaults = async (data: OperatorJsonConfig):
     const appLogger = getLogger(loggingOptions, 'app');
 
     const dbConfig = createDatabaseConfig(dbConnection);
+    let realdbConnectionWeb: DatabaseDriver = dbConnectionWeb;
+    if(typeof dbConnectionWeb === 'string') {
+        realdbConnectionWeb = dbConnectionWeb as DatabaseDriverType;
+    } else if(!(typeof dbConnection === 'string')) {
+        realdbConnectionWeb = {...dbConnection, ...dbConnectionWeb};
+    }
+    const webDbConfig = createDatabaseConfig(realdbConnectionWeb);
 
     const config: OperatorConfig = {
         mode,
@@ -864,14 +886,22 @@ export const buildOperatorConfigWithDefaults = async (data: OperatorJsonConfig):
         logging: loggingOptions,
         caching: cache,
         snoowrap: snoowrapOp,
-        database: await createDatabaseConnection('app', dbConfig, appLogger, dbLogging),
+        database: await createAppDatabaseConnection(dbConfig, appLogger),
         databaseConfig: {
             connection: dbConfig,
             migrations,
         },
         userAgent,
         web: {
-            database: await createDatabaseConnection('web', dbConfig, appLogger, dbLogging),
+            database: await createWebDatabaseConnection(webDbConfig, appLogger),
+            databaseConfig: {
+                connection: webDbConfig,
+                migrations: migrationsWeb,
+            },
+            caching: {
+                ...defaultProvider,
+                ...webCaching
+            },
             port,
             storage: webStorage,
             invites: {

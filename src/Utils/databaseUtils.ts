@@ -1,4 +1,4 @@
-import {DatabaseConfig, DatabaseDriver} from "../Common/interfaces";
+import {DatabaseConfig, DatabaseDriverType} from "../Common/interfaces";
 import {SqljsConnectionOptions} from "typeorm/driver/sqljs/SqljsConnectionOptions";
 import {MysqlConnectionOptions} from "typeorm/driver/mysql/MysqlConnectionOptions";
 import {MongoConnectionOptions} from "typeorm/driver/mongodb/MongoConnectionOptions";
@@ -15,18 +15,19 @@ import {WinstonAdaptor} from "typeorm-logger-adaptor/logger/winston";
 import process from "process";
 import {defaultDataDir} from "../Common/defaults";
 import {LoggerOptions} from "typeorm/logger/LoggerOptions";
+import {DataSourceOptions} from "typeorm/data-source/DataSourceOptions";
 
 
 const validDrivers = ['sqljs', 'better-sqlite3', 'mysql', 'mariadb', 'postgres'];
 
-export const isDatabaseDriver = (val: any): val is DatabaseDriver => {
+export const isDatabaseDriver = (val: any): val is DatabaseDriverType => {
     if (typeof val !== 'string') {
         return false;
     }
     return validDrivers.some(x => x === val.toLocaleLowerCase());
 }
 
-export const asDatabaseDriver = (val: string): DatabaseDriver => {
+export const asDatabaseDriver = (val: string): DatabaseDriverType => {
     const cleanVal = val.trim().toLocaleLowerCase();
     if(isDatabaseDriver(cleanVal)) {
         return cleanVal;
@@ -34,9 +35,9 @@ export const asDatabaseDriver = (val: string): DatabaseDriver => {
     throw new Error(`Value '${cleanVal}' is not a valid driver. Must be one of: ${validDrivers.join(', ')}`);
 }
 
-export const createDatabaseConfig = (val: DatabaseDriver | any): DatabaseConfig => {
+export const createDatabaseConfig = (val: DatabaseDriverType | any): DatabaseConfig => {
     try {
-        let dbType: DatabaseDriver;
+        let dbType: DatabaseDriverType;
         let userDbConfig: any = {};
         if (typeof val === 'string') {
             dbType = asDatabaseDriver(val);
@@ -105,11 +106,13 @@ export const createDatabaseConfig = (val: DatabaseDriver | any): DatabaseConfig 
     }
 }
 
-export const createDatabaseConnection = async (type: 'app' | 'web', rawConfig: DatabaseConfig, logger: Logger, dbLogLevels?: LoggerOptions): Promise<DataSource> => {
+type DomainSpecificDataSourceOptions = Required<Pick<DataSourceOptions, 'migrations' | 'migrationsTableName' | 'entities'>>;
+
+export const createDatabaseConnection = async (rawConfig: DatabaseConfig, domainOptions: DomainSpecificDataSourceOptions, logger: Logger): Promise<DataSource> => {
 
     let config = {...rawConfig};
 
-    const dbLogger = logger.child({labels: ['Database', (type === 'app' ? 'App' : 'Web')]}, mergeArr);
+    const dbLogger = logger.child({labels: ['Database']}, mergeArr);
 
     dbLogger.info(`Using '${rawConfig.type}' database type`);
 
@@ -121,21 +124,15 @@ export const createDatabaseConnection = async (type: 'app' | 'web', rawConfig: D
         const rawPath = rawConfig.type === 'sqljs' ? rawConfig.location : rawConfig.database;
 
         if (typeof rawPath !== 'string' || (typeof rawPath === 'string' && rawPath.trim().toLocaleLowerCase() === ':memory:')) {
-            dbLogger.info('Will use IN-MEMORY database');
-        } else if (typeof rawPath === 'string' && rawPath.trim().toLocaleLowerCase() !== ':memory:') {
+            dbLogger.warn('Will use IN-MEMORY database. All data will be lost on application restart.');
+        } else {
             try {
-                let sqlLitePath = rawPath;
-                if(rawConfig.type === 'sqljs') {
-                    const pathInfo = parsePath(rawPath);
-                    dbLogger.info(`Converting to domain-specific database file (${pathInfo.name}-${type}.sqlite) due to how sqljs works.`)
-                    sqlLitePath = resolve(pathInfo.dir, `${pathInfo.name}-${type}${pathInfo.ext}`);
-                }
                 dbLogger.debug('Testing that database path is writeable...');
-                fileOrDirectoryIsWriteable(sqlLitePath);
-                dbPath = sqlLitePath;
-                dbLogger.info(`Using database at path: ${sqlLitePath}`);
+                fileOrDirectoryIsWriteable(rawPath);
+                dbPath = rawPath;
+                dbLogger.verbose(`Using database at path: ${rawPath}`);
             } catch (e: any) {
-                dbLogger.error(new ErrorWithCause(`Falling back to IN-MEMORY database due to error while trying to access database`, {cause: e}));
+                dbLogger.error(new ErrorWithCause(`Falling back to IN-MEMORY database due to error while trying to access database. All data will be lost on application restart`, {cause: e}));
                 if(castToBool(process.env.IS_DOCKER) === true) {
                     dbLogger.info(`Make sure you have specified user in docker run command! See https://github.com/FoxxMD/context-mod/blob/master/docs/gettingStartedOperator.md#docker-recommended`);
                 }
@@ -156,23 +153,71 @@ export const createDatabaseConnection = async (type: 'app' | 'web', rawConfig: D
         config = {...config, ...dbOptions} as SqljsConnectionOptions | BetterSqlite3ConnectionOptions;
     }
 
-    const entitiesDir = type === 'app' ? '../Common/Entities' : '../Common/WebEntities'
-    const migrationsDir = type === 'app' ? '../Common/Migrations/Database/Server' : '../Common/Migrations/Database/Web';
-    const migrationTable = type === 'app' ? 'migrationsApp' : 'migrationsWeb';
+    const {
+        logging = ['error', 'warn', 'schema'],
+        ...rest
+    } = config;
+
+    let logTypes: any = logging;
+    if(logTypes === true) {
+        logTypes = ['ALL (logging=true)'];
+    } else if (logTypes === false) {
+        logTypes = ['NONE (logging=false)'];
+    }
+    dbLogger.debug(`Will log the follow types from typeorm: ${logTypes.join(',')}`);
 
     const source = new DataSource({
-        ...config,
+        ...rest,
         synchronize: false,
-        entities: [`${resolve(__dirname, entitiesDir)}/**/*.js`],
-        migrations: [`${resolve(__dirname, migrationsDir)}/*.js`],
-        migrationsTableName: migrationTable,
+        ...domainOptions,
         migrationsRun: false,
         logging: ['error', 'warn', 'migration', 'schema', 'log'],
-        logger: new WinstonAdaptor(dbLogger, dbLogLevels ?? ['error', 'warn', 'schema'], false, ormLoggingAdaptorLevelMappings(dbLogger)),
+        logger: new WinstonAdaptor(dbLogger, logging, false, ormLoggingAdaptorLevelMappings(dbLogger)),
         namingStrategy: new CMNamingStrategy(),
     });
     await source.initialize();
     return source;
+}
+
+export const convertSqlJsLocation = (suffix: string, rawConfig: DatabaseConfig, logger: Logger) => {
+    if (rawConfig.type === 'sqljs' && typeof rawConfig.location === 'string' && rawConfig.location.trim().toLocaleLowerCase() !== ':memory:') {
+        const pathInfo = parsePath(rawConfig.location);
+        const suffixedFilename = `${pathInfo.name}-${suffix}${pathInfo.ext}`;
+        logger.debug(`Converting to domain-specific database file (${suffixedFilename}) due to how sqljs works.`, {leaf: 'Database'});
+        return {...rawConfig, location: resolve(pathInfo.dir, suffixedFilename)}
+    }
+    return rawConfig;
+}
+
+export const domainDatabaseOptions = {
+    app: {
+        entities: '../Common/Entities',
+        migrations: '../Common/Migrations/Database/Server',
+        migrationsTableName: 'migrationsApp'
+    },
+    web: {
+        entities: '../Common/WebEntities',
+        migrations: '../Common/Migrations/Database/Web',
+        migrationsTableName: 'migrationsWeb'
+    }
+}
+
+export const createAppDatabaseConnection = async (rawConfig: DatabaseConfig, logger: Logger) => {
+    const domainLogger = logger.child({labels: ['App']}, mergeArr);
+    return createDatabaseConnection(convertSqlJsLocation('app', rawConfig, domainLogger), {
+        entities: [`${resolve(__dirname, domainDatabaseOptions.app.entities)}/**/*.js`],
+        migrations: [`${resolve(__dirname, domainDatabaseOptions.app.migrations)}/*.js`],
+        migrationsTableName: domainDatabaseOptions.app.migrationsTableName
+    }, domainLogger);
+}
+
+export const createWebDatabaseConnection = async (rawConfig: DatabaseConfig, logger: Logger) => {
+    const domainLogger = logger.child({labels: ['Web']}, mergeArr);
+    return createDatabaseConnection(convertSqlJsLocation('web', rawConfig, domainLogger), {
+        entities: [`${resolve(__dirname, domainDatabaseOptions.web.entities)}/**/*.js`],
+        migrations: [`${resolve(__dirname, domainDatabaseOptions.web.migrations)}/*.js`],
+        migrationsTableName: domainDatabaseOptions.web.migrationsTableName
+    }, domainLogger);
 }
 
 const ormLoggingAdaptorLevelMappings = (logger: Logger) => ({

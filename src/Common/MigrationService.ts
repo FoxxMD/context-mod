@@ -17,7 +17,7 @@ export class MigrationService {
         database: DataSource,
         options: DatabaseMigrationOptions
     }) {
-        this.dbLogger = data.logger.child({labels: [`Database`, (data.type === 'app' ? 'App' : 'Web')]}, mergeArr);
+        this.dbLogger = data.logger.child({labels: [(data.type === 'app' ? 'App' : 'Web'), `Database`]}, mergeArr);
         this.database = data.database;
         this.options = data.options;
     }

@@ -155,17 +155,17 @@ const webClient = async (options: OperatorConfig) => {
             display,
         },
         userAgent: uaFragment,
-        caching: {
-            provider: caching
-        },
+        // caching: {
+        //     provider: caching
+        // },
         web: {
             database,
+            databaseConfig: {
+                migrations
+            },
             port,
             storage: webStorage = 'database',
-            // caching,
-            // caching: {
-            //     prefix
-            // },
+            caching,
             invites: {
               maxAge: invitesMaxAge,
             },
@@ -209,7 +209,7 @@ const webClient = async (options: OperatorConfig) => {
         type: 'web',
         logger,
         database,
-        options: options.databaseConfig.migrations
+        options: migrations
     });
 
     if (await tcpUsed.check(port)) {
