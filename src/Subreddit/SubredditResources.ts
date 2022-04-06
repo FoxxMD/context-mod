@@ -591,8 +591,7 @@ export class SubredditResources {
                 const cachedSubreddit = await this.cache.get(hash);
                 if (cachedSubreddit !== undefined && cachedSubreddit !== null) {
                     this.logger.debug(`Cache Hit: Subreddit ${subName}`);
-                    // @ts-ignore
-                    return cachedSubreddit as Subreddit;
+                    return new Subreddit(cachedSubreddit, this.client, false);
                 }
                 // @ts-ignore
                 const subreddit = await this.client.getSubreddit(subName).fetch() as Subreddit;
