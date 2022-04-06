@@ -6,12 +6,14 @@ import {Cache} from "cache-manager";
 // @ts-ignore
 import CacheManagerStore from 'express-session-cache-manager'
 import {CacheOptions} from "../../Common/interfaces";
-import {Brackets, DataSource, IsNull, LessThanOrEqual} from "typeorm";
+import {Brackets, DataSource, IsNull, LessThanOrEqual, Repository} from "typeorm";
 import {DateUtils} from 'typeorm/util/DateUtils';
 import {ClientSession} from "../../Common/WebEntities/ClientSession";
 import dayjs from "dayjs";
 import {Logger} from "winston";
 import {Invite} from "../../Common/WebEntities/Invite";
+import {WebSetting} from "../../Common/WebEntities/WebSetting";
+import {ErrorWithCause} from "pony-cause";
 
 export interface CacheManagerStoreOptions {
     prefix?: string
@@ -32,6 +34,10 @@ interface IWebStorageProvider {
     inviteDelete(id: string): Promise<void>
 
     inviteCreate(id: string, data: InviteData): Promise<InviteData>
+
+    getSessionSecret(): Promise<string | undefined>
+
+    setSessionSecret(secret: string): Promise<void>
 }
 
 interface StorageProviderOptions {
@@ -40,7 +46,7 @@ interface StorageProviderOptions {
     loggerLabels?: string[]
 }
 
-abstract class StorageProvider {
+abstract class StorageProvider implements IWebStorageProvider {
 
     invitesMaxAge?: number
     logger: Logger;
@@ -64,9 +70,19 @@ abstract class StorageProvider {
         }
         return data;
     }
+
+    abstract createSessionStore(options?: CacheManagerStoreOptions | TypeormStoreOptions): Store;
+
+    abstract getSessionSecret(): Promise<string | undefined>;
+
+    abstract inviteCreate(id: string, data: InviteData): Promise<InviteData>;
+
+    abstract inviteDelete(id: string): Promise<void>;
+
+    abstract setSessionSecret(secret: string): Promise<void>;
 }
 
-export class CacheStorageProvider extends StorageProvider implements IWebStorageProvider {
+export class CacheStorageProvider extends StorageProvider {
 
     protected cache: Cache;
 
@@ -96,22 +112,38 @@ export class CacheStorageProvider extends StorageProvider implements IWebStorage
         return await this.cache.del(`invite:${id}`);
     }
 
+    async getSessionSecret() {
+        const val = await this.cache.get(`sessionSecret`);
+        if (val === null || val === undefined) {
+            return undefined;
+        }
+        return val as string;
+    }
+
+    async setSessionSecret(secret: string) {
+        await this.cache.set('sessionSecret', secret, {ttl: 0});
+    }
+
 }
 
-export class DatabaseStorageProvider extends StorageProvider implements IWebStorageProvider {
+export class DatabaseStorageProvider extends StorageProvider {
 
     database: DataSource;
-    inviteRepo;
+    inviteRepo: Repository<Invite>;
+    webSettingRepo: Repository<WebSetting>;
+    clientSessionRepo: Repository<ClientSession>
 
     constructor(data: { database: DataSource } & StorageProviderOptions) {
         super(data);
         this.database = data.database;
         this.inviteRepo = this.database.getRepository(Invite);
+        this.webSettingRepo = this.database.getRepository(WebSetting);
+        this.clientSessionRepo = this.database.getRepository(ClientSession);
         this.logger.debug('Using DATABASE');
     }
 
     createSessionStore(options?: TypeormStoreOptions): Store {
-        return new TypeormStore(options).connect(this.database.getRepository(ClientSession))
+        return new TypeormStore(options).connect(this.clientSessionRepo)
     }
 
     protected async getInvite(id: string): Promise<InviteData | undefined | null> {
@@ -132,6 +164,26 @@ export class DatabaseStorageProvider extends StorageProvider implements IWebStor
 
     async inviteDelete(id: string): Promise<void> {
         await this.inviteRepo.delete(id);
+    }
+
+    async getSessionSecret(): Promise<string | undefined> {
+        try {
+            const dbSessionSecret = await this.webSettingRepo.findOneBy({name: 'sessionSecret'});
+            if (dbSessionSecret === null) {
+                return undefined;
+            }
+            return dbSessionSecret.value;
+        } catch (e) {
+            throw new ErrorWithCause('Unable to retrieve session secret from database', {cause: e});
+        }
+    }
+
+    async setSessionSecret(secret: string): Promise<void> {
+        try {
+            await this.webSettingRepo.save(new WebSetting({name: 'sessionSecret', value: secret}));
+        } catch (e) {
+            throw new ErrorWithCause('Unable to insert session secret into database', {cause: e});
+        }
     }
 
 }

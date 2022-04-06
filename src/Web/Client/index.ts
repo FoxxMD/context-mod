@@ -232,39 +232,30 @@ const webClient = async (options: OperatorConfig) => {
         }
     });
 
-    const settingRepo = database.getRepository(WebSetting);
+    const storage = webStorage === 'database' ? new DatabaseStorageProvider({database, invitesMaxAge, logger}) : new CacheStorageProvider({...caching, invitesMaxAge, logger});
 
-    let sessionSecret = sessionSecretFromConfig;
-    if (sessionSecret !== undefined) {
-        logger.debug('Using defined session secret from config');
+    let sessionSecret: string;
+    if (sessionSecretFromConfig !== undefined) {
+        logger.debug('Using session secret defined in config');
+        sessionSecret = sessionSecretFromConfig;
         sessionSecretSynced = true;
     } else {
         try {
-            const dbSessionSecret = await settingRepo.findOneBy({name: 'sessionSecret'});
-            if (null === dbSessionSecret) {
-                logger.debug('Generating new session secret and saving to database...');
+            let persistedSecret = await storage.getSessionSecret();
+            if (undefined === persistedSecret) {
+                storage.logger.debug('No session secret found in storage, generating new session secret and saving...');
                 sessionSecret = randomId();
-                await settingRepo.save(new WebSetting({name: 'sessionSecret', value: sessionSecret}));
+                await storage.setSessionSecret(sessionSecret);
             } else {
-                logger.debug('Using session secret from database');
-                sessionSecret = dbSessionSecret.value as string;
+                storage.logger.debug('Using session secret found in from storage')
+                sessionSecret = persistedSecret;
             }
             sessionSecretSynced = true;
         } catch (e) {
-            let msg = 'Unable to get/insert session secret from database.'
-            if(!ranMigrations) {
-                msg += '(Probably initial database creation is not done yet)';
-            }
-            msg += 'Will use random ID for now';
             sessionSecret = randomId();
-            logger.warn(new ErrorWithCause(msg, {cause: e}));
+            storage.logger.warn(new ErrorWithCause('Falling back to a random ID for session secret', {cause: e}));
         }
     }
-
-
-    //const webCache = createCacheManager({...caching, prefix: buildCachePrefix([prefix, 'web'])}) as Cache;
-
-    const storage = webStorage === 'database' ? new DatabaseStorageProvider({database, invitesMaxAge, logger}) : new CacheStorageProvider({...caching, invitesMaxAge, logger});
 
     const connectedUsers: ConnectUserObj = {};
 
@@ -1263,7 +1254,7 @@ const webClient = async (options: OperatorConfig) => {
         } finally {
             if(ranMigrations && !sessionSecretSynced) {
                 // ensure session secret is synced
-                await settingRepo.save(new WebSetting({name: 'sessionSecret', value: sessionSecret}));
+                await storage.setSessionSecret(sessionSecret)
             }
             const dbLogs = webLogs.filter(x => x.labels?.includes('Database') && dayjs(x.timestamp).isSameOrAfter(now));
             dbLogs.reverse();
