@@ -3,9 +3,10 @@ import Action from "./index";
 import {Comment} from "snoowrap";
 import {renderContent} from "../Utils/SnoowrapUtils";
 import {RuleResult} from "../Rule";
-import {UserNote, UserNoteJson} from "../Subreddit/UserNotes";
+import {UserNoteJson} from "../Subreddit/UserNotes";
 import Submission from "snoowrap/dist/objects/Submission";
 import {ActionProcessResult} from "../Common/interfaces";
+//import {getActivityAuthorName, isSubmission} from "../util";
 
 
 export class UserNoteAction extends Action {
@@ -51,7 +52,7 @@ export class UserNoteAction extends Action {
             }
         }
         if (!dryRun) {
-            await this.resources.userNotes.addUserNote(item, this.type, renderedContent);
+            await this.resources.userNotes.addUserNote(item, this.type, renderedContent, this.name !== undefined ? `(Action ${this.name})` : '');
         } else if (!await this.resources.userNotes.warningExists(this.type)) {
             this.logger.warn(`UserNote type '${this.type}' does not exist. If you meant to use this please add it through Toolbox first.`);
         }
