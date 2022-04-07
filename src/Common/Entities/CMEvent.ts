@@ -60,6 +60,8 @@ export class CMEvent extends RandomIdBaseEntity {
 
     @AfterLoad()
     sortRuns() {
-        this.runResults.sort((a, b) => a.createdAt.isSameOrBefore(b.createdAt) ?  -1 : 1);
+        if(this.runResults !== undefined) {
+            this.runResults.sort((a, b) => a.createdAt.isSameOrBefore(b.createdAt) ?  -1 : 1);
+        }
     }
 }
