@@ -1,0 +1,14 @@
+#!/usr/bin/with-contenv bash
+
+# used https://github.com/linuxserver/docker-plex as a template
+
+# make data folder if not /config
+#if [ ! -d "${DATA_DIR}" ]; then \
+#mkdir -p "${DATA_DIR}"
+#chown -R abc:abc /config
+#fi
+
+# permissions
+chown abc:abc \
+  /config \
+  /config/*
