@@ -25,7 +25,7 @@ COPY --chown=node:node tsconfig.json .
 
 RUN npm install
 
-ADD --chown=node:node . /home/node
+COPY --chown=node:node . /home/node
 
 RUN npm run build && rm -rf node_modules
 
@@ -33,7 +33,7 @@ FROM base as app
 
 COPY --from=build --chown=node:node /home/node /home/node
 
-RUN npm install --production
+RUN npm install --production && npm cache clean --force
 
 ENV NPM_CONFIG_LOGLEVEL debug
 
