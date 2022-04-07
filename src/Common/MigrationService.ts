@@ -1,10 +1,15 @@
 import {Logger} from "winston";
-import {DataSource} from "typeorm";
+import {DataSource, Table} from "typeorm";
 import {intersect, mergeArr} from "../util";
 import {DatabaseMigrationOptions} from "./interfaces";
 import {copyFile} from "fs/promises";
 import {constants} from "fs";
 import {ErrorWithCause} from "pony-cause";
+
+export interface ExistingTable {
+    table: Table
+    name: string
+}
 
 export class MigrationService {
     dbLogger: Logger;
@@ -22,6 +27,49 @@ export class MigrationService {
         this.options = data.options;
     }
 
+    /**
+     * Return clean list of names of tables existing only in relevant database/schema
+     *
+     * @deprecated EntityMetadata.tablePath should return correct name
+     * */
+    protected async getRelevantExistingTables(): Promise<ExistingTable[]> {
+        const runner = this.database.createQueryRunner();
+        let existingTables = await runner.getTables();
+
+        const {
+            options: {
+                type: dbType
+            },
+            schema,
+            database
+        } = this.database.driver;
+
+        if (database !== undefined && ['mysql', 'mariadb', 'postgres'].includes(dbType)) {
+            // filter by database if it was specified in connection options
+            existingTables = existingTables.filter(x => x.database === undefined || x.database === database);
+        }
+
+        // Table name from postgres db are prefixed by schema EX: cm.ClientSession
+        // need to filter to only used schema tables and then return only non-prefixed table names
+        if (dbType === 'postgres') {
+            // determine what schema is actually used. Default if not defined is 'public'
+            // https://typeorm.io/data-source-options#postgres--cockroachdb-data-source-options
+            const realSchema = schema ?? 'public';
+            existingTables = existingTables.filter(x => x.schema === realSchema);
+
+            // finally, return table names without schema prefix
+            return existingTables.map(x => {
+                const splitName = x.name.split('.');
+                return {
+                    table: x,
+                    name: splitName[splitName.length - 1]
+                }
+            });
+        }
+
+        return existingTables.map(x => ({table: x, name: x.name}));
+    }
+
     async initDatabase(): Promise<[boolean, string?]> {
         const {
             force = false,
@@ -30,27 +78,34 @@ export class MigrationService {
 
         this.dbLogger.info('Checking if migrations are required...');
 
+        const migrationTableName = this.database.options.migrationsTableName ?? 'migrations';
+
         const runner = this.database.createQueryRunner();
         const existingTables = await runner.getTables();
-        const potentialTables = this.database.entityMetadatas.map(x => x.tableName);
+        const existingTableNames = existingTables.map(x => x.name);
+        // const existingTables = await this.getRelevantExistingTables();
+        const potentialTables = this.database.entityMetadatas.map(x => x.tablePath);
 
-        const blankDb = existingTables.length === 0 || (existingTables.length === 1 && existingTables.map(x => x.name).includes('migrations'));
-        const conflictingTables = intersect(existingTables.map(x => x.name), potentialTables)
+        const noTables = existingTables.length === 0;
+        const migrationsTablePresent = existingTableNames.some(x => x.includes(migrationTableName));
+        const onlyMigrationsTablePresent = existingTables.length === 1 && migrationsTablePresent;
+        const blankDb = noTables || onlyMigrationsTablePresent;
+        const conflictingTables = intersect(existingTableNames, potentialTables);
 
         if (blankDb || conflictingTables.length === 0) {
             if(blankDb) {
-                this.dbLogger.info('Detected a new database with no tables!');
+                this.dbLogger.info('Detected a new database with no domain tables!');
             } else {
-                this.dbLogger.info('Database has existing tables/schema (may be system tables) but none conflict with potential application tables!');
+                this.dbLogger.info('Database has existing tables/schema (may be system tables) but none conflict with potential domain tables!');
             }
             await this.database.showMigrations();
             await this.doMigration();
             return [true];
         }
 
-        if (!existingTables.map(x => x.name).some(x => x.toLocaleLowerCase().includes('migrations')) && !force) {
-            this.dbLogger.warn(`DANGER! Your database has existing tables but none of them include a 'migrations' table. 
-            Are you sure this is the correct database? Continuing with migrations will most likely drop any existing data and recreate all tables.`);
+        if (!migrationsTablePresent && !force) {
+            this.dbLogger.warn(`DANGER! Your database has existing tables but none of them include a '${migrationTableName}' table. 
+            Are you sure this is the correct database? Continuing with migrations will most likely drop any existing data and recreate all domain tables.`);
             return [false, 'unknownTables'];
         }
         if (await this.database.showMigrations()) {
