@@ -226,11 +226,11 @@ export async function getAuthorActivities(user: RedditUser, options: AuthorTyped
     const listFunc = (chunkSize: number): Promise<Listing<Submission | Comment>> => {
         switch (options.type) {
             case 'comment':
-                return user.getComments({limit: chunkSize});
+                return user.getComments({limit: chunkSize, sort: 'new'});
             case 'submission':
-                return user.getSubmissions({limit: chunkSize});
+                return user.getSubmissions({limit: chunkSize, sort: 'new'});
             default:
-                return user.getOverview({limit: chunkSize});
+                return user.getOverview({limit: chunkSize, sort: 'new'});
         }
     };
     try {

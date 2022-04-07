@@ -704,13 +704,17 @@
         el.addEventListener('click', e => {
             e.preventDefault();
             const subSection = e.target.closest('div.sub');
-            action = e.target.dataset.action;
-            subreddit = subSection.dataset.subreddit;
-            bot = subSection.dataset.bot;
-            type = e.target.dataset.type;
-            force = e.target.dataset.force === 'true';
+            const actionParams = new URLSearchParams();
 
-            fetch(`/api/action?instance=<%= instanceId %>&bot=${bot}&action=${action}&subreddit=${subreddit}&force=${force}&type=${type}`);
+            actionParams.append('action', e.target.dataset.action);
+            actionParams.append('subreddit', subSection.dataset.subreddit);
+            actionParams.append('bot', subSection.dataset.bot);
+            actionParams.append('force', e.target.dataset.force === 'true');
+            actionParams.append('instance', '<%= instanceId %>');
+            if(e.target.dataset.type !== undefined) {
+                actionParams.append('type', e.target.dataset.type);
+            }
+            fetch(`/api/action?${actionParams.toString()}`);
         });
     })
 

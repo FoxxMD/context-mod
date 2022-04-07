@@ -256,7 +256,7 @@ export class SubredditResources {
             this.stats.cache.userNotes.requests++;
             this.stats.cache.userNotes.miss += miss ? 1 : 0;
         }
-        this.userNotes = new UserNotes(userNotesTTL, this.subreddit, this.client, this.logger, this.cache, cacheUseCB)
+        this.userNotes = new UserNotes(userNotesTTL, this.subreddit.display_name, this.client, this.logger, this.cache, cacheUseCB)
 
         if(this.cacheType === 'memory' && this.cacheSettingsHash !== 'default') {
             const min = Math.min(...([this.wikiTTL, this.authorTTL, this.submissionTTL, this.commentTTL, this.filterCriteriaTTL].filter(x => typeof x === 'number' && x !== 0) as number[]));
@@ -771,8 +771,7 @@ export class SubredditResources {
                 const cachedSubreddit = await this.cache.get(hash);
                 if (cachedSubreddit !== undefined && cachedSubreddit !== null) {
                     this.logger.debug(`Cache Hit: Subreddit ${subName}`);
-                    // @ts-ignore
-                    return cachedSubreddit as Subreddit;
+                    return new Subreddit(cachedSubreddit, this.client, false);
                 }
                 // @ts-ignore
                 const subreddit = await this.client.getSubreddit(subName).fetch() as Subreddit;

@@ -985,8 +985,8 @@ const webClient = async (options: OperatorConfig) => {
                 });
                 return {...x, subreddits: subredditsWithSimpleLogs};
             }),
-            botId: (req.instance as CMInstanceInterface).friendly,
-            instanceId: (req.instance as CMInstanceInterface).friendly,
+            botId: (req.instance as CMInstance).getName(),
+            instanceId: (req.instance as CMInstance).getName(),
             isOperator: isOp,
             system: isOp ? {
                 // @ts-ignore
