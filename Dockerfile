@@ -75,7 +75,7 @@ RUN apk add --no-cache \
   && apk del .build-deps \
   # smoke tests
   && node --version \
-  && npm --version \
+  && npm --version
 #
 # end of docker node stuff
 #
@@ -87,11 +87,10 @@ RUN echo "http://dl-4.alpinelinux.org/alpine/v3.14/community" >> /etc/apk/reposi
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
 ARG data_dir=/config
-#RUN mkdir -p $data_dir && \
-#    chown -R abc:abc $data_dir && \
-#    chmod 755 $data_dir
 VOLUME $data_dir
 ENV DATA_DIR=$data_dir
+
+COPY docker/root/ /
 
 WORKDIR /app
 
@@ -110,7 +109,9 @@ FROM base as app
 
 COPY --from=build --chown=abc:abc /app /app
 
-RUN npm install --production && npm cache clean --force
+RUN npm install --production \
+    && npm cache clean --force \
+    && chown abc:abc node_modules
 
 ENV NPM_CONFIG_LOGLEVEL debug
 
@@ -123,6 +124,4 @@ EXPOSE $PORT
 
 # convenience variable for more helpful error messages
 ENV IS_DOCKER=true
-
-COPY docker/root/ /
 
