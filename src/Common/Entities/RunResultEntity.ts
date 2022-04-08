@@ -16,8 +16,7 @@ import {AuthorFilterResult} from "./FilterCriteria/AuthorFilterResult";
 import {CheckResultEntity} from "./CheckResultEntity";
 import {RuleResultEntity} from "./RuleResultEntity";
 import {CMEvent} from "./CMEvent";
-import {FilterResult as IFilterResult, TypedActivityState} from "../interfaces";
-import {AuthorCriteria} from "../../Author/Author";
+import {AuthorCriteria, FilterResult as IFilterResult, TypedActivityState} from "../interfaces";
 import {TimeAwareRandomBaseEntity} from "./Base/TimeAwareRandomBaseEntity";
 
 export interface RunResultEntityOptions {

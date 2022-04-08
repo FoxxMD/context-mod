@@ -41,7 +41,7 @@ import {
     PostBehavior,
     StrongLoggingOptions,
     DatabaseDriverConfig,
-    DatabaseDriver, DatabaseDriverType
+    DatabaseDriver, DatabaseDriverType, AuthorCriteria, AuthorOptions
 } from "./Common/interfaces";
 import {isRuleSetJSON, RuleSetJson, RuleSetObjectJson} from "./Rule/RuleSet";
 import deepEqual from "fast-deep-equal";
@@ -60,7 +60,6 @@ import {
     filterCriteriaDefault
 } from "./Common/defaults";
 import objectHash from "object-hash";
-import {AuthorCriteria, AuthorOptions} from "./Author/Author";
 import {
     createAppDatabaseConnection,
     createDatabaseConfig,

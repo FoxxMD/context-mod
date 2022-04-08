@@ -1,8 +1,6 @@
 import winston, {Logger} from "winston";
 import jsonStringify from 'safe-stable-stringify';
 import dayjs, {Dayjs, OpUnitType} from 'dayjs';
-import {UserNoteCriteria} from "./Rule";
-import deepEqual from "fast-deep-equal";
 import {Duration} from 'dayjs/plugin/duration.js';
 import Ajv from "ajv";
 import {InvalidOptionArgumentError} from "commander";
@@ -12,10 +10,14 @@ import os from 'os';
 import pathUtil from 'path';
 import crypto, {createHash} from 'crypto';
 import {
-    ActionResult, ActivityDispatch, ActivityDispatchConfig,
-    ActivitySource, ActivitySourceTypes,
+    ActionResult,
+    ActivityDispatch,
+    ActivityDispatchConfig,
+    ActivitySource,
+    ActivitySourceTypes,
     ActivityWindowCriteria,
     ActivityWindowType,
+    AuthorCriteria, AuthorOptions,
     CacheOptions,
     CacheProvider,
     CheckSummary,
@@ -25,13 +27,14 @@ import {
     FilterCriteriaDefaults,
     FilterCriteriaPropertyResult,
     FilterCriteriaResult,
-    FilterResult, FullNameTypes,
+    FilterResult,
+    FullNameTypes,
     GenericComparison,
     ImageComparisonResult,
     ItemCritPropHelper,
     LogInfo,
-    ObjectPremise,
-    OperatorJsonConfig, PermalinkRedditThings,
+    OperatorJsonConfig,
+    PermalinkRedditThings,
     PollingOptionsStrong,
     RedditEntity,
     RedditEntityType,
@@ -51,11 +54,12 @@ import {
     SubmissionState,
     SubredditState,
     TypedActivityState,
-    TypedActivityStates
+    TypedActivityStates,
+    UserNoteCriteria
 } from "./Common/interfaces";
 import {Document as YamlDocument} from 'yaml'
 import InvalidRegexError from "./Utils/InvalidRegexError";
-import {constants, promises, accessSync} from "fs";
+import {accessSync, constants, promises} from "fs";
 import {cacheOptDefaults, VERSION} from "./Common/defaults";
 import cacheManager, {Cache} from "cache-manager";
 import redisStore from "cache-manager-redis-store";
@@ -76,7 +80,6 @@ import {isRateLimitError, isRequestError, isScopeError, isStatusError, SimpleErr
 import JsonConfigDocument from "./Common/Config/JsonConfigDocument";
 import YamlConfigDocument from "./Common/Config/YamlConfigDocument";
 import AbstractConfigDocument, {ConfigDocumentInterface} from "./Common/Config/AbstractConfigDocument";
-import {AuthorOptions} from "./Author/Author";
 import merge from "deepmerge";
 import {RulePremise} from "./Common/Entities/RulePremise";
 import {RuleResultEntity as RuleResultEntity} from "./Common/Entities/RuleResultEntity";
@@ -2559,4 +2562,12 @@ export const resolvePathFromEnvWithRelative = (pathVal: any, relativeRoot: strin
         return resolvePath(pathVal.trim(), relativeRoot);
     }
     return defaultVal;
+}
+export const normalizeAuthorCriteria = (options: AuthorCriteria) => {
+    return {
+        ...options,
+        flairCssClass: typeof options.flairCssClass === 'string' ? [options.flairCssClass] : options.flairCssClass,
+        flairText: typeof options.flairText === 'string' ? [options.flairText] : options.flairText,
+        description: options.description === undefined ? undefined : Array.isArray(options.description) ? options.description : [options.description]
+    }
 }

@@ -2,8 +2,8 @@ import {
     ChildEntity, DataSource
 } from "typeorm";
 import {FilterCriteria, FilterCriteriaOptions, filterCriteriaTypeIdentifiers} from "./FilterCriteria";
-import {AuthorCriteria} from "../../../Author/Author";
 import objectHash from "object-hash";
+import {AuthorCriteria} from "../../interfaces";
 
 @ChildEntity()
 export class AuthorFilterCriteria extends FilterCriteria<AuthorCriteria> {

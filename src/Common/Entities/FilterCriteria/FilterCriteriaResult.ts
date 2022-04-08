@@ -1,8 +1,11 @@
 import {ChildEntity, Column, Entity, ManyToOne, TableInheritance} from "typeorm";
-import {FilterCriteriaPropertyResult, FilterCriteriaResult as IFilterCriteriaResult} from "../../interfaces";
+import {
+    AuthorCriteria,
+    FilterCriteriaPropertyResult,
+    FilterCriteriaResult as IFilterCriteriaResult
+} from "../../interfaces";
 import {FilterResult} from "./FilterResult";
 import {RandomIdBaseEntity} from "../Base/RandomIdBaseEntity";
-import {AuthorCriteria} from "../../../Author/Author";
 import {AuthorFilterCriteria} from "./AuthorFilterCriteria";
 
 export interface FilterCriteriaResultOptions<T> {

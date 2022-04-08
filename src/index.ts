@@ -230,10 +230,11 @@ const program = new Command();
         process.kill(process.pid, 'SIGTERM');
     }
 }());
-export {AuthorCriteria} from "./Author/Author";
-export {AuthorOptions} from "./Author/Author";
 export {RuleSetResult} from "./Common/interfaces";
 export {FormattedRuleResult} from "./Common/interfaces";
 export {RuleResult} from "./Common/interfaces";
 export {ResultContext} from "./Common/interfaces";
 export {isRuleSetResult} from "./util";
+export {UserNoteCriteria} from "./Common/interfaces";
+export {AuthorCriteria} from "./Common/interfaces";
+export {AuthorOptions} from "./Common/interfaces";

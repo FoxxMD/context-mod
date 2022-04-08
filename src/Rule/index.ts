@@ -2,8 +2,9 @@ import Snoowrap, {Comment} from "snoowrap";
 import Submission from "snoowrap/dist/objects/Submission";
 import {Logger} from "winston";
 import {findResultByPremise, mergeArr} from "../util";
-import {checkAuthorFilter, checkItemFilter, SubredditResources} from "../Subreddit/SubredditResources";
+import {checkAuthorFilter, checkItemFilter} from "../Subreddit/SubredditResources";
 import {
+    AuthorOptions,
     ChecksActivityState,
     ObjectPremise,
     ResultContext,
@@ -11,7 +12,6 @@ import {
     RunnableBaseOptions,
     TypedActivityStates
 } from "../Common/interfaces";
-import {AuthorOptions, normalizeAuthorCriteria} from "../Author/Author";
 import {runCheckOptions} from "../Subreddit/Manager";
 import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
 import {RuleType} from "../Common/Entities/RuleType";
@@ -169,55 +169,6 @@ export abstract class Rule extends RunnableBase implements IRule, Triggerable {
             ...context,
         };
     }
-}
-
-export interface UserNoteCriteria {
-    /**
-     * User Note type key to search for
-     * @examples ["spamwarn"]
-     * */
-    type: string;
-    /**
-     * Number of occurrences of this type. Ignored if `search` is `current`
-     *
-     * A string containing a comparison operator and/or a value to compare number of occurrences against
-     *
-     * The syntax is `(< OR > OR <= OR >=) <number>[percent sign] [ascending|descending]`
-     *
-     * @examples [">= 1"]
-     * @default ">= 1"
-     * @pattern ^\s*(?<opStr>>|>=|<|<=)\s*(?<value>\d+)\s*(?<percent>%?)\s*(?<extra>asc.*|desc.*)*$
-     * */
-    count?: string;
-
-    /**
-     * How to test the notes for this Author:
-     *
-     * ### current
-     *
-     * Only the most recent note is checked for `type`
-     *
-     * ### total
-     *
-     * The `count` comparison of `type` must be found within all notes
-     *
-     * * EX `count: > 3`   => Must have more than 3 notes of `type`, total
-     * * EX `count: <= 25%` => Must have 25% or less of notes of `type`, total
-     *
-     * ### consecutive
-     *
-     * The `count` **number** of `type` notes must be found in a row.
-     *
-     * You may also specify the time-based order in which to search the notes by specifying `ascending (asc)` or `descending (desc)` in the `count` value. Default is `descending`
-     *
-     * * EX `count: >= 3` => Must have 3 or more notes of `type` consecutively, in descending order
-     * * EX `count: < 2`  => Must have less than 2 notes of `type` consecutively, in descending order
-     * * EX `count: > 4 asc` => Must have greater than 4 notes of `type` consecutively, in ascending order
-     *
-     * @examples ["current"]
-     * @default current
-     * */
-    search?: 'current' | 'consecutive' | 'total'
 }
 
 export interface IRule extends ChecksActivityState {

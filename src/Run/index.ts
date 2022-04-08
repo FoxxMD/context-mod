@@ -1,7 +1,7 @@
 import {Check, CheckStructuredJson} from "../Check";
 import {
     ActionResult,
-    ActivityCheckJson, CheckResult, CheckSummary,
+    ActivityCheckJson, AuthorCriteria, AuthorOptions, CheckResult, CheckSummary,
     FilterCriteriaDefaults, FilterResult,
     PostBehavior,
     PostBehaviorTypes, RuleResult, RunnableBaseOptions, RunResult,
@@ -10,10 +10,9 @@ import {
 import {SubmissionCheck} from "../Check/SubmissionCheck";
 import {CommentCheck} from "../Check/CommentCheck";
 import {Logger} from "winston";
-import {determineNewResults, FAIL, isSubmission, mergeArr, normalizeName} from "../util";
+import {determineNewResults, FAIL, isSubmission, mergeArr, normalizeAuthorCriteria, normalizeName} from "../util";
 import {checkAuthorFilter, checkItemFilter, SubredditResources} from "../Subreddit/SubredditResources";
 import {ExtendedSnoowrap} from "../Utils/SnoowrapClients";
-import {AuthorCriteria, AuthorOptions, normalizeAuthorCriteria} from "../Author/Author";
 import Submission from "snoowrap/dist/objects/Submission";
 import {Comment} from "snoowrap";
 import {runCheckOptions} from "../Subreddit/Manager";

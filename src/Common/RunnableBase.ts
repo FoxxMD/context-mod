@@ -1,9 +1,16 @@
 import {Logger} from "winston";
-import {FilterResult, RunnableBaseOptions, TypedActivityState, TypedActivityStates} from "./interfaces";
-import {AuthorCriteria, AuthorOptions, normalizeAuthorCriteria} from "../Author/Author";
+import {
+    AuthorCriteria,
+    AuthorOptions,
+    FilterResult,
+    RunnableBaseOptions,
+    TypedActivityState,
+    TypedActivityStates
+} from "./interfaces";
 import {checkAuthorFilter, checkItemFilter, SubredditResources} from "../Subreddit/SubredditResources";
 import {Comment, Submission} from "snoowrap";
 import {runCheckOptions} from "../Subreddit/Manager";
+import {normalizeAuthorCriteria} from "../util";
 
 
 export abstract class RunnableBase {

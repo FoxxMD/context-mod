@@ -3,13 +3,12 @@ import {Logger} from "winston";
 import {checkAuthorFilter, checkItemFilter, SubredditResources} from "../Subreddit/SubredditResources";
 import {
     ActionProcessResult,
-    ActionResult,
+    ActionResult, AuthorCriteria, AuthorOptions,
     ChecksActivityState, FilterResult,
     ObjectPremise, RuleResult, RunnableBaseOptions, TypedActivityState,
     TypedActivityStates
 } from "../Common/interfaces";
-import {AuthorCriteria, AuthorOptions, normalizeAuthorCriteria} from "../Author/Author";
-import {mergeArr} from "../util";
+import {mergeArr, normalizeAuthorCriteria} from "../util";
 import LoggedError from "../Utils/LoggedError";
 import {ExtendedSnoowrap} from '../Utils/SnoowrapClients';
 import {ErrorWithCause} from "pony-cause";

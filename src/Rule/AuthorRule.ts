@@ -1,9 +1,9 @@
 import {Rule, RuleJSONConfig, RuleOptions} from "./index";
 import {Comment} from "snoowrap";
 import Submission from "snoowrap/dist/objects/Submission";
-import {AuthorCriteria, normalizeAuthorCriteria} from "../Author/Author";
 import {checkAuthorFilter} from "../Subreddit/SubredditResources";
-import {RuleResult} from "../Common/interfaces";
+import {AuthorCriteria, RuleResult} from "../Common/interfaces";
+import {normalizeAuthorCriteria} from "../util";
 
 /**
  * Checks the author of the Activity against AuthorCriteria. This differs from a Rule's AuthorOptions as this is a full Rule and will only pass/fail, not skip.

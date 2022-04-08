@@ -5,12 +5,11 @@ import {Duration, DurationUnitsObjectType} from "dayjs/plugin/duration";
 import dayjs, {Dayjs} from "dayjs";
 import Mustache from "mustache";
 import he from "he";
-import {UserNoteCriteria} from "../Rule";
 import {
-    ActivityWindowType, CommentState, DomainInfo,
+    ActivityWindowType, AuthorCriteria, CommentState, DomainInfo,
     DurationVal, FilterCriteriaPropertyResult, FilterCriteriaResult, RuleResult,
     SubmissionState,
-    TypedActivityStates
+    TypedActivityStates, UserNoteCriteria
 } from "../Common/interfaces";
 import {
     asSubmission,
@@ -30,7 +29,6 @@ import {
 import UserNotes from "../Subreddit/UserNotes";
 import {Logger} from "winston";
 import InvalidRegexError from "./InvalidRegexError";
-import {AuthorCriteria} from "../Author/Author";
 import {URL} from "url";
 import {SimpleError, isStatusError} from "./Errors";
 import {Dictionary, ElementOf, SafeDictionary} from "ts-essentials";

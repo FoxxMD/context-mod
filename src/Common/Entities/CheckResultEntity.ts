@@ -14,8 +14,13 @@ import {CheckEntity} from "./CheckEntity";
 import {RunResultEntity} from "./RunResultEntity";
 import {RuleResultEntity} from "./RuleResultEntity";
 import {ActionResultEntity} from "./ActionResultEntity";
-import {FilterResult as IFilterResult, FilterResult, JoinOperands, TypedActivityState} from "../interfaces";
-import {AuthorCriteria} from "../../Author/Author";
+import {
+    AuthorCriteria,
+    FilterResult as IFilterResult,
+    FilterResult,
+    JoinOperands,
+    TypedActivityState
+} from "../interfaces";
 import {RandomIdBaseEntity} from "./Base/RandomIdBaseEntity";
 import {TimeAwareRandomBaseEntity} from "./Base/TimeAwareRandomBaseEntity";
 

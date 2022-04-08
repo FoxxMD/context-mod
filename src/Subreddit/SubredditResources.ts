@@ -62,12 +62,11 @@ import {
     ItemCritPropHelper,
     ActivityDispatch,
     FilterCriteriaPropertyResult,
-    ActivitySource, HistoricalStatsDisplay,
+    ActivitySource, HistoricalStatsDisplay, UserNoteCriteria, AuthorCriteria, AuthorOptions,
 } from "../Common/interfaces";
 import UserNotes from "./UserNotes";
 import Mustache from "mustache";
 import he from "he";
-import {AuthorCriteria, AuthorOptions} from "../Author/Author";
 import {SPoll} from "./Streams";
 import {Cache} from 'cache-manager';
 import {Submission, Comment, Subreddit, RedditUser} from "snoowrap/dist/objects";
@@ -85,7 +84,6 @@ import globrex from 'globrex';
 import {runMigrations} from "../Common/Migrations/CacheMigrationUtils";
 import {isStatusError, SimpleError} from "../Utils/Errors";
 import {ErrorWithCause} from "pony-cause";
-import {UserNoteCriteria} from "../Rule";
 import {AuthorCritPropHelper, RequiredAuthorCrit} from "../Common/types";
 import {ManagerEntity} from "../Common/Entities/ManagerEntity";
 import {Bot} from "../Common/Entities/Bot";

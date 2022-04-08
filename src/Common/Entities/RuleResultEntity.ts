@@ -3,8 +3,7 @@ import {RulePremise} from "./RulePremise";
 import {CheckResultEntity} from "./CheckResultEntity";
 import {ActivityStateFilterResult} from "./FilterCriteria/ActivityStateFilterResult";
 import {AuthorFilterResult} from "./FilterCriteria/AuthorFilterResult";
-import {FilterResult as IFilterResult, FilterResult, TypedActivityState} from "../interfaces";
-import {AuthorCriteria} from "../../Author/Author";
+import {AuthorCriteria, FilterResult as IFilterResult, FilterResult, TypedActivityState} from "../interfaces";
 import {RandomIdBaseEntity} from "./Base/RandomIdBaseEntity";
 import {TimeAwareRandomBaseEntity} from "./Base/TimeAwareRandomBaseEntity";
 

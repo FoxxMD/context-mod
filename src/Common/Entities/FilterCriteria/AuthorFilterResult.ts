@@ -1,7 +1,7 @@
 import {ChildEntity, ManyToOne, OneToMany} from "typeorm";
-import {AuthorCriteria} from "../../../Author/Author";
 import {FilterResult} from "./FilterResult";
 import {
+    AuthorCriteria,
     FilterCriteriaResult as IFilterCriteriaResult,
     FilterResult as IFilterResult,
 } from "../../interfaces";

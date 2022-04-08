@@ -3,8 +3,7 @@ import {ActivityStateFilterResult} from "./FilterCriteria/ActivityStateFilterRes
 import {AuthorFilterResult} from "./FilterCriteria/AuthorFilterResult";
 import {CheckResultEntity} from "./CheckResultEntity";
 import {ActionPremise} from "./ActionPremise";
-import {FilterResult, FilterResult as IFilterResult, TypedActivityState} from "../interfaces";
-import {AuthorCriteria} from "../../Author/Author";
+import {AuthorCriteria, FilterResult, FilterResult as IFilterResult, TypedActivityState} from "../interfaces";
 import Submission from "snoowrap/dist/objects/Submission";
 import Comment from "snoowrap/dist/objects/Comment";
 import RedditUser from "snoowrap/dist/objects/RedditUser";

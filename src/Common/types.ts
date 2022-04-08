@@ -18,8 +18,7 @@ import {RepostRuleJSONConfig} from "../Rule/RepostRule";
 import {DispatchActionJson} from "../Action/DispatchAction";
 import {CancelDispatchActionJson} from "../Action/CancelDispatchAction";
 import {SafeDictionary} from "ts-essentials";
-import {FilterCriteriaPropertyResult} from "./interfaces";
-import {AuthorCriteria} from "../Author/Author";
+import {AuthorCriteria, FilterCriteriaPropertyResult} from "./interfaces";
 import {ContributorActionJson} from "../Action/ContributorAction";
 
 export type RuleJson = RecentActivityRuleJSONConfig | RepeatActivityJSONConfig | AuthorRuleJSONConfig | AttributionJSONConfig | HistoryJSONConfig | RegexRuleJSONConfig | RepostRuleJSONConfig | string;

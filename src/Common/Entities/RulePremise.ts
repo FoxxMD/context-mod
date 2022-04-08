@@ -11,6 +11,7 @@ import {
 } from "typeorm";
 import {RuleResultEntity} from "./RuleResultEntity";
 import {
+    AuthorOptions,
     ObjectPremise,
     TypedActivityStates
 } from "../interfaces";
@@ -19,7 +20,6 @@ import {TimeAwareAndUpdatedBaseEntity} from "./Base/TimeAwareAndUpdatedBaseEntit
 import {TimeAwareRandomBaseEntity} from "./Base/TimeAwareRandomBaseEntity";
 import {RuleType} from "./RuleType";
 import {ManagerEntity} from "./ManagerEntity";
-import {AuthorOptions} from "../../Author/Author";
 import {capitalize} from "lodash";
 
 export interface RulePremiseOptions {
