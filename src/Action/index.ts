@@ -5,10 +5,10 @@ import {
     ActionProcessResult,
     ActionResult, AuthorCriteria, AuthorOptions,
     ChecksActivityState, FilterResult,
-    ObjectPremise, RuleResult, RunnableBaseOptions, TypedActivityState,
+    ObjectPremise, RuleResult, RunnableBaseJson, RunnableBaseOptions, TypedActivityState,
     TypedActivityStates
 } from "../Common/interfaces";
-import {mergeArr, normalizeAuthorCriteria} from "../util";
+import {mergeArr, normalizeCriteria} from "../util";
 import LoggedError from "../Utils/LoggedError";
 import {ExtendedSnoowrap} from '../Utils/SnoowrapClients';
 import {ErrorWithCause} from "pony-cause";
@@ -183,7 +183,7 @@ export interface ActionOptions extends ActionConfig, RunnableBaseOptions {
     emitter: EventEmitter
 }
 
-export interface ActionConfig extends ChecksActivityState {
+export interface ActionConfig extends RunnableBaseJson {
     /**
      * An optional, but highly recommended, friendly name for this Action. If not present will default to `kind`.
      *
@@ -200,19 +200,6 @@ export interface ActionConfig extends ChecksActivityState {
      * @examples [false, true]
      * */
     dryRun?: boolean;
-
-    /**
-     * If present then these Author criteria are checked before running the Action. If criteria fails then the Action is not run.
-     * */
-    authorIs?: AuthorOptions
-
-    /**
-     * A list of criteria to test the state of the `Activity` against before running the Action.
-     *
-     * If any set of criteria passes the Action will be run.
-     *
-     * */
-    itemIs?: TypedActivityStates
 
     /**
      * If set to `false` the Action will not be run

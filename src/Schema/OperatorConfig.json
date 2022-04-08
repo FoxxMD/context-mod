@@ -153,50 +153,6 @@
             },
             "type": "object"
         },
-        "AuthorOptions": {
-            "description": "If present then these Author criteria are checked before running the rule. If criteria fails then the rule is skipped.",
-            "examples": [
-                {
-                    "include": [
-                        {
-                            "flairText": [
-                                "Contributor",
-                                "Veteran"
-                            ]
-                        },
-                        {
-                            "isMod": true
-                        }
-                    ]
-                }
-            ],
-            "properties": {
-                "exclude": {
-                    "description": "Only runs if `include` is not present. Each AuthorCriteria is comprised of conditions that the Author being checked must \"not\" pass. See excludeCondition for set behavior\n\nEX: `isMod: true, name: Automoderator` => Will pass if the Author IS NOT a mod and IS NOT named Automoderator",
-                    "items": {
-                        "$ref": "#/definitions/AuthorCriteria"
-                    },
-                    "type": "array"
-                },
-                "excludeCondition": {
-                    "default": "OR",
-                    "description": "* OR => if ANY exclude condition \"does not\" pass then the exclude test passes\n* AND => if ALL exclude conditions \"do not\" pass then the exclude test passes\n\nDefaults to OR",
-                    "enum": [
-                        "AND",
-                        "OR"
-                    ],
-                    "type": "string"
-                },
-                "include": {
-                    "description": "Will \"pass\" if any set of AuthorCriteria passes",
-                    "items": {
-                        "$ref": "#/definitions/AuthorCriteria"
-                    },
-                    "type": "array"
-                }
-            },
-            "type": "object"
-        },
         "BotConnection": {
             "description": "Configuration required to connect to a CM Server",
             "properties": {
@@ -638,23 +594,18 @@
         "FilterCriteriaDefaults": {
             "properties": {
                 "authorIs": {
-                    "$ref": "#/definitions/AuthorOptions",
-                    "description": "Determine how authorIs defaults behave when authorIs is present on the check\n\n* merge => merges defaults with check's authorIs\n* replace => check authorIs will replace defaults (no defaults used)",
-                    "examples": [
+                    "anyOf": [
                         {
-                            "include": [
-                                {
-                                    "flairText": [
-                                        "Contributor",
-                                        "Veteran"
-                                    ]
-                                },
-                                {
-                                    "isMod": true
-                                }
-                            ]
+                            "$ref": "#/definitions/FilterOptions<AuthorCriteria>"
+                        },
+                        {
+                            "items": {
+                                "$ref": "#/definitions/AuthorCriteria"
+                            },
+                            "type": "array"
                         }
-                    ]
+                    ],
+                    "description": "Determine how authorIs defaults behave when authorIs is present on the check\n\n* merge => merges defaults with check's authorIs\n* replace => check authorIs will replace defaults (no defaults used)"
                 },
                 "authorIsBehavior": {
                     "enum": [
@@ -664,6 +615,68 @@
                     "type": "string"
                 },
                 "itemIs": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/definitions/FilterOptions<TypedActivityState>"
+                        },
+                        {
+                            "items": {
+                                "anyOf": [
+                                    {
+                                        "$ref": "#/definitions/SubmissionState"
+                                    },
+                                    {
+                                        "$ref": "#/definitions/CommentState"
+                                    }
+                                ]
+                            },
+                            "type": "array"
+                        }
+                    ]
+                },
+                "itemIsBehavior": {
+                    "description": "Determine how itemIs defaults behave when itemIs is present on the check\n\n* merge => adds defaults to check's itemIs\n* replace => check itemIs will replace defaults (no defaults used)",
+                    "enum": [
+                        "merge",
+                        "replace"
+                    ],
+                    "type": "string"
+                }
+            },
+            "type": "object"
+        },
+        "FilterOptions<AuthorCriteria>": {
+            "properties": {
+                "exclude": {
+                    "description": "Only runs if `include` is not present. Each Criteria is comprised of conditions that the filter (Author/Item) being checked must \"not\" pass. See excludeCondition for set behavior\n\nEX: `isMod: true, name: Automoderator` => Will pass if the Author IS NOT a mod and IS NOT named Automoderator",
+                    "items": {
+                        "$ref": "#/definitions/AuthorCriteria"
+                    },
+                    "type": "array"
+                },
+                "excludeCondition": {
+                    "default": "OR",
+                    "description": "* OR => if ANY exclude condition \"does not\" pass then the exclude test passes\n* AND => if ALL exclude conditions \"do not\" pass then the exclude test passes\n\nDefaults to OR",
+                    "enum": [
+                        "AND",
+                        "OR"
+                    ],
+                    "type": "string"
+                },
+                "include": {
+                    "description": "Will \"pass\" if any set of Criteria passes",
+                    "items": {
+                        "$ref": "#/definitions/AuthorCriteria"
+                    },
+                    "type": "array"
+                }
+            },
+            "type": "object"
+        },
+        "FilterOptions<TypedActivityState>": {
+            "properties": {
+                "exclude": {
+                    "description": "Only runs if `include` is not present. Each Criteria is comprised of conditions that the filter (Author/Item) being checked must \"not\" pass. See excludeCondition for set behavior\n\nEX: `isMod: true, name: Automoderator` => Will pass if the Author IS NOT a mod and IS NOT named Automoderator",
                     "items": {
                         "anyOf": [
                             {
@@ -676,13 +689,28 @@
                     },
                     "type": "array"
                 },
-                "itemIsBehavior": {
-                    "description": "Determine how itemIs defaults behave when itemIs is present on the check\n\n* merge => adds defaults to check's itemIs\n* replace => check itemIs will replace defaults (no defaults used)",
+                "excludeCondition": {
+                    "default": "OR",
+                    "description": "* OR => if ANY exclude condition \"does not\" pass then the exclude test passes\n* AND => if ALL exclude conditions \"do not\" pass then the exclude test passes\n\nDefaults to OR",
                     "enum": [
-                        "merge",
-                        "replace"
+                        "AND",
+                        "OR"
                     ],
                     "type": "string"
+                },
+                "include": {
+                    "description": "Will \"pass\" if any set of Criteria passes",
+                    "items": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/definitions/SubmissionState"
+                            },
+                            {
+                                "$ref": "#/definitions/CommentState"
+                            }
+                        ]
+                    },
+                    "type": "array"
                 }
             },
             "type": "object"

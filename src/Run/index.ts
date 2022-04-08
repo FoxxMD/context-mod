@@ -1,16 +1,16 @@
-import {Check, CheckStructuredJson} from "../Check";
+import {asStructuredCommentCheckJson, asStructuredSubmissionCheckJson, Check, CheckStructuredJson} from "../Check";
 import {
     ActionResult,
     ActivityCheckJson, AuthorCriteria, AuthorOptions, CheckResult, CheckSummary,
     FilterCriteriaDefaults, FilterResult,
     PostBehavior,
-    PostBehaviorTypes, RuleResult, RunnableBaseOptions, RunResult,
+    PostBehaviorTypes, RuleResult, RunnableBaseJson, RunnableBaseOptions, RunResult,
     TypedActivityStates
 } from "../Common/interfaces";
 import {SubmissionCheck} from "../Check/SubmissionCheck";
 import {CommentCheck} from "../Check/CommentCheck";
 import {Logger} from "winston";
-import {determineNewResults, FAIL, isSubmission, mergeArr, normalizeAuthorCriteria, normalizeName} from "../util";
+import {determineNewResults, FAIL, isSubmission, mergeArr, normalizeCriteria, normalizeName} from "../util";
 import {checkAuthorFilter, checkItemFilter, SubredditResources} from "../Subreddit/SubredditResources";
 import {ExtendedSnoowrap} from "../Utils/SnoowrapClients";
 import Submission from "snoowrap/dist/objects/Submission";
@@ -77,9 +77,9 @@ export class Run extends RunnableBase {
                 resources: this.resources,
                 client: this.client,
             };
-            if (c.kind === 'comment') {
+            if (asStructuredCommentCheckJson(checkConfig)) {
                 this.commentChecks.push(new CommentCheck(checkConfig));
-            } else if (c.kind === 'submission') {
+            } else if (asStructuredSubmissionCheckJson(checkConfig)) {
                 this.submissionChecks.push(new SubmissionCheck(checkConfig));
             }
         }
@@ -162,23 +162,16 @@ export class Run extends RunnableBase {
 
         try {
 
-            const [itemPass, itemFilterType, itemFilterResults] = await checkItemFilter(activity, this.itemIs, this.resources, this.logger, source)
-            if (!itemPass) {
-                this.logger.verbose(`${FAIL} => Item did not pass 'itemIs' test`);
-                runResultEnt.itemIs = itemFilterResults;
-                return [runResultEnt, postBehavior];
-            } else if (this.itemIs.length > 0) {
-                runResultEnt.itemIs = itemFilterResults;
-                runResult.itemIs = itemFilterResults;
-            }
+            const filterResults = await this.runFilters(activity, options);
+            const [itemRes, authorRes] = filterResults;
+            runResult.itemIs = itemRes;
+            runResultEnt.itemIs = itemRes;
+            runResult.authorIs = authorRes;
+            runResultEnt.authorIs = authorRes;
 
-            const [authFilterPass, authFilterType, authorFilterResult] = await checkAuthorFilter(activity, this.authorIs, this.resources, this.logger);
-            if (!authFilterPass) {
-                runResultEnt.authorIs = authorFilterResult;
+            const filtersPassed = filterResults.every(x => x === undefined || x.passed);
+            if(!filtersPassed) {
                 return [runResultEnt, postBehavior];
-            } else if (authFilterType !== undefined) {
-                runResultEnt.authorIs = authorFilterResult;
-                runResult.authorIs = authorFilterResult;
             }
 
             while (continueCheckIteration && (checkIndex < checks.length || gotoContext !== '')) {
@@ -273,7 +266,7 @@ export class Run extends RunnableBase {
     }
 }
 
-export interface IRun extends PostBehavior {
+export interface IRun extends PostBehavior, RunnableBaseJson {
     /**
      * Friendly name for this Run EX "flairsRun"
      *
@@ -296,20 +289,6 @@ export interface IRun extends PostBehavior {
      * @examples [false, true]
      * */
     dryRun?: boolean;
-
-    /**
-     * A list of criteria to test the state of the `Activity` against before running the check.
-     *
-     * If any set of criteria passes the Check will be run. If the criteria fails then the Check will fail.
-     *
-     * * @examples [[{"over_18": true, "removed': false}]]
-     * */
-    itemIs?: TypedActivityStates
-
-    /**
-     * If present then these Author criteria are checked before running the Check. If criteria fails then the Check will fail.
-     * */
-    authorIs?: AuthorOptions
 
     /**
      * Should this Run be executed by the bot?

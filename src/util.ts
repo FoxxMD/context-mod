@@ -17,7 +17,7 @@ import {
     ActivitySourceTypes,
     ActivityWindowCriteria,
     ActivityWindowType,
-    AuthorCriteria, AuthorOptions,
+    AuthorCriteria, authorCriteriaProperties, AuthorOptions,
     CacheOptions,
     CacheProvider,
     CheckSummary,
@@ -26,13 +26,13 @@ import {
     DurationVal,
     FilterCriteriaDefaults,
     FilterCriteriaPropertyResult,
-    FilterCriteriaResult,
+    FilterCriteriaResult, FilterOptions,
     FilterResult,
     FullNameTypes,
     GenericComparison,
     ImageComparisonResult,
-    ItemCritPropHelper,
-    LogInfo,
+    ItemCritPropHelper, ItemOptions,
+    LogInfo, MinimalOrFullFilter,
     OperatorJsonConfig,
     PermalinkRedditThings,
     PollingOptionsStrong,
@@ -45,7 +45,7 @@ import {
     RequiredItemCrit,
     ResourceStats,
     RuleResult,
-    RuleSetResult,
+    RuleSetResult, RunnableBaseJson,
     RunResult,
     SearchAndReplaceRegExp,
     StringComparisonOptions,
@@ -2295,33 +2295,54 @@ export async function* redisScanIterator(client: any, options: any = {}): AsyncI
     } while (cursor !== '0');
 }
 
-export const mergeFilters = (objectConfig: any, filterDefs: FilterCriteriaDefaults | undefined): [AuthorOptions, TypedActivityStates] => {
-    const {authorIs: aisVal = {}, itemIs: iisVal = []} = objectConfig || {};
-    const authorIs = aisVal as AuthorOptions;
-    const itemIs = iisVal as TypedActivityStates;
+export const mergeFilters = (objectConfig: RunnableBaseJson, filterDefs: FilterCriteriaDefaults | undefined): [AuthorOptions, ItemOptions] => {
+    const {authorIs: aisVal = {}, itemIs: iisVal = {}} = objectConfig || {};
+    const authorIs = buildFilter(aisVal as MinimalOrFullFilter<AuthorCriteria>);
+    const itemIs = buildFilter(iisVal as MinimalOrFullFilter<TypedActivityState>);
 
     const {
         authorIsBehavior = 'merge',
         itemIsBehavior = 'merge',
         authorIs: authorIsDefault = {},
-        itemIs: itemIsDefault = []
+        itemIs: itemIsDefault = {}
     } = filterDefs || {};
 
-    let derivedAuthorIs: AuthorOptions = authorIsDefault;
+    let derivedAuthorIs: AuthorOptions = buildFilter(authorIsDefault);
     if (authorIsBehavior === 'merge') {
         derivedAuthorIs = merge.all([authorIs, authorIsDefault], {arrayMerge: removeFromSourceIfKeysExistsInDestination});
     } else if (Object.keys(authorIs).length > 0) {
         derivedAuthorIs = authorIs;
     }
 
-    let derivedItemIs: TypedActivityStates = itemIsDefault;
+    let derivedItemIs: ItemOptions = buildFilter(itemIsDefault);
     if (itemIsBehavior === 'merge') {
-        derivedItemIs = [...itemIs, ...itemIsDefault];
-    } else if (itemIs.length > 0) {
+        derivedItemIs = merge.all([itemIs, itemIsDefault], {arrayMerge: removeFromSourceIfKeysExistsInDestination});
+    } else if (Object.keys(itemIs).length > 0) {
         derivedItemIs = itemIs;
     }
 
     return [derivedAuthorIs, derivedItemIs];
+}
+
+export const buildFilter = <T extends AuthorCriteria | TypedActivityState>(filterVal: MinimalOrFullFilter<T>): FilterOptions<T> => {
+    if(Array.isArray(filterVal)) {
+        return {
+            include: filterVal.map(x => normalizeCriteria(x)),
+            excludeCondition: 'OR',
+            exclude: [],
+        }
+    } else {
+        const {
+            include = [],
+            exclude = [],
+            excludeCondition,
+        } = filterVal;
+        return {
+            excludeCondition,
+            include: include.map(x => normalizeCriteria(x)),
+            exclude: exclude.map(x => normalizeCriteria(x))
+        }
+    }
 }
 
 export const formatFilterData = (result: (RunResult | CheckSummary | RuleResult | ActionResult)) => {
@@ -2379,7 +2400,7 @@ export const parseDurationValToDuration = (val: DurationVal): Duration => {
     return duration;
 }
 
-export const generateItemFilterHelpers = (stateCriteria: TypedActivityState): [ItemCritPropHelper, RequiredItemCrit] => {
+export const generateItemFilterHelpers = (stateCriteria: TypedActivityState, include: boolean): [ItemCritPropHelper, RequiredItemCrit] => {
     const definedStateCriteria = (removeUndefinedKeys(stateCriteria) as RequiredItemCrit);
 
     if(definedStateCriteria === undefined) {
@@ -2390,7 +2411,7 @@ export const generateItemFilterHelpers = (stateCriteria: TypedActivityState): [I
         const key = (k as keyof (SubmissionState & CommentState));
         acc[key] = {
             property: key,
-            behavior: 'include',
+            behavior: include ? 'include' : 'exclude',
         };
         return acc;
     }, {});
@@ -2563,11 +2584,37 @@ export const resolvePathFromEnvWithRelative = (pathVal: any, relativeRoot: strin
     }
     return defaultVal;
 }
-export const normalizeAuthorCriteria = (options: AuthorCriteria) => {
-    return {
-        ...options,
-        flairCssClass: typeof options.flairCssClass === 'string' ? [options.flairCssClass] : options.flairCssClass,
-        flairText: typeof options.flairText === 'string' ? [options.flairText] : options.flairText,
-        description: options.description === undefined ? undefined : Array.isArray(options.description) ? options.description : [options.description]
+
+export const asAuthorCriteria = (val: any): val is AuthorCriteria => {
+    if (typeof val === 'object' && val !== null) {
+        const keys = Object.keys(val);
+        return intersect(keys, authorCriteriaProperties).length > 0;
     }
+    return false;
+}
+
+export const normalizeCriteria = <T extends AuthorCriteria | TypedActivityState>(options: T): T => {
+
+    if(asAuthorCriteria(options)) {
+        return {
+            ...options,
+            flairCssClass: typeof options.flairCssClass === 'string' ? [options.flairCssClass] : options.flairCssClass,
+            flairText: typeof options.flairText === 'string' ? [options.flairText] : options.flairText,
+            description: options.description === undefined ? undefined : Array.isArray(options.description) ? options.description : [options.description]
+        }
+    }
+
+    return options;
+}
+
+export const criteriaPassWithIncludeBehavior = (passes: boolean, include: boolean) => {
+    // if inner statement IS TRUE then criteria FAILED
+    // so to get pass result reverse inner statement result
+    return !(
+        // DOES NOT PASS and INCLUDE => true
+        (include && !passes)
+        ||  // OR
+        // DOES PASS and DO NOT INCLUDE => true
+        (!include && passes)
+    );
 }

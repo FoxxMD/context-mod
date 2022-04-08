@@ -1537,15 +1537,13 @@ export interface SnoowrapOptions {
 
 export type FilterCriteriaDefaultBehavior = 'replace' | 'merge';
 
-/**
- * If present then these Author criteria are checked before running the rule. If criteria fails then the rule is skipped.
- * @examples [{"include": [{"flairText": ["Contributor","Veteran"]}, {"isMod": true}]}]
- * */
-export interface AuthorOptions {
+export interface FilterOptions<T> {
+
     /**
-     * Will "pass" if any set of AuthorCriteria passes
+     * Will "pass" if any set of Criteria passes
      * */
-    include?: AuthorCriteria[];
+    include?: T[]
+
     /**
      * * OR => if ANY exclude condition "does not" pass then the exclude test passes
      * * AND => if ALL exclude conditions "do not" pass then the exclude test passes
@@ -1554,16 +1552,42 @@ export interface AuthorOptions {
      * @default OR
      * */
     excludeCondition?: JoinOperands
+
     /**
-     * Only runs if `include` is not present. Each AuthorCriteria is comprised of conditions that the Author being checked must "not" pass. See excludeCondition for set behavior
+     * Only runs if `include` is not present. Each Criteria is comprised of conditions that the filter (Author/Item) being checked must "not" pass. See excludeCondition for set behavior
      *
      * EX: `isMod: true, name: Automoderator` => Will pass if the Author IS NOT a mod and IS NOT named Automoderator
      * */
-    exclude?: AuthorCriteria[];
+    exclude?: T[];
+
 }
 
+/**
+ * If present then these Author criteria are checked before running. If criteria fails then this process is skipped.
+ * @examples [{"include": [{"flairText": ["Contributor","Veteran"]}, {"isMod": true}]}]
+ * */
+export interface AuthorOptions extends FilterOptions<AuthorCriteria> {
+}
+
+/**
+ * A list of criteria to test the state of the `Activity` against before running. If criteria fails then this process is skipped.
+ *
+ * * @examples [{"include": [{"over_18": true, "removed': false}]}]
+ * */
+export interface ItemOptions extends FilterOptions<TypedActivityState> {
+}
+
+// /**
+//  * A list of criteria to test the state of the `Activity` against before running. If criteria fails then this process is skipped.
+//  *
+//  * * @examples [{"include": [{"over_18": true, "removed': false}]}]
+//  * */
+// export type ItemOptions = FilterOptions<SubmissionState> | FilterOptions<CommentState>
+
+export type MinimalOrFullFilter<T> = T[] | FilterOptions<T>
+
 export interface FilterCriteriaDefaults {
-    itemIs?: TypedActivityStates
+    itemIs?: MinimalOrFullFilter<TypedActivityState>
     /**
      * Determine how itemIs defaults behave when itemIs is present on the check
      *
@@ -1577,7 +1601,7 @@ export interface FilterCriteriaDefaults {
      * * merge => merges defaults with check's authorIs
      * * replace => check authorIs will replace defaults (no defaults used)
      * */
-    authorIs?: AuthorOptions
+    authorIs?: MinimalOrFullFilter<AuthorCriteria>
     authorIsBehavior?: FilterCriteriaDefaultBehavior
 }
 
@@ -2155,6 +2179,8 @@ export interface LogInfo {
     user?: string
 }
 
+export const authorCriteriaProperties = ['name', 'flairCssClass','flairText','flairTemplate','isMod','userNotes','age','linkKarma','commentKarma','totalKarma','verified', 'shadowBanned', 'description', 'isContributor'];
+
 /**
  * Criteria with which to test against the author of an Activity. The outcome of the test is based on:
  *
@@ -2624,27 +2650,30 @@ export type ActivitySource = NonDispatchActivitySource | DispatchSource;
 export interface ObjectPremise {
     kind: string
     config: object
-    itemIs?: TypedActivityStates
+    itemIs?: ItemOptions
     authorIs?: AuthorOptions
 }
 
-export interface RunnableBaseOptions {
+export interface RunnableBaseOptions extends RunnableBaseJson {
     logger: Logger;
+    resources: SubredditResources
+}
+
+export interface RunnableBaseJson {
     /**
      * A list of criteria to test the state of the `Activity` against before running the check.
      *
      * If any set of criteria passes the Check will be run. If the criteria fails then the Check will fail.
      *
      * * @examples [[{"over_18": true, "removed': false}]]
+     *
      * */
-    itemIs?: TypedActivityStates
+    itemIs?: MinimalOrFullFilter<TypedActivityState>
 
     /**
      * If present then these Author criteria are checked before running the Check. If criteria fails then the Check will fail.
      * */
-    authorIs?: AuthorOptions
-
-    resources: SubredditResources
+    authorIs?: MinimalOrFullFilter<AuthorCriteria>
 }
 
 export interface RedditThing {

@@ -1,22 +1,27 @@
 import {Check, CheckOptions, userResultCacheDefault, UserResultCacheOptions} from "./index";
-import {ActivityType, CommentState, RuleResult, UserResultCache} from "../Common/interfaces";
+import {
+    ActivityType,
+    CommentState,
+    FilterOptions,
+    MinimalOrFullFilter,
+    RuleResult,
+    UserResultCache
+} from "../Common/interfaces";
 import {Submission, Comment} from "snoowrap/dist/objects";
+import { buildFilter } from "../util";
 
 export interface CommentCheckOptions extends CheckOptions {
+    itemIs?: MinimalOrFullFilter<CommentState>
     cacheUserResult?: UserResultCacheOptions;
 }
 
 export class CommentCheck extends Check {
-    itemIs: CommentState[];
+    itemIs: FilterOptions<CommentState>;
     checkType = 'comment' as ActivityType;
 
     constructor(options: CommentCheckOptions) {
         super(options);
-        const {
-            itemIs = [],
-        } = options;
-
-        this.itemIs = itemIs;
+        this.itemIs = buildFilter(options.itemIs ?? []);
         this.logSummary();
     }
 

@@ -21,15 +21,15 @@ import {
     CheckResult,
     ChecksActivityState,
     CheckSummary,
-    CommentState,
+    CommentState, FilterOptions,
     FilterResult,
     JoinCondition,
-    JoinOperands,
+    JoinOperands, MinimalOrFullFilter,
     NotificationEventPayload,
     PostBehavior,
     PostBehaviorTypes,
     RuleResult,
-    RuleSetResult,
+    RuleSetResult, RunnableBaseJson,
     RunnableBaseOptions,
     SubmissionState,
     TypedActivityState,
@@ -178,7 +178,7 @@ export abstract class Check extends RunnableBase implements ICheck {
         runStats.push(`${this.actions.length} Actions`);
         // not sure if this should be info or verbose
         this.logger.info(`=${this.enabled ? 'Enabled' : 'Disabled'}= ${this.checkType.toUpperCase()} (${this.condition})${this.notifyOnTrigger ? ' ||Notify on Trigger|| ' : ''} => ${runStats.join(' | ')}${this.description !== undefined ? ` => ${this.description}` : ''}`);
-        if (this.rules.length === 0 && this.itemIs.length === 0 && this.authorIs.exclude?.length === 0 && this.authorIs.include?.length === 0) {
+        if (this.rules.length === 0 && this.itemIs.exclude?.length === 0 && this.itemIs.include?.length === 0 && this.authorIs.exclude?.length === 0 && this.authorIs.include?.length === 0) {
             this.logger.warn('No rules, item tests, or author test found -- this check will ALWAYS PASS!');
         }
         let ruleSetIndex = 1;
@@ -513,7 +513,7 @@ export abstract class Check extends RunnableBase implements ICheck {
     }
 }
 
-export interface ICheck extends JoinCondition, ChecksActivityState, PostBehavior {
+export interface ICheck extends JoinCondition, PostBehavior, RunnableBaseJson {
     /**
      * Friendly name for this Check EX "crosspostSpamCheck"
      *
@@ -533,20 +533,6 @@ export interface ICheck extends JoinCondition, ChecksActivityState, PostBehavior
      * @examples [false, true]
      * */
     dryRun?: boolean;
-
-    /**
-     * A list of criteria to test the state of the `Activity` against before running the check.
-     *
-     * If any set of criteria passes the Check will be run. If the criteria fails then the Check will fail.
-     *
-     * * @examples [[{"over_18": true, "removed': false}]]
-     * */
-    itemIs?: TypedActivityStates
-
-    /**
-     * If present then these Author criteria are checked before running the Check. If criteria fails then the Check will fail.
-     * */
-    authorIs?: AuthorOptions
 
     /**
      * Should this check be run by the bot?
@@ -606,7 +592,7 @@ export interface CheckJson extends ICheck {
 
 export interface SubmissionCheckJson extends CheckJson {
     kind: 'submission'
-    itemIs?: SubmissionState[]
+    itemIs?: MinimalOrFullFilter<SubmissionState>
 }
 
 /**
@@ -646,7 +632,15 @@ export const userResultCacheDefault: Required<UserResultCacheOptions> = {
 
 export interface CommentCheckJson extends CheckJson {
     kind: 'comment'
-    itemIs?: CommentState[]
+    itemIs?: MinimalOrFullFilter<CommentState>
+}
+
+export const asStructuredCommentCheckJson = (val: any): val is CommentCheckStructuredJson => {
+    return val.kind === 'comment';
+}
+
+export const asStructuredSubmissionCheckJson = (val: any): val is SubmissionCheckStructuredJson => {
+    return val.kind === 'submission';
 }
 
 export type CheckStructuredJson = SubmissionCheckStructuredJson | CommentCheckStructuredJson;

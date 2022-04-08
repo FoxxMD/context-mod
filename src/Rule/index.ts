@@ -8,7 +8,7 @@ import {
     ChecksActivityState,
     ObjectPremise,
     ResultContext,
-    RuleResult as IRuleResult,
+    RuleResult as IRuleResult, RunnableBaseJson,
     RunnableBaseOptions,
     TypedActivityStates
 } from "../Common/interfaces";
@@ -105,22 +105,22 @@ export abstract class Rule extends RunnableBase implements IRule, Triggerable {
                 this.logger.debug(`Returning existing result of ${existingResult.triggered ? '✔️' : '❌'}`);
                 return Promise.resolve([existingResult.triggered ?? null, existingResult]);
             }
-            const [itemPass, itemFilterType, itemFilterResults] = await checkItemFilter(item, this.itemIs, this.resources, this.logger, options.source);
-            if(this.itemIs.length > 0) {
-                res.itemIs = itemFilterResults;
-            }
-            if (!itemPass) {
-                this.logger.verbose(`(Skipped) Item did not pass 'itemIs' test`);
-                res.result = `Item did not pass 'itemIs' test`;
+
+            const filterResults = await this.runFilters(item, options);
+            const [itemRes, authorRes] = filterResults;
+            res.itemIs = itemRes;
+            res.authorIs = authorRes;
+
+            if (itemRes !== undefined && !itemRes.passed) {
+                const filterBehavior = (this.itemIs.exclude ?? []).length > 0 ? 'exclusive' : 'inclusive';
+                this.logger.verbose(`(Skipped) ${filterBehavior} Item did not pass 'itemIs' test`);
+                res.result = `${filterBehavior} Item did not pass 'itemIs' test`;
                 return Promise.resolve([null, res]);
             }
-            const [authFilterResult, authFilterType, authFilterRes] = await checkAuthorFilter(item, this.authorIs, this.resources, this.logger);
-            if(authFilterType !== undefined) {
-                res.authorIs = authFilterRes;
-            }
-            if(!authFilterResult) {
-                this.logger.verbose(`(Skipped) ${authFilterType} Author criteria not matched`);
-                res.result = `${authFilterType} author criteria not matched`;
+            if(authorRes !== undefined && !authorRes.passed) {
+                const filterBehavior = (this.authorIs.exclude ?? []).length > 0 ? 'exclusive' : 'inclusive';
+                this.logger.verbose(`(Skipped) ${filterBehavior} Author criteria not matched`);
+                res.result = `${filterBehavior} author criteria not matched`;
                 return Promise.resolve([null, res]);
             }
         } catch (err: any) {
@@ -171,7 +171,7 @@ export abstract class Rule extends RunnableBase implements IRule, Triggerable {
     }
 }
 
-export interface IRule extends ChecksActivityState {
+export interface IRule extends RunnableBaseJson {
     /**
      * An optional, but highly recommended, friendly name for this rule. If not present will default to `kind`.
      *
@@ -182,17 +182,6 @@ export interface IRule extends ChecksActivityState {
      * @examples ["myNewRule"]
      * */
     name?: string
-    /**
-     * If present then these Author criteria are checked before running the rule. If criteria fails then the rule is skipped.
-     * */
-    authorIs?: AuthorOptions
-    /**
-     * A list of criteria to test the state of the `Activity` against before running the Rule.
-     *
-     * If any set of criteria passes the Rule will be run. If the criteria fails then the Rule is skipped.
-     *
-     * */
-    itemIs?: TypedActivityStates
 }
 
 export interface RuleJSONConfig extends IRule {

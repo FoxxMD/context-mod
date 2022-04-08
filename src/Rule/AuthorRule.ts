@@ -3,7 +3,7 @@ import {Comment} from "snoowrap";
 import Submission from "snoowrap/dist/objects/Submission";
 import {checkAuthorFilter} from "../Subreddit/SubredditResources";
 import {AuthorCriteria, RuleResult} from "../Common/interfaces";
-import {normalizeAuthorCriteria} from "../util";
+import {normalizeCriteria} from "../util";
 
 /**
  * Checks the author of the Activity against AuthorCriteria. This differs from a Rule's AuthorOptions as this is a full Rule and will only pass/fail, not skip.
@@ -41,8 +41,8 @@ export class AuthorRule extends Rule {
             exclude,
         } = options;
 
-        this.include = include !== undefined ? include.map(x => normalizeAuthorCriteria(x)) : [];
-        this.exclude = exclude !== undefined ? exclude.map(x => normalizeAuthorCriteria(x)) : [];
+        this.include = include !== undefined ? include.map(x => normalizeCriteria(x)) : [];
+        this.exclude = exclude !== undefined ? exclude.map(x => normalizeCriteria(x)) : [];
 
         if(this.include.length === 0 && this.exclude.length === 0) {
             throw new Error('At least one of the properties [include,exclude] on Author Rule must not be empty');

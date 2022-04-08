@@ -35,7 +35,7 @@ import {
     parseWikiContext, PASS, redisScanIterator, removeUndefinedKeys,
     shouldCacheSubredditStateCriteriaResult, strToActivitySource,
     subredditStateIsNameOnly, testMaybeStringRegex,
-    toStrongSubredditState, truncateStringToLength, userNoteCriteriaSummary
+    toStrongSubredditState, truncateStringToLength, userNoteCriteriaSummary, asComment, criteriaPassWithIncludeBehavior
 } from "../util";
 import LoggedError from "../Utils/LoggedError";
 import {
@@ -62,7 +62,7 @@ import {
     ItemCritPropHelper,
     ActivityDispatch,
     FilterCriteriaPropertyResult,
-    ActivitySource, HistoricalStatsDisplay, UserNoteCriteria, AuthorCriteria, AuthorOptions,
+    ActivitySource, HistoricalStatsDisplay, UserNoteCriteria, AuthorCriteria, AuthorOptions, ItemOptions, JoinOperands,
 } from "../Common/interfaces";
 import UserNotes from "./UserNotes";
 import Mustache from "mustache";
@@ -1176,10 +1176,10 @@ export class SubredditResources {
         return await this.isAuthor(item, authorOpts, include);
     }
 
-    async testItemCriteria(i: (Comment | Submission), activityState: TypedActivityState, logger: Logger, source?: ActivitySource): Promise<FilterCriteriaResult<TypedActivityState>> {
+    async testItemCriteria(i: (Comment | Submission), activityState: TypedActivityState, logger: Logger, include = true, source?: ActivitySource): Promise<FilterCriteriaResult<TypedActivityState>> {
         if(Object.keys(activityState).length === 0) {
             return {
-                behavior: 'include',
+                behavior: include ? 'include' : 'exclude',
                 criteria: activityState,
                 propertyResults: [],
                 passed: true
@@ -1195,10 +1195,10 @@ export class SubredditResources {
             // -- additionally we keep that data in-memory (for now??) so its always accessible and doesn't need to be stored in cache
             let runtimeRes: FilterCriteriaResult<(SubmissionState & CommentState)> | undefined;
             if(dispatched !== undefined || stateSource !== undefined) {
-                runtimeRes = await this.isItem(item, {dispatched, source: stateSource}, logger, source);
+                runtimeRes = await this.isItem(item, {dispatched, source: stateSource}, logger, include, source);
                 if(!runtimeRes.passed) {
                     // if dispatched does not pass can return early and avoid testing the rest of the item
-                    const [propResultsMap, definedStateCriteria] = generateItemFilterHelpers(rest);
+                    const [propResultsMap, definedStateCriteria] = generateItemFilterHelpers(rest, include);
                     if(dispatched !== undefined) {
                         propResultsMap.dispatched = runtimeRes.propertyResults.find(x => x.property === 'dispatched');
                     }
@@ -1207,7 +1207,7 @@ export class SubredditResources {
                     }
 
                     return {
-                        behavior: 'include',
+                        behavior: include ? 'include' : 'exclude',
                         criteria: activityState,
                         propertyResults: Object.values(propResultsMap),
                         passed: false
@@ -1217,7 +1217,7 @@ export class SubredditResources {
 
             try {
                 // only cache non-runtime state and results
-                const hash = `itemCrit-${item.name}-${objectHash.sha1(state)}`;
+                const hash = `itemCrit-${item.name}-${objectHash.sha1({...state, include})}`;
                 await this.stats.cache.itemCrit.identifierRequestCount.set(hash, (await this.stats.cache.itemCrit.identifierRequestCount.wrap(hash, () => 0) as number) + 1);
                 this.stats.cache.itemCrit.requestTimestamps.push(Date.now());
                 this.stats.cache.itemCrit.requests++;
@@ -1226,7 +1226,7 @@ export class SubredditResources {
                     this.logger.debug(`Cache Hit: Item Check on ${item.name} (Hash ${hash})`);
                     //return cachedItem as boolean;
                 } else {
-                    itemResult = await this.isItem(item, state, logger);
+                    itemResult = await this.isItem(item, state, logger, include);
                 }
                 this.stats.cache.itemCrit.miss++;
                 await this.cache.set(hash, itemResult, {ttl: this.filterCriteriaTTL});
@@ -1250,7 +1250,7 @@ export class SubredditResources {
             }
         }
 
-        return await this.isItem(i, activityState, logger, source);
+        return await this.isItem(i, activityState, logger, include, source);
     }
 
     async isSubreddit (subreddit: Subreddit, stateCriteriaRaw: SubredditState | StrongSubredditState, logger: Logger) {
@@ -1316,17 +1316,17 @@ export class SubredditResources {
         })() as boolean;
     }
 
-    async isItem (item: Submission | Comment, stateCriteria: TypedActivityState, logger: Logger, source?: ActivitySource): Promise<FilterCriteriaResult<(SubmissionState & CommentState)>> {
+    async isItem (item: Submission | Comment, stateCriteria: TypedActivityState, logger: Logger, include: boolean, source?: ActivitySource): Promise<FilterCriteriaResult<(SubmissionState & CommentState)>> {
 
         //const definedStateCriteria = (removeUndefinedKeys(stateCriteria) as RequiredItemCrit);
 
-        const [propResultsMap, definedStateCriteria] = generateItemFilterHelpers(stateCriteria);
+        const [propResultsMap, definedStateCriteria] = generateItemFilterHelpers(stateCriteria, include);
 
         const log = logger.child({leaf: 'Item Check'}, mergeArr);
 
         if(Object.keys(stateCriteria).length === 0) {
             return {
-                behavior: 'include',
+                behavior: include ? 'include' : 'exclude',
                 criteria: stateCriteria,
                 propertyResults: [],
                 passed: true
@@ -1394,13 +1394,13 @@ export class SubredditResources {
                                 reason = 'Found delayed activities but none matched dispatch identifier';
                             }
                         }
-                        propResultsMap.dispatched!.passed = found === itemOptVal || typeof found === 'string';
+                        propResultsMap.dispatched!.passed = criteriaPassWithIncludeBehavior(found === itemOptVal || typeof found === 'string', include);
                         propResultsMap.dispatched!.found = found;
                         propResultsMap.dispatched!.reason = reason;
                         break;
                     case 'source':
                         if(source === undefined) {
-                            propResultsMap.source!.passed = false;
+                            propResultsMap.source!.passed = !include;
                             propResultsMap.source!.found = 'Not From Source';
                             propResultsMap.source!.reason = 'Activity was not retrieved from a source (may be from cache)';
                             break;
@@ -1410,12 +1410,12 @@ export class SubredditResources {
                             const requestedSourcesVal: string[] = !Array.isArray(itemOptVal) ? [itemOptVal] as string[] : itemOptVal as string[];
                             const requestedSources = requestedSourcesVal.map(x => strToActivitySource(x).toLowerCase());
 
-                            propResultsMap.source!.passed = requestedSources.some(x => source.toLowerCase().includes(x))
+                            propResultsMap.source!.passed = criteriaPassWithIncludeBehavior(requestedSources.some(x => source.toLowerCase().includes(x)), include);
                             break;
                         }
                     case 'score':
                         const scoreCompare = parseGenericValueComparison(itemOptVal as string);
-                        propResultsMap.score!.passed = comparisonTextOp(item.score, scoreCompare.operator, scoreCompare.value);
+                        propResultsMap.score!.passed = criteriaPassWithIncludeBehavior(comparisonTextOp(item.score, scoreCompare.operator, scoreCompare.value), include);
                         propResultsMap.score!.found = item.score;
                         break;
                     case 'reports':
@@ -1447,16 +1447,16 @@ export class SubredditResources {
                             reportNum = item.mod_reports.length;
                         }
                         propResultsMap.reports!.found = `${reportNum} ${reportType}`;
-                        propResultsMap.reports!.passed = comparisonTextOp(reportNum, reportCompare.operator, reportCompare.value);
+                        propResultsMap.reports!.passed = criteriaPassWithIncludeBehavior(comparisonTextOp(reportNum, reportCompare.operator, reportCompare.value), include);
                         break;
                     case 'removed':
                         const removed = activityIsRemoved(item);
-                        propResultsMap.removed!.passed = removed === itemOptVal;
+                        propResultsMap.removed!.passed = criteriaPassWithIncludeBehavior(removed === itemOptVal, include);
                         propResultsMap.removed!.found = removed;
                         break;
                     case 'deleted':
                         const deleted = activityIsDeleted(item);
-                        propResultsMap.deleted!.passed = deleted === itemOptVal;
+                        propResultsMap.deleted!.passed = criteriaPassWithIncludeBehavior(deleted === itemOptVal, include);
                         propResultsMap.deleted!.found = deleted;
                         break;
                     case 'filtered':
@@ -1468,13 +1468,13 @@ export class SubredditResources {
                             break;
                         }
                         const filtered = activityIsFiltered(item);
-                        propResultsMap.filtered!.passed = filtered === itemOptVal;
+                        propResultsMap.filtered!.passed = criteriaPassWithIncludeBehavior(filtered === itemOptVal, include);
                         propResultsMap.filtered!.found = filtered;
                         break;
                     case 'age':
                         const created = dayjs.unix(await item.created);
                         const ageTest = compareDurationValue(parseDurationComparison(itemOptVal as string), created);
-                        propResultsMap.age!.passed = ageTest;
+                        propResultsMap.age!.passed = criteriaPassWithIncludeBehavior(ageTest, include);
                         propResultsMap.age!.found = created.format('MMMM D, YYYY h:mm A Z');
                         break;
                     case 'title':
@@ -1490,7 +1490,7 @@ export class SubredditResources {
 
                         try {
                             const [titlePass, reg] = testMaybeStringRegex(itemOptVal as string, item.title);
-                            propResultsMap.title!.passed = titlePass;
+                            propResultsMap.title!.passed = criteriaPassWithIncludeBehavior(titlePass, include);
                         } catch (err: any) {
                             propResultsMap.title!.passed = false;
                             propResultsMap.title!.reason = err.message;
@@ -1506,7 +1506,7 @@ export class SubredditResources {
                         }
 
                         propResultsMap.isRedditMediaDomain!.found = item.is_reddit_media_domain;
-                        propResultsMap.isRedditMediaDomain!.passed = item.is_reddit_media_domain === itemOptVal;
+                        propResultsMap.isRedditMediaDomain!.passed = criteriaPassWithIncludeBehavior(item.is_reddit_media_domain === itemOptVal, include);
                         break;
                     case 'approved':
                     case 'spam':
@@ -1519,7 +1519,7 @@ export class SubredditResources {
                         }
                         // @ts-ignore
                         propResultsMap[k]!.found = item[k];
-                        propResultsMap[k]!.passed = propResultsMap[k]!.found === itemOptVal;
+                        propResultsMap[k]!.passed = criteriaPassWithIncludeBehavior(propResultsMap[k]!.found === itemOptVal, include);
                         break;
                     case 'op':
                         if(isSubmission(item)) {
@@ -1530,7 +1530,7 @@ export class SubredditResources {
                             break;
                         }
                         propResultsMap.op!.found = (item as Comment).is_submitter;
-                        propResultsMap.op!.passed = propResultsMap.op!.found === itemOptVal;
+                        propResultsMap.op!.passed = criteriaPassWithIncludeBehavior(propResultsMap.op!.found === itemOptVal, include);
                         break;
                     case 'depth':
                         if(isSubmission(item)) {
@@ -1544,7 +1544,7 @@ export class SubredditResources {
 
                         const depth = (item as Comment).depth;
                         propResultsMap.depth!.found = depth;
-                        propResultsMap.depth!.passed = comparisonTextOp(depth, depthCompare.operator, depthCompare.value);
+                        propResultsMap.depth!.passed = criteriaPassWithIncludeBehavior(comparisonTextOp(depth, depthCompare.operator, depthCompare.value), include);
                         break;
                     case 'flairTemplate':
                     case 'link_flair_text':
@@ -1561,16 +1561,16 @@ export class SubredditResources {
 
                             if (typeof itemOptVal === 'boolean') {
                                 if (itemOptVal === true) {
-                                    propResultsMap[k]!.passed = propertyValue !== undefined && propertyValue !== null && propertyValue !== '';
+                                    propResultsMap[k]!.passed = criteriaPassWithIncludeBehavior(propertyValue !== undefined && propertyValue !== null && propertyValue !== '', include);
                                 } else {
-                                    propResultsMap[k]!.passed = propertyValue === undefined || propertyValue === null || propertyValue === '';
+                                    propResultsMap[k]!.passed = criteriaPassWithIncludeBehavior(propertyValue === undefined || propertyValue === null || propertyValue === '', include);
                                 }
                             } else if (propertyValue === undefined || propertyValue === null || propertyValue === '') {
                                 // if crit is not a boolean but property is "empty" then it'll never pass anyway
-                                propResultsMap[k]!.passed = false;
+                                propResultsMap[k]!.passed = !include;
                             } else {
                                 const expectedValues = typeof itemOptVal === 'string' ? [itemOptVal] : (itemOptVal as string[]);
-                                propResultsMap[k]!.passed = expectedValues.some(x => x.trim().toLowerCase() === propertyValue?.trim().toLowerCase());
+                                propResultsMap[k]!.passed = criteriaPassWithIncludeBehavior(expectedValues.some(x => x.trim().toLowerCase() === propertyValue?.trim().toLowerCase()), include);
                             }
                             break;
                         } else {
@@ -1599,7 +1599,7 @@ export class SubredditResources {
 
                         } else {
                             propResultsMap[k]!.found = val;
-                            propResultsMap[k]!.passed = val === itemOptVal;
+                            propResultsMap[k]!.passed = criteriaPassWithIncludeBehavior(val === itemOptVal, include);
                         }
                         break;
                 }
@@ -1617,7 +1617,7 @@ export class SubredditResources {
         const passed = propResults.filter(x => typeof x.passed === 'boolean').every(x => x.passed === true);
 
         return {
-            behavior: 'include',
+            behavior: include ? 'include' : 'exclude',
             criteria: stateCriteria,
             propertyResults: propResults,
             passed,
@@ -2366,42 +2366,33 @@ export const checkAuthorFilter = async (item: (Submission | Comment), filter: Au
     return [true, undefined, {criteriaResults: allCritResults, join: 'OR', passed: true}];
 }
 
-export const checkItemFilter = async (item: (Submission | Comment), filter: TypedActivityStates, resources: SubredditResources, parentLogger: Logger, source?: ActivitySource): Promise<[boolean, ('inclusive' | 'exclusive' | undefined), FilterResult<TypedActivityState>]> => {
+export const checkItemFilter = async (item: (Submission | Comment), filter: ItemOptions, resources: SubredditResources, parentLogger: Logger, source?: ActivitySource): Promise<[boolean, ('inclusive' | 'exclusive' | undefined), FilterResult<TypedActivityState>]> => {
     const logger = parentLogger.child({labels: ['Item Filter']}, mergeArr);
+
+    const {
+        include = [],
+        excludeCondition = 'AND',
+        exclude = [],
+    } = filter;
+    let itemPass = null;
 
     const allCritResults: FilterCriteriaResult<TypedActivityState>[] = [];
 
-    if(filter.length > 0) {
+    if(include.length > 0) {
         let index = 1
-        for(const state of filter) {
+        for(const state of include) {
             let critResult: FilterCriteriaResult<TypedActivityState>;
 
             // need to determine if criteria is for comment or submission state
             // and if its comment state WITH submission state then break apart testing into individual activity testing
-            if(isCommentState(state) && isComment(item) && state.submissionState !== undefined) {
+            if(isCommentState(state) && asComment(item) && state.submissionState !== undefined) {
                 const {submissionState, ...restCommentState} = state;
-                // test submission state first since it's more likely(??) we have crit results or cache data for this submission than for the comment
-
-                // get submission
-                // @ts-ignore
-                const subProxy = await resources.client.getSubmission(await item.link_id);
-                // @ts-ignore
-                const sub = await resources.getActivity(subProxy);
-                const [subPass, _, subFilterResults] = await checkItemFilter(sub, submissionState, resources, parentLogger);
-                const subPropertyResult: FilterCriteriaPropertyResult<CommentState> = {
-                    property: 'submissionState',
-                    behavior: 'include',
-                    passed: subPass,
-                    found: {
-                        join: 'OR',
-                        criteriaResults: subFilterResults.criteriaResults,
-                        passed: subPass,
-                    }
-                };
+                
+                const [subPass, subPropertyResult] = await checkCommentSubmissionStates(item, submissionState, resources, parentLogger, source);
 
                 if(!subPass) {
                     // generate dummy results for the rest of the comment state since we don't need to test it
-                    const [propResultsMap, definedStateCriteria] = generateItemFilterHelpers(restCommentState);
+                    const [propResultsMap, definedStateCriteria] = generateItemFilterHelpers(restCommentState, true);
                     propResultsMap.submissionState = subPropertyResult;
                     critResult = {
                         behavior: 'include',
@@ -2410,12 +2401,12 @@ export const checkItemFilter = async (item: (Submission | Comment), filter: Type
                         passed: false
                     }
                 } else {
-                    critResult = await resources.testItemCriteria(item, restCommentState, parentLogger, source);
+                    critResult = await resources.testItemCriteria(item, restCommentState, parentLogger, true, source);
                     critResult.criteria = state;
                     critResult.propertyResults.unshift(subPropertyResult);
                 }
             } else {
-                critResult = await resources.testItemCriteria(item, state, parentLogger, source);
+                critResult = await resources.testItemCriteria(item, state, parentLogger, true, source);
             }
 
             if(critResult.propertyResults.some(x => x.property === 'source')) {
@@ -2439,5 +2430,112 @@ export const checkItemFilter = async (item: (Submission | Comment), filter: Type
         return [false, 'inclusive', {criteriaResults: allCritResults, join: 'OR', passed: false}];
     }
 
+    if (exclude.length > 0) {
+        let index = 1;
+        const summaries: string[] = [];
+        for (const state of exclude) {
+            let critResult: FilterCriteriaResult<TypedActivityState>;
+
+            if(isCommentState(state) && asComment(item) && state.submissionState !== undefined) {
+                const {submissionState, ...restCommentState} = state;
+
+                const [subPass, subPropertyResult] = await checkCommentSubmissionStates(item, submissionState, resources, parentLogger, source);
+
+                if(!subPass) {
+                    // generate dummy results for the rest of the comment state since we don't need to test it
+                    const [propResultsMap, definedStateCriteria] = generateItemFilterHelpers(restCommentState, false);
+                    propResultsMap.submissionState = subPropertyResult;
+                    critResult = {
+                        behavior: 'include',
+                        criteria: state,
+                        propertyResults: Object.values(propResultsMap),
+                        passed: false
+                    }
+                } else {
+                    critResult = await resources.testItemCriteria(item, restCommentState, parentLogger, false, source);
+                    critResult.criteria = state;
+                    critResult.propertyResults.unshift(subPropertyResult);
+                }
+            } else {
+                critResult = await resources.testItemCriteria(item, state, parentLogger, false, source);
+            }
+
+            if(critResult.propertyResults.some(x => x.property === 'source')) {
+                critResult.criteria.source = source;
+            }
+
+            //critResult = await resources.testItemCriteria(item, state, parentLogger, false);
+            allCritResults.push(critResult);
+
+
+            const [summary, details] = filterCriteriaSummary(critResult);
+            if (critResult.passed) {
+                if (excludeCondition === 'OR') {
+                    logger.verbose(`${PASS} (OR) => Exclusive Item Criteria ${index} => ${summary}`);
+                    logger.debug(`Criteria Details: \n${details.join('\n')}`);
+                    itemPass = true;
+                    break;
+                }
+                summaries.push(summary);
+                logger.debug(`${PASS} (AND) => Exclusive Item Criteria ${index} => ${summary}`);
+                logger.debug(`Criteria Details: \n${details.join('\n')}`);
+            } else if (!critResult.passed) {
+                if (excludeCondition === 'AND') {
+                    logger.verbose(`${FAIL} (AND) => Exclusive Item Criteria ${index} => ${summary}`);
+                    logger.debug(`Criteria Details: \n${details.join('\n')}`);
+                    itemPass = false;
+                    break;
+                }
+                summaries.push(summary);
+                logger.debug(`${FAIL} (OR) => Exclusive Item Criteria ${index} => ${summary}`);
+                logger.debug(`Criteria Details: \n${details.join('\n')}`);
+            }
+            index++;
+        }
+        if (excludeCondition === 'AND' && itemPass === null) {
+            itemPass = true;
+        }
+        if (itemPass !== true) {
+            if (excludeCondition === 'OR') {
+                logger.verbose(`${FAIL} => Exclusive Item criteria not matched => ${summaries.length === 1 ? `${summaries[0]}` : '(many, see debug)'}`);
+            }
+            return [false, 'exclusive', {criteriaResults: allCritResults, join: excludeCondition, passed: false}]
+        } else if (excludeCondition === 'AND') {
+            logger.verbose(`${PASS} => Exclusive Item criteria matched => ${summaries.length === 1 ? `${summaries[0]}` : '(many, see debug)'}`);
+        }
+        return [true, 'exclusive', {criteriaResults: allCritResults, join: excludeCondition, passed: true}];
+    }
+
     return [true, undefined, {criteriaResults: allCritResults, join: 'OR', passed: true}];
+}
+
+export const checkCommentSubmissionStates = async (item: Comment, submissionStates: SubmissionState[], resources: SubredditResources, logger: Logger, source?: ActivitySource, excludeCondition?: JoinOperands): Promise<[boolean, FilterCriteriaPropertyResult<CommentState>]> => {
+    // test submission state first since it's more likely(??) we have crit results or cache data for this submission than for the comment
+
+    // get submission
+    // @ts-ignore
+    const subProxy = await resources.client.getSubmission(await item.link_id);
+    // @ts-ignore
+    const sub = await resources.getActivity(subProxy);
+    
+    const subStatesFilter: ItemOptions = {
+        include: excludeCondition === undefined ? submissionStates : undefined,
+        excludeCondition,
+        exclude: excludeCondition === undefined ? undefined : submissionStates
+    }
+    
+    const [subPass, _, subFilterResults] = await checkItemFilter(sub, subStatesFilter, resources, logger);
+    const subPropertyResult: FilterCriteriaPropertyResult<CommentState> = {
+        property: 'submissionState',
+        behavior: excludeCondition !== undefined ? 'exclude' : 'include',
+        passed: subPass,
+        found: {
+            // TODO change this to exclude condition as well?
+            join: 'OR',
+            criteriaResults: subFilterResults.criteriaResults,
+            passed: subPass,
+        }
+    };
+    
+    return [subPass, subPropertyResult];
 }

@@ -10,7 +10,7 @@ import {
 } from "typeorm";
 import {ActionResultEntity} from "./ActionResultEntity";
 import objectHash from "object-hash";
-import {AuthorOptions, ObjectPremise, TypedActivityStates} from "../interfaces";
+import {AuthorOptions, ItemOptions, ObjectPremise, TypedActivityStates} from "../interfaces";
 import {TimeAwareAndUpdatedBaseEntity} from "./Base/TimeAwareAndUpdatedBaseEntity";
 import {TimeAwareRandomBaseEntity} from "./Base/TimeAwareRandomBaseEntity";
 import {ActionType} from "./ActionType";
@@ -58,7 +58,7 @@ export class ActionPremise extends TimeAwareRandomBaseEntity  {
     managerId!: string
 
     @Column("simple-json", {nullable: true})
-    itemIsConfig?: TypedActivityStates
+    itemIsConfig?: ItemOptions
 
     @Column("varchar", {length: 300, nullable: true})
     itemIsConfigHash?: string;
@@ -84,12 +84,25 @@ export class ActionPremise extends TimeAwareRandomBaseEntity  {
                     include = [],
                     exclude = [],
                 } = {},
-                itemIs = [],
+                itemIs: {
+                    include: includeItemIs = [],
+                    exclude: excludeItemIs = [],
+                    excludeCondition: ecItemIs,
+                } = {},
             } = data.config;
 
-            if (itemIs.length > 0) {
-                this.itemIsConfig = itemIs;
-                this.itemIsConfigHash = objectHash.sha1(itemIs);
+            if (includeItemIs.length > 0 || excludeItemIs.length > 0) {
+                if (includeItemIs.length > 0) {
+                    this.itemIsConfig = {
+                        include: includeItemIs
+                    };
+                } else {
+                    this.itemIsConfig = {
+                        excludeCondition: ecItemIs,
+                        exclude: excludeItemIs
+                    }
+                }
+                this.itemIsConfigHash = objectHash.sha1(this.itemIsConfig);
             }
             if (include.length > 0 || exclude.length > 0) {
                 if (include.length > 0) {

@@ -1,8 +1,8 @@
 import {Logger} from "winston";
 import {
     AuthorCriteria,
-    AuthorOptions,
-    FilterResult,
+    AuthorOptions, FilterOptions,
+    FilterResult, ItemOptions, MinimalOrFullFilter,
     RunnableBaseOptions,
     TypedActivityState,
     TypedActivityStates
@@ -10,13 +10,13 @@ import {
 import {checkAuthorFilter, checkItemFilter, SubredditResources} from "../Subreddit/SubredditResources";
 import {Comment, Submission} from "snoowrap";
 import {runCheckOptions} from "../Subreddit/Manager";
-import {normalizeAuthorCriteria} from "../util";
+import {buildFilter, normalizeCriteria} from "../util";
 
 
 export abstract class RunnableBase {
 
     logger: Logger;
-    itemIs: TypedActivityStates;
+    itemIs: ItemOptions;
     authorIs: AuthorOptions;
     resources: SubredditResources;
 
@@ -24,20 +24,12 @@ export abstract class RunnableBase {
         const {
             resources,
             itemIs = [],
-            authorIs: {
-                include = [],
-                excludeCondition,
-                exclude = [],
-            } = {},
+            authorIs = [],
             logger,
         } = options;
 
-        this.itemIs = itemIs;
-        this.authorIs = {
-            excludeCondition,
-            exclude: exclude.map(x => normalizeAuthorCriteria(x)),
-            include: include.map(x => normalizeAuthorCriteria(x)),
-        }
+        this.itemIs = buildFilter(itemIs);
+        this.authorIs = buildFilter(authorIs)
         this.resources = resources;
         this.logger = logger;
     }
@@ -49,7 +41,7 @@ export abstract class RunnableBase {
         const [itemPass, itemFilterType, itemFilterResults] = await checkItemFilter(activity, this.itemIs, this.resources, this.logger, options.source);
         if (!itemPass) {
             return [itemFilterResults, undefined];
-        } else if(this.itemIs.length > 0) {
+        } else if(itemFilterType !== undefined) {
             itemRes = itemFilterResults;
         }
         const [authPass, authFilterType, authorFilterResults] = await checkAuthorFilter(activity, this.authorIs, this.resources, this.logger);

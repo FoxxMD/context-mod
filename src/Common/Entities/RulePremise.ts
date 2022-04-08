@@ -11,7 +11,7 @@ import {
 } from "typeorm";
 import {RuleResultEntity} from "./RuleResultEntity";
 import {
-    AuthorOptions,
+    AuthorOptions, ItemOptions,
     ObjectPremise,
     TypedActivityStates
 } from "../interfaces";
@@ -64,7 +64,7 @@ export class RulePremise extends TimeAwareRandomBaseEntity {
     managerId!: string
 
     @Column("simple-json", {nullable: true})
-    itemIsConfig?: TypedActivityStates
+    itemIsConfig?: ItemOptions
 
     @Column("varchar", {length: 300, nullable: true})
     itemIsConfigHash?: string;
@@ -90,13 +90,27 @@ export class RulePremise extends TimeAwareRandomBaseEntity {
                     include = [],
                     exclude = [],
                 } = {},
-                itemIs = [],
+                itemIs: {
+                    include: includeItemIs = [],
+                    exclude: excludeItemIs = [],
+                    excludeCondition: ecItemIs,
+                } = {},
             } = data.config;
 
-            if (itemIs.length > 0) {
-                this.itemIsConfig = itemIs;
-                this.itemIsConfigHash = objectHash.sha1(itemIs);
+            if (includeItemIs.length > 0 || excludeItemIs.length > 0) {
+                if (includeItemIs.length > 0) {
+                    this.itemIsConfig = {
+                        include: includeItemIs
+                    };
+                } else {
+                    this.itemIsConfig = {
+                        excludeCondition: ecItemIs,
+                        exclude: excludeItemIs
+                    }
+                }
+                this.itemIsConfigHash = objectHash.sha1(this.itemIsConfig);
             }
+            
             if (include.length > 0 || exclude.length > 0) {
                 if (include.length > 0) {
                     this.authorIsConfig = {

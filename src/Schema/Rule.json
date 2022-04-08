@@ -340,23 +340,18 @@
             "description": "Aggregates all of the domain/media accounts attributed to an author's Submission history. If any domain is over the threshold the rule is triggered\n\nAvailable data for [Action templating](https://github.com/FoxxMD/context-mod#action-templating):\n\n```\ntriggeredDomainCount => Number of domains that met the threshold\nactivityTotal        => Number of Activities considered from window\nwindow               => The date range of the Activities considered\nlargestCount         => The count from the largest aggregated domain\nlargestPercentage    => The percentage of Activities the largest aggregated domain comprises\nsmallestCount        => The count from the smallest aggregated domain\nsmallestPercentage   => The percentage of Activities the smallest aggregated domain comprises\ncountRange           => A convenience string displaying \"smallestCount - largestCount\" or just one number if both are the same\npercentRange         => A convenience string displaying \"smallestPercentage - largestPercentage\" or just one percentage if both are the same\ndomains              => An array of all the domain URLs that met the threshold\ndomainsDelim         => A comma-delimited string of all the domain URLs that met the threshold\ntitles               => The friendly-name of the domain if one is present, otherwise the URL (IE youtube.com/c/34ldfa343 => \"My Youtube Channel Title\")\ntitlesDelim          => A comma-delimited string of all the domain friendly-names\nthreshold            => The threshold you configured for this Rule to trigger\nurl                  => Url of the submission that triggered the rule\n```",
             "properties": {
                 "authorIs": {
-                    "$ref": "#/definitions/AuthorOptions",
-                    "description": "If present then these Author criteria are checked before running the rule. If criteria fails then the rule is skipped.",
-                    "examples": [
+                    "anyOf": [
                         {
-                            "include": [
-                                {
-                                    "flairText": [
-                                        "Contributor",
-                                        "Veteran"
-                                    ]
-                                },
-                                {
-                                    "isMod": true
-                                }
-                            ]
+                            "$ref": "#/definitions/FilterOptions<AuthorCriteria>"
+                        },
+                        {
+                            "items": {
+                                "$ref": "#/definitions/AuthorCriteria"
+                            },
+                            "type": "array"
                         }
-                    ]
+                    ],
+                    "description": "If present then these Author criteria are checked before running the Check. If criteria fails then the Check will fail."
                 },
                 "criteria": {
                     "description": "A list threshold-window values to test attribution against\n\nIf none is provided the default set used is:\n\n```\nthreshold: 10%\nwindow: 100\n```",
@@ -375,18 +370,25 @@
                     "type": "string"
                 },
                 "itemIs": {
-                    "description": "A list of criteria to test the state of the `Activity` against before running the Rule.\n\nIf any set of criteria passes the Rule will be run. If the criteria fails then the Rule is skipped.",
-                    "items": {
-                        "anyOf": [
-                            {
-                                "$ref": "#/definitions/SubmissionState"
+                    "anyOf": [
+                        {
+                            "$ref": "#/definitions/FilterOptions<TypedActivityState>"
+                        },
+                        {
+                            "items": {
+                                "anyOf": [
+                                    {
+                                        "$ref": "#/definitions/SubmissionState"
+                                    },
+                                    {
+                                        "$ref": "#/definitions/CommentState"
+                                    }
+                                ]
                             },
-                            {
-                                "$ref": "#/definitions/CommentState"
-                            }
-                        ]
-                    },
-                    "type": "array"
+                            "type": "array"
+                        }
+                    ],
+                    "description": "A list of criteria to test the state of the `Activity` against before running the check.\n\nIf any set of criteria passes the Check will be run. If the criteria fails then the Check will fail.\n\n* @examples [[{\"over_18\": true, \"removed': false}]]"
                 },
                 "kind": {
                     "description": "The kind of rule to run",
@@ -561,70 +563,21 @@
             },
             "type": "object"
         },
-        "AuthorOptions": {
-            "description": "If present then these Author criteria are checked before running the rule. If criteria fails then the rule is skipped.",
-            "examples": [
-                {
-                    "include": [
-                        {
-                            "flairText": [
-                                "Contributor",
-                                "Veteran"
-                            ]
-                        },
-                        {
-                            "isMod": true
-                        }
-                    ]
-                }
-            ],
-            "properties": {
-                "exclude": {
-                    "description": "Only runs if `include` is not present. Each AuthorCriteria is comprised of conditions that the Author being checked must \"not\" pass. See excludeCondition for set behavior\n\nEX: `isMod: true, name: Automoderator` => Will pass if the Author IS NOT a mod and IS NOT named Automoderator",
-                    "items": {
-                        "$ref": "#/definitions/AuthorCriteria"
-                    },
-                    "type": "array"
-                },
-                "excludeCondition": {
-                    "default": "OR",
-                    "description": "* OR => if ANY exclude condition \"does not\" pass then the exclude test passes\n* AND => if ALL exclude conditions \"do not\" pass then the exclude test passes\n\nDefaults to OR",
-                    "enum": [
-                        "AND",
-                        "OR"
-                    ],
-                    "type": "string"
-                },
-                "include": {
-                    "description": "Will \"pass\" if any set of AuthorCriteria passes",
-                    "items": {
-                        "$ref": "#/definitions/AuthorCriteria"
-                    },
-                    "type": "array"
-                }
-            },
-            "type": "object"
-        },
         "AuthorRuleJSONConfig": {
             "properties": {
                 "authorIs": {
-                    "$ref": "#/definitions/AuthorOptions",
-                    "description": "If present then these Author criteria are checked before running the rule. If criteria fails then the rule is skipped.",
-                    "examples": [
+                    "anyOf": [
                         {
-                            "include": [
-                                {
-                                    "flairText": [
-                                        "Contributor",
-                                        "Veteran"
-                                    ]
-                                },
-                                {
-                                    "isMod": true
-                                }
-                            ]
+                            "$ref": "#/definitions/FilterOptions<AuthorCriteria>"
+                        },
+                        {
+                            "items": {
+                                "$ref": "#/definitions/AuthorCriteria"
+                            },
+                            "type": "array"
                         }
-                    ]
+                    ],
+                    "description": "If present then these Author criteria are checked before running the Check. If criteria fails then the Check will fail."
                 },
                 "exclude": {
                     "description": "Only runs if include is not present. Will \"pass\" if any of set of the AuthorCriteria does not pass",
@@ -641,18 +594,25 @@
                     "type": "array"
                 },
                 "itemIs": {
-                    "description": "A list of criteria to test the state of the `Activity` against before running the Rule.\n\nIf any set of criteria passes the Rule will be run. If the criteria fails then the Rule is skipped.",
-                    "items": {
-                        "anyOf": [
-                            {
-                                "$ref": "#/definitions/SubmissionState"
+                    "anyOf": [
+                        {
+                            "$ref": "#/definitions/FilterOptions<TypedActivityState>"
+                        },
+                        {
+                            "items": {
+                                "anyOf": [
+                                    {
+                                        "$ref": "#/definitions/SubmissionState"
+                                    },
+                                    {
+                                        "$ref": "#/definitions/CommentState"
+                                    }
+                                ]
                             },
-                            {
-                                "$ref": "#/definitions/CommentState"
-                            }
-                        ]
-                    },
-                    "type": "array"
+                            "type": "array"
+                        }
+                    ],
+                    "description": "A list of criteria to test the state of the `Activity` against before running the check.\n\nIf any set of criteria passes the Check will be run. If the criteria fails then the Check will fail.\n\n* @examples [[{\"over_18\": true, \"removed': false}]]"
                 },
                 "kind": {
                     "description": "The kind of rule to run",
@@ -829,6 +789,76 @@
             },
             "type": "object"
         },
+        "FilterOptions<AuthorCriteria>": {
+            "properties": {
+                "exclude": {
+                    "description": "Only runs if `include` is not present. Each Criteria is comprised of conditions that the filter (Author/Item) being checked must \"not\" pass. See excludeCondition for set behavior\n\nEX: `isMod: true, name: Automoderator` => Will pass if the Author IS NOT a mod and IS NOT named Automoderator",
+                    "items": {
+                        "$ref": "#/definitions/AuthorCriteria"
+                    },
+                    "type": "array"
+                },
+                "excludeCondition": {
+                    "default": "OR",
+                    "description": "* OR => if ANY exclude condition \"does not\" pass then the exclude test passes\n* AND => if ALL exclude conditions \"do not\" pass then the exclude test passes\n\nDefaults to OR",
+                    "enum": [
+                        "AND",
+                        "OR"
+                    ],
+                    "type": "string"
+                },
+                "include": {
+                    "description": "Will \"pass\" if any set of Criteria passes",
+                    "items": {
+                        "$ref": "#/definitions/AuthorCriteria"
+                    },
+                    "type": "array"
+                }
+            },
+            "type": "object"
+        },
+        "FilterOptions<TypedActivityState>": {
+            "properties": {
+                "exclude": {
+                    "description": "Only runs if `include` is not present. Each Criteria is comprised of conditions that the filter (Author/Item) being checked must \"not\" pass. See excludeCondition for set behavior\n\nEX: `isMod: true, name: Automoderator` => Will pass if the Author IS NOT a mod and IS NOT named Automoderator",
+                    "items": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/definitions/SubmissionState"
+                            },
+                            {
+                                "$ref": "#/definitions/CommentState"
+                            }
+                        ]
+                    },
+                    "type": "array"
+                },
+                "excludeCondition": {
+                    "default": "OR",
+                    "description": "* OR => if ANY exclude condition \"does not\" pass then the exclude test passes\n* AND => if ALL exclude conditions \"do not\" pass then the exclude test passes\n\nDefaults to OR",
+                    "enum": [
+                        "AND",
+                        "OR"
+                    ],
+                    "type": "string"
+                },
+                "include": {
+                    "description": "Will \"pass\" if any set of Criteria passes",
+                    "items": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/definitions/SubmissionState"
+                            },
+                            {
+                                "$ref": "#/definitions/CommentState"
+                            }
+                        ]
+                    },
+                    "type": "array"
+                }
+            },
+            "type": "object"
+        },
         "HistoryCriteria": {
             "description": "Criteria will only trigger if ALL present thresholds (comment, submission, total) are met",
             "properties": {
@@ -885,23 +915,18 @@
             "description": "Aggregates an Author's submission and comment history. Rule can be triggered on count/percent of total (for either or both comment/sub totals) as well as comment OP total.\n\nAvailable data for [Action templating](https://github.com/FoxxMD/context-mod#action-templating):\n\n```\nactivityTotal    => Total number of activities\nsubmissionTotal  => Total number of submissions\ncommentTotal     => Total number of comments\nopTotal          => Total number of comments as OP\nthresholdSummary => A text summary of the first Criteria triggered with totals/percentages\ncriteria         => The ThresholdCriteria object\nwindow           => A text summary of the range of Activities considered (# of Items if number, time range if Duration)\n```",
             "properties": {
                 "authorIs": {
-                    "$ref": "#/definitions/AuthorOptions",
-                    "description": "If present then these Author criteria are checked before running the rule. If criteria fails then the rule is skipped.",
-                    "examples": [
+                    "anyOf": [
                         {
-                            "include": [
-                                {
-                                    "flairText": [
-                                        "Contributor",
-                                        "Veteran"
-                                    ]
-                                },
-                                {
-                                    "isMod": true
-                                }
-                            ]
+                            "$ref": "#/definitions/FilterOptions<AuthorCriteria>"
+                        },
+                        {
+                            "items": {
+                                "$ref": "#/definitions/AuthorCriteria"
+                            },
+                            "type": "array"
                         }
-                    ]
+                    ],
+                    "description": "If present then these Author criteria are checked before running the Check. If criteria fails then the Check will fail."
                 },
                 "condition": {
                     "description": "* If `OR` then any set of Criteria that pass will trigger the Rule\n* If `AND` then all Criteria sets must pass to trigger the Rule",
@@ -968,18 +993,25 @@
                     "type": "array"
                 },
                 "itemIs": {
-                    "description": "A list of criteria to test the state of the `Activity` against before running the Rule.\n\nIf any set of criteria passes the Rule will be run. If the criteria fails then the Rule is skipped.",
-                    "items": {
-                        "anyOf": [
-                            {
-                                "$ref": "#/definitions/SubmissionState"
+                    "anyOf": [
+                        {
+                            "$ref": "#/definitions/FilterOptions<TypedActivityState>"
+                        },
+                        {
+                            "items": {
+                                "anyOf": [
+                                    {
+                                        "$ref": "#/definitions/SubmissionState"
+                                    },
+                                    {
+                                        "$ref": "#/definitions/CommentState"
+                                    }
+                                ]
                             },
-                            {
-                                "$ref": "#/definitions/CommentState"
-                            }
-                        ]
-                    },
-                    "type": "array"
+                            "type": "array"
+                        }
+                    ],
+                    "description": "A list of criteria to test the state of the `Activity` against before running the check.\n\nIf any set of criteria passes the Check will be run. If the criteria fails then the Check will fail.\n\n* @examples [[{\"over_18\": true, \"removed': false}]]"
                 },
                 "kind": {
                     "description": "The kind of rule to run",
@@ -1148,41 +1180,43 @@
             "description": "Checks a user's history for any Activity (Submission/Comment) in the subreddits specified in thresholds\n\nAvailable data for [Action templating](https://github.com/FoxxMD/context-mod#action-templating):\n\n```\nsummary    => comma-deliminated list of subreddits that hit the threshold and their count EX subredditA(1), subredditB(4),...\nsubCount   => Total number of subreddits that hit the threshold\ntotalCount => Total number of all activity occurrences in subreddits\n```",
             "properties": {
                 "authorIs": {
-                    "$ref": "#/definitions/AuthorOptions",
-                    "description": "If present then these Author criteria are checked before running the rule. If criteria fails then the rule is skipped.",
-                    "examples": [
+                    "anyOf": [
                         {
-                            "include": [
-                                {
-                                    "flairText": [
-                                        "Contributor",
-                                        "Veteran"
-                                    ]
-                                },
-                                {
-                                    "isMod": true
-                                }
-                            ]
+                            "$ref": "#/definitions/FilterOptions<AuthorCriteria>"
+                        },
+                        {
+                            "items": {
+                                "$ref": "#/definitions/AuthorCriteria"
+                            },
+                            "type": "array"
                         }
-                    ]
+                    ],
+                    "description": "If present then these Author criteria are checked before running the Check. If criteria fails then the Check will fail."
                 },
                 "imageDetection": {
                     "$ref": "#/definitions/ImageDetection",
                     "description": "When comparing submissions detect if the reference submission is an image and do a pixel-comparison to other detected image submissions.\n\n**Note:** This is an **experimental feature**"
                 },
                 "itemIs": {
-                    "description": "A list of criteria to test the state of the `Activity` against before running the Rule.\n\nIf any set of criteria passes the Rule will be run. If the criteria fails then the Rule is skipped.",
-                    "items": {
-                        "anyOf": [
-                            {
-                                "$ref": "#/definitions/SubmissionState"
+                    "anyOf": [
+                        {
+                            "$ref": "#/definitions/FilterOptions<TypedActivityState>"
+                        },
+                        {
+                            "items": {
+                                "anyOf": [
+                                    {
+                                        "$ref": "#/definitions/SubmissionState"
+                                    },
+                                    {
+                                        "$ref": "#/definitions/CommentState"
+                                    }
+                                ]
                             },
-                            {
-                                "$ref": "#/definitions/CommentState"
-                            }
-                        ]
-                    },
-                    "type": "array"
+                            "type": "array"
+                        }
+                    ],
+                    "description": "A list of criteria to test the state of the `Activity` against before running the check.\n\nIf any set of criteria passes the Check will be run. If the criteria fails then the Check will fail.\n\n* @examples [[{\"over_18\": true, \"removed': false}]]"
                 },
                 "kind": {
                     "description": "The kind of rule to run",
@@ -1401,23 +1435,18 @@
             "description": "Test a (list of) Regular Expression against the contents or title of an Activity\n\nOptionally, specify a `window` of the User's history to additionally test against\n\nAvailable data for [Action templating](https://github.com/FoxxMD/context-mod#action-templating):",
             "properties": {
                 "authorIs": {
-                    "$ref": "#/definitions/AuthorOptions",
-                    "description": "If present then these Author criteria are checked before running the rule. If criteria fails then the rule is skipped.",
-                    "examples": [
+                    "anyOf": [
                         {
-                            "include": [
-                                {
-                                    "flairText": [
-                                        "Contributor",
-                                        "Veteran"
-                                    ]
-                                },
-                                {
-                                    "isMod": true
-                                }
-                            ]
+                            "$ref": "#/definitions/FilterOptions<AuthorCriteria>"
+                        },
+                        {
+                            "items": {
+                                "$ref": "#/definitions/AuthorCriteria"
+                            },
+                            "type": "array"
                         }
-                    ]
+                    ],
+                    "description": "If present then these Author criteria are checked before running the Check. If criteria fails then the Check will fail."
                 },
                 "condition": {
                     "default": "OR",
@@ -1443,18 +1472,25 @@
                     "type": "array"
                 },
                 "itemIs": {
-                    "description": "A list of criteria to test the state of the `Activity` against before running the Rule.\n\nIf any set of criteria passes the Rule will be run. If the criteria fails then the Rule is skipped.",
-                    "items": {
-                        "anyOf": [
-                            {
-                                "$ref": "#/definitions/SubmissionState"
+                    "anyOf": [
+                        {
+                            "$ref": "#/definitions/FilterOptions<TypedActivityState>"
+                        },
+                        {
+                            "items": {
+                                "anyOf": [
+                                    {
+                                        "$ref": "#/definitions/SubmissionState"
+                                    },
+                                    {
+                                        "$ref": "#/definitions/CommentState"
+                                    }
+                                ]
                             },
-                            {
-                                "$ref": "#/definitions/CommentState"
-                            }
-                        ]
-                    },
-                    "type": "array"
+                            "type": "array"
+                        }
+                    ],
+                    "description": "A list of criteria to test the state of the `Activity` against before running the check.\n\nIf any set of criteria passes the Check will be run. If the criteria fails then the Check will fail.\n\n* @examples [[{\"over_18\": true, \"removed': false}]]"
                 },
                 "kind": {
                     "description": "The kind of rule to run",
@@ -1485,23 +1521,18 @@
             "description": "Checks a user's history for Submissions with identical content\n\nAvailable data for [Action templating](https://github.com/FoxxMD/context-mod#action-templating):\n\n```\ncount      => Total number of repeat Submissions\nthreshold  => The threshold you configured for this Rule to trigger\nurl        => Url of the submission that triggered the rule\n```",
             "properties": {
                 "authorIs": {
-                    "$ref": "#/definitions/AuthorOptions",
-                    "description": "If present then these Author criteria are checked before running the rule. If criteria fails then the rule is skipped.",
-                    "examples": [
+                    "anyOf": [
                         {
-                            "include": [
-                                {
-                                    "flairText": [
-                                        "Contributor",
-                                        "Veteran"
-                                    ]
-                                },
-                                {
-                                    "isMod": true
-                                }
-                            ]
+                            "$ref": "#/definitions/FilterOptions<AuthorCriteria>"
+                        },
+                        {
+                            "items": {
+                                "$ref": "#/definitions/AuthorCriteria"
+                            },
+                            "type": "array"
                         }
-                    ]
+                    ],
+                    "description": "If present then these Author criteria are checked before running the Check. If criteria fails then the Check will fail."
                 },
                 "caseSensitive": {
                     "default": false,
@@ -1561,18 +1592,25 @@
                     "type": "array"
                 },
                 "itemIs": {
-                    "description": "A list of criteria to test the state of the `Activity` against before running the Rule.\n\nIf any set of criteria passes the Rule will be run. If the criteria fails then the Rule is skipped.",
-                    "items": {
-                        "anyOf": [
-                            {
-                                "$ref": "#/definitions/SubmissionState"
+                    "anyOf": [
+                        {
+                            "$ref": "#/definitions/FilterOptions<TypedActivityState>"
+                        },
+                        {
+                            "items": {
+                                "anyOf": [
+                                    {
+                                        "$ref": "#/definitions/SubmissionState"
+                                    },
+                                    {
+                                        "$ref": "#/definitions/CommentState"
+                                    }
+                                ]
                             },
-                            {
-                                "$ref": "#/definitions/CommentState"
-                            }
-                        ]
-                    },
-                    "type": "array"
+                            "type": "array"
+                        }
+                    ],
+                    "description": "A list of criteria to test the state of the `Activity` against before running the check.\n\nIf any set of criteria passes the Check will be run. If the criteria fails then the Check will fail.\n\n* @examples [[{\"over_18\": true, \"removed': false}]]"
                 },
                 "keepRemoved": {
                     "default": false,
@@ -1792,23 +1830,18 @@
             "description": "Search for reposts of a Submission or Comment\n\n* For submissions the title or URL can searched and matched against\n* For comments, candidate comments are gathered from similar reddit submissions and/or external sources (youtube, twitter, etc..) and then matched against",
             "properties": {
                 "authorIs": {
-                    "$ref": "#/definitions/AuthorOptions",
-                    "description": "If present then these Author criteria are checked before running the rule. If criteria fails then the rule is skipped.",
-                    "examples": [
+                    "anyOf": [
                         {
-                            "include": [
-                                {
-                                    "flairText": [
-                                        "Contributor",
-                                        "Veteran"
-                                    ]
-                                },
-                                {
-                                    "isMod": true
-                                }
-                            ]
+                            "$ref": "#/definitions/FilterOptions<AuthorCriteria>"
+                        },
+                        {
+                            "items": {
+                                "$ref": "#/definitions/AuthorCriteria"
+                            },
+                            "type": "array"
                         }
-                    ]
+                    ],
+                    "description": "If present then these Author criteria are checked before running the Check. If criteria fails then the Check will fail."
                 },
                 "condition": {
                     "default": "OR",
@@ -1834,18 +1867,25 @@
                     "type": "array"
                 },
                 "itemIs": {
-                    "description": "A list of criteria to test the state of the `Activity` against before running the Rule.\n\nIf any set of criteria passes the Rule will be run. If the criteria fails then the Rule is skipped.",
-                    "items": {
-                        "anyOf": [
-                            {
-                                "$ref": "#/definitions/SubmissionState"
+                    "anyOf": [
+                        {
+                            "$ref": "#/definitions/FilterOptions<TypedActivityState>"
+                        },
+                        {
+                            "items": {
+                                "anyOf": [
+                                    {
+                                        "$ref": "#/definitions/SubmissionState"
+                                    },
+                                    {
+                                        "$ref": "#/definitions/CommentState"
+                                    }
+                                ]
                             },
-                            {
-                                "$ref": "#/definitions/CommentState"
-                            }
-                        ]
-                    },
-                    "type": "array"
+                            "type": "array"
+                        }
+                    ],
+                    "description": "A list of criteria to test the state of the `Activity` against before running the check.\n\nIf any set of criteria passes the Check will be run. If the criteria fails then the Check will fail.\n\n* @examples [[{\"over_18\": true, \"removed': false}]]"
                 },
                 "kind": {
                     "description": "The kind of rule to run",
