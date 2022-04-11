@@ -1521,7 +1521,7 @@ export class Manager extends EventEmitter {
         this.managerEntity[type].invokee = await this.cacheManager.invokeeRepo.findOneBy({name: this[type].causedBy}) as InvokeeType
         // @ts-ignore
         this.managerEntity[type].runType = await this.cacheManager.runTypeRepo.findOneBy({name: this[type].state}) as RunStateType
-        // @ts-ignore
-        await this.cacheManager.defaultDatabase.manager.save(this.managerEntity[type]);
+
+        await this.cacheManager.defaultDatabase.getRepository(ManagerEntity).save(this.managerEntity);
     }
 }
