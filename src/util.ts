@@ -714,7 +714,7 @@ export const parseGenericValueOrPercentComparison = (val: string): GenericCompar
         value: Number.parseFloat(groups.value),
         isPercent: groups.percent !== '',
         extra: groups.extra,
-        displayText: `${groups.opStr} ${groups.value}${groups.percent === undefined ? '': '%'}`
+        displayText: `${groups.opStr} ${groups.value}${groups.percent === undefined || groups.percent === '' ? '': '%'}`
     }
 }
 
