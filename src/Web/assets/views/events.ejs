@@ -186,10 +186,58 @@
                                         <span class="font-semibold">Rules:</span>
                                         <ul class="list-inside list-disc">
                                             <% chkSum.ruleResults.forEach(function (ruleResult) { %>
-                                                <% if(ruleResult.authorIs !== undefined || ruleResult.itemIs !== undefined) { %>
+                                                <% if(ruleResult.condition !== undefined) { %>
+                                                        <li> <%= ruleResult.condition %> <%= ruleResult.triggered%>
+                                                            <ul class="list-inside list-disc">
+                                                                <% ruleResult.results.forEach(function (rsResult) { %>
+                                                                    <% if(rsResult.authorIs !== undefined || rsResult.itemIs !== undefined) { %>
+                                                                        <li><%= rsResult.name %> <%= rsResult.triggered%>
+                                                                            <ul class="list-inside list-disc">
+                                                                                <% if(rsResult.authorIs !== undefined) { %>
+                                                                                    <li>
+                                                                                        <span class="font-semibold">Author:</span> <span class="px-1"><%= rsResult.authorIs.passed %> (<%= rsResult.authorIs.join %>)</span>
+                                                                                        <ul class="list-inside list-disc">
+                                                                                            <% rsResult.authorIs.criteriaResults.forEach(function (res, index) { %>
+                                                                                                <li>Criteria #<%= index %> => <%= res[0] %>
+                                                                                                    <ul class="list-inside list-disc">
+                                                                                                        <% res[1].forEach(function (resInside) { %>
+                                                                                                            <li><%= resInside %></li>
+                                                                                                        <% }) %>
+                                                                                                    </ul>
+                                                                                                </li>
+                                                                                            <% }) %>
+                                                                                        </ul>
+                                                                                    </li>
+                                                                                <% } %>
+                                                                                <% if(rsResult.itemIs !== undefined) { %>
+                                                                                    <li>
+                                                                                        <span class="font-semibold">Item:</span> <span class="px-1"><%= rsResult.itemIs.passed %> (<%= rsResult.itemIs.join %>)</span>
+                                                                                        <ul class="list-inside list-disc">
+                                                                                            <% rsResult.itemIs.criteriaResults.forEach(function (res, index) { %>
+                                                                                                <li>Criteria #<%= index %> => <%= res[0] %>
+                                                                                                    <ul class="list-inside list-disc">
+                                                                                                        <% res[1].forEach(function (resInside) { %>
+                                                                                                            <li><%= resInside %></li>
+                                                                                                        <% }) %>
+                                                                                                    </ul>
+                                                                                                </li>
+                                                                                            <% }) %>
+                                                                                        </ul>
+                                                                                    </li>
+                                                                                <% } %>
+                                                                                <li><span class="font-semibold">Result:</span> <%= rsResult.result %></li>
+                                                                            </ul>
+                                                                        </li>
+                                                                    <% } else { %>
+                                                                        <li><%= rsResult.name %> <%= rsResult.triggered%> - <%= rsResult.result %></li>
+                                                                    <% } %>
+                                                                <% }) %>
+                                                            </ul>
+                                                        </li>
+                                                <% } else if(ruleResult.authorIs !== undefined || ruleResult.itemIs !== undefined) { %>
                                                     <li><%= ruleResult.name %> <%= ruleResult.triggered%>
                                                         <ul class="list-inside list-disc">
-                                                            <% if(chkSum.authorIs !== undefined) { %>
+                                                            <% if(ruleResult.authorIs !== undefined) { %>
                                                                 <li>
                                                                     <span class="font-semibold">Author:</span> <span class="px-1"><%= ruleResult.authorIs.passed %> (<%= ruleResult.authorIs.join %>)</span>
                                                                     <ul class="list-inside list-disc">

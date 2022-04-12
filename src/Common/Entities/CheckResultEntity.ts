@@ -189,7 +189,7 @@ export class CheckResultEntity extends TimeAwareRandomBaseEntity {
 
     toJSON() {
         const data = super.toJSON();
-        data['ruleResults'] = {...data.results};
+        data['ruleResults'] = [...data.results];
         delete data['ruleSetResults'];
         delete data['allRuleResults'];
         delete data['results'];

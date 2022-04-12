@@ -1138,21 +1138,34 @@ const webClient = async (options: OperatorConfig) => {
 
                            return {
                                ...z,
-                               itemIs: z._itemIs,
-                               authorIs: z._authorIs,
-                               ruleResults: z.ruleResults?.map(a => {
+                               itemIs: z.itemIs,
+                               authorIs: z.authorIs,
+                               // @ts-ignore
+                               ruleResults: z.ruleResults?.map((a: RuleResultEntity | RuleSetResultEntity) => {
+                                   if('condition' in a) {
+                                       return {
+                                           ...a,
+                                           results: (a as RuleSetResultEntity).results.map(b => ({
+                                               ...b,
+                                               itemIs: b.itemIs,
+                                               authorIs: b.authorIs,
+                                               name: RulePremise.getFriendlyIdentifier(b.premise)
+                                           }))
+                                       }
+                                   }
+                                   const b = a as RuleResultEntity;
                                    return {
-                                       ...a,
-                                       itemIs: a._itemIs,
-                                       authorIs: a._authorIs,
-                                       name: RulePremise.getFriendlyIdentifier(a.premise)
+                                       ...b,
+                                       itemIs: b.itemIs,
+                                       authorIs: b.authorIs,
+                                       name: RulePremise.getFriendlyIdentifier(b.premise)
                                    }
                                }),
                                actionResults: z.actionResults?.map(a => {
                                    return {
                                        ...a,
-                                       itemIs: a._itemIs,
-                                       authorIs: a._authorIs,
+                                       itemIs: a.itemIs,
+                                       authorIs: a.authorIs,
                                        name: ActionPremise.getFriendlyIdentifier(a.premise)
                                    }
                                })
@@ -1182,6 +1195,22 @@ const webClient = async (options: OperatorConfig) => {
 
                     // @ts-ignore
                     const formattedRuleResults = ruleResults.map((z: RuleResult) => {
+                        if('condition' in z) {
+                            const y = z as unknown as RuleSetResultEntity;
+                            return {
+                                condition: y.condition,
+                                triggered: triggeredIndicator(y.triggered),
+                                results: y.results.map(a => {
+                                    const {triggered, result, ...restA} = a;
+                                    return {
+                                        ...restA,
+                                        triggered: triggeredIndicator(triggered ?? null, 'Skipped'),
+                                        result: result || '-',
+                                        // @ts-ignore
+                                        ...formatFilterData(a)
+                                }})
+                            }
+                        }
                         const {triggered, result, ...restY} = z;
                         return {
                             ...restY,
