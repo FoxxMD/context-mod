@@ -13,29 +13,49 @@ import as from 'async';
 import fetch from 'node-fetch';
 import {
     asActivity,
-    asSubmission, asUserNoteCriteria,
+    asSubmission,
+    asUserNoteCriteria,
     buildCacheOptionsFromProvider,
     buildCachePrefix,
     cacheStats,
     compareDurationValue,
     comparisonTextOp,
     createCacheManager,
-    escapeRegex, FAIL,
-    fetchExternalUrl, filterCriteriaSummary,
-    formatNumber, generateItemFilterHelpers,
+    escapeRegex,
+    FAIL,
+    fetchExternalUrl,
+    filterCriteriaSummary,
+    formatNumber,
+    generateItemFilterHelpers,
     getActivityAuthorName,
-    getActivitySubredditName, isComment, isCommentState,
-    isStrongSubredditState, isSubmission, isUser,
+    getActivitySubredditName,
+    isComment,
+    isCommentState,
+    isStrongSubredditState,
+    isSubmission,
+    isUser,
     hashString,
     mergeArr,
     parseDurationComparison,
     parseExternalUrl,
-    parseGenericValueComparison, parseGenericValueOrPercentComparison,
-    parseRedditEntity, parseStringToRegex,
-    parseWikiContext, PASS, redisScanIterator, removeUndefinedKeys,
-    shouldCacheSubredditStateCriteriaResult, strToActivitySource,
-    subredditStateIsNameOnly, testMaybeStringRegex,
-    toStrongSubredditState, truncateStringToLength, userNoteCriteriaSummary, asComment, criteriaPassWithIncludeBehavior
+    parseGenericValueComparison,
+    parseGenericValueOrPercentComparison,
+    parseRedditEntity,
+    parseStringToRegex,
+    parseWikiContext,
+    PASS,
+    redisScanIterator,
+    removeUndefinedKeys,
+    shouldCacheSubredditStateCriteriaResult,
+    strToActivitySource,
+    subredditStateIsNameOnly,
+    testMaybeStringRegex,
+    toStrongSubredditState,
+    truncateStringToLength,
+    userNoteCriteriaSummary,
+    asComment,
+    criteriaPassWithIncludeBehavior,
+    isRuleSetResult
 } from "../util";
 import LoggedError from "../Utils/LoggedError";
 import {
@@ -94,6 +114,8 @@ import {TimeSeriesStat} from "../Common/Entities/Stats/TimeSeriesStat";
 import {InvokeeType} from "../Common/Entities/InvokeeType";
 import {RunStateType} from "../Common/Entities/RunStateType";
 import {CheckResultEntity} from "../Common/Entities/CheckResultEntity";
+import {RuleSetResultEntity} from "../Common/Entities/RuleSetResultEntity";
+import {RulePremise} from "../Common/Entities/RulePremise";
 
 export const DEFAULT_FOOTER = '\r\n*****\r\nThis action was performed by [a bot.]({{botLink}}) Mention a moderator or [send a modmail]({{modmailLink}}) if you any ideas, questions, or concerns about this action.';
 
@@ -2010,28 +2032,67 @@ export class SubredditResources {
         };
     }
 
-    async getCommentCheckCacheResult(item: Comment, checkConfig: object): Promise<CheckResultEntity | undefined> {
+    async getCommentCheckCacheResult(item: Comment, checkConfig: object): Promise<CheckResultEntity | Pick<CheckResultEntity, 'triggered' | 'results'> | undefined> {
         const userName = getActivityAuthorName(item.author);
         const hash = `commentUserResult-${userName}-${item.link_id}-${objectHash.sha1(checkConfig)}`;
         this.stats.cache.commentCheck.requests++;
         this.stats.cache.commentCheck.requestTimestamps.push(Date.now());
         await this.stats.cache.commentCheck.identifierRequestCount.set(hash, (await this.stats.cache.commentCheck.identifierRequestCount.wrap(hash, () => 0) as number) + 1);
-        let result = await this.cache.get(hash) as string | undefined | null;
-        if(result === null) {
+        let result = await this.cache.get(hash) as { id: string, results: (RuleResultEntity | RuleSetResultEntity)[], triggered: boolean } | undefined | null;
+        if (result === null) {
             result = undefined;
         }
-        if(result === undefined) {
+        if (result === undefined) {
             this.stats.cache.commentCheck.miss++;
             return result;
         }
+        const {id, results, triggered} = result;
         this.logger.debug(`Cache Hit: Comment Check for ${userName} in Submission ${item.link_id} (Hash ${hash})`);
-        return await this.database.getRepository(CheckResultEntity).findOne({where: {id: result}}) as CheckResultEntity;
+        // check if the Check was persisted since that would be easiest
+        const persisted = await this.database.getRepository(CheckResultEntity).findOne({where: {id}}) as CheckResultEntity;
+        if (persisted !== null) {
+            return persisted;
+        }
+        const hydratedResults: (RuleResultEntity | RuleSetResultEntity)[] = [];
+        const premiseRepo = this.database.getRepository(RulePremise);
+        for (const r of results) {
+            if (isRuleSetResult(r)) {
+                hydratedResults.push(new RuleSetResultEntity({
+                    triggered: r.triggered,
+                    condition: r.condition,
+                    results: await mapAsync(r.results, async (ruleResult: RuleResultEntity) => {
+                        const prem = await premiseRepo.findOneBy({
+                            configHash: ruleResult.premise.configHash,
+                            kindId: ruleResult.premise.kindId,
+                            managerId: ruleResult.premise.managerId,
+                        }) as RulePremise;
+                        return new RuleResultEntity({
+                            ...ruleResult,
+                            premise: prem,
+                            fromCache: true
+                        })
+                    })
+                }))
+            } else {
+                const prem = await premiseRepo.findOneBy({
+                    configHash: r.premise.configHash,
+                    kindId: r.premise.kindId,
+                    managerId: r.premise.managerId,
+                }) as RulePremise;
+                hydratedResults.push(new RuleResultEntity({
+                    ...r,
+                    premise: prem,
+                    fromCache: true
+                }));
+            }
+        }
+        return {results: hydratedResults, triggered};
     }
 
     async setCommentCheckCacheResult(item: Comment, checkConfig: object, result: CheckResultEntity, ttl: number) {
         const userName = getActivityAuthorName(item.author);
         const hash = `commentUserResult-${userName}-${item.link_id}-${objectHash.sha1(checkConfig)}`
-        await this.cache.set(hash, result.id, { ttl });
+        await this.cache.set(hash, {id: result.id, results: result.results, triggered: result.triggered}, { ttl });
         this.logger.debug(`Cached check result '${result.check.name}' for User ${userName} on Submission ${item.link_id} for ${ttl} seconds (Hash ${hash})`);
     }
 

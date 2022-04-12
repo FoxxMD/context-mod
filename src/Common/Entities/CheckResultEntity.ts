@@ -145,7 +145,7 @@ export class CheckResultEntity extends TimeAwareRandomBaseEntity {
             index++;
             let realVal = x;
             if(isRuleSetResult(x)) {
-                realVal = new RuleSetResultEntity({...(x as RuleSetResult), checkResult: this});
+                realVal = new RuleSetResultEntity({...(x as RuleSetResult)});
             }
             if (realVal instanceof RuleSetResultEntity) {
                 if (this.ruleSetResults === undefined) {

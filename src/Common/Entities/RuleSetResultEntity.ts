@@ -28,7 +28,7 @@ export interface RuleSetResultEntityOptions {
     triggered: boolean
     condition: JoinOperands
     results: RuleResultEntity[]
-    checkResult: CheckResultEntity
+    //checkResult: CheckResultEntity
 }
 
 @Entity({name: 'RuleSetResult'})

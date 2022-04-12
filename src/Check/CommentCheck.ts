@@ -26,13 +26,25 @@ export class CommentCheck extends Check {
         this.logSummary();
     }
 
-    async getCacheResult(item: Submission | Comment): Promise<CheckResultEntity | undefined> {
+    async getCacheResult(item: Submission | Comment, partialResult: CheckResultEntity): Promise<CheckResultEntity | undefined> {
         if (this.cacheUserResult.enable) {
-            return await this.resources.getCommentCheckCacheResult(item as Comment, {
+            const res = await this.resources.getCommentCheckCacheResult(item as Comment, {
                 name: this.name,
                 authorIs: this.authorIs,
                 itemIs: this.itemIs
-            })
+            });
+            if(res === undefined) {
+                return undefined;
+            }
+            partialResult.triggered = res.triggered;
+
+            if(res instanceof CheckResultEntity) {
+                partialResult.ruleResults = res.ruleResults;
+                partialResult.ruleSetResults = res.ruleSetResults;
+            } else {
+                partialResult.results = res.results;
+            }
+            return partialResult;
         }
         return undefined;
     }
