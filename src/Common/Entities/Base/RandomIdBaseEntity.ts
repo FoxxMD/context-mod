@@ -14,9 +14,15 @@ export abstract class RandomIdBaseEntity {
     @PrimaryColumn('varchar', {length: 20})
     id!: string
 
+    constructor() {
+        this.id = nanoid(16);
+    }
+
     @BeforeInsert()
     setId() {
-        this.id = nanoid(16);
+        if(this.id === undefined) {
+            this.id = nanoid(16);
+        }
     }
 
     toJSON() {

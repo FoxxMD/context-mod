@@ -990,7 +990,7 @@ export class Manager extends EventEmitter {
                 const [runResult, postBehavior] = await currRun.handle(item,allRuleResults, runResults.filter(x => x.run.name === currRun.name), {...options, gotoContext, maxGotoDepth: this.maxGotoDepth});
                 runResults.push(runResult);
 
-                allRuleResults = allRuleResults.concat(determineNewResults(allRuleResults, (runResult.checkResults ?? []).map(x => x.ruleResults ?? []).flat()));
+                allRuleResults = allRuleResults.concat(determineNewResults(allRuleResults, (runResult.checkResults ?? []).map(x => x.allRuleResults ?? []).flat()));
 
                 switch (postBehavior.toLowerCase()) {
                     case 'next':

@@ -93,6 +93,7 @@ import {TotalStat} from "../Common/Entities/Stats/TotalStat";
 import {TimeSeriesStat} from "../Common/Entities/Stats/TimeSeriesStat";
 import {InvokeeType} from "../Common/Entities/InvokeeType";
 import {RunStateType} from "../Common/Entities/RunStateType";
+import {CheckResultEntity} from "../Common/Entities/CheckResultEntity";
 
 export const DEFAULT_FOOTER = '\r\n*****\r\nThis action was performed by [a bot.]({{botLink}}) Mention a moderator or [send a modmail]({{modmailLink}}) if you any ideas, questions, or concerns about this action.';
 
@@ -588,61 +589,61 @@ export class SubredditResources {
             .orderBy('event.processedAt', 'DESC')
     }
 
-    async getActionedEvents(): Promise<ActionedEventEntity[]> {
-        const eventRepo = this.database.getRepository(ActionedEventEntity);
-        const events = await eventRepo.find({
-            where: {
-                manager: {
-                        id: this.managerEntity.id
-                }
-            },
-            order: {
-                // @ts-ignore
-                processedAt: 'DESC'
-            },
-            relations: {
-                source: true,
-                activity: {
-                    subreddit: true,
-                    author: true
-                },
-                runResults: {
-                    _authorIs: {
-                        criteriaResults: true
-                    },
-                    _itemIs: {
-                        criteriaResults: true
-                    },
-                    run: true,
-                    checkResults: {
-                        _authorIs: {
-                            criteriaResults: true
-                        },
-                        _itemIs: {
-                            criteriaResults: true
-                        },
-                        ruleResults: {
-                            _authorIs: {
-                                criteriaResults: true
-                            },
-                            _itemIs: {
-                                criteriaResults: true
-                            },
-                        },
-                        actionResults: {
-                            _authorIs: {
-                                criteriaResults: true
-                            },
-                            _itemIs: {
-                                criteriaResults: true
-                            },
-                        }
-                    }
-                },
-            }
-        })
-        return events;
-    }
+    // async getActionedEvents(): Promise<ActionedEventEntity[]> {
+    //     const eventRepo = this.database.getRepository(ActionedEventEntity);
+    //     const events = await eventRepo.find({
+    //         where: {
+    //             manager: {
+    //                     id: this.managerEntity.id
+    //             }
+    //         },
+    //         order: {
+    //             // @ts-ignore
+    //             processedAt: 'DESC'
+    //         },
+    //         relations: {
+    //             source: true,
+    //             activity: {
+    //                 subreddit: true,
+    //                 author: true
+    //             },
+    //             runResults: {
+    //                 _authorIs: {
+    //                     criteriaResults: true
+    //                 },
+    //                 _itemIs: {
+    //                     criteriaResults: true
+    //                 },
+    //                 run: true,
+    //                 checkResults: {
+    //                     _authorIs: {
+    //                         criteriaResults: true
+    //                     },
+    //                     _itemIs: {
+    //                         criteriaResults: true
+    //                     },
+    //                     ruleResults: {
+    //                         _authorIs: {
+    //                             criteriaResults: true
+    //                         },
+    //                         _itemIs: {
+    //                             criteriaResults: true
+    //                         },
+    //                     },
+    //                     actionResults: {
+    //                         _authorIs: {
+    //                             criteriaResults: true
+    //                         },
+    //                         _itemIs: {
+    //                             criteriaResults: true
+    //                         },
+    //                     }
+    //                 }
+    //             },
+    //         }
+    //     })
+    //     return events;
+    // }
 
     async getActivity(item: Submission | Comment) {
         try {
@@ -2009,13 +2010,13 @@ export class SubredditResources {
         };
     }
 
-    async getCommentCheckCacheResult(item: Comment, checkConfig: object): Promise<UserResultCache | undefined> {
+    async getCommentCheckCacheResult(item: Comment, checkConfig: object): Promise<CheckResultEntity | undefined> {
         const userName = getActivityAuthorName(item.author);
         const hash = `commentUserResult-${userName}-${item.link_id}-${objectHash.sha1(checkConfig)}`;
         this.stats.cache.commentCheck.requests++;
         this.stats.cache.commentCheck.requestTimestamps.push(Date.now());
         await this.stats.cache.commentCheck.identifierRequestCount.set(hash, (await this.stats.cache.commentCheck.identifierRequestCount.wrap(hash, () => 0) as number) + 1);
-        let result = await this.cache.get(hash) as UserResultCache | undefined | null;
+        let result = await this.cache.get(hash) as string | undefined | null;
         if(result === null) {
             result = undefined;
         }
@@ -2024,19 +2025,14 @@ export class SubredditResources {
             return result;
         }
         this.logger.debug(`Cache Hit: Comment Check for ${userName} in Submission ${item.link_id} (Hash ${hash})`);
-        const results = await mapAsync(result.ruleResults, async (x: RuleResultEntity) => await this.database.getRepository(RuleResultEntity).findOne({where: {id: x.id}}) as RuleResultEntity);
-        return {
-            result: result?.result,
-            ruleResults: results
-        };
-        //return result;
+        return await this.database.getRepository(CheckResultEntity).findOne({where: {id: result}}) as CheckResultEntity;
     }
 
-    async setCommentCheckCacheResult(item: Comment, checkConfig: object, result: UserResultCache, ttl: number) {
+    async setCommentCheckCacheResult(item: Comment, checkConfig: object, result: CheckResultEntity, ttl: number) {
         const userName = getActivityAuthorName(item.author);
         const hash = `commentUserResult-${userName}-${item.link_id}-${objectHash.sha1(checkConfig)}`
-        await this.cache.set(hash, result, { ttl });
-        this.logger.debug(`Cached check result '${result.result}' for User ${userName} on Submission ${item.link_id} for ${ttl} seconds (Hash ${hash})`);
+        await this.cache.set(hash, result.id, { ttl });
+        this.logger.debug(`Cached check result '${result.check.name}' for User ${userName} on Submission ${item.link_id} for ${ttl} seconds (Hash ${hash})`);
     }
 
     async generateFooter(item: Submission | Comment, actionFooter?: false | string) {

@@ -18,6 +18,7 @@ import {RuleResultEntity} from "./RuleResultEntity";
 import {CMEvent} from "./CMEvent";
 import {AuthorCriteria, FilterResult as IFilterResult, TypedActivityState} from "../interfaces";
 import {TimeAwareRandomBaseEntity} from "./Base/TimeAwareRandomBaseEntity";
+//import {RunToCheckResultEntity} from "./RunnableAssociation/RunToCheckResultEntity";
 
 export interface RunResultEntityOptions {
     run: RunEntity
@@ -57,6 +58,18 @@ export class RunResultEntity extends TimeAwareRandomBaseEntity {
     sortRuns() {
         this.checkResults.sort((a, b) => a.createdAt.isSameOrBefore(b.createdAt) ?  -1 : 1);
     }
+
+    // get checkResults() {
+    //     return this._checkResults.map(x => x.result);
+    // }
+    //
+    // set checkResults(checkResults) {
+    //     this._checkResults = checkResults.map((x, index) => new RunToCheckResultEntity({
+    //         result: x,
+    //         order: index + 1,
+    //         runnable: this
+    //     }));
+    // }
 
     set itemIs(data: ActivityStateFilterResult | IFilterResult<TypedActivityState> | undefined) {
         if (data === undefined) {

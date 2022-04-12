@@ -98,17 +98,24 @@ const actionedEvents = async (req: Request, res: Response) => {
 
     query = filterResultsBuilder<CMEvent>(query, 'checkResults', 'c');
 
-    query.leftJoinAndSelect('checkResults.ruleResults', 'ruleResults')
-        .leftJoinAndSelect('ruleResults.premise', 'rPremise')
-        .leftJoinAndSelect('rPremise.rule', 'rule')
-        .leftJoinAndSelect('rule.kind', 'ruleKind');
+    query.leftJoinAndSelect('checkResults.ruleResults', 'rrIterim')
+        .leftJoinAndSelect('rrIterim.result', 'ruleResult')
+        .leftJoinAndSelect('ruleResult.premise', 'rPremise')
+        .leftJoinAndSelect('rPremise.kind', 'ruleKind')
+        .leftJoinAndSelect('checkResults.ruleSetResults', 'ruleSetResultsIterim')
+        .leftJoinAndSelect('ruleSetResultsIterim.result', 'ruleSetResult')
+        .leftJoinAndSelect('ruleSetResult._ruleResults', 'rsRuleResultsIterim')
+        .leftJoinAndSelect('rsRuleResultsIterim.result', 'rsRuleResult')
+        .leftJoinAndSelect('rsRuleResult.premise', 'rsPremise')
+        .leftJoinAndSelect('rsPremise.kind', 'rsRuleKind')
+        .leftJoinAndSelect('checkResults.check', 'check');
 
-    query = filterResultsBuilder<CMEvent>(query, 'ruleResults', 'r');
+    query = filterResultsBuilder<CMEvent>(query, 'ruleResult', 'r');
+    query = filterResultsBuilder<CMEvent>(query, 'rsRuleResult', 'rsr');
 
     query.leftJoinAndSelect('checkResults.actionResults', 'actionResults')
         .leftJoinAndSelect('actionResults.premise', 'aPremise')
-        .leftJoinAndSelect('aPremise.action', 'action')
-        .leftJoinAndSelect('action.kind', 'actionKind');
+        .leftJoinAndSelect('aPremise.kind', 'actionKind');
 
     query = filterResultsBuilder<CMEvent>(query, 'actionResults', 'a');
 
@@ -140,7 +147,8 @@ const actionedEvents = async (req: Request, res: Response) => {
 
 
     // TODO will need to refactor this if we switch to allowing subreddits to use their own datasources
-    return res.json(await paginateRequest(query, req));
+    const results = await paginateRequest(query, req);
+    return res.json(results);
 };
 export const actionedEventsRoute = [authUserCheck(), botRoute(), subredditRoute(false), booleanMiddle(['includeRelated']), actionedEvents];
 

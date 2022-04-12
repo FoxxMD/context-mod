@@ -9,6 +9,7 @@ import {
 } from "../Common/interfaces";
 import {Submission, Comment} from "snoowrap/dist/objects";
 import { buildFilter } from "../util";
+import {CheckResultEntity} from "../Common/Entities/CheckResultEntity";
 
 export interface CommentCheckOptions extends CheckOptions {
     itemIs?: MinimalOrFullFilter<CommentState>
@@ -25,7 +26,7 @@ export class CommentCheck extends Check {
         this.logSummary();
     }
 
-    async getCacheResult(item: Submission | Comment): Promise<UserResultCache | undefined> {
+    async getCacheResult(item: Submission | Comment): Promise<CheckResultEntity | undefined> {
         if (this.cacheUserResult.enable) {
             return await this.resources.getCommentCheckCacheResult(item as Comment, {
                 name: this.name,
@@ -36,22 +37,22 @@ export class CommentCheck extends Check {
         return undefined;
     }
 
-    async setCacheResult(item: Submission | Comment, result: UserResultCache): Promise<void> {
+    async setCacheResult(item: Submission | Comment, result: CheckResultEntity): Promise<void> {
         if (this.cacheUserResult.enable) {
-            const {result: outcome, ruleResults} = result;
-
-            const res: UserResultCache = {
-                result: outcome,
-                // don't need to cache rule results if check was not triggered
-                // since we only use rule results for actions
-                ruleResults: outcome ? ruleResults : []
-            };
+            // const {result: outcome, ruleResults} = result;
+            //
+            // const res: UserResultCache = {
+            //     result: outcome,
+            //     // don't need to cache rule results if check was not triggered
+            //     // since we only use rule results for actions
+            //     ruleResults: outcome ? ruleResults : []
+            // };
 
             await this.resources.setCommentCheckCacheResult(item as Comment, {
                 name: this.name,
                 authorIs: this.authorIs,
                 itemIs: this.itemIs
-            }, res, this.cacheUserResult.ttl)
+            }, result, this.cacheUserResult.ttl)
         }
     }
 }

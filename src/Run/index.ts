@@ -209,7 +209,7 @@ export class Run extends RunnableBase {
                 const checkSummary = await check.handle(activity, allRuleResults, options);
                 postBehavior = checkSummary.postBehavior;
 
-                allRuleResults = allRuleResults.concat(determineNewResults(allRuleResults, checkSummary.ruleResults ?? []));
+                allRuleResults = allRuleResults.concat(determineNewResults(allRuleResults, checkSummary.allRuleResults ?? []));
 
                 runResultEnt.checkResults.push(checkSummary);
 

@@ -18,18 +18,22 @@ import {
     AuthorCriteria,
     FilterResult as IFilterResult,
     FilterResult,
-    JoinOperands,
+    JoinOperands, RuleSetResult,
     TypedActivityState
 } from "../interfaces";
 import {RandomIdBaseEntity} from "./Base/RandomIdBaseEntity";
 import {TimeAwareRandomBaseEntity} from "./Base/TimeAwareRandomBaseEntity";
+import {RuleSetResultEntity} from "./RuleSetResultEntity";
+import {CheckToRuleResultEntity} from "./RunnableAssociation/CheckToRuleResultEntity";
+import {CheckToRuleSetResultEntity} from "./RunnableAssociation/CheckToRuleSetResultEntity";
+import {isRuleSetResult} from "../../util";
 
 export interface CheckResultEntityOptions {
     triggered: boolean
     fromCache?: boolean
     itemIs?: FilterResult<TypedActivityState>
     authorIs?: FilterResult<AuthorCriteria>
-    ruleResults?: RuleResultEntity[]
+    ruleResults?: (RuleResultEntity | RuleSetResultEntity)[]
     actionResults?: ActionResultEntity[]
     error?: string
     condition: JoinOperands
@@ -70,19 +74,29 @@ export class CheckResultEntity extends TimeAwareRandomBaseEntity {
     @Column("varchar", {length: 50, nullable: true})
     postBehavior!: string
 
-    @OneToMany(type => RuleResultEntity, obj => obj.checkResult, {cascade: ['insert', 'update'], nullable: true, eager: true})
-    ruleResults?: RuleResultEntity[]
+    @OneToMany(type => CheckToRuleResultEntity, obj => obj.runnable, {cascade: ['insert'], nullable: true, eager: true})
+    ruleResults?: CheckToRuleResultEntity[]
 
-    @OneToMany(type => ActionResultEntity, obj => obj.checkResult, {cascade: ['insert', 'update'], nullable: true, eager: true})
+    @OneToMany(type => CheckToRuleSetResultEntity, obj => obj.runnable, {
+        cascade: ['insert'],
+        nullable: true,
+        eager: true
+    })
+    ruleSetResults?: CheckToRuleSetResultEntity[]
+
+    @OneToMany(type => ActionResultEntity, obj => obj.checkResult, {cascade: ['insert'], nullable: true, eager: true})
     actionResults?: ActionResultEntity[]
 
     @AfterLoad()
     sortRuns() {
-        if(this.ruleResults !== undefined) {
-            this.ruleResults.sort((a, b) => a.createdAt.isSameOrBefore(b.createdAt) ?  -1 : 1);
+        if (this.ruleResults !== undefined) {
+            this.ruleResults.sort((a, z) => a.order - z.order);
         }
-        if(this.actionResults !== undefined) {
-            this.actionResults.sort((a, b) => a.createdAt.isSameOrBefore(b.createdAt) ?  -1 : 1);
+        if (this.ruleSetResults !== undefined) {
+            this.ruleSetResults.sort((a, z) => a.order - z.order);
+        }
+        if (this.actionResults !== undefined) {
+            this.actionResults.sort((a, b) => a.createdAt.isSameOrBefore(b.createdAt) ? -1 : 1);
         }
     }
 
@@ -114,19 +128,71 @@ export class CheckResultEntity extends TimeAwareRandomBaseEntity {
         return this._authorIs;
     }
 
+    get results(): (RuleResultEntity | RuleSetResultEntity)[] {
+        let allResults: (CheckToRuleResultEntity | CheckToRuleSetResultEntity)[] = this.ruleResults ?? [];
+        allResults = allResults.concat(this.ruleSetResults ?? []);
+        allResults.sort((a, z) => a.order - z.order);
+        return allResults.map(x => x.result);
+    }
+
+    get allRuleResults(): RuleResultEntity[] {
+        return this.results.map(x => x instanceof RuleSetResultEntity ? x.results : x).flat();
+    }
+
+    set results(data: (RuleResultEntity | RuleSetResultEntity | RuleSetResult)[]) {
+        let index = 0;
+        for (const x of data) {
+            index++;
+            let realVal = x;
+            if(isRuleSetResult(x)) {
+                realVal = new RuleSetResultEntity({...(x as RuleSetResult), checkResult: this});
+            }
+            if (realVal instanceof RuleSetResultEntity) {
+                if (this.ruleSetResults === undefined) {
+                    this.ruleSetResults = [];
+                }
+                this.ruleSetResults.push(new CheckToRuleSetResultEntity({
+                    result: realVal,
+                    runnable: this,
+                    order: index
+                }));
+            } else if(realVal instanceof RuleResultEntity) {
+                if (this.ruleResults === undefined) {
+                    this.ruleResults = [];
+                }
+                this.ruleResults.push(new CheckToRuleResultEntity({
+                    result: realVal,
+                    runnable: this,
+                    order: index
+                }))
+            }
+        }
+    }
+
     constructor(data?: CheckResultEntityOptions) {
         super();
-        if(data !== undefined) {
+        if (data !== undefined) {
             this.triggered = data.triggered;
             this.fromCache = data.fromCache;
             this.condition = data.condition;
             this.error = data.error;
             this.itemIs = data.itemIs ? new ActivityStateFilterResult(data.itemIs) : undefined;
             this.authorIs = data.authorIs ? new AuthorFilterResult(data.authorIs) : undefined;
-            this.ruleResults = data.ruleResults;
+            if (data.ruleResults !== undefined) {
+                this.results = data.ruleResults;
+            }
             this.actionResults = data.actionResults;
             this.check = data.check;
             this.postBehavior = data.postBehavior;
         }
+    }
+
+    toJSON() {
+        const data = super.toJSON();
+        data['ruleResults'] = {...data.results};
+        delete data['ruleSetResults'];
+        delete data['allRuleResults'];
+        delete data['results'];
+        return data;
     }
 }

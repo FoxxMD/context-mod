@@ -777,6 +777,47 @@ export class initApi1642180264563 implements MigrationInterface {
 
         //</editor-fold>
 
+        await queryRunner.createTable(
+            new Table({
+                name: 'RunnableResult',
+                columns: [
+                    randomIdColumn(),
+                    {
+                        name: 'type',
+                        type: 'varchar',
+                        isNullable: false,
+                        length: '50'
+                    },
+                    {
+                        name: 'order',
+                        type: 'integer',
+                        isNullable: false,
+                    },
+                    {
+                        name: 'resultId',
+                        type: 'varchar',
+                        length: '20',
+                        isNullable: false,
+                    },
+                    {
+                        name: 'runnableId',
+                        type: 'varchar',
+                        length: '20',
+                        isNullable: false,
+                    },
+                    createdAtColumn(dbType),
+                ],
+                indices: [
+                    new TableIndex({
+                        name: 'IDX_RunnableResult_type',
+                        columnNames: ['type']
+                    }),
+                    createdAtIndex('RunnableResult'),
+                ]
+            }),
+            true
+        );
+
         //<editor-fold desc="Rule Stuff">
 
         await queryRunner.createTable(
@@ -917,12 +958,12 @@ export class initApi1642180264563 implements MigrationInterface {
                         length: '20',
                         isNullable: false
                     },
-                    {
-                        name: 'checkResultId',
-                        type: 'varchar',
-                        length: '20',
-                        isNullable: false
-                    },
+                    // {
+                    //     name: 'checkResultId',
+                    //     type: 'varchar',
+                    //     length: '20',
+                    //     isNullable: false
+                    // },
                     {
                         name: 'data',
                         type: 'text',
@@ -949,6 +990,33 @@ export class initApi1642180264563 implements MigrationInterface {
                 indices: [
                     createdAtIndex('RuleResult'),
                     ...filterIndices('RuleResult')
+                ]
+            }),
+            true,
+            true,
+            true
+        );
+
+        await queryRunner.createTable(
+            new Table({
+                name: 'RuleSetResult',
+                columns: [
+                    randomIdColumn(),
+                    {
+                        name: 'condition',
+                        type: 'varchar',
+                        length: '20',
+                        isNullable: false
+                    },
+                    createdAtColumn(dbType),
+                    {
+                        name: 'triggered',
+                        type: 'boolean',
+                        isNullable: true,
+                    },
+                ],
+                indices: [
+                    createdAtIndex('RuleSetResult'),
                 ]
             }),
             true,

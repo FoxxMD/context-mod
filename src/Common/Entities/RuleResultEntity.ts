@@ -1,4 +1,13 @@
-import {Entity, Column, PrimaryGeneratedColumn, ManyToOne, OneToOne, CreateDateColumn, JoinColumn} from "typeorm";
+import {
+    Entity,
+    Column,
+    PrimaryGeneratedColumn,
+    ManyToOne,
+    OneToOne,
+    CreateDateColumn,
+    JoinColumn,
+    OneToMany
+} from "typeorm";
 import {RulePremise} from "./RulePremise";
 import {CheckResultEntity} from "./CheckResultEntity";
 import {ActivityStateFilterResult} from "./FilterCriteria/ActivityStateFilterResult";
@@ -6,6 +15,7 @@ import {AuthorFilterResult} from "./FilterCriteria/AuthorFilterResult";
 import {AuthorCriteria, FilterResult as IFilterResult, FilterResult, TypedActivityState} from "../interfaces";
 import {RandomIdBaseEntity} from "./Base/RandomIdBaseEntity";
 import {TimeAwareRandomBaseEntity} from "./Base/TimeAwareRandomBaseEntity";
+import {RuleSetResultEntity} from "./RuleSetResultEntity";
 
 export interface RuleResultEntityOptions {
     triggered?: boolean
@@ -36,8 +46,9 @@ export class RuleResultEntity extends TimeAwareRandomBaseEntity {
     @JoinColumn({name: 'premiseId'})
     premise!: RulePremise;
 
-    @ManyToOne(type => CheckResultEntity, act => act.ruleResults, /*{cascade: ['insert']}*/)
-    checkResult!: CheckResultEntity;
+    // @ManyToOne(type => CheckResultEntity, act => act.ruleResults, {nullable: true})
+    // checkResult?: CheckResultEntity;
+    //
 
     @OneToOne(() => ActivityStateFilterResult, {nullable: true, cascade: ['insert'], eager: true})
     @JoinColumn({name: 'itemIs'})

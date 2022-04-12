@@ -67,6 +67,9 @@ import {CacheStorageProvider, DatabaseStorageProvider} from "./StorageProvider";
 import {nanoid} from "nanoid";
 import {MigrationService} from "../../Common/MigrationService";
 import {WebSetting} from "../../Common/WebEntities/WebSetting";
+import {CheckResultEntity} from "../../Common/Entities/CheckResultEntity";
+import {RuleResultEntity} from "../../Common/Entities/RuleResultEntity";
+import {RuleSetResultEntity} from "../../Common/Entities/RuleSetResultEntity";
 
 const emitter = new EventEmitter();
 
@@ -1132,6 +1135,7 @@ const webClient = async (options: OperatorConfig) => {
                        itemIs: y._itemIs,
                        authorIs: y._authorIs,
                        checkResults: y.checkResults.map(z => {
+
                            return {
                                ...z,
                                itemIs: z._itemIs,

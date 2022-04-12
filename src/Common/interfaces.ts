@@ -2370,6 +2370,7 @@ export interface RuleSetResult {
 export interface CheckResult {
     triggered: boolean
     ruleResults: RuleResultEntity[]
+    ruleSetResults?: RuleSetResult[]
     itemIs?: FilterResult<TypedActivityState>
     authorIs?: FilterResult<AuthorCriteria>
     fromCache?: boolean
