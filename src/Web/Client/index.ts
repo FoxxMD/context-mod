@@ -1234,15 +1234,31 @@ const webClient = async (options: OperatorConfig) => {
                             ...formatFilterData(z)
                         };
                     });
-
+                    let ruleSummary = '(No rules to run)';
+                    const filterData = formatFilterData(y);
+                    if(y.fromCache) {
+                        ruleSummary =  `Check result was found in cache: ${triggeredIndicator(checkTriggered, 'Skipped')}`;
+                    } else {
+                        const filterSummary = Object.entries(filterData).reduce((acc, [k,v]) => {
+                            if(v !== undefined && (v as any).passed === '✘') {
+                                return `Did not pass ${k} filter`;
+                            }
+                            return acc;
+                        }, '')
+                        if(filterSummary !== '') {
+                            ruleSummary = filterSummary;
+                        } else if(ruleResults.length > 0) {
+                            ruleSummary = resultsSummary(ruleResults, y.condition);
+                        }
+                    }
                     return {
                         ...rest,
                         triggered: triggeredIndicator(checkTriggered, 'Skipped'),
                         triggeredVal: checkTriggered,
                         ruleResults: formattedRuleResults,
                         actionResults: formattedActionResults,
-                        ruleSummary: y.fromCache ? `Check result was found in cache: ${triggeredIndicator(checkTriggered, 'Skipped')}` : resultsSummary(ruleResults, y.condition),
-                        ...formatFilterData(y)
+                        ruleSummary,
+                        ...filterData
                     }
                 });
 
