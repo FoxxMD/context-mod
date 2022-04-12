@@ -212,10 +212,10 @@ export class AttributionRule extends Rule {
                 };
                 if(include.length > 0) {
                     const subStates = include.map(x => convertSubredditsRawToStrong(x, defaultOpts));
-                    activities = await this.resources.batchTestSubredditCriteria(activities, subStates);
+                    activities = await this.resources.batchTestSubredditCriteria(activities, subStates, item.author);
                 } else {
                     const subStates = exclude.map(x => convertSubredditsRawToStrong(x, defaultOpts));
-                    const toExclude = (await this.resources.batchTestSubredditCriteria(activities, subStates)).map(x => x.id);
+                    const toExclude = (await this.resources.batchTestSubredditCriteria(activities, subStates, item.author)).map(x => x.id);
                     activities = activities.filter(x => !toExclude.includes(x.id));
                 }
             }

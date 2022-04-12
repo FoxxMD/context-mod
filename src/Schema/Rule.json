@@ -2138,7 +2138,12 @@
                 }
             ],
             "properties": {
+                "isOwnProfile": {
+                    "description": "Test whether the subreddit is the profile of the Author of the Activity being checked",
+                    "type": "boolean"
+                },
                 "isUserProfile": {
+                    "description": "Test whether the subreddit is a user profile",
                     "type": "boolean"
                 },
                 "name": {
@@ -2150,7 +2155,7 @@
                             "type": "string"
                         }
                     ],
-                    "description": "The name the subreddit.\n\nCan be a normal string (will check case-insensitive) or a regular expression\n\nEX `[\"mealtimevideos\", \"/onlyfans*\\/i\"]`",
+                    "description": "The name of the subreddit.\n\nCan be a normal string (will check case-insensitive) or a regular expression\n\nEX `[\"mealtimevideos\", \"/onlyfans*\\/i\"]`",
                     "examples": [
                         "mealtimevideos",
                         "/onlyfans*/i"

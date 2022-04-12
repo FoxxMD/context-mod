@@ -1050,7 +1050,7 @@ export interface SubredditState {
      * */
     over18?: boolean
     /**
-     * The name the subreddit.
+     * The name of the subreddit.
      *
      * Can be a normal string (will check case-insensitive) or a regular expression
      *
@@ -1064,7 +1064,15 @@ export interface SubredditState {
      * */
     stateDescription?: string
 
+    /**
+     * Test whether the subreddit is a user profile
+     * */
     isUserProfile?: boolean
+
+    /**
+     * Test whether the subreddit is the profile of the Author of the Activity being checked
+     * */
+    isOwnProfile?: boolean
 }
 
 export interface StrongSubredditState extends SubredditState {
