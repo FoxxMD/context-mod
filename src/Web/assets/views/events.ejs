@@ -138,7 +138,7 @@
                             <% runSum.checkResults.forEach(function (chkSum, index) { %>
                                 <div class="py-3 px-4 space-y-2 bg-gray-500 triggeredStateWrapper <%= chkSum.triggeredVal ? 'border-2 border-gray-100' : ''%>">
                                     <div class="triggeredStateToggle">
-                                        <span class="font-semibold">Check:</span><span class="px-1"><%= chkSum.triggered %></span><%= chkSum.name %>
+                                        <span class="font-semibold">Check:</span><span class="px-1"><%= chkSum.triggered %></span><%= chkSum.check.name %>
                                         <% if (chkSum.ruleSummary !== '' && chkSum.ruleSummary !== null) { %><span class="px-3">&#10132;</span><%= chkSum.ruleSummary %><% } %>
                                     </div>
                                     <div class="space-y-2 triggeredState <%= chkSum.triggeredVal ? 'triggered' : 'notTriggered'%>">
