@@ -14,7 +14,7 @@ export class ActivityStateFilterCriteriaResult extends FilterCriteriaResult<Type
     constructor(data?: IFilterCriteriaResult<TypedActivityState>) {
         super(data);
         if(data !== undefined) {
-            this.criteria = new ActivityStateFilterCriteria({criteria: data.criteria});
+            this.criteria = new ActivityStateFilterCriteria(data.criteria);
         }
     }
 }

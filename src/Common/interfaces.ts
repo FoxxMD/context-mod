@@ -1537,12 +1537,14 @@ export interface SnoowrapOptions {
 
 export type FilterCriteriaDefaultBehavior = 'replace' | 'merge';
 
-export interface FilterOptions<T> {
+export type MaybeAnonymousCriteria<T> = T | NamedCriteria<T>;
+
+export interface FilterOptionsJson<T> {
 
     /**
      * Will "pass" if any set of Criteria passes
      * */
-    include?: T[]
+    include?: MaybeAnonymousCriteria<T>[]
 
     /**
      * * OR => if ANY exclude condition "does not" pass then the exclude test passes
@@ -1558,8 +1560,15 @@ export interface FilterOptions<T> {
      *
      * EX: `isMod: true, name: Automoderator` => Will pass if the Author IS NOT a mod and IS NOT named Automoderator
      * */
-    exclude?: T[];
+    exclude?: MaybeAnonymousCriteria<T>[];
 
+}
+
+export interface FilterOptions<T> extends Omit<FilterOptionsJson<T>, 'include' | 'exclude'> {
+
+    include?: NamedCriteria<T>[]
+
+    exclude?: NamedCriteria<T>[];
 }
 
 /**
@@ -1584,7 +1593,7 @@ export interface ItemOptions extends FilterOptions<TypedActivityState> {
 //  * */
 // export type ItemOptions = FilterOptions<SubmissionState> | FilterOptions<CommentState>
 
-export type MinimalOrFullFilter<T> = T[] | FilterOptions<T>
+export type MinimalOrFullFilter<T> = MaybeAnonymousCriteria<T>[] | FilterOptionsJson<T>
 
 export interface FilterCriteriaDefaults {
     itemIs?: MinimalOrFullFilter<TypedActivityState>
@@ -2305,6 +2314,11 @@ export interface AuthorCriteria {
     isContributor?: boolean
 }
 
+export interface NamedCriteria<T extends AuthorCriteria | TypedActivityState> {
+    name?: string
+    criteria: T
+}
+
 export interface ActionResult extends ActionProcessResult {
     premise: ObjectPremise
     kind: string,
@@ -2481,7 +2495,7 @@ export interface FilterCriteriaPropertyResult<T> {
 
 export interface FilterCriteriaResult<T> {
     behavior: FilterBehavior
-    criteria: T//AuthorCriteria | TypedActivityStates
+    criteria: NamedCriteria<T>//AuthorCriteria | TypedActivityStates
     propertyResults: FilterCriteriaPropertyResult<T>[]
     passed: boolean
 }

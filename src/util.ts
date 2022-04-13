@@ -32,7 +32,7 @@ import {
     GenericComparison,
     ImageComparisonResult,
     ItemCritPropHelper, ItemOptions,
-    LogInfo, MinimalOrFullFilter,
+    LogInfo, MaybeAnonymousCriteria, MinimalOrFullFilter, NamedCriteria,
     OperatorJsonConfig,
     PermalinkRedditThings,
     PollingOptionsStrong,
@@ -459,7 +459,7 @@ export const filterCriteriaSummary = <T>(val: FilterCriteriaResult<T>): [string,
         propSummary.push(dnrProps);
     }
     const propSummaryStrArr = propSummary.map(x => `${x.props.length} ${x.name}${x.props.length > 0 ? ` (${x.props.map(y => y.property as string)})` : ''}`);
-    return [propSummaryStrArr.join(' | '), val.propertyResults.map(x => filterCriteriaPropertySummary(x, val.criteria))]
+    return [propSummaryStrArr.join(' | '), val.propertyResults.map(x => filterCriteriaPropertySummary(x, val.criteria.criteria))]
 }
 
 export const filterCriteriaPropertySummary = <T>(val: FilterCriteriaPropertyResult<T>, criteria: T): string => {
@@ -479,7 +479,7 @@ export const filterCriteriaPropertySummary = <T>(val: FilterCriteriaPropertyResu
         found = '';
     } else if(val.property === 'submissionState') {
         const foundResult = val.found as FilterResult<SubmissionState>;
-        const criteriaResults = foundResult.criteriaResults.map((x, index) => `Criteria #${index + 1} => ${triggeredIndicator(x.passed)}\n   ${x.propertyResults.map(y => filterCriteriaPropertySummary(y, x.criteria)).join('\n    ')}`).join('\n  ');
+        const criteriaResults = foundResult.criteriaResults.map((x, index) => `Criteria #${index + 1} => ${triggeredIndicator(x.passed)}\n   ${x.propertyResults.map(y => filterCriteriaPropertySummary(y, x.criteria.criteria)).join('\n    ')}`).join('\n  ');
         found = `\n  ${criteriaResults}`;
     } else {
         found = ` => Found: ${val.found}`;
@@ -2345,6 +2345,37 @@ export const buildFilter = <T extends AuthorCriteria | TypedActivityState>(filte
     }
 }
 
+export const normalizeCriteria = <T extends AuthorCriteria | TypedActivityState>(options: MaybeAnonymousCriteria<T>): NamedCriteria<T> => {
+
+    let name: string | undefined;
+    let criteria: T;
+
+    if (asNamedCriteria(options)) {
+        criteria = options.criteria;
+        name = options.name;
+    } else {
+        criteria = options;
+    }
+
+    if (asAuthorCriteria(criteria)) {
+        criteria = {
+            ...criteria,
+            flairCssClass: typeof criteria.flairCssClass === 'string' ? [criteria.flairCssClass] : criteria.flairCssClass,
+            flairText: typeof criteria.flairText === 'string' ? [criteria.flairText] : criteria.flairText,
+            description: criteria.description === undefined ? undefined : Array.isArray(criteria.description) ? criteria.description : [criteria.description]
+        }
+    }
+
+    return {
+        name,
+        criteria
+    };
+}
+
+export const asNamedCriteria = <T>(val: MaybeAnonymousCriteria<T>): val is NamedCriteria<T> => {
+    return 'criteria' in val;
+}
+
 export const formatFilterData = (result: (RunResult | CheckSummary | RuleResult | ActionResult)) => {
 
     const formattedResult: any = {
@@ -2591,20 +2622,6 @@ export const asAuthorCriteria = (val: any): val is AuthorCriteria => {
         return intersect(keys, authorCriteriaProperties).length > 0;
     }
     return false;
-}
-
-export const normalizeCriteria = <T extends AuthorCriteria | TypedActivityState>(options: T): T => {
-
-    if(asAuthorCriteria(options)) {
-        return {
-            ...options,
-            flairCssClass: typeof options.flairCssClass === 'string' ? [options.flairCssClass] : options.flairCssClass,
-            flairText: typeof options.flairText === 'string' ? [options.flairText] : options.flairText,
-            description: options.description === undefined ? undefined : Array.isArray(options.description) ? options.description : [options.description]
-        }
-    }
-
-    return options;
 }
 
 export const criteriaPassWithIncludeBehavior = (passes: boolean, include: boolean) => {

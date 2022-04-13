@@ -54,7 +54,7 @@ export class AuthorFilterCriteriaResult extends FilterCriteriaResult<AuthorCrite
     constructor(data?: IFilterCriteriaResult<AuthorCriteria>) {
         super(data);
         if (data !== undefined) {
-            this.criteria = new AuthorFilterCriteria({criteria: data.criteria});
+            this.criteria = new AuthorFilterCriteria(data.criteria);
         }
     }
 }

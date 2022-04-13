@@ -82,7 +82,7 @@ import {
     ItemCritPropHelper,
     ActivityDispatch,
     FilterCriteriaPropertyResult,
-    ActivitySource, HistoricalStatsDisplay, UserNoteCriteria, AuthorCriteria, AuthorOptions, ItemOptions, JoinOperands,
+    ActivitySource, HistoricalStatsDisplay, UserNoteCriteria, AuthorCriteria, AuthorOptions, ItemOptions, JoinOperands, NamedCriteria,
 } from "../Common/interfaces";
 import UserNotes from "./UserNotes";
 import Mustache from "mustache";
@@ -1169,7 +1169,9 @@ export class SubredditResources {
         return await this.isSubreddit(await this.getSubreddit(item), state, this.logger);
     }
 
-    async testAuthorCriteria(item: (Comment | Submission), authorOpts: AuthorCriteria, include = true): Promise<FilterCriteriaResult<AuthorCriteria>> {
+    async testAuthorCriteria(item: (Comment | Submission), authorOptsObj: NamedCriteria<AuthorCriteria>, include = true): Promise<FilterCriteriaResult<AuthorCriteria>> {
+        const {criteria: authorOpts} = authorOptsObj;
+
         if (this.filterCriteriaTTL !== false) {
             // in the criteria check we only actually use the `item` to get the author flair
             // which will be the same for the entire subreddit
@@ -1191,19 +1193,23 @@ export class SubredditResources {
             } else {
                 this.stats.cache.authorCrit.miss++;
                 cachedAuthorTest = await this.isAuthor(item, authorOpts, include);
+                cachedAuthorTest.criteria = authorOptsObj;
                 await this.cache.set(hash, cachedAuthorTest, {ttl: this.filterCriteriaTTL});
                 return cachedAuthorTest;
             }
         }
 
-        return await this.isAuthor(item, authorOpts, include);
+        const res = await this.isAuthor(item, authorOpts, include);
+        res.criteria = authorOptsObj;
+        return res;
     }
 
-    async testItemCriteria(i: (Comment | Submission), activityState: TypedActivityState, logger: Logger, include = true, source?: ActivitySource): Promise<FilterCriteriaResult<TypedActivityState>> {
+    async testItemCriteria(i: (Comment | Submission), activityStateObj: NamedCriteria<TypedActivityState>, logger: Logger, include = true, source?: ActivitySource): Promise<FilterCriteriaResult<TypedActivityState>> {
+        const {criteria: activityState} = activityStateObj;
         if(Object.keys(activityState).length === 0) {
             return {
                 behavior: include ? 'include' : 'exclude',
-                criteria: activityState,
+                criteria: activityStateObj,
                 propertyResults: [],
                 passed: true
             }
@@ -1231,7 +1237,7 @@ export class SubredditResources {
 
                     return {
                         behavior: include ? 'include' : 'exclude',
-                        criteria: activityState,
+                        criteria: activityStateObj,
                         propertyResults: Object.values(propResultsMap),
                         passed: false
                     }
@@ -1263,7 +1269,7 @@ export class SubredditResources {
                         itemResult.propertyResults.push(runtimeRes.propertyResults.find(x => x.property === 'source') as FilterCriteriaPropertyResult<TypedActivityState>);
                     }
                 }
-
+                itemResult.criteria = activityStateObj;
                 return itemResult;
             } catch (err: any) {
                 if (err.logged !== true) {
@@ -1273,7 +1279,9 @@ export class SubredditResources {
             }
         }
 
-        return await this.isItem(i, activityState, logger, include, source);
+        const res = await this.isItem(i, activityState, logger, include, source);
+        res.criteria = activityStateObj;
+        return res;
     }
 
     async isSubreddit (subreddit: Subreddit, stateCriteriaRaw: SubredditState | StrongSubredditState, logger: Logger) {
@@ -1350,7 +1358,7 @@ export class SubredditResources {
         if(Object.keys(stateCriteria).length === 0) {
             return {
                 behavior: include ? 'include' : 'exclude',
-                criteria: stateCriteria,
+                criteria: {criteria: stateCriteria},
                 propertyResults: [],
                 passed: true
             }
@@ -1641,7 +1649,7 @@ export class SubredditResources {
 
         return {
             behavior: include ? 'include' : 'exclude',
-            criteria: stateCriteria,
+            criteria: {criteria: stateCriteria},
             propertyResults: propResults,
             passed,
         };
@@ -2026,7 +2034,7 @@ export class SubredditResources {
 
         return {
             behavior: include ? 'include' : 'exclude',
-            criteria: authorOpts,
+            criteria: {criteria: authorOpts},
             propertyResults: propResults,
             passed,
         };
@@ -2437,7 +2445,8 @@ export const checkItemFilter = async (item: (Submission | Comment), filter: Item
 
     if(include.length > 0) {
         let index = 1
-        for(const state of include) {
+        for(const namedState of include) {
+            const { criteria: state, name } = namedState;
             let critResult: FilterCriteriaResult<TypedActivityState>;
 
             // need to determine if criteria is for comment or submission state
@@ -2453,21 +2462,21 @@ export const checkItemFilter = async (item: (Submission | Comment), filter: Item
                     propResultsMap.submissionState = subPropertyResult;
                     critResult = {
                         behavior: 'include',
-                        criteria: state,
+                        criteria: namedState,
                         propertyResults: Object.values(propResultsMap),
                         passed: false
                     }
                 } else {
-                    critResult = await resources.testItemCriteria(item, restCommentState, parentLogger, true, source);
-                    critResult.criteria = state;
+                    critResult = await resources.testItemCriteria(item, {criteria: restCommentState}, parentLogger, true, source);
+                    critResult.criteria = namedState;
                     critResult.propertyResults.unshift(subPropertyResult);
                 }
             } else {
-                critResult = await resources.testItemCriteria(item, state, parentLogger, true, source);
+                critResult = await resources.testItemCriteria(item, namedState, parentLogger, true, source);
             }
 
             if(critResult.propertyResults.some(x => x.property === 'source')) {
-                critResult.criteria.source = source;
+                critResult.criteria.criteria.source = source;
             }
 
             //critResult = await resources.testItemCriteria(item, state, parentLogger);
@@ -2490,7 +2499,10 @@ export const checkItemFilter = async (item: (Submission | Comment), filter: Item
     if (exclude.length > 0) {
         let index = 1;
         const summaries: string[] = [];
-        for (const state of exclude) {
+        for (const namedState of exclude) {
+
+            const { criteria: state, name } = namedState;
+
             let critResult: FilterCriteriaResult<TypedActivityState>;
 
             if(isCommentState(state) && asComment(item) && state.submissionState !== undefined) {
@@ -2504,21 +2516,21 @@ export const checkItemFilter = async (item: (Submission | Comment), filter: Item
                     propResultsMap.submissionState = subPropertyResult;
                     critResult = {
                         behavior: 'include',
-                        criteria: state,
+                        criteria: namedState,
                         propertyResults: Object.values(propResultsMap),
                         passed: false
                     }
                 } else {
-                    critResult = await resources.testItemCriteria(item, restCommentState, parentLogger, false, source);
-                    critResult.criteria = state;
+                    critResult = await resources.testItemCriteria(item, {criteria: restCommentState}, parentLogger, false, source);
+                    critResult.criteria = namedState;
                     critResult.propertyResults.unshift(subPropertyResult);
                 }
             } else {
-                critResult = await resources.testItemCriteria(item, state, parentLogger, false, source);
+                critResult = await resources.testItemCriteria(item, namedState, parentLogger, false, source);
             }
 
             if(critResult.propertyResults.some(x => x.property === 'source')) {
-                critResult.criteria.source = source;
+                critResult.criteria.criteria.source = source;
             }
 
             //critResult = await resources.testItemCriteria(item, state, parentLogger, false);
@@ -2576,9 +2588,9 @@ export const checkCommentSubmissionStates = async (item: Comment, submissionStat
     const sub = await resources.getActivity(subProxy);
     
     const subStatesFilter: ItemOptions = {
-        include: excludeCondition === undefined ? submissionStates : undefined,
+        include: excludeCondition === undefined ? submissionStates.map(x => ({criteria: x})) : undefined,
         excludeCondition,
-        exclude: excludeCondition === undefined ? undefined : submissionStates
+        exclude: excludeCondition === undefined ? undefined : submissionStates.map(x => ({criteria: x}))
     }
     
     const [subPass, _, subFilterResults] = await checkItemFilter(sub, subStatesFilter, resources, logger);

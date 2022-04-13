@@ -2,8 +2,8 @@ import {Rule, RuleJSONConfig, RuleOptions} from "./index";
 import {Comment} from "snoowrap";
 import Submission from "snoowrap/dist/objects/Submission";
 import {checkAuthorFilter} from "../Subreddit/SubredditResources";
-import {AuthorCriteria, RuleResult} from "../Common/interfaces";
-import {normalizeCriteria} from "../util";
+import {AuthorCriteria, AuthorOptions, RuleResult} from "../Common/interfaces";
+import {buildFilter, normalizeCriteria} from "../util";
 
 /**
  * Checks the author of the Activity against AuthorCriteria. This differs from a Rule's AuthorOptions as this is a full Rule and will only pass/fail, not skip.
@@ -30,21 +30,15 @@ export interface AuthorRuleJSONConfig extends AuthorRuleConfig, RuleJSONConfig {
 }
 
 export class AuthorRule extends Rule {
-    include: AuthorCriteria[] = [];
-    exclude: AuthorCriteria[] = [];
+
+    authorOptions: AuthorOptions;
 
     constructor(options: AuthorRuleOptions) {
         super(options);
 
-        const {
-            include,
-            exclude,
-        } = options;
+        this.authorOptions = buildFilter(options ?? {});
 
-        this.include = include !== undefined ? include.map(x => normalizeCriteria(x)) : [];
-        this.exclude = exclude !== undefined ? exclude.map(x => normalizeCriteria(x)) : [];
-
-        if(this.include.length === 0 && this.exclude.length === 0) {
+        if(this.authorOptions.include?.length === 0 && this.authorOptions.exclude?.length === 0) {
             throw new Error('At least one of the properties [include,exclude] on Author Rule must not be empty');
         }
     }
@@ -54,14 +48,11 @@ export class AuthorRule extends Rule {
     }
 
     protected getSpecificPremise(): object {
-        return {
-            include: this.include,
-            exclude: this.exclude,
-        };
+        return this.authorOptions;
     }
 
     protected async process(item: Comment | Submission): Promise<[boolean, RuleResult]> {
-        const [result, filterType] = await checkAuthorFilter(item, {include: this.include, exclude: this.exclude}, this.resources, this.logger);
+        const [result, filterType] = await checkAuthorFilter(item, this.authorOptions, this.resources, this.logger);
         return Promise.resolve([result, this.getResult(result)]);
     }
 }

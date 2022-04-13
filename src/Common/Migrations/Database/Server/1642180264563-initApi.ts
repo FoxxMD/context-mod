@@ -696,6 +696,12 @@ export class initApi1642180264563 implements MigrationInterface {
                         isPrimary: true,
                     },
                     {
+                        name: 'name',
+                        type: 'varchar',
+                        length: '300',
+                        isNullable: true
+                    },
+                    {
                         name: 'criteria',
                         type: 'text',
                         isNullable: false,

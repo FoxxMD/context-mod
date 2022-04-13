@@ -4,6 +4,7 @@ import {removeUndefinedKeys} from "../../../util";
 
 export interface FilterCriteriaOptions<T> {
     criteria: T
+    name?: string
 }
 
 export const filterCriteriaTypeIdentifiers = {
@@ -17,6 +18,9 @@ export abstract class FilterCriteria<T> {
 
     @PrimaryColumn()
     id!: string
+
+    @Column()
+    name?: string
 
     @Column("simple-json")
     criteria!: T;
@@ -39,7 +43,13 @@ export abstract class FilterCriteria<T> {
         if(data !== undefined) {
             this.criteria = removeUndefinedKeys(data.criteria);
             this.hash = objectHash.sha1(this.criteria);
+            this.name = data.name;
+            this.generateId();
         }
+    }
+
+    generateId() {
+        this.id = `${this.type}-${this.name !== undefined ? `-${this.name}-` : ''}${this.hash}`;
     }
 }
 
