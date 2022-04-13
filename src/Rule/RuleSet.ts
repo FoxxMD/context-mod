@@ -1,4 +1,4 @@
-import {IRule, Triggerable, Rule, RuleJSONConfig} from "./index";
+import {IRule, Triggerable, Rule, RuleJSONConfig, StructuredRuleJson} from "./index";
 import Snoowrap, {Comment, Submission} from "snoowrap";
 import {ruleFactory} from "./RuleFactory";
 import {createAjvFactory, mergeArr} from "../util";
@@ -6,7 +6,7 @@ import {Logger} from "winston";
 import {JoinCondition, JoinOperands, RuleResult, RuleSetResult} from "../Common/interfaces";
 import * as RuleSchema from '../Schema/Rule.json';
 import Ajv from 'ajv';
-import {RuleJson, RuleObjectJson} from "../Common/types";
+import {RuleJson, RuleObjectJson, StructuredRuleObjectJson} from "../Common/types";
 import {SubredditResources} from "../Subreddit/SubredditResources";
 import {runCheckOptions} from "../Subreddit/Manager";
 import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
@@ -28,7 +28,7 @@ export class RuleSet implements IRuleSet {
             } else {
                 const valid = ajv.validate(RuleSchema, r);
                 if (valid) {
-                    this.rules.push(ruleFactory(r as RuleJSONConfig, logger, options.subredditName, options.resources, options.client));
+                    this.rules.push(ruleFactory(r, logger, options.subredditName, options.resources, options.client));
                 } else {
                     this.logger.warn('Could not build rule because of JSON errors', {}, {errors: ajv.errors, obj: r});
                 }
@@ -98,7 +98,7 @@ export interface IRuleSet extends JoinCondition {
 }
 
 export interface RuleSetOptions extends IRuleSet {
-    rules: Array<IRule | RuleJSONConfig>,
+    rules: Array<StructuredRuleObjectJson>,
     logger: Logger
     subredditName: string
     resources: SubredditResources

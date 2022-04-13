@@ -9,7 +9,7 @@ import {
     ObjectPremise,
     ResultContext,
     RuleResult as IRuleResult, RunnableBaseJson,
-    RunnableBaseOptions,
+    RunnableBaseOptions, StructuredRunnableBase,
     TypedActivityStates
 } from "../Common/interfaces";
 import {runCheckOptions} from "../Subreddit/Manager";
@@ -30,7 +30,7 @@ export interface Triggerable {
     run(item: Comment | Submission, existingResults: RuleResultEntity[], options: runCheckOptions): Promise<[(boolean | null), RuleResultEntity?]>;
 }
 
-export abstract class Rule extends RunnableBase implements IRule, Triggerable {
+export abstract class Rule extends RunnableBase implements Omit<IRule, 'authorIs' | 'itemIs'>, Triggerable {
     name?: string;
     logger: Logger
     client: Snoowrap;
@@ -192,3 +192,7 @@ export interface RuleJSONConfig extends IRule {
     kind: 'recentActivity' | 'repeatActivity' | 'author' | 'attribution' | 'history' | 'regex' | 'repost'
 }
 
+
+export interface StructuredRuleJson extends Omit<RuleJSONConfig, 'authorIs' | 'itemIs'>, StructuredRunnableBase {
+
+}

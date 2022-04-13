@@ -596,6 +596,9 @@
                 "authorIs": {
                     "anyOf": [
                         {
+                            "$ref": "#/definitions/FilterOptions<AuthorCriteria>"
+                        },
+                        {
                             "items": {
                                 "anyOf": [
                                     {
@@ -607,12 +610,8 @@
                                 ]
                             },
                             "type": "array"
-                        },
-                        {
-                            "$ref": "#/definitions/FilterOptionsJson<AuthorCriteria>"
                         }
-                    ],
-                    "description": "Determine how authorIs defaults behave when authorIs is present on the check\n\n* merge => merges defaults with check's authorIs\n* replace => check authorIs will replace defaults (no defaults used)"
+                    ]
                 },
                 "authorIsBehavior": {
                     "enum": [
@@ -623,6 +622,9 @@
                 },
                 "itemIs": {
                     "anyOf": [
+                        {
+                            "$ref": "#/definitions/FilterOptions<TypedActivityState>"
+                        },
                         {
                             "items": {
                                 "anyOf": [
@@ -638,9 +640,6 @@
                                 ]
                             },
                             "type": "array"
-                        },
-                        {
-                            "$ref": "#/definitions/FilterOptionsJson<TypedActivityState>"
                         }
                     ]
                 },
@@ -655,19 +654,11 @@
             },
             "type": "object"
         },
-        "FilterOptionsJson<AuthorCriteria>": {
+        "FilterOptions<AuthorCriteria>": {
             "properties": {
                 "exclude": {
-                    "description": "Only runs if `include` is not present. Each Criteria is comprised of conditions that the filter (Author/Item) being checked must \"not\" pass. See excludeCondition for set behavior\n\nEX: `isMod: true, name: Automoderator` => Will pass if the Author IS NOT a mod and IS NOT named Automoderator",
                     "items": {
-                        "anyOf": [
-                            {
-                                "$ref": "#/definitions/AuthorCriteria"
-                            },
-                            {
-                                "$ref": "#/definitions/NamedCriteria<AuthorCriteria>"
-                            }
-                        ]
+                        "$ref": "#/definitions/NamedCriteria<AuthorCriteria>"
                     },
                     "type": "array"
                 },
@@ -681,38 +672,19 @@
                     "type": "string"
                 },
                 "include": {
-                    "description": "Will \"pass\" if any set of Criteria passes",
                     "items": {
-                        "anyOf": [
-                            {
-                                "$ref": "#/definitions/AuthorCriteria"
-                            },
-                            {
-                                "$ref": "#/definitions/NamedCriteria<AuthorCriteria>"
-                            }
-                        ]
+                        "$ref": "#/definitions/NamedCriteria<AuthorCriteria>"
                     },
                     "type": "array"
                 }
             },
             "type": "object"
         },
-        "FilterOptionsJson<TypedActivityState>": {
+        "FilterOptions<TypedActivityState>": {
             "properties": {
                 "exclude": {
-                    "description": "Only runs if `include` is not present. Each Criteria is comprised of conditions that the filter (Author/Item) being checked must \"not\" pass. See excludeCondition for set behavior\n\nEX: `isMod: true, name: Automoderator` => Will pass if the Author IS NOT a mod and IS NOT named Automoderator",
                     "items": {
-                        "anyOf": [
-                            {
-                                "$ref": "#/definitions/SubmissionState"
-                            },
-                            {
-                                "$ref": "#/definitions/CommentState"
-                            },
-                            {
-                                "$ref": "#/definitions/NamedCriteria<TypedActivityState>"
-                            }
-                        ]
+                        "$ref": "#/definitions/NamedCriteria<TypedActivityState>"
                     },
                     "type": "array"
                 },
@@ -726,19 +698,8 @@
                     "type": "string"
                 },
                 "include": {
-                    "description": "Will \"pass\" if any set of Criteria passes",
                     "items": {
-                        "anyOf": [
-                            {
-                                "$ref": "#/definitions/SubmissionState"
-                            },
-                            {
-                                "$ref": "#/definitions/CommentState"
-                            },
-                            {
-                                "$ref": "#/definitions/NamedCriteria<TypedActivityState>"
-                            }
-                        ]
+                        "$ref": "#/definitions/NamedCriteria<TypedActivityState>"
                     },
                     "type": "array"
                 }

@@ -4,7 +4,7 @@ import {
     ActivityCheckJson, AuthorCriteria, AuthorOptions, CheckResult, CheckSummary,
     FilterCriteriaDefaults, FilterResult,
     PostBehavior,
-    PostBehaviorTypes, RuleResult, RunnableBaseJson, RunnableBaseOptions, RunResult,
+    PostBehaviorTypes, RuleResult, RunnableBaseJson, RunnableBaseOptions, RunResult, StructuredRunnableBase,
     TypedActivityStates
 } from "../Common/interfaces";
 import {SubmissionCheck} from "../Check/SubmissionCheck";
@@ -299,10 +299,10 @@ export interface IRun extends PostBehavior, RunnableBaseJson {
     enable?: boolean,
 }
 
-export interface RunOptions extends IRun, RunnableBaseOptions {
+export interface RunOptions extends RunStructuredJson, RunnableBaseOptions {
     // submissionChecks?: SubmissionCheck[]
     // commentChecks?: CommentCheck[]
-    checks: CheckStructuredJson[]
+    //checks: CheckStructuredJson[]
     name: string
     //logger: Logger
     //resources: SubredditResources
@@ -315,6 +315,6 @@ export interface RunJson extends IRun {
     checks: ActivityCheckJson[]
 }
 
-export interface RunStructuredJson extends RunJson {
+export interface RunStructuredJson extends Omit<RunJson, 'authorIs' | 'itemIs' | 'checks'>, StructuredRunnableBase {
     checks: CheckStructuredJson[]
 }

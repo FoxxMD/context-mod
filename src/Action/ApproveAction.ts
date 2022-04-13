@@ -82,7 +82,7 @@ export class ApproveAction extends Action {
     }
 }
 
-export interface ApproveOptions extends ApproveActionConfig, ActionOptions {}
+export interface ApproveOptions extends Omit<ApproveActionConfig, 'authorIs' | 'itemIs'>, ActionOptions {}
 
 export interface ApproveActionConfig extends ActionConfig {
     /**

@@ -1,6 +1,6 @@
-import {RuleSet, IRuleSet, RuleSetJson, RuleSetObjectJson} from "../Rule/RuleSet";
+import {RuleSet, IRuleSet, RuleSetJson, RuleSetObjectJson, isRuleSetJSON} from "../Rule/RuleSet";
 import {IRule, Rule, RuleJSONConfig} from "../Rule";
-import Action, {ActionConfig, ActionJson} from "../Action";
+import Action, {ActionConfig, ActionJson, StructuredActionJson} from "../Action";
 import {Logger} from "winston";
 import Snoowrap, {Comment, Submission} from "snoowrap";
 import {actionFactory} from "../Action/ActionFactory";
@@ -25,12 +25,13 @@ import {
     FilterResult,
     JoinCondition,
     JoinOperands, MinimalOrFullFilter,
+    MinimalOrFullFilterJson,
     NotificationEventPayload,
     PostBehavior,
     PostBehaviorTypes,
     RuleResult,
     RuleSetResult, RunnableBaseJson,
-    RunnableBaseOptions,
+    RunnableBaseOptions, StructuredRunnableBase,
     SubmissionState,
     TypedActivityState,
     TypedActivityStates,
@@ -39,7 +40,13 @@ import {
 import * as RuleSchema from '../Schema/Rule.json';
 import * as RuleSetSchema from '../Schema/RuleSet.json';
 import * as ActionSchema from '../Schema/Action.json';
-import {ActionObjectJson, RuleJson, RuleObjectJson, ActionJson as ActionTypeJson} from "../Common/types";
+import {
+    ActionObjectJson,
+    RuleJson,
+    RuleObjectJson,
+    ActionJson as ActionTypeJson,
+    StructuredRuleSetObjectJson, StructuredRuleObjectJson, StructuredActionObjectJson
+} from "../Common/types";
 import {checkAuthorFilter, checkItemFilter, SubredditResources} from "../Subreddit/SubredditResources";
 import {AuthorCriteria, AuthorOptions} from '..';
 import {ExtendedSnoowrap} from '../Utils/SnoowrapClients';
@@ -132,13 +139,13 @@ export abstract class Check extends RunnableBase implements ICheck {
                 let setErrors: any = [];
                 let ruleErrors: any = [];
                 if (valid) {
-                    const ruleConfig = r as RuleSetObjectJson;
-                    this.rules.push(new RuleSet({...ruleConfig, logger: this.logger, subredditName, resources: this.resources, client: this.client}));
+                    const ruleConfig = r;
+                    this.rules.push(new RuleSet({...ruleConfig as StructuredRuleSetObjectJson, logger: this.logger, subredditName, resources: this.resources, client: this.client}));
                 } else {
                     setErrors = ajv.errors;
                     valid = ajv.validate(RuleSchema, r);
                     if (valid) {
-                        this.rules.push(ruleFactory(r as RuleJSONConfig, this.logger, subredditName, this.resources, this.client));
+                        this.rules.push(ruleFactory(r as StructuredRuleObjectJson, this.logger, subredditName, this.resources, this.client));
                     } else {
                         ruleErrors = ajv.errors;
                         const leastErrorType = setErrors.length < ruleErrors ? 'RuleSet' : 'Rule';
@@ -158,7 +165,7 @@ export abstract class Check extends RunnableBase implements ICheck {
             } else {
                 let valid = ajv.validate(ActionSchema, a);
                 if (valid) {
-                    const aj = a as ActionJson;
+                    const aj = a as StructuredActionObjectJson;
                     this.actions.push(actionFactory({
                         ...aj,
                         dryRun: this.dryRun || aj.dryRun
@@ -542,8 +549,8 @@ export interface ICheck extends JoinCondition, PostBehavior, RunnableBaseJson {
     enable?: boolean,
 }
 
-export interface CheckOptions extends ICheck, RunnableBaseOptions {
-    rules: Array<IRuleSet | IRule>;
+export interface CheckOptions extends Omit<ICheck, 'authorIs' | 'itemIs'>, RunnableBaseOptions {
+    rules: Array<StructuredRuleSetObjectJson | StructuredRuleObjectJson>;
     actions: ActionConfig[];
     logger: Logger;
     subredditName: string;
@@ -591,7 +598,7 @@ export interface CheckJson extends ICheck {
 
 export interface SubmissionCheckJson extends CheckJson {
     kind: 'submission'
-    itemIs?: MinimalOrFullFilter<SubmissionState>
+    itemIs?: MinimalOrFullFilterJson<SubmissionState>
 }
 
 /**
@@ -631,7 +638,7 @@ export const userResultCacheDefault: Required<UserResultCacheOptions> = {
 
 export interface CommentCheckJson extends CheckJson {
     kind: 'comment'
-    itemIs?: MinimalOrFullFilter<CommentState>
+    itemIs?: MinimalOrFullFilterJson<CommentState>
 }
 
 export const asStructuredCommentCheckJson = (val: any): val is CommentCheckStructuredJson => {
@@ -648,12 +655,14 @@ export type CheckStructuredJson = SubmissionCheckStructuredJson | CommentCheckSt
 //     actions: Array<ActionObjectJson>
 // }
 
-export interface SubmissionCheckStructuredJson extends SubmissionCheckJson {
-    rules: Array<RuleSetObjectJson | RuleObjectJson>
+export interface SubmissionCheckStructuredJson extends Omit<SubmissionCheckJson, 'authorIs' | 'itemIs' | 'rules'>,  StructuredRunnableBase {
+    rules: Array<StructuredRuleSetObjectJson | StructuredRuleObjectJson>
     actions: Array<ActionObjectJson>
+    itemIs?: MinimalOrFullFilter<SubmissionState>
 }
 
-export interface CommentCheckStructuredJson extends CommentCheckJson {
-    rules: Array<RuleSetObjectJson | RuleObjectJson>
+export interface CommentCheckStructuredJson extends Omit<CommentCheckJson, 'authorIs' | 'itemIs' | 'rules'>, StructuredRunnableBase {
+    rules: Array<StructuredRuleSetObjectJson | StructuredRuleObjectJson>
     actions: Array<ActionObjectJson>
+    itemIs?: MinimalOrFullFilter<CommentState>
 }

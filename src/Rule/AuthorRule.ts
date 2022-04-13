@@ -2,7 +2,13 @@ import {Rule, RuleJSONConfig, RuleOptions} from "./index";
 import {Comment} from "snoowrap";
 import Submission from "snoowrap/dist/objects/Submission";
 import {checkAuthorFilter} from "../Subreddit/SubredditResources";
-import {AuthorCriteria, AuthorOptions, RuleResult} from "../Common/interfaces";
+import {
+    AuthorCriteria,
+    AuthorOptions, MaybeAnonymousCriteria,
+    MaybeAnonymousOrStringCriteria,
+    NamedCriteria,
+    RuleResult
+} from "../Common/interfaces";
 import {buildFilter, normalizeCriteria} from "../util";
 
 /**
@@ -14,15 +20,16 @@ export interface AuthorRuleConfig {
     /**
      * Will "pass" if any set of AuthorCriteria passes
      * */
-    include?: AuthorCriteria[];
+    include?: MaybeAnonymousCriteria<AuthorCriteria>[];
     /**
      * Only runs if include is not present. Will "pass" if any of set of the AuthorCriteria does not pass
      * */
-    exclude?: AuthorCriteria[];
+    exclude?: MaybeAnonymousCriteria<AuthorCriteria>[];
 }
 
-export interface AuthorRuleOptions extends AuthorRuleConfig, RuleOptions {
-
+export interface AuthorRuleOptions extends Omit<AuthorRuleConfig, 'include' | 'exclude'>, RuleOptions {
+    include?: NamedCriteria<AuthorCriteria>[]
+    exclude?: NamedCriteria<AuthorCriteria>[]
 }
 
 export interface AuthorRuleJSONConfig extends AuthorRuleConfig, RuleJSONConfig {

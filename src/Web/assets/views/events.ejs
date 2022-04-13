@@ -106,9 +106,9 @@
                                             <span class="font-semibold">Author:</span> <span class="px-1"><%= runSum.authorIs.passed %> (<%= runSum.authorIs.join %>)</span>
                                             <ul class="list-inside list-disc">
                                                 <% runSum.authorIs.criteriaResults.forEach(function (res, index) { %>
-                                                    <li>Criteria #<%= index + 1 %> => <%= res[0] %>
+                                                    <li>Criteria #<%= index + 1 %><%= res.name !== null ? ` (${res.name})` : ''%> => <%= res.summary %>
                                                         <ul class="list-inside list-disc">
-                                                            <% res[1].forEach(function (resInside) { %>
+                                                            <% res.details.forEach(function (resInside) { %>
                                                                 <li><%= resInside %></li>
                                                             <% }) %>
                                                         </ul>
@@ -122,9 +122,9 @@
                                                 <span class="font-semibold">Item:</span> <span class="px-1"><%= runSum.itemIs.passed %> (<%= runSum.itemIs.join %>)</span>
                                                 <ul class="list-inside list-disc">
                                                     <% runSum.itemIs.criteriaResults.forEach(function (res, index) { %>
-                                                        <li>Criteria #<%= index + 1 %> => <%= res[0] %>
+                                                        <li>Criteria #<%= index + 1 %><%= res.name !== null ? ` (${res.name})` : ''%> => <%= res.summary %>
                                                             <ul class="list-inside list-disc">
-                                                                <% res[1].forEach(function (resInside) { %>
+                                                                <% res.details.forEach(function (resInside) { %>
                                                                     <li><%= resInside %></li>
                                                                 <% }) %>
                                                             </ul>
@@ -152,9 +152,9 @@
                                                     <span class="font-semibold">Author:</span> <span class="px-1"><%= chkSum.authorIs.passed %> (<%= chkSum.authorIs.join %>)</span>
                                                     <ul class="list-inside list-disc">
                                                         <% chkSum.authorIs.criteriaResults.forEach(function (res, index) { %>
-                                                            <li>Criteria #<%= index %> => <%= res[0] %>
+                                                            <li>Criteria #<%= index %><%= res.name !== null ? ` (${res.name})` : ''%> => <%= res.summary %>
                                                                 <ul class="list-inside list-disc">
-                                                                    <% res[1].forEach(function (resInside) { %>
+                                                                    <% res.details.forEach(function (resInside) { %>
                                                                         <li><%= resInside %></li>
                                                                     <% }) %>
                                                                 </ul>
@@ -168,9 +168,9 @@
                                                     <span class="font-semibold">Item:</span> <span class="px-1"><%= chkSum.itemIs.passed %> (<%= chkSum.itemIs.join %>)</span>
                                                     <ul class="list-inside list-disc">
                                                         <% chkSum.itemIs.criteriaResults.forEach(function (res, index) { %>
-                                                            <li>Criteria #<%= index %> => <%= res[0] %>
+                                                            <li>Criteria #<%= index %><%= res.name !== null ? ` (${res.name})` : ''%> => <%= res.summary %>
                                                                 <ul class="list-inside list-disc">
-                                                                    <% res[1].forEach(function (resInside) { %>
+                                                                    <% res.details.forEach(function (resInside) { %>
                                                                         <li><%= resInside %></li>
                                                                     <% }) %>
                                                                 </ul>
@@ -198,9 +198,9 @@
                                                                                         <span class="font-semibold">Author:</span> <span class="px-1"><%= rsResult.authorIs.passed %> (<%= rsResult.authorIs.join %>)</span>
                                                                                         <ul class="list-inside list-disc">
                                                                                             <% rsResult.authorIs.criteriaResults.forEach(function (res, index) { %>
-                                                                                                <li>Criteria #<%= index %> => <%= res[0] %>
+                                                                                                <li>Criteria #<%= index %><%= res.name !== null ? ` (${res.name})` : ''%> => <%= res.summary %>
                                                                                                     <ul class="list-inside list-disc">
-                                                                                                        <% res[1].forEach(function (resInside) { %>
+                                                                                                        <% res.details.forEach(function (resInside) { %>
                                                                                                             <li><%= resInside %></li>
                                                                                                         <% }) %>
                                                                                                     </ul>
@@ -214,9 +214,9 @@
                                                                                         <span class="font-semibold">Item:</span> <span class="px-1"><%= rsResult.itemIs.passed %> (<%= rsResult.itemIs.join %>)</span>
                                                                                         <ul class="list-inside list-disc">
                                                                                             <% rsResult.itemIs.criteriaResults.forEach(function (res, index) { %>
-                                                                                                <li>Criteria #<%= index %> => <%= res[0] %>
+                                                                                                <li>Criteria #<%= index %><%= res.name !== null ? ` (${res.name})` : ''%> => <%= res.summary %>
                                                                                                     <ul class="list-inside list-disc">
-                                                                                                        <% res[1].forEach(function (resInside) { %>
+                                                                                                        <% res.details.forEach(function (resInside) { %>
                                                                                                             <li><%= resInside %></li>
                                                                                                         <% }) %>
                                                                                                     </ul>
@@ -242,9 +242,9 @@
                                                                     <span class="font-semibold">Author:</span> <span class="px-1"><%= ruleResult.authorIs.passed %> (<%= ruleResult.authorIs.join %>)</span>
                                                                     <ul class="list-inside list-disc">
                                                                         <% ruleResult.authorIs.criteriaResults.forEach(function (res, index) { %>
-                                                                            <li>Criteria #<%= index %> => <%= res[0] %>
+                                                                            <li>Criteria #<%= index %><%= res.name !== null ? ` (${res.name})` : ''%> => <%= res.summary %>
                                                                                 <ul class="list-inside list-disc">
-                                                                                    <% res[1].forEach(function (resInside) { %>
+                                                                                    <% res.details.forEach(function (resInside) { %>
                                                                                         <li><%= resInside %></li>
                                                                                     <% }) %>
                                                                                 </ul>
@@ -258,9 +258,9 @@
                                                                     <span class="font-semibold">Item:</span> <span class="px-1"><%= ruleResult.itemIs.passed %> (<%= ruleResult.itemIs.join %>)</span>
                                                                     <ul class="list-inside list-disc">
                                                                         <% ruleResult.itemIs.criteriaResults.forEach(function (res, index) { %>
-                                                                            <li>Criteria #<%= index %> => <%= res[0] %>
+                                                                            <li>Criteria #<%= index %><%= res.name !== null ? ` (${res.name})` : ''%> => <%= res.summary %>
                                                                                 <ul class="list-inside list-disc">
-                                                                                    <% res[1].forEach(function (resInside) { %>
+                                                                                    <% res.details.forEach(function (resInside) { %>
                                                                                         <li><%= resInside %></li>
                                                                                     <% }) %>
                                                                                 </ul>
@@ -295,9 +295,9 @@
                                                                         <span class="font-semibold">Author:</span> <span class="px-1"><%= aRes.authorIs.passed %> (<%= aRes.authorIs.join %>)</span>
                                                                         <ul class="list-inside list-disc">
                                                                             <% aRes.authorIs.criteriaResults.forEach(function (res, index) { %>
-                                                                                <li>Criteria #<%= index %> => <%= res[0] %>
+                                                                                <li>Criteria #<%= index %><%= res.name !== null ? ` (${res.name})` : ''%> => <%= res.summary %>
                                                                                     <ul class="list-inside list-disc">
-                                                                                        <% res[1].forEach(function (resInside) { %>
+                                                                                        <% res.details.forEach(function (resInside) { %>
                                                                                             <li><%= resInside %></li>
                                                                                         <% }) %>
                                                                                     </ul>
@@ -311,9 +311,9 @@
                                                                         <span class="font-semibold">Item:</span> <span class="px-1"><%= aRes.itemIs.passed %> (<%= aRes.itemIs.join %>)</span>
                                                                         <ul class="list-inside list-disc">
                                                                             <% aRes.itemIs.criteriaResults.forEach(function (res, index) { %>
-                                                                                <li>Criteria #<%= index %> => <%= res[0] %>
+                                                                                <li>Criteria #<%= index %><%= res.name !== null ? ` (${res.name})` : ''%> => <%= res.summary %>
                                                                                     <ul class="list-inside list-disc">
-                                                                                        <% res[1].forEach(function (resInside) { %>
+                                                                                        <% res.details.forEach(function (resInside) { %>
                                                                                             <li><%= resInside %></li>
                                                                                         <% }) %>
                                                                                     </ul>

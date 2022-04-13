@@ -111,7 +111,7 @@ export interface CheckTask {
     options: runCheckOptions
 }
 
-export interface RuntimeManagerOptions extends ManagerOptions {
+export interface RuntimeManagerOptions extends Omit<ManagerOptions, 'filterCriteriaDefaults'> {
     sharedStreams?: PollOn[];
     wikiLocation?: string;
     botName?: string;
@@ -119,6 +119,7 @@ export interface RuntimeManagerOptions extends ManagerOptions {
     maxGotoDepth?: number
     botEntity: BotEntity
     managerEntity: ManagerEntity
+    filterCriteriaDefaults?: FilterCriteriaDefaults
 }
 
 interface QueuedIdentifier {

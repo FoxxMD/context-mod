@@ -5,7 +5,7 @@ import {
     ActionProcessResult,
     ActionResult, AuthorCriteria, AuthorOptions,
     ChecksActivityState, FilterResult,
-    ObjectPremise, RuleResult, RunnableBaseJson, RunnableBaseOptions, TypedActivityState,
+    ObjectPremise, RuleResult, RunnableBaseJson, RunnableBaseOptions, StructuredRunnableBase, TypedActivityState,
     TypedActivityStates
 } from "../Common/interfaces";
 import {mergeArr, normalizeCriteria} from "../util";
@@ -175,7 +175,7 @@ export abstract class Action extends RunnableBase {
     abstract process(item: Comment | Submission, ruleResults: RuleResultEntity[], runtimeDryun?: boolean): Promise<ActionProcessResult>;
 }
 
-export interface ActionOptions extends ActionConfig, RunnableBaseOptions {
+export interface ActionOptions extends Omit<ActionConfig, 'authorIs' | 'itemIs'>, RunnableBaseOptions {
     //logger: Logger;
     subredditName: string;
     //resources: SubredditResources;
@@ -215,6 +215,10 @@ export interface ActionJson extends ActionConfig {
      * The type of action that will be performed
      */
     kind: ActionTypes
+}
+
+export interface StructuredActionJson extends Omit<ActionJson, 'itemIs' | 'authorIs'>, StructuredRunnableBase {
+
 }
 
 export const isActionJson = (obj: object): obj is ActionJson => {

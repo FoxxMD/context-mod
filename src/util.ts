@@ -444,7 +444,12 @@ export const resultsSummary = (results: (RuleResultEntity|RuleSetResult)[], topL
     //return results.map(x => x.name || x.premise.kind).join(' | ')
 }
 
-export const filterCriteriaSummary = <T>(val: FilterCriteriaResult<T>): [string, string[]] => {
+export interface FilterCriteriaSummary {
+    name?: string
+    summary: string
+    details: string[]
+}
+export const buildFilterCriteriaSummary = <T>(val: FilterCriteriaResult<T>): FilterCriteriaSummary => {
     // summarize properties relevant to result
     const passedProps = {props: val.propertyResults.filter(x => x.passed === true), name: 'Passed'};
     const failedProps = {props: val.propertyResults.filter(x => x.passed === false), name: 'Failed'};
@@ -459,7 +464,19 @@ export const filterCriteriaSummary = <T>(val: FilterCriteriaResult<T>): [string,
         propSummary.push(dnrProps);
     }
     const propSummaryStrArr = propSummary.map(x => `${x.props.length} ${x.name}${x.props.length > 0 ? ` (${x.props.map(y => y.property as string)})` : ''}`);
-    return [propSummaryStrArr.join(' | '), val.propertyResults.map(x => filterCriteriaPropertySummary(x, val.criteria.criteria))]
+    const summary = propSummaryStrArr.join(' | ');
+    const details = val.propertyResults.map(x => filterCriteriaPropertySummary(x, val.criteria.criteria));
+
+    return {
+        name: val.criteria.name,
+        summary,
+        details
+    }
+}
+
+export const filterCriteriaSummary = <T>(val: FilterCriteriaResult<T>): [string, string[]] => {
+    const deets = buildFilterCriteriaSummary(val);
+    return [deets.summary, deets.details];
 }
 
 export const filterCriteriaPropertySummary = <T>(val: FilterCriteriaPropertyResult<T>, criteria: T): string => {
@@ -2358,11 +2375,14 @@ export const normalizeCriteria = <T extends AuthorCriteria | TypedActivityState>
     }
 
     if (asAuthorCriteria(criteria)) {
-        criteria = {
-            ...criteria,
-            flairCssClass: typeof criteria.flairCssClass === 'string' ? [criteria.flairCssClass] : criteria.flairCssClass,
-            flairText: typeof criteria.flairText === 'string' ? [criteria.flairText] : criteria.flairText,
-            description: criteria.description === undefined ? undefined : Array.isArray(criteria.description) ? criteria.description : [criteria.description]
+        if(criteria.flairCssClass !== undefined) {
+            criteria.flairCssClass = typeof criteria.flairCssClass === 'string' ? [criteria.flairCssClass] : criteria.flairCssClass;
+        }
+        if(criteria.flairText !== undefined) {
+            criteria.flairText = typeof criteria.flairText === 'string' ? [criteria.flairText] : criteria.flairText;
+        }
+        if(criteria.description !== undefined) {
+            criteria.description = Array.isArray(criteria.description) ? criteria.description : [criteria.description];
         }
     }
 
@@ -2372,7 +2392,10 @@ export const normalizeCriteria = <T extends AuthorCriteria | TypedActivityState>
     };
 }
 
-export const asNamedCriteria = <T>(val: MaybeAnonymousCriteria<T>): val is NamedCriteria<T> => {
+export const asNamedCriteria = <T>(val: MaybeAnonymousCriteria<T> | undefined): val is NamedCriteria<T> => {
+    if(val === undefined || typeof val === 'string') {
+        return false;
+    }
     return 'criteria' in val;
 }
 
@@ -2389,14 +2412,14 @@ export const formatFilterData = (result: (RunResult | CheckSummary | RuleResult 
         formattedResult.authorIs = {
             ...authorIs,
             passed: triggeredIndicator(authorIs.passed),
-            criteriaResults: authorIs.criteriaResults.map(x => filterCriteriaSummary(x))
+            criteriaResults: authorIs.criteriaResults.map(x => buildFilterCriteriaSummary(x))
         }
     }
     if (itemIs !== undefined && itemIs !== null) {
         formattedResult.itemIs = {
             ...itemIs,
             passed: triggeredIndicator(itemIs.passed),
-            criteriaResults: itemIs.criteriaResults.map(x => filterCriteriaSummary(x))
+            criteriaResults: itemIs.criteriaResults.map(x => buildFilterCriteriaSummary(x))
         }
     }
 

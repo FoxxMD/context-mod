@@ -81,7 +81,7 @@ export interface UserNoteActionConfig extends ActionConfig,UserNoteJson {
     allowDuplicate?: boolean,
 }
 
-export interface UserNoteActionOptions extends UserNoteActionConfig, ActionOptions {
+export interface UserNoteActionOptions extends Omit<UserNoteActionConfig, 'authorIs' | 'itemIs'>, ActionOptions {
 }
 
 /**

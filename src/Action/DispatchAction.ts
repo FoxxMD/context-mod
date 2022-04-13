@@ -129,7 +129,7 @@ export class DispatchAction extends Action {
     }
 }
 
-export interface DispatchOptions extends DispatchActionConfig, ActionOptions {
+export interface DispatchOptions extends Omit<DispatchActionConfig, 'authorIs' | 'itemIs'>, ActionOptions {
 }
 
 export interface DispatchActionConfig extends ActionConfig, ActivityDispatchConfig {

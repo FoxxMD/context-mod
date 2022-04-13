@@ -280,6 +280,9 @@
                             },
                             {
                                 "$ref": "#/definitions/NamedCriteria<AuthorCriteria>"
+                            },
+                            {
+                                "type": "string"
                             }
                         ]
                     },
@@ -303,6 +306,9 @@
                             },
                             {
                                 "$ref": "#/definitions/NamedCriteria<AuthorCriteria>"
+                            },
+                            {
+                                "type": "string"
                             }
                         ]
                     },
@@ -325,6 +331,9 @@
                             },
                             {
                                 "$ref": "#/definitions/NamedCriteria<TypedActivityState>"
+                            },
+                            {
+                                "type": "string"
                             }
                         ]
                     },
@@ -351,6 +360,9 @@
                             },
                             {
                                 "$ref": "#/definitions/NamedCriteria<TypedActivityState>"
+                            },
+                            {
+                                "type": "string"
                             }
                         ]
                     },
@@ -597,6 +609,9 @@
                             },
                             {
                                 "$ref": "#/definitions/NamedCriteria<AuthorCriteria>"
+                            },
+                            {
+                                "type": "string"
                             }
                         ]
                     },
@@ -638,6 +653,9 @@
                             },
                             {
                                 "$ref": "#/definitions/NamedCriteria<TypedActivityState>"
+                            },
+                            {
+                                "type": "string"
                             }
                         ]
                     },

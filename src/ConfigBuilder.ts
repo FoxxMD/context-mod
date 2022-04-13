@@ -1,6 +1,7 @@
 import winston, {Logger} from "winston";
 import {
-    buildCacheOptionsFromProvider, buildCachePrefix, castToBool,
+    asNamedCriteria,
+    buildCacheOptionsFromProvider, buildCachePrefix, buildFilter, castToBool,
     createAjvFactory, fileOrDirectoryIsWriteable,
     mergeArr, mergeFilters,
     normalizeName,
@@ -41,11 +42,28 @@ import {
     PostBehavior,
     StrongLoggingOptions,
     DatabaseDriverConfig,
-    DatabaseDriver, DatabaseDriverType, AuthorCriteria, AuthorOptions
+    DatabaseDriver,
+    DatabaseDriverType,
+    AuthorCriteria,
+    AuthorOptions,
+    NamedCriteria,
+    TypedActivityState,
+    MaybeAnonymousOrStringCriteria,
+    MinimalOrFullFilterJson,
+    RunnableBaseJson,
+    RunnableBaseOptions,
+    StructuredRunnableBase, FilterOptionsJson, MaybeAnonymousCriteria, FilterCriteriaDefaultsJson, MinimalOrFullFilter
 } from "./Common/interfaces";
 import {isRuleSetJSON, RuleSetJson, RuleSetObjectJson} from "./Rule/RuleSet";
 import deepEqual from "fast-deep-equal";
-import {ActionJson, ActionObjectJson, ConfigFormat, RuleJson, RuleObjectJson} from "./Common/types";
+import {
+    ActionJson,
+    ActionObjectJson,
+    ConfigFormat,
+    RuleJson,
+    RuleObjectJson, StructuredActionObjectJson, StructuredRuleObjectJson,
+    StructuredRuleSetObjectJson
+} from "./Common/types";
 import {isActionJson} from "./Action";
 import {getLogger, resolveLogDir} from "./Utils/loggerFactory";
 import {GetEnvVars} from 'env-cmd';
@@ -76,7 +94,8 @@ import {ConfigDocumentInterface} from "./Common/Config/AbstractConfigDocument";
 import {Document as YamlDocument} from "yaml";
 import {SimpleError} from "./Utils/Errors";
 import {ErrorWithCause} from "pony-cause";
-import {RunStructuredJson} from "./Run";
+import {RunJson, RunStructuredJson} from "./Run";
+import {AuthorRuleConfig} from "./Rule/AuthorRule";
 
 export interface ConfigBuilderOptions {
     logger: Logger,
@@ -171,21 +190,29 @@ export class ConfigBuilder {
             }
         }
 
+        const [namedAuthorFilters, namedItemFilters] = extractNamedFilters({...config, runs: realRuns});
+
+        const configFilterDefaults = filterCriteriaDefaults === undefined ? undefined : buildDefaultFilterCriteriaFromJson(filterCriteriaDefaults, namedAuthorFilters, namedItemFilters);
+
         const structuredRuns: RunStructuredJson[] = [];
+
+        const namedFilters = insertNameFilters(namedAuthorFilters, namedItemFilters);
 
         for(const r of realRuns) {
 
             const {filterCriteriaDefaults: filterCriteriaDefaultsFromRun, postFail, postTrigger, authorIs, itemIs } = r;
 
-            const [derivedRunAuthorIs, derivedRunItemIs] = mergeFilters(r, filterCriteriaDefaults ?? filterCriteriaDefaultsFromBot);
+            const [derivedRunAuthorIs, derivedRunItemIs] = mergeFilters(namedFilters(r), configFilterDefaults ?? filterCriteriaDefaultsFromBot);
+
+            const configFilterDefaultsFromRun = filterCriteriaDefaultsFromRun === undefined ? undefined : buildDefaultFilterCriteriaFromJson(filterCriteriaDefaultsFromRun, namedAuthorFilters, namedItemFilters);
 
             const structuredChecks: CheckStructuredJson[] = [];
             for (const c of r.checks) {
                 const {rules = [], actions = [], authorIs = {}, itemIs = []} = c;
-                const strongRules = insertNamedRules(rules, namedRules);
-                const strongActions = insertNamedActions(actions, namedActions);
+                const strongRules = insertNamedRules(rules, namedRules, namedAuthorFilters, namedItemFilters);
+                const strongActions = insertNamedActions(actions, namedActions, namedAuthorFilters, namedItemFilters);
 
-                const [derivedAuthorIs, derivedItemIs] = mergeFilters(c, filterCriteriaDefaultsFromRun ?? (filterCriteriaDefaults ?? filterCriteriaDefaultsFromBot));
+                const [derivedAuthorIs, derivedItemIs] = mergeFilters(namedFilters(c), configFilterDefaultsFromRun ?? (configFilterDefaults ?? filterCriteriaDefaultsFromBot));
 
                 const postCheckBehaviors = Object.assign({}, postCheckBehaviorDefaultsFromBot, removeUndefinedKeys({postFail, postTrigger}));
 
@@ -238,6 +265,20 @@ export const buildPollingOptions = (values: (string | PollingOptions)[]): Pollin
     return opts;
 }
 
+export const buildDefaultFilterCriteriaFromJson = (val: FilterCriteriaDefaultsJson, namedAuthorFilters: Map<string, NamedCriteria<AuthorCriteria>>, namedItemFilters: Map<string, NamedCriteria<TypedActivityState>>): FilterCriteriaDefaults => {
+    const {
+        itemIs,
+        authorIs,
+        ...rest
+    } = val;
+    const def: FilterCriteriaDefaults = rest;
+
+    const fullFilters = insertNameFilters(namedAuthorFilters, namedItemFilters)(val);
+    def.itemIs = fullFilters.itemIs;
+    def.authorIs = fullFilters.authorIs;
+    return def;
+}
+
 export const extractNamedRules = (rules: Array<RuleSetJson | RuleJson>, namedRules: Map<string, RuleObjectJson> = new Map()): Map<string, RuleObjectJson> => {
     //const namedRules = new Map();
     for (const r of rules) {
@@ -274,22 +315,234 @@ export const extractNamedRules = (rules: Array<RuleSetJson | RuleJson>, namedRul
     return namedRules;
 }
 
-export const insertNamedRules = (rules: Array<RuleSetJson | RuleJson>, namedRules: Map<string, RuleObjectJson> = new Map()): Array<RuleSetObjectJson | RuleObjectJson> => {
-    const strongRules: Array<RuleSetObjectJson | RuleObjectJson> = [];
+type FilterJsonFuncArg<T> = (val: MaybeAnonymousOrStringCriteria<T>) => void;
+
+const addToNamedFilter= <T>(namedFilter: Map<string, NamedCriteria<T>>, filterName: string) => (val: MaybeAnonymousOrStringCriteria<T>) => {
+    if (typeof val === 'string') {
+        return;
+    }
+    if (asNamedCriteria(val) && val.name !== undefined) {
+        if (namedFilter.has(val.name.toLocaleLowerCase())) {
+            throw new Error(`names for ${filterName} filters must be unique (case-insensitive). Conflicting name ${val.name}`);
+        }
+        namedFilter.set(val.name.toLocaleLowerCase(), val);
+    }
+}
+
+const parseFilterJson = <T>(addToFilter: FilterJsonFuncArg<T>) => (val: MinimalOrFullFilterJson<T> | undefined) => {
+    if (val === undefined) {
+        return;
+    }
+    if (Array.isArray(val)) {
+        for (const v of val) {
+            addToFilter(v);
+        }
+    } else {
+        const {include = [], exclude = []} = val;
+        for (const v of include) {
+            addToFilter(v);
+        }
+        for (const v of exclude) {
+            addToFilter(v);
+        }
+    }
+}
+
+export const extractNamedFilters = (config: JSONConfig, namedAuthorFilters: Map<string, NamedCriteria<AuthorCriteria>> = new Map(), namedItemFilters: Map<string, NamedCriteria<TypedActivityState>> = new Map()): [Map<string, NamedCriteria<AuthorCriteria>>, Map<string, NamedCriteria<TypedActivityState>>] => {
+    const addToAuthors = addToNamedFilter(namedAuthorFilters, 'authorIs');
+    const addToItems = addToNamedFilter(namedItemFilters, 'itemIs');
+
+    const parseAuthorIs = parseFilterJson(addToAuthors);
+    const parseItemIs = parseFilterJson(addToItems);
+
+    // const parseAuthorIs = (val: MinimalOrFullFilterJson<AuthorCriteria> | undefined) => {
+    //     if (val === undefined) {
+    //         return;
+    //     }
+    //     if (Array.isArray(val)) {
+    //         for (const v of val) {
+    //             addToAuthors(v);
+    //         }
+    //     } else {
+    //         const {include = [], exclude = []} = val;
+    //         for (const v of include) {
+    //             addToAuthors(v);
+    //         }
+    //         for (const v of exclude) {
+    //             addToAuthors(v);
+    //         }
+    //     }
+    // }
+
+    // const parseItemIs = (val: MinimalOrFullFilterJson<TypedActivityState> | undefined) => {
+    //     if (val === undefined) {
+    //         return;
+    //     }
+    //     if (Array.isArray(val)) {
+    //         for (const v of val) {
+    //             addToItems(v);
+    //         }
+    //     } else {
+    //         const {include = [], exclude = []} = val;
+    //         for (const v of include) {
+    //             addToItems(v);
+    //         }
+    //         for (const v of exclude) {
+    //             addToItems(v);
+    //         }
+    //     }
+    // }
+
+    //const namedRules = new Map();
+
+    const {
+        filterCriteriaDefaults,
+        runs = []
+    } = config;
+
+    parseAuthorIs(filterCriteriaDefaults?.authorIs);
+    parseItemIs(filterCriteriaDefaults?.itemIs);
+
+    for (const r of runs as RunJson[]) {
+
+        const {
+            filterCriteriaDefaults: filterCriteriaDefaultsFromRun
+        } = r;
+
+        parseAuthorIs(filterCriteriaDefaults?.authorIs);
+        parseAuthorIs(r.authorIs);
+        parseItemIs(r.itemIs);
+        parseItemIs(filterCriteriaDefaults?.itemIs);
+
+        for(const c of r.checks) {
+             parseAuthorIs(c.authorIs);
+             parseItemIs(c.itemIs);
+
+             for(const ru of c.rules ?? []) {
+                 if(typeof ru === 'string') {
+                     continue;
+                 }
+                 if(isRuleSetJSON(ru)) {
+                     for(const rr of ru.rules) {
+                         if(typeof rr === 'string') {
+                             continue;
+                         }
+                         parseAuthorIs(rr.authorIs);
+                         parseItemIs(c.itemIs);
+                     }
+                 } else {
+                     parseAuthorIs(ru.authorIs);
+                     parseItemIs(c.itemIs);
+                 }
+             }
+             for(const a of c.actions ?? []) {
+                 if(typeof a === 'string') {
+                     continue;
+                 }
+                 parseAuthorIs(a.authorIs);
+                 parseItemIs(c.itemIs);
+             }
+        }
+    }
+    return [namedAuthorFilters, namedItemFilters];
+}
+
+const getNamedOrReturn = <T>(namedFilters: Map<string, NamedCriteria<T>>, filterName: string) => (x: MaybeAnonymousOrStringCriteria<T>): NamedCriteria<T> => {
+    if(typeof x === 'string') {
+        if(!namedFilters.has(x.toLocaleLowerCase())) {
+            throw new Error(`No named ${filterName} criteria with the name "${x}"`);
+        }
+        return namedFilters.get(x) as NamedCriteria<T>;
+    }
+    if(asNamedCriteria(x)) {
+        return x;
+    }
+    return {criteria: x};
+}
+
+
+export const insertNameFilters = (namedAuthorFilters: Map<string, NamedCriteria<AuthorCriteria>>, namedItemFilters: Map<string, NamedCriteria<TypedActivityState>>) => (val: RunnableBaseJson) => {
+
+    const getNamedAuthorOrReturn = getNamedOrReturn(namedAuthorFilters, 'authorIs');
+    const getNamedItemOrReturn = getNamedOrReturn(namedItemFilters, 'itemIs');
+
+    let runnableOpts: StructuredRunnableBase = {
+        authorIs: undefined,
+        itemIs: undefined,
+    }
+    if(val.authorIs !== undefined) {
+        if (Array.isArray(val.authorIs)) {
+            runnableOpts.authorIs = val.authorIs.map(x => getNamedAuthorOrReturn(x))
+        } else {
+            runnableOpts.authorIs = {};
+
+            const {include, exclude} = val.authorIs;
+            if(include !== undefined) {
+                runnableOpts.authorIs.include = include.map(x => getNamedAuthorOrReturn(x))
+            }
+            if(exclude !== undefined) {
+                runnableOpts.authorIs.exclude = exclude.map(x => getNamedAuthorOrReturn(x))
+            }
+        }
+    }
+    if(val.itemIs !== undefined) {
+        if (Array.isArray(val.itemIs)) {
+            runnableOpts.itemIs = val.itemIs.map(x => getNamedItemOrReturn(x))
+        } else {
+            runnableOpts.itemIs = {};
+
+            const {include, exclude} = val.itemIs;
+            if(include !== undefined) {
+                runnableOpts.itemIs.include = include.map(x => getNamedItemOrReturn(x))
+            }
+            if(exclude !== undefined) {
+                runnableOpts.itemIs.exclude = exclude.map(x => getNamedItemOrReturn(x))
+            }
+        }
+    }
+
+    return runnableOpts;
+}
+
+export const insertNamedRules = (rules: Array<RuleSetJson | RuleJson>, namedRules: Map<string, RuleObjectJson> = new Map(), namedAuthorFilters: Map<string, NamedCriteria<AuthorCriteria>> = new Map(), namedItemFilters: Map<string, NamedCriteria<TypedActivityState>> = new Map()): (StructuredRuleSetObjectJson | StructuredRuleObjectJson)[] => {
+
+    const namedFilters = insertNameFilters(namedAuthorFilters, namedItemFilters);
+
+    const strongRules: (StructuredRuleSetObjectJson | StructuredRuleObjectJson)[] = [];
     for (const r of rules) {
+        let rule: StructuredRuleObjectJson | undefined;
         if (typeof r === 'string') {
             const foundRule = namedRules.get(r.toLowerCase());
             if (foundRule === undefined) {
                 throw new Error(`No named Rule with the name ${r} was found`);
             }
-            strongRules.push(foundRule);
+            rule = {
+                ...foundRule,
+                ...namedFilters(foundRule)
+            } as StructuredRuleObjectJson
+            //strongRules.push(foundRule);
         } else if (isRuleSetJSON(r)) {
             const {rules: sr, ...rest} = r;
-            const setRules = insertNamedRules(sr, namedRules);
-            const strongSet = {rules: setRules, ...rest} as RuleSetObjectJson;
+            const setRules = insertNamedRules(sr, namedRules, namedAuthorFilters, namedItemFilters);
+            const strongSet = {rules: setRules, ...rest} as StructuredRuleSetObjectJson;
             strongRules.push(strongSet);
         } else {
-            strongRules.push(r);
+            rule = {...r, ...namedFilters(r)} as StructuredRuleObjectJson;
+        }
+
+        if(rule !== undefined) {
+            if(rule.kind === 'author') {
+                const authorRuleConfig = rule as (StructuredRuleObjectJson & AuthorRuleConfig);
+                const filters = namedFilters({authorIs: {include: authorRuleConfig.include, exclude: authorRuleConfig.exclude}});
+                const builtFilter = buildFilter(filters.authorIs as MinimalOrFullFilter<AuthorCriteria>);
+                rule = {
+                    ...rule,
+                    // @ts-ignore
+                    include: builtFilter.include,
+                    exclude: builtFilter.exclude
+                }
+            }
+            strongRules.push(rule as StructuredRuleObjectJson);
         }
     }
 
@@ -318,17 +571,20 @@ export const extractNamedActions = (actions: Array<ActionJson>, namedActions: Ma
     return namedActions;
 }
 
-export const insertNamedActions = (actions: Array<ActionJson>, namedActions: Map<string, ActionObjectJson> = new Map()): Array<ActionObjectJson> => {
-    const strongActions: Array<ActionObjectJson> = [];
+export const insertNamedActions = (actions: Array<ActionJson>, namedActions: Map<string, ActionObjectJson> = new Map(), namedAuthorFilters: Map<string, NamedCriteria<AuthorCriteria>> = new Map(), namedItemFilters: Map<string, NamedCriteria<TypedActivityState>> = new Map()): Array<StructuredActionObjectJson> => {
+
+    const namedFilters = insertNameFilters(namedAuthorFilters, namedItemFilters);
+
+    const strongActions: Array<StructuredActionObjectJson> = [];
     for (const a of actions) {
         if (typeof a === 'string') {
             const foundAction = namedActions.get(a.toLowerCase());
             if (foundAction === undefined) {
                 throw new Error(`No named Action with the name ${a} was found`);
             }
-            strongActions.push(foundAction);
+            strongActions.push({...foundAction, ...namedFilters(foundAction)} as StructuredActionObjectJson);
         } else {
-            strongActions.push(a);
+            strongActions.push({...a, ...namedFilters(a)} as StructuredActionObjectJson);
         }
     }
 

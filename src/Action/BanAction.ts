@@ -116,7 +116,7 @@ export interface BanActionConfig extends ActionConfig, Footer {
     note?: string
 }
 
-export interface BanActionOptions extends BanActionConfig, ActionOptions {
+export interface BanActionOptions extends Omit<BanActionConfig, 'authorIs' | 'itemIs'>, ActionOptions {
 }
 
 /**

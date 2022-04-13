@@ -20,7 +20,9 @@ export const filterCriteriaDefault: FilterCriteriaDefaults = {
     authorIs: {
         exclude: [
             {
-                isMod: true
+                criteria: {
+                    isMod: true
+                }
             }
         ]
     }

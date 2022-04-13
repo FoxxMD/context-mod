@@ -323,6 +323,9 @@
                                     },
                                     {
                                         "$ref": "#/definitions/NamedCriteria<AuthorCriteria>"
+                                    },
+                                    {
+                                        "type": "string"
                                     }
                                 ]
                             },
@@ -363,6 +366,9 @@
                                     },
                                     {
                                         "$ref": "#/definitions/NamedCriteria<TypedActivityState>"
+                                    },
+                                    {
+                                        "type": "string"
                                     }
                                 ]
                             },
@@ -559,6 +565,9 @@
                                     },
                                     {
                                         "$ref": "#/definitions/NamedCriteria<AuthorCriteria>"
+                                    },
+                                    {
+                                        "type": "string"
                                     }
                                 ]
                             },
@@ -573,14 +582,28 @@
                 "exclude": {
                     "description": "Only runs if include is not present. Will \"pass\" if any of set of the AuthorCriteria does not pass",
                     "items": {
-                        "$ref": "#/definitions/AuthorCriteria"
+                        "anyOf": [
+                            {
+                                "$ref": "#/definitions/AuthorCriteria"
+                            },
+                            {
+                                "$ref": "#/definitions/NamedCriteria<AuthorCriteria>"
+                            }
+                        ]
                     },
                     "type": "array"
                 },
                 "include": {
                     "description": "Will \"pass\" if any set of AuthorCriteria passes",
                     "items": {
-                        "$ref": "#/definitions/AuthorCriteria"
+                        "anyOf": [
+                            {
+                                "$ref": "#/definitions/AuthorCriteria"
+                            },
+                            {
+                                "$ref": "#/definitions/NamedCriteria<AuthorCriteria>"
+                            }
+                        ]
                     },
                     "type": "array"
                 },
@@ -597,6 +620,9 @@
                                     },
                                     {
                                         "$ref": "#/definitions/NamedCriteria<TypedActivityState>"
+                                    },
+                                    {
+                                        "type": "string"
                                     }
                                 ]
                             },
@@ -794,6 +820,9 @@
                             },
                             {
                                 "$ref": "#/definitions/NamedCriteria<AuthorCriteria>"
+                            },
+                            {
+                                "type": "string"
                             }
                         ]
                     },
@@ -817,6 +846,9 @@
                             },
                             {
                                 "$ref": "#/definitions/NamedCriteria<AuthorCriteria>"
+                            },
+                            {
+                                "type": "string"
                             }
                         ]
                     },
@@ -839,6 +871,9 @@
                             },
                             {
                                 "$ref": "#/definitions/NamedCriteria<TypedActivityState>"
+                            },
+                            {
+                                "type": "string"
                             }
                         ]
                     },
@@ -865,6 +900,9 @@
                             },
                             {
                                 "$ref": "#/definitions/NamedCriteria<TypedActivityState>"
+                            },
+                            {
+                                "type": "string"
                             }
                         ]
                     },
@@ -938,6 +976,9 @@
                                     },
                                     {
                                         "$ref": "#/definitions/NamedCriteria<AuthorCriteria>"
+                                    },
+                                    {
+                                        "type": "string"
                                     }
                                 ]
                             },
@@ -1026,6 +1067,9 @@
                                     },
                                     {
                                         "$ref": "#/definitions/NamedCriteria<TypedActivityState>"
+                                    },
+                                    {
+                                        "type": "string"
                                     }
                                 ]
                             },
@@ -1248,6 +1292,9 @@
                                     },
                                     {
                                         "$ref": "#/definitions/NamedCriteria<AuthorCriteria>"
+                                    },
+                                    {
+                                        "type": "string"
                                     }
                                 ]
                             },
@@ -1276,6 +1323,9 @@
                                     },
                                     {
                                         "$ref": "#/definitions/NamedCriteria<TypedActivityState>"
+                                    },
+                                    {
+                                        "type": "string"
                                     }
                                 ]
                             },
@@ -1513,6 +1563,9 @@
                                     },
                                     {
                                         "$ref": "#/definitions/NamedCriteria<AuthorCriteria>"
+                                    },
+                                    {
+                                        "type": "string"
                                     }
                                 ]
                             },
@@ -1560,6 +1613,9 @@
                                     },
                                     {
                                         "$ref": "#/definitions/NamedCriteria<TypedActivityState>"
+                                    },
+                                    {
+                                        "type": "string"
                                     }
                                 ]
                             },
@@ -1609,6 +1665,9 @@
                                     },
                                     {
                                         "$ref": "#/definitions/NamedCriteria<AuthorCriteria>"
+                                    },
+                                    {
+                                        "type": "string"
                                     }
                                 ]
                             },
@@ -1690,6 +1749,9 @@
                                     },
                                     {
                                         "$ref": "#/definitions/NamedCriteria<TypedActivityState>"
+                                    },
+                                    {
+                                        "type": "string"
                                     }
                                 ]
                             },
@@ -1928,6 +1990,9 @@
                                     },
                                     {
                                         "$ref": "#/definitions/NamedCriteria<AuthorCriteria>"
+                                    },
+                                    {
+                                        "type": "string"
                                     }
                                 ]
                             },
@@ -1975,6 +2040,9 @@
                                     },
                                     {
                                         "$ref": "#/definitions/NamedCriteria<TypedActivityState>"
+                                    },
+                                    {
+                                        "type": "string"
                                     }
                                 ]
                             },

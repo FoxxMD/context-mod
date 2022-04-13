@@ -853,7 +853,7 @@ export interface ManagerOptions {
      *
      * Default behavior is to exclude all mods and automoderator from checks
      * */
-    filterCriteriaDefaults?: FilterCriteriaDefaults
+    filterCriteriaDefaults?: FilterCriteriaDefaultsJson
 
     /**
      * Set the default post-check behavior for all checks. If this property is specified it will override any defaults passed from the bot's config
@@ -1539,12 +1539,14 @@ export type FilterCriteriaDefaultBehavior = 'replace' | 'merge';
 
 export type MaybeAnonymousCriteria<T> = T | NamedCriteria<T>;
 
+export type MaybeAnonymousOrStringCriteria<T> = MaybeAnonymousCriteria<T> | string;
+
 export interface FilterOptionsJson<T> {
 
     /**
      * Will "pass" if any set of Criteria passes
      * */
-    include?: MaybeAnonymousCriteria<T>[]
+    include?: MaybeAnonymousOrStringCriteria<T>[]
 
     /**
      * * OR => if ANY exclude condition "does not" pass then the exclude test passes
@@ -1560,7 +1562,7 @@ export interface FilterOptionsJson<T> {
      *
      * EX: `isMod: true, name: Automoderator` => Will pass if the Author IS NOT a mod and IS NOT named Automoderator
      * */
-    exclude?: MaybeAnonymousCriteria<T>[];
+    exclude?: MaybeAnonymousOrStringCriteria<T>[];
 
 }
 
@@ -1593,10 +1595,17 @@ export interface ItemOptions extends FilterOptions<TypedActivityState> {
 //  * */
 // export type ItemOptions = FilterOptions<SubmissionState> | FilterOptions<CommentState>
 
-export type MinimalOrFullFilter<T> = MaybeAnonymousCriteria<T>[] | FilterOptionsJson<T>
+export type MinimalOrFullFilter<T> = MaybeAnonymousCriteria<T>[] | FilterOptions<T>
 
-export interface FilterCriteriaDefaults {
+export type MinimalOrFullFilterJson<T> = MaybeAnonymousOrStringCriteria<T>[] | FilterOptionsJson<T>
+
+export interface FilterCriteriaDefaults extends Omit<FilterCriteriaDefaultsJson, 'itemIs' | 'authorIs'> {
     itemIs?: MinimalOrFullFilter<TypedActivityState>
+    authorIs?: MinimalOrFullFilter<AuthorCriteria>
+}
+
+export interface FilterCriteriaDefaultsJson {
+    itemIs?: MinimalOrFullFilterJson<TypedActivityState>
     /**
      * Determine how itemIs defaults behave when itemIs is present on the check
      *
@@ -1610,9 +1619,10 @@ export interface FilterCriteriaDefaults {
      * * merge => merges defaults with check's authorIs
      * * replace => check authorIs will replace defaults (no defaults used)
      * */
-    authorIs?: MinimalOrFullFilter<AuthorCriteria>
+    authorIs?: MinimalOrFullFilterJson<AuthorCriteria>
     authorIsBehavior?: FilterCriteriaDefaultBehavior
 }
+
 
 export interface SubredditOverrides {
     name: string
@@ -2669,9 +2679,21 @@ export interface ObjectPremise {
     authorIs?: AuthorOptions
 }
 
-export interface RunnableBaseOptions extends RunnableBaseJson {
+export interface RunnableBaseOptions extends Omit<RunnableBaseJson, 'itemIs' | 'authorIs'> {
     logger: Logger;
     resources: SubredditResources
+    itemIs?: MinimalOrFullFilter<TypedActivityState>
+    authorIs?: MinimalOrFullFilter<AuthorCriteria>
+}
+
+export interface StructuredRunnableBase {
+    itemIs?: MinimalOrFullFilter<TypedActivityState>
+    authorIs?: MinimalOrFullFilter<AuthorCriteria>
+}
+
+export type  StructuredFilter<T> = Omit<T, 'authorIs' | 'itemIs'> & {
+    itemIs?: MinimalOrFullFilter<TypedActivityState>
+    authorIs?: MinimalOrFullFilter<AuthorCriteria>
 }
 
 export interface RunnableBaseJson {
@@ -2683,12 +2705,12 @@ export interface RunnableBaseJson {
      * * @examples [[{"over_18": true, "removed': false}]]
      *
      * */
-    itemIs?: MinimalOrFullFilter<TypedActivityState>
+    itemIs?: MinimalOrFullFilterJson<TypedActivityState>
 
     /**
      * If present then these Author criteria are checked before running the Check. If criteria fails then the Check will fail.
      * */
-    authorIs?: MinimalOrFullFilter<AuthorCriteria>
+    authorIs?: MinimalOrFullFilterJson<AuthorCriteria>
 }
 
 export interface RedditThing {

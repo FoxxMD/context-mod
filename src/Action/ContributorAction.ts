@@ -73,7 +73,7 @@ export class ContributorAction extends Action {
     }
 }
 
-export interface ContributorOptions extends ContributorActionConfig, ActionOptions {}
+export interface ContributorOptions extends Omit<ContributorActionConfig, 'authorIs' | 'itemIs'>, ActionOptions {}
 
 export interface ContributorActionConfig extends ActionConfig {
     action: ContributorActionType

@@ -98,7 +98,7 @@ export interface FlairActionConfig extends SubmissionActionConfig {
     flair_template_id?: string,
 }
 
-export interface FlairActionOptions extends FlairActionConfig,ActionOptions {
+export interface FlairActionOptions extends Omit<FlairActionConfig, 'authorIs' | 'itemIs'>,ActionOptions {
 
 }
 

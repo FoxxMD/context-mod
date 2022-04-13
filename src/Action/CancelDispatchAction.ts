@@ -136,7 +136,7 @@ export class CancelDispatchAction extends Action {
     }
 }
 
-export interface CancelDispatchOptions extends CancelDispatchActionConfig, ActionOptions {
+export interface CancelDispatchOptions extends Omit<CancelDispatchActionConfig, 'authorIs' | 'itemIs'>, ActionOptions {
 }
 
 export interface CancelDispatchActionConfig extends ActionConfig {

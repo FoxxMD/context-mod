@@ -61,7 +61,7 @@ export class RemoveAction extends Action {
     }
 }
 
-export interface RemoveOptions extends RemoveActionConfig, ActionOptions {
+export interface RemoveOptions extends Omit<RemoveActionConfig, 'authorIs' | 'itemIs'>, ActionOptions {
 }
 
 export interface RemoveActionConfig extends ActionConfig {

@@ -116,7 +116,7 @@ export interface UserFlairActionConfig extends ActionConfig {
   flair_template_id?: string;
 }
 
-export interface UserFlairActionOptions extends UserFlairActionConfig, ActionOptions {
+export interface UserFlairActionOptions extends Omit<UserFlairActionConfig, 'authorIs' | 'itemIs'>, ActionOptions {
 
 }
 
