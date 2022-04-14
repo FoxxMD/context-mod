@@ -1470,7 +1470,24 @@
                     "type": "string"
                 },
                 "approved": {
-                    "type": "boolean"
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "$ref": "#/definitions/ModeratorNameCriteria"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
+                        }
+                    ],
+                    "description": "* true/false => test whether Activity is approved or not\n* string or list of strings => test which moderator approved this Activity"
                 },
                 "deleted": {
                     "type": "boolean"
@@ -1511,7 +1528,24 @@
                     "type": "boolean"
                 },
                 "removed": {
-                    "type": "boolean"
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "$ref": "#/definitions/ModeratorNameCriteria"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
+                        }
+                    ],
+                    "description": "* true/false => test whether Activity is removed or not\n* string or list of strings => test which moderator removed this Activity"
                 },
                 "reports": {
                     "description": "A string containing a comparison operator and a value to compare against\n\nThe syntax is `(< OR > OR <= OR >=) <number>`\n\n* EX `> 2`  => greater than 2 total reports\n\nDefaults to TOTAL reports on an Activity. Suffix the value with the report type to check that type:\n\n* EX `> 3 mod` => greater than 3 mod reports\n* EX `>= 1 user` => greater than 1 user report",
@@ -2433,6 +2467,34 @@
                 "asSubreddit",
                 "content",
                 "kind"
+            ],
+            "type": "object"
+        },
+        "ModeratorNameCriteria": {
+            "properties": {
+                "behavior": {
+                    "enum": [
+                        "exclude",
+                        "include"
+                    ],
+                    "type": "string"
+                },
+                "name": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "string"
+                        }
+                    ]
+                }
+            },
+            "required": [
+                "name"
             ],
             "type": "object"
         },
@@ -3985,7 +4047,24 @@
                     "type": "string"
                 },
                 "approved": {
-                    "type": "boolean"
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "$ref": "#/definitions/ModeratorNameCriteria"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
+                        }
+                    ],
+                    "description": "* true/false => test whether Activity is approved or not\n* string or list of strings => test which moderator approved this Activity"
                 },
                 "deleted": {
                     "type": "boolean"
@@ -4082,7 +4161,24 @@
                     "type": "boolean"
                 },
                 "removed": {
-                    "type": "boolean"
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "$ref": "#/definitions/ModeratorNameCriteria"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
+                        }
+                    ],
+                    "description": "* true/false => test whether Activity is removed or not\n* string or list of strings => test which moderator removed this Activity"
                 },
                 "reports": {
                     "description": "A string containing a comparison operator and a value to compare against\n\nThe syntax is `(< OR > OR <= OR >=) <number>`\n\n* EX `> 2`  => greater than 2 total reports\n\nDefaults to TOTAL reports on an Activity. Suffix the value with the report type to check that type:\n\n* EX `> 3 mod` => greater than 3 mod reports\n* EX `>= 1 user` => greater than 1 user report",

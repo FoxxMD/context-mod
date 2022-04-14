@@ -64,7 +64,7 @@ import {
     ItemCritPropHelper,
     ActivityDispatch,
     FilterCriteriaPropertyResult,
-    ActivitySource,
+    ActivitySource, ModeratorNameCriteria,
 } from "../Common/interfaces";
 import UserNotes from "./UserNotes";
 import Mustache from "mustache";
@@ -1225,7 +1225,7 @@ export class SubredditResources {
                         let reason: string | undefined;
                         let identifiers: string[] | undefined;
                         if(found && typeof itemOptVal !== 'boolean') {
-                            identifiers = Array.isArray(itemOptVal) ? (itemOptVal as string[]) : [itemOptVal];
+                            identifiers = Array.isArray(itemOptVal) ? (itemOptVal as string[]) : [itemOptVal as string];
                             for(const i of identifiers) {
                                 const matchingDelayedIdentifier = matchingDelayedActivities.find(x => x.identifier === i);
                                 if(matchingDelayedIdentifier !== undefined) {
@@ -1293,9 +1293,60 @@ export class SubredditResources {
                         propResultsMap.reports!.passed = comparisonTextOp(reportNum, reportCompare.operator, reportCompare.value);
                         break;
                     case 'removed':
+
                         const removed = activityIsRemoved(item);
-                        propResultsMap.removed!.passed = removed === itemOptVal;
-                        propResultsMap.removed!.found = removed;
+
+                        if(typeof itemOptVal === 'boolean') {
+                            propResultsMap.removed!.passed = removed === itemOptVal;
+                            propResultsMap.removed!.found = removed;
+                        } else if(!removed) {
+                            propResultsMap.removed!.passed = false;
+                            propResultsMap.removed!.found = 'Not Removed';
+                        } else {
+                            if(!item.can_mod_post || (item.banned_by === null || item.banned_by === undefined)) {
+                                propResultsMap.removed!.passed = false;
+                                propResultsMap.removed!.found = 'No moderator access';
+                                propResultsMap.removed!.reason = 'Could not determine who removed Activity b/c Bot is a not a moderator in the Activity\'s subreddit';
+                            } else {
+                                propResultsMap.removed!.found = `Removed by u/${item.banned_by.name}`;
+
+                                // TODO move normalization into normalizeCriteria after merging databaseSupport into edge
+                                let behavior: 'include' | 'exclude' = 'include';
+                                let names: string[] = [];
+                                if(typeof itemOptVal === 'string') {
+                                    names.push(itemOptVal);
+                                } else if(Array.isArray(itemOptVal)) {
+                                    names = itemOptVal as string[];
+                                } else {
+                                    const {
+                                        behavior: rBehavior = 'include',
+                                        name
+                                    } = itemOptVal as ModeratorNameCriteria;
+                                    behavior = rBehavior;
+                                    if(typeof name === 'string') {
+                                        names.push(name);
+                                    } else {
+                                        names = name;
+                                    }
+                                }
+                                names = [...new Set(names.map(x => {
+                                    const clean = x.trim();
+                                    if(x.toLocaleLowerCase() === 'self') {
+                                        return 'fsdf';
+                                    }
+                                    if(x.toLocaleLowerCase() === 'automod') {
+                                        return 'automoderator';
+                                    }
+                                    return clean;
+                                }))]
+                                const removedBy = item.banned_by.name.toLocaleLowerCase();
+                                if(behavior === 'include') {
+                                    propResultsMap.removed!.passed = names.some(x => x.toLocaleLowerCase().includes(removedBy));
+                                } else {
+                                    propResultsMap.removed!.passed = !names.some(x => x.toLocaleLowerCase().includes(removedBy));
+                                }
+                            }
+                        }
                         break;
                     case 'deleted':
                         const deleted = activityIsDeleted(item);
@@ -1352,6 +1403,68 @@ export class SubredditResources {
                         propResultsMap.isRedditMediaDomain!.passed = item.is_reddit_media_domain === itemOptVal;
                         break;
                     case 'approved':
+                        if(!item.can_mod_post) {
+                            const spamWarn = `Cannot test for '${k}' state on Activity in a subreddit bot account is not a moderator for. Skipping criteria...`
+                            log.debug(spamWarn);
+                            propResultsMap[k]!.passed = true;
+                            propResultsMap[k]!.reason = spamWarn;
+                            break;
+                        }
+
+                        if(typeof itemOptVal === 'boolean') {
+                            // @ts-ignore
+                            propResultsMap.approved!.found = item[k];
+                            propResultsMap.approved!.passed = propResultsMap[k]!.found === itemOptVal;
+                            // @ts-ignore
+                        } else if(!item.approved) {
+                            propResultsMap.removed!.passed = false;
+                            propResultsMap.removed!.found = 'Not Approved';
+                        } else {
+                            if(!item.can_mod_post || (item.approved_by === null || item.approved_by === undefined)) {
+                                propResultsMap.approved!.passed = false;
+                                propResultsMap.approved!.found = 'No moderator access';
+                                propResultsMap.approved!.reason = 'Could not determine who approved Activity b/c Bot is a not a moderator in the Activity\'s subreddit';
+                            } else {
+                                propResultsMap.approved!.found = `Approved by u/${item.approved_by.name}`;
+
+                                // TODO move normalization into normalizeCriteria after merging databaseSupport into edge
+                                let behavior: 'include' | 'exclude' = 'include';
+                                let names: string[] = [];
+                                if(typeof itemOptVal === 'string') {
+                                    names.push(itemOptVal);
+                                } else if(Array.isArray(itemOptVal)) {
+                                    names = itemOptVal as string[];
+                                } else {
+                                    const {
+                                        behavior: rBehavior = 'include',
+                                        name
+                                    } = itemOptVal as ModeratorNameCriteria;
+                                    behavior = rBehavior;
+                                    if(typeof name === 'string') {
+                                        names.push(name);
+                                    } else {
+                                        names = name;
+                                    }
+                                }
+                                names = [...new Set(names.map(x => {
+                                    const clean = x.trim();
+                                    if(x.toLocaleLowerCase() === 'self') {
+                                        return 'fsdf';
+                                    }
+                                    if(x.toLocaleLowerCase() === 'automod') {
+                                        return 'automoderator';
+                                    }
+                                    return clean;
+                                }))]
+                                const doneBy = item.approved_by.name.toLocaleLowerCase();
+                                if(behavior === 'include') {
+                                    propResultsMap.approved!.passed = names.some(x => x.toLocaleLowerCase().includes(doneBy));
+                                } else {
+                                    propResultsMap.approved!.passed = !names.some(x => x.toLocaleLowerCase().includes(doneBy));
+                                }
+                            }
+                        }
+                        break;
                     case 'spam':
                         if(!item.can_mod_post) {
                             const spamWarn = `Cannot test for '${k}' state on Activity in a subreddit bot account is not a moderator for. Skipping criteria...`

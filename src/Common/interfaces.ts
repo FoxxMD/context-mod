@@ -914,14 +914,22 @@ export interface ChecksActivityState {
 }
 
 export interface ActivityState {
-    removed?: boolean
+    /**
+     * * true/false => test whether Activity is removed or not
+     * * string or list of strings => test which moderator removed this Activity
+     * */
+    removed?: boolean | ModeratorNames | ModeratorNames[] | ModeratorNameCriteria
     filtered?: boolean
     deleted?: boolean
     locked?: boolean
     spam?: boolean
     stickied?: boolean
     distinguished?: boolean
-    approved?: boolean
+    /**
+     * * true/false => test whether Activity is approved or not
+     * * string or list of strings => test which moderator approved this Activity
+     * */
+    approved?: boolean | ModeratorNames | ModeratorNames[] | ModeratorNameCriteria
     score?: CompareValue
     /**
      * A string containing a comparison operator and a value to compare against
@@ -968,6 +976,13 @@ export interface ActivityState {
      *
      * */
     source?: string | string[]
+}
+
+export type ModeratorNames = 'self' | 'automod' | 'automoderator' | string;
+
+export interface ModeratorNameCriteria {
+    behavior?: 'include' | 'exclude'
+    name: ModeratorNames | ModeratorNames[]
 }
 
 /**
