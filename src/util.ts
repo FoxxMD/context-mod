@@ -491,13 +491,15 @@ export const filterCriteriaPropertySummary = <T>(val: FilterCriteriaPropertyResu
             passResult = triggeredIndicator(val.passed, 'Skipped');
             break;
     }
-    let found;
+    let found = '';
     if(val.passed === null || val.passed === undefined) {
         found = '';
     } else if(val.property === 'submissionState') {
-        const foundResult = val.found as FilterResult<SubmissionState>;
-        const criteriaResults = foundResult.criteriaResults.map((x, index) => `Criteria #${index + 1} => ${triggeredIndicator(x.passed)}\n   ${x.propertyResults.map(y => filterCriteriaPropertySummary(y, x.criteria.criteria)).join('\n    ')}`).join('\n  ');
-        found = `\n  ${criteriaResults}`;
+        const foundResult = val.found as FilterResult<SubmissionState> | undefined;
+        if(foundResult !== undefined) {
+            const criteriaResults = foundResult.criteriaResults.map((x, index) => `Criteria #${index + 1} => ${triggeredIndicator(x.passed)}\n   ${x.propertyResults.map(y => filterCriteriaPropertySummary(y, x.criteria.criteria)).join('\n    ')}`).join('\n  ');
+            found = `\n  ${criteriaResults}`;
+        }
     } else {
         found = ` => Found: ${val.found}`;
     }
