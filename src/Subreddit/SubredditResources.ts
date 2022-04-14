@@ -82,7 +82,7 @@ import {
     ItemCritPropHelper,
     ActivityDispatch,
     FilterCriteriaPropertyResult,
-    ActivitySource, HistoricalStatsDisplay, UserNoteCriteria, AuthorCriteria, AuthorOptions, ItemOptions, JoinOperands, NamedCriteria,
+    ActivitySource, HistoricalStatsDisplay, UserNoteCriteria, AuthorCriteria, AuthorOptions, ItemOptions, JoinOperands, NamedCriteria, ModeratorNameCriteria
 } from "../Common/interfaces";
 import UserNotes from "./UserNotes";
 import Mustache from "mustache";
@@ -159,6 +159,7 @@ interface SubredditResourceOptions extends Footer {
     actionedEventsMax: number;
     thirdPartyCredentials: ThirdPartyCredentialsJsonConfig
     delayedItems?: ActivityDispatch[]
+    botAccount?: string
     botName: string
     managerEntity: ManagerEntity
     botEntity: Bot
@@ -194,6 +195,7 @@ export class SubredditResources {
     actionedEventsMax: number;
     thirdPartyCredentials: ThirdPartyCredentialsJsonConfig;
     delayedItems: ActivityDispatch[] = [];
+    botAccount?: string;
     dispatchedActivityRepo: Repository<DispatchedEntity>
     activitySourceRepo: Repository<ActivitySourceEntity>
     totalStatsRepo: Repository<TotalStat>
@@ -231,6 +233,7 @@ export class SubredditResources {
             client,
             thirdPartyCredentials,
             delayedItems = [],
+            botAccount,
             managerEntity,
             botEntity,
         } = options || {};
@@ -260,6 +263,7 @@ export class SubredditResources {
         this.subreddit = subreddit;
         this.thirdPartyCredentials = thirdPartyCredentials;
         this.name = name;
+        this.botAccount = botAccount;
         if (logger === undefined) {
             const alogger = winston.loggers.get('app')
             this.logger = alogger.child({labels: [this.name, 'Resource Cache']}, mergeArr);
@@ -1434,7 +1438,7 @@ export class SubredditResources {
                         let reason: string | undefined;
                         let identifiers: string[] | undefined;
                         if(found && typeof itemOptVal !== 'boolean') {
-                            identifiers = Array.isArray(itemOptVal) ? (itemOptVal as string[]) : [itemOptVal];
+                            identifiers = Array.isArray(itemOptVal) ? (itemOptVal as string[]) : [itemOptVal as string];
                             for(const i of identifiers) {
                                 const matchingDelayedIdentifier = matchingDelayedActivities.find(x => x.identifier === i);
                                 if(matchingDelayedIdentifier !== undefined) {
@@ -1502,9 +1506,60 @@ export class SubredditResources {
                         propResultsMap.reports!.passed = criteriaPassWithIncludeBehavior(comparisonTextOp(reportNum, reportCompare.operator, reportCompare.value), include);
                         break;
                     case 'removed':
+
                         const removed = activityIsRemoved(item);
-                        propResultsMap.removed!.passed = criteriaPassWithIncludeBehavior(removed === itemOptVal, include);
-                        propResultsMap.removed!.found = removed;
+
+                        if(typeof itemOptVal === 'boolean') {
+                            propResultsMap.removed!.passed = criteriaPassWithIncludeBehavior(removed === itemOptVal, include);
+                            propResultsMap.removed!.found = removed;
+                        } else if(!removed) {
+                            propResultsMap.removed!.passed = false;
+                            propResultsMap.removed!.found = 'Not Removed';
+                        } else {
+                            if(!item.can_mod_post || (item.banned_by === null || item.banned_by === undefined)) {
+                                propResultsMap.removed!.passed = false;
+                                propResultsMap.removed!.found = 'No moderator access';
+                                propResultsMap.removed!.reason = 'Could not determine who removed Activity b/c Bot is a not a moderator in the Activity\'s subreddit';
+                            } else {
+                                propResultsMap.removed!.found = `Removed by u/${item.banned_by.name}`;
+
+                                // TODO move normalization into normalizeCriteria after merging databaseSupport into edge
+                                let behavior: 'include' | 'exclude' = 'include';
+                                let names: string[] = [];
+                                if(typeof itemOptVal === 'string') {
+                                    names.push(itemOptVal);
+                                } else if(Array.isArray(itemOptVal)) {
+                                    names = itemOptVal as string[];
+                                } else {
+                                    const {
+                                        behavior: rBehavior = 'include',
+                                        name
+                                    } = itemOptVal as ModeratorNameCriteria;
+                                    behavior = rBehavior;
+                                    if(typeof name === 'string') {
+                                        names.push(name);
+                                    } else {
+                                        names = name;
+                                    }
+                                }
+                                names = [...new Set(names.map(x => {
+                                    const clean = x.trim();
+                                    if(x.toLocaleLowerCase() === 'self' && this.botAccount !== undefined) {
+                                        return this.botAccount.toLocaleLowerCase();
+                                    }
+                                    if(x.toLocaleLowerCase() === 'automod') {
+                                        return 'automoderator';
+                                    }
+                                    return clean;
+                                }))]
+                                const removedBy = item.banned_by.name.toLocaleLowerCase();
+                                if(behavior === 'include') {
+                                    propResultsMap.removed!.passed = names.some(x => x.toLocaleLowerCase().includes(removedBy));
+                                } else {
+                                    propResultsMap.removed!.passed = !names.some(x => x.toLocaleLowerCase().includes(removedBy));
+                                }
+                            }
+                        }
                         break;
                     case 'deleted':
                         const deleted = activityIsDeleted(item);
@@ -1561,6 +1616,68 @@ export class SubredditResources {
                         propResultsMap.isRedditMediaDomain!.passed = criteriaPassWithIncludeBehavior(item.is_reddit_media_domain === itemOptVal, include);
                         break;
                     case 'approved':
+                        if(!item.can_mod_post) {
+                            const spamWarn = `Cannot test for '${k}' state on Activity in a subreddit bot account is not a moderator for. Skipping criteria...`
+                            log.debug(spamWarn);
+                            propResultsMap[k]!.passed = true;
+                            propResultsMap[k]!.reason = spamWarn;
+                            break;
+                        }
+
+                        if(typeof itemOptVal === 'boolean') {
+                            // @ts-ignore
+                            propResultsMap.approved!.found = item[k];
+                            propResultsMap.approved!.passed = propResultsMap[k]!.found === itemOptVal;
+                            // @ts-ignore
+                        } else if(!item.approved) {
+                            propResultsMap.removed!.passed = false;
+                            propResultsMap.removed!.found = 'Not Approved';
+                        } else {
+                            if(!item.can_mod_post || (item.approved_by === null || item.approved_by === undefined)) {
+                                propResultsMap.approved!.passed = false;
+                                propResultsMap.approved!.found = 'No moderator access';
+                                propResultsMap.approved!.reason = 'Could not determine who approved Activity b/c Bot is a not a moderator in the Activity\'s subreddit';
+                            } else {
+                                propResultsMap.approved!.found = `Approved by u/${item.approved_by.name}`;
+
+                                // TODO move normalization into normalizeCriteria after merging databaseSupport into edge
+                                let behavior: 'include' | 'exclude' = 'include';
+                                let names: string[] = [];
+                                if(typeof itemOptVal === 'string') {
+                                    names.push(itemOptVal);
+                                } else if(Array.isArray(itemOptVal)) {
+                                    names = itemOptVal as string[];
+                                } else {
+                                    const {
+                                        behavior: rBehavior = 'include',
+                                        name
+                                    } = itemOptVal as ModeratorNameCriteria;
+                                    behavior = rBehavior;
+                                    if(typeof name === 'string') {
+                                        names.push(name);
+                                    } else {
+                                        names = name;
+                                    }
+                                }
+                                names = [...new Set(names.map(x => {
+                                    const clean = x.trim();
+                                    if(x.toLocaleLowerCase() === 'self' && this.botAccount !== undefined) {
+                                        return this.botAccount.toLocaleLowerCase();
+                                    }
+                                    if(x.toLocaleLowerCase() === 'automod') {
+                                        return 'automoderator';
+                                    }
+                                    return clean;
+                                }))]
+                                const doneBy = item.approved_by.name.toLocaleLowerCase();
+                                if(behavior === 'include') {
+                                    propResultsMap.approved!.passed = names.some(x => x.toLocaleLowerCase().includes(doneBy));
+                                } else {
+                                    propResultsMap.approved!.passed = !names.some(x => x.toLocaleLowerCase().includes(doneBy));
+                                }
+                            }
+                        }
+                        break;
                     case 'spam':
                         if(!item.can_mod_post) {
                             const spamWarn = `Cannot test for '${k}' state on Activity in a subreddit bot account is not a moderator for. Skipping criteria...`
@@ -2189,6 +2306,7 @@ export class BotResourcesManager {
     pruneInterval: any;
     defaultThirdPartyCredentials: ThirdPartyCredentialsJsonConfig;
     logger: Logger;
+    botAccount?: string;
     defaultDatabase: DataSource
     botName!: string
 
@@ -2326,13 +2444,14 @@ export class BotResourcesManager {
         let resource: SubredditResources;
         const res = this.get(subName);
         if(res === undefined || res.cacheSettingsHash !== hash) {
-            resource = new SubredditResources(subName, {...opts, delayedItems: res?.delayedItems});
+            resource = new SubredditResources(subName, {...opts, delayedItems: res?.delayedItems, botAccount: this.botAccount});
             await resource.initHistoricalStats();
             resource.setHistoricalSaveInterval();
             this.resources.set(subName, resource);
         } else {
             // just set non-cache related settings
             resource = res;
+            resource.botAccount = this.botAccount;
             if(opts.footer !== resource.footer) {
                 resource.footer = opts.footer || DEFAULT_FOOTER;
             }
@@ -2474,7 +2593,7 @@ export const checkItemFilter = async (item: (Submission | Comment), filter: Item
             // and if its comment state WITH submission state then break apart testing into individual activity testing
             if(isCommentState(state) && asComment(item) && state.submissionState !== undefined) {
                 const {submissionState, ...restCommentState} = state;
-                
+
                 const [subPass, subPropertyResult] = await checkCommentSubmissionStates(item, submissionState, resources, parentLogger, source);
 
                 if(!subPass) {
@@ -2607,13 +2726,13 @@ export const checkCommentSubmissionStates = async (item: Comment, submissionStat
     const subProxy = await resources.client.getSubmission(await item.link_id);
     // @ts-ignore
     const sub = await resources.getActivity(subProxy);
-    
+
     const subStatesFilter: ItemOptions = {
         include: excludeCondition === undefined ? submissionStates.map(x => ({criteria: x})) : undefined,
         excludeCondition,
         exclude: excludeCondition === undefined ? undefined : submissionStates.map(x => ({criteria: x}))
     }
-    
+
     const [subPass, _, subFilterResults] = await checkItemFilter(sub, subStatesFilter, resources, logger);
     const subPropertyResult: FilterCriteriaPropertyResult<CommentState> = {
         property: 'submissionState',
@@ -2626,6 +2745,6 @@ export const checkCommentSubmissionStates = async (item: Comment, submissionStat
             passed: subPass,
         }
     };
-    
+
     return [subPass, subPropertyResult];
 }
