@@ -107,6 +107,7 @@ interface SubredditResourceOptions extends Footer {
     actionedEventsMax: number;
     thirdPartyCredentials: ThirdPartyCredentialsJsonConfig
     delayedItems?: ActivityDispatch[]
+    botAccount?: string
 }
 
 export interface SubredditResourceSetOptions extends CacheConfig, Footer {
@@ -137,6 +138,7 @@ export class SubredditResources {
     actionedEventsMax: number;
     thirdPartyCredentials: ThirdPartyCredentialsJsonConfig;
     delayedItems: ActivityDispatch[] = [];
+    botAccount?: string;
 
     stats: {
         cache: ResourceStats
@@ -165,6 +167,7 @@ export class SubredditResources {
             client,
             thirdPartyCredentials,
             delayedItems = [],
+            botAccount,
         } = options || {};
 
         this.delayedItems = delayedItems;
@@ -184,6 +187,7 @@ export class SubredditResources {
         this.subreddit = subreddit;
         this.thirdPartyCredentials = thirdPartyCredentials;
         this.name = name;
+        this.botAccount = botAccount;
         if (logger === undefined) {
             const alogger = winston.loggers.get('app')
             this.logger = alogger.child({labels: [this.name, 'Resource Cache']}, mergeArr);
@@ -1331,8 +1335,8 @@ export class SubredditResources {
                                 }
                                 names = [...new Set(names.map(x => {
                                     const clean = x.trim();
-                                    if(x.toLocaleLowerCase() === 'self') {
-                                        return 'fsdf';
+                                    if(x.toLocaleLowerCase() === 'self' && this.botAccount !== undefined) {
+                                        return this.botAccount.toLocaleLowerCase();
                                     }
                                     if(x.toLocaleLowerCase() === 'automod') {
                                         return 'automoderator';
@@ -1448,8 +1452,8 @@ export class SubredditResources {
                                 }
                                 names = [...new Set(names.map(x => {
                                     const clean = x.trim();
-                                    if(x.toLocaleLowerCase() === 'self') {
-                                        return 'fsdf';
+                                    if(x.toLocaleLowerCase() === 'self' && this.botAccount !== undefined) {
+                                        return this.botAccount.toLocaleLowerCase();
                                     }
                                     if(x.toLocaleLowerCase() === 'automod') {
                                         return 'automoderator';
@@ -2053,6 +2057,7 @@ export class BotResourcesManager {
     pruneInterval: any;
     defaultThirdPartyCredentials: ThirdPartyCredentialsJsonConfig;
     logger: Logger;
+    botAccount?: string;
 
     constructor(config: BotInstanceConfig, logger: Logger) {
         const {
@@ -2164,13 +2169,14 @@ export class BotResourcesManager {
         let resource: SubredditResources;
         const res = this.get(subName);
         if(res === undefined || res.cacheSettingsHash !== hash) {
-            resource = new SubredditResources(subName, {...opts, delayedItems: res?.delayedItems});
+            resource = new SubredditResources(subName, {...opts, delayedItems: res?.delayedItems, botAccount: this.botAccount});
             await resource.initHistoricalStats();
             resource.setHistoricalSaveInterval();
             this.resources.set(subName, resource);
         } else {
             // just set non-cache related settings
             resource = res;
+            resource.botAccount = this.botAccount;
             if(opts.footer !== resource.footer) {
                 resource.footer = opts.footer || DEFAULT_FOOTER;
             }

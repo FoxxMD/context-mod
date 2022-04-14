@@ -1,4 +1,4 @@
-import Snoowrap, {Comment, ConfigOptions, Submission, Subreddit} from "snoowrap";
+import Snoowrap, {Comment, ConfigOptions, RedditUser, Submission, Subreddit} from "snoowrap";
 import {Logger} from "winston";
 import dayjs, {Dayjs} from "dayjs";
 import {Duration} from "dayjs/plugin/duration";
@@ -322,6 +322,10 @@ class Bot {
         this.botAccount = `u/${user.name}`;
         this.logger.info(`Reddit API Limit Remaining: ${this.client.ratelimitRemaining}`);
         this.logger.info(`Authenticated Account: u/${user.name}`);
+
+        if(this.cacheManager !== undefined) {
+            this.cacheManager.botAccount = user.name;
+        }
 
         const botNameFromConfig = this.botName !== undefined;
         if(this.botName === undefined) {
