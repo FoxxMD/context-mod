@@ -1195,7 +1195,7 @@ export class SubredditResources {
                     case 'submissionState':
                         if(isSubmission(item)) {
                             const subMsg = `'submissionState' is not allowed in 'itemIs' criteria when the main Activity is a Submission`;
-                            log.debug(subMsg);
+                            log.warn(subMsg);
                             propResultsMap.submissionState!.passed = true;
                             propResultsMap.submissionState!.reason = subMsg;
                             break;
