@@ -341,7 +341,7 @@ export class RecentActivityRule extends Rule {
                 return true;
             });
 
-            validActivity = await this.resources.batchTestSubredditCriteria(validActivity, subStates);
+            validActivity = await this.resources.batchTestSubredditCriteria(validActivity, subStates, item.author);
             for (const activity of validActivity) {
                 currCount++;
                 // @ts-ignore

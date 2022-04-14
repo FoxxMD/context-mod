@@ -19,7 +19,7 @@ import {
     PASS,
     percentFromString, toStrongSubredditState
 } from "../util";
-import {Comment} from "snoowrap";
+import {Comment, RedditUser} from "snoowrap";
 
 export interface CommentThresholdCriteria extends ThresholdCriteria {
     /**
@@ -92,7 +92,7 @@ export class HistoryRule extends Rule {
     condition: 'AND' | 'OR';
     include: (string | SubredditState)[];
     exclude: (string | SubredditState)[];
-    activityFilterFunc: (x: Submission|Comment) => Promise<boolean> = async (x) => true;
+    activityFilterFunc: (x: Submission|Comment, author: RedditUser) => Promise<boolean> = async (x) => true;
 
     constructor(options: HistoryOptions) {
         super(options);
@@ -119,9 +119,9 @@ export class HistoryRule extends Rule {
                 }
                 return toStrongSubredditState(x, {defaultFlags: 'i', generateDescription: true});
             });
-            this.activityFilterFunc = async (x: Submission|Comment) => {
+            this.activityFilterFunc = async (x: Submission|Comment, author: RedditUser) => {
                 for(const ss of subStates) {
-                    if(await this.resources.testSubredditCriteria(x, ss)) {
+                    if(await this.resources.testSubredditCriteria(x, ss, author)) {
                         return true;
                     }
                 }
@@ -134,9 +134,9 @@ export class HistoryRule extends Rule {
                 }
                 return toStrongSubredditState(x, {defaultFlags: 'i', generateDescription: true});
             });
-            this.activityFilterFunc = async (x: Submission|Comment) => {
+            this.activityFilterFunc = async (x: Submission|Comment, author: RedditUser) => {
                 for(const ss of subStates) {
-                    if(await this.resources.testSubredditCriteria(x, ss)) {
+                    if(await this.resources.testSubredditCriteria(x, ss, author)) {
                         return false;
                     }
                 }
@@ -168,7 +168,7 @@ export class HistoryRule extends Rule {
             let activities = await this.resources.getAuthorActivities(item.author, {window: window});
             const filteredActivities = [];
             for(const a of activities) {
-                if(await this.activityFilterFunc(a)) {
+                if(await this.activityFilterFunc(a, item.author)) {
                     filteredActivities.push(a);
                 }
             }

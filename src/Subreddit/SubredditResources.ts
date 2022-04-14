@@ -1087,7 +1087,7 @@ export class SubredditResources {
         }
     }
 
-    async batchTestSubredditCriteria(items: (Comment | Submission)[], states: (SubredditState | StrongSubredditState)[]): Promise<(Comment | Submission)[]> {
+    async batchTestSubredditCriteria(items: (Comment | Submission)[], states: (SubredditState | StrongSubredditState)[], author: RedditUser): Promise<(Comment | Submission)[]> {
         let passedItems: (Comment | Submission)[] = [];
         let unpassedItems: (Comment | Submission)[] = [];
 
@@ -1104,7 +1104,7 @@ export class SubredditResources {
             for(const item of items) {
                 const subName = getActivitySubredditName(item);
                 for(const state of nameOnly) {
-                    if(await this.isSubreddit({display_name: subName} as Subreddit, state, this.logger)) {
+                    if(await this.isSubreddit({display_name: subName} as Subreddit, state, author, this.logger)) {
                         passedItems.push(item);
                         break;
                     }
@@ -1117,7 +1117,7 @@ export class SubredditResources {
             await this.cacheSubreddits(unpassedItems.map(x => x.subreddit));
             for(const item of unpassedItems) {
                 for(const state of full) {
-                    if(await this.isSubreddit(await this.getSubreddit(item), state, this.logger)) {
+                    if(await this.isSubreddit(await this.getSubreddit(item), state, author, this.logger)) {
                         passedItems.push(item);
                         break;
                     }
@@ -1128,7 +1128,7 @@ export class SubredditResources {
         return passedItems;
     }
 
-    async testSubredditCriteria(item: (Comment | Submission), state: SubredditState | StrongSubredditState) {
+    async testSubredditCriteria(item: (Comment | Submission), state: SubredditState | StrongSubredditState, author: RedditUser) {
         if(Object.keys(state).length === 0) {
             return true;
         }
@@ -1139,7 +1139,7 @@ export class SubredditResources {
         }).length;
         if(critCount === 0) {
             const subName = getActivitySubredditName(item);
-            return await this.isSubreddit({display_name: subName} as Subreddit, state, this.logger);
+            return await this.isSubreddit({display_name: subName} as Subreddit, state, author, this.logger);
         }
 
         // see comments on shouldCacheSubredditStateCriteriaResult() for why this is needed
@@ -1154,7 +1154,7 @@ export class SubredditResources {
                     this.logger.debug(`Cache Hit: Subreddit Check on ${getActivitySubredditName(item)} (Hash ${hash})`);
                     return cachedItem as boolean;
                 }
-                const itemResult = await this.isSubreddit(await this.getSubreddit(item), state, this.logger);
+                const itemResult = await this.isSubreddit(await this.getSubreddit(item), state, author, this.logger);
                 this.stats.cache.subredditCrit.miss++;
                 await this.cache.set(hash, itemResult, {ttl: this.filterCriteriaTTL});
                 return itemResult;
@@ -1166,7 +1166,7 @@ export class SubredditResources {
             }
         }
 
-        return await this.isSubreddit(await this.getSubreddit(item), state, this.logger);
+        return await this.isSubreddit(await this.getSubreddit(item), state, author, this.logger);
     }
 
     async testAuthorCriteria(item: (Comment | Submission), authorOptsObj: NamedCriteria<AuthorCriteria>, include = true): Promise<FilterCriteriaResult<AuthorCriteria>> {
@@ -1284,8 +1284,18 @@ export class SubredditResources {
         return res;
     }
 
-    async isSubreddit (subreddit: Subreddit, stateCriteriaRaw: SubredditState | StrongSubredditState, logger: Logger) {
+    async isSubreddit (subreddit: Subreddit, stateCriteriaRaw: SubredditState | StrongSubredditState, author: RedditUser, logger: Logger) {
         const {stateDescription, ...stateCriteria} = stateCriteriaRaw;
+
+        let fetchedUser: RedditUser | undefined;
+        // @ts-ignore
+        const user = async (): Promise<RedditUser> => {
+            if(fetchedUser === undefined) {
+                fetchedUser = await this.getAuthor(author);
+            }
+            // @ts-ignore
+            return fetchedUser;
+        }
 
         if (Object.keys(stateCriteria).length === 0) {
             return true;
@@ -1323,6 +1333,17 @@ export class SubredditResources {
                             if (crit[k] !== subreddit.over18) {
                                 // @ts-ignore
                                 log.debug(`Failed: Expected => ${k}:${crit[k]} | Found => ${k}:${subreddit.over18}`)
+                                return false
+                            }
+                            break;
+                        case 'isOwnProfile':
+                            // @ts-ignore
+                            const ownSub = (await user()).subreddit?.display_name.display_name;
+                            const isOwn = subreddit.display_name === ownSub
+                            // @ts-ignore
+                            if (crit[k] !== isOwn) {
+                                // @ts-ignore
+                                log.debug(`Failed: Expected => ${k}:${crit[k]} | Found => ${k}:${isOwn}`)
                                 return false
                             }
                             break;

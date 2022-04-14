@@ -1,5 +1,5 @@
 import {Rule, RuleJSONConfig, RuleOptions} from "./index";
-import {Comment} from "snoowrap";
+import {Comment, RedditUser} from "snoowrap";
 import {
     activityWindowText,
     asSubmission,
@@ -49,7 +49,7 @@ export class RepeatActivityRule extends Rule {
     include: (string | SubredditState)[];
     exclude: (string | SubredditState)[];
     hasFullSubredditCrits: boolean = false;
-    activityFilterFunc: (x: Submission|Comment) => Promise<boolean> = async (x) => true;
+    activityFilterFunc: (x: Submission|Comment, author: RedditUser) => Promise<boolean> = async (x) => true;
     keepRemoved: boolean;
     minWordCount: number;
     transformations: SearchAndReplaceRegExp[]
@@ -92,9 +92,9 @@ export class RepeatActivityRule extends Rule {
                 return toStrongSubredditState(x, {defaultFlags: 'i', generateDescription: true});
             });
             this.hasFullSubredditCrits = !subStates.every(x => subredditStateIsNameOnly(x));
-            this.activityFilterFunc = async (x: Submission|Comment) => {
+            this.activityFilterFunc = async (x: Submission|Comment, author: RedditUser) => {
                 for(const ss of subStates) {
-                    if(await this.resources.testSubredditCriteria(x, ss)) {
+                    if(await this.resources.testSubredditCriteria(x, ss, author)) {
                         return true;
                     }
                 }
@@ -108,9 +108,9 @@ export class RepeatActivityRule extends Rule {
                 return toStrongSubredditState(x, {defaultFlags: 'i', generateDescription: true});
             });
             this.hasFullSubredditCrits = !subStates.every(x => subredditStateIsNameOnly(x));
-            this.activityFilterFunc = async (x: Submission|Comment) => {
+            this.activityFilterFunc = async (x: Submission|Comment, author: RedditUser) => {
                 for(const ss of subStates) {
-                    if(await this.resources.testSubredditCriteria(x, ss)) {
+                    if(await this.resources.testSubredditCriteria(x, ss, author)) {
                         return false;
                     }
                 }
@@ -196,7 +196,7 @@ export class RepeatActivityRule extends Rule {
 
             const isUrl = isExternalUrlSubmission(activity);
             //let fu = new Fuse([identifier], !isUrl ? fuzzyOptions : {...fuzzyOptions, distance: 5});
-            const validSub = await this.activityFilterFunc(activity);
+            const validSub = await this.activityFilterFunc(activity, item.author);
             let minMet = identifier.length >= this.minWordCount;
 
             let updatedAllSets = [...allSets];
