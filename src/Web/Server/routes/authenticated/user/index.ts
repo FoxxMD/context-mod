@@ -10,6 +10,7 @@ import {CMEvent, CMEvent as ActionedEventEntity} from "../../../../../Common/Ent
 import {nanoid} from "nanoid";
 import dayjs from "dayjs";
 import {
+    emptyEventResults,
     EventConditions,
     getDistinctEventIdsWhereQuery,
     getFullEventsById,
@@ -17,6 +18,7 @@ import {
 } from "../../../../Common/util";
 import {filterResultsBuilder} from "../../../../../Utils/typeormUtils";
 import {Brackets} from "typeorm";
+import {Activity} from "../../../../../Common/Entities/Activity";
 
 const commentReg = parseLinkIdentifier([COMMENT_URL_ID]);
 const submissionReg = parseLinkIdentifier([SUBMISSION_URL_ID]);
@@ -73,7 +75,8 @@ const actionedEvents = async (req: Request, res: Response) => {
 
     const {
         permalink,
-        includeRelated = false
+        related,
+        author
     } = req.query as any;
 
     let managers: Manager[] = [];
@@ -88,82 +91,28 @@ const actionedEvents = async (req: Request, res: Response) => {
         }
     }
 
-    // let query = req.serverBot.database.getRepository(CMEvent)
-    //     .createQueryBuilder("event")
-    //     .leftJoinAndSelect('event.source', 'source')
-    //     .leftJoinAndSelect('event.activity', 'activity')
-    //     .leftJoinAndSelect('activity.subreddit', 'subreddit')
-    //     .leftJoinAndSelect('activity.author', 'author')
-    //     .leftJoinAndSelect('event.runResults', 'runResults');
-    //
-    // query = filterResultsBuilder<CMEvent>(query, 'runResults', 'rr');
-    //
-    // query.leftJoinAndSelect('runResults.run', 'run')
-    //     .leftJoinAndSelect('runResults.checkResults', 'checkResults');
-    //
-    // query = filterResultsBuilder<CMEvent>(query, 'checkResults', 'c');
-    //
-    // query.leftJoinAndSelect('checkResults.ruleResults', 'rrIterim')
-    //     .leftJoinAndSelect('rrIterim.result', 'ruleResult')
-    //     .leftJoinAndSelect('ruleResult.premise', 'rPremise')
-    //     .leftJoinAndSelect('rPremise.kind', 'ruleKind')
-    //     .leftJoinAndSelect('checkResults.ruleSetResults', 'ruleSetResultsIterim')
-    //     .leftJoinAndSelect('ruleSetResultsIterim.result', 'ruleSetResult')
-    //     .leftJoinAndSelect('ruleSetResult._ruleResults', 'rsRuleResultsIterim')
-    //     .leftJoinAndSelect('rsRuleResultsIterim.result', 'rsRuleResult')
-    //     .leftJoinAndSelect('rsRuleResult.premise', 'rsPremise')
-    //     .leftJoinAndSelect('rsPremise.kind', 'rsRuleKind')
-    //     .leftJoinAndSelect('checkResults.check', 'check');
-    //
-    // query = filterResultsBuilder<CMEvent>(query, 'ruleResult', 'r');
-    // query = filterResultsBuilder<CMEvent>(query, 'rsRuleResult', 'rsr');
-    //
-    // query.leftJoinAndSelect('checkResults.actionResults', 'actionResults')
-    //     .leftJoinAndSelect('actionResults.premise', 'aPremise')
-    //     .leftJoinAndSelect('aPremise.kind', 'actionKind');
-    //
-    // query = filterResultsBuilder<CMEvent>(query, 'actionResults', 'a');
-    //
-    // query.andWhere('event.manager.id IN (:...managerIds)', {managerIds: managers.map(x => x.managerEntity.id)})
-    //     .orderBy('event._processedAt', 'DESC');
-    //
-    // if (permalink !== undefined) {
-    //     const things = parseRedditThingsFromLink(permalink);
-    //     if (things.comment !== undefined) {
-    //         if (includeRelated && things.submission !== undefined) {
-    //             query.andWhere(new Brackets((qb) => {
-    //                 qb.where('activity._id = :actId', {actId: (things.comment as RedditThing).val})
-    //                     .orWhere('activity._id = :subId', {subId: (things.submission as RedditThing).val})
-    //             }));
-    //         } else {
-    //             query.andWhere('activity._id = :actId', {actId: things.comment.val});
-    //         }
-    //     } else if (things.submission !== undefined) {
-    //         if (includeRelated) {
-    //             query.leftJoinAndSelect('activity.submission', 'activitySubmission')
-    //                 .leftJoinAndSelect('activitySubmission.author', 'actSubAuthor');
-    //
-    //             query.andWhere(new Brackets((qb) => {
-    //                 qb.where('activity._id = :actId', {actId: (things.submission as RedditThing).val})
-    //                     .orWhere('activitySubmission._id = :subId', {subId: (things.submission as RedditThing).val})
-    //             }));
-    //         } else {
-    //             query.andWhere('activity._id = :actId', {actId: (things.submission as RedditThing).val});
-    //         }
-    //     }
-    // }
-
-
     const opts: EventConditions = {
         managerIds: managers.map(x => x.managerEntity.id),
-        //eventType: things.comment !== undefined ? 'comment' : 'submission',
-        //activity: things.comment !== undefined ? things.comment.val : things.submission?.val,
-        includeRelated
+        related,
+        author
     };
     if(permalink !== undefined) {
         const things = parseRedditThingsFromLink(permalink);
-        opts.eventType = things.comment !== undefined ? 'comment' : 'submission';
-        opts.activity = things.comment !== undefined ? things.comment.val : things.submission?.val;
+        const actRepo = req.serverBot.database.getRepository(Activity);
+
+        if(things.comment === undefined && things.submission === undefined) {
+            throw new Error('Could not parse comment or submission id from link');
+        }
+
+        const idToUse = things.comment !== undefined ? things.comment.val : things.submission?.val;
+
+        const activity = await actRepo.findOne({where: {'_id': idToUse}, relations: {submission: true, author: true}});
+
+        if(activity === null) {
+            return res.json(emptyEventResults());
+        }
+
+        opts.activity = activity;
     }
 
     const paginatedIdResults = await paginateRequest(getDistinctEventIdsWhereQuery(req.serverBot.database, opts), req);
@@ -175,7 +124,7 @@ const actionedEvents = async (req: Request, res: Response) => {
     //const results = await paginateRequest(query, req);
     return res.json({...paginatedIdResults, data: hydratedResults});
 };
-export const actionedEventsRoute = [authUserCheck(), botRoute(), subredditRoute(false), booleanMiddle(['includeRelated']), actionedEvents];
+export const actionedEventsRoute = [authUserCheck(), botRoute(), subredditRoute(false), actionedEvents];
 
 const action = async (req: Request, res: Response) => {
     const bot = req.serverBot;

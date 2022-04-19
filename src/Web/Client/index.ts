@@ -1062,7 +1062,7 @@ const webClient = async (options: OperatorConfig) => {
     });
 
     app.getAsync('/events', [ensureAuthenticatedApi, defaultSession, instanceWithPermissions, botWithPermissions(true), createUserToken], async (req: express.Request, res: express.Response) => {
-        const {subreddit, page = 1, permalink, includeRelated} = req.query as any;
+        const {subreddit, page = 1, permalink, related, author} = req.query as any;
         const resp = await got.get(`${(req.instance as CMInstanceInterface).normalUrl}/events`, {
             headers: {
                 'Authorization': `Bearer ${req.token}`,
@@ -1072,7 +1072,8 @@ const webClient = async (options: OperatorConfig) => {
                 bot: req.bot?.botName,
                 page,
                 permalink,
-                includeRelated
+                related,
+                author
             }
         }).json() as PaginationAwareObject;
 

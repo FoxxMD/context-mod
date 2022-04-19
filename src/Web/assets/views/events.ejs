@@ -34,17 +34,37 @@
     <div class="container mx-auto">
         <div class="grid">
             <% if(pagination.total > 0) { %>
-                <div class="pr-3 pt-3 flex">
-                    <div class="flex flex-grow">
-                        <input data-subreddit="<%= data.name %>" style="width: 420px;"
-                               class="border-gray-50 mr-3 placeholder-gray-500 rounded mt-2 mb-3 p-2 text-black checkUrl"
-                               placeholder="Find events by permalink"/>
+                <div class="px-3 pt-3 flex">
+                    <div class="flex flex-grow flex-col">
                         <div>
-                            <div class="mb-2">
-                            <input type="checkbox" id="related">
-                            <label for="related">Include Related?</label>
+                            <div class="relative" style="width:650px; display: inline-block;">
+                                <input data-subreddit="<%= data.name %>" style="width: 100%;"
+                                       id="checkUrlInput"
+                                       class="border-gray-50 placeholder-gray-500 rounded mt-2 mb-3 p-2 text-black"
+                                       placeholder="Find events by permalink"/>
+                                <div class="absolute inset-y-0 right-0 flex items-center">
+                                    <select id="permaRelated" name="permaRelated" class="py-0 pl-2 pr-1 outline-0 focus:outline-0 focus:shadow-none border-transparent bg-white text-gray-500 sm:text-sm">
+                                        <option value="exact">Exact</option>
+                                        <option value="all">All Related</option>
+                                        <option value="activity">And Related Activities</option>
+                                        <option value="author">And Related Author</option>
+                                    </select>
+                                </div>
                             </div>
-                            <a id="checkEvents" class="hover:bg-gray-700 opacity-20 no-underline rounded-md py-2 px-3 border" href="">Fetch</a>
+                            <div style="margin: auto 0 auto 0.75rem;display:inline-block">
+                                <a id="checkEvents" class="hover:bg-gray-700 opacity-20 no-underline rounded-md py-2 px-3 border" href="">Search</a>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="relative" style="width:650px; display: inline-block;">
+                                <input data-subreddit="<%= data.name %>" style="width: 100%;"
+                                       id="checkAuthorInput"
+                                       class="border-gray-50 placeholder-gray-500 rounded mt-2 mb-3 p-2 text-black checkUrl"
+                                       placeholder="Find events by author"/>
+                            </div>
+                            <div style="margin: auto 0 auto 0.75rem;display:inline-block">
+                                <a id="checkAuthor" class="hover:bg-gray-700 opacity-20 no-underline rounded-md py-2 px-3 border" href="">Search</a>
+                            </div>
                         </div>
                     </div>
                     <div class="flex" style="align-items: center">
@@ -407,7 +427,7 @@
         });
     });
 
-    document.querySelectorAll(".checkUrl").forEach(el => {
+    document.querySelectorAll("#checkUrlInput").forEach(el => {
         const toggleButtons = (e) => {
             const inputVal = e.currentTarget.value;
             if (inputVal.length > 0) {
@@ -424,14 +444,45 @@
         el.addEventListener('change', toggleButtons, false);
     });
 
+    document.querySelectorAll("#checkAuthorInput").forEach(el => {
+        const toggleButtons = (e) => {
+            const inputVal = e.currentTarget.value;
+            if (inputVal.length > 0) {
+                document.querySelectorAll(`#checkAuthor`).forEach(el => {
+                    el.classList.remove('pointer-events-none', 'opacity-20');
+                });
+            } else {
+                document.querySelectorAll(`#checkAuthor`).forEach(el => {
+                    el.classList.add('pointer-events-none', 'opacity-20');
+                });
+            }
+        }
+        el.addEventListener('keyup', toggleButtons, false);
+        el.addEventListener('change', toggleButtons, false);
+    });
+
     document.querySelector('#checkEvents').addEventListener('click', (e) => {
         e.preventDefault();
         const currParams = new URLSearchParams(window.location.search);
-        const includeRelated  = document.querySelector('#related').checked;
-        const permalink = document.querySelector('.checkUrl').value;
+        const related = document.querySelector('#permaRelated').value;
+        const permalink = document.querySelector('#checkUrlInput').value;
 
         currParams.set('permalink', permalink);
-        currParams.set('includeRelated', includeRelated);
+        if(related !== 'exact') {
+            currParams.set('related', related);
+        }
+        currParams.set('page', 1);
+
+        const newUrl = window.location.pathname + '?' + currParams.toString();
+        window.location.href = newUrl;
+    });
+
+    document.querySelector('#checkAuthor').addEventListener('click', (e) => {
+        e.preventDefault();
+        const currParams = new URLSearchParams(window.location.search);
+        const authorVal = document.querySelector('#checkAuthorInput').value;
+
+        currParams.set('author', authorVal);
         currParams.set('page', 1);
 
         const newUrl = window.location.pathname + '?' + currParams.toString();

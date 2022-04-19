@@ -1,12 +1,13 @@
 import {App} from "../../App";
 import {BotStats} from "./interfaces";
 import dayjs from "dayjs";
-import {formatNumber} from "../../util";
+import {formatNumber, parseRedditEntity} from "../../util";
 import Bot from "../../Bot";
-import {Brackets, DataSource, SelectQueryBuilder} from "typeorm";
+import {Brackets, DataSource, SelectQueryBuilder, WhereExpressionBuilder} from "typeorm";
 import {Request} from "express";
 import {CMEvent} from "../../Common/Entities/CMEvent";
 import {filterResultsBuilder} from "../../Utils/typeormUtils";
+import {Activity} from "../../Common/Entities/Activity";
 
 export const opStats = (bot: Bot): BotStats => {
     const limitReset = bot.client === undefined ? dayjs() : dayjs(bot.client.ratelimitExpiration);
@@ -71,11 +72,36 @@ export const paginateRequest = async (builder: SelectQueryBuilder<any>, req: Req
     }
 }
 
+export const emptyEventResults = () => ({
+    from:       null,
+    to:         0,
+    per_page:   15,
+    total:      0,
+    current_page: 1,
+    prev_page:  null,
+    next_page:  null,
+    last_page:  0,
+    data:       []
+})
+
+export const orByRelatedActivities = (activity: Activity, qb: WhereExpressionBuilder): void => {
+    if(activity.type === 'comment' && activity.submission !== undefined) {
+        qb.where('activity._id = :actId', {actId: activity.id})
+            .orWhere('activity._id = :subId', {subId: activity.submission?.id});
+    } else if (activity.type === 'submission') {
+        qb.where('activity._id = :actId', {actId: activity.id})
+            .orWhere('activitySubmission._id = :subId', {subId: activity.id});
+    }
+}
+
+export const orByRelatedAuthor = (activity: Activity, qb: WhereExpressionBuilder): void => {
+    qb.where('author.name = :authorName', {authorName: activity.author.name});
+}
+
 export interface EventConditions {
     managerIds: string[]
-    eventType?: 'comment' | 'submission'
-    includeRelated?: boolean
-    activity?: string
+    related?: string
+    activity?: Activity
     author?: string
 }
 
@@ -85,42 +111,38 @@ export const getSimpleEventsWhereQuery = (dataSource: DataSource, opts: EventCon
 
     const {
         managerIds,
-        eventType,
-        includeRelated = false,
+        related,
         activity,
         author,
     } = opts;
 
     query.andWhere('event.manager.id IN (:...managerIds)', {managerIds: managerIds});
 
-    if (eventType !== undefined) {
+    if (activity !== undefined) {
         query.leftJoinAndSelect('event.activity', 'activity');
 
-        if (!includeRelated) {
-            query.andWhere('activity._id = :actId', {actId: activity});
-        } else if (eventType === 'comment') {
-            query.leftJoinAndSelect('activity.submission', 'activitySubmission');
-
-            query.andWhere(new Brackets((qb) => {
-                qb.where('activity._id = :actId', {actId: activity})
-                    .orWhere('activity._id = activitySubmission._id');
-            }));
-        } else if (eventType === 'submission') {
-            query.leftJoinAndSelect('activity.submission', 'activitySubmission');
-
-            query.andWhere(new Brackets((qb) => {
-                qb.where('activity._id = :actId', {actId: activity})
-                    .orWhere('activitySubmission._id = :subId', {subId: activity});
-            }));
+        if (related === undefined) {
+            query.andWhere('activity._id = :actId', {actId: activity.id});
+        } else {
+            if (related === 'all') {
+                query.leftJoinAndSelect('activity.author', 'author')
+                query.andWhere(new Brackets((qb) => {
+                    qb.where(new Brackets(qbAct => orByRelatedActivities(activity, qbAct)))
+                        .orWhere(new Brackets(qbAuthor => orByRelatedAuthor(activity, qbAuthor)));
+                }))
+            } else if (related === 'activity') {
+                query.andWhere(new Brackets((qb) => orByRelatedActivities(activity, qb)));
+            } else if (related === 'author') {
+                query.leftJoinAndSelect('activity.author', 'author')
+                query.andWhere(new Brackets((qb) => orByRelatedAuthor(activity, qb)));
+            }
         }
-    }
+    } else if(author !== undefined) {
+        const authorVal = parseRedditEntity(author, 'user');
 
-    if (author !== undefined) {
-        if (eventType === undefined) {
-            query.leftJoinAndSelect('event.activity', 'activity');
-        }
+        query.leftJoinAndSelect('event.activity', 'activity');
         query.leftJoinAndSelect('activity.author', 'author')
-            .andWhere('author.name = :authorName', {authorNAme: author});
+            .andWhere('author.name = :authorName', {authorName: authorVal.name});
     }
 
     // can't order by using this AND use "select event id only" in getDistinctEventIdsWhereQuery
