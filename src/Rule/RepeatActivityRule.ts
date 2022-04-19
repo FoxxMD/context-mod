@@ -135,6 +135,7 @@ export class RepeatActivityRule extends Rule {
         }
     }
 
+    // TODO unify matching logic with recent and repost rules
     getActivityIdentifier(activity: (Submission | Comment), length = 200, transform = true) {
         let identifier: string;
         if (asSubmission(activity)) {
@@ -270,14 +271,28 @@ export class RepeatActivityRule extends Rule {
         if (this.useSubmissionAsReference) {
             applicableGroupedActivities = new Map();
             let identifier = this.getActivityIdentifier(item);
+            // look for exact match first
             let referenceSubmissions = identifierGroupedActivities.get(identifier);
-            if(referenceSubmissions === undefined && isExternalUrlSubmission(item)) {
-                // if external url sub then try by title
-                identifier = (item as Submission).title;
-                referenceSubmissions = identifierGroupedActivities.get(identifier);
-                if(referenceSubmissions === undefined) {
-                    // didn't get by title so go back to url since that's the default
-                    identifier = this.getActivityIdentifier(item);
+            if(referenceSubmissions === undefined) {
+                if(isExternalUrlSubmission(item)) {
+                    // if external url sub then try by title
+                    identifier = (item as Submission).title;
+                    referenceSubmissions = identifierGroupedActivities.get(identifier);
+                    if(referenceSubmissions === undefined) {
+                        // didn't get by title so go back to url since that's the default
+                        identifier = this.getActivityIdentifier(item);
+                    }
+                } else if(asSubmission(item) && item.is_self) {
+                    // if is self post then identifier is made up of title and body so identifiers may not be *exact* if title varies or body varies
+                    // -- try to find identifying sets by using string sameness on set identifiers
+                    let fuzzySets: (Submission | Comment)[] = [];
+                    for(const [k, v] of identifierGroupedActivities.entries()) {
+                        const strMatchResults = stringSameness(k, identifier);
+                        if (strMatchResults.highScoreWeighted >= this.matchScore) {
+                            fuzzySets = fuzzySets.concat(v);
+                        }
+                    }
+                    referenceSubmissions = [fuzzySets.flat()];
                 }
             }
 
