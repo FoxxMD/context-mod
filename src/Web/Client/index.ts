@@ -59,7 +59,6 @@ import {TransformableInfo} from "logform";
 import {SimpleError} from "../../Utils/Errors";
 import {ErrorWithCause} from "pony-cause";
 import {CMInstance} from "./CMInstance";
-import {PaginationAwareObject} from "typeorm-pagination/dist/helpers/pagination";
 import {CMEvent} from "../../Common/Entities/CMEvent";
 import { RulePremise } from "../../Common/Entities/RulePremise";
 import { ActionPremise } from "../../Common/Entities/ActionPremise";
@@ -70,6 +69,7 @@ import {WebSetting} from "../../Common/WebEntities/WebSetting";
 import {CheckResultEntity} from "../../Common/Entities/CheckResultEntity";
 import {RuleResultEntity} from "../../Common/Entities/RuleResultEntity";
 import {RuleSetResultEntity} from "../../Common/Entities/RuleSetResultEntity";
+import { PaginationAwareObject } from "../Common/util";
 
 const emitter = new EventEmitter();
 

@@ -6,7 +6,6 @@ import {Server as SocketServer} from 'socket.io';
 import {ExtractJwt, Strategy as JwtStrategy} from 'passport-jwt';
 import passport from 'passport';
 import tcpUsed from 'tcp-port-used';
-import {pagination} from 'typeorm-pagination'
 import {getLogger} from "../../Utils/loggerFactory";
 import LoggedError from "../../Utils/LoggedError";
 import {Invokee, LogInfo, OperatorConfigWithFileContext, RUNNING, STOPPED} from "../../Common/interfaces";
@@ -38,7 +37,6 @@ import dayjs from "dayjs";
 import { sleep } from '../../util';
 
 const server = addAsync(express());
-server.use(pagination);
 server.use(bodyParser.json());
 server.use(bodyParser.urlencoded({extended: false}));
 

@@ -9,7 +9,12 @@ import {ActionedEvent, RedditThing} from "../../../../../Common/interfaces";
 import {CMEvent, CMEvent as ActionedEventEntity} from "../../../../../Common/Entities/CMEvent";
 import {nanoid} from "nanoid";
 import dayjs from "dayjs";
-import {paginateRequest} from "../../../../Common/util";
+import {
+    EventConditions,
+    getDistinctEventIdsWhereQuery,
+    getFullEventsById,
+    paginateRequest
+} from "../../../../Common/util";
 import {filterResultsBuilder} from "../../../../../Utils/typeormUtils";
 import {Brackets} from "typeorm";
 
@@ -83,75 +88,92 @@ const actionedEvents = async (req: Request, res: Response) => {
         }
     }
 
-    let query = req.serverBot.database.getRepository(CMEvent)
-        .createQueryBuilder("event")
-        .leftJoinAndSelect('event.source', 'source')
-        .leftJoinAndSelect('event.activity', 'activity')
-        .leftJoinAndSelect('activity.subreddit', 'subreddit')
-        .leftJoinAndSelect('activity.author', 'author')
-        .leftJoinAndSelect('event.runResults', 'runResults');
+    // let query = req.serverBot.database.getRepository(CMEvent)
+    //     .createQueryBuilder("event")
+    //     .leftJoinAndSelect('event.source', 'source')
+    //     .leftJoinAndSelect('event.activity', 'activity')
+    //     .leftJoinAndSelect('activity.subreddit', 'subreddit')
+    //     .leftJoinAndSelect('activity.author', 'author')
+    //     .leftJoinAndSelect('event.runResults', 'runResults');
+    //
+    // query = filterResultsBuilder<CMEvent>(query, 'runResults', 'rr');
+    //
+    // query.leftJoinAndSelect('runResults.run', 'run')
+    //     .leftJoinAndSelect('runResults.checkResults', 'checkResults');
+    //
+    // query = filterResultsBuilder<CMEvent>(query, 'checkResults', 'c');
+    //
+    // query.leftJoinAndSelect('checkResults.ruleResults', 'rrIterim')
+    //     .leftJoinAndSelect('rrIterim.result', 'ruleResult')
+    //     .leftJoinAndSelect('ruleResult.premise', 'rPremise')
+    //     .leftJoinAndSelect('rPremise.kind', 'ruleKind')
+    //     .leftJoinAndSelect('checkResults.ruleSetResults', 'ruleSetResultsIterim')
+    //     .leftJoinAndSelect('ruleSetResultsIterim.result', 'ruleSetResult')
+    //     .leftJoinAndSelect('ruleSetResult._ruleResults', 'rsRuleResultsIterim')
+    //     .leftJoinAndSelect('rsRuleResultsIterim.result', 'rsRuleResult')
+    //     .leftJoinAndSelect('rsRuleResult.premise', 'rsPremise')
+    //     .leftJoinAndSelect('rsPremise.kind', 'rsRuleKind')
+    //     .leftJoinAndSelect('checkResults.check', 'check');
+    //
+    // query = filterResultsBuilder<CMEvent>(query, 'ruleResult', 'r');
+    // query = filterResultsBuilder<CMEvent>(query, 'rsRuleResult', 'rsr');
+    //
+    // query.leftJoinAndSelect('checkResults.actionResults', 'actionResults')
+    //     .leftJoinAndSelect('actionResults.premise', 'aPremise')
+    //     .leftJoinAndSelect('aPremise.kind', 'actionKind');
+    //
+    // query = filterResultsBuilder<CMEvent>(query, 'actionResults', 'a');
+    //
+    // query.andWhere('event.manager.id IN (:...managerIds)', {managerIds: managers.map(x => x.managerEntity.id)})
+    //     .orderBy('event._processedAt', 'DESC');
+    //
+    // if (permalink !== undefined) {
+    //     const things = parseRedditThingsFromLink(permalink);
+    //     if (things.comment !== undefined) {
+    //         if (includeRelated && things.submission !== undefined) {
+    //             query.andWhere(new Brackets((qb) => {
+    //                 qb.where('activity._id = :actId', {actId: (things.comment as RedditThing).val})
+    //                     .orWhere('activity._id = :subId', {subId: (things.submission as RedditThing).val})
+    //             }));
+    //         } else {
+    //             query.andWhere('activity._id = :actId', {actId: things.comment.val});
+    //         }
+    //     } else if (things.submission !== undefined) {
+    //         if (includeRelated) {
+    //             query.leftJoinAndSelect('activity.submission', 'activitySubmission')
+    //                 .leftJoinAndSelect('activitySubmission.author', 'actSubAuthor');
+    //
+    //             query.andWhere(new Brackets((qb) => {
+    //                 qb.where('activity._id = :actId', {actId: (things.submission as RedditThing).val})
+    //                     .orWhere('activitySubmission._id = :subId', {subId: (things.submission as RedditThing).val})
+    //             }));
+    //         } else {
+    //             query.andWhere('activity._id = :actId', {actId: (things.submission as RedditThing).val});
+    //         }
+    //     }
+    // }
 
-    query = filterResultsBuilder<CMEvent>(query, 'runResults', 'rr');
 
-    query.leftJoinAndSelect('runResults.run', 'run')
-        .leftJoinAndSelect('runResults.checkResults', 'checkResults');
-
-    query = filterResultsBuilder<CMEvent>(query, 'checkResults', 'c');
-
-    query.leftJoinAndSelect('checkResults.ruleResults', 'rrIterim')
-        .leftJoinAndSelect('rrIterim.result', 'ruleResult')
-        .leftJoinAndSelect('ruleResult.premise', 'rPremise')
-        .leftJoinAndSelect('rPremise.kind', 'ruleKind')
-        .leftJoinAndSelect('checkResults.ruleSetResults', 'ruleSetResultsIterim')
-        .leftJoinAndSelect('ruleSetResultsIterim.result', 'ruleSetResult')
-        .leftJoinAndSelect('ruleSetResult._ruleResults', 'rsRuleResultsIterim')
-        .leftJoinAndSelect('rsRuleResultsIterim.result', 'rsRuleResult')
-        .leftJoinAndSelect('rsRuleResult.premise', 'rsPremise')
-        .leftJoinAndSelect('rsPremise.kind', 'rsRuleKind')
-        .leftJoinAndSelect('checkResults.check', 'check');
-
-    query = filterResultsBuilder<CMEvent>(query, 'ruleResult', 'r');
-    query = filterResultsBuilder<CMEvent>(query, 'rsRuleResult', 'rsr');
-
-    query.leftJoinAndSelect('checkResults.actionResults', 'actionResults')
-        .leftJoinAndSelect('actionResults.premise', 'aPremise')
-        .leftJoinAndSelect('aPremise.kind', 'actionKind');
-
-    query = filterResultsBuilder<CMEvent>(query, 'actionResults', 'a');
-
-    query.andWhere('event.manager.id IN (:...managerIds)', {managerIds: managers.map(x => x.managerEntity.id)})
-        .orderBy('event._processedAt', 'DESC');
-
-    if (permalink !== undefined) {
+    const opts: EventConditions = {
+        managerIds: managers.map(x => x.managerEntity.id),
+        //eventType: things.comment !== undefined ? 'comment' : 'submission',
+        //activity: things.comment !== undefined ? things.comment.val : things.submission?.val,
+        includeRelated
+    };
+    if(permalink !== undefined) {
         const things = parseRedditThingsFromLink(permalink);
-        if (things.comment !== undefined) {
-            if (includeRelated && things.submission !== undefined) {
-                query.andWhere(new Brackets((qb) => {
-                    qb.where('activity._id = :actId', {actId: (things.comment as RedditThing).val})
-                        .orWhere('activity._id = :subId', {subId: (things.submission as RedditThing).val})
-                }));
-            } else {
-                query.andWhere('activity._id = :actId', {actId: things.comment.val});
-            }
-        } else if (things.submission !== undefined) {
-            if (includeRelated) {
-                query.leftJoinAndSelect('activity.submission', 'activitySubmission')
-                    .leftJoinAndSelect('activitySubmission.author', 'actSubAuthor');
-
-                query.andWhere(new Brackets((qb) => {
-                    qb.where('activity._id = :actId', {actId: (things.submission as RedditThing).val})
-                        .orWhere('activitySubmission._id = :subId', {subId: (things.submission as RedditThing).val})
-                }));
-            } else {
-                query.andWhere('activity._id = :actId', {actId: (things.submission as RedditThing).val});
-            }
-        }
+        opts.eventType = things.comment !== undefined ? 'comment' : 'submission';
+        opts.activity = things.comment !== undefined ? things.comment.val : things.submission?.val;
     }
+
+    const paginatedIdResults = await paginateRequest(getDistinctEventIdsWhereQuery(req.serverBot.database, opts), req);
+
+    const hydratedResults = await getFullEventsById(req.serverBot.database, paginatedIdResults.data.map((x: CMEvent) => x.id)).getMany();
 
 
     // TODO will need to refactor this if we switch to allowing subreddits to use their own datasources
-    const results = await paginateRequest(query, req);
-    return res.json(results);
+    //const results = await paginateRequest(query, req);
+    return res.json({...paginatedIdResults, data: hydratedResults});
 };
 export const actionedEventsRoute = [authUserCheck(), botRoute(), subredditRoute(false), booleanMiddle(['includeRelated']), actionedEvents];
 
