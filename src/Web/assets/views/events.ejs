@@ -17,7 +17,20 @@
 </head>
 <body class="bg-gray-900 text-white font-sans">
 <div class="min-w-screen min-h-screen">
-    <%- include('partials/title') %>
+    <div class="space-x-4 p-6 md:px-10 md:py-6 leading-6 font-semibold bg-gray-500">
+        <div class="container mx-auto">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center flex-grow pr-4">
+                    <% if(locals.title !== undefined) { %>
+                        <a href="/events?instance=<%= instance %>&bot=<%= bot %><%= subreddit !== undefined ? `&subreddit=${subreddit}` : '' %>"><%= title %></a>
+                    <% } %>
+                </div>
+                <div class="flex items-center flex-end text-sm">
+                    <a href="logout">Logout</a>
+                </div>
+            </div>
+        </div>
+    </div>
     <div class="container mx-auto">
         <div class="grid">
             <% if(pagination.total > 0) { %>
@@ -52,7 +65,7 @@
                         <div class="space-x-4 px-4 p-2 leading-2 triggeredStateToggle">
                             <div class="flex items-center justify-between">
                                 <div>
-                                    <a class="activityLink font-semibold" target="_blank" href="https://reddit.com<%= eRes.activity.link%>"><%= eRes.activity.type === 'comment' ? 'Comment' : 'Submission' %></a>
+                                    <a class="activityLink font-semibold" target="_blank" href="<%= eRes.activity.link%>"><%= eRes.activity.type === 'comment' ? 'Comment' : 'Submission' %></a>
                                     by <a class="activityLink" target="_blank" href="https://reddit.com/u/<%= eRes.activity.author%>">u/<%= eRes.activity.author%></a>
 
                                         <span class="has-tooltip ml-1">
@@ -419,6 +432,7 @@
 
         currParams.set('permalink', permalink);
         currParams.set('includeRelated', includeRelated);
+        currParams.set('page', 1);
 
         const newUrl = window.location.pathname + '?' + currParams.toString();
         window.location.href = newUrl;

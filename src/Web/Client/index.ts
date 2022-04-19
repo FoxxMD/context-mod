@@ -1098,7 +1098,7 @@ const webClient = async (options: OperatorConfig) => {
                author: x.activity.author.name
            };
            let submission: EventActivity | undefined;
-           if(x.activity.submission !== undefined) {
+           if(x.activity.submission !== undefined && x.activity.submission !== null) {
                submission = {
                    peek: Autolinker.link(peekTrunc(x.activity.submission.content), {
                        email: false,
@@ -1288,6 +1288,9 @@ const webClient = async (options: OperatorConfig) => {
         return res.render('events', {
             data: actionedEvents,
             pagination,
+            subreddit,
+            bot: req.bot?.botName,
+            instance: (req.instance as CMInstance).getName(),
             title: `${subreddit !== undefined ? `${subreddit} ` : ''}Actioned Events`
         });
     });
