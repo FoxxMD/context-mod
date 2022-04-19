@@ -127,20 +127,23 @@ const actionedEvents = async (req: Request, res: Response) => {
         if (things.comment !== undefined) {
             if (includeRelated && things.submission !== undefined) {
                 query.andWhere(new Brackets((qb) => {
-                    qb.where('event.activity._id = :actId', {actId: (things.comment as RedditThing).val})
-                        .orWhere('event.activity._id = :subId', {subId: (things.submission as RedditThing).val})
+                    qb.where('activity._id = :actId', {actId: (things.comment as RedditThing).val})
+                        .orWhere('activity._id = :subId', {subId: (things.submission as RedditThing).val})
                 }));
             } else {
-                query.andWhere('event.activity._id = :actId', {actId: things.comment.val});
+                query.andWhere('activity._id = :actId', {actId: things.comment.val});
             }
         } else if (things.submission !== undefined) {
             if (includeRelated) {
+                query.leftJoinAndSelect('activity.submission', 'activitySubmission')
+                    .leftJoinAndSelect('activitySubmission.author', 'actSubAuthor');
+
                 query.andWhere(new Brackets((qb) => {
-                    qb.where('event.activity._id = :actId', {actId: (things.submission as RedditThing).val})
-                        .orWhere('event.activity.submission._id = :subId', {subId: (things.submission as RedditThing).val})
+                    qb.where('activity._id = :actId', {actId: (things.submission as RedditThing).val})
+                        .orWhere('activitySubmission._id = :subId', {subId: (things.submission as RedditThing).val})
                 }));
             } else {
-                query.andWhere('event.activity._id = :actId', {actId: (things.submission as RedditThing).val});
+                query.andWhere('activity._id = :actId', {actId: (things.submission as RedditThing).val});
             }
         }
     }
