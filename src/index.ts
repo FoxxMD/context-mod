@@ -8,6 +8,7 @@ import dduration from 'dayjs/plugin/duration.js';
 import relTime from 'dayjs/plugin/relativeTime.js';
 import sameafter from 'dayjs/plugin/isSameOrAfter.js';
 import samebefore from 'dayjs/plugin/isSameOrBefore.js';
+import weekOfYear from 'dayjs/plugin/weekOfYear.js';
 import {Manager} from "./Subreddit/Manager";
 import {Command, Argument} from 'commander';
 
@@ -37,6 +38,7 @@ dayjs.extend(sameafter);
 dayjs.extend(samebefore);
 dayjs.extend(tz);
 dayjs.extend(advancedFormat);
+dayjs.extend(weekOfYear);
 
 const commentReg = parseLinkIdentifier([COMMENT_URL_ID]);
 const submissionReg = parseLinkIdentifier([SUBMISSION_URL_ID]);

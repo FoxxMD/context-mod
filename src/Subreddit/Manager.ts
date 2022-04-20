@@ -9,7 +9,7 @@ import {
     createRetryHandler,
     determineNewResults,
     findLastIndex,
-    formatNumber, getActivityAuthorName, isComment, isSubmission, likelyJson5,
+    formatNumber, frequencyEqualOrLargerThanMin, getActivityAuthorName, isComment, isSubmission, likelyJson5,
     mergeArr, normalizeName,
     parseFromJsonOrYamlToObject,
     parseRedditEntity,
@@ -47,7 +47,7 @@ import {
     RunState,
     STOPPED,
     SYSTEM,
-    USER, RuleResult
+    USER, RuleResult, DatabaseStatisticsOperatorConfig
 } from "../Common/interfaces";
 import Submission from "snoowrap/dist/objects/Submission";
 import {activityIsRemoved, ItemContent, itemContentPeek} from "../Utils/SnoowrapUtils";
@@ -126,6 +126,7 @@ export interface RuntimeManagerOptions extends Omit<ManagerOptions, 'filterCrite
     botEntity: BotEntity
     managerEntity: ManagerEntity
     filterCriteriaDefaults?: FilterCriteriaDefaults
+    statDefaults: DatabaseStatisticsOperatorConfig
 }
 
 interface QueuedIdentifier {
@@ -157,6 +158,7 @@ export class Manager extends EventEmitter implements RunningStates {
     wikiFormat: ('yaml' | 'json') = 'yaml';
     filterCriteriaDefaults?: FilterCriteriaDefaults
     postCheckBehaviorDefaults?: PostBehavior
+    statDefaults: DatabaseStatisticsOperatorConfig
     //wikiUpdateRunning: boolean = false;
 
     streams: Map<string, SPoll<Snoowrap.Submission | Snoowrap.Comment>> = new Map();
@@ -291,6 +293,7 @@ export class Manager extends EventEmitter implements RunningStates {
             postCheckBehaviorDefaults,
             botEntity,
             managerEntity,
+            statDefaults,
         } = opts || {};
         this.displayLabel = opts.nickname || `${sub.display_name_prefixed}`;
         const getLabels = this.getCurrentLabels;
@@ -314,6 +317,7 @@ export class Manager extends EventEmitter implements RunningStates {
         this.wikiLocation = wikiLocation;
         this.filterCriteriaDefaults = filterCriteriaDefaults;
         this.postCheckBehaviorDefaults = postCheckBehaviorDefaults;
+        this.statDefaults = statDefaults;
         this.sharedStreams = sharedStreams;
         this.pollingRetryHandler = createRetryHandler({maxRequestRetry: 3, maxOtherRetry: 2}, this.logger);
         this.subreddit = sub;
@@ -555,7 +559,6 @@ export class Manager extends EventEmitter implements RunningStates {
         try {
             const configBuilder = new ConfigBuilder({logger: this.logger});
             const validJson = configBuilder.validateJson(configObj);
-            const {checks, ...configManagerOpts} = validJson;
             const {
                 polling = [{pollOn: 'unmoderated', limit: DEFAULT_POLLING_LIMIT, interval: DEFAULT_POLLING_INTERVAL}],
                 caching,
@@ -563,11 +566,14 @@ export class Manager extends EventEmitter implements RunningStates {
                 dryRun,
                 footer,
                 nickname,
+                databaseStatistics: {
+                    frequency = this.statDefaults.frequency,
+                } = {},
                 notifications,
                 queue: {
                     maxWorkers = undefined,
                 } = {},
-            } = configManagerOpts || {};
+            } = validJson || {};
             this.pollOptions = buildPollingOptions(polling);
             this.dryRun = this.globalDryRun || dryRun;
 
@@ -595,6 +601,12 @@ export class Manager extends EventEmitter implements RunningStates {
             const eventContent = events.length === 0 ? 'None' : events.join(', ');
             this.logger.info(`Notification Info => Providers: ${notifierContent} | Events: ${eventContent}`);
 
+            let realStatFrequency = frequency;
+            if(realStatFrequency !== false && !frequencyEqualOrLargerThanMin(realStatFrequency, this.statDefaults.minFrequency)) {
+                this.logger.warn(`Specified database statistic frequency of '${realStatFrequency}' is shorter than minimum enforced by operator of '${this.statDefaults.minFrequency}' -- will fallback to '${this.statDefaults.minFrequency}'`);
+                realStatFrequency = this.statDefaults.minFrequency;
+            }
+
             let resourceConfig: SubredditResourceConfig = {
                 footer,
                 logger: this.logger,
@@ -604,6 +616,7 @@ export class Manager extends EventEmitter implements RunningStates {
                 client: this.client,
                 botEntity: this.botEntity,
                 managerEntity: this.managerEntity,
+                statFrequency: realStatFrequency,
             };
             this.resources = await this.cacheManager.set(this.subreddit.display_name, resourceConfig);
             this.resources.setLogger(this.logger);

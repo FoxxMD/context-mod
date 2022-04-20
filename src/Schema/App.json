@@ -1790,6 +1790,23 @@
             ],
             "type": "string"
         },
+        "DatabaseStatisticsJsonConfig": {
+            "properties": {
+                "frequency": {
+                    "description": "Specify the frequency for collecting time-series statistics.\n\nValid values are: 'minute','hour','day','week','month','year' OR false to disable collection",
+                    "enum": [
+                        "day",
+                        false,
+                        "hour",
+                        "minute",
+                        "month",
+                        "week",
+                        "year"
+                    ]
+                }
+            },
+            "type": "object"
+        },
         "DiscordProviderConfig": {
             "properties": {
                 "name": {
@@ -5375,6 +5392,9 @@
         },
         "credentials": {
             "$ref": "#/definitions/ThirdPartyCredentialsJsonConfig"
+        },
+        "databaseStatistics": {
+            "$ref": "#/definitions/DatabaseStatisticsJsonConfig"
         },
         "dryRun": {
             "default": "undefined",

@@ -864,6 +864,8 @@ export interface ManagerOptions {
      * * postTrigger => nextRun
      * */
     postCheckBehaviorDefaults?: PostBehavior
+
+    databaseStatistics?: DatabaseStatisticsJsonConfig
 }
 
 /**
@@ -1652,6 +1654,10 @@ export interface SubredditOverrides {
     flowControlDefaults?: {
         maxGotoDepth?: number
     }
+    /**
+     * Set defaults for the frequency time series stats are collected. Will override bot-level defaults
+     * */
+    databaseStatisticsDefaults?: DatabaseStatisticsOperatorJsonConfig
 }
 
 /**
@@ -1694,6 +1700,11 @@ export interface BotInstanceJsonConfig {
     flowControlDefaults?: {
         maxGotoDepth?: number
     }
+
+    /**
+     * Set defaults for the frequency time series stats are collected. Will override top-level defaults
+     * */
+    databaseStatisticsDefaults?: DatabaseStatisticsOperatorJsonConfig
 
     /**
      * Settings related to bot behavior for subreddits it is managing
@@ -1839,6 +1850,38 @@ export interface BotInstanceJsonConfig {
     }
 }
 
+export type StatisticFrequency = 'minute' | 'hour' | 'day' | 'week' | 'month' | 'year';
+export const statFrequencies: StatisticFrequency[] = ['minute','hour','day','week','month','year'];
+export type StatisticFrequencyOption = StatisticFrequency | false;
+
+export interface DatabaseStatisticsJsonConfig {
+    /**
+     * Specify the frequency for collecting time-series statistics.
+     *
+     * Valid values are: 'minute','hour','day','week','month','year' OR false to disable collection
+     *
+     * */
+    frequency?: StatisticFrequencyOption
+}
+
+export interface DatabaseStatisticsConfig extends DatabaseStatisticsJsonConfig {
+    frequency: StatisticFrequencyOption
+}
+
+export interface DatabaseStatisticsOperatorJsonConfig extends DatabaseStatisticsJsonConfig {
+    /**
+     * Specify the allowed minimum frequency for collecting time-series statistics. If the frequency set for a subreddit is smaller this will override it.
+     *
+     * Valid values are: 'minute','hour','day','week','month','year' OR false to specify no minimum
+     *
+     * */
+    minFrequency?: StatisticFrequencyOption
+}
+
+export interface DatabaseStatisticsOperatorConfig extends DatabaseStatisticsConfig {
+    minFrequency: StatisticFrequencyOption
+}
+
 /**
  * Configuration for application-level settings IE for running the bot instance
  *
@@ -1917,6 +1960,11 @@ export interface OperatorJsonConfig {
      * Set global snoowrap options as well as default snoowrap config for all bots that don't specify their own
      * */
     snoowrap?: SnoowrapOptions
+
+    /**
+     * Set defaults for the frequency time series stats are collected
+     * */
+    databaseStatisticsDefaults?: DatabaseStatisticsOperatorJsonConfig
 
     bots?: BotInstanceJsonConfig[]
 
@@ -2111,8 +2159,9 @@ export interface BotCredentialsConfig extends ThirdPartyCredentialsJsonConfig {
 
 export interface BotInstanceConfig extends BotInstanceJsonConfig {
     credentials: BotCredentialsJsonConfig
-    database: Connection
+    database: DataSource
     snoowrap: SnoowrapOptions
+    databaseStatisticsDefaults: DatabaseStatisticsOperatorConfig
     subreddits: {
         names?: string[],
         exclude?: string[],
@@ -2180,6 +2229,7 @@ export interface OperatorConfig extends OperatorJsonConfig {
         secret: string,
         friendly?: string,
     }
+    databaseStatisticsDefaults: DatabaseStatisticsOperatorConfig
     bots: BotInstanceConfig[]
     credentials: ThirdPartyCredentialsJsonConfig
 }

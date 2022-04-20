@@ -210,6 +210,10 @@
                         }
                     ]
                 },
+                "databaseStatisticsDefaults": {
+                    "$ref": "#/definitions/DatabaseStatisticsOperatorJsonConfig",
+                    "description": "Set defaults for the frequency time series stats are collected. Will override top-level defaults"
+                },
                 "filterCriteriaDefaults": {
                     "$ref": "#/definitions/FilterCriteriaDefaults",
                     "description": "Define the default behavior for all filter criteria on all checks in all subreddits\n\nDefaults to exclude mods and automoderator from checks"
@@ -599,6 +603,35 @@
                 "force": {
                     "description": "When pending migrations are present at startup force migrations to run regardless of backup attempt or outcome",
                     "type": "boolean"
+                }
+            },
+            "type": "object"
+        },
+        "DatabaseStatisticsOperatorJsonConfig": {
+            "properties": {
+                "frequency": {
+                    "description": "Specify the frequency for collecting time-series statistics.\n\nValid values are: 'minute','hour','day','week','month','year' OR false to disable collection",
+                    "enum": [
+                        "day",
+                        false,
+                        "hour",
+                        "minute",
+                        "month",
+                        "week",
+                        "year"
+                    ]
+                },
+                "minFrequency": {
+                    "description": "Specify the allowed minimum frequency for collecting time-series statistics. If the frequency set for a subreddit is smaller this will override it.\n\nValid values are: 'minute','hour','day','week','month','year' OR false to specify no minimum",
+                    "enum": [
+                        "day",
+                        false,
+                        "hour",
+                        "minute",
+                        "month",
+                        "week",
+                        "year"
+                    ]
                 }
             },
             "type": "object"
@@ -1527,6 +1560,10 @@
         },
         "SubredditOverrides": {
             "properties": {
+                "databaseStatisticsDefaults": {
+                    "$ref": "#/definitions/DatabaseStatisticsOperatorJsonConfig",
+                    "description": "Set defaults for the frequency time series stats are collected. Will override bot-level defaults"
+                },
                 "flowControlDefaults": {
                     "properties": {
                         "maxGotoDepth": {
@@ -1731,6 +1768,10 @@
                 }
             },
             "type": "object"
+        },
+        "databaseStatisticsDefaults": {
+            "$ref": "#/definitions/DatabaseStatisticsOperatorJsonConfig",
+            "description": "Set defaults for the frequency time series stats are collected"
         },
         "logging": {
             "$ref": "#/definitions/LoggingOptions",

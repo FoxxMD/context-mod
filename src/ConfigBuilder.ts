@@ -1011,6 +1011,10 @@ export const buildOperatorConfigWithDefaults = async (data: OperatorJsonConfig):
         logging,
         caching: opCache,
         userAgent,
+        databaseStatisticsDefaults: {
+            minFrequency = 'day',
+            frequency = 'day'
+        } = {},
         databaseConfig: {
             connection: dbConnection = (process.env.DB_DRIVER ?? 'sqljs') as DatabaseDriverType,
             migrations = {},
@@ -1141,6 +1145,10 @@ export const buildOperatorConfigWithDefaults = async (data: OperatorJsonConfig):
         logging: loggingOptions,
         caching: cache,
         snoowrap: snoowrapOp,
+        databaseStatisticsDefaults: {
+            frequency,
+            minFrequency
+        },
         database: await createAppDatabaseConnection(dbConfig, appLogger),
         databaseConfig: {
             connection: dbConfig,
@@ -1196,6 +1204,7 @@ export const buildBotConfig = (data: BotInstanceJsonConfig, opConfig: OperatorCo
         } = {},
         userAgent,
         database,
+        databaseStatisticsDefaults: statDefaultsFromOp,
     } = opConfig;
     const {
         name: botName,
@@ -1217,6 +1226,7 @@ export const buildBotConfig = (data: BotInstanceJsonConfig, opConfig: OperatorCo
             hardLimit = 50
         } = {},
         snoowrap = snoowrapOp,
+        databaseStatisticsDefaults = {},
         flowControlDefaults,
         credentials = {},
         subreddits: {
@@ -1326,6 +1336,17 @@ export const buildBotConfig = (data: BotInstanceJsonConfig, opConfig: OperatorCo
         realShared.push('modqueue');
     }
 
+    const botLevelStatDefaults = {...statDefaultsFromOp, ...databaseStatisticsDefaults};
+    const mergedOverrides = overrides.map(x => {
+        const {
+            databaseStatisticsDefaults: fromOverride = {},
+        } = x;
+        return {
+            ...x,
+            databaseStatisticsDefaults: {...botLevelStatDefaults, ...fromOverride}
+        }
+    });
+
     return {
         name: botName,
         snoowrap: snoowrap || {},
@@ -1333,13 +1354,14 @@ export const buildBotConfig = (data: BotInstanceJsonConfig, opConfig: OperatorCo
         filterCriteriaDefaults,
         postCheckBehaviorDefaults,
         database,
+        databaseStatisticsDefaults: botLevelStatDefaults,
         subreddits: {
             names,
             exclude,
             wikiConfig,
             heartbeatInterval,
             dryRun,
-            overrides,
+            overrides: mergedOverrides,
         },
         credentials: botCreds,
         caching: botCache,

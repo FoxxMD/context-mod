@@ -55,7 +55,7 @@ import {
     userNoteCriteriaSummary,
     asComment,
     criteriaPassWithIncludeBehavior,
-    isRuleSetResult
+    isRuleSetResult, frequencyEqualOrLargerThanMin
 } from "../util";
 import LoggedError from "../Utils/LoggedError";
 import {
@@ -82,7 +82,16 @@ import {
     ItemCritPropHelper,
     ActivityDispatch,
     FilterCriteriaPropertyResult,
-    ActivitySource, HistoricalStatsDisplay, UserNoteCriteria, AuthorCriteria, AuthorOptions, ItemOptions, JoinOperands, NamedCriteria, ModeratorNameCriteria
+    ActivitySource,
+    HistoricalStatsDisplay,
+    UserNoteCriteria,
+    AuthorCriteria,
+    AuthorOptions,
+    ItemOptions,
+    JoinOperands,
+    NamedCriteria,
+    ModeratorNameCriteria,
+    StatisticFrequency, StatisticFrequencyOption, statFrequencies
 } from "../Common/interfaces";
 import UserNotes from "./UserNotes";
 import Mustache from "mustache";
@@ -97,7 +106,7 @@ import {
 import {ExtendedSnoowrap} from "../Utils/SnoowrapClients";
 import dayjs from "dayjs";
 import ImageData from "../Common/ImageData";
-import {DataSource, Repository, SelectQueryBuilder} from "typeorm";
+import {DataSource, Repository, SelectQueryBuilder, Between} from "typeorm";
 import {CMEvent as ActionedEventEntity, CMEvent } from "../Common/Entities/CMEvent";
 import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
 import globrex from 'globrex';
@@ -144,6 +153,7 @@ export interface SubredditResourceConfig extends Footer {
     credentials?: ThirdPartyCredentialsJsonConfig
     managerEntity: ManagerEntity
     botEntity: Bot
+    statFrequency: StatisticFrequencyOption
 }
 
 interface SubredditResourceOptions extends Footer {
@@ -163,6 +173,7 @@ interface SubredditResourceOptions extends Footer {
     botName: string
     managerEntity: ManagerEntity
     botEntity: Bot
+    statFrequency: StatisticFrequencyOption
 }
 
 export interface SubredditResourceSetOptions extends CacheConfig, Footer {
@@ -199,14 +210,17 @@ export class SubredditResources {
     dispatchedActivityRepo: Repository<DispatchedEntity>
     activitySourceRepo: Repository<ActivitySourceEntity>
     totalStatsRepo: Repository<TotalStat>
-    totalStatsEntities: TotalStat[] = [];
+    totalStatsEntities?: TotalStat[];
     tsStatsRepo: Repository<TimeSeriesStat>
+    timeSeriesStatsEntities?: TimeSeriesStat[];
+    statFrequency: StatisticFrequencyOption
     managerEntity: ManagerEntity
     botEntity: Bot
 
     stats: {
         cache: ResourceStats
         historical: HistoricalStatsDisplay
+        timeSeries: HistoricalStatsDisplay
     };
 
     constructor(name: string, options: SubredditResourceOptions) {
@@ -236,6 +250,7 @@ export class SubredditResources {
             botAccount,
             managerEntity,
             botEntity,
+            statFrequency,
         } = options || {};
 
         this.managerEntity = managerEntity;
@@ -249,6 +264,7 @@ export class SubredditResources {
         this.activitySourceRepo = this.database.getRepository(ActivitySourceEntity);
         this.totalStatsRepo = this.database.getRepository(TotalStat);
         this.tsStatsRepo = this.database.getRepository(TimeSeriesStat);
+        this.statFrequency = statFrequency;
         this.prefix = prefix;
         this.client = client;
         this.cacheType = cacheType;
@@ -274,6 +290,7 @@ export class SubredditResources {
         this.stats = {
             cache: cacheStats(),
             historical: createHistoricalDisplayDefaults(),
+            timeSeries: createHistoricalDisplayDefaults(),
         };
 
         const cacheUseCB = (miss: boolean) => {
@@ -350,67 +367,127 @@ export class SubredditResources {
         this.delayedItems.filter(x => x.id !== id);
     }
 
-    async initHistoricalStats() {
+    async initStats() {
         // temp migration strategy to transition from cache to db
-        let currentStats: HistoricalStatsDisplay = createHistoricalDisplayDefaults();
-        const totalStats = await this.totalStatsRepo.findBy({managerId: this.managerEntity.id});
-        if(totalStats.length === 0) {
-            const at = await this.cache.get(`${this.name}-historical-allTime`) as null | undefined | OldHistoricalStats;
-            if(at !== null && at !== undefined) {
-                // convert to historical stat object
-                const rehydratedAt: any = {};
-                for(const [k, v] of Object.entries(at)) {
-                    const t = typeof v;
-                    if(t === 'number') {
-                        // simple number stat like eventsCheckedTotal
-                        rehydratedAt[k] = v;
-                    } else if(Array.isArray(v)) {
-                        // a map stat that we have data for is serialized as an array of KV pairs
-                         const statMap = new Map(v);
-                        // @ts-ignore
-                        rehydratedAt[`${k}Total`] = Array.from(statMap.values()).reduce((acc, curr) => acc + curr, 0)
-                    } else if(v === null || v === undefined || (t === 'object' && Object.keys(v).length === 0)) {
-                        // a map stat that was not serialized (for some reason) or serialized without any data
-                        rehydratedAt[k] = 0;
+        try {
+            let currentStats: HistoricalStatsDisplay = createHistoricalDisplayDefaults();
+            const totalStats = await this.totalStatsRepo.findBy({managerId: this.managerEntity.id});
+            if (totalStats.length === 0) {
+                const at = await this.cache.get(`${this.name}-historical-allTime`) as null | undefined | OldHistoricalStats;
+                if (at !== null && at !== undefined) {
+                    // convert to historical stat object
+                    const rehydratedAt: any = {};
+                    for (const [k, v] of Object.entries(at)) {
+                        const t = typeof v;
+                        if (t === 'number') {
+                            // simple number stat like eventsCheckedTotal
+                            rehydratedAt[k] = v;
+                        } else if (Array.isArray(v)) {
+                            // a map stat that we have data for is serialized as an array of KV pairs
+                            const statMap = new Map(v);
+                            // @ts-ignore
+                            rehydratedAt[`${k}Total`] = Array.from(statMap.values()).reduce((acc, curr) => acc + curr, 0)
+                        } else if (v === null || v === undefined || (t === 'object' && Object.keys(v).length === 0)) {
+                            // a map stat that was not serialized (for some reason) or serialized without any data
+                            rehydratedAt[k] = 0;
+                        } else {
+                            // ???? shouldn't get here
+                            this.logger.warn(`Did not recognize rehydrated historical stat "${k}" of type ${t}`);
+                            rehydratedAt[k] = v;
+                        }
+                    }
+                    currentStats = rehydratedAt as HistoricalStatsDisplay;
+                }
+                const now = dayjs();
+                const statEntities: TotalStat[] = [];
+                for (const [k, v] of Object.entries(currentStats)) {
+                    statEntities.push(new TotalStat({
+                        metric: k,
+                        value: v,
+                        manager: this.managerEntity,
+                        createdAt: now,
+                    }));
+                }
+                await this.totalStatsRepo.save(statEntities);
+                this.totalStatsEntities = statEntities;
+            } else {
+                this.totalStatsEntities = totalStats;
+                for (const [k, v] of Object.entries(currentStats)) {
+                    const matchedStat = totalStats.find(x => x.metric === k);
+                    if (matchedStat !== undefined) {
+                        currentStats[k] = matchedStat.value;
                     } else {
-                        // ???? shouldn't get here
-                        this.logger.warn(`Did not recognize rehydrated historical stat "${k}" of type ${t}`);
-                        rehydratedAt[k] = v;
+                        this.logger.warn(`Could not find historical stat matching '${k}' in the database, will default to 0`);
+                        currentStats[k] = v;
                     }
                 }
-                currentStats = rehydratedAt as HistoricalStatsDisplay;
             }
-            const now = dayjs();
-            const statEntities: TotalStat[] = [];
-            for(const [k,v] of Object.entries(currentStats)) {
-                statEntities.push(new TotalStat({
-                    metric: k,
-                    value: v,
-                    manager: this.managerEntity,
-                    createdAt: now,
-                }));
-            }
-            await this.totalStatsRepo.save(statEntities);
-            this.totalStatsEntities = statEntities;
-        } else {
-            this.totalStatsEntities = totalStats;
-            for(const [k, v] of Object.entries(currentStats)) {
-                const matchedStat = totalStats.find(x => x.metric === k);
-                if(matchedStat !== undefined) {
-                    currentStats[k] = matchedStat.value;
+            this.stats.historical = currentStats;
+        } catch (e) {
+            this.logger.error(new ErrorWithCause('Failed to init historical stats', {cause: e}));
+        }
+
+        try {
+            if(this.statFrequency !== false) {
+                let currentStats: HistoricalStatsDisplay = createHistoricalDisplayDefaults();
+                let startRange = dayjs().set('second', 0);
+                for(const unit of statFrequencies) {
+                    if(unit !== 'week' && !frequencyEqualOrLargerThanMin(unit, this.statFrequency)) {
+                        startRange = startRange.set(unit, 0);
+                    }
+                    if(unit === 'week' && this.statFrequency === 'week') {
+                        // make sure we get beginning of week
+                        startRange = startRange.week(startRange.week());
+                    }
+                }
+                // set end range by +1 of whatever unit we are using
+                const endRange = this.statFrequency === 'week' ? startRange.clone().week(startRange.week() + 1) : startRange.clone().set(this.statFrequency, startRange.get(this.statFrequency) + 1);
+
+                const tsStats = await this.tsStatsRepo.findBy({
+                    managerId: this.managerEntity.id,
+                    granularity: this.statFrequency,
+                    // make sure its inclusive!
+                    _createdAt: Between(startRange.clone().subtract(1, 'second').toDate(), endRange.clone().add(1, 'second').toDate())
+                });
+
+                if(tsStats.length === 0) {
+                    const statEntities: TimeSeriesStat[] = [];
+                    for (const [k, v] of Object.entries(currentStats)) {
+                        statEntities.push(new TimeSeriesStat({
+                            metric: k,
+                            value: v,
+                            granularity: this.statFrequency,
+                            manager: this.managerEntity,
+                            createdAt: startRange,
+                        }));
+                    }
+                    this.timeSeriesStatsEntities = statEntities;
                 } else {
-                    this.logger.warn(`Could not find stat matching '${k}' in the database, will default to 0`);
-                    currentStats[k] = v;
+                    this.timeSeriesStatsEntities = tsStats;
+                }
+
+                for (const [k, v] of Object.entries(currentStats)) {
+                    const matchedStat = this.timeSeriesStatsEntities.find(x => x.metric === k);
+                    if (matchedStat !== undefined) {
+                        currentStats[k] = matchedStat.value;
+                    } else {
+                        this.logger.warn(`Could not find time series stat matching '${k}' in the database, will default to 0`);
+                        currentStats[k] = v;
+                    }
                 }
             }
+        } catch (e) {
+            this.logger.error(new ErrorWithCause('Failed to init frequency (time series) stats', {cause: e}));
         }
-        this.stats.historical = currentStats;
     }
 
     updateHistoricalStats(data: Partial<HistoricalStatsDisplay>) {
         for(const [k, v] of Object.entries(data)) {
             if(this.stats.historical[k] !== undefined && v !== undefined) {
                 this.stats.historical[k] += v;
+            }
+            if(this.stats.timeSeries[k] !== undefined && v !== undefined) {
+                this.stats.timeSeries[k] += v;
             }
         }
     }
@@ -420,16 +497,31 @@ export class SubredditResources {
     }
 
     async saveHistoricalStats() {
-        for(const [k, v] of Object.entries(this.stats.historical)) {
-            const matchedStatIndex = this.totalStatsEntities.findIndex(x => x.metric === k);
-            if(matchedStatIndex !== -1) {
-                this.totalStatsEntities[matchedStatIndex].value = v;
-            } else {
-                this.logger.warn(`Could not find stat matching '${k}' in total stats??`);
-            }
+        if(this.totalStatsEntities !== undefined) {
+            for(const [k, v] of Object.entries(this.stats.historical)) {
+                const matchedStatIndex = this.totalStatsEntities.findIndex(x => x.metric === k);
+                if(matchedStatIndex !== -1) {
+                    this.totalStatsEntities[matchedStatIndex].value = v;
+                } else {
+                    this.logger.warn(`Could not find historical stat matching '${k}' in total stats??`);
+                }
 
+            }
+            await this.totalStatsRepo.save(this.totalStatsEntities);
         }
-        await this.totalStatsRepo.save(this.totalStatsEntities);
+
+        if(this.timeSeriesStatsEntities !== undefined) {
+            for(const [k, v] of Object.entries(this.stats.timeSeries)) {
+                const matchedStatIndex = this.timeSeriesStatsEntities.findIndex(x => x.metric === k);
+                if(matchedStatIndex !== -1) {
+                    this.timeSeriesStatsEntities[matchedStatIndex].value = v;
+                } else {
+                    this.logger.warn(`Could not find time series stat matching '${k}' in total stats??`);
+                }
+
+            }
+            await this.tsStatsRepo.save(this.timeSeriesStatsEntities);
+        }
     }
 
     setHistoricalSaveInterval() {
@@ -2445,7 +2537,7 @@ export class BotResourcesManager {
         const res = this.get(subName);
         if(res === undefined || res.cacheSettingsHash !== hash) {
             resource = new SubredditResources(subName, {...opts, delayedItems: res?.delayedItems, botAccount: this.botAccount});
-            await resource.initHistoricalStats();
+            await resource.initStats();
             resource.setHistoricalSaveInterval();
             this.resources.set(subName, resource);
         } else {

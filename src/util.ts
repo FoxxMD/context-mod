@@ -47,7 +47,8 @@ import {
     RuleResult,
     RuleSetResult, RunnableBaseJson,
     RunResult,
-    SearchAndReplaceRegExp,
+    SearchAndReplaceRegExp, statFrequencies, StatisticFrequency,
+    StatisticFrequencyOption,
     StringComparisonOptions,
     StringOperator,
     StrongSubredditState,
@@ -2659,4 +2660,11 @@ export const criteriaPassWithIncludeBehavior = (passes: boolean, include: boolea
         // DOES PASS and DO NOT INCLUDE => true
         (!include && passes)
     );
+}
+
+export const frequencyEqualOrLargerThanMin = (val: StatisticFrequency, minFrequency: StatisticFrequencyOption): boolean => {
+    if(!minFrequency) {
+        return true;
+    }
+    return statFrequencies.indexOf(minFrequency) <= statFrequencies.indexOf(val);
 }

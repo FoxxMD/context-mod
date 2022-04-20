@@ -4,7 +4,7 @@ import dayjs, {Dayjs} from "dayjs";
 import {Duration} from "dayjs/plugin/duration";
 import EventEmitter from "events";
 import {
-    BotInstanceConfig,
+    BotInstanceConfig, DatabaseStatisticsOperatorConfig,
     FilterCriteriaDefaults,
     Invokee, LogInfo,
     PAUSED,
@@ -562,6 +562,7 @@ class Bot {
             flowControlDefaults: {
                 maxGotoDepth: botMaxDefault
             } = {},
+            databaseStatisticsDefaults,
             subreddits: {
                 overrides = [],
             } = {}
@@ -578,7 +579,8 @@ class Bot {
         const {
             flowControlDefaults: {
                 maxGotoDepth: subMax = undefined,
-            } = {}
+            } = {},
+            databaseStatisticsDefaults: statDefaultsFromOverride,
         } = override || {};
 
         const managerRepo = this.database.getRepository(ManagerEntity);
@@ -621,6 +623,7 @@ class Bot {
             maxGotoDepth: subMax ?? botMaxDefault,
             botEntity: this.botEntity,
             managerEntity: managerEntity as ManagerEntity,
+            statDefaults: (statDefaultsFromOverride ?? databaseStatisticsDefaults) as DatabaseStatisticsOperatorConfig,
         });
         // all errors from managers will count towards bot-level retry count
         manager.on('error', async (err) => await this.panicOnRetries(err));
