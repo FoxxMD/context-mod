@@ -415,7 +415,7 @@ export abstract class Check extends RunnableBase implements ICheck {
                 actionsRunTotal: checkResult.actionResults !== undefined ? checkResult.actionResults.length : undefined,
                 rulesRunTotal: currentResults.length,
                 rulesTriggeredTotal: currentResults.filter(x => x.triggered).length,
-                rulesCachedTotal: currentResults.length - (new Set(...currentResults.map(x => x.id))).size
+                rulesCachedTotal: currentResults.length - (new Set(currentResults.map(x => x.id))).size
             })
         }
     }
