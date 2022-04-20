@@ -19,6 +19,8 @@ import { QueueRunState } from "./EntityRunState/QueueRunState";
 import {EventsRunState} from "./EntityRunState/EventsRunState";
 import {RulePremise} from "./RulePremise";
 import {ActionPremise} from "./ActionPremise";
+import { RunningStateTypes } from "../../Subreddit/Manager";
+import {EntityRunState} from "./EntityRunState/EntityRunState";
 
 export interface ManagerEntityOptions {
     name: string
@@ -29,8 +31,12 @@ export interface ManagerEntityOptions {
     managerState: ManagerRunState
 }
 
+export type RunningStateEntities = {
+    [key in RunningStateTypes]: EntityRunState;
+};
+
 @Entity({name: 'Manager'})
-export class ManagerEntity extends RandomIdBaseEntity {
+export class ManagerEntity extends RandomIdBaseEntity implements RunningStateEntities {
 
     @Column("varchar", {length: 200})
     name!: string;
@@ -56,15 +62,15 @@ export class ManagerEntity extends RandomIdBaseEntity {
     @OneToMany(type => RunEntity, obj => obj.manager) // note: we will create author property in the Photo class below
     runs!: Promise<RunEntity[]>
 
-    @OneToOne(() => EventsRunState, {cascade: ['insert'], eager: true})
+    @OneToOne(() => EventsRunState, {cascade: ['insert', 'update'], eager: true})
     @JoinColumn()
     eventsState!: EventsRunState
 
-    @OneToOne(() => QueueRunState, {cascade: ['insert'], eager: true})
+    @OneToOne(() => QueueRunState, {cascade: ['insert', 'update'], eager: true})
     @JoinColumn()
     queueState!: QueueRunState
 
-    @OneToOne(() => ManagerRunState, {cascade: ['insert'], eager: true})
+    @OneToOne(() => ManagerRunState, {cascade: ['insert', 'update'], eager: true})
     @JoinColumn()
     managerState!: ManagerRunState
 

@@ -544,6 +544,7 @@ class Bot {
 
     async initManager(manager: Manager) {
         try {
+            await manager.syncRunningStates();
             await manager.parseConfiguration('system', true, {suppressNotification: true, suppressChangeEvent: true});
         } catch (err: any) {
             if(err.logged !== true) {

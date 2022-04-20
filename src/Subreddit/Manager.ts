@@ -74,7 +74,7 @@ import {ErrorWithCause, stackWithCauses} from "pony-cause";
 import {Run} from "../Run";
 import got from "got";
 import {Bot as BotEntity} from "../Common/Entities/Bot";
-import {ManagerEntity as ManagerEntity} from "../Common/Entities/ManagerEntity";
+import {ManagerEntity as ManagerEntity, RunningStateEntities} from "../Common/Entities/ManagerEntity";
 import {isRuleSet} from "../Rule/RuleSet";
 import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
 import {RunResultEntity} from "../Common/Entities/RunResultEntity";
@@ -91,6 +91,12 @@ import {EntityRunState} from "../Common/Entities/EntityRunState/EntityRunState";
 export interface RunningState {
     state: RunState,
     causedBy: Invokee
+}
+
+export type RunningStateTypes = 'managerState' | 'eventsState' | 'queueState';
+
+export type RunningStates = {
+    [key in RunningStateTypes]: RunningState
 }
 
 export interface runCheckOptions {
@@ -128,7 +134,7 @@ interface QueuedIdentifier {
     state: 'queued' | 'processing'
 }
 
-export class Manager extends EventEmitter {
+export class Manager extends EventEmitter implements RunningStates {
     subreddit: Subreddit;
     botEntity: BotEntity;
     managerEntity: ManagerEntity;
@@ -315,9 +321,9 @@ export class Manager extends EventEmitter {
 
         this.managerEntity = managerEntity;
         // always init in stopped state but use last invokee to determine if we should start the manager automatically afterwards
-        this.eventsState = {state: STOPPED, causedBy: managerEntity.eventsState.invokee.name};
-        this.queueState = {state: STOPPED, causedBy: managerEntity.queueState.invokee.name};
-        this.managerState = {state: STOPPED, causedBy: managerEntity.managerState.invokee.name};
+        this.eventsState = this.setInitialRunningState(managerEntity, 'eventsState');
+        this.queueState = this.setInitialRunningState(managerEntity, 'queueState');
+        this.managerState = this.setInitialRunningState(managerEntity, 'managerState');
 
         this.client = client;
         this.botName = botName;
@@ -1517,10 +1523,22 @@ export class Manager extends EventEmitter {
         await this.syncRunningState('managerState');
     }
 
-    async syncRunningState(type: string) {
-        // @ts-ignore
+    setInitialRunningState(managerEntity: RunningStateEntities, type: RunningStateTypes): RunningState {
+        if(managerEntity[type].runType.name === 'stopped' && managerEntity[type].invokee.name === 'user') {
+            return {state: STOPPED, causedBy: 'user'};
+        }
+        return {state: STOPPED, causedBy: 'system'};
+    }
+
+    async syncRunningStates() {
+        for(const s of ['managerState','eventsState','queueState'] as RunningStateTypes[]) {
+            await this.syncRunningState(s);
+        }
+    }
+
+    async syncRunningState(type: RunningStateTypes) {
+
         this.managerEntity[type].invokee = await this.cacheManager.invokeeRepo.findOneBy({name: this[type].causedBy}) as InvokeeType
-        // @ts-ignore
         this.managerEntity[type].runType = await this.cacheManager.runTypeRepo.findOneBy({name: this[type].state}) as RunStateType
 
         await this.cacheManager.defaultDatabase.getRepository(ManagerEntity).save(this.managerEntity);
