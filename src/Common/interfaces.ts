@@ -2647,6 +2647,24 @@ export interface TextMatchOptions {
 export type ActivityCheckJson = SubmissionCheckJson | CommentCheckJson;
 
 export type GotoPath = `goto:${string}`;
+
+/**
+ * Possible outputs to store event details to
+ * */
+export type RecordOutputType = 'database' | 'influx';
+
+export const recordOutputTypes: RecordOutputType[] = ['database', 'influx'];
+
+/**
+ * Possible options for output:
+ * 
+ * * true -> store to all
+ * * false -> store to none
+ * * string -> store to this one output
+ * * list -> store to these specified outputs
+ * */
+export type RecordOutputOption = boolean | RecordOutputType | RecordOutputType[]
+
 /**
  * The possible behaviors that can occur after a check has run
  *
@@ -2656,7 +2674,18 @@ export type GotoPath = `goto:${string}`;
  * * goto:[path] => specify a run[.check] to jump to
  *
  * */
-export type PostBehaviorTypes = 'next' | 'stop' | 'nextRun' | string;
+export type PostBehaviorType = 'next' | 'stop' | 'nextRun' | string;
+
+export interface PostBehaviorOptionConfig {
+    recordTo?: RecordOutputOption
+    behavior?: PostBehaviorType
+}
+
+export interface PostBehaviorOptionConfigStrong extends Required<Omit<PostBehaviorOptionConfig, 'recordTo'>> {
+    recordTo: RecordOutputType[]
+}
+
+export type PostBehaviorOption = PostBehaviorType | PostBehaviorOptionConfig;
 
 export interface PostBehavior {
     /**
@@ -2665,14 +2694,19 @@ export interface PostBehavior {
      * @default nextRun
      * @example ["nextRun"]
      * */
-    postTrigger?: PostBehaviorTypes
+    postTrigger?: PostBehaviorOption
     /**
      * Do this behavior if a Check is NOT triggered
      *
      * @default next
      * @example ["next"]
      * */
-    postFail?: PostBehaviorTypes
+    postFail?: PostBehaviorOption
+}
+
+export interface PostBehaviorStrong {
+    postTrigger: PostBehaviorOptionConfigStrong
+    postFail: PostBehaviorOptionConfigStrong
 }
 
 export type ActivityType = 'submission' | 'comment';

@@ -3,8 +3,8 @@ import {
     ActionResult,
     ActivityCheckJson, AuthorCriteria, AuthorOptions, CheckResult, CheckSummary,
     FilterCriteriaDefaults, FilterResult,
-    PostBehavior,
-    PostBehaviorTypes, RuleResult, RunnableBaseJson, RunnableBaseOptions, RunResult, StructuredRunnableBase,
+    PostBehavior, PostBehaviorOption,
+    PostBehaviorType, RuleResult, RunnableBaseJson, RunnableBaseOptions, RunResult, StructuredRunnableBase,
     TypedActivityStates
 } from "../Common/interfaces";
 import {SubmissionCheck} from "../Check/SubmissionCheck";
@@ -28,8 +28,8 @@ export class Run extends RunnableBase {
     name: string;
     submissionChecks: SubmissionCheck[] = [];
     commentChecks: CommentCheck[] = [];
-    postFail?: PostBehaviorTypes;
-    postTrigger?: PostBehaviorTypes;
+    postFail?: PostBehaviorOption;
+    postTrigger?: PostBehaviorOption;
     filterCriteriaDefaults?: FilterCriteriaDefaults
     logger: Logger;
     client: ExtendedSnoowrap;

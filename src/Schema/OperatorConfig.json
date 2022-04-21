@@ -1270,14 +1270,61 @@
         "PostBehavior": {
             "properties": {
                 "postFail": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/definitions/PostBehaviorOptionConfig"
+                        },
+                        {
+                            "type": "string"
+                        }
+                    ],
                     "default": "next",
-                    "description": "Do this behavior if a Check is NOT triggered",
-                    "type": "string"
+                    "description": "Do this behavior if a Check is NOT triggered"
                 },
                 "postTrigger": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/definitions/PostBehaviorOptionConfig"
+                        },
+                        {
+                            "type": "string"
+                        }
+                    ],
                     "default": "nextRun",
-                    "description": "Do this behavior if a Check is triggered",
+                    "description": "Do this behavior if a Check is triggered"
+                }
+            },
+            "type": "object"
+        },
+        "PostBehaviorOptionConfig": {
+            "properties": {
+                "behavior": {
+                    "description": "The possible behaviors that can occur after a check has run\n\n* next => continue to next Check/Run\n* stop => stop CM lifecycle for this activity (immediately end)\n* nextRun => skip any remaining Checks in this Run and start the next Run\n* goto:[path] => specify a run[.check] to jump to",
                     "type": "string"
+                },
+                "recordTo": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "description": "Possible outputs to store event details to",
+                                "enum": [
+                                    "database",
+                                    "influx"
+                                ],
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "enum": [
+                                "database",
+                                false,
+                                "influx",
+                                true
+                            ]
+                        }
+                    ],
+                    "description": "Possible options for output:\n\n* true -> store to all\n* false -> store to none\n* string -> store to this one output\n* list -> store to these specified outputs"
                 }
             },
             "type": "object"

@@ -1264,6 +1264,11 @@ export class initApi1642180264563 implements MigrationInterface {
                         isNullable: false
                     },
                     {
+                        name: 'recordOutputs',
+                        type: 'text',
+                        isNullable: true
+                    },
+                    {
                         name: 'checkName',
                         type: 'varchar',
                         length: '50',

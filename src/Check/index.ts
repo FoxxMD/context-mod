@@ -6,6 +6,7 @@ import Snoowrap, {Comment, Submission} from "snoowrap";
 import {actionFactory} from "../Action/ActionFactory";
 import {ruleFactory} from "../Rule/RuleFactory";
 import {
+    asPostBehaviorOptionConfig,
     boolToString,
     createAjvFactory, determineNewResults,
     FAIL, isRuleSetResult,
@@ -27,8 +28,8 @@ import {
     JoinOperands, MinimalOrFullFilter,
     MinimalOrFullFilterJson,
     NotificationEventPayload,
-    PostBehavior,
-    PostBehaviorTypes,
+    PostBehavior, PostBehaviorOptionConfig, PostBehaviorOptionConfigStrong, PostBehaviorStrong,
+    PostBehaviorType, RecordOutputType, recordOutputTypes,
     RuleResult,
     RuleSetResult, RunnableBaseJson,
     RunnableBaseOptions, StructuredRunnableBase,
@@ -72,7 +73,7 @@ interface RuleResults {
     results: (RuleSetResult | RuleResultEntity)[]
 }
 
-export abstract class Check extends RunnableBase implements ICheck {
+export abstract class Check extends RunnableBase implements Omit<ICheck, 'postTrigger' | 'postFail'>, PostBehaviorStrong {
     actions: Action[] = [];
     description?: string;
     name: string;
@@ -84,8 +85,8 @@ export abstract class Check extends RunnableBase implements ICheck {
     dryRun?: boolean;
     notifyOnTrigger: boolean;
     client: ExtendedSnoowrap;
-    postTrigger: PostBehaviorTypes;
-    postFail: PostBehaviorTypes;
+    postTrigger: PostBehaviorOptionConfigStrong;
+    postFail: PostBehaviorOptionConfigStrong;
     emitter: EventEmitter;
     runEntity!: RunEntity;
     checkEntity!: CheckEntity;
@@ -124,8 +125,59 @@ export abstract class Check extends RunnableBase implements ICheck {
         this.description = description;
         this.notifyOnTrigger = notifyOnTrigger;
         this.condition = condition;
-        this.postTrigger = postTrigger;
-        this.postFail = postFail;
+
+        if(asPostBehaviorOptionConfig(postTrigger)) {
+            const {
+                behavior = 'nextRun',
+                recordTo = true
+            } = postTrigger;
+            let recordStrong: RecordOutputType[] = [];
+            if(typeof recordTo === 'boolean') {
+                if(recordTo) {
+                    recordStrong = recordOutputTypes;
+                }
+            } else if(Array.isArray(recordTo)) {
+                recordStrong = recordTo;
+            } else {
+                recordStrong = [recordTo];
+            }
+            this.postTrigger = {
+                behavior: behavior as PostBehaviorType,
+                recordTo: recordStrong
+            }
+        } else {
+            this.postTrigger = {
+                behavior: postTrigger,
+                recordTo: recordOutputTypes
+            }
+        }
+
+        if(asPostBehaviorOptionConfig(postFail)) {
+            const {
+                behavior = 'next',
+                recordTo = false
+            } = postFail;
+            let recordStrong: RecordOutputType[] = [];
+            if(typeof recordTo === 'boolean') {
+                if(recordTo) {
+                    recordStrong = recordOutputTypes;
+                }
+            } else if(Array.isArray(recordTo)) {
+                recordStrong = recordTo;
+            } else {
+                recordStrong = [recordTo];
+            }
+            this.postFail = {
+                behavior: behavior as PostBehaviorType,
+                recordTo: recordStrong
+            }
+        } else {
+            this.postFail = {
+                behavior: postFail,
+                recordTo: []
+            }
+        }
+
         this.cacheUserResult = {
             ...userResultCacheDefault,
             ...cacheUserResult
@@ -265,7 +317,8 @@ export abstract class Check extends RunnableBase implements ICheck {
         let checkResult = new CheckResultEntity();
         checkResult.condition = this.condition;
         checkResult.check = this.checkEntity;
-        checkResult.postBehavior = this.postFail;
+        checkResult.postBehavior = this.postFail.behavior;
+        checkResult.recordOutputs = this.postFail.recordTo.length === 0 ? undefined : this.postFail.recordTo;
         checkResult.fromCache = false;
         //checkResult.ruleResults = [];
         //checkResult.actionResults = [];
@@ -342,8 +395,9 @@ export abstract class Check extends RunnableBase implements ICheck {
             let behaviorT: string;
 
             if (checkResult.triggered) {
-                checkResult.postBehavior = this.postTrigger;
-                checkSum.postBehavior = this.postTrigger;
+                checkResult.postBehavior = this.postTrigger.behavior;
+                checkResult.recordOutputs = this.postTrigger.recordTo.length === 0 ? undefined : this.postTrigger.recordTo;
+                checkSum.postBehavior = this.postTrigger.behavior;
 
                 try {
                     checkResult.actionResults = await this.runActions(activity, currentResults.filter(x => x.triggered), options);
@@ -375,8 +429,9 @@ export abstract class Check extends RunnableBase implements ICheck {
                     }
                 }
             } else {
-                checkResult.postBehavior = this.postFail;
-                checkSum.postBehavior = this.postFail;
+                checkResult.postBehavior = this.postFail.behavior;
+                checkResult.recordOutputs = this.postFail.recordTo.length === 0 ? undefined : this.postFail.recordTo;
+                checkSum.postBehavior = this.postFail.behavior;
             }
 
             behaviorT = checkSum.triggered ? 'Trigger' : 'Fail';

@@ -18,7 +18,7 @@ import {
     AuthorCriteria,
     FilterResult as IFilterResult,
     FilterResult,
-    JoinOperands, RuleSetResult,
+    JoinOperands, RecordOutputType, RuleSetResult,
     TypedActivityState
 } from "../interfaces";
 import {RandomIdBaseEntity} from "./Base/RandomIdBaseEntity";
@@ -40,6 +40,7 @@ export interface CheckResultEntityOptions {
     check: CheckEntity
     run: RunResultEntity
     postBehavior: string;
+    recordOutputs?: RecordOutputType[];
 }
 
 @Entity({name: 'CheckResult'})
@@ -73,6 +74,9 @@ export class CheckResultEntity extends TimeAwareRandomBaseEntity {
 
     @Column("varchar", {length: 50, nullable: true})
     postBehavior!: string
+
+    @Column('simple-array', {nullable: true})
+    recordOutputs?: RecordOutputType[];
 
     @OneToMany(type => CheckToRuleResultEntity, obj => obj.runnable, {cascade: ['insert'], nullable: true, eager: true})
     ruleResults?: CheckToRuleResultEntity[]
@@ -184,6 +188,7 @@ export class CheckResultEntity extends TimeAwareRandomBaseEntity {
             this.actionResults = data.actionResults;
             this.check = data.check;
             this.postBehavior = data.postBehavior;
+            this.recordOutputs = data.recordOutputs;
         }
     }
 

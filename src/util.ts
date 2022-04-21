@@ -35,7 +35,7 @@ import {
     LogInfo, MaybeAnonymousCriteria, MinimalOrFullFilter, NamedCriteria,
     OperatorJsonConfig,
     PermalinkRedditThings,
-    PollingOptionsStrong,
+    PollingOptionsStrong, PostBehaviorOptionConfig,
     RedditEntity,
     RedditEntityType,
     RedditThing,
@@ -2667,4 +2667,14 @@ export const frequencyEqualOrLargerThanMin = (val: StatisticFrequency, minFreque
         return true;
     }
     return statFrequencies.indexOf(minFrequency) <= statFrequencies.indexOf(val);
+}
+
+export const asPostBehaviorOptionConfig = (val: any): val is PostBehaviorOptionConfig => {
+    if (null === val) {
+        return false;
+    }
+    if (typeof val === 'object') {
+        return 'recordTo' in val || 'behavior' in val;
+    }
+    return false;
 }
