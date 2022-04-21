@@ -113,15 +113,15 @@ export abstract class Rule extends RunnableBase implements Omit<IRule, 'authorIs
 
             if (itemRes !== undefined && !itemRes.passed) {
                 const filterBehavior = (this.itemIs.exclude ?? []).length > 0 ? 'exclusive' : 'inclusive';
-                this.logger.verbose(`(Skipped) ${filterBehavior} Item did not pass 'itemIs' test`);
+                this.logger.verbose(`${filterBehavior} Item did not pass 'itemIs' test`);
                 res.result = `${filterBehavior} Item did not pass 'itemIs' test`;
-                return Promise.resolve([null, res]);
+                return Promise.resolve([false, res]);
             }
             if(authorRes !== undefined && !authorRes.passed) {
                 const filterBehavior = (this.authorIs.exclude ?? []).length > 0 ? 'exclusive' : 'inclusive';
-                this.logger.verbose(`(Skipped) ${filterBehavior} Author criteria not matched`);
-                res.result = `${filterBehavior} author criteria not matched`;
-                return Promise.resolve([null, res]);
+                this.logger.verbose(`${filterBehavior} Author criteria not matched`);
+                res.result = `${filterBehavior} Item did not pass 'authorIs' test`;
+                return Promise.resolve([false, res]);
             }
         } catch (err: any) {
             this.logger.error('Error occurred during Rule pre-process checks');

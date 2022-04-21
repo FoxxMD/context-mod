@@ -192,14 +192,12 @@ For detailed explanation and options of what individual Actions can do [see the 
 
 ### Filters
 
-**Runs, Checks, Rules, and Actions** all have two additional (optional) criteria "tests". These tests behave differently than rule/check triggers in that:
+**Runs, Checks, Rules, and Actions** all have two additional (optional) criteria "pre-tests". These tests are different from rules/checks in these ways:
 
-* When they **pass** the thing being tested continues to process as usual
-* When they **fail** the thing being tested **is skipped, not failed.**
-
-For **Runs**, **Checks**, and **Actions** skipping means that the thing is not processed. The Action is not run, the Check is not triggered.
-
-In the context of **Rules** (in a Check) skipping means the Rule does not get run BUT it does not fail. The Check will continue processing as if the Rule did not exist. However, if ALL Rules in a Check are skipped then the Check does "fail" (is not triggered).
+* Filters test against the **current state** of the Activity (or it's Author) being processed, rather than looking at history/context/etc...
+* Filter test results only determine if the Run, Check, Rule, or Action **should run** -- rather than triggering it
+  * When the filter test **passes** the thing being tested continues to process as usual
+  * When the filter test **fails** the thing being tested **fails**.
 
 #### Available Filters
 
