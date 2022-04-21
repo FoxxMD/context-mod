@@ -49,6 +49,7 @@ export interface SubredditDataResponse {
     hardLimit?: number
     heartbeatHuman?: string
     heartbeat: number
+    retention: string
 }
 
 export interface BotStatusResponse {

@@ -1018,6 +1018,7 @@ export const buildOperatorConfigWithDefaults = async (data: OperatorJsonConfig):
         databaseConfig: {
             connection: dbConnection = (process.env.DB_DRIVER ?? 'sqljs') as DatabaseDriverType,
             migrations = {},
+            retention,
         } = {},
         web: {
             port = 8085,
@@ -1153,6 +1154,7 @@ export const buildOperatorConfigWithDefaults = async (data: OperatorJsonConfig):
         databaseConfig: {
             connection: dbConfig,
             migrations,
+            retention,
         },
         userAgent,
         web: {
@@ -1205,6 +1207,9 @@ export const buildBotConfig = (data: BotInstanceJsonConfig, opConfig: OperatorCo
         userAgent,
         database,
         databaseStatisticsDefaults: statDefaultsFromOp,
+        databaseConfig: {
+            retention: retentionFromOp,
+        } = {},
     } = opConfig;
     const {
         name: botName,
@@ -1227,6 +1232,9 @@ export const buildBotConfig = (data: BotInstanceJsonConfig, opConfig: OperatorCo
         } = {},
         snoowrap = snoowrapOp,
         databaseStatisticsDefaults = {},
+        databaseConfig: {
+            retention,
+        } = {},
         flowControlDefaults,
         credentials = {},
         subreddits: {
@@ -1355,6 +1363,9 @@ export const buildBotConfig = (data: BotInstanceJsonConfig, opConfig: OperatorCo
         postCheckBehaviorDefaults,
         database,
         databaseStatisticsDefaults: botLevelStatDefaults,
+        databaseConfig: {
+          retention: retention ?? retentionFromOp
+        },
         subreddits: {
             names,
             exclude,

@@ -175,6 +175,8 @@
                                                 </span>
                                                 <label>Slow Mode</label>
                                                 <span class="delayBy"><%= data.delayBy %></span>
+                                                <label>Retention</label>
+                                                <span><%= data.retention %></span>
                                             <% } %>
                                             <% if (data.name === 'All') { %>
                                                     <label>Status</label>
@@ -230,18 +232,18 @@
                                                     </span>
                                                 </span>
                                             </label>
-                                                <span>
-                                                    <span class="runningActivities"><%= data.runningActivities %></span> Processing /
-                                                    <span class="queuedActivities"><%= data.queuedActivities %></span> Queued /
-                                                    <span class="has-tooltip">
-                                                        <span style="margin-top:35px"
-                                                              class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2 space-y-3 p-2 text-left delayedItemsList'>
-                                                        </span>
-                                                    <span class="underline" style="text-decoration-style: dotted"><span class="delayedItemsCount"><%= data.delayedItems.length %></span> Delayed</span>
+                                            <span>
+                                                <span class="runningActivities"><%= data.runningActivities %></span> Processing /
+                                                <span class="queuedActivities"><%= data.queuedActivities %></span> Queued /
+                                                <span class="has-tooltip">
+                                                    <span style="margin-top:35px"
+                                                          class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2 space-y-3 p-2 text-left delayedItemsList'>
                                                     </span>
+                                                <span class="underline" style="text-decoration-style: dotted"><span class="delayedItemsCount"><%= data.delayedItems.length %></span> Delayed</span>
                                                 </span>
-                                                <label>Operated By</label>
-                                                <span><%= operatorDisplay %></span>
+                                            </span>
+                                            <label>Operated By</label>
+                                            <span><%= operatorDisplay %></span>
                                             <% if (data.name === 'All' && isOperator) { %>
                                                 <label>Operators</label>
                                                 <span><%= operators %></span>

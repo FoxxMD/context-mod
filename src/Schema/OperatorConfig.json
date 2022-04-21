@@ -210,6 +210,25 @@
                         }
                     ]
                 },
+                "databaseConfig": {
+                    "properties": {
+                        "retention": {
+                            "anyOf": [
+                                {
+                                    "$ref": "#/definitions/DurationObject"
+                                },
+                                {
+                                    "type": [
+                                        "string",
+                                        "number"
+                                    ]
+                                }
+                            ],
+                            "description": "Number of Events, or time range of events were processed during, that should continue to be stored in the database PER SUBREDDIT\n\nAny Events falling outside this criteria will be deleted\n\nLeave unspecified to disable deleting anything\n\nThis will override operator-level retention"
+                        }
+                    },
+                    "type": "object"
+                },
                 "databaseStatisticsDefaults": {
                     "$ref": "#/definitions/DatabaseStatisticsOperatorJsonConfig",
                     "description": "Set defaults for the frequency time series stats are collected. Will override top-level defaults"
@@ -656,6 +675,62 @@
                 "type",
                 "url"
             ],
+            "type": "object"
+        },
+        "DurationObject": {
+            "additionalProperties": false,
+            "description": "A [Day.js duration object](https://day.js.org/docs/en/durations/creating)",
+            "examples": [
+                {
+                    "hours": 1,
+                    "minutes": 30
+                }
+            ],
+            "minProperties": 1,
+            "properties": {
+                "days": {
+                    "examples": [
+                        7
+                    ],
+                    "type": "number"
+                },
+                "hours": {
+                    "examples": [
+                        4
+                    ],
+                    "type": "number"
+                },
+                "minutes": {
+                    "examples": [
+                        50
+                    ],
+                    "type": "number"
+                },
+                "months": {
+                    "examples": [
+                        3
+                    ],
+                    "type": "number"
+                },
+                "seconds": {
+                    "examples": [
+                        15
+                    ],
+                    "type": "number"
+                },
+                "weeks": {
+                    "examples": [
+                        2
+                    ],
+                    "type": "number"
+                },
+                "years": {
+                    "examples": [
+                        0
+                    ],
+                    "type": "number"
+                }
+            },
             "type": "object"
         },
         "FilterCriteriaDefaults": {
@@ -1607,6 +1682,25 @@
         },
         "SubredditOverrides": {
             "properties": {
+                "databaseConfig": {
+                    "properties": {
+                        "retention": {
+                            "anyOf": [
+                                {
+                                    "$ref": "#/definitions/DurationObject"
+                                },
+                                {
+                                    "type": [
+                                        "string",
+                                        "number"
+                                    ]
+                                }
+                            ],
+                            "description": "Number of Events, or time range of events were processed during, that should continue to be stored in the database.\n\nAny Events falling outside this criteria will be deleted\n\nLeave unspecified to disable deleting anything\n\nThis will override any retention value set in the subreddit's config"
+                        }
+                    },
+                    "type": "object"
+                },
                 "databaseStatisticsDefaults": {
                     "$ref": "#/definitions/DatabaseStatisticsOperatorJsonConfig",
                     "description": "Set defaults for the frequency time series stats are collected. Will override bot-level defaults"
@@ -1812,6 +1906,20 @@
                 },
                 "migrations": {
                     "$ref": "#/definitions/DatabaseMigrationOptions"
+                },
+                "retention": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/definitions/DurationObject"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "number"
+                            ]
+                        }
+                    ],
+                    "description": "Number of Events, or time range of events were processed during, that should continue to be stored in the database PER SUBREDDIT\n\nAny Events falling outside this criteria will be deleted\n\nLeave unspecified to disable deleting anything"
                 }
             },
             "type": "object"

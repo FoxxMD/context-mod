@@ -55,7 +55,7 @@ import {
     userNoteCriteriaSummary,
     asComment,
     criteriaPassWithIncludeBehavior,
-    isRuleSetResult, frequencyEqualOrLargerThanMin
+    isRuleSetResult, frequencyEqualOrLargerThanMin, parseDurationValToDuration
 } from "../util";
 import LoggedError from "../Utils/LoggedError";
 import {
@@ -91,7 +91,7 @@ import {
     JoinOperands,
     NamedCriteria,
     ModeratorNameCriteria,
-    StatisticFrequency, StatisticFrequencyOption, statFrequencies
+    StatisticFrequency, StatisticFrequencyOption, statFrequencies, EventRetentionPolicyRange, DurationVal
 } from "../Common/interfaces";
 import UserNotes from "./UserNotes";
 import Mustache from "mustache";
@@ -106,7 +106,7 @@ import {
 import {ExtendedSnoowrap} from "../Utils/SnoowrapClients";
 import dayjs from "dayjs";
 import ImageData from "../Common/ImageData";
-import {DataSource, Repository, SelectQueryBuilder, Between} from "typeorm";
+import {DataSource, Repository, SelectQueryBuilder, Between, LessThan, DeleteQueryBuilder} from "typeorm";
 import {CMEvent as ActionedEventEntity, CMEvent } from "../Common/Entities/CMEvent";
 import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
 import globrex from 'globrex';
@@ -154,6 +154,7 @@ export interface SubredditResourceConfig extends Footer {
     managerEntity: ManagerEntity
     botEntity: Bot
     statFrequency: StatisticFrequencyOption
+    retention?: EventRetentionPolicyRange
 }
 
 interface SubredditResourceOptions extends Footer {
@@ -174,6 +175,7 @@ interface SubredditResourceOptions extends Footer {
     managerEntity: ManagerEntity
     botEntity: Bot
     statFrequency: StatisticFrequencyOption
+    retention?: EventRetentionPolicyRange
 }
 
 export interface SubredditResourceSetOptions extends CacheConfig, Footer {
@@ -214,6 +216,7 @@ export class SubredditResources {
     tsStatsRepo: Repository<TimeSeriesStat>
     timeSeriesStatsEntities?: TimeSeriesStat[];
     statFrequency: StatisticFrequencyOption
+    retention?: EventRetentionPolicyRange
     managerEntity: ManagerEntity
     botEntity: Bot
 
@@ -251,6 +254,7 @@ export class SubredditResources {
             managerEntity,
             botEntity,
             statFrequency,
+            retention
         } = options || {};
 
         this.managerEntity = managerEntity;
@@ -265,6 +269,7 @@ export class SubredditResources {
         this.totalStatsRepo = this.database.getRepository(TotalStat);
         this.tsStatsRepo = this.database.getRepository(TimeSeriesStat);
         this.statFrequency = statFrequency;
+        this.retention = retention;
         this.prefix = prefix;
         this.client = client;
         this.cacheType = cacheType;
@@ -282,9 +287,9 @@ export class SubredditResources {
         this.botAccount = botAccount;
         if (logger === undefined) {
             const alogger = winston.loggers.get('app')
-            this.logger = alogger.child({labels: [this.name, 'Resource Cache']}, mergeArr);
+            this.logger = alogger.child({labels: [this.name, 'Resources']}, mergeArr);
         } else {
-            this.logger = logger.child({labels: ['Resource Cache']}, mergeArr);
+            this.logger = logger.child({labels: ['Resources']}, mergeArr);
         }
 
         this.stats = {
@@ -311,6 +316,92 @@ export class SubredditResources {
                     // prune interval should be twice the smallest TTL
                 },min * 1000 * 2)
             }
+        }
+
+        if(this.retention === undefined) {
+            this.logger.verbose('Events will be stored in database indefinitely.', {leaf: 'Event Retention'});
+        } else if(typeof this.retention === 'number') {
+            this.logger.verbose(`Will retain the last ${this.retention} events in database`, {leaf: 'Event Retention'});
+        } else {
+            try {
+                const dur = parseDurationValToDuration(this.retention as DurationVal);
+                this.logger.verbose(`Will retain events processed within the last ${dur.humanize()} in database`, {leaf: 'Event Retention'});
+            } catch (e) {
+                this.retention = undefined;
+                this.logger.error(new ErrorWithCause('Could not parse retention as a valid duration. Retention enforcement is disabled.', {cause: e}));
+            }
+        }
+    }
+
+    async retentionCleanup() {
+        const logger = this.logger.child({labels: ['Event Retention'], mergeArr});
+        logger.debug('Starting cleanup');
+        if (this.retention === undefined) {
+            logger.debug('Nothing to cleanup because there is no retention policy! finished.');
+            return;
+        }
+        let count = 0;
+
+        try {
+            let deleteQuery: DeleteQueryBuilder<CMEvent>; // = this.database.getRepository(CMEvent).createQueryBuilder();
+
+            if (typeof this.retention === 'number') {
+                const idQuery = this.database.getRepository(CMEvent).createQueryBuilder('event');
+                idQuery
+                    .select('event.id')
+                    .where({manager: {id: this.managerEntity.id}})
+                    .orderBy('event._processedAt', 'DESC')
+                    .skip(this.retention);
+
+                const res = await idQuery.getRawMany();
+                count = res.length;
+
+                deleteQuery = this.database.getRepository(CMEvent).createQueryBuilder()
+                    .delete()
+                    .from(CMEvent, 'event')
+                    .whereInIds(res.map(x => x.event_id));
+
+                logger.debug(`Found ${count} Events past the first ${this.retention}`);
+            } else {
+                const dur = parseDurationValToDuration(this.retention as DurationVal);
+
+                const date = dayjs().subtract(dur.asSeconds(), 'second');
+
+                const res = await this.database.getRepository(CMEvent).createQueryBuilder('event')
+                    .select('event.id')
+                    .where({_processedAt: LessThan(date.toDate())})
+                    .andWhere('event.manager.id = :managerId', {managerId: this.managerEntity.id})
+                    .getRawMany();
+
+                count = res.length;
+
+                // for some reason cannot use "normal" where conditions for delete builder -- can only use "raw" parameters
+                // so have to use same approach as number and just whereIn all ids from count query
+
+                // deleteQuery = this.database.getRepository(CMEvent).createQueryBuilder()
+                //     .delete()
+                //     .from(CMEvent, 'event')
+                //     .where({_processedAt: LessThan(date.toDate())})
+                //     .andWhere('event.manager.id = :managerId', {managerId: this.managerEntity.id})
+
+                deleteQuery = this.database.getRepository(CMEvent).createQueryBuilder()
+                    .delete()
+                    .from(CMEvent, 'event')
+                    .whereInIds(res.map(x => x.event_id));
+
+                logger.debug(`Found ${count} Events older than ${date.format('YY-MM-DD HH:mm:ss z')} (${dur.humanize()})`);
+            }
+
+            if (count === 0) {
+                logger.debug('Nothing to be done, finished.');
+                return;
+            }
+
+            logger.debug(`Deleting Events...`);
+            await deleteQuery.execute();
+            logger.info(`Successfully enforced retention policy. ${count} Events deleted.`);
+        } catch (e) {
+            logger.error(new ErrorWithCause('Failed to enforce retention policy due to an error', {cause: e}));
         }
     }
 
@@ -680,7 +771,7 @@ export class SubredditResources {
     }
 
     setLogger(logger: Logger) {
-        this.logger = logger.child({labels: ['Resource Cache']}, mergeArr);
+        this.logger = logger.child({labels: ['Resources']}, mergeArr);
     }
 
     async getActionedEventsBuilder(): Promise<SelectQueryBuilder<CMEvent>> {
@@ -2401,6 +2492,7 @@ export class BotResourcesManager {
     botAccount?: string;
     defaultDatabase: DataSource
     botName!: string
+    retention?: EventRetentionPolicyRange
 
     invokeeRepo: Repository<InvokeeType>
     runTypeRepo: Repository<RunStateType>
@@ -2426,6 +2518,9 @@ export class BotResourcesManager {
                 ...thirdParty
             },
             database,
+            databaseConfig: {
+                retention
+            } = {},
             caching,
         } = config;
         caching.provider.prefix = buildCachePrefix([caching.provider.prefix, 'SHARED']);
@@ -2439,6 +2534,7 @@ export class BotResourcesManager {
         this.logger = logger;
         this.invokeeRepo = this.defaultDatabase.getRepository(InvokeeType);
         this.runTypeRepo = this.defaultDatabase.getRepository(RunStateType);
+        this.retention = retention;
 
         const options = provider;
         this.cacheType = options.store;
@@ -2470,7 +2566,7 @@ export class BotResourcesManager {
 
     async set(subName: string, initOptions: SubredditResourceConfig): Promise<SubredditResources> {
         let hash = 'default';
-        const { caching, credentials, ...init } = initOptions;
+        const { caching, credentials, retention, ...init } = initOptions;
 
         // const bEntity = await this.defaultDatabase.getRepository(Bot).findOne({where: {name: this.botName}}) as Bot;
         // //const subreddit = this.defaultDatabase.getRepository(SubredditEntity).findOne({name: initOptions.subreddit.display_name});
@@ -2494,6 +2590,7 @@ export class BotResourcesManager {
             actionedEventsMax: this.actionedEventsMaxDefault !== undefined ? Math.min(this.actionedEventsDefault, this.actionedEventsMaxDefault) : this.actionedEventsDefault,
             database: this.defaultDatabase,
             botName: this.botName,
+            retention: retention ?? this.retention,
             ...init,
         };
 
@@ -2523,6 +2620,7 @@ export class BotResourcesManager {
                     prefix: subPrefix,
                     botName: this.botName,
                     database: this.defaultDatabase,
+                    retention: retention ?? this.retention,
                     ...init,
                     ...trueRest,
                 };

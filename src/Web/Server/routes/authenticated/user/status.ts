@@ -5,12 +5,12 @@ import {
     filterLogBySubreddit, filterLogs,
     formatNumber,
     intersect,
-    LogEntry, logSortFunc,
+    LogEntry, logSortFunc, parseDurationValToDuration,
     pollingInfo
 } from "../../../../../util";
 import {Manager} from "../../../../../Subreddit/Manager";
 import dayjs from "dayjs";
-import {LogInfo, ResourceStats, RUNNING, STOPPED, SYSTEM} from "../../../../../Common/interfaces";
+import {DurationVal, LogInfo, ResourceStats, RUNNING, STOPPED, SYSTEM} from "../../../../../Common/interfaces";
 import {BotStatusResponse} from "../../../../Common/interfaces";
 import winston from "winston";
 import {opStats} from "../../../../Common/util";
@@ -72,6 +72,19 @@ const status = () => {
                     limit: limit as string,
                     returnType: 'object'
                 }) as LogInfo[]: [];
+
+            let retention = 'Unknown';
+            if (m.resources !== undefined) {
+                if (m.resources.retention === undefined) {
+                    retention = 'Indefinite';
+                } else if (typeof m.resources.retention === 'number') {
+                    retention = `Last ${m.resources.retention}`;
+                } else {
+                    const dur = parseDurationValToDuration(m.resources.retention as DurationVal);
+                    retention = `Last ${dur.humanize()}`;
+                }
+            }
+
             const sd = {
                 name: m.displayLabel,
                 //linkName: s.replace(/\W/g, ''),
@@ -105,6 +118,7 @@ const status = () => {
                 startedAt: 'Not Started',
                 startedAtHuman: 'Not Started',
                 delayBy: m.delayBy === undefined ? 'No' : `Delayed by ${m.delayBy} sec`,
+                retention,
             };
             // TODO replace indicator data with js on client page
             let indicator;

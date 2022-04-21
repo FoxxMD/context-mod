@@ -67,6 +67,7 @@ class Bot {
     nannyRetryHandler: Function;
     managerRetryHandler: Function;
     nextExpiration: Dayjs = dayjs();
+    nextRetentionCheck: Dayjs = dayjs();
     botName?: string;
     botLink?: string;
     botAccount?: string;
@@ -581,6 +582,9 @@ class Bot {
                 maxGotoDepth: subMax = undefined,
             } = {},
             databaseStatisticsDefaults: statDefaultsFromOverride,
+            databaseConfig: {
+                retention = undefined
+            } = {},
         } = override || {};
 
         const managerRepo = this.database.getRepository(ManagerEntity);
@@ -624,6 +628,7 @@ class Bot {
             botEntity: this.botEntity,
             managerEntity: managerEntity as ManagerEntity,
             statDefaults: (statDefaultsFromOverride ?? databaseStatisticsDefaults) as DatabaseStatisticsOperatorConfig,
+            retention,
         });
         // all errors from managers will count towards bot-level retry count
         manager.on('error', async (err) => await this.panicOnRetries(err));
@@ -739,7 +744,8 @@ class Bot {
             if (!this.running) {
                 break;
             }
-            if (dayjs().isSameOrAfter(this.nextNannyCheck)) {
+            const now = dayjs();
+            if (now.isSameOrAfter(this.nextNannyCheck)) {
                 try {
                     await this.runApiNanny();
                     this.nextNannyCheck = dayjs().add(10, 'second');
@@ -748,7 +754,7 @@ class Bot {
                     this.nextNannyCheck = dayjs().add(240, 'second');
                 }
             }
-            if(dayjs().isSameOrAfter(this.nextHeartbeat)) {
+            if(now.isSameOrAfter(this.nextHeartbeat)) {
                 try {
                     await this.heartbeat();
                     await this.checkModInvites();
@@ -757,8 +763,22 @@ class Bot {
                 }
                 this.nextHeartbeat = dayjs().add(this.heartbeatInterval, 'second');
             }
+            // run without awaiting as we don't know how long this might take and we don't want to pause the whole healthloop for it
+            this.retentionCleanup();
         }
         this.emitter.emit('healthStopped');
+    }
+
+    async retentionCleanup() {
+        const now = dayjs();
+        if(now.isSameOrAfter(this.nextRetentionCheck)) {
+            this.nextRetentionCheck = dayjs().add(30, 'minute');
+            for(const m of this.subManagers) {
+                if(m.resources !== undefined) {
+                    await m.resources.retentionCleanup();
+                }
+            }
+        }
     }
 
     async heartbeat() {

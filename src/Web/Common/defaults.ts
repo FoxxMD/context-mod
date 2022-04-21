@@ -67,7 +67,8 @@ const sub: SubredditDataResponse = {
     wikiLastCheckHuman: "-",
     wikiLocation: "-",
     wikiRevision: "-",
-    wikiRevisionHuman: "-"
+    wikiRevisionHuman: "-",
+    retention: 'Unknown'
 };
 
 export const defaultBotStatus = (subreddits: string[] = []) => {

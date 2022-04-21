@@ -47,7 +47,7 @@ import {
     RunState,
     STOPPED,
     SYSTEM,
-    USER, RuleResult, DatabaseStatisticsOperatorConfig, recordOutputTypes
+    USER, RuleResult, DatabaseStatisticsOperatorConfig, recordOutputTypes, EventRetentionPolicyRange
 } from "../Common/interfaces";
 import Submission from "snoowrap/dist/objects/Submission";
 import {activityIsRemoved, ItemContent, itemContentPeek} from "../Utils/SnoowrapUtils";
@@ -159,6 +159,7 @@ export class Manager extends EventEmitter implements RunningStates {
     filterCriteriaDefaults?: FilterCriteriaDefaults
     postCheckBehaviorDefaults?: PostBehavior
     statDefaults: DatabaseStatisticsOperatorConfig
+    retentionOverride?: EventRetentionPolicyRange
     //wikiUpdateRunning: boolean = false;
 
     streams: Map<string, SPoll<Snoowrap.Submission | Snoowrap.Comment>> = new Map();
@@ -294,6 +295,7 @@ export class Manager extends EventEmitter implements RunningStates {
             botEntity,
             managerEntity,
             statDefaults,
+            retention
         } = opts || {};
         this.displayLabel = opts.nickname || `${sub.display_name_prefixed}`;
         const getLabels = this.getCurrentLabels;
@@ -318,6 +320,7 @@ export class Manager extends EventEmitter implements RunningStates {
         this.filterCriteriaDefaults = filterCriteriaDefaults;
         this.postCheckBehaviorDefaults = postCheckBehaviorDefaults;
         this.statDefaults = statDefaults;
+        this.retentionOverride = retention;
         this.sharedStreams = sharedStreams;
         this.pollingRetryHandler = createRetryHandler({maxRequestRetry: 3, maxOtherRetry: 2}, this.logger);
         this.subreddit = sub;
@@ -570,6 +573,7 @@ export class Manager extends EventEmitter implements RunningStates {
                     frequency = this.statDefaults.frequency,
                 } = {},
                 notifications,
+                retention,
                 queue: {
                     maxWorkers = undefined,
                 } = {},
@@ -617,6 +621,7 @@ export class Manager extends EventEmitter implements RunningStates {
                 botEntity: this.botEntity,
                 managerEntity: this.managerEntity,
                 statFrequency: realStatFrequency,
+                retention: this.retentionOverride ?? retention
             };
             this.resources = await this.cacheManager.set(this.subreddit.display_name, resourceConfig);
             this.resources.setLogger(this.logger);

@@ -5556,6 +5556,20 @@
             },
             "type": "object"
         },
+        "retention": {
+            "anyOf": [
+                {
+                    "$ref": "#/definitions/DurationObject"
+                },
+                {
+                    "type": [
+                        "string",
+                        "number"
+                    ]
+                }
+            ],
+            "description": "Number of Events, or time range of events were processed during, that should continue to be stored in the database.\n\nAny Events falling outside this criteria will be deleted\n\nLeave unspecified to disable deleting anything"
+        },
         "runs": {
             "description": "A list of sets of Checks to run",
             "items": {

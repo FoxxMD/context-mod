@@ -866,6 +866,16 @@ export interface ManagerOptions {
     postCheckBehaviorDefaults?: PostBehavior
 
     databaseStatistics?: DatabaseStatisticsJsonConfig
+
+    /**
+     * Number of Events, or time range of events were processed during, that should continue to be stored in the database.
+     *
+     * Any Events falling outside this criteria will be deleted
+     *
+     * Leave unspecified to disable deleting anything
+     *
+     * */
+    retention?: EventRetentionPolicyRange
 }
 
 /**
@@ -1658,6 +1668,18 @@ export interface SubredditOverrides {
      * Set defaults for the frequency time series stats are collected. Will override bot-level defaults
      * */
     databaseStatisticsDefaults?: DatabaseStatisticsOperatorJsonConfig
+    databaseConfig?: {
+        /**
+         * Number of Events, or time range of events were processed during, that should continue to be stored in the database.
+         *
+         * Any Events falling outside this criteria will be deleted
+         *
+         * Leave unspecified to disable deleting anything
+         *
+         * This will override any retention value set in the subreddit's config
+         * */
+        retention?: EventRetentionPolicyRange
+    }
 }
 
 /**
@@ -1705,6 +1727,19 @@ export interface BotInstanceJsonConfig {
      * Set defaults for the frequency time series stats are collected. Will override top-level defaults
      * */
     databaseStatisticsDefaults?: DatabaseStatisticsOperatorJsonConfig
+
+    databaseConfig?: {
+        /**
+         * Number of Events, or time range of events were processed during, that should continue to be stored in the database PER SUBREDDIT
+         *
+         * Any Events falling outside this criteria will be deleted
+         *
+         * Leave unspecified to disable deleting anything
+         *
+         * This will override operator-level retention
+         * */
+        retention?: EventRetentionPolicyRange
+    }
 
     /**
      * Settings related to bot behavior for subreddits it is managing
@@ -1882,6 +1917,8 @@ export interface DatabaseStatisticsOperatorConfig extends DatabaseStatisticsConf
     minFrequency: StatisticFrequencyOption
 }
 
+export type EventRetentionPolicyRange = DurationVal | number;
+
 /**
  * Configuration for application-level settings IE for running the bot instance
  *
@@ -1954,6 +1991,15 @@ export interface OperatorJsonConfig {
         // ...also including all those options makes the schema huge
         connection?: DatabaseDriverType | DatabaseDriverConfig,
         migrations?: DatabaseMigrationOptions
+        /**
+         * Number of Events, or time range of events were processed during, that should continue to be stored in the database PER SUBREDDIT
+         *
+         * Any Events falling outside this criteria will be deleted
+         *
+         * Leave unspecified to disable deleting anything
+         *
+         * */
+        retention?: EventRetentionPolicyRange
     }
 
     /**
@@ -2199,6 +2245,7 @@ export interface OperatorConfig extends OperatorJsonConfig {
     databaseConfig: {
         connection: DatabaseConfig,
         migrations: DatabaseMigrationOptions
+        retention?: EventRetentionPolicyRange
     }
     database: DataSource
     web: {
