@@ -1497,7 +1497,7 @@ export const parseRegex = (reg: RegExp, val: string): RegExResult => {
     const m = val.match(reg)
     return {
         matched: m !== null,
-        matches: m !== null ? m.slice(0) : [],
+        matches: m !== null ? m.slice(0).filter(x => x !== undefined) : [],
         global: [],
     }
 }
