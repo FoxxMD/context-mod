@@ -36,7 +36,7 @@ configuration.
 Using a file has many benefits over using ARG or ENV:
 
 * CM can automatically update your configuration
-* CM can automatically add bots via the [CM OAuth Helper](/docs/operator/addingBot.md#using-cm-oauth-helper-recommended)
+* CM can automatically add bots via the [CM OAuth Helper](/docs/operator/addingBot.md#cm-oauth-helper-recommended)
 * CM has a built-in configuration editor that can help you build and validate your configuration file
 * File config is **required** if adding multiple bots to CM
 

@@ -1,10 +1,10 @@
 # Table of Contents
 
 * [What is a Bot?](#what-is-a-bot)
-* [Prequisites](#prerequisties)
-* [Adding a Bot to CM](#adding-a-bot-tocm)
+* [Prerequisites](#Prerequisites)
+* [Adding a Bot to CM](#adding-a-bot-to-cm)
   * [Using CM OAuth Helper (Recommended)](#cm-oauth-helper-recommended)
-  * [Using Aardvark OAuth Helper](#aarvark-oauth-helper)
+  * [Using Aardvark OAuth Helper](#aardvark-oauth-helper)
 
 # What is a Bot?
 
@@ -15,11 +15,11 @@ A **reddit bot** is composed of two components:
 
 There is nothing special about the account! What's special is how its used -- through the API *with bot software* like ContextMod.
 
-# Prerequistes
+# Prerequisites
 
 These things need to be done before a Bot can be added to CM:
 
-* [Provisioned a Reddit Client](/docs/operator/README.md#provising-a-reddit-client)
+* [Provisioned a Reddit Client](/docs/operator/README.md#provisioning-a-reddit-client)
 * You or the person who controls the Bot account must have account credentials (username/password). Logging in to reddit is part of the setup process.
   * If the bot does not exist **create a reddit account for it.**
   * If the bot does exist make sure you are in communication with the owner of the account.
@@ -37,7 +37,7 @@ This method will use CM's built in oauth flow. It is recommended because:
 
 If this is your **first time adding a bot** you must make sure you have
 
-* done the [prerequisties](#prerequisites)
+* done the [prerequisites](#prerequisites)
 * created a [minimum operator configuration](/docs/operator/configuration.md#minimum-config)
   * that specifies the client id/secret from provisioning your reddit client
   * specified **Operator Name** in the configuration

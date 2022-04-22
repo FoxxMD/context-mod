@@ -53,7 +53,7 @@ npm install
 tsc -p .
 ```
 
-An example of running CM using the [minimum configuration](/docs/operator/operatorConfiguration.md#minimum-config) with a [configuration file](/docs/operator/operatorConfiguration.md#defining-configuration-via-file):
+An example of running CM using the [minimum configuration](/docs/operator/configuration.md#minimum-config) with a [configuration file](/docs/operator/configuration.md#file-configuration-recommended):
 
 ```bash
 node src/index.js run

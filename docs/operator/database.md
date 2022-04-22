@@ -92,7 +92,8 @@ A **Retention Policy** is a metric to determine what "range" of Recorded Events 
 The Retention Policy can be specified at operator level, bot, subreddit *override*, and subreddit configuration level:
 
 ```yaml
-operator:  name: u/MyRedditAccount
+operator:  
+  name: u/MyRedditAccount
 databaseConfig:
   retention: '3 months' # each subreddit will retain 3 more of recorded events
 bots:

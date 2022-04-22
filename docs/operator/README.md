@@ -13,8 +13,8 @@ They are responsible for configuring the software at a high-level and managing a
 
 * [Overview](#overview)
   * [Client-Server Architecture](/docs/serverClientArchitecture.md)
-* [Getting Started](#getting-started)
-* [Installation](#installation)
+* [Getting Started](/docs/operator/gettingStarted.md)
+* [Installation](/docs/operator/installation.md)
 * [Provisioning a Reddit Client](#provisioning-a-reddit-client)
 * [Configuration](/docs/operator/configuration.md)
 * [Adding A Bot](/docs/operator/addingBot.md)
@@ -30,9 +30,9 @@ Both applications authenticate, and are primarily operated, by using [Reddit's A
 
 In its default mode of operation CM takes care of all the interaction between **Server** and **Client** for you so that you can effectively treat it as a monolithic application. Learn more about CM's architecture and other operation modes in the [Server-Client Architecture documentation.](/docs/serverClientArchitecture.md)
 
-# [Getting Started](/doc1s/operator/gettingStarted.md)
+# [Getting Started](/docs/operator/gettingStarted.md)
 
-The [Getting Started](/doc1s/operator/gettingStarted.md) guide serves as a straight-forward "how-to" for standing up a CM server from scratch with minimal explanation.
+The [Getting Started](/docs/operator/gettingStarted.md) guide serves as a straight-forward "how-to" for standing up a CM server from scratch with minimal explanation.
 
 # [Installation](/docs/operator/installation.md)
 
@@ -42,7 +42,7 @@ CM has many installation options:
 * Built/pulled from a Docker image hosted on Dockerhub
 * Deployed to Heroku with a Quick Deploy template (experimental)
 
-Refer to the [Installation](/docs/oeprator/installation) docs for more information.
+Refer to the [Installation](/docs/operator/installation.md) docs for more information.
 
 # Provisioning A Reddit Client
 
