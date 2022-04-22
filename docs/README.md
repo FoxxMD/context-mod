@@ -30,7 +30,7 @@
 
 Review **at least** the **How It Works** and **Concepts** below, then:
 
-* For **Operators** (running a bot instance) refer to [**Operator Getting Started**](/docs/gettingStartedOperator.md)  guide
+* For **Operators** (running a bot instance) refer to [**Operator Getting Started**](/docs/operator/gettingStarted.md)  guide
 * For **Moderators** (configuring an existing bot for your subreddit) refer to the [**Moderator Getting Started**](/docs/gettingStartedMod.md) guide
 
 ## How It Works
@@ -186,7 +186,9 @@ An **Action** is some action the bot can take against the checked Activity (comm
 * Comment (Reply to Comment/Submission)
 * Lock (Comment/Submission)
 * Report (Comment/Submission)
+* Contributor -- add or remove Author of Comment/Submission as approved contributor
 * [UserNote](/docs/examples/userNotes) (User, when /r/Toolbox is used)
+* Dispatch/Delay Activity processing
 
 For detailed explanation and options of what individual Actions can do [see the links in the `actions` property in the schema.](https://json-schema.app/view/%23/%23%2Fdefinitions%2FSubmissionCheckJson?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Fcontext-mod%2Fmaster%2Fsrc%2FSchema%2FApp.json)
 
@@ -242,8 +244,8 @@ Some examples of using `authorIs` can be found in the [Author examples.](/docs/e
 
 ## Configuration And Usage
 
-* For **Operator/Bot maintainers** see **[Operation Configuration](/docs/operatorConfiguration.md)**
-  * [CLI Usage](docs/operatorConfiguration.md#cli-usage)
+* For **Operator/Bot maintainers** see **[Operation Configuration](/docs/operator/configuration.md)**
+  * [CLI Usage](operator/configuration.md#cli-usage)
 * For **Moderators** 
   * Refer to the [examples folder](/docs/examples) or the [subreddit-ready examples](/docs/examples/subredditReady)
   * as well as the [schema editor](https://json-schema.app/view/%23?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Fcontext-mod%2Fmaster%2Fsrc%2FSchema%2FApp.json) which has

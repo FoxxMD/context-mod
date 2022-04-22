@@ -1,5 +1,5 @@
 This getting started guide is for **reddit moderators** -- that is, someone who wants **an existing ContextMod bot to run on their subreddit.** If you are trying to run a ContextMod
- instance (software) please refer to the [operator getting started](/docs/gettingStartedOperator.md) guide.
+instance (software) please refer to the [operator getting started](/docs/operator/gettingStartedOperator.md) guide.
 
 # Table of Contents
 
@@ -34,7 +34,7 @@ If the Operator has communicated that **you should add a bot they control as a m
 
 * Shared api quota among other moderated subreddits (not great for high-volume subreddits)
 
-___
+---
 
 Ensure that you are in communication with the **operator** of this bot. The bot **will only accept a moderator invitation if your subreddit has been whitelisted by the operator.** This is an intentional barrier to ensure moderators and the operator are familiar with their respective needs and have some form of trust.
 
@@ -55,7 +55,7 @@ If the operator has communicated that **they want to use a bot you control** thi
 
 * **Dedicated API quota**
   * This is basically a requirement if your subreddit has high-volume activity and you plan on running checks on comments
-* More security guarantees since you control the account 
+* More security guarantees since you control the account
   * **Note:** authenticating an account does NOT give the operator access to view or change the email/password for the account
 * Established history in your subreddit
 
@@ -63,7 +63,7 @@ If the operator has communicated that **they want to use a bot you control** thi
 
 * You must have access to the credentials for the reddit account (bot)
 
-___
+---
 
 The **operator** will send you an **invite link** that you will use to authenticate your bot with the operator's application. Example link: `https://operatorsUrl.com/auth/invite?invite=4kf9n3o03ncd4nd`
 
@@ -117,11 +117,13 @@ After you have found a configuration to use as a starting point:
 CM comes equipped with a [configuration explorer](https://json-schema.app/view/%23?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Fcontext-mod%2Fmaster%2Fsrc%2FSchema%2FApp.json) to help you see all available options, with descriptions and examples, that can be used in your configuration.
 
 To create or edit a configuration you should use **CM's buit-in editor** which features:
+
 * syntax validation and formatting
 * full configuration validation with error highlighting, hints, and fixes
 * hover over properties to see documentation and examples
 
 To use the editor either:
+
 * [use your subreddit's built-in editor](#using-the-built-in-editor)
 * or use the public editor at https://cm.foxxmd.dev/config
 
@@ -148,7 +150,7 @@ In the web interface each subreddit's tab has access to the built-in editor. Use
 
 </details>
 
-___
+---
 
 The bot automatically checks for new configurations on your wiki page every 5 minutes. If your operator has the web interface accessible you may login there and force the config to update on your subreddit.
 

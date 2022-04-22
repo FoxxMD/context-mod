@@ -2,32 +2,23 @@ The **Operator** configuration refers to configuration used configure to the act
 from the **Subreddit** configuration that is defined in each Subreddit's wiki and determines the rules/actions for
 activities the Bot runs on.
 
+**The full documentation** for all options in the operator configuration can be found [**here in the operator schema.**](https://json-schema.app/view/%23?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Fcontext-mod%2Fmaster%2Fsrc%2FSchema%2FOperatorConfig.json)
+
 # Table of Contents
 
-* [Minimum Required Configuration](#minimum-required-configuration)
 * [Defining Configuration](#defining-configuration)
 * [CLI Usage](#cli-usage)
+* [Minimum Configuration](#minimum-configuration)
+* [Bots](#bots)
 * [Examples](#example-configurations)
   * [Minimum Config](#minimum-config)
   * [Using Config Overrides](#using-config-overrides)
 * [Cache Configuration](#cache-configuration)
-
-# Minimum Required Configuration
-
-| property       | Server And Web     | Server Only        | Web/Bot-Auth Only  |
-|:--------------:|:------------------:|:------------------:|:------------------:|
-| `clientId`     | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
-| `clientSecret` | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
-| `redirectUri`  | :heavy_check_mark: | :x:                | :heavy_check_mark: |
-| `refreshToken` | :heavy_check_mark: | :heavy_check_mark: | :x:                |
-| `accessToken`  | :heavy_check_mark: | :heavy_check_mark: | :x:                |
-
-Refer to the **[Bot Authentication guide](/docs/botAuthentication.md)** to retrieve credentials.
+* [Database Configuration](#database-configuration)
 
 # Defining Configuration
 
-CM can be configured using **any or all** of the approaches below. Note that **at each level ALL configuration values are
-optional** but the "required configuration" mentioned above must be available when all levels are combined.
+CM can be configured using **any or all** of the approaches below. **It is recommended to use FILE ([File Configuration](#file-configuration-recommended))**
 
 Any values defined at a **lower-listed** level of configuration will override any values from a higher-listed
 configuration.
@@ -35,20 +26,37 @@ configuration.
 * **ENV** -- Environment variables loaded from an [`.env`](https://github.com/toddbluhm/env-cmd) file (path may be
   specified with `--file` cli argument)
 * **ENV** -- Any already existing environment variables (exported on command line/terminal profile/etc.)
-* **FILE** -- Values specified in a JSON configuration file using the structure [in the schema](https://json-schema.app/view/%23?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Fcontext-mod%2Fmaster%2Fsrc%2FSchema%2FOperatorConfig.json)
+* **FILE** -- Values specified in a YAML/JSON configuration file using the structure [in the schema](https://json-schema.app/view/%23?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Fcontext-mod%2Fmaster%2Fsrc%2FSchema%2FOperatorConfig.json)
+  * When reading the **schema** if the variable is available at a level of configuration other than **FILE** it will be
+    noted with the same symbol as above. The value shown is the default.
 * **ARG** -- Values specified as CLI arguments to the program (see [ClI Usage](#cli-usage) below)
 
-**Note:** When reading the **schema** if the variable is available at a level of configuration other than **FILE** it will be
-noted with the same symbol as above. The value shown is the default.
+## File Configuration (Recommended)
 
-## Defining Configuration Via File
+Using a file has many benefits over using ARG or ENV:
 
-* **from the command line**  use the `-c` cli argument EX: `node src/index.js -c /path/to/JSON/config.json`
-* **using an environmental variable**  use `OPERATOR_CONFIG` EX: `OPERATOR_CONFIG=/path/to/JSON/config.json`
+* CM can automatically update your configuration
+* CM can automatically add bots via the [CM OAuth Helper](/docs/operator/addingBot.md#using-cm-oauth-helper-recommended)
+* CM has a built-in configuration editor that can help you build and validate your configuration file
+* File config is **required** if adding multiple bots to CM
 
-[**See the Operator Config Schema here**](https://json-schema.app/view/%23?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Fcontext-mod%2Fmaster%2Fsrc%2FSchema%2FOperatorConfig.json)
+### Specify File Location
 
-## Defining Multiple Bots or CM Instances
+By default CM will look for `config.yaml` or `config.json` in the `DATA_DIR` directory:
+
+* [Local installation](/docs/operator/installation.md#locally) -- `DATA_DIR` is the root of your installation directory (same folder as `package.json`)
+* [Docker](/docs/operator/installation.md#docker-recommended) -- `DATA_DIR` is at `/config` in the container
+
+The `DATA_DIR` directory can be changed by passing `DATA_DIR` as an environmental variable EX `DATA_DIR=/path/to/directory`
+
+The name of the config file can be changed by passing `OPERATOR_CONFIG` as an environmental variable:
+
+* As filename -- `OPERATOR_CONFIG=myConfig.yaml` -> CM looks for `/path/to/directory/myConfig.yaml`
+* As absolute path -- `OPERATOR_CONFIG=/a/path/myConfig.yaml` -> CM looks for `/a/path/myConfig.yaml`
+
+[**Refer to the Operator Config File Schema for full documentation**](https://json-schema.app/view/%23?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Fcontext-mod%2Fmaster%2Fsrc%2FSchema%2FOperatorConfig.json)
+
+### Defining Multiple Bots or CM Instances
 
 One ContextMod instance can
 
@@ -114,6 +122,85 @@ Options:
 
 </details>
 
+# Minimum Configuration
+
+The minimum configuration required to run CM assumes you have no bots and want to use CM to [add your first bot.](/docs/operator/addingBot.md#cm-oauth-helper-recommended)
+
+You will need have this information available:
+
+* From [provision a reddit client](/docs/operator/README.md#provisioning-a-reddit-client)
+  * Client ID
+  * Client Secret
+  * Redirect URI (if different from default `http://localhost:8085/callback`)
+* Operator Name -- username of the reddit account you want to use to administer CM with
+
+See the [**example minimum configuration** below.](#minimum-config)
+
+# Bots
+
+Configured using the `bots` top-level property. Bot configuration can override and specify many more options than are available at the operator-level. Many of these can also set the defaults for each subreddit the bot runs:
+
+* Of the subreddits this bot moderates, specify a subset of subreddits to run or exclude from running
+* default caching behavior
+* control the soft/hard api usage limits
+* Flow Control defaults
+* Filter Criteria defaults
+* default Polling behavior
+
+[Full documentation for all bot instance options can be found in the schema.](https://json-schema.app/view/%23/%23%2Fdefinitions%2FBotInstanceJsonConfig?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Fcontext-mod%2Fmaster%2Fsrc%2FSchema%2FOperatorConfig.json)
+
+## Adding A Bot
+
+If you use the [CM OAuth Helper](/docs/operator/addingBot.md#cm-oauth-helper-recommended) and it works successfully then the configuration for the Bot will be automatically added.
+
+### Manually Adding a Bot
+
+Add a new *object* to the `bots` property at the top-level of your configuration. If `bots` does not exist create it now.
+
+Minimum information required for a valid bot:
+
+* Client Id
+* Client Secret
+* Refresh Token
+* Access Token
+
+<details>
+<summary>Example</summary>
+
+```yaml
+operator:
+  name: YourRedditUsername
+
+bots:
+  - name: u/MyRedditBot # name is optional but highly recommend for readability in both config and web interface
+    credentials:
+      reddit:
+        clientId: f4b4df1c7b2
+        clientSecret: 34v5q1c56ub
+        accessToken: 34_f1w1v4
+        refreshToken: p75_1c467b2
+
+web:
+  credentials:
+    clientId: f4b4df1c7b2
+    clientSecret: 34v5q1c56ub
+    redirectUri: 'http://localhost:8085/callback'
+```
+
+</details>
+
+# Web Client
+
+Configured using the `web` top-level property. Allows specifying settings related to:
+
+* UI port
+* Database and caching connection, if different from global settings
+* Session max age and secret
+* Invite max age
+* Connections to CM API instances (if using multiple)
+
+[Full documentation for all web settings can be found in the schema.](https://json-schema.app/view/%23/%23%2Fproperties%2Fweb?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Fcontext-mod%2Fmaster%2Fsrc%2FSchema%2FOperatorConfig.json)
+
 # Example Configurations
 
 ## Minimum Config
@@ -121,41 +208,35 @@ Options:
 Below are examples of the minimum required config to run the application using all three config approaches independently.
 
 Using **FILE**
+
 <details>
 
-CM will look for a file configuration at `PROJECT_DIR/config.yaml` by default [or you can specify your own location.](#defining-configuration-via-file)
+See [Specify File Location](#specify-file-location) for where this file would be located.
 
-YAML
+YAML (`config.yaml`)
+
 ```yaml
 operator:
   name: YourRedditUsername
-bots:
-  - credentials:
-      clientId: f4b4df1c7b2
-      clientSecret: 34v5q1c56ub
 web:
   credentials:
     clientId: f4b4df1c7b2
     clientSecret: 34v5q1c56ub
+    redirectUri: 'http://localhost:8085/callback'
 ```
-JSON
+
+JSON (`config.json5`)
+
 ```json5
 {
   "operator": {
     "name": "YourRedditUsername"
   },
-  "bots": [
-    {
-      "credentials": {
-        "clientId": "f4b4df1c7b2",
-        "clientSecret": "34v5q1c56ub"
-      }
-    }
-  ],
   "web": {
     "credentials": {
       "clientId": "f4b4df1c7b2",
-      "clientSecret": "34v5q1c56ub"
+      "clientSecret": "34v5q1c56ub",
+      "redirectUri": "http://localhost:8085/callback"
     }
   }
 }
@@ -171,6 +252,7 @@ Using **ENV** (`.env`)
 OPERATOR=YourRedditUsername
 CLIENT_ID=f4b4df1c7b2
 CLIENT_SECRET=34v5q1c56ub
+REDIRECT_URI=http://localhost:8085/callback
 ```
 
 </details>
@@ -180,7 +262,7 @@ Using **ARG**
 <details>
 
 ```
-node src/index.js run --clientId=f4b4df1c7b2 --clientSecret=34v5q1c56ub --refreshToken=34_f1w1v4 --accessToken=p75_1c467b2
+node src/index.js run --clientId=f4b4df1c7b2 --clientSecret=34v5q1c56ub --redirectUri=http://localhost:8085/callback
 ```
 
 </details>
@@ -190,6 +272,7 @@ node src/index.js run --clientId=f4b4df1c7b2 --clientSecret=34v5q1c56ub --refres
 An example of using multiple configuration levels together IE all are provided to the application:
 
 **FILE**
+
 <details>
 
 ```json
@@ -199,7 +282,9 @@ An example of using multiple configuration levels together IE all are provided t
   }
 }
 ```
+
 YAML
+
 ```yaml
 logging:
   level: debug
@@ -213,8 +298,6 @@ logging:
 
 ```
 CLIENT_SECRET=34v5q1c56ub
-REFRESH_TOKEN=34_f1w1v4
-ACCESS_TOKEN=p75_1c467b2
 SUBREDDITS=sub1,sub2,sub3
 PORT=9008
 ```
@@ -236,8 +319,6 @@ When all three are used together they produce these variables at runtime for the
 ```
 clientId: f4b4df1c7b2
 clientSecret: 34v5q1c56ub
-refreshToken: 34_f1w1v4
-accessToken: accessToken
 subreddits: sub1
 port: 9008
 log level: debug
@@ -250,6 +331,7 @@ See the [Architecture Docs](/docs/serverClientArchitecture.md) for more informat
 <details>
 
 YAML
+
 ```yaml
 bots:
   - credentials:
@@ -272,7 +354,9 @@ web:
 api:
   secret: localSecret
 ```
+
 JSON
+
 ```json5
 {
   "bots": [
@@ -315,41 +399,8 @@ JSON
 
 # Cache Configuration
 
-CM implements two caching backend **providers**. By default all providers use `memory`:
+See the [Cache Configuration](/docs/operator/caching.md) documentation.
 
-* `memory` -- in-memory (non-persistent) backend
-* `redis` -- [Redis](https://redis.io/) backend
+# Database Configuration
 
-Each `provider` object in configuration can be specified as:
-
-* one of the above **strings** to use the **defaults settings** or
-* an **object** with keys to override default settings
-
-A caching object in the json configuration:
-
-```json5
-{
- "provider": {
-   "store": "memory", // one of "memory" or "redis"
-   "ttl": 60, // the default max age of a key in seconds
-   "max": 500, // the maximum number of keys in the cache (for "memory" only)
-   
-   // the below properties only apply to 'redis' provider
-   "host": 'localhost',
-   "port": 6379,
-   "auth_pass": null,
-   "db": 0,
- }
-}
-```
-YAML
-```yaml
-provider:
-  store: memory
-  ttl: 60
-  max: 500
-  host: localhost
-  port: 6379
-  auth_pass: null
-  db: 0
-```
+See the [Database Configuration](/docs/operator/database.md) documentation.

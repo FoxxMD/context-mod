@@ -7,7 +7,7 @@ alt="ContextMod logo" width="180" height="176">
 
 It is designed to help fill in the gaps for [automoderator](https://www.reddit.com/wiki/automoderator/full-documentation) in regard to more complex behavior with a focus on **user-history based moderation.**
 
-An example of the above that Context Bot can do now:
+An example of the above that Context Bot can do:
 
 > * On a new submission, check if the user has also posted the same link in **N** number of other subreddits within a timeframe/# of posts
 > * On a new submission or comment, check if the user has had any activity (sub/comment) in **N** set of subreddits within a timeframe/# of posts
@@ -23,13 +23,18 @@ Some feature highlights:
 * **Per-subreddit configuration** is handled by YAML (**like automoderator!**) or JSON stored in the subreddit wiki
 * Any text-based actions (comment, submission, message, usernotes, ban, etc...) can be configured via a wiki page or raw text and supports [mustache](https://mustache.github.io) [templating](/docs/actionTemplating.md)
 * History-based rules support multiple "valid window" types -- [ISO 8601 Durations](https://en.wikipedia.org/wiki/ISO_8601#Durations), [Day.js Durations](https://day.js.org/docs/en/durations/creating), and submission/comment count limits.
-* Support Activity skipping based on:
-  * Author criteria (name, css flair/text, age, karma, moderator status, and [Toolbox User Notes](https://www.reddit.com/r/toolbox/wiki/docs/usernotes))
-  * Activity state (removed, locked, distinguished, etc.)
+* Support Activity filtering based on:
+  * Author criteria (name, css flair/text, age, karma, moderator status, [Toolbox User Notes](https://www.reddit.com/r/toolbox/wiki/docs/usernotes), and more!)
+  * Activity state (removed, locked, distinguished, etc...)
 * Rules and Actions support named references (write once, reference anywhere)
+* Powerful state-machine-esque logic control (if, then, goto)
+* Delay/re-process activities using arbitrary rules
 * [**Image Comparisons**](/docs/imageComparison.md) via fingerprinting and/or pixel differences
 * [**Repost detection**](/docs/examples/repost) with support for external services (youtube, etc...)
 * Global/subreddit-level **API caching**
+* Database Persistence using SQLite, MySql, or Postgres
+  * Audit trails for bot activity
+  * Historical statistics
 * Support for [Toolbox User Notes](https://www.reddit.com/r/toolbox/wiki/docs/usernotes) as criteria or Actions (writing notes)
 * Docker container support
 * Event notification via Discord
@@ -76,7 +81,7 @@ ___
 
 This guide is for users who want to **run their own bot on a ContextMod instance.**
 
-See the [Operator's Getting Started Guide](/docs/gettingStartedOperator.md)
+See the [Operator's Getting Started Guide](/docs/operator/gettingStarted.md)
 
 #### Moderators
 
@@ -88,7 +93,7 @@ See the [Moderator's Getting Started Guide](/docs/gettingStartedMod.md)
 
 Context Bot's configuration can be written in YAML (like automoderator) or [JSON5](https://json5.org/). Its schema conforms to [JSON Schema Draft 7](https://json-schema.org/). Additionally, many **operator** settings can be passed via command line or environmental variables.
 
-* For **operators** (running the bot instance) see the [Operator Configuration](/docs/operatorConfiguration.md) guide
+* For **operators** (running the bot instance) see the [Operator Configuration](/docs/operator/configuration.md) guide
 * For **moderators** consult the [app schema and examples folder](/docs/#configuration-and-usage)
 
 [**Check the full docs for in-depth explanations of all concepts and examples**](/docs)
@@ -113,7 +118,7 @@ CM comes equipped with a dashboard designed for use by both moderators and bot o
 
 ### Bot Setup/Authentication
 
-A bot oauth helper allows operators to define oauth credentials/permissions and then generate unique, one-time invite links that allow moderators to authenticate their own bots without operator assistance. [Learn more about using the oauth helper.](docs/botAuthentication.md#cm-oauth-helper-recommended)
+A bot oauth helper allows operators to define oauth credentials/permissions and then generate unique, one-time invite links that allow moderators to authenticate their own bots without operator assistance. [Learn more about using the oauth helper.](docs/operator/addingBot.md#cm-oauth-helper-recommended)
 
 Operator view/invite link generation:
 

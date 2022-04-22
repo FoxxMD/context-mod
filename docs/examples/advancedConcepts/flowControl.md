@@ -104,7 +104,7 @@ The **Goto** behavior is an **advanced** behavior that allows you to specify tha
 
 **Goto should be use with care.** If you do not fully understand how this mechanism works you should avoid using it as **most** behaviors can be accomplished using the other behaviors. 
 
-As an additional protection **goto depth is limited to 1 by default** which means if a `goto` would be executed more than once during an Activity's lifecycle CM will automatically stop processing that Activity. The `maxGotoDepth` can be raised by the [**Bot Operator**](/docs/gettingStartedOperator.md) per subreddit.
+As an additional protection **goto depth is limited to 1 by default** which means if a `goto` would be executed more than once during an Activity's lifecycle CM will automatically stop processing that Activity. The `maxGotoDepth` can be raised by the [**Bot Operator**](/docs/operator/gettingStarted.md) per subreddit.
 
 #### Goto Syntax
 

@@ -16,7 +16,7 @@ Map port `1080:1080` -- acts as both the proxy port and the UI endpoint with the
 http(s)://localhost:1080/mockserver/dashboard
 ```
 
-In your [operator configuration](/docs/operatorConfiguration.md) define a proxy for snoowrap at the top-level:
+In your [operator configuration](/docs/operator/operatorConfiguration.md) define a proxy for snoowrap at the top-level:
 
 ```yaml
 snoowrap:
