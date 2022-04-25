@@ -2481,11 +2481,12 @@ export const isCommentState = (state: TypedActivityState): state is CommentState
 }
 const DISPATCH_REGEX: RegExp = /^dispatch:/i;
 const POLL_REGEX: RegExp = /^poll:/i;
+const USER_REGEX: RegExp = /^user:/i;
 export const asActivitySource = (val: string): val is ActivitySource => {
     if(['dispatch','poll','user'].some(x => x === val)) {
         return true;
     }
-    return DISPATCH_REGEX.test(val) || POLL_REGEX.test(val);
+    return DISPATCH_REGEX.test(val) || POLL_REGEX.test(val) || USER_REGEX.test(val);
 }
 
 export const strToActivitySource = (val: string): ActivitySource => {
@@ -2493,7 +2494,7 @@ export const strToActivitySource = (val: string): ActivitySource => {
     if (asActivitySource(cleanStr)) {
         return cleanStr;
     }
-    throw new SimpleError(`'${cleanStr}' is not a valid ActivitySource. Must be one of: dispatch, dispatch:[identifier], poll, poll:[identifier], user`);
+    throw new SimpleError(`'${cleanStr}' is not a valid ActivitySource. Must be one of: dispatch, dispatch:[identifier], poll, poll:[identifier], user, or user:[identifier]`);
 }
 
 export const prefixToReddThingType = (prefix: string): FullNameTypes => {

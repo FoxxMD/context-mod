@@ -125,6 +125,7 @@ import {RunStateType} from "../Common/Entities/RunStateType";
 import {CheckResultEntity} from "../Common/Entities/CheckResultEntity";
 import {RuleSetResultEntity} from "../Common/Entities/RuleSetResultEntity";
 import {RulePremise} from "../Common/Entities/RulePremise";
+import cloneDeep from "lodash/cloneDeep";
 
 export const DEFAULT_FOOTER = '\r\n*****\r\nThis action was performed by [a bot.]({{botLink}}) Mention a moderator or [send a modmail]({{modmailLink}}) if you any ideas, questions, or concerns about this action.';
 
@@ -1380,14 +1381,14 @@ export class SubredditResources {
             } else {
                 this.stats.cache.authorCrit.miss++;
                 cachedAuthorTest = await this.isAuthor(item, authorOpts, include);
-                cachedAuthorTest.criteria = authorOptsObj;
+                cachedAuthorTest.criteria = cloneDeep(authorOptsObj);
                 await this.cache.set(hash, cachedAuthorTest, {ttl: this.filterCriteriaTTL});
                 return cachedAuthorTest;
             }
         }
 
         const res = await this.isAuthor(item, authorOpts, include);
-        res.criteria = authorOptsObj;
+        res.criteria = cloneDeep(authorOptsObj);
         return res;
     }
 
@@ -1396,7 +1397,7 @@ export class SubredditResources {
         if(Object.keys(activityState).length === 0) {
             return {
                 behavior: include ? 'include' : 'exclude',
-                criteria: activityStateObj,
+                criteria: cloneDeep(activityStateObj),
                 propertyResults: [],
                 passed: true
             }
@@ -1424,7 +1425,7 @@ export class SubredditResources {
 
                     return {
                         behavior: include ? 'include' : 'exclude',
-                        criteria: activityStateObj,
+                        criteria: cloneDeep(activityStateObj),
                         propertyResults: Object.values(propResultsMap),
                         passed: false
                     }
@@ -1456,7 +1457,7 @@ export class SubredditResources {
                         itemResult.propertyResults.push(runtimeRes.propertyResults.find(x => x.property === 'source') as FilterCriteriaPropertyResult<TypedActivityState>);
                     }
                 }
-                itemResult.criteria = activityStateObj;
+                itemResult.criteria = cloneDeep(activityStateObj);
                 return itemResult;
             } catch (err: any) {
                 if (err.logged !== true) {
@@ -1467,7 +1468,7 @@ export class SubredditResources {
         }
 
         const res = await this.isItem(i, activityState, logger, include, source);
-        res.criteria = activityStateObj;
+        res.criteria = cloneDeep(activityStateObj);
         return res;
     }
 
@@ -1970,7 +1971,7 @@ export class SubredditResources {
 
         return {
             behavior: include ? 'include' : 'exclude',
-            criteria: {criteria: stateCriteria},
+            criteria: {criteria: cloneDeep(stateCriteria)},
             propertyResults: propResults,
             passed,
         };
@@ -2355,7 +2356,7 @@ export class SubredditResources {
 
         return {
             behavior: include ? 'include' : 'exclude',
-            criteria: {criteria: authorOpts},
+            criteria: {criteria: cloneDeep(authorOpts)},
             propertyResults: propResults,
             passed,
         };
@@ -2792,20 +2793,21 @@ export const checkItemFilter = async (item: (Submission | Comment), filter: Item
                     propResultsMap.submissionState = subPropertyResult;
                     critResult = {
                         behavior: 'include',
-                        criteria: namedState,
+                        criteria: cloneDeep(namedState),
                         propertyResults: Object.values(propResultsMap),
                         passed: false
                     }
                 } else {
                     critResult = await resources.testItemCriteria(item, {criteria: restCommentState}, parentLogger, true, source);
-                    critResult.criteria = namedState;
+                    critResult.criteria = cloneDeep(namedState);
                     critResult.propertyResults.unshift(subPropertyResult);
                 }
             } else {
                 critResult = await resources.testItemCriteria(item, namedState, parentLogger, true, source);
             }
 
-            if(critResult.propertyResults.some(x => x.property === 'source')) {
+            if(critResult.propertyResults.some(x => x.property === 'source')
+            && critResult.criteria.criteria.source === undefined) {
                 critResult.criteria.criteria.source = source;
             }
 
@@ -2846,13 +2848,13 @@ export const checkItemFilter = async (item: (Submission | Comment), filter: Item
                     propResultsMap.submissionState = subPropertyResult;
                     critResult = {
                         behavior: 'include',
-                        criteria: namedState,
+                        criteria: {...namedState},
                         propertyResults: Object.values(propResultsMap),
                         passed: false
                     }
                 } else {
                     critResult = await resources.testItemCriteria(item, {criteria: restCommentState}, parentLogger, false, source);
-                    critResult.criteria = namedState;
+                    critResult.criteria = {...namedState};
                     critResult.propertyResults.unshift(subPropertyResult);
                 }
             } else {
