@@ -154,7 +154,7 @@ export abstract class Action extends RunnableBase {
                 actRes.runReason = runReason;
                 return actRes;
             }
-            const results = await this.process(item, ruleResults, runtimeDryrun);
+            const results = await this.process(item, ruleResults, options);
             actRes.success = results.success;
             actRes.dryRun = results.dryRun;
             actRes.result = results.result;
@@ -172,7 +172,12 @@ export abstract class Action extends RunnableBase {
         }
     }
 
-    abstract process(item: Comment | Submission, ruleResults: RuleResultEntity[], runtimeDryun?: boolean): Promise<ActionProcessResult>;
+    abstract process(item: Comment | Submission, ruleResults: RuleResultEntity[], options: runCheckOptions): Promise<ActionProcessResult>;
+
+    getRuntimeAwareDryrun(options: runCheckOptions): boolean {
+        const {dryRun: runtimeDryrun} = options;
+        return runtimeDryrun || this.dryRun;
+    }
 }
 
 export interface ActionOptions extends Omit<ActionConfig, 'authorIs' | 'itemIs'>, RunnableBaseOptions {

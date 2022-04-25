@@ -129,6 +129,21 @@ export class DispatchedEntity extends TimeAwareRandomBaseEntity {
                 this.cancelIfQueued = JSON.parse(cVal) as NonDispatchActivitySource[];
             }
         }
+        if(this.goto === null) {
+            this.goto = undefined;
+        }
+        if(this.action === null) {
+            this.action = undefined;
+        }
+        if(this.identifier === null) {
+            this.identifier = undefined;
+        }
+        if(this.cancelIfQueued === null) {
+            this.cancelIfQueued = undefined;
+        }
+        if(this.onExistingFound === null) {
+            this.onExistingFound = undefined;
+        }
     }
 
     async toActivityDispatch(client: ExtendedSnoowrap): Promise<ActivityDispatch> {

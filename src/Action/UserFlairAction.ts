@@ -3,6 +3,7 @@ import {Comment, RedditUser, Submission} from 'snoowrap';
 import {ActionProcessResult, RuleResult} from '../Common/interfaces';
 import {ActionTypes} from "../Common/types";
 import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
+import {runCheckOptions} from "../Subreddit/Manager";
 
 export class UserFlairAction extends Action {
   text?: string;
@@ -21,8 +22,8 @@ export class UserFlairAction extends Action {
     return 'userflair';
   }
 
-  async process(item: Comment | Submission, ruleResults: RuleResultEntity[], runtimeDryrun?: boolean): Promise<ActionProcessResult> {
-    const dryRun = runtimeDryrun || this.dryRun;
+  async process(item: Comment | Submission, ruleResults: RuleResultEntity[], options: runCheckOptions): Promise<ActionProcessResult> {
+    const dryRun = this.getRuntimeAwareDryrun(options);
     let flairParts = [];
 
     if (this.flair_template_id !== undefined) {

@@ -6,6 +6,7 @@ import Submission from "snoowrap/dist/objects/Submission";
 import Comment from "snoowrap/dist/objects/Comment";
 import {ActionTypes} from "../Common/types";
 import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
+import {runCheckOptions} from "../Subreddit/Manager";
 
 export class ContributorAction extends Action {
 
@@ -24,8 +25,8 @@ export class ContributorAction extends Action {
         this.actionType = action;
     }
 
-    async process(item: Comment | Submission, ruleResults: RuleResultEntity[], runtimeDryrun?: boolean): Promise<ActionProcessResult> {
-        const dryRun = runtimeDryrun || this.dryRun;
+    async process(item: Comment | Submission, ruleResults: RuleResultEntity[], options: runCheckOptions): Promise<ActionProcessResult> {
+        const dryRun = this.getRuntimeAwareDryrun(options);
 
         const contributors = await this.resources.getSubredditContributors();
 

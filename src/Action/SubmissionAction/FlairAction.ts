@@ -5,6 +5,7 @@ import Submission from 'snoowrap/dist/objects/Submission';
 import Comment from 'snoowrap/dist/objects/Comment';
 import {ActionTypes} from "../../Common/types";
 import {RuleResultEntity} from "../../Common/Entities/RuleResultEntity";
+import {runCheckOptions} from "../../Subreddit/Manager";
 
 export class FlairAction extends Action {
     text: string;
@@ -25,8 +26,8 @@ export class FlairAction extends Action {
         return 'flair';
     }
 
-    async process(item: Comment | Submission, ruleResults: RuleResultEntity[], runtimeDryrun?: boolean): Promise<ActionProcessResult> {
-        const dryRun = runtimeDryrun || this.dryRun;
+    async process(item: Comment | Submission, ruleResults: RuleResultEntity[], options: runCheckOptions): Promise<ActionProcessResult> {
+        const dryRun = this.getRuntimeAwareDryrun(options);
         let flairParts = [];
         if(this.text !== '') {
             flairParts.push(`Text: ${this.text}`);

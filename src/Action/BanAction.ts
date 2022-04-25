@@ -5,6 +5,7 @@ import {renderContent} from "../Utils/SnoowrapUtils";
 import {ActionProcessResult, Footer, RuleResult} from "../Common/interfaces";
 import {ActionTypes} from "../Common/types";
 import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
+import {runCheckOptions} from "../Subreddit/Manager";
 
 export class BanAction extends Action {
 
@@ -34,8 +35,8 @@ export class BanAction extends Action {
         return 'ban';
     }
 
-    async process(item: Comment | Submission, ruleResults: RuleResultEntity[], runtimeDryrun?: boolean): Promise<ActionProcessResult> {
-        const dryRun = runtimeDryrun || this.dryRun;
+    async process(item: Comment | Submission, ruleResults: RuleResultEntity[], options: runCheckOptions): Promise<ActionProcessResult> {
+        const dryRun = this.getRuntimeAwareDryrun(options);
         const content = this.message === undefined ? undefined : await this.resources.getContent(this.message, item.subreddit);
         const renderedBody = content === undefined ? undefined : await renderContent(content, item, ruleResults, this.resources.userNotes);
         const renderedContent = renderedBody === undefined ? undefined : `${renderedBody}${await this.resources.generateFooter(item, this.footer)}`;

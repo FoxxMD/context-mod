@@ -621,10 +621,18 @@
                             <br/>
                             <div class="flex items-center justify-between flex-wrap">
                                 <div class="inline-flex items-center">
-                                    <input data-subreddit="<%= data.name %>" style="min-width: 420px;"
+                                    <div class="relative" style="width:550px; display: inline-block;">
+                                    <input data-subreddit="<%= data.name %>"
+                                           style="width: 100%;"
                                            class="border-gray-50 placeholder-gray-500 rounded mt-2 mb-3 p-2 text-black checkUrl"
                                            placeholder="<%= data.name === 'All' ? 'Run Bot on a permalink from any moderated Subreddit' : `Run Bot on a permalink using this Subreddit's config` %>"/>
-
+                                        <div class="absolute inset-y-0 right-0 flex items-center">
+                                            <select id="delayOption" name="delayOption" class="py-0 pl-2 pr-1 outline-0 focus:outline-0 focus:shadow-none border-transparent bg-white text-gray-500 sm:text-sm">
+                                                <option value="asis">As-Is</option>
+                                                <option value="disable">Disable Delays</option>
+                                            </select>
+                                        </div>
+                                    </div>
                                     <a class="hover:bg-gray-700 pointer-events-none opacity-20 no-underline rounded-md mx-4 py-2 px-3 border checkActions dryRunCheck" data-subreddit="<%= data.name %>" href="">Dry Run</a>
                                     <a class="hover:bg-gray-700 pointer-events-none opacity-20 no-underline rounded-md py-2 px-3 border checkActions runCheck" data-subreddit="<%= data.name %>" href="">Run</a>
                                 </div>
@@ -744,6 +752,7 @@
             const subreddit = e.target.dataset.subreddit;
             const subFilter = `.sub[data-subreddit="${subreddit}"]`;
             const urlInput = document.querySelector(`${subFilter} .checkUrl`);
+            const delayOpt = document.querySelector(`${subFilter} #delayOption`).value;
 
             const isDryun = e.target.classList.contains('dryRunCheck');
 
@@ -751,7 +760,7 @@
             bot = subSection.dataset.bot;
             const url = urlInput.value;
 
-            const fetchUrl = `/api/check?instance=<%= instanceId %>&bot=${bot}&url=${url}&dryRun=${isDryun ? 1 : 0}&subreddit=${subreddit}`;
+            const fetchUrl = `/api/check?instance=<%= instanceId %>&bot=${bot}&url=${url}&dryRun=${isDryun ? 1 : 0}&subreddit=${subreddit}&delayOption=${delayOpt}`;
             fetch(fetchUrl);
 
             urlInput.value = '';

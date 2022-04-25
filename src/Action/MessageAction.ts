@@ -15,6 +15,7 @@ import {SimpleError} from "../Utils/Errors";
 import {ErrorWithCause} from "pony-cause";
 import {ActionTypes} from "../Common/types";
 import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
+import {runCheckOptions} from "../Subreddit/Manager";
 
 export class MessageAction extends Action {
     content: string;
@@ -47,8 +48,8 @@ export class MessageAction extends Action {
         return 'message';
     }
 
-    async process(item: Comment | Submission, ruleResults: RuleResultEntity[], runtimeDryrun?: boolean): Promise<ActionProcessResult> {
-        const dryRun = runtimeDryrun || this.dryRun;
+    async process(item: Comment | Submission, ruleResults: RuleResultEntity[], options: runCheckOptions): Promise<ActionProcessResult> {
+        const dryRun = this.getRuntimeAwareDryrun(options);
         const content = await this.resources.getContent(this.content);
         const body = await renderContent(content, item, ruleResults, this.resources.userNotes);
 

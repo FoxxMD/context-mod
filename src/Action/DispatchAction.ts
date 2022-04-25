@@ -7,6 +7,7 @@ import dayjs from "dayjs";
 import {activityDispatchConfigToDispatch, isSubmission, parseDurationValToDuration, randomId} from "../util";
 import {ActionTypes} from "../Common/types";
 import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
+import {runCheckOptions} from "../Subreddit/Manager";
 
 export class DispatchAction extends Action {
     dispatchData: ActivityDispatchConfig;
@@ -38,7 +39,7 @@ export class DispatchAction extends Action {
         this.targets = !Array.isArray(target) ? [target] : target;
     }
 
-    async process(item: Comment | Submission, ruleResults: RuleResultEntity[], runtimeDryrun?: boolean): Promise<ActionProcessResult> {
+    async process(item: Comment | Submission, ruleResults: RuleResultEntity[], options: runCheckOptions): Promise<ActionProcessResult> {
         // ignore runtimeDryrun here because "real run" isn't causing any reddit api calls to happen
         // -- basically if bot is in dryrun this should still run since we want the "full effect" of the bot
         // BUT if the action explicitly sets 'dryRun: true' then do not dispatch as they probably don't want to it actually going (intention?)
@@ -57,7 +58,8 @@ export class DispatchAction extends Action {
             }
         }
 
-        const dur = parseDurationValToDuration(this.dispatchData.delay);
+        const runtimeDelay = options.disableDispatchDelays === true ? '1 second' : this.dispatchData.delay;
+        const dur = parseDurationValToDuration(runtimeDelay);
 
         const dispatchActivitiesHints = [];
         for (const target of realTargets) {
@@ -101,7 +103,7 @@ export class DispatchAction extends Action {
             }
 
             if (!dryRun) {
-                await this.resources.addDelayedActivity(activityDispatchConfigToDispatch(this.dispatchData, act, 'dispatch', this.getActionUniqueName()))
+                await this.resources.addDelayedActivity(activityDispatchConfigToDispatch({...this.dispatchData, delay: runtimeDelay}, act, 'dispatch', this.getActionUniqueName()))
             }
         }
         let dispatchBehaviors = [];

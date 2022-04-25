@@ -7,6 +7,7 @@ import dayjs from "dayjs";
 import {isSubmission} from "../util";
 import {ActionTypes} from "../Common/types";
 import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
+import {runCheckOptions} from "../Subreddit/Manager";
 
 export class RemoveAction extends Action {
     spam: boolean;
@@ -23,8 +24,8 @@ export class RemoveAction extends Action {
         this.spam = spam;
     }
 
-    async process(item: Comment | Submission, ruleResults: RuleResultEntity[], runtimeDryrun?: boolean): Promise<ActionProcessResult> {
-        const dryRun = runtimeDryrun || this.dryRun;
+    async process(item: Comment | Submission, ruleResults: RuleResultEntity[], options: runCheckOptions): Promise<ActionProcessResult> {
+        const dryRun = this.getRuntimeAwareDryrun(options);
         const touchedEntities = [];
         // issue with snoowrap typings, doesn't think prop exists on Submission
         // @ts-ignore

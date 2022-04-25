@@ -110,6 +110,7 @@ export interface runCheckOptions {
     source: ActivitySource
     initialGoto?: string
     activitySource: ActivitySourceData
+    disableDispatchDelays?: boolean
 }
 
 export interface CheckTask {

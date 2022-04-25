@@ -129,7 +129,7 @@ export const actionedEventsRoute = [authUserCheck(), botRoute(), subredditRoute(
 const action = async (req: Request, res: Response) => {
     const bot = req.serverBot;
 
-    const {url, dryRun = false, subreddit} = req.query as any;
+    const {url, dryRun = false, subreddit, delayOption = 'asis'} = req.query as any;
     const {name: userName} = req.user as Express.User;
 
     let a;
@@ -171,6 +171,7 @@ const action = async (req: Request, res: Response) => {
         await manager.firehose.push({
             activity, options: {
                 dryRun: dr,
+                disableDispatchDelays: delayOption !== 'asis',
                 force: true,
                 source: `user:${userName}`,
                 activitySource: {

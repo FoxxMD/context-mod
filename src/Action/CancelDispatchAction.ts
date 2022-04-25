@@ -13,6 +13,7 @@ import dayjs from "dayjs";
 import {isSubmission, parseDurationValToDuration} from "../util";
 import {ActionTypes} from "../Common/types";
 import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
+import {runCheckOptions} from "../Subreddit/Manager";
 
 export class CancelDispatchAction extends Action {
     identifiers?: (string | null)[];
@@ -36,7 +37,7 @@ export class CancelDispatchAction extends Action {
         this.targets = !Array.isArray(target) ? [target] : target;
     }
 
-    async process(item: Comment | Submission, ruleResults: RuleResultEntity[], runtimeDryrun?: boolean): Promise<ActionProcessResult> {
+    async process(item: Comment | Submission, ruleResults: RuleResultEntity[], options: runCheckOptions): Promise<ActionProcessResult> {
         // see note in DispatchAction about missing runtimeDryrun
         const dryRun = this.dryRun;
 

@@ -4,14 +4,15 @@ import Snoowrap, {Comment, Submission} from "snoowrap";
 import {ActionProcessResult, RuleResult} from "../Common/interfaces";
 import {ActionTypes} from "../Common/types";
 import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
+import {runCheckOptions} from "../Subreddit/Manager";
 
 export class LockAction extends Action {
     getKind(): ActionTypes {
         return 'lock';
     }
 
-    async process(item: Comment | Submission, ruleResults: RuleResultEntity[], runtimeDryrun?: boolean): Promise<ActionProcessResult> {
-        const dryRun = runtimeDryrun || this.dryRun;
+    async process(item: Comment | Submission, ruleResults: RuleResultEntity[], options: runCheckOptions): Promise<ActionProcessResult> {
+        const dryRun = this.getRuntimeAwareDryrun(options);
         const touchedEntities = [];
         //snoowrap typing issue, thinks comments can't be locked
         // @ts-ignore
