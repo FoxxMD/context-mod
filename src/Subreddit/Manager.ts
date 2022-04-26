@@ -1321,10 +1321,6 @@ export class Manager extends EventEmitter implements RunningStates {
         } else if (!this.validConfigLoaded) {
             this.logger.warn('Cannot start activity processing queue while manager has an invalid configuration');
         } else {
-            if(this.queueState.state === STOPPED) {
-                // extra precaution to make sure queue meta is cleared before starting queue
-                this.queuedItemsMeta = [];
-            }
             this.queue.resume();
             this.firehose.resume();
             this.logger.info(`Activity processing queue started RUNNING with ${this.queue.length()} queued activities`);
