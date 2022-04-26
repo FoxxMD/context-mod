@@ -1,6 +1,6 @@
 ### Named Rules
 
-See **Rule Name Reuse Examples [YAML](/docs/examples/advancedConcepts/ruleNameReuse.yaml) | [JSON](/docs/examples/advancedConcepts/ruleNameReuse.json5)**
+See **Rule Name Reuse Examples [YAML](/docs/components/advancedConcepts/ruleNameReuse.yaml) | [JSON](/docs/components/advancedConcepts/ruleNameReuse.json5)**
 
 ### Check Order and Flow Control
 
@@ -8,7 +8,7 @@ Checks are run in the order they appear in your configuration, therefore you sho
 
 This is so that if an Activity warrants a more serious reaction that Check is triggered first rather than having a lower requirement check with less severe actions triggered and causing all subsequent Checks to be skipped. 
 
-This behavior can also be controlled modified using [Flow Control](/docs/examples/advancedConcepts/flowControl.md)
+This behavior can also be controlled modified using [Flow Control](/docs/components/advancedConcepts/flowControl.md)
 
 * Attribution >50% AND Repeat Activity 8x AND Recent Activity in 2 subs => remove submission + ban
 * Attribution >20% AND Repeat Activity 4x AND Recent Activity in 5 subs => remove submission + flair user restricted
@@ -25,7 +25,7 @@ The `rules` array on a `Checks` can contain both `Rule` objects and `RuleSet` ob
 
 A **Rule Set** is a "nested" set of `Rule` objects with a passing condition specified. These allow you to create more complex trigger behavior by combining multiple rules. 
 
-See **ruleSets [YAML](/docs/examples/advancedConcepts/ruleSets.yaml) | [JSON](/docs/examples/advancedConcepts/ruleSets.json5)** for a complete example as well as consulting the [schema](https://json-schema.app/view/%23%2Fdefinitions%2FRuleSetJson?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Fcontext-mod%2Fmaster%2Fsrc%2FSchema%2FApp.json).
+See **ruleSets [YAML](/docs/components/advancedConcepts/ruleSets.yaml) | [JSON](/docs/components/advancedConcepts/ruleSets.json5)** for a complete example as well as consulting the [schema](https://json-schema.app/view/%23%2Fdefinitions%2FRuleSetJson?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Fcontext-mod%2Fmaster%2Fsrc%2FSchema%2FApp.json).
 
 ### Rule Order
 

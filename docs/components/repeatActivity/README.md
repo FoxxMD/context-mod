@@ -2,6 +2,8 @@
 
 The **Repeat Activity** rule will check for patterns of repetition in an Author's Submission/Comment history. Consult the [schema](https://json-schema.app/view/%23%2Fdefinitions%2FRepeatActivityJSONConfig?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Fcontext-mod%2Fmaster%2Fsrc%2FSchema%2FApp.json) for a complete reference of the rule's properties.
 
+To determine sameness it uses an average of [Dice's Coefficient](https://en.wikipedia.org/wiki/S%C3%B8rensen%E2%80%93Dice_coefficient), [Cosine Similarity](https://en.wikipedia.org/wiki/Cosine_similarity), and [Levenshtein Distance](https://en.wikipedia.org/wiki/Levenshtein_distance) weighted by the length of the content being compared (more weight for longer content).
+
 ## Tuning
 
 The most critical properties for this Rule are **gapAllowance** and **lookAt**.
@@ -45,5 +47,5 @@ With only `gapAllowance: 2` this rule **would trigger** because the the 1 and 2 
 
 ## Examples
 
-* Crosspost Spamming [JSON](/docs/examples/repeatActivity/crosspostSpamming.json5) | [YAML](/docs/examples/repeatActivity/crosspostSpamming.yaml) - Check if an Author is spamming their Submissions across multiple subreddits
-* Burst-posting [JSON](/docs/examples/repeatActivity/burstPosting.json5) | [YAML](/docs/examples/repeatActivity/burstPosting.yaml) - Check if Author is crossposting their Submissions in short bursts
+* Crosspost Spamming [JSON](/docs/components/repeatActivity/crosspostSpamming.json5) | [YAML](/docs/components/repeatActivity/crosspostSpamming.yaml) - Check if an Author is spamming their Submissions across multiple subreddits
+* Burst-posting [JSON](/docs/components/repeatActivity/burstPosting.json5) | [YAML](/docs/components/repeatActivity/burstPosting.yaml) - Check if Author is crossposting their Submissions in short bursts

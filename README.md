@@ -30,7 +30,7 @@ Some feature highlights:
 * Powerful state-machine-esque logic control (if, then, goto)
 * Delay/re-process activities using arbitrary rules
 * [**Image Comparisons**](/docs/imageComparison.md) via fingerprinting and/or pixel differences
-* [**Repost detection**](/docs/examples/repost) with support for external services (youtube, etc...)
+* [**Repost detection**](/docs/components/repost) with support for external services (youtube, etc...)
 * Global/subreddit-level **API caching**
 * Database Persistence using SQLite, MySql, or Postgres
   * Audit trails for bot activity

@@ -5,6 +5,8 @@
 * [Getting Started](#getting-started)
 * [How It Works](#how-it-works)
 * [Concepts](#concepts)
+  * [Event](#event)
+  * [Activity](#activity)
   * [Run](#runs)
   * [Check](#checks)
   * [Rule](#rule)
@@ -50,9 +52,9 @@ Expand the section below for a simplified flow diagram of how CM processes an in
 
 CM's lifecycle looks like this:
 
-#### 1) A new event in your subreddit is received by CM
+#### 1) A new Activity in your subreddit is received by CM
 
-The events CM watches for are configured by you. These can be new modqueue/unmoderated items, submissions, or comments.
+The Activities CM watches for are configured by you. These can be new modqueue/unmoderated items, submissions, or comments.
 
 #### 2) CM sequentially processes each Run in your configuration
 
@@ -81,6 +83,14 @@ Until all Runs have been processed.
 
 Core, high-level concepts regarding how CM works.
 
+### Event
+
+An **Event** refers to the [Activity](#activity) (Comment or Submission) CM receives to process as well as the results of processing that Activity.
+
+### Activity
+
+An Activity is a Comment or Submission from Reddit.
+
 ### Runs
 
 A **Run** is made up of a set of **Checks** that represent a group of related behaviors the bot should check for or perform -- that are independent of any other behaviors the Bot should perform.
@@ -90,7 +100,7 @@ An example of Runs:
 * A group of Checks that look for missing flairs on a user or a new submission and flair accordingly
 * A group of Checks that detect spam or self-promotion and then remove those activities
 
-Both group of Checks are independent of each other (don't have any patterns or actions in common). Learn more about using [Runs and **Flow Control** to control how CM behaves.](/docs/examples/advancedConcepts/flowControl.md)
+Both group of Checks are independent of each other (don't have any patterns or actions in common). Learn more about using [Runs and **Flow Control** to control how CM behaves.](/docs/components/advancedConcepts/flowControl.md)
 
 ### Checks
 
@@ -108,9 +118,9 @@ Some other important concepts regarding Checks:
 * All Checks have a **kind** (defined in the configuration) that determine if they should run on **Submissions** or **Comments**
 * Checks have a **condition** property that determines when they are considered **triggered**
   * If the **condition** is `AND` then ALL of their **Rules** must be **triggered** for the Check to be **triggered**
-  * If the **condition** is `OR` then if ANY **Rules** is triggered **triggered** then the Check is **triggered**
+  * If the **condition** is `OR` then if ANY **Rules** is **triggered** then the Check is **triggered**
 
-Examples of different types of Checks can be found in the [subreddit-ready examples.](/docs/examples/subredditReady)
+Examples of different types of Checks can be found in the [subreddit-ready examples.](/docs/components/subredditReady)
   
 ### Rule
 
@@ -125,15 +135,8 @@ There are generally three main properties for a Rule:
 CM has different **Rules** that can test against different types of behavior and aspects of a User, their history, and the Activity (submission/common) being checked.
 
 #### Available Rules
-Find detailed descriptions of all the Rules, with examples, below:
 
-* [Attribution](/docs/examples/attribution)
-* [Recent Activity](/docs/examples/recentActivity)
-* [Repeat Activity](/docs/examples/repeatActivity)
-* [History](/docs/examples/history)
-* [Author](/docs/examples/author)
-* [Regex](/docs/examples/regex)
-* [Repost](/docs/examples/repost)
+All available rules can be found in the [components documentation](/docs/components/README.md#rules)
 
 ### Rule Set
 
@@ -143,34 +146,7 @@ Rule Sets can be used interchangeably with other **Rules** and **Rule Sets** in 
 
 They allow you to create more complex trigger behavior by combining multiple rules into one "parent rule".
 
-It consists of:
-
-* **condition** -- Under what condition should the Rule Set be considered triggered?
-  * `AND` -- ALL Rules in the Rule Set must **trigger** in order for the Rule Set to **trigger.**
-  * `OR` -- ANY Rule in the Rule Set that is **triggered** will trigger the whole Rule Set.
-* **rules** -- The **Rules** for the Rule Set.
-
-Example
-
-YAML
-```yaml
-condition: AND
-# rules are an array
-rules:
- - aRule
-```
-JSON
-```json5
-{
-  "condition": "AND",
-  "rules": [
-    // all the rules go here
-  ]
-}
-```
-#### Rule Set Examples
-
-* [**Detailed Example**](/docs/examples/advancedConcepts/ruleSets.json5)
+[Rule Sets Documentation](/docs/components/README.md#rule-sets)
 
 ### Action
 
@@ -187,7 +163,7 @@ An **Action** is some action the bot can take against the checked Activity (comm
 * Lock (Comment/Submission)
 * Report (Comment/Submission)
 * Contributor -- add or remove Author of Comment/Submission as approved contributor
-* [UserNote](/docs/examples/userNotes) (User, when /r/Toolbox is used)
+* [UserNote](/docs/components/userNotes) (User, when /r/Toolbox is used)
 * Dispatch/Delay Activity processing
 
 For detailed explanation and options of what individual Actions can do [see the links in the `actions` property in the schema.](https://json-schema.app/view/%23/%23%2Fdefinitions%2FSubmissionCheckJson?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Fcontext-mod%2Fmaster%2Fsrc%2FSchema%2FApp.json)
@@ -240,14 +216,14 @@ The `authorIs` filter is made up two (optional) lists of [`AuthorCriteria`](http
 
 Refer to the [app schema for `AuthorCriteria`](https://json-schema.app/view/%23/%23%2Fdefinitions%2FSubmissionCheckJson/%23%2Fdefinitions%2FAuthorOptions/%23%2Fdefinitions%2FAuthorCriteria?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Fcontext-mod%2Fmaster%2Fsrc%2FSchema%2FApp.json) for all available properties to test against.
 
-Some examples of using `authorIs` can be found in the [Author examples.](/docs/examples/author)
+Some examples of using `authorIs` can be found in the [Author examples.](/docs/components/author)
 
 ## Configuration And Usage
 
 * For **Operator/Bot maintainers** see **[Operation Configuration](/docs/operator/configuration.md)**
   * [CLI Usage](operator/configuration.md#cli-usage)
 * For **Moderators** 
-  * Refer to the [examples folder](/docs/examples) or the [subreddit-ready examples](/docs/examples/subredditReady)
+  * Refer to the [examples folder](/docs/components) or the [subreddit-ready examples](/docs/components/subredditReady)
   * as well as the [schema editor](https://json-schema.app/view/%23?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Fcontext-mod%2Fmaster%2Fsrc%2FSchema%2FApp.json) which has
     * fully annotated configuration data/structure
     * generated examples in json/yaml
@@ -325,7 +301,7 @@ All **Rules** in a subreddit's configuration can be assigned a **name** that can
 
 Create general-use rules so they can be reused and de-clutter your configuration. Additionally, CM will automatically cache the result of a rule so there is a performance and api usage benefit to re-using Rules.
 
-See [ruleNameReuse.json5](/docs/examples/advancedConcepts/ruleNameReuse.json5) for a detailed configuration with annotations.
+See [ruleNameReuse.json5](/docs/components/advancedConcepts/ruleNameReuse.json5) for a detailed configuration with annotations.
 
 ### Check Order
 
