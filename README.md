@@ -16,32 +16,32 @@ An example of the above that Context Bot can do:
 
 Feature Highlights for **Moderators:**
 
-* Complete bot **autonomy**. YAML config is stored in your subreddit's wiki (like automoderator)
+* Complete bot **autonomy**. YAML config is [stored in your subreddit's wiki](/docs/subreddit/gettingStarted.md#setup-wiki-page) (like automoderator)
 * Simple rule-action behavior can be combined to create **complex behavior detection**
 * Support Activity filtering based on:
-  * Author criteria (name, css flair/text, age, karma, moderator status, [Toolbox User Notes](https://www.reddit.com/r/toolbox/wiki/docs/usernotes), and more!)
-  * Activity state (removed, locked, distinguished, etc...)
-* Rules and Actions support named references -- **write once, reference anywhere**
-* Powerful logic control (if, then, goto)
-* Delay/re-process activities using arbitrary rules
+  * [Author criteria](/docs/subreddit/components/README.md#author-filter) (name, css flair/text, age, karma, moderator status, [Toolbox User Notes](https://www.reddit.com/r/toolbox/wiki/docs/usernotes), and more!)
+  * [Activity state](/docs/subreddit/components/README.md#item-filter) (removed, locked, distinguished, etc...)
+* Rules and Actions support [named references](/docs/subreddit/components/README.md#named-rules) -- **write once, reference anywhere**
+* Powerful [logic control](/docs/subreddit/components/advancedConcepts/flowControl.md) (if, then, goto)
+* [Delay/re-process activities](/docs/subreddit/components/README.md#dispatch) using arbitrary rules
 * [**Image Comparisons**](/docs/imageComparison.md) via fingerprinting and/or pixel differences
 * [**Repost detection**](/docs/subreddit/components/repost) with support for external services (youtube, etc...)
 * Event notification via Discord
-* **Web interface** for monitoring, administration, and oauth bot authentication
-* **Placeholders** (like automoderator) can be configured via a wiki page or raw text and supports [mustache](https://mustache.github.io) [templating](/docs/subreddit/actionTemplating.md)
+* [**Web interface**](#web-ui-and-screenshots) for monitoring, administration, and oauth bot authentication
+* [**Placeholders**](/docs/subreddit/actionTemplating.md) (like automoderator) can be configured via a wiki page or raw text and supports [mustache](https://mustache.github.io) templating
 
 Feature highlights for **Developers and Hosting (Operators):**
 
-* Server/client architecture
+* [Server/client architecture](/docs/serverClientArchitecture.md)
   * Default/no configuration runs "All In One" behavior
   * Additional configuration allows web interface to connect to multiple servers
   * Each server instance can run multiple reddit accounts as bots
-* Global/subreddit-level **caching** of Reddit APIs responses and CM results
-* Database Persistence using SQLite, MySql, or Postgres
+* Global/subreddit-level [**caching**](/docs/operator/caching.md) of Reddit APIs responses and CM results
+* [Database Persistence](/docs/operator/database.md) using SQLite, MySql, or Postgres
   * Audit trails for bot activity
   * Historical statistics
-* Docker container support
-* Easy, UI-based OAuth authentication for adding Bots and moderator dashboard
+* [Docker container support](/docs/operator/installation.md#docker-recommended)
+* Easy, UI-based [OAuth authentication](/docs/operator/addingBot.md) for adding Bots and moderator dashboard
 
 # Table of Contents
 
@@ -54,7 +54,7 @@ Feature highlights for **Developers and Hosting (Operators):**
 
 Each subreddit using the RCB bot configures its behavior via their own wiki page. 
 
-When a monitored **Activity** (new comment/submission, new modqueue item, etc.) is detected the bot runs through a list of **Checks** to determine what to do with the **Activity** from that Event. Each **Check** consists of :
+When a monitored **Activity** (new comment/submission, new modqueue item, etc.) is detected the bot runs through a list of [**Checks**](/docs/subreddit/components/README.md#checks) to determine what to do with the **Activity** from that Event. Each **Check** consists of :
 
 #### Kind
 
@@ -62,11 +62,11 @@ Is this check for a submission or comment?
 
 #### Rules
 
-A list of **Rule** objects to run against the **Activity**. Triggered Rules can cause the whole Check to trigger and run its **Actions**
+A list of [**Rules**](/docs/subreddit/components/README.md#rules) to run against the **Activity**. Triggered Rules can cause the whole Check to trigger and run its **Actions**
 
 #### Actions
 
-A list of **Action** objects that describe what the bot should do with the **Activity** or **Author** of the activity (comment, remove, approve, etc.). The bot will run **all** Actions in this list.
+A list of [**Actions**](/docs/subreddit/components/README.md#actions) that describe what the bot should do with the **Activity** or **Author** of the activity (comment, remove, approve, etc.). The bot will run **all** Actions in this list.
 
 ___
 
