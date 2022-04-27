@@ -58,8 +58,11 @@ This list is not exhaustive. [For complete documentation on a subreddit's config
     * [Polling Sources](#polling-sources) 
     * [Configuring Polling Sources](#configuring-polling-sources)
 * [Best Practices](#best-practices)
-  * [Check Ordering](/docs/components/advancedConcepts)
-* [Subreddit-ready examples](/docs/components/subredditReady)
+  * [Order of Operations](#order-of-operations)
+    * [Check Order](#check-order)
+    * [Rule Order](#rule-order)
+  * [Configuration Re-use and Caching](#configuration-re-use-and-caching)
+* [Subreddit-ready examples](#subreddit-ready-examples)
 
 # Runs
 
@@ -205,7 +208,7 @@ This enables a user to arbitrarily configure how CM responds to the triggering (
 
 Each Check will **always** have these properties defined -- either explicitly or passed down as defaults from a [Run](#flow-control-defaults-using-runs), [Subreddit](#filter-defaults), or Operator configuration.
 
-Refer to the main [**Flow Control** documentation](/docs/components/advancedConcepts/flowControl.md) for an in-depth explanation and all possible options.
+Refer to the main [**Flow Control** documentation](/docs/subreddit/components/advancedConcepts/flowControl.md) for an in-depth explanation and all possible options.
 
 ## Recording Options
 
@@ -282,13 +285,13 @@ runs:
 
 Named Rules are essential building blocks of a readable and effective configuration. If you find yourself repeating the same Rule many times it's a sign you should give it a name and replace it's usage with references to it.
 
-See **Rule Name Reuse Examples [YAML](/docs/components/advancedConcepts/ruleNameReuse.yaml) | [JSON](/docs/components/advancedConcepts/ruleNameReuse.json5)**
+See **Rule Name Reuse Examples [YAML](/docs/subreddit/components/advancedConcepts/ruleNameReuse.yaml) | [JSON](/docs/subreddit/components/advancedConcepts/ruleNameReuse.json5)**
 
 ## List of Rules
 
 ### Attribution
 
-[**Full Documentation**](/docs/components/attribution)
+[**Full Documentation**](/docs/subreddit/components/attribution)
 
 The **Attribution** rule will aggregate an Author's content Attributions (youtube channels, twitter, website domains, etc.) and can check on their totals or percentages of all Activities over a time period:
 
@@ -299,7 +302,7 @@ The **Attribution** rule will aggregate an Author's content Attributions (youtub
 
 ### Recent Activity
 
-[**Full Documentation**](/docs/components/recentActivity)
+[**Full Documentation**](/docs/subreddit/components/recentActivity)
 
 Given a list subreddit criteria, the **Recent Activity** rule finds Activities matching those criteria in the Author's history over [window](#activities-window) and then allows for comparing different facets of the results:
 
@@ -318,7 +321,7 @@ The search can also be modified in a number of ways:
 
 ### Repeat Activity
 
-[**Full Documentation**](/docs/components/repeatActivity)
+[**Full Documentation**](/docs/subreddit/components/repeatActivity)
 
 The **Repeat Activity** rule will check for patterns of repetition in an Author's Activity history over a [window](#activities-window). When comparing submissions it checks a composite of the submissions' title and content.
 
@@ -333,7 +336,7 @@ Some of the ways the rule can be modified:
 
 ### History
 
-[**Full Documentation**](/docs/components/history)
+[**Full Documentation**](/docs/subreddit/components/history)
 
 The **History** rule can check an Author's submission/comment statistics over a time period:
 
@@ -343,23 +346,23 @@ The **History** rule can check an Author's submission/comment statistics over a 
 
 ### Author
 
-[**Full Documentation**](/docs/components/author)
+[**Full Documentation**](/docs/subreddit/components/author)
 
 The **Author** rule behaves the same as the [Author Filter](#author-filter). It can be used when you want to test Author state alongside other rules to create more complex behavior than would be possible by only applying to individual Rules or an entire check.
 
 ### Regex
 
-[**Full Documentation**](/docs/components/regex)
+[**Full Documentation**](/docs/subreddit/components/regex)
 
 The **Regex** rule matches on text content from an Activity in the same way automod uses regex. However, it can also be used to match on content from the Author's Activity history over a [window](#activities-window).
 
 ### Repost
 
-[**Full Documentation**](/docs/components/repost)
+[**Full Documentation**](/docs/subreddit/components/repost)
 
 The **Repost** rule is used to find reposts for both **Submissions** and **Comments**, depending on what type of **Check** it is used on.
 
-This rule is for searching **all of Reddit** for reposts, as opposed to just the history of the Author of the Activity being checked. If you only want to check for reposts by the Author of the Activity being checked you should use the [Repeat Activity](/docs/components/repeatActivity) rule.
+This rule is for searching **all of Reddit** for reposts, as opposed to just the history of the Author of the Activity being checked. If you only want to check for reposts by the Author of the Activity being checked you should use the [Repeat Activity](/docs/subreddit/components/repeatActivity) rule.
 
 # Rule Sets
 
@@ -396,7 +399,7 @@ runs:
                 ...
 ```
 
-See **ruleSets [YAML](/docs/components/advancedConcepts/ruleSets.yaml) | [JSON](/docs/components/advancedConcepts/ruleSets.json5)** for a complete example as well as consulting the [schema](https://json-schema.app/view/%23%2Fdefinitions%2FRuleSetJson?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Fcontext-mod%2Fmaster%2Fsrc%2FSchema%2FApp.json).
+See **ruleSets [YAML](/docs/subreddit/components/advancedConcepts/ruleSets.yaml) | [JSON](/docs/subreddit/components/advancedConcepts/ruleSets.json5)** for a complete example as well as consulting the [schema](https://json-schema.app/view/%23%2Fdefinitions%2FRuleSetJson?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Fcontext-mod%2Fmaster%2Fsrc%2FSchema%2FApp.json).
 
 # Actions
 
@@ -440,7 +443,7 @@ runs:
 
 Actions that can submit text (Report, Comment, UserNote) will have their `content` values run through a [Mustache Template](https://mustache.github.io/). This means you can insert data generated by Rules into your text before the Action is performed.
 
-[**Action Templating Documentation**](/docs/actionTemplating.md)
+[**Action Templating Documentation**](/docs/subreddit/actionTemplating.md)
 
 ## List of Actions
 
@@ -634,7 +637,7 @@ actions:
 
 Add a Toolbox User Note to the Author of the Activity. [Schema Documentation](https://json-schema.app/view/%23/%23%2Fdefinitions%2FSubmissionCheckJson/%23%2Fdefinitions%2FUserNoteActionJson?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Freddit-context-bot%2Fedge%2Fsrc%2FSchema%2FApp.json)
 
-Your subreddit must have [Toolbox UserNotes](/docs/components/userNotes) enabled for this action to work.
+Your subreddit must have [Toolbox UserNotes](/docs/subreddit/components/userNotes) enabled for this action to work.
 
 * `type` is required
 * `content` can be [templated](#templating) and use [URL Tokens](#url-tokens)
@@ -807,7 +810,7 @@ These conditions can be combined together to evaluate to either true or false us
 
 Most **Rules** have a `window` property somewhere within their configuration. This property defines the range of **Activities** (submission and/or comments) that should be retrieved for checking the criteria of the Rule.
 
-[Full Activities `window` documentation](/docs/activitiesWindow.md)
+[Full Activities `window` documentation](/docs/subreddit/activitiesWindow.md)
 
 ## URL Tokens
 
@@ -869,7 +872,7 @@ Some criteria accept an optional **duration** to compare against:
 
 The duration value compares a time range from **now** to `duration value` time in the past.
 
-Refer to [duration values in activity window documentation](/docs/activitiesWindow.md#duration-values) as well as the individual rule/criteria schema to see what this duration is comparing against.
+Refer to [duration values in activity window documentation](/docs/subreddit/activitiesWindow.md#duration-values) as well as the individual rule/criteria schema to see what this duration is comparing against.
 
 ## Filter Defaults
 
@@ -903,7 +906,7 @@ In other words -- Checks will not run if the Author of the Activity being proces
 
 ## Flow Control Defaults
 
-See [Flow Control Documentation](/docs/components/advancedConcepts/flowControl.md#default-behaviors)
+See [Flow Control Documentation](/docs/subreddit/components/advancedConcepts/flowControl.md#default-behaviors)
 
 # Subreddit-Level Configuration
 
@@ -1049,4 +1052,4 @@ PROTIP: You can monitor the re-use of cache in the `Cache` section of your subre
 
 # Subreddit-Ready Examples
 
-Refer to the [Subreddit-Ready Examples](/docs/components/subredditReady) section to find ready-to-use configurations for common scenarios (spam, freekarma blocking, etc...). This is also a good place to familiarize yourself with what complete configurations look like.
+Refer to the [Subreddit-Ready Examples](/docs/subreddit/components/subredditReady) section to find ready-to-use configurations for common scenarios (spam, freekarma blocking, etc...). This is also a good place to familiarize yourself with what complete configurations look like.

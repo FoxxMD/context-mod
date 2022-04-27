@@ -14,31 +14,34 @@ An example of the above that Context Bot can do:
 >
 >In either instance Context Bot can then perform any action a moderator can (comment, report, remove, lock, etc...) against that user, comment, or submission.
 
-Some feature highlights:
-* Simple rule-action behavior can be combined to create any level of complexity in behavior
+Feature Highlights for **Moderators:**
+
+* Complete bot **autonomy**. YAML config is stored in your subreddit's wiki (like automoderator)
+* Simple rule-action behavior can be combined to create **complex behavior detection**
+* Support Activity filtering based on:
+  * Author criteria (name, css flair/text, age, karma, moderator status, [Toolbox User Notes](https://www.reddit.com/r/toolbox/wiki/docs/usernotes), and more!)
+  * Activity state (removed, locked, distinguished, etc...)
+* Rules and Actions support named references -- **write once, reference anywhere**
+* Powerful logic control (if, then, goto)
+* Delay/re-process activities using arbitrary rules
+* [**Image Comparisons**](/docs/imageComparison.md) via fingerprinting and/or pixel differences
+* [**Repost detection**](/docs/subreddit/components/repost) with support for external services (youtube, etc...)
+* Event notification via Discord
+* **Web interface** for monitoring, administration, and oauth bot authentication
+* **Placeholders** (like automoderator) can be configured via a wiki page or raw text and supports [mustache](https://mustache.github.io) [templating](/docs/subreddit/actionTemplating.md)
+
+Feature highlights for **Developers and Hosting (Operators):**
+
 * Server/client architecture
   * Default/no configuration runs "All In One" behavior
   * Additional configuration allows web interface to connect to multiple servers
   * Each server instance can run multiple reddit accounts as bots
-* **Per-subreddit configuration** is handled by YAML (**like automoderator!**) or JSON stored in the subreddit wiki
-* Any text-based actions (comment, submission, message, usernotes, ban, etc...) can be configured via a wiki page or raw text and supports [mustache](https://mustache.github.io) [templating](/docs/actionTemplating.md)
-* History-based rules support multiple "valid window" types -- [ISO 8601 Durations](https://en.wikipedia.org/wiki/ISO_8601#Durations), [Day.js Durations](https://day.js.org/docs/en/durations/creating), and submission/comment count limits.
-* Support Activity filtering based on:
-  * Author criteria (name, css flair/text, age, karma, moderator status, [Toolbox User Notes](https://www.reddit.com/r/toolbox/wiki/docs/usernotes), and more!)
-  * Activity state (removed, locked, distinguished, etc...)
-* Rules and Actions support named references (write once, reference anywhere)
-* Powerful state-machine-esque logic control (if, then, goto)
-* Delay/re-process activities using arbitrary rules
-* [**Image Comparisons**](/docs/imageComparison.md) via fingerprinting and/or pixel differences
-* [**Repost detection**](/docs/components/repost) with support for external services (youtube, etc...)
-* Global/subreddit-level **API caching**
+* Global/subreddit-level **caching** of Reddit APIs responses and CM results
 * Database Persistence using SQLite, MySql, or Postgres
   * Audit trails for bot activity
   * Historical statistics
-* Support for [Toolbox User Notes](https://www.reddit.com/r/toolbox/wiki/docs/usernotes) as criteria or Actions (writing notes)
 * Docker container support
-* Event notification via Discord
-* **Web interface** for monitoring, administration, and oauth bot authentication
+* Easy, UI-based OAuth authentication for adding Bots and moderator dashboard
 
 # Table of Contents
 
@@ -51,7 +54,7 @@ Some feature highlights:
 
 Each subreddit using the RCB bot configures its behavior via their own wiki page. 
 
-When a monitored **Event** (new comment/submission, new modqueue item, etc.) is detected the bot runs through a list of **Checks** to determine what to do with the **Activity** from that Event. Each **Check** consists of :
+When a monitored **Activity** (new comment/submission, new modqueue item, etc.) is detected the bot runs through a list of **Checks** to determine what to do with the **Activity** from that Event. Each **Check** consists of :
 
 #### Kind
 
@@ -73,7 +76,7 @@ When an Event occurs all Checks of that type are run in the order they were list
 
 ___
 
-[Learn more about the RCB lifecycle and core concepts in the docs.](/docs#how-it-works)
+[Learn more about the RCB lifecycle and core concepts in the docs.](/docs/README.md#how-it-works)
 
 ## Getting Started
 
@@ -87,14 +90,14 @@ See the [Operator's Getting Started Guide](/docs/operator/gettingStarted.md)
 
 This guide is for **reddit moderators** who want to configure an existing CM bot to run on their subreddit.
 
-See the [Moderator's Getting Started Guide](/docs/gettingStartedMod.md)
+See the [Moderator's Getting Started Guide](/docs/subreddit/gettingStarted.md)
 
 ## Configuration and Documentation
 
 Context Bot's configuration can be written in YAML (like automoderator) or [JSON5](https://json5.org/). Its schema conforms to [JSON Schema Draft 7](https://json-schema.org/). Additionally, many **operator** settings can be passed via command line or environmental variables.
 
 * For **operators** (running the bot instance) see the [Operator Configuration](/docs/operator/configuration.md) guide
-* For **moderators** consult the [app schema and examples folder](/docs/#configuration-and-usage)
+* For **moderators** consult the [app schema and examples folder](/docs/README.md#configuration-and-usage)
 
 [**Check the full docs for in-depth explanations of all concepts and examples**](/docs)
 

@@ -1,6 +1,6 @@
 The **Repost** rule is used to find reposts for both **Submissions** and **Comments**, depending on what type of **Check** it is used on.
 
-Note: This rule is for searching **all of Reddit** for reposts, as opposed to just the Author of the Activity being checked. If you only want to check for reposts by the Author of the Activity being checked you should use the [Repeat Activity](/docs/components/repeatActivity) rule.
+Note: This rule is for searching **all of Reddit** for reposts, as opposed to just the Author of the Activity being checked. If you only want to check for reposts by the Author of the Activity being checked you should use the [Repeat Activity](/docs/subreddit/componentscomponents/repeatActivity) rule.
 
 # TLDR
 

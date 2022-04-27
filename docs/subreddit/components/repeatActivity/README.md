@@ -47,5 +47,5 @@ With only `gapAllowance: 2` this rule **would trigger** because the the 1 and 2 
 
 ## Examples
 
-* Crosspost Spamming [JSON](/docs/components/repeatActivity/crosspostSpamming.json5) | [YAML](/docs/components/repeatActivity/crosspostSpamming.yaml) - Check if an Author is spamming their Submissions across multiple subreddits
-* Burst-posting [JSON](/docs/components/repeatActivity/burstPosting.json5) | [YAML](/docs/components/repeatActivity/burstPosting.yaml) - Check if Author is crossposting their Submissions in short bursts
+* Crosspost Spamming [JSON](/docs/subreddit/componentscomponents/repeatActivity/crosspostSpamming.json5) | [YAML](/docs/subreddit/componentscomponents/repeatActivity/crosspostSpamming.yaml) - Check if an Author is spamming their Submissions across multiple subreddits
+* Burst-posting [JSON](/docs/subreddit/componentscomponents/repeatActivity/burstPosting.json5) | [YAML](/docs/subreddit/componentscomponents/repeatActivity/burstPosting.yaml) - Check if Author is crossposting their Submissions in short bursts

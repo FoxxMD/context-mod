@@ -23,7 +23,7 @@
 Review **at least** the **How It Works** and **Concepts** below, then:
 
 * For **Operators** (running a bot instance) refer to [**Operator Getting Started**](/docs/operator/gettingStarted.md)  guide
-* For **Moderators** (configuring an existing bot for your subreddit) refer to the [**Moderator Getting Started**](/docs/gettingStartedMod.md) guide
+* For **Moderators** (configuring an existing bot for your subreddit) refer to the [**Moderator Getting Started**](/docs/subreddit/gettingStarted.md) guide
 
 ## How It Works
 
@@ -92,7 +92,7 @@ An example of Runs:
 
 Both group of Checks are independent of each other (don't have any patterns or actions in common).
 
-[Full Documentation for Runs](/docs/components/README.md#runs)
+[Full Documentation for Runs](/docs/subreddit/components/README.md#runs)
 
 ### Checks
 
@@ -105,7 +105,7 @@ A Run can be made up of one or more **Checks** that are processed **in the order
 
 Once a Check is **triggered** (its Rules are satisfied and Actions performed) all subsequent Checks are skipped.
 
-[Full Documentation for Checks](/docs/components/README.md#checks)
+[Full Documentation for Checks](/docs/subreddit/components/README.md#checks)
   
 ### Rule
 
@@ -113,11 +113,11 @@ A **Rule** is some set of **criteria** (conditions) that are tested against an A
 
 CM has different **Rules** that can test against different types of behavior and aspects of a User, their history, and the Activity (submission/common) being checked.
 
-[Full Documentation for Rules](/docs/components/README.md#rules)
+[Full Documentation for Rules](/docs/subreddit/components/README.md#rules)
 
 #### Available Rules
 
-All available rules can be found in the [components documentation](/docs/components/README.md#rules)
+All available rules can be found in the [components documentation](/docs/subreddit/components/README.md#rules)
 
 ### Rule Set
 
@@ -127,7 +127,7 @@ Rule Sets can be used interchangeably with other **Rules** and **Rule Sets** in 
 
 They allow you to create more complex trigger behavior by combining multiple rules into one "parent rule".
 
-[Rule Sets Documentation](/docs/components/README.md#rule-sets)
+[Rule Sets Documentation](/docs/subreddit/components/README.md#rule-sets)
 
 ### Action
 
@@ -135,7 +135,7 @@ An **Action** is some action the bot can take against the checked Activity (comm
 
 #### Available Actions
 
-[Available Actions Documentation](/docs/components/README.md#list-of-actions)
+[Available Actions Documentation](/docs/subreddit/components/README.md#list-of-actions)
 
 ### Filters
 
@@ -146,13 +146,13 @@ An **Action** is some action the bot can take against the checked Activity (comm
   * When the filter test **passes** the thing being tested continues to process as usual
   * When the filter test **fails** the thing being tested **fails**.
 
-[Full Documentation for Filters](/docs/components/README.md#filters)
+[Full Documentation for Filters](/docs/subreddit/components/README.md#filters)
 
 ## Configuration And Usage
 
 * For **Operator/Bot maintainers** see **[Operation Guide](/docs/operator/README.md)**
 * For **Moderators** 
-  * Refer to the [Subreddit Components Documentation](/docs/components) or the [subreddit-ready examples](/docs/components/subredditReady)
+  * Refer to the [Subreddit Components Documentation](/docs/subreddit/components) or the [subreddit-ready examples](/docs/subreddit/components/subredditReady)
   * as well as the [schema](https://json-schema.app/view/%23?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Fcontext-mod%2Fmaster%2Fsrc%2FSchema%2FApp.json) which has
     * fully annotated configuration data/structure
     * generated examples in json/yaml

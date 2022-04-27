@@ -104,7 +104,7 @@ If you already have a configuration you may skip the below step and go directly 
 
 ### Using an Example Config
 
-Visit the [Examples](https://github.com/FoxxMD/context-mod/tree/master/docs/examples) folder to find various examples of individual rules or see the [subreddit-ready examples.](/docs/components/subredditReady)
+Visit the [Examples](https://github.com/FoxxMD/context-mod/tree/master/docs/examples) folder to find various examples of individual rules or see the [subreddit-ready examples.](/docs/subreddit/components/subredditReady)
 
 After you have found a configuration to use as a starting point:
 

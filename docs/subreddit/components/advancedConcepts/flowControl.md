@@ -21,7 +21,7 @@ Context Mod's behavior after a **Check** has been processed can be configured by
 When a Check is finished processing it can be in one of two states:
 
 * **Triggered** -- The **Rules** defined in the Check were **triggered** which caused the **Actions** for the Check to be run
-* **Failure** -- The **Rules** defined in the check were **not triggered**, based on the conditions that were set (either from the [Check condition](/docs/README.md#Checks) or [Rule Sets](/docs/components/advancedConcepts/README.md#Rule-Sets)), and no **Actions** were run
+* **Failure** -- The **Rules** defined in the check were **not triggered**, based on the conditions that were set (either from the [Check condition](/docs/README.md#Checks) or [Rule Sets](/docs/subreddit/components/advancedConcepts/README.md#Rule-Sets)), and no **Actions** were run
 
 The behavior CM follows is based on which state it is in. The behavior can be specified **by one or both** of these **state properties** on the Check configuration:
 

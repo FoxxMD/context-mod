@@ -27,5 +27,5 @@ Consult the [schema](https://json-schema.app/view/%23%2Fdefinitions%2FRecentActi
 
 ### Examples
 
-* Free Karma Subreddits [YAML](/docs/components/recentActivity/freeKarma.yaml) | [JSON](/docs/components/recentActivity/freeKarma.json5) - Check if the Author has recently posted in any "free karma" subreddits
-* Submission in Free Karma Subreddits [YAML](/docs/components/recentActivity/freeKarmaOnSubmission.yaml) | [JSON](/docs/components/recentActivity/freeKarmaOnSubmission.json5) - Check if the Author has posted the Submission this check is running on in any "free karma" subreddits recently
+* Free Karma Subreddits [YAML](/docs/subreddit/componentscomponents/recentActivity/freeKarma.yaml) | [JSON](/docs/subreddit/componentscomponents/recentActivity/freeKarma.json5) - Check if the Author has recently posted in any "free karma" subreddits
+* Submission in Free Karma Subreddits [YAML](/docs/subreddit/componentscomponents/recentActivity/freeKarmaOnSubmission.yaml) | [JSON](/docs/subreddit/componentscomponents/recentActivity/freeKarmaOnSubmission.json5) - Check if the Author has posted the Submission this check is running on in any "free karma" subreddits recently
