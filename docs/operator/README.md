@@ -5,8 +5,8 @@ An **Operator** is the user **running the ContextMod software.**
 They are responsible for configuring the software at a high-level and managing associated infrastructure such as:
 
 * Creating cache/database servers and configuring their connections in CM
-* Provisioning the [Reddit Clients](/botAutHere) needed to run bots and the CM UI
-* Providing [global-level configuration](/operatorConfiguration.md) that affects general bot/subreddit behavior
+* Provisioning the [Reddit Clients](#provisioning-a-reddit-client) needed to run bots and the CM UI
+* Providing [global-level configuration](/docs/operator/configuration.md) that affects general bot/subreddit behavior
 * Onboarding new bots/subreddits
 
 # Table of Contents

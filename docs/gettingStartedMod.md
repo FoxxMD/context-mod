@@ -1,5 +1,5 @@
 This getting started guide is for **reddit moderators** -- that is, someone who wants **an existing ContextMod bot to run on their subreddit.** If you are trying to run a ContextMod
-instance (software) please refer to the [operator getting started](/docs/operator/gettingStartedOperator.md) guide.
+instance (software) please refer to the [operator getting started](/docs/operator/gettingStarted.md) guide.
 
 # Table of Contents
 

@@ -55,8 +55,8 @@ This list is not exhaustive. [For complete documentation on a subreddit's config
   * [Flow Control Defaults](#flow-control-defaults)
 * [Subreddit-Level Configuration](#subreddit-level-configuration)
   * [Polling (Where CM Gets Activities From)](#polling)
-  * [Filter Defaults](#filter-defaults-using-subreddit)
-  * [Flow Control Defaults](#flow-control-defaults-using-subreddit)
+    * [Polling Sources](#polling-sources) 
+    * [Configuring Polling Sources](#configuring-polling-sources)
 * [Best Practices](#best-practices)
   * [Check Ordering](/docs/components/advancedConcepts)
 * [Subreddit-ready examples](/docs/components/subredditReady)
@@ -85,11 +85,11 @@ An example of Runs:
 
 Both group of Checks are independent of each other (don't have any patterns or actions in common).
 
-However, Checks processed *prior* to a Run can determine if a Run is processed or not depending on the [flow control](#flow-control) configured in those Checks.
+However, Checks processed *prior* to a Run can determine if a Run is processed or not depending on the [flow control](#specifying-flow-control) configured in those Checks.
 
 ## Flow Control Defaults Using Runs
 
-[Checks](#specifying-flow-control) in a Run that do not specify their own [Flow Control](#flow-control) can have their defaults configured at the Run level:
+[Checks](#specifying-flow-control) in a Run that do not specify their own [Flow Control](#specifying-flow-control) can have their defaults configured at the Run level:
 
 ```yaml
 runs:
@@ -100,7 +100,7 @@ runs:
       ...
 ```
 
-Runs may also have these flow control defaults specified at the [subreddit](#flow-control-defaults-using-subreddit) or operator level.
+Runs may also have these flow control defaults specified at the [subreddit or bot level](#flow-control-defaults).
 
 ## Filter Defaults Using Runs
 
@@ -114,7 +114,7 @@ runs:
         - isMod: false
 ```
 
-Runs may also have these filter behavior defaults specified at the [subreddit](#filter-defaults-using-subreddit) or operator level.
+Runs may also have these filter behavior defaults specified at the [subreddit or bot level](#filter-defaults).
 
 # Checks
 
@@ -203,7 +203,7 @@ When a Check is finished processing it can have one of two states: **triggered**
 
 This enables a user to arbitrarily configure how CM responds to the triggering (or not triggering) of a Check.
 
-Each Check will **always** have these properties defined -- either explicitly or passed down as defaults from a [Run](#flow-control-defaults-using-runs), [Subreddit](#filter-defaults-using-subreddit), or Operator configuration.
+Each Check will **always** have these properties defined -- either explicitly or passed down as defaults from a [Run](#flow-control-defaults-using-runs), [Subreddit](#filter-defaults), or Operator configuration.
 
 Refer to the main [**Flow Control** documentation](/docs/components/advancedConcepts/flowControl.md) for an in-depth explanation and all possible options.
 
@@ -235,7 +235,7 @@ Recording options can be explicitly defined by providing a [PostBehaviorOptionCo
 
 When an Activity has finished being processed CM will aggregate all Recording Options and output to all specified. Any "positive" outputs override a `false` output IE to prevent an Event from being recorded **all** `recordTo` values must be `false`.
 
-`recordTo` values can also be specified in flow control defaults for a [Run](#flow-control-defaults-using-runs), [Subreddit](#filter-defaults-using-subreddit), or Operator configuration.
+`recordTo` values can also be specified in flow control defaults for a [Run](#flow-control-defaults-using-runs), [Subreddit](#filter-defaults), or Operator configuration.
 
 # Rules
 
@@ -313,7 +313,7 @@ The search can also be modified in a number of ways:
 
 * Filter found activities using an [Item Filter](#item-filter)
 * Only return activities that match the Activity from the Event being processed
-  * Using image detection (pixel or perceptual hash matching)
+  * Using [image detection](/docs/imageComparison.md) (pixel or perceptual hash matching)
 * Only return certain types of activities (only submission or only comments)
 
 ### Repeat Activity
@@ -717,7 +717,7 @@ itemIs:
   - is_self: true
 ```
 
-## Types
+## Filter Types
 
 There are two types of Filter. Both types have the same "shape" in the configuration with the differences between them being:
 
@@ -849,6 +849,16 @@ The RepeatActivity rule has a `threshold` comparison to test against the number 
 
 Essentially what this is telling the rule is `threshold: "x >= 4"` where `x` is the largest repeat of activities it finds.
 
+### Percentages
+
+Some criteria accept an optional **percentage** to compare against:
+
+```
+"threshold": "> 20%"
+```
+
+Refer to the individual rule/criteria schema to see what this percentage is comparing against.
+
 ## Durations
 
 Some criteria accept an optional **duration** to compare against:
@@ -863,16 +873,180 @@ Refer to [duration values in activity window documentation](/docs/activitiesWind
 
 ## Filter Defaults
 
+[Filters](#filters) can have default values specified at the [bot level](https://json-schema.app/view/%23/%23%2Fdefinitions%2FBotInstanceJsonConfig/%23%2Fdefinitions%2FFilterCriteriaDefaults?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Fcontext-mod%2Fedge%2Fsrc%2FSchema%2FOperatorConfig.json), [subreddit level](https://json-schema.app/view/%23/%23%2Fdefinitions%2FFilterCriteriaDefaults?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Freddit-context-bot%2Fedge%2Fsrc%2FSchema%2FApp.json), and [run level](https://json-schema.app/view/%23/%23%2Fdefinitions%2FRunJson/%23%2Fdefinitions%2FFilterCriteriaDefaults?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Freddit-context-bot%2Fedge%2Fsrc%2FSchema%2FApp.json).
+
+Each level is "more specific" than the previous and will override more specific levels below it until, eventually, the defaults are applied to a Check.
+
+IE `Bot Defaults -> Subreddit Defaults (overiddes Bot) -> Run Defaults (overrides Subreddit) -> Apply to Check`
+
+### Applying Default Behavior
+
+The defaults object also specifies how it applies itself to the Filters on a Check using `authorIsBehavior` and `itemIsBehavior`.
+
+Both behavior properties have these options:
+
+* `merge` -- will **add** any Filter Criteria in the defaults to the Filters, leaving any explicitly specified in the Check untouched.
+* `replace` -- If the Check has any explicitly specified Filters the default's Filter Criteria are **ignored**.
+
+### Filter Defaults Defaults
+
+If no Filter Defaults are specified at any level then all Checks will have this default applied:
+
+```yaml
+authorIs:
+  exclude:
+    - isMod: true
+authorIsBehavior: merge
+```
+
+In other words -- Checks will not run if the Author of the Activity being processed is a Moderator.
+
 ## Flow Control Defaults
+
+See [Flow Control Documentation](/docs/components/advancedConcepts/flowControl.md#default-behaviors)
 
 # Subreddit-Level Configuration
 
+Other than configuration specific to processing Events there are many subreddit-level defaults and settings that can be controlled from the top-level of your configuration.
+
+See [Filter Defaults](#filter-defaults) and [Flow Control Defaults](#flow-control-defaults) for links to those defaults for a subreddit.
+
 ## Polling
 
-## Filter Defaults Using Subreddit
+**Polling** is how ContextMod creates [Events](/docs/README.md#event) from new Activities in a Subreddit. CM monitors one or more polling sources and processes any new Activities it discovers.
 
-## Flow Control Defaults Using Subreddit
+### Polling Sources
+
+There are four valid polling sources:
+
+#### `unmoderated`
+
+Activities that have yet to be approved/removed by a mod. This includes all modqueue (reports/spam) and new submissions.
+
+Use this if you want the bot to act like a regular moderator and act on anything that can be seen from mod tools.
+
+This is the **default polling source.**
+
+#### `modqueue`
+
+Activities requiring moderator review, such as reported things and items caught by the spam filter.
+
+Use this if you only want the Bot to process reported/filtered Activities.
+
+#### `newSub`
+
+Get only Submissions that show up in /r/mySubreddit/new
+
+Use this if you want the bot to process Submissions only when:
+
+* they are not initially filtered by Automoderator or
+* after they have been manually approved from modqueue
+
+#### `newComm`
+
+Get only new Comments
+
+Use this if you want the bot to process Comments only when:
+
+* they are not initially filtered by Automoderator or
+* after they have been manually approved from modqueue
+
+### Configuring Polling Sources
+
+Polling can be configured by specifying the top level `polling` property in your subreddit's configuration:
+
+```yaml
+polling:
+  ...
+
+runs:
+  ...
+```
+
+`polling` must be a list comprised of either **polling source names**:
+
+```yaml
+polling:
+  - unmoderated
+  - modqueue
+```
+
+and/or a [**polling source objects**](https://json-schema.app/view/%23/%23%2Fdefinitions%2FPollingOptions?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Freddit-context-bot%2Fedge%2Fsrc%2FSchema%2FApp.json):
+
+```yaml
+# using names and objects
+polling:
+  # using a name
+  - unmoderated
+  
+  # using an object
+  - pollOn: newComm
+    delayUntil: 30
+```
 
 # Best Practices
 
+## Order of Operations
+
+### Check Order
+
+Checks are run in the order they appear in your configuration, therefore you should place your highest requirement/severe action checks at the top and lowest requirement/moderate actions at the bottom.
+
+This is so that if an Activity warrants a more serious reaction that Check is triggered first rather than having a lower requirement check with less severe actions triggered and causing all subsequent Checks to be skipped.
+
+* Attribution >50% AND Repeat Activity 8x AND Recent Activity in 2 subs => remove submission + ban
+* Attribution >20% AND Repeat Activity 4x AND Recent Activity in 5 subs => remove submission + flair user restricted
+* Attribution >20% AND Repeat Activity 2x => remove submission
+* Attribution >20% AND History comments <30% => remove submission
+* Attribution >15% => report
+* Repeat Activity 2x => report
+* Recent Activity in 3 subs => report
+* Author not vetted => flair new user submission
+  
+This behavior can be arbitrarily controlled using [Flow Control](#specifying-flow-control) but, in order to keep complexity low, the above approach is a good rule-of-thumb.
+
+### Rule Order
+
+The ordering of your Rules within a Check/RuleSet can have an impact on Check performance (speed) as well as API usage.
+
+Consider these three rules:
+
+* Rule A -- Recent Activity => 3 subreddits => last 15 submissions
+* Rule B -- Repeat Activity => last 3 days
+* Rule C -- Attribution => >10% => last 90 days or 300 submissions
+
+The first two rules are lightweight in their requirements -- Rule A can be completed in 1 API call, Rule B potentially completed in 1 Api call.
+
+However, depending on how active the Author is, Rule C will take *at least* 3 API calls just to get all activities (Reddit limit 100 items per call).
+
+If the Check is using `AND` condition for its rules (default) then if either Rule A or Rule B fail then Rule C will never run. This means 3 API calls never made plus the time waiting for each to return.
+
+**It is therefore advantageous to list your lightweight Rules first in each Check.**
+
+### Configuration Re-use and Caching
+
+ContextMod implements caching functionality for:
+
+* author history ([`window` criteria](#activities-window) in rules)
+* `authorIs` and `itemIs` results
+* `content` that uses wiki pages (on Comment/Report/Ban Actions)
+* User Notes
+* Rule results
+
+All of these use api requests so caching them reduces api usage.
+
+Cached results can be re-used if the criteria in configuration is identical to a previously cached result or by using **Named Rules/Actions/Filters**. So...
+
+* author history cache results are re-used if **`window` criteria on a Rule is identical to the `window` on another Rule** IE always use **7 Days** or always use **50 Items** for absolute counts.
+* `authorIs` criteria is identical to another `authorIs` elsewhere in configuration..
+* etc...
+
+Re-use will result in less API calls and faster Check times.
+
+PROTIP: You can monitor the re-use of cache in the `Cache` section of your subreddit on the web interface. See the tooltips in that section for a better breakdown of cache statistics.
+
+[Learn more about how Caching works](/docs/operator/caching.md)
+
 # Subreddit-Ready Examples
+
+Refer to the [Subreddit-Ready Examples](/docs/components/subredditReady) section to find ready-to-use configurations for common scenarios (spam, freekarma blocking, etc...). This is also a good place to familiarize yourself with what complete configurations look like.
