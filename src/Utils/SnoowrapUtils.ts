@@ -335,7 +335,7 @@ export const renderContent = async (template: string, data: (Submission | Commen
         } = ruleResult;
         let name = ruleResult.premise.name;
         const kind = ruleResult.premise.kind.name;
-        if(name === undefined) {
+        if(name === undefined || name === null) {
             name = kind;
         }
         // remove all non-alphanumeric characters (spaces, dashes, underscore) and set to lowercase
