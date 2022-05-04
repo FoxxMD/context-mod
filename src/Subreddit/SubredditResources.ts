@@ -2051,6 +2051,21 @@ export class SubredditResources {
                         continue;
                     }
 
+                    // none of the criteria below are returned if the user is suspended
+                    switch(k) {
+                        case 'age':
+                        case 'linkKarma':
+                        case 'commentKarma':
+                        case 'verified':
+                        case 'description':
+                            // @ts-ignore
+                            if((await user()).is_suspended) {
+                                propResultsMap[k]!.passed = false;
+                                propResultsMap[k]!.reason = 'User is suspended';
+                                break;
+                            }
+                    }
+
                     const authorOptVal = definedAuthorOpts[k];
 
                     //if (authorOpts[k] !== undefined) {

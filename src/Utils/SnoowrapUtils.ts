@@ -33,6 +33,7 @@ import {URL} from "url";
 import {SimpleError, isStatusError} from "./Errors";
 import {Dictionary, ElementOf, SafeDictionary} from "ts-essentials";
 import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
+import {ErrorWithCause} from "pony-cause";
 
 export const BOT_LINK = 'https://www.reddit.com/r/ContextModBot/comments/otz396/introduction_to_contextmodbot';
 
@@ -234,8 +235,16 @@ export async function getAuthorActivities(user: RedditUser, options: AuthorTyped
     try {
         return await getActivities(listFunc, options);
     } catch (err: any) {
-        if(isStatusError(err) && err.statusCode === 404) {
-            throw new SimpleError('Reddit returned a 404 for user history. Likely this user is shadowbanned.');
+        if(isStatusError(err)) {
+            switch(err.statusCode) {
+                case 404:
+                    throw new SimpleError('Reddit returned a 404 for user history. Likely this user is shadowbanned.');
+                case 403:
+                    throw new ErrorWithCause('Reddit returned a 403 for user history, likely this user is suspended.', {cause: err});
+                default:
+                    throw err;
+            }
+
         } else {
             throw err;
         }
