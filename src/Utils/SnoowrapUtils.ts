@@ -30,7 +30,7 @@ import UserNotes from "../Subreddit/UserNotes";
 import {Logger} from "winston";
 import InvalidRegexError from "./InvalidRegexError";
 import {URL} from "url";
-import {SimpleError, isStatusError} from "./Errors";
+import {SimpleError, isStatusError, MaybeSeriousErrorWithCause} from "./Errors";
 import {Dictionary, ElementOf, SafeDictionary} from "ts-essentials";
 import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
 import {ErrorWithCause} from "pony-cause";
@@ -238,9 +238,9 @@ export async function getAuthorActivities(user: RedditUser, options: AuthorTyped
         if(isStatusError(err)) {
             switch(err.statusCode) {
                 case 404:
-                    throw new SimpleError('Reddit returned a 404 for user history. Likely this user is shadowbanned.');
+                    throw new SimpleError('Reddit returned a 404 for user history. Likely this user is shadowbanned.', {isSerious: false});
                 case 403:
-                    throw new ErrorWithCause('Reddit returned a 403 for user history, likely this user is suspended.', {cause: err});
+                    throw new MaybeSeriousErrorWithCause('Reddit returned a 403 for user history, likely this user is suspended.', {cause: err, isSerious: false});
                 default:
                     throw err;
             }

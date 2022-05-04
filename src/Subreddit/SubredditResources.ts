@@ -1100,6 +1100,9 @@ export class SubredditResources {
     // @ts-ignore
     async getAuthor(val: RedditUser | string) {
         const authorName = typeof val === 'string' ? val : val.name;
+        if(authorName === '[deleted]') {
+            throw new SimpleError(`User is '[deleted]', cannot retrieve`, {isSerious: false});
+        }
         const hash = `author-${authorName}`;
         if (this.authorTTL !== false) {
             const cachedAuthorData = await this.cache.get(hash);
@@ -1124,15 +1127,22 @@ export class SubredditResources {
         } else {
             user = this.client.getUser(val);
         }
-        // @ts-ignore
-        user = await user.fetch();
-
-        if (this.authorTTL !== false) {
+        try {
             // @ts-ignore
-            await this.cache.set(hash, user, {ttl: this.authorTTL});
-        }
+            user = await user.fetch();
 
-        return user;
+            if (this.authorTTL !== false) {
+                // @ts-ignore
+                await this.cache.set(hash, user, {ttl: this.authorTTL});
+            }
+
+            return user;
+        } catch (err) {
+            if(isStatusError(err) && err.statusCode === 404) {
+                throw new SimpleError(`Reddit returned a 404 for User '${authorName}'. Likely this user is shadowbanned.`, {isSerious: false});
+            }
+            throw new ErrorWithCause(`Could not retrieve User '${authorName}'`, {cause: err});
+        }
     }
 
     async getAuthorActivities(user: RedditUser, options: AuthorTypedActivitiesOptions): Promise<Array<Submission | Comment>> {
@@ -2062,8 +2072,13 @@ export class SubredditResources {
                             if((await user()).is_suspended) {
                                 propResultsMap[k]!.passed = false;
                                 propResultsMap[k]!.reason = 'User is suspended';
+                                shouldContinue = false;
                                 break;
                             }
+                    }
+
+                    if(!shouldContinue) {
+                        break;
                     }
 
                     const authorOptVal = definedAuthorOpts[k];
@@ -2358,7 +2373,7 @@ export class SubredditResources {
                 }
             } catch (err: any) {
                 if (isStatusError(err) && err.statusCode === 404) {
-                    throw new SimpleError('Reddit returned a 404 while trying to retrieve User profile. It is likely this user is shadowbanned.');
+                    throw new SimpleError('Reddit returned a 404 while trying to retrieve User profile. It is likely this user is shadowbanned.', {isSerious: false});
                 } else {
                     throw err;
                 }

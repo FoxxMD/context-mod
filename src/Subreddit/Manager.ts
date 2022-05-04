@@ -69,7 +69,14 @@ import {Check, CheckStructuredJson} from "../Check";
 import NotificationManager from "../Notification/NotificationManager";
 import {createHistoricalDisplayDefaults} from "../Common/defaults";
 import {ExtendedSnoowrap} from "../Utils/SnoowrapClients";
-import {CMError, isRateLimitError, isStatusError, RunProcessingError} from "../Utils/Errors";
+import {
+    CMError,
+    definesSeriousError,
+    isRateLimitError,
+    isSeriousError,
+    isStatusError,
+    RunProcessingError
+} from "../Utils/Errors";
 import {ErrorWithCause, stackWithCauses} from "pony-cause";
 import {Run} from "../Run";
 import got from "got";
@@ -1041,7 +1048,9 @@ export class Manager extends EventEmitter implements RunningStates {
             }
             const processError = new ErrorWithCause('Activity processing terminated early due to unexpected error', {cause: err});
             this.logger.error(processError);
-            this.emit('error', err);
+            if(isSeriousError(err)) {
+                this.emit('error', err);
+            }
         } finally {
             event.triggered = runResults.some(x => x.triggered);
             actionedEvent.triggered = runResults.some(x => x.triggered);
