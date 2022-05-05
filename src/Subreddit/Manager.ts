@@ -496,7 +496,8 @@ export class Manager extends EventEmitter implements RunningStates {
                 if(!ar.processing && ar.queuedAt.add(ar.delay).isSameOrBefore(dayjs())) {
                     this.logger.info(`Delayed Activity ${ar.activity.name} is being queued.`);
                     await this.firehose.push({
-                        activity: ar.activity, options: {
+                        activity: ar.activity,
+                        options: {
                             refresh: true,
                             // @ts-ignore
                             source: ar.identifier === undefined ? ar.type : `${ar.type}:${ar.identifier}`,
@@ -509,7 +510,8 @@ export class Manager extends EventEmitter implements RunningStates {
                                 goto: ar.goto,
                                 identifier: ar.identifier,
                                 type: ar.type
-                            }
+                            },
+                            dryRun: ar.dryRun,
                         }
                     });
                     this.resources.delayedItems.splice(index, 1, {...ar, processing: true});
@@ -536,7 +538,12 @@ export class Manager extends EventEmitter implements RunningStates {
                 try {
                     const itemMeta = this.queuedItemsMeta[queuedItemIndex];
                     this.queuedItemsMeta.splice(queuedItemIndex, 1, {...itemMeta, state: 'processing'});
-                    await this.handleActivity(task.activity, {refresh: itemMeta.shouldRefresh, dryRun: this.dryRun, ...task.options});
+                    await this.handleActivity(task.activity, {
+                        refresh: itemMeta.shouldRefresh,
+                        ...task.options,
+                        // use dryRun specified in task options if it exists (usually from manual user invocation or from dispatched action)
+                        dryRun: task.options.dryRun ?? this.dryRun
+                    });
                 } finally {
                     // always remove item meta regardless of success or failure since we are done with it meow
                     this.queuedItemsMeta.splice(queuedItemIndex, 1);

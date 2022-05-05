@@ -61,6 +61,9 @@ export class DispatchedEntity extends TimeAwareRandomBaseEntity {
     @Column({nullable: true})
     onExistingFound?: onExistingFoundBehavior
 
+    @Column("boolean", {nullable: true})
+    dryRun?: boolean;
+
     @ManyToOne(type => ManagerEntity, act => act.events)
     manager!: ManagerEntity;
 
@@ -96,6 +99,7 @@ export class DispatchedEntity extends TimeAwareRandomBaseEntity {
             this.cancelIfQueued = data.cancelIfQueued;
             this.onExistingFound = data.onExistingFound;
             this.manager = data.manager;
+            this.dryRun = data.dryRun;
             if (data.tardyTolerant === undefined) {
                 this.tardyTolerant = dayjs.duration(5, 'minutes');
             } else {
@@ -144,6 +148,9 @@ export class DispatchedEntity extends TimeAwareRandomBaseEntity {
         if(this.onExistingFound === null) {
             this.onExistingFound = undefined;
         }
+        if(this.dryRun === null) {
+            this.dryRun = undefined;
+        }
     }
 
     async toActivityDispatch(client: ExtendedSnoowrap): Promise<ActivityDispatch> {
@@ -169,7 +176,8 @@ export class DispatchedEntity extends TimeAwareRandomBaseEntity {
             cancelIfQueued: this.cancelIfQueued,
             identifier: this.identifier,
             type: this.type,
-            author: this.author
+            author: this.author,
+            dryRun: this.dryRun
         }
     }
 }

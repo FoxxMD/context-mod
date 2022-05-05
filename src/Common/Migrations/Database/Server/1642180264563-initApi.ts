@@ -508,6 +508,11 @@ export class initApi1642180264563 implements MigrationInterface {
                         isNullable: false
                     },
                     {
+                        name: 'dryRun',
+                        type: 'boolean',
+                        isNullable: true,
+                    },
+                    {
                         name: 'delay',
                         type: 'integer',
                         isNullable: false,

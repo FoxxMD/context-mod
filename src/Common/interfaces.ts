@@ -2784,6 +2784,7 @@ export interface ActivityDispatch extends Omit<ActivityDispatchConfig, 'delay'| 
     processing: boolean
     action?: string
     type: ActivitySourceTypes
+    dryRun?: boolean
 }
 
 export interface ActivitySourceData {

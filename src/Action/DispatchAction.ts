@@ -45,6 +45,21 @@ export class DispatchAction extends Action {
         // BUT if the action explicitly sets 'dryRun: true' then do not dispatch as they probably don't want to it actually going (intention?)
         const dryRun = this.dryRun;
 
+        // For the dispatched activity we want to make sure that if dryrun is set then it inherits that
+        // Example scenario:
+        // * Bot is running LIVE
+        // * User manually checks an activity using "dry run" button
+        // * DispatchAction is run
+        // * Pass dryrun state for this activity onto the dispatched activity so it does not become live
+        //
+        // BUT ALSO we want to defer to manager/activity handle dryrun value as much as possible so
+        // if dryrun is false IE 1) current manager is not in dryrun 2) and user didn't specify dryrun manually 3) and action doesn't explicitly specify dryrun
+        // then don't "say" dryrun was explicitly set as false since it wasn't...we only need to explicitly specify dryrun if its true
+        //
+        // TODO reduce dryrun initial values, this is a bit complicated
+        // should default it to undefined everywhere so we can better identify when its explicitly set instead of assuming false === not set
+        const dispatchedDryRun = this.getRuntimeAwareDryrun(options) === false ? undefined : true;
+
         const realTargets = isSubmission(item) ? ['self'] : this.targets;
         if (this.targets.includes('parent') && isSubmission(item)) {
             if (this.targets.includes('self')) {
@@ -103,7 +118,7 @@ export class DispatchAction extends Action {
             }
 
             if (!dryRun) {
-                await this.resources.addDelayedActivity(activityDispatchConfigToDispatch({...this.dispatchData, delay: runtimeDelay}, act, 'dispatch', this.getActionUniqueName()))
+                await this.resources.addDelayedActivity(activityDispatchConfigToDispatch({...this.dispatchData, delay: runtimeDelay}, act, 'dispatch', {action: this.getActionUniqueName(), dryRun: dispatchedDryRun}))
             }
         }
         let dispatchBehaviors = [];

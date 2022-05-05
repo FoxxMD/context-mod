@@ -2550,7 +2550,7 @@ export const parseRedditFullname = (str: string): RedditThing | undefined => {
     }
 }
 
-export const activityDispatchConfigToDispatch = (config: ActivityDispatchConfig, activity: (Comment | Submission), type: ActivitySourceTypes, action?: string): ActivityDispatch => {
+export const activityDispatchConfigToDispatch = (config: ActivityDispatchConfig, activity: (Comment | Submission), type: ActivitySourceTypes, {action, dryRun}: {action?: string, dryRun?: boolean} = {}): ActivityDispatch => {
     let tolerantVal: boolean | Duration | undefined;
     if (config.tardyTolerant !== undefined) {
         if (typeof config.tardyTolerant === 'boolean') {
@@ -2568,6 +2568,7 @@ export const activityDispatchConfigToDispatch = (config: ActivityDispatchConfig,
         id: nanoid(16),
         activity,
         action,
+        dryRun,
         type,
         author: getActivityAuthorName(activity.author),
     }
