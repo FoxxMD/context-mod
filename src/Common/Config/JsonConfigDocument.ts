@@ -12,7 +12,7 @@ class JsonConfigDocument extends AbstractConfigDocument<OperatorJsonConfig> {
 
     public constructor(raw: string, location?: string) {
         super(raw, location);
-        this.parsed = parse(raw);
+        this.parsed = parse(raw) as OperatorJsonConfig;
         this.cleanParsed = JSON5.parse(raw);
         this.format = 'json';
     }
