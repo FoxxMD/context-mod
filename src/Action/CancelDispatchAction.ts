@@ -4,9 +4,7 @@ import Snoowrap, {Comment, Submission} from "snoowrap";
 import {activityIsRemoved} from "../Utils/SnoowrapUtils";
 import {
     ActionProcessResult,
-    ActionTarget,
     ActivityDispatchConfig,
-    InclusiveActionTarget,
     RuleResult
 } from "../Common/interfaces";
 import dayjs from "dayjs";
@@ -14,6 +12,7 @@ import {isSubmission, parseDurationValToDuration} from "../util";
 import {ActionTypes} from "../Common/types";
 import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
 import {runCheckOptions} from "../Subreddit/Manager";
+import {ActionTarget, InclusiveActionTarget} from "../Common/Typings/Atomic";
 
 export class CancelDispatchAction extends Action {
     identifiers?: (string | null)[];

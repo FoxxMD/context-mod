@@ -1,7 +1,7 @@
 import winston, {Logger} from "winston";
 import dayjs, {Dayjs} from "dayjs";
 import {getLogger} from "./Utils/loggerFactory";
-import {DatabaseConfig, DatabaseMigrationOptions, Invokee, OperatorConfig, OperatorConfigWithFileContext, OperatorFileConfig} from "./Common/interfaces";
+import {DatabaseMigrationOptions, OperatorConfig, OperatorConfigWithFileContext, OperatorFileConfig} from "./Common/interfaces";
 import Bot from "./Bot";
 import LoggedError from "./Utils/LoggedError";
 import {mergeArr, sleep} from "./util";
@@ -10,6 +10,8 @@ import {constants} from "fs";
 import {Connection} from "typeorm";
 import {ErrorWithCause} from "pony-cause";
 import {MigrationService} from "./Common/MigrationService";
+import {Invokee} from "./Common/Typings/Atomic";
+import {DatabaseConfig} from "./Common/Typings/Database";
 
 export class App {
 

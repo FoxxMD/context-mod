@@ -26,9 +26,7 @@ import {
     OperatorConfig,
     PollingOptions,
     PollingOptionsStrong,
-    PollOn,
     StrongCache,
-    CacheProvider,
     CacheOptions,
     BotInstanceJsonConfig,
     BotInstanceConfig,
@@ -37,22 +35,12 @@ import {
     BotCredentialsJsonConfig,
     BotCredentialsConfig,
     FilterCriteriaDefaults,
-    TypedActivityStates,
     OperatorFileConfig,
     PostBehavior,
-    StrongLoggingOptions,
-    DatabaseDriverConfig,
-    DatabaseDriver,
-    DatabaseDriverType,
-    AuthorCriteria,
     AuthorOptions,
-    NamedCriteria,
-    TypedActivityState,
-    MaybeAnonymousOrStringCriteria,
-    MinimalOrFullFilterJson,
     RunnableBaseJson,
     RunnableBaseOptions,
-    StructuredRunnableBase, FilterOptionsJson, MaybeAnonymousCriteria, FilterCriteriaDefaultsJson, MinimalOrFullFilter
+    StructuredRunnableBase, FilterCriteriaDefaultsJson
 } from "./Common/interfaces";
 import {isRuleSetJSON, RuleSetJson, RuleSetObjectJson} from "./Rule/RuleSet";
 import deepEqual from "fast-deep-equal";
@@ -96,6 +84,18 @@ import {SimpleError} from "./Utils/Errors";
 import {ErrorWithCause} from "pony-cause";
 import {RunJson, RunStructuredJson} from "./Run";
 import {AuthorRuleConfig} from "./Rule/AuthorRule";
+import {
+    CacheProvider,
+    PollOn
+} from "./Common/Typings/Atomic";
+import {
+    FilterOptionsJson,
+    MaybeAnonymousCriteria,
+    MaybeAnonymousOrStringCriteria, MinimalOrFullFilter, MinimalOrFullFilterJson, NamedCriteria
+} from "./Common/Typings/Filters/FilterShapes";
+import {AuthorCriteria, TypedActivityState, TypedActivityStates} from "./Common/Typings/Filters/FilterCriteria";
+import {StrongLoggingOptions} from "./Common/Typings/Logging";
+import {DatabaseDriver, DatabaseDriverConfig, DatabaseDriverType} from "./Common/Typings/Database";
 
 export interface ConfigBuilderOptions {
     logger: Logger,

@@ -4,232 +4,51 @@ import {MESSAGE} from 'triple-beam';
 import Submission from "snoowrap/dist/objects/Submission";
 import Comment from "snoowrap/dist/objects/Comment";
 import RedditUser from "snoowrap/dist/objects/RedditUser";
-import {SqljsConnectionOptions} from "typeorm/driver/sqljs/SqljsConnectionOptions";
-import {MysqlConnectionOptions} from "typeorm/driver/mysql/MysqlConnectionOptions";
-import {PostgresConnectionOptions} from "typeorm/driver/postgres/PostgresConnectionOptions";
-import {Connection, DataSource} from "typeorm";
+import {DataSource} from "typeorm";
 import {JsonOperatorConfigDocument, YamlOperatorConfigDocument} from "./Config/Operator";
-import {ConsoleTransportOptions} from "winston/lib/winston/transports";
-import {DailyRotateFileTransportOptions} from "winston-daily-rotate-file";
-import {DuplexTransportOptions} from "winston-duplex/dist/DuplexTransport";
 import {CommentCheckJson, SubmissionCheckJson} from "../Check";
 import {SafeDictionary} from "ts-essentials";
 import {RuleResultEntity} from "./Entities/RuleResultEntity";
 import {Logger} from "winston";
 import {SubredditResources} from "../Subreddit/SubredditResources";
-import {BetterSqlite3ConnectionOptions} from "typeorm/driver/better-sqlite3/BetterSqlite3ConnectionOptions";
 import {Dayjs} from "dayjs";
-import {LoggerOptions} from "typeorm/logger/LoggerOptions";
+import {
+    AuthorCriteria,
+    CommentState,
+    FilterCriteriaDefaultBehavior,
+    SubmissionState,
+    TypedActivityState,
+    TypedActivityStates
+} from "./Typings/Filters/FilterCriteria";
+import {
+    ActivitySourceTypes,
+    CacheProvider,
+    DurationVal,
+    EventRetentionPolicyRange,
+    FilterBehavior,
+    JoinOperands,
+    NonDispatchActivitySource,
+    NotificationEventType,
+    NotificationProvider,
+    onExistingFoundBehavior,
+    PollOn,
+    PostBehaviorType,
+    RecordOutputOption,
+    RecordOutputType,
+    SearchFacetType,
+    StatisticFrequencyOption,
+    StringOperator
+} from "./Typings/Atomic";
+import {
+    FilterOptions,
+    MinimalOrFullFilter,
+    MinimalOrFullFilterJson,
+    NamedCriteria
+} from "./Typings/Filters/FilterShapes";
+import {LoggingOptions, LogLevel, StrongLoggingOptions} from "./Typings/Logging";
+import {DatabaseConfig, DatabaseDriver, DatabaseDriverConfig, DatabaseDriverType} from "./Typings/Database";
+import {ActivityType} from "./Typings/Reddit";
 
-/**
- * An ISO 8601 Duration
- * @pattern ^(-?)P(?=\d|T\d)(?:(\d+)Y)?(?:(\d+)M)?(?:(\d+)([DW]))?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?)?$
- * */
-export type ISO8601 = string;
-
-/**
- * A shorthand value for a DayJS duration consisting of a number value and time unit
- *
- * * EX `9 days`
- * * EX `3 months`
- * @pattern ^\s*(?<time>\d+)\s*(?<unit>days?|weeks?|months?|years?|hours?|minutes?|seconds?|milliseconds?)\s*$
- * */
-export type DayJSShorthand = string;
-export type DurationString = DayJSShorthand | ISO8601;
-
-/**
- * A value to define the range of Activities to retrieve.
- *
- * Acceptable values:
- *
- * **`ActivityWindowCriteria` object**
- *
- * Allows specify multiple range properties and more specific behavior
- *
- * **A `number` of Activities to retrieve**
- *
- * * EX `100` => 100 Activities
- *
- * *****
- *
- * Any of the below values that specify the amount of time to subtract from `NOW` to create a time range IE `NOW <---> [duration] ago`
- *
- * Acceptable values:
- *
- * **A `string` consisting of a value and a [Day.js](https://day.js.org/docs/en/durations/creating#list-of-all-available-units) time UNIT**
- *
- * * EX `9 days` => Range is `NOW <---> 9 days ago`
- *
- * **A [Day.js](https://day.js.org/docs/en/durations/creating) `object`**
- *
- * * EX `{"days": 90, "minutes": 15}` => Range is `NOW <---> 90 days and 15 minutes ago`
- *
- * **An [ISO 8601 duration](https://en.wikipedia.org/wiki/ISO_8601#Durations) `string`**
- *
- * * EX `PT15M` => 15 minutes => Range is `NOW <----> 15 minutes ago`
- *
- * @examples ["90 days"]
- * */
-export type ActivityWindowType = ActivityWindowCriteria | DurationVal | number;
-export type DurationVal = DurationString | DurationObject;
-
-/**
- * Multiple properties that may be used to define what range of Activity to retrieve.
- *
- * May specify one, or both properties along with the `satisfyOn` property, to affect the retrieval behavior.
- *
- * @examples [{"count": 100, "duration": {"days": 90}}]
- * @minProperties 1
- * @additionalProperties false
- * */
-export interface ActivityWindowCriteria {
-    /**
-     * The number of activities (submission/comments) to consider
-     * @examples [15]
-     * */
-    count?: number,
-    /**
-     * A value that specifies the amount of time to subtract from `NOW` to create a time range IE `NOW <---> [duration] ago`
-     *
-     * Acceptable values:
-     *
-     * **A `string` consisting of a value and a [Day.js](https://day.js.org/docs/en/durations/creating) time unit** ([test your value](https://regexr.com/61em3))
-     *
-     * * EX `9 days` => Range is `NOW <---> 9 days ago`
-     *
-     * **A [Day.js](https://day.js.org/docs/en/durations/creating) `object`**
-     *
-     * * EX `{"days": 90, "minutes": 15}` => Range is `NOW <---> 90 days and 15 minutes ago`
-     *
-     * **An [ISO 8601 duration](https://en.wikipedia.org/wiki/ISO_8601#Durations) `string`** ([test your value](https://regexr.com/61em9))
-     *
-     * * EX `PT15M` => 15 minutes => Range is `NOW <----> 15 minutes ago`
-     *
-     * @examples ["90 days", "PT15M", {"minutes": 15}]
-     * */
-    duration?: DurationVal
-
-    /**
-     * Define the condition under which both criteria are considered met
-     *
-     * **If `any` then it will retrieve Activities until one of the criteria is met, whichever occurs first**
-     *
-     * EX `{"count": 100, duration: "90 days"}`:
-     * * If 90 days of activities = 40 activities => returns 40 activities
-     * * If 100 activities is only 20 days => 100 activities
-     *
-     * **If `all` then both criteria must be met.**
-     *
-     * Effectively, whichever criteria produces the most Activities...
-     *
-     * EX `{"count": 100, duration: "90 days"}`:
-     * * If at 90 days of activities => 40 activities, continue retrieving results until 100 => results in >90 days of activities
-     * * If at 100 activities => 20 days of activities, continue retrieving results until 90 days => results in >100 activities
-     *
-     * @examples ["any"]
-     * @default any
-     * */
-    satisfyOn?: 'any' | 'all';
-
-    /**
-     * Filter which subreddits (case-insensitive) Activities are retrieved from.
-     *
-     * **Note:** Filtering occurs **before** `duration/count` checks are performed.
-     * */
-    subreddits?: {
-        /**
-         * Include only results from these subreddits
-         *
-         * @examples [["mealtimevideos","askscience"]]
-         * */
-        include?: (string | SubredditState)[],
-        /**
-         * Exclude any results from these subreddits
-         *
-         * **Note:** `exclude` is ignored if `include` is present
-         *
-         * @examples [["mealtimevideos","askscience"]]
-         * */
-        exclude?: (string | SubredditState)[],
-    }
-}
-
-/**
- * A [Day.js duration object](https://day.js.org/docs/en/durations/creating)
- *
- * @examples [{"minutes": 30, "hours": 1}]
- * @minProperties 1
- * @additionalProperties false
- * */
-export interface DurationObject {
-    /**
-     * @examples [15]
-     * */
-    seconds?: number
-    /**
-     * @examples [50]
-     * */
-    minutes?: number
-    /**
-     * @examples [4]
-     * */
-    hours?: number
-    /**
-     * @examples [7]
-     * */
-    days?: number
-    /**
-     * @examples [2]
-     * */
-    weeks?: number
-    /**
-     * @examples [3]
-     * */
-    months?: number
-    /**
-     * @examples [0]
-     * */
-    years?: number
-}
-
-export interface DurationComparison {
-    operator: StringOperator,
-    duration: Duration
-}
-
-export interface GenericComparison {
-    operator: StringOperator,
-    value: number,
-    isPercent: boolean,
-    extra?: string,
-    displayText: string,
-}
-
-
-export const windowExample: ActivityWindowType[] = [
-    15,
-    'PT1M',
-    {
-        count: 10
-    },
-    {
-        duration: {
-            hours: 5
-        }
-    },
-    {
-        count: 5,
-        duration: {
-            minutes: 15
-        }
-    }
-];
-
-
-export interface ActivityWindow {
-
-    window?: ActivityWindowType,
-}
 
 export interface ReferenceSubmission {
     /**
@@ -460,28 +279,6 @@ export interface RequiredRichContent extends RichContent {
     content: string
 }
 
-/**
- * A list of subreddits (case-insensitive) to look for.
- *
- * EX ["mealtimevideos","askscience"]
- * @examples ["mealtimevideos","askscience"]
- * @minItems 1
- * */
-export type SubredditList = string[];
-
-export interface SubredditCriteria {
-    /**
-     * A list of Subreddits (by name, case-insensitive) to look for.
-     *
-     * EX ["mealtimevideos","askscience"]
-     * @examples [["mealtimevideos","askscience"]]
-     * @minItems 1
-     * */
-    subreddits: string[]
-}
-
-export type JoinOperands = 'OR' | 'AND';
-
 export interface JoinCondition {
     /**
      * Under what condition should a set of run `Rule` objects be considered "successful"?
@@ -495,8 +292,6 @@ export interface JoinCondition {
      * */
     condition?: JoinOperands,
 }
-
-export type PollOn = 'unmoderated' | 'modqueue' | 'newSub' | 'newComm';
 
 export interface PollingOptionsStrong extends PollingOptions {
     limit: number,
@@ -708,20 +503,6 @@ export interface OperatorCacheConfig extends CacheConfig {
     actionedEventsDefault?: number
 }
 
-export type DatabaseDriverType = 'sqljs' | 'better-sqlite3' | 'mysql' | 'mariadb' | 'postgres';
-export type DatabaseConfig = SqljsConnectionOptions | MysqlConnectionOptions | PostgresConnectionOptions | BetterSqlite3ConnectionOptions;
-export type DatabaseDriverConfig = {
-    type: DatabaseDriverType,
-    [key: string]: any
-    /**
-     * Set the type of logging typeorm should output
-     *
-     * Defaults to errors, warnings, and schema (migration progress)
-     * */
-    logging?: LoggerOptions
-}
-export type DatabaseDriver = DatabaseDriverType | DatabaseDriverConfig;
-
 export interface Footer {
     /**
      * Customize the footer for Actions that send replies (Comment/Ban)
@@ -878,47 +659,6 @@ export interface ManagerOptions {
     retention?: EventRetentionPolicyRange
 }
 
-/**
- * A string containing a comparison operator and a value to compare against
- *
- * The syntax is `(< OR > OR <= OR >=) <number>`
- *
- * * EX `> 100`  => greater than 100
- *
- * @pattern ^\s*(>|>=|<|<=)\s*(\d+)\s*(%?)(.*)$
- * */
-export type CompareValue = string;
-
-/**
- * A duration and how to compare it against a value
- *
- * The syntax is `(< OR > OR <= OR >=) <number> <unit>` EX `> 100 days`, `<= 2 months`
- *
- * * EX `> 100 days` => Passes if the date being compared is before 100 days ago
- * * EX `<= 2 months` => Passes if the date being compared is after or equal to 2 months
- *
- * Unit must be one of [DayJS Duration units](https://day.js.org/docs/en/durations/creating)
- *
- * [See] https://regexr.com/609n8 for example
- *
- * @pattern ^\s*(>|>=|<|<=)\s*(\d+)\s*(days|weeks|months|years|hours|minutes|seconds|milliseconds)\s*$
- * */
-export type DurationComparor = string;
-
-/**
- * A string containing a comparison operator and a value to compare against
- *
- * The syntax is `(< OR > OR <= OR >=) <number>[percent sign]`
- *
- * * EX `> 100`  => greater than 100
- * * EX `<= 75%` => less than or equal to 75%
- *
- * @pattern ^\s*(>|>=|<|<=)\s*(\d+)\s*(%?)(.*)$
- * */
-export type CompareValueOrPercent = string;
-
-export type StringOperator = '>' | '>=' | '<' | '<=';
-
 export interface ThresholdCriteria {
     /**
      * The number or percentage to trigger this criteria at
@@ -941,191 +681,6 @@ export interface ChecksActivityState {
     itemIs?: TypedActivityStates
 }
 
-export interface ActivityState {
-    /**
-     * * true/false => test whether Activity is removed or not
-     * * string or list of strings => test which moderator removed this Activity
-     * */
-    removed?: boolean | ModeratorNames | ModeratorNames[] | ModeratorNameCriteria
-    filtered?: boolean
-    deleted?: boolean
-    locked?: boolean
-    spam?: boolean
-    stickied?: boolean
-    distinguished?: boolean
-    /**
-     * * true/false => test whether Activity is approved or not
-     * * string or list of strings => test which moderator approved this Activity
-     * */
-    approved?: boolean | ModeratorNames | ModeratorNames[] | ModeratorNameCriteria
-    score?: CompareValue
-    /**
-     * A string containing a comparison operator and a value to compare against
-     *
-     * The syntax is `(< OR > OR <= OR >=) <number>`
-     *
-     * * EX `> 2`  => greater than 2 total reports
-     *
-     * Defaults to TOTAL reports on an Activity. Suffix the value with the report type to check that type:
-     *
-     * * EX `> 3 mod` => greater than 3 mod reports
-     * * EX `>= 1 user` => greater than 1 user report
-     *
-     * @pattern ^\s*(>|>=|<|<=)\s*(\d+)\s*(%?)(.*)$
-     * */
-    reports?: CompareValue
-    age?: DurationComparor
-    /**
-     * Test whether the activity is present in dispatched/delayed activities
-     *
-     * NOTE: This is DOES NOT mean that THIS activity is from dispatch -- just that it exists there. To test whether THIS activity is from dispatch use `source`
-     *
-     * * `true` => activity exists in delayed activities
-     * * `false` => activity DOES NOT exist in delayed activities
-     * * `string` => activity exists in delayed activities with given identifier
-     * * `string[]` => activity exists in delayed activities with any of the given identifiers
-     *
-     * */
-    dispatched?: boolean | string | string[]
-
-
-    // can use ActivitySource | ActivitySource[] here because of issues with generating json schema, see ActivitySource comments
-    /**
-     * Test where the current activity was sourced from.
-     *
-     * A source can be any of:
-     *
-     * * `poll` => activity was retrieved from polling a queue (unmoderated, modqueue, etc...)
-     * * `poll:[pollSource]` => activity was retrieved from specific polling source IE `poll:unmoderated` activity comes from unmoderated queue
-     *   * valid sources: unmoderated modqueue newComm newSub
-     * * `dispatch` => activity is from Dispatch Action
-     * * `dispatch:[identifier]` => activity is from Dispatch Action with specific identifier
-     * * `user` => activity was from user input (web dashboard)
-     *
-     * */
-    source?: string | string[]
-}
-
-export type ModeratorNames = 'self' | 'automod' | 'automoderator' | string;
-
-export interface ModeratorNameCriteria {
-    behavior?: 'include' | 'exclude'
-    name: ModeratorNames | ModeratorNames[]
-}
-
-/**
- * Different attributes a `Submission` can be in. Only include a property if you want to check it.
- * @examples [{"over_18": true, "removed": false}]
- * */
-export interface SubmissionState extends ActivityState {
-    pinned?: boolean
-    spoiler?: boolean
-    /**
-     * NSFW
-     * */
-    over_18?: boolean
-    is_self?: boolean
-    /**
-     * A valid regular expression to match against the title of the submission
-     * */
-    title?: string
-
-    /**
-     * * If `true` then passes if flair has ANY text
-     * * If `false` then passes if flair has NO text
-     * */
-    link_flair_text?: boolean | string | string[]
-    /**
-     * * If `true` then passes if flair has ANY css
-     * * If `false` then passes if flair has NO css
-     * */
-    link_flair_css_class?: boolean | string | string[]
-    /**
-     * * If `true` then passes if there is ANY flair template id
-     * * If `false` then passes if there is NO flair template id
-     * */
-    flairTemplate?: boolean | string | string[]
-    /**
-     * Is the submission a reddit-hosted image or video?
-     * */
-    isRedditMediaDomain?: boolean
-}
-
-// properties calculated/derived by CM -- not provided as plain values by reddit
-export const cmActivityProperties = ['submissionState','score','reports','removed','deleted','filtered','age','title'];
-
-/**
- * Different attributes a `Comment` can be in. Only include a property if you want to check it.
- * @examples [{"op": true, "removed": false}]
- * */
-export interface CommentState extends ActivityState {
-    /**
-     * Is this Comment Author also the Author of the Submission this comment is in?
-     * */
-    op?: boolean
-    /**
-     * A list of SubmissionState attributes to test the Submission this comment is in
-     * */
-    submissionState?: SubmissionState[]
-
-    /**
-     * The (nested) level of a comment.
-     *
-     * * 0 mean the comment is at top-level (replying to submission)
-     * * non-zero, Nth value means the comment has N parent comments
-     * */
-    depth?: DurationComparor
-}
-
-/**
- * Different attributes a `Subreddit` can be in. Only include a property if you want to check it.
- * @examples [{"over18": true}]
- * */
-export interface SubredditState {
-    /**
-     * Is subreddit quarantined?
-     * */
-    quarantine?: boolean
-    /**
-     * Is subreddit NSFW/over 18?
-     *
-     * **Note**: This is **mod-controlled flag** so it is up to the mods of the subreddit to correctly mark their subreddit as NSFW
-     * */
-    over18?: boolean
-    /**
-     * The name of the subreddit.
-     *
-     * Can be a normal string (will check case-insensitive) or a regular expression
-     *
-     * EX `["mealtimevideos", "/onlyfans*\/i"]`
-     *
-     * @examples ["mealtimevideos", "/onlyfans*\/i"]
-     * */
-    name?: string | RegExp
-    /**
-     * A friendly description of what this State is trying to parse
-     * */
-    stateDescription?: string
-
-    /**
-     * Test whether the subreddit is a user profile
-     * */
-    isUserProfile?: boolean
-
-    /**
-     * Test whether the subreddit is the profile of the Author of the Activity being checked
-     * */
-    isOwnProfile?: boolean
-}
-
-export interface StrongSubredditState extends SubredditState {
-    name?: RegExp
-}
-
-export type TypedActivityState = SubmissionState | CommentState;
-
-export type TypedActivityStates = TypedActivityState[];
-
 export interface DomainInfo {
     display: string,
     domain: string,
@@ -1137,10 +692,8 @@ export interface DomainInfo {
 export const DEFAULT_POLLING_INTERVAL = 30;
 export const DEFAULT_POLLING_LIMIT = 50;
 
-export type Invokee = 'system' | 'user';
 export const SYSTEM = 'system';
 export const USER = 'user';
-export type RunState = 'running' | 'paused' | 'stopped';
 export const STOPPED = 'stopped';
 export const RUNNING = 'running';
 export const PAUSED = 'paused';
@@ -1183,101 +736,6 @@ export interface RegExResult {
     global: GlobalRegExResult[]
 }
 
-type LogLevel = "error" | "warn" | "info" | "verbose" | "debug";
-
-export type LogConsoleOptions = Pick<ConsoleTransportOptions, 'silent' | 'eol' | 'stderrLevels' | 'consoleWarnLevels'> & {
-    level?: LogLevel
-}
-
-export type LogFileOptions = Omit<DailyRotateFileTransportOptions, 'stream' | 'handleRejections' | 'options' | 'handleExceptions' | 'format' | 'log' | 'logv' | 'close' | 'dirname'> & {
-    level?: LogLevel
-    /**
-     * The absolute path to a directory where rotating log files should be stored.
-     *
-     * * If not present or `null` or `false` no log files will be created
-     * * If `true` logs will be stored at `[working directory]/logs`
-     *
-     * * ENV => `LOG_DIR`
-     * * ARG => `--logDir [dir]`
-     *
-     * @examples ["/var/log/contextmod"]
-     * */
-    dirname?: string | boolean | null
-}
-
-// export type StrongFileOptions = LogFileOptions & {
-//     dirname?: string
-// }
-
-export type LogStreamOptions = Omit<DuplexTransportOptions, 'name' | 'stream' | 'handleRejections' | 'handleExceptions' | 'format' | 'log' | 'logv' | 'close'> & {
-    level?: LogLevel
-}
-
-export interface LoggingOptions  {
-    /**
-     * The minimum log level to output. The log level set will output logs at its level **and all levels above it:**
-     *
-     *  * `error`
-     *  * `warn`
-     *  * `info`
-     *  * `verbose`
-     *  * `debug`
-     *
-     *  Note: `verbose` will display *a lot* of information on the status/result of run rules/checks/actions etc. which is very useful for testing configurations. Once your bot is stable changing the level to `info` will reduce log noise.
-     *
-     *  * ENV => `LOG_LEVEL`
-     *  * ARG => `--logLevel <level>`
-     *
-     *  @default "verbose"
-     *  @examples ["verbose"]
-     * */
-    level?: LogLevel,
-    /**
-     * **DEPRECATED** - Use `file.dirname` instead
-     * The absolute path to a directory where rotating log files should be stored.
-     *
-     * * If not present or `null` or `false` no log files will be created
-     * * If `true` logs will be stored at `[working directory]/logs`
-     *
-     * * ENV => `LOG_DIR`
-     * * ARG => `--logDir [dir]`
-     *
-     * @examples ["/var/log/contextmod"]
-     * @deprecated
-     * @see logging.file.dirname
-     * */
-    path?: string | boolean | null
-
-    /**
-     * Options for Rotating File logging
-     * */
-    file?: LogFileOptions
-    /**
-     * Options for logging to api/web
-     * */
-    stream?: LogStreamOptions
-    /**
-     * Options for logging to console
-     * */
-    console?: LogConsoleOptions
-}
-
-export type StrongLoggingOptions = Required<Pick<LoggingOptions, 'stream' | 'console' | 'file'>> & {
-    level?: LogLevel
-};
-
-export type LoggerFactoryOptions = StrongLoggingOptions & {
-    additionalTransports?: any[]
-    defaultLabel?: string
-}
-/**
- * Available cache providers
- * */
-export type CacheProvider = 'memory' | 'redis' | 'none';
-
-// export type StrongCache = SubredditCacheConfig & {
-//     provider: CacheOptions
-// }
 export type StrongCache = {
     authorTTL: number | boolean,
     userNotesTTL: number | boolean,
@@ -1351,10 +809,6 @@ export interface CacheOptions {
 
     [key:string]: any
 }
-
-export type NotificationProvider = 'discord';
-
-export type NotificationEventType = 'runStateChanged' | 'pollingError' | 'eventActioned' | 'configUpdated'
 
 export interface NotificationEventPayload  {
     type: NotificationEventType,
@@ -1570,44 +1024,6 @@ export interface SnoowrapOptions {
     timeoutCodes?: string[]
 }
 
-export type FilterCriteriaDefaultBehavior = 'replace' | 'merge';
-
-export type MaybeAnonymousCriteria<T> = T | NamedCriteria<T>;
-
-export type MaybeAnonymousOrStringCriteria<T> = MaybeAnonymousCriteria<T> | string;
-
-export interface FilterOptionsJson<T> {
-
-    /**
-     * Will "pass" if any set of Criteria passes
-     * */
-    include?: MaybeAnonymousOrStringCriteria<T>[]
-
-    /**
-     * * OR => if ANY exclude condition "does not" pass then the exclude test passes
-     * * AND => if ALL exclude conditions "do not" pass then the exclude test passes
-     *
-     * Defaults to OR
-     * @default OR
-     * */
-    excludeCondition?: JoinOperands
-
-    /**
-     * Only runs if `include` is not present. Each Criteria is comprised of conditions that the filter (Author/Item) being checked must "not" pass. See excludeCondition for set behavior
-     *
-     * EX: `isMod: true, name: Automoderator` => Will pass if the Author IS NOT a mod and IS NOT named Automoderator
-     * */
-    exclude?: MaybeAnonymousOrStringCriteria<T>[];
-
-}
-
-export interface FilterOptions<T> extends Omit<FilterOptionsJson<T>, 'include' | 'exclude'> {
-
-    include?: NamedCriteria<T>[]
-
-    exclude?: NamedCriteria<T>[];
-}
-
 /**
  * If present then these Author criteria are checked before running. If criteria fails then this process is skipped.
  * @examples [{"include": [{"flairText": ["Contributor","Veteran"]}, {"isMod": true}]}]
@@ -1629,10 +1045,6 @@ export interface ItemOptions extends FilterOptions<TypedActivityState> {
 //  * * @examples [{"include": [{"over_18": true, "removed': false}]}]
 //  * */
 // export type ItemOptions = FilterOptions<SubmissionState> | FilterOptions<CommentState>
-
-export type MinimalOrFullFilter<T> = MaybeAnonymousCriteria<T>[] | FilterOptions<T>
-
-export type MinimalOrFullFilterJson<T> = MaybeAnonymousOrStringCriteria<T>[] | FilterOptionsJson<T>
 
 export interface FilterCriteriaDefaults extends Omit<FilterCriteriaDefaultsJson, 'itemIs' | 'authorIs'> {
     itemIs?: MinimalOrFullFilter<TypedActivityState>
@@ -1885,10 +1297,6 @@ export interface BotInstanceJsonConfig {
     }
 }
 
-export type StatisticFrequency = 'minute' | 'hour' | 'day' | 'week' | 'month' | 'year';
-export const statFrequencies: StatisticFrequency[] = ['minute','hour','day','week','month','year'];
-export type StatisticFrequencyOption = StatisticFrequency | false;
-
 export interface DatabaseStatisticsJsonConfig {
     /**
      * Specify the frequency for collecting time-series statistics.
@@ -1916,8 +1324,6 @@ export interface DatabaseStatisticsOperatorJsonConfig extends DatabaseStatistics
 export interface DatabaseStatisticsOperatorConfig extends DatabaseStatisticsConfig {
     minFrequency: StatisticFrequencyOption
 }
-
-export type EventRetentionPolicyRange = DurationVal | number;
 
 /**
  * Configuration for application-level settings IE for running the bot instance
@@ -2318,137 +1724,6 @@ export interface LogInfo {
     user?: string
 }
 
-export const authorCriteriaProperties = ['name', 'flairCssClass','flairText','flairTemplate','isMod','userNotes','age','linkKarma','commentKarma','totalKarma','verified', 'shadowBanned', 'description', 'isContributor'];
-
-/**
- * Criteria with which to test against the author of an Activity. The outcome of the test is based on:
- *
- * 1. All present properties passing and
- * 2. If a property is a list then any value from the list matching
- *
- * @minProperties 1
- * @additionalProperties false
- * @examples [{"flairText": ["Contributor","Veteran"], "isMod": true, "name": ["FoxxMD", "AnotherUser"] }]
- * */
-export interface AuthorCriteria {
-    /**
-     * A list of reddit usernames (case-insensitive) to match against. Do not include the "u/" prefix
-     *
-     *  EX to match against /u/FoxxMD and /u/AnotherUser use ["FoxxMD","AnotherUser"]
-     * @examples ["FoxxMD","AnotherUser"]
-     * */
-    name?: string[],
-    /**
-     * A (user) flair css class (or list of) from the subreddit to match against
-     *
-     * * If `true` then passes if ANY css is assigned
-     * * If `false` then passes if NO css is assigned
-     * @examples ["red"]
-     * */
-    flairCssClass?: boolean | string | string[],
-    /**
-     * A (user) flair text value (or list of) from the subreddit to match against
-     *
-     * * If `true` then passes if ANY text is assigned
-     * * If `false` then passes if NO text is assigned
-     *
-     * @examples ["Approved"]
-     * */
-    flairText?: boolean | string | string[],
-
-    /**
-     * A (user) flair template id (or list of) from the subreddit to match against
-     *
-     * * If `true` then passes if ANY template is assigned
-     * * If `false` then passed if NO template is assigned
-     *
-     * */
-    flairTemplate?: boolean | string | string[]
-    /**
-     * Is the author a moderator?
-     * */
-    isMod?: boolean,
-    /**
-     * A list of UserNote properties to check against the User Notes attached to this Author in this Subreddit (must have Toolbox enabled and used User Notes at least once)
-     * */
-    userNotes?: UserNoteCriteria[]
-
-    /**
-     * Test the age of the Author's account (when it was created) against this comparison
-     *
-     * The syntax is `(< OR > OR <= OR >=) <number> <unit>`
-     *
-     * * EX `> 100 days` => Passes if Author's account is older than 100 days
-     * * EX `<= 2 months` => Passes if Author's account is younger than or equal to 2 months
-     *
-     * Unit must be one of [DayJS Duration units](https://day.js.org/docs/en/durations/creating)
-     *
-     * [See] https://regexr.com/609n8 for example
-     *
-     * @pattern ^\s*(>|>=|<|<=)\s*(\d+)\s*(days?|weeks?|months?|years?|hours?|minutes?|seconds?|milliseconds?)\s*$
-     * */
-    age?: DurationComparor
-
-    /**
-     * A string containing a comparison operator and a value to compare link karma against
-     *
-     * The syntax is `(< OR > OR <= OR >=) <number>[percent sign]`
-     *
-     * * EX `> 100`  => greater than 100 link karma
-     * * EX `<= 75%` => link karma is less than or equal to 75% of **all karma**
-     *
-     * @pattern ^\s*(>|>=|<|<=)\s*(\d+)\s*(%?)(.*)$
-     * */
-    linkKarma?: CompareValueOrPercent
-
-    /**
-     * A string containing a comparison operator and a value to compare karma against
-     *
-     * The syntax is `(< OR > OR <= OR >=) <number>[percent sign]`
-     *
-     * * EX `> 100`  => greater than 100 comment karma
-     * * EX `<= 75%` => comment karma is less than or equal to 75% of **all karma**
-     *
-     * @pattern ^\s*(>|>=|<|<=)\s*(\d+)\s*(%?)(.*)$
-     * */
-    commentKarma?: CompareValueOrPercent
-
-    totalKarma?: CompareValue
-
-    /**
-     * Does Author's account have a verified email?
-     * */
-    verified?: boolean
-
-    /**
-     * Is the author shadowbanned?
-     *
-     * This is determined by trying to retrieve the author's profile. If a 404 is returned it is likely they are shadowbanned
-     * */
-    shadowBanned?: boolean
-
-    /**
-     * An (array of) string/regular expression to test contents of an Author's profile description against
-     *
-     * If no flags are specified then the **insensitive** flag is used by default
-     *
-     * If using an array then if **any** value in the array passes the description test passes
-     *
-     * @examples [["/test$/i", "look for this string literal"]]
-     * */
-    description?: string | string[]
-
-    /**
-     * Is the author an approved user (contributor)?
-     * */
-    isContributor?: boolean
-}
-
-export interface NamedCriteria<T extends AuthorCriteria | TypedActivityState> {
-    name?: string
-    criteria: T
-}
-
 export interface ActionResult extends ActionProcessResult {
     premise: ObjectPremise
     kind: string,
@@ -2544,13 +1819,6 @@ export interface UserResultCache {
     ruleResults: RuleResultEntity[]
 }
 
-export type RedditEntityType = 'user' | 'subreddit';
-
-export interface RedditEntity {
-    name: string
-    type: RedditEntityType
-}
-
 export interface HistoricalStatsDisplay {
     checksRunTotal: number
     checksFromCacheTotal: number
@@ -2579,8 +1847,6 @@ export interface ManagerStats {
         types: ResourceStats
     },
 }
-
-export type SearchFacetType = 'title' | 'url' | 'duplicates' | 'crossposts' | 'external';
 
 export interface RepostItem {
     value: string
@@ -2629,8 +1895,6 @@ export interface FilterCriteriaResult<T> {
     propertyResults: FilterCriteriaPropertyResult<T>[]
     passed: boolean
 }
-
-export type FilterBehavior = 'include' | 'exclude'
 
 export interface FilterResult<T> {
     criteriaResults: FilterCriteriaResult<T>[]
@@ -2693,36 +1957,6 @@ export interface TextMatchOptions {
 
 export type ActivityCheckJson = SubmissionCheckJson | CommentCheckJson;
 
-export type GotoPath = `goto:${string}`;
-
-/**
- * Possible outputs to store event details to
- * */
-export type RecordOutputType = 'database' | 'influx';
-
-export const recordOutputTypes: RecordOutputType[] = ['database', 'influx'];
-
-/**
- * Possible options for output:
- * 
- * * true -> store to all
- * * false -> store to none
- * * string -> store to this one output
- * * list -> store to these specified outputs
- * */
-export type RecordOutputOption = boolean | RecordOutputType | RecordOutputType[]
-
-/**
- * The possible behaviors that can occur after a check has run
- *
- * * next => continue to next Check/Run
- * * stop => stop CM lifecycle for this activity (immediately end)
- * * nextRun => skip any remaining Checks in this Run and start the next Run
- * * goto:[path] => specify a run[.check] to jump to
- *
- * */
-export type PostBehaviorType = 'next' | 'stop' | 'nextRun' | string;
-
 export interface PostBehaviorOptionConfig {
     recordTo?: RecordOutputOption
     behavior?: PostBehaviorType
@@ -2756,14 +1990,8 @@ export interface PostBehaviorStrong {
     postFail: PostBehaviorOptionConfigStrong
 }
 
-export type ActivityType = 'submission' | 'comment';
-
-export type FullNameTypes = ActivityType | 'user' | 'subreddit' | 'message';
-
 export type ItemCritPropHelper = SafeDictionary<FilterCriteriaPropertyResult<(CommentState & SubmissionState)>, keyof (CommentState & SubmissionState)>;
 export type RequiredItemCrit = Required<(CommentState & SubmissionState)>;
-
-export type onExistingFoundBehavior = 'replace' | 'skip' | 'ignore';
 
 export interface ActivityDispatchConfig {
     identifier?: string
@@ -2796,36 +2024,6 @@ export interface ActivitySourceData {
     id: string
     identifier?: string
 }
-
-export type ActionTarget = 'self' | 'parent';
-
-export type InclusiveActionTarget = ActionTarget | 'any';
-
-export type DispatchSource = 'dispatch' | `dispatch:${string}`;
-
-export type NonDispatchActivitySource = 'poll' | `poll:${PollOn}` | 'user' | `user:${string}`;
-
-export type ActivitySourceTypes = 'poll' | 'dispatch' | 'user';
-
-// TODO
-// https://github.com/YousefED/typescript-json-schema/issues/426
-// https://github.com/YousefED/typescript-json-schema/issues/425
-// @pattern ^(((poll|dispatch)(:\w+)?)|user)$
-// @type string
-/**
- * Where an Activity was retrieved from
- *
- * Source can be any of:
- *
- * * `poll` => activity was retrieved from polling a queue (unmoderated, modqueue, etc...)
- * * `poll:[pollSource]` => activity was retrieved from specific polling source IE `poll:unmoderated` activity comes from unmoderated queue
- * * `dispatch` => activity is from Dispatch Action
- * * `dispatch:[identifier]` => activity is from Dispatch Action with specific identifier
- * * `user` => activity was from user input (web dashboard)
- *
- *
- * */
-export type ActivitySource = NonDispatchActivitySource | DispatchSource;
 
 export interface ObjectPremise {
     kind: string
@@ -2868,63 +2066,3 @@ export interface RunnableBaseJson {
     authorIs?: MinimalOrFullFilterJson<AuthorCriteria>
 }
 
-export interface RedditThing {
-    val: string
-    type: FullNameTypes
-    prefix: string
-    id: string
-}
-
-export interface PermalinkRedditThings {
-    comment?: RedditThing,
-    submission?: RedditThing
-}
-
-export interface UserNoteCriteria {
-    /**
-     * User Note type key to search for
-     * @examples ["spamwarn"]
-     * */
-    type: string;
-    /**
-     * Number of occurrences of this type. Ignored if `search` is `current`
-     *
-     * A string containing a comparison operator and/or a value to compare number of occurrences against
-     *
-     * The syntax is `(< OR > OR <= OR >=) <number>[percent sign] [ascending|descending]`
-     *
-     * @examples [">= 1"]
-     * @default ">= 1"
-     * @pattern ^\s*(?<opStr>>|>=|<|<=)\s*(?<value>\d+)\s*(?<percent>%?)\s*(?<extra>asc.*|desc.*)*$
-     * */
-    count?: string;
-
-    /**
-     * How to test the notes for this Author:
-     *
-     * ### current
-     *
-     * Only the most recent note is checked for `type`
-     *
-     * ### total
-     *
-     * The `count` comparison of `type` must be found within all notes
-     *
-     * * EX `count: > 3`   => Must have more than 3 notes of `type`, total
-     * * EX `count: <= 25%` => Must have 25% or less of notes of `type`, total
-     *
-     * ### consecutive
-     *
-     * The `count` **number** of `type` notes must be found in a row.
-     *
-     * You may also specify the time-based order in which to search the notes by specifying `ascending (asc)` or `descending (desc)` in the `count` value. Default is `descending`
-     *
-     * * EX `count: >= 3` => Must have 3 or more notes of `type` consecutively, in descending order
-     * * EX `count: < 2`  => Must have less than 2 notes of `type` consecutively, in descending order
-     * * EX `count: > 4 asc` => Must have greater than 4 notes of `type` consecutively, in ascending order
-     *
-     * @examples ["current"]
-     * @default current
-     * */
-    search?: 'current' | 'consecutive' | 'total'
-}

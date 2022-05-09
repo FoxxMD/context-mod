@@ -10,12 +10,13 @@ import {
 } from "typeorm";
 import {ActionResultEntity} from "./ActionResultEntity";
 import objectHash from "object-hash";
-import {AuthorOptions, ItemOptions, ObjectPremise, TypedActivityStates} from "../interfaces";
+import {AuthorOptions, ItemOptions, ObjectPremise} from "../interfaces";
 import {TimeAwareAndUpdatedBaseEntity} from "./Base/TimeAwareAndUpdatedBaseEntity";
 import {TimeAwareRandomBaseEntity} from "./Base/TimeAwareRandomBaseEntity";
 import {ActionType} from "./ActionType";
 import {ManagerEntity} from "./ManagerEntity";
 import {capitalize} from "lodash";
+import {TypedActivityStates} from "../Typings/Filters/FilterCriteria";
 
 export interface ActionPremiseOptions {
     kind: ActionType

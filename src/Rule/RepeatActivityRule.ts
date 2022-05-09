@@ -5,7 +5,7 @@ import {
     asSubmission,
     comparisonTextOp,
     FAIL,
-    getActivitySubredditName,
+    getActivitySubredditName, isActivityWindowConfig,
     isExternalUrlSubmission,
     isRedditMedia,
     parseGenericValueComparison,
@@ -15,18 +15,22 @@ import {
     searchAndReplace,
     stringSameness,
     subredditStateIsNameOnly,
-    toStrongSubredditState
+    toStrongSubredditState, windowConfigToWindowCriteria
 } from "../util";
 import {
-    ActivityWindow,
-    ActivityWindowType,
     ReferenceSubmission, RuleResult, SearchAndReplaceRegExp,
-    StrongSubredditState,
-    SubredditState, TextMatchOptions, TextTransformOptions
+    TextMatchOptions, TextTransformOptions
 } from "../Common/interfaces";
 import Submission from "snoowrap/dist/objects/Submission";
 import dayjs from "dayjs";
 import Fuse from 'fuse.js'
+import {StrongSubredditCriteria, SubredditCriteria} from "../Common/Typings/Filters/FilterCriteria";
+import {
+    ActivityWindow,
+    ActivityWindowConfig,
+    ActivityWindowCriteria,
+    HistoryFiltersOptions
+} from "../Common/Typings/ActivityWindow";
 
 const parseUsableLinkIdentifier = linkParser();
 
@@ -42,12 +46,12 @@ interface RepeatActivityReducer {
 
 export class RepeatActivityRule extends Rule {
     threshold: string;
-    window: ActivityWindowType;
+    window: ActivityWindowConfig;
     gapAllowance?: number;
     useSubmissionAsReference: boolean;
     lookAt: 'submissions' | 'all';
-    include: (string | SubredditState)[];
-    exclude: (string | SubredditState)[];
+    include: (string | SubredditCriteria)[];
+    exclude: (string | SubredditCriteria)[];
     hasFullSubredditCrits: boolean = false;
     activityFilterFunc: (x: Submission|Comment, author: RedditUser) => Promise<boolean> = async (x) => true;
     keepRemoved: boolean;
@@ -174,14 +178,39 @@ export class RepeatActivityRule extends Rule {
         }
 
         let activities: (Submission | Comment)[] = [];
-        switch (this.lookAt) {
-            case 'submissions':
-                activities = await this.resources.getAuthorSubmissions(item.author, {window: this.window, keepRemoved: this.keepRemoved});
-                break;
-            default:
-                activities = await this.resources.getAuthorActivities(item.author, {window: this.window, keepRemoved: this.keepRemoved});
-                break;
+        let postFilter: HistoryFiltersOptions;
+        const ruleConfiguredWindow: ActivityWindowCriteria = windowConfigToWindowCriteria(this.window);
+        if (!this.keepRemoved) {
+            postFilter = {
+                activityState: {
+                    include: [
+                        {
+                            criteria: {
+                                removed: false
+                            }
+                        }
+                    ]
+                }
+            }
+            if(ruleConfiguredWindow.filterOn?.post === undefined) {
+                ruleConfiguredWindow.filterOn = {
+                    ...(ruleConfiguredWindow.filterOn ?? {}),
+                    post: postFilter
+                }
+            }
         }
+        if(!isActivityWindowConfig(this.window)) {
+            switch (this.lookAt) {
+                case 'submissions':
+                    ruleConfiguredWindow.fetch = 'submission';
+                    break;
+                default:
+                    ruleConfiguredWindow.fetch = 'overview';
+                    break;
+            }
+        }
+
+        activities = await this.resources.getAuthorActivities(item.author, ruleConfiguredWindow);
 
         if(this.hasFullSubredditCrits) {
             // go ahead and cache subreddits now
@@ -399,7 +428,7 @@ interface RepeatActivityConfig extends ActivityWindow, ReferenceSubmission, Text
      * EX `["mealtimevideos","askscience", "/onlyfans*\/i", {"over18": true}]`
      * @examples [["mealtimevideos","askscience", "/onlyfans*\/i", {"over18": true}]]
      * */
-    include?: (string | SubredditState)[],
+    include?: (string | SubredditCriteria)[],
     /**
      * If present, activities will be counted only if they are **NOT** found in this list of Subreddits
      *
@@ -412,7 +441,7 @@ interface RepeatActivityConfig extends ActivityWindow, ReferenceSubmission, Text
      * EX `["mealtimevideos","askscience", "/onlyfans*\/i", {"over18": true}]`
      * @examples [["mealtimevideos","askscience", "/onlyfans*\/i", {"over18": true}]]
      * */
-    exclude?: (string | SubredditState)[],
+    exclude?: (string | SubredditCriteria)[],
 
     /**
      * If present determines which activities to consider for gapAllowance.

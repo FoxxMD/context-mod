@@ -2,13 +2,13 @@ import {
     NotificationConfig,
     NotificationEventConfig,
     NotificationEvents,
-    NotificationEventType,
     Notifier
 } from "../Common/interfaces";
 import DiscordNotifier from "./DiscordNotifier";
 import {Logger} from "winston";
 import {mergeArr} from "../util";
 import Subreddit from "snoowrap/dist/objects/Subreddit";
+import {NotificationEventType} from "../Common/Typings/Atomic";
 
 class NotificationManager {
     notifiers: Notifier[] = [];

@@ -1,299 +1,49 @@
-import Snoowrap, {Listing, RedditUser} from "snoowrap";
+import {Listing, RedditUser} from "snoowrap";
 import Submission from "snoowrap/dist/objects/Submission";
 import Comment from "snoowrap/dist/objects/Comment";
 import Subreddit from "snoowrap/dist/objects/Subreddit";
-import {Duration, DurationUnitsObjectType} from "dayjs/plugin/duration";
+import {Duration} from "dayjs/plugin/duration";
 import dayjs, {Dayjs} from "dayjs";
 import Mustache from "mustache";
 import he from "he";
 import {
-    ActivityWindowType, AuthorCriteria, CommentState, DomainInfo,
-    DurationVal, FilterCriteriaPropertyResult, FilterCriteriaResult, RuleResult,
-    SubmissionState,
-    TypedActivityStates, UserNoteCriteria, StrongSubredditState, SubredditState,
+    DomainInfo,
+
+
 } from "../Common/interfaces";
 import {
-    asSubmission,
-    asUserNoteCriteria,
-    compareDurationValue,
-    comparisonTextOp,
-    escapeRegex,
-    formatNumber,
-    getActivityAuthorName,
-    isActivityWindowCriteria,
-    isSubmission,
-    isUserNoteCriteria,
-    normalizeName,
-    parseDuration,
-    parseDurationComparison,
-    parseDurationValToDuration,
-    parseGenericValueComparison,
-    parseGenericValueOrPercentComparison,
-    parseRedditEntity,
-    parseRuleResultsToMarkdownSummary,
-    parseStringToRegex,
-    parseSubredditName,
-    removeUndefinedKeys,
-    truncateStringToLength,
-    userNoteCriteriaSummary,
-    windowToActivityWindowCriteria,
-    subredditStateIsNameOnly,
-    getActivitySubredditName,
     asStrongSubredditState,
+    asSubmission,
     convertSubredditsRawToStrong,
-    isStrongSubredditState, mergeArr, toStrongSubredditState
+    getActivityAuthorName,
+    getActivitySubredditName,
+    isStrongSubredditState,
+    mergeArr,
+    normalizeName,
+    parseDurationValToDuration,
+    parseRedditEntity,
+    parseRuleResultsToMarkdownSummary, removeUndefinedKeys,
+    subredditStateIsNameOnly,
+    toStrongSubredditState,
+    truncateStringToLength,
+    windowConfigToWindowCriteria
 } from "../util";
 import UserNotes from "../Subreddit/UserNotes";
 import {Logger} from "winston";
-import InvalidRegexError from "./InvalidRegexError";
 import {URL} from "url";
-import {SimpleError, isStatusError, MaybeSeriousErrorWithCause} from "./Errors";
-import {Dictionary, ElementOf, SafeDictionary} from "ts-essentials";
+import {isStatusError, MaybeSeriousErrorWithCause, SimpleError} from "./Errors";
 import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
-import {ErrorWithCause} from "pony-cause";
+import {StrongSubredditCriteria, SubredditCriteria} from "../Common/Typings/Filters/FilterCriteria";
+import {DurationVal} from "../Common/Typings/Atomic";
+import {ActivityWindowCriteria} from "../Common/Typings/ActivityWindow";
 
 export const BOT_LINK = 'https://www.reddit.com/r/ContextModBot/comments/otz396/introduction_to_contextmodbot';
 
-export interface AuthorTypedActivitiesOptions extends AuthorActivitiesOptions {
+export interface AuthorTypedActivitiesOptions extends ActivityWindowCriteria {
     type?: 'comment' | 'submission',
 }
 
-export interface AuthorActivitiesOptions {
-    window: ActivityWindowType | Duration
-    chunkSize?: number,
-    // TODO maybe move this into window
-    keepRemoved?: boolean,
-    includeFilter?: (items: (Submission|Comment)[], states: StrongSubredditState[]) => Promise<(Submission|Comment)[]>
-    excludeFilter?: (items: (Submission|Comment)[], states: StrongSubredditState[]) => Promise<(Submission|Comment)[]>
-    [key: string]: any,
-}
-
-const defaultOpts = {
-    defaultFlags: 'i',
-    generateDescription: true
-};
-
-const defaultIncludeFilter = async (items: (Submission|Comment)[], states: StrongSubredditState[]) => {
-    // can only use states that only use name
-    const nameStates = states.filter(subredditStateIsNameOnly);
-    return items.filter(x => nameStates.some(y => isSubreddit({display_name: getActivitySubredditName(x)} as Subreddit,y)));
-}
-
-const defaultExcludeFilter = async (items: (Submission|Comment)[], states: StrongSubredditState[]) => {
-    // can only use states that only use name
-    const nameStates = states.filter(subredditStateIsNameOnly);
-    return items.filter(x => nameStates.every(y => !isSubreddit({display_name: getActivitySubredditName(x)} as Subreddit,y)));
-}
-
-export async function getActivities(listingFunc: (limit: number) => Promise<Listing<Submission | Comment>>, options: AuthorActivitiesOptions): Promise<Array<Submission | Comment>> {
-
-    const {
-        chunkSize: cs = 100,
-        window: optWindow,
-        keepRemoved = true,
-        includeFilter = defaultIncludeFilter,
-        excludeFilter = defaultExcludeFilter,
-        ...restFetchOptions
-    } = options;
-
-    let satisfiedCount: number | undefined,
-        satisfiedEndtime: Dayjs | undefined,
-        chunkSize = Math.min(cs, 100),
-        satisfy = 'any';
-
-    let durVal: DurationVal | undefined;
-    let duration: Duration | undefined;
-
-    let includes: (string | SubredditState)[] = [];
-    let excludes: (string | SubredditState)[] = [];
-
-    const strongWindow = windowToActivityWindowCriteria(optWindow);
-
-    const {
-        satisfyOn = 'any',
-        count,
-        duration: oDuration,
-        subreddits: {
-            include = [],
-            exclude = [],
-        } = {},
-    } = strongWindow;
-
-    satisfy = satisfyOn;
-    satisfiedCount = count;
-    includes = include;
-    excludes = exclude;
-    durVal = oDuration;
-
-    if (includes.length > 0 && excludes.length > 0) {
-        // TODO add logger so this can be logged...
-        // this.logger.warn('include and exclude both specified, exclude will be ignored');
-    }
-
-    // if (isActivityWindowCriteria(optWindow)) {
-    //     const {
-    //         satisfyOn = 'any',
-    //         count,
-    //         duration,
-    //         subreddits: {
-    //             include = [],
-    //             exclude = [],
-    //         } = {},
-    //     } = optWindow;
-    //
-    //     includes = include.map(x => parseSubredditName(x).toLowerCase());
-    //     excludes = exclude.map(x => parseSubredditName(x).toLowerCase());
-    //
-    //     if (includes.length > 0 && excludes.length > 0) {
-    //         // TODO add logger so this can be logged...
-    //         // this.logger.warn('include and exclude both specified, exclude will be ignored');
-    //     }
-    //     satisfiedCount = count;
-    //     durVal = duration;
-    //     satisfy = satisfyOn
-    // } else if (typeof optWindow === 'number') {
-    //     satisfiedCount = optWindow;
-    // } else {
-    //     durVal = optWindow as DurationVal;
-    // }
-
-    // if count is less than max limit (100) go ahead and just get that many. may result in faster response time for low numbers
-    if (satisfiedCount !== undefined) {
-        chunkSize = Math.min(chunkSize, satisfiedCount);
-    }
-
-    if (durVal !== undefined) {
-        const endTime = dayjs();
-        const duration = parseDurationValToDuration(durVal);
-        satisfiedEndtime = endTime.subtract(duration.asMilliseconds(), 'milliseconds');
-    }
-
-    if (satisfiedCount === undefined && satisfiedEndtime === undefined) {
-        throw new Error('window value was not valid');
-    } else if (satisfy === 'all' && !(satisfiedCount !== undefined && satisfiedEndtime !== undefined)) {
-        // even though 'all' was requested we don't have two criteria so its really 'any' logic
-        satisfy = 'any';
-    }
-
-    let items: Array<Submission | Comment> = [];
-
-    let listing = await listingFunc(chunkSize);
-    let hitEnd = false;
-    let offset = chunkSize;
-    while (!hitEnd) {
-
-        let countOk = false,
-            timeOk = false;
-
-        let listSlice = listing.slice(offset - chunkSize)
-        // TODO partition list by filtered so we can log a debug statement with count of filtered out activities
-        if (includes.length > 0) {
-            const strongIncludes = includes.map(y => typeof y === 'string' || !asStrongSubredditState(y) ? convertSubredditsRawToStrong(y, defaultOpts) : y);
-            listSlice = await includeFilter(listSlice, strongIncludes);
-            // listSlice = listSlice.filter(x => {
-            //     const actSub = x.subreddit.display_name.toLowerCase();
-            //     return includes.includes(actSub);
-            // });
-        } else if (excludes.length > 0) {
-            const strongExcludes = excludes.map(y => typeof y === 'string' || !asStrongSubredditState(y) ? convertSubredditsRawToStrong(y, defaultOpts) : y);
-            listSlice = await excludeFilter(listSlice, strongExcludes);
-            // listSlice = listSlice.filter(x => {
-            //     const actSub = x.subreddit.display_name.toLowerCase();
-            //     return !excludes.includes(actSub);
-            // });
-        }
-
-        if (!keepRemoved) {
-            // snoowrap typings think 'removed' property does not exist on submission
-            // @ts-ignore
-            listSlice = listSlice.filter(x => !activityIsRemoved(x));
-        }
-
-        // its more likely the time criteria is going to be hit before the count criteria
-        // so check this first
-        let truncatedItems: Array<Submission | Comment> = [];
-        if (satisfiedEndtime !== undefined) {
-            truncatedItems = listSlice.filter((x) => {
-                const utc = x.created_utc * 1000;
-                const itemDate = dayjs(utc);
-                // @ts-ignore
-                return satisfiedEndtime.isBefore(itemDate);
-            });
-
-            if (truncatedItems.length !== listSlice.length) {
-                if (satisfy === 'any') {
-                    // satisfied duration
-                    items = items.concat(truncatedItems);
-                    break;
-                }
-                timeOk = true;
-            }
-        }
-
-        if (satisfiedCount !== undefined && items.length + listSlice.length >= satisfiedCount) {
-            // satisfied count
-            if (satisfy === 'any') {
-                items = items.concat(listSlice).slice(0, satisfiedCount);
-                break;
-            }
-            countOk = true;
-        }
-
-        // if we've satisfied everything take whichever is bigger
-        if (satisfy === 'all' && countOk && timeOk) {
-            if (satisfiedCount as number > items.length + truncatedItems.length) {
-                items = items.concat(listSlice).slice(0, satisfiedCount);
-            } else {
-                items = items.concat(truncatedItems);
-            }
-            break;
-        }
-
-        // if we got this far neither count nor time was satisfied (or both) so just add all items from listing and fetch more if possible
-        items = items.concat(listSlice);
-
-        hitEnd = listing.isFinished;
-
-        if (!hitEnd) {
-            offset += chunkSize;
-            listing = await listing.fetchMore({amount: chunkSize, ...restFetchOptions});
-        }
-    }
-    return Promise.resolve(items);
-}
-
-export async function getAuthorActivities(user: RedditUser, options: AuthorTypedActivitiesOptions): Promise<Array<Submission | Comment>> {
-
-    const listFunc = (chunkSize: number): Promise<Listing<Submission | Comment>> => {
-        switch (options.type) {
-            case 'comment':
-                return user.getComments({limit: chunkSize, sort: 'new'});
-            case 'submission':
-                return user.getSubmissions({limit: chunkSize, sort: 'new'});
-            default:
-                return user.getOverview({limit: chunkSize, sort: 'new'});
-        }
-    };
-    try {
-        return await getActivities(listFunc, options);
-    } catch (err: any) {
-        if(isStatusError(err)) {
-            switch(err.statusCode) {
-                case 404:
-                    throw new SimpleError('Reddit returned a 404 for user history. Likely this user is shadowbanned.', {isSerious: false});
-                case 403:
-                    throw new MaybeSeriousErrorWithCause('Reddit returned a 403 for user history, likely this user is suspended.', {cause: err, isSerious: false});
-                default:
-                    throw err;
-            }
-
-        } else {
-            throw err;
-        }
-    }
-}
-
-export const isSubreddit = async (subreddit: Subreddit, stateCriteria: SubredditState | StrongSubredditState, logger?: Logger) => {
+export const isSubreddit = async (subreddit: Subreddit, stateCriteria: SubredditCriteria | StrongSubredditCriteria, logger?: Logger) => {
     delete stateCriteria.stateDescription;
 
     if (Object.keys(stateCriteria).length === 0) {
@@ -629,4 +379,24 @@ export const activityIsDeleted = (item: Submission | Comment): boolean => {
         return item.removed_by_category === 'deleted';
     }
     return item.author.name === '[deleted]'
+}
+
+export const getAuthorHistoryAPIOptions = (val: any) => {
+    const {
+        sort,
+        sortTime,
+        t,
+        limit,
+        chunkSize,
+        skipReplies
+    } = val;
+
+    const opts = removeUndefinedKeys({
+        sort,
+        t: t ?? sortTime,
+        limit: limit ?? chunkSize,
+        skipReplies
+    });
+
+    return opts;
 }

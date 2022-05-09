@@ -18,24 +18,16 @@ import {
 } from "../util";
 import {
     ActionResult,
-    ActivityType,
     CheckResult,
     ChecksActivityState,
     CheckSummary,
-    CommentState, FilterOptions,
     FilterResult,
     JoinCondition,
-    JoinOperands, MinimalOrFullFilter,
-    MinimalOrFullFilterJson,
     NotificationEventPayload,
     PostBehavior, PostBehaviorOptionConfig, PostBehaviorOptionConfigStrong, PostBehaviorStrong,
-    PostBehaviorType, RecordOutputType, recordOutputTypes,
     RuleResult,
     RuleSetResult, RunnableBaseJson,
     RunnableBaseOptions, StructuredRunnableBase,
-    SubmissionState,
-    TypedActivityState,
-    TypedActivityStates,
     UserResultCache
 } from "../Common/interfaces";
 import * as RuleSchema from '../Schema/Rule.json';
@@ -65,6 +57,20 @@ import {ActionResultEntity} from "../Common/Entities/ActionResultEntity";
 import {RuleSetResultEntity} from "../Common/Entities/RuleSetResultEntity";
 import {CheckToRuleResultEntity} from "../Common/Entities/RunnableAssociation/CheckToRuleResultEntity";
 import {CheckToRuleSetResultEntity} from "../Common/Entities/RunnableAssociation/CheckToRuleSetResultEntity";
+import {
+    JoinOperands,
+    PostBehaviorType,
+    RecordOutputType,
+    recordOutputTypes
+} from "../Common/Typings/Atomic";
+import {FilterOptions, MinimalOrFullFilter, MinimalOrFullFilterJson} from "../Common/Typings/Filters/FilterShapes";
+import {
+    CommentState,
+    SubmissionState,
+    TypedActivityState,
+    TypedActivityStates
+} from "../Common/Typings/Filters/FilterCriteria";
+import {ActivityType} from "../Common/Typings/Reddit";
 
 const checkLogName = truncateStringToLength(25);
 

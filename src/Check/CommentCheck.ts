@@ -1,15 +1,14 @@
 import {Check, CheckOptions, userResultCacheDefault, UserResultCacheOptions} from "./index";
 import {
-    ActivityType,
-    CommentState,
-    FilterOptions,
-    MinimalOrFullFilter,
     RuleResult,
     UserResultCache
 } from "../Common/interfaces";
 import {Submission, Comment} from "snoowrap/dist/objects";
 import { buildFilter } from "../util";
 import {CheckResultEntity} from "../Common/Entities/CheckResultEntity";
+import {FilterOptions, MinimalOrFullFilter} from "../Common/Typings/Filters/FilterShapes";
+import {CommentState} from "../Common/Typings/Filters/FilterCriteria";
+import {ActivityType} from "../Common/Typings/Reddit";
 
 export interface CommentCheckOptions extends CheckOptions {
     itemIs?: MinimalOrFullFilter<CommentState>

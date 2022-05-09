@@ -2,7 +2,7 @@ import {Entity, Column, PrimaryGeneratedColumn, OneToMany, ManyToOne, PrimaryCol
 import {CheckResultEntity} from "./CheckResultEntity";
 import {RunEntity} from "./RunEntity";
 import {ManagerEntity} from "./ManagerEntity";
-import {ActivityType} from "../interfaces";
+import {ActivityType} from "../Typings/Reddit";
 
 export interface CheckEntityOptions {
     name: string

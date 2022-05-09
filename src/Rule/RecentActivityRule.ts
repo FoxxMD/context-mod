@@ -24,25 +24,29 @@ import {
     parseSubredditName,
     parseUsableLinkIdentifier,
     PASS, sleep,
-    toStrongSubredditState, windowToActivityWindowCriteria
+    toStrongSubredditState, windowConfigToWindowCriteria
 } from "../util";
 import {
-    ActivityWindow,
-    ActivityWindowCriteria,
-    ActivityWindowType, CommentState, CompareValueOrPercent,
     //ImageData,
     ImageDetection,
-    ReferenceSubmission, RuleResult, StrongImageDetection, StrongSubredditState, SubmissionState,
-    SubredditCriteria, SubredditState
+    ReferenceSubmission, RuleResult, StrongImageDetection
 } from "../Common/interfaces";
 import ImageData from "../Common/ImageData";
 import {blockhash, hammingDistance} from "../Common/blockhash/blockhash";
 import leven from "leven";
+import {
+    CommentState,
+    StrongSubredditCriteria,
+    SubmissionState,
+    SubredditCriteria
+} from "../Common/Typings/Filters/FilterCriteria";
+import {CompareValueOrPercent} from "../Common/Typings/Atomic";
+import {ActivityWindow, FullActivityWindowConfig, ActivityWindowConfig} from "../Common/Typings/ActivityWindow";
 
 const parseLink = parseUsableLinkIdentifier();
 
 export class RecentActivityRule extends Rule {
-    window: ActivityWindowType;
+    window: ActivityWindowConfig;
     thresholds: ActivityThreshold[];
     useSubmissionAsReference: boolean | undefined;
     imageDetection: StrongImageDetection
@@ -121,35 +125,48 @@ export class RecentActivityRule extends Rule {
         // so make sure we add it in if config is checking the same type and it isn't included
         // TODO refactor this for SubredditState everywhere branch
         let shouldIncludeSelf = true;
-        const strongWindow = windowToActivityWindowCriteria(this.window);
+        const strongWindow = windowConfigToWindowCriteria(this.window);
         const {
-            subreddits: {
-                include = [],
-                exclude = []
+            filterOn: {
+                post: {
+                    subreddits: {
+                        include = [],
+                        exclude = []
+                    } = {},
+                } = {},
             } = {}
         } = strongWindow;
         // typeof x === string -- a patch for now...technically this is all it supports but eventually will need to be able to do any SubredditState
-        if (include.length > 0 && !include.some(x => typeof x === 'string' && x.toLocaleLowerCase() === item.subreddit.display_name.toLocaleLowerCase())) {
+        if (include.length > 0 && !include.some(x => x.name !== undefined && x.name.toLocaleLowerCase() === item.subreddit.display_name.toLocaleLowerCase())) {
             shouldIncludeSelf = false;
-        } else if (exclude.length > 0 && exclude.some(x =>typeof x === 'string' && x.toLocaleLowerCase() === item.subreddit.display_name.toLocaleLowerCase())) {
+        } else if (exclude.length > 0 && exclude.some(x => x.name !== undefined && x.name.toLocaleLowerCase() === item.subreddit.display_name.toLocaleLowerCase())) {
             shouldIncludeSelf = false;
         }
 
-        switch (this.lookAt) {
-            case 'comments':
-                activities = await this.resources.getAuthorComments(item.author, {window: this.window});
+        if(strongWindow.fetch === undefined && this.lookAt !== undefined) {
+            switch(this.lookAt) {
+                case 'comments':
+                    strongWindow.fetch = 'comment';
+                    break;
+                case 'submissions':
+                    strongWindow.fetch = 'submission';
+            }
+        }
+
+        activities = await this.resources.getAuthorActivities(item.author, strongWindow);
+
+        switch (strongWindow.fetch) {
+            case 'comment':
                 if (shouldIncludeSelf && item instanceof Comment && !activities.some(x => x.name === item.name)) {
                     activities.unshift(item);
                 }
                 break;
-            case 'submissions':
-                activities = await this.resources.getAuthorSubmissions(item.author, {window: this.window});
+            case 'submission':
                 if (shouldIncludeSelf && item instanceof Submission && !activities.some(x => x.name === item.name)) {
                     activities.unshift(item);
                 }
                 break;
             default:
-                activities = await this.resources.getAuthorActivities(item.author, {window: this.window});
                 if (shouldIncludeSelf && !activities.some(x => x.name === item.name)) {
                     activities.unshift(item);
                 }
@@ -329,7 +346,7 @@ export class RecentActivityRule extends Rule {
                 defaultFlags: 'i',
                 generateDescription: true
             };
-            const subStates: StrongSubredditState[] = subreddits.map((x) => convertSubredditsRawToStrong(x, defaultOpts));
+            const subStates: StrongSubredditCriteria[] = subreddits.map((x) => convertSubredditsRawToStrong(x, defaultOpts));
 
             let validActivity: (Comment | Submission)[] = await as.filter(viableActivity, async (activity) => {
                 if (asSubmission(activity) && submissionState !== undefined) {
@@ -542,7 +559,7 @@ export interface ActivityThreshold {
      * EX `["mealtimevideos","askscience", "/onlyfans*\/i", {"over18": true}]`
      * @examples [["mealtimevideos","askscience", "/onlyfans*\/i", {"over18": true}]]
      * */
-    subreddits?: (string | SubredditState)[]
+    subreddits?: (string | SubredditCriteria)[]
 
     /**
      * A string containing a comparison operator and a value to compare the **number of subreddits that have valid activities** against

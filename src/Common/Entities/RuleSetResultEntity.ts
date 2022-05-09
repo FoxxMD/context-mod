@@ -13,16 +13,15 @@ import {CheckResultEntity} from "./CheckResultEntity";
 import {ActivityStateFilterResult} from "./FilterCriteria/ActivityStateFilterResult";
 import {AuthorFilterResult} from "./FilterCriteria/AuthorFilterResult";
 import {
-    AuthorCriteria,
     FilterResult as IFilterResult,
-    FilterResult,
-    JoinOperands,
-    TypedActivityState
+    FilterResult
 } from "../interfaces";
 import {RandomIdBaseEntity} from "./Base/RandomIdBaseEntity";
 import {TimeAwareRandomBaseEntity} from "./Base/TimeAwareRandomBaseEntity";
 import {RuleResultEntity} from "./RuleResultEntity";
 import {RuleSetToRuleResultEntity} from "./RunnableAssociation/RuleSetToRuleResultEntity";
+import {JoinOperands} from "../Typings/Atomic";
+import {AuthorCriteria, TypedActivityState} from "../Typings/Filters/FilterCriteria";
 
 export interface RuleSetResultEntityOptions {
     triggered: boolean

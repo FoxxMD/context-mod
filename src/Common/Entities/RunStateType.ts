@@ -1,6 +1,6 @@
 import {Entity, Column, PrimaryColumn, OneToMany, PrimaryGeneratedColumn} from "typeorm";
 import {Activity} from "./Activity";
-import {RunState} from "../interfaces";
+import {RunState} from "../Typings/Atomic";
 
 @Entity()
 export class RunStateType {

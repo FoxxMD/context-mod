@@ -13,50 +13,31 @@ import {
     ActionResult,
     ActivityDispatch,
     ActivityDispatchConfig,
-    ActivitySource,
-    ActivitySourceTypes,
-    ActivityWindowCriteria,
-    ActivityWindowType,
-    AuthorCriteria, authorCriteriaProperties, AuthorOptions,
+    AuthorOptions,
     CacheOptions,
-    CacheProvider,
     CheckSummary,
-    CommentState,
-    DurationComparison,
-    DurationVal,
     FilterCriteriaDefaults,
     FilterCriteriaPropertyResult,
-    FilterCriteriaResult, FilterOptions,
+    FilterCriteriaResult,
     FilterResult,
-    FullNameTypes,
-    GenericComparison,
     ImageComparisonResult,
-    ItemCritPropHelper, ItemOptions,
-    LogInfo, MaybeAnonymousCriteria, MinimalOrFullFilter, NamedCriteria,
+    ItemCritPropHelper,
+    ItemOptions,
+    LogInfo,
     OperatorJsonConfig,
-    PermalinkRedditThings,
-    PollingOptionsStrong, PostBehaviorOptionConfig,
-    RedditEntity,
-    RedditEntityType,
-    RedditThing,
+    PollingOptionsStrong,
+    PostBehaviorOptionConfig,
     RegExResult,
     RepostItem,
     RepostItemResult,
     RequiredItemCrit,
     ResourceStats,
     RuleResult,
-    RuleSetResult, RunnableBaseJson,
+    RuleSetResult,
+    RunnableBaseJson,
     RunResult,
-    SearchAndReplaceRegExp, statFrequencies, StatisticFrequency,
-    StatisticFrequencyOption,
-    StringComparisonOptions,
-    StringOperator,
-    StrongSubredditState,
-    SubmissionState,
-    SubredditState,
-    TypedActivityState,
-    TypedActivityStates,
-    UserNoteCriteria
+    SearchAndReplaceRegExp,
+    StringComparisonOptions
 } from "./Common/interfaces";
 import {Document as YamlDocument} from 'yaml'
 import InvalidRegexError from "./Utils/InvalidRegexError";
@@ -85,6 +66,44 @@ import merge from "deepmerge";
 import {RulePremise} from "./Common/Entities/RulePremise";
 import {RuleResultEntity as RuleResultEntity} from "./Common/Entities/RuleResultEntity";
 import {nanoid} from "nanoid";
+import {
+    ActivityState,
+    AuthorCriteria, authorCriteriaProperties, CommentState, defaultStrongSubredditCriteriaOptions,
+    StrongSubredditCriteria, SubmissionState,
+    SubredditCriteria, TypedActivityState, TypedActivityStates,
+    UserNoteCriteria
+} from "./Common/Typings/Filters/FilterCriteria";
+import {
+    SnoowrapActivity,
+    ActivitySource,
+    ActivitySourceTypes,
+    CacheProvider,
+    DurationVal, RedditEntity, RedditEntityType,
+    statFrequencies, StatisticFrequency,
+    StatisticFrequencyOption,
+    StringOperator
+} from "./Common/Typings/Atomic";
+import {DurationComparison, GenericComparison} from "./Common/Typings/Comparisons";
+import {
+    FilterOptions, FilterOptionsJson,
+    MaybeAnonymousCriteria,
+    MaybeAnonymousOrStringCriteria,
+    MinimalOrFullFilter, MinimalOrFullMaybeAnonymousFilter,
+    NamedCriteria
+} from "./Common/Typings/Filters/FilterShapes";
+import {
+    ActivityType,
+    AuthorHistoryType,
+    FullNameTypes,
+    PermalinkRedditThings,
+    RedditThing
+} from "./Common/Typings/Reddit";
+import {
+    FullActivityWindowConfig,
+    ActivityWindowConfig,
+    ActivityWindowCriteria,
+    HistoryFiltersConfig, HistoryFiltersOptions
+} from "./Common/Typings/ActivityWindow";
 
 
 //import {ResembleSingleCallbackComparisonResult} from "resemblejs";
@@ -667,7 +686,7 @@ export const deflateUserNotes = (usersObject: object) => {
     return blob;
 }
 
-export const isActivityWindowCriteria = (val: any): val is ActivityWindowCriteria => {
+export const isActivityWindowConfig = (val: any): val is FullActivityWindowConfig => {
     if (val !== null && typeof val === 'object') {
         return (val.count !== undefined && typeof val.count === 'number') ||
             // close enough
@@ -1513,11 +1532,11 @@ export const testMaybeStringRegex = (test: string, subject: string, defaultFlags
     return [reg.test(subject), reg.toString()];
 }
 
-export const isStrongSubredditState = (value: SubredditState | StrongSubredditState) => {
+export const isStrongSubredditState = (value: SubredditCriteria | StrongSubredditCriteria) => {
     return value.name === undefined || value.name instanceof RegExp;
 }
 
-export const asStrongSubredditState = (value: any): value is StrongSubredditState => {
+export const asStrongSubredditState = (value: any): value is StrongSubredditCriteria => {
     return isStrongSubredditState(value);
 }
 
@@ -1526,7 +1545,7 @@ export interface StrongSubredditStateOptions {
     generateDescription?: boolean
 }
 
-export const toStrongSubredditState = (s: SubredditState, opts?: StrongSubredditStateOptions): StrongSubredditState => {
+export const toStrongSubredditState = (s: SubredditCriteria, opts?: StrongSubredditStateOptions): StrongSubredditCriteria => {
     const {defaultFlags = 'i', generateDescription = false} = opts || {};
     const {name: nameValRaw, stateDescription, isUserProfile, ...rest} = s;
 
@@ -1553,7 +1572,7 @@ export const toStrongSubredditState = (s: SubredditState, opts?: StrongSubreddit
             nameReg = nameValRaw;
         }
     }
-    const strongState: StrongSubredditState = {
+    const strongState: StrongSubredditCriteria = {
         ...rest,
         name: nameReg
     };
@@ -1573,9 +1592,12 @@ export const toStrongSubredditState = (s: SubredditState, opts?: StrongSubreddit
     return strongState;
 }
 
-export const convertSubredditsRawToStrong = (x: (SubredditState | string), opts: StrongSubredditStateOptions): StrongSubredditState => {
+export const convertSubredditsRawToStrong = (x: (SubredditCriteria | string | StrongSubredditCriteria), opts: StrongSubredditStateOptions): StrongSubredditCriteria => {
     if (typeof x === 'string') {
         return toStrongSubredditState({name: x, stateDescription: x}, opts);
+    }
+    if(asStrongSubredditState(x)) {
+        return x;
     }
     return toStrongSubredditState(x, opts);
 }
@@ -2103,7 +2125,7 @@ export const pixelImageCompare = async (data1: ImageData, data2: ImageData): Pro
  * If neither then do not cache results as the number of unique keys (sub-state) increases AT LEAST linearly taking up space (especially in memory cache)
  * when they are probably not necessary to begin with
  * */
-export const shouldCacheSubredditStateCriteriaResult = (state: SubredditState | StrongSubredditState): boolean => {
+export const shouldCacheSubredditStateCriteriaResult = (state: SubredditCriteria | StrongSubredditCriteria): boolean => {
     // currently there are no scenarios where we need to cache results
     // since only things computed from state are comparisons for properties already cached on subreddit object
     // and regexes for name which aren't that costly
@@ -2111,7 +2133,7 @@ export const shouldCacheSubredditStateCriteriaResult = (state: SubredditState | 
     return false;
 }
 
-export const subredditStateIsNameOnly = (state: SubredditState | StrongSubredditState): boolean => {
+export const subredditStateIsNameOnly = (state: SubredditCriteria | StrongSubredditCriteria): boolean => {
     const critCount = Object.entries(state).filter(([key, val]) => {
         return val !== undefined && !['name','stateDescription', 'isUserProfile'].includes(key);
     }).length;
@@ -2130,10 +2152,28 @@ export const escapeRegex = (val: string) => {
     return val.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
 }
 
-export const windowToActivityWindowCriteria = (window: (Duration | ActivityWindowType | ActivityWindowCriteria)): ActivityWindowCriteria => {
-    let crit: ActivityWindowCriteria;
+export const fetchToStrongHistoryType = (fetch?: ActivityType | 'submissions' | 'comments' | 'all' | 'overview') => {
+    const cleanFetch = fetch !== undefined ? fetch.trim().toLocaleLowerCase() : undefined;
 
-    if (isActivityWindowCriteria(window)) {
+    let trueFetch: AuthorHistoryType;
+
+    if(cleanFetch === undefined) {
+        trueFetch = 'overview';
+    } else if(['overview','all'].includes(cleanFetch)) {
+        trueFetch = 'overview'
+    } else if(['submissions','submission'].includes(cleanFetch)) {
+        trueFetch = 'submission';
+    } else {
+        trueFetch = 'comment';
+    }
+
+    return trueFetch;
+}
+
+export const windowConfigToWindowCriteria = (window: ActivityWindowConfig): ActivityWindowCriteria => {
+    let crit: FullActivityWindowConfig;
+
+    if (isActivityWindowConfig(window)) {
         crit = window;
     } else if (typeof window === 'number') {
         crit = {count: window};
@@ -2145,30 +2185,68 @@ export const windowToActivityWindowCriteria = (window: (Duration | ActivityWindo
         satisfyOn = 'any',
         count,
         duration,
-        subreddits: {
-            include = [],
-            exclude = [],
-        } = {},
+        subreddits,
+        submissionState,
+        commentState,
+        activityState,
+        filterOn,
+        fetch,
+        ...rest
     } = crit;
 
-    const includes = include.map(x => typeof x === 'string' || !asStrongSubredditState(x) ? convertSubredditsRawToStrong(x, {
-        defaultFlags: 'i',
-        generateDescription: true
-    }) : x);
-    const excludes = exclude.map(x => typeof x === 'string' || !asStrongSubredditState(x) ? convertSubredditsRawToStrong(x, {
-        defaultFlags: 'i',
-        generateDescription: true
-    }) : x);
-
-    return {
-        satisfyOn,
+    let opts: ActivityWindowCriteria = {
         count,
-        duration,
-        subreddits: {
-            include: includes,
-            exclude: excludes
+        duration: duration !== undefined ? parseDurationValToDuration(duration) : undefined,
+        satisfyOn,
+        fetch: fetch === undefined ? fetch : fetchToStrongHistoryType(fetch)
+    };
+
+    if(filterOn !== undefined) {
+        const {pre, post} = filterOn;
+        opts.filterOn = {};
+        if(pre !== undefined) {
+            opts.filterOn.pre = {
+                ...historyFilterConfigToOptions(pre),
+                max: typeof pre.max === 'number' ? pre.max : parseDurationValToDuration(pre.max)
+            }
+        }
+        if(post !== undefined) {
+            opts.filterOn.post = historyFilterConfigToOptions(post);
         }
     }
+
+    if(opts.filterOn?.post === undefined) {
+        const potentialPost = removeUndefinedKeys(historyFilterConfigToOptions({subreddits, submissionState, commentState, activityState}));
+        if(potentialPost !== undefined) {
+            if(opts.filterOn === undefined) {
+                opts.filterOn = {
+                    post: potentialPost
+                }
+            } else {
+                opts.filterOn.post = potentialPost;
+            }
+        }
+    }
+
+    return {...rest, ...opts};
+}
+
+export const historyFilterConfigToOptions = (val: HistoryFiltersConfig): HistoryFiltersOptions => {
+    const opts: HistoryFiltersOptions = {};
+    if(val.subreddits !== undefined) {
+        opts.subreddits = buildSubredditFilter(val.subreddits);
+    }
+    if(val.activityState !== undefined) {
+        opts.activityState = buildFilter(val.activityState);
+    }
+    if(val.commentState !== undefined) {
+        opts.commentState = buildFilter(val.commentState);
+    }
+    if(val.submissionState !== undefined) {
+        opts.submissionState = buildFilter(val.submissionState);
+    }
+
+    return opts;
 }
 
 export const searchAndReplace = (val: string, ops: SearchAndReplaceRegExp[]) => {
@@ -2350,10 +2428,41 @@ export const mergeFilters = (objectConfig: RunnableBaseJson, filterDefs: FilterC
     return [derivedAuthorIs, derivedItemIs];
 }
 
-export const buildFilter = <T extends AuthorCriteria | TypedActivityState>(filterVal: MinimalOrFullFilter<T>): FilterOptions<T> => {
+export const buildFilter = (filterVal: MinimalOrFullMaybeAnonymousFilter<AuthorCriteria | TypedActivityState | ActivityState>): FilterOptions<AuthorCriteria | TypedActivityState | ActivityState> => {
+    if(Array.isArray(filterVal)) {
+        const named = filterVal.map(x => normalizeCriteria(x));
+        return {
+            include: named,
+            excludeCondition: 'OR',
+            exclude: [],
+        }
+    } else {
+        const {
+            include = [],
+            exclude = [],
+            excludeCondition,
+        } = filterVal;
+        const namedInclude = include.map(x => normalizeCriteria(x));
+        const namedExclude = exclude.map(x => normalizeCriteria(x))
+        return {
+            excludeCondition,
+            include: namedInclude,
+            exclude: namedExclude,
+        }
+    }
+}
+
+// export const buildSubredditFilter = <T extends SubredditState>(filterVal: MinimalSingleOrFullFilter<T>): FilterOptions<T> => {
+
+export const buildSubredditFilter = (filterVal: FilterOptionsJson<SubredditCriteria>): FilterOptions<StrongSubredditCriteria> => {
     if(Array.isArray(filterVal)) {
         return {
-            include: filterVal.map(x => normalizeCriteria(x)),
+            include: filterVal
+                .map(x => normalizeSubredditState(x))
+                .map(x => ({
+                    ...x,
+                    criteria: convertSubredditsRawToStrong(x.criteria, defaultStrongSubredditCriteriaOptions)
+                })),
             excludeCondition: 'OR',
             exclude: [],
         }
@@ -2365,13 +2474,41 @@ export const buildFilter = <T extends AuthorCriteria | TypedActivityState>(filte
         } = filterVal;
         return {
             excludeCondition,
-            include: include.map(x => normalizeCriteria(x)),
-            exclude: exclude.map(x => normalizeCriteria(x))
+            include: include.map(x => normalizeSubredditState(x))
+                .map(x => ({
+                    ...x,
+                    criteria: convertSubredditsRawToStrong(x.criteria, defaultStrongSubredditCriteriaOptions)
+                })),
+            exclude: exclude
+                .map(x => normalizeSubredditState(x))
+                .map(x => ({
+                    ...x,
+                    criteria: convertSubredditsRawToStrong(x.criteria, defaultStrongSubredditCriteriaOptions)
+                }))
         }
     }
 }
 
-export const normalizeCriteria = <T extends AuthorCriteria | TypedActivityState>(options: MaybeAnonymousCriteria<T>): NamedCriteria<T> => {
+export const normalizeSubredditState = <T extends SubredditCriteria>(options: MaybeAnonymousOrStringCriteria<T>): NamedCriteria<T> => {
+    let name: string | undefined;
+    let criteria: T;
+
+    if (asNamedCriteria(options)) {
+        criteria = options.criteria;
+        name = options.name;
+    } else if(typeof options === 'string') {
+        criteria = {name: options} as T;
+    } else {
+        criteria = options;
+    }
+
+    return {
+        name,
+        criteria
+    };
+}
+
+export const normalizeCriteria = <T extends AuthorCriteria | TypedActivityState | ActivityState>(options: MaybeAnonymousCriteria<T>): NamedCriteria<T> => {
 
     let name: string | undefined;
     let criteria: T;
@@ -2685,4 +2822,15 @@ export const asPostBehaviorOptionConfig = (val: any): val is PostBehaviorOptionC
         return 'recordTo' in val || 'behavior' in val;
     }
     return false;
+}
+
+export const filterByTimeRequirement = (satisfiedEndtime: Dayjs, listSlice: SnoowrapActivity[]): [boolean, SnoowrapActivity[]] => {
+    const truncatedItems: SnoowrapActivity[] = listSlice.filter((x) => {
+        const utc = x.created_utc * 1000;
+        const itemDate = dayjs(utc);
+        // @ts-ignore
+        return satisfiedEndtime.isBefore(itemDate);
+    });
+
+    return [truncatedItems.length !== listSlice.length, truncatedItems]
 }

@@ -3,10 +3,9 @@ import {Logger} from "winston";
 import {checkAuthorFilter, checkItemFilter, SubredditResources} from "../Subreddit/SubredditResources";
 import {
     ActionProcessResult,
-    ActionResult, AuthorCriteria, AuthorOptions,
+    ActionResult, AuthorOptions,
     ChecksActivityState, FilterResult,
-    ObjectPremise, RuleResult, RunnableBaseJson, RunnableBaseOptions, StructuredRunnableBase, TypedActivityState,
-    TypedActivityStates
+    ObjectPremise, RuleResult, RunnableBaseJson, RunnableBaseOptions, StructuredRunnableBase
 } from "../Common/interfaces";
 import {mergeArr, normalizeCriteria} from "../util";
 import LoggedError from "../Utils/LoggedError";
@@ -25,6 +24,7 @@ import { RunnableBase } from "../Common/RunnableBase";
 import {ActionResultEntity} from "../Common/Entities/ActionResultEntity";
 import {FindOptionsWhere} from "typeorm/find-options/FindOptionsWhere";
 import {RulePremise} from "../Common/Entities/RulePremise";
+import {AuthorCriteria, TypedActivityState, TypedActivityStates} from "../Common/Typings/Filters/FilterCriteria";
 
 export abstract class Action extends RunnableBase {
     name?: string;

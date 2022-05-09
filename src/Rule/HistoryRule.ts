@@ -1,25 +1,24 @@
 
 import {
-    ActivityWindowType,
-    CompareValueOrPercent,
     RuleResult,
-    SubredditState,
     ThresholdCriteria
 } from "../Common/interfaces";
 import {Rule, RuleJSONConfig, RuleOptions} from "./index";
 import Submission from "snoowrap/dist/objects/Submission";
-import {getAuthorActivities} from "../Utils/SnoowrapUtils";
 import dayjs from "dayjs";
 import {
     asSubmission,
     comparisonTextOp,
     FAIL,
-    formatNumber, getActivitySubredditName, isSubmission,
+    formatNumber, getActivitySubredditName, historyFilterConfigToOptions, isSubmission,
     parseGenericValueOrPercentComparison, parseSubredditName,
     PASS,
-    percentFromString, toStrongSubredditState
+    percentFromString, toStrongSubredditState, windowConfigToWindowCriteria
 } from "../util";
 import {Comment, RedditUser} from "snoowrap";
+import {SubredditCriteria} from "../Common/Typings/Filters/FilterCriteria";
+import {CompareValueOrPercent} from "../Common/Typings/Atomic";
+import {ActivityWindowConfig, ActivityWindowCriteria} from "../Common/Typings/ActivityWindow";
 
 export interface CommentThresholdCriteria extends ThresholdCriteria {
     /**
@@ -77,7 +76,7 @@ export interface HistoryCriteria {
      * */
     total?: CompareValueOrPercent
 
-    window: ActivityWindowType
+    window: ActivityWindowConfig
 
     /**
      * The minimum number of **filtered** activities that must exist from the `window` results for this criteria to run
@@ -87,62 +86,86 @@ export interface HistoryCriteria {
     name?: string
 }
 
+interface StrongCriteria extends Omit<HistoryCriteria, 'window'> {
+    window: ActivityWindowCriteria
+}
+
 export class HistoryRule extends Rule {
-    criteria: HistoryCriteria[];
+    criteria: StrongCriteria[];
     condition: 'AND' | 'OR';
-    include: (string | SubredditState)[];
-    exclude: (string | SubredditState)[];
-    activityFilterFunc: (x: Submission|Comment, author: RedditUser) => Promise<boolean> = async (x) => true;
+    include?: (string | SubredditCriteria)[];
+    exclude?: (string | SubredditCriteria)[];
+    //activityFilterFunc: (x: Submission|Comment, author: RedditUser) => Promise<boolean> = async (x) => true;
 
     constructor(options: HistoryOptions) {
         super(options);
         const {
             criteria,
             condition = 'OR',
-            include = [],
-            exclude = [],
+            include,
+            exclude,
         } = options || {};
 
-        this.criteria = criteria;
         this.condition = condition;
-        if (this.criteria.length === 0) {
+        if (criteria.length === 0) {
             throw new Error('Must provide at least one HistoryCriteria');
         }
 
         this.include = include;
         this.exclude = exclude;
 
-        if(this.include.length > 0) {
-            const subStates = include.map((x) => {
-                if(typeof x === 'string') {
-                    return toStrongSubredditState({name: x, stateDescription: x}, {defaultFlags: 'i', generateDescription: true});
-                }
-                return toStrongSubredditState(x, {defaultFlags: 'i', generateDescription: true});
-            });
-            this.activityFilterFunc = async (x: Submission|Comment, author: RedditUser) => {
-                for(const ss of subStates) {
-                    if(await this.resources.testSubredditCriteria(x, ss, author)) {
-                        return true;
-                    }
-                }
-                return false;
-            };
-        } else if(this.exclude.length > 0) {
-            const subStates = exclude.map((x) => {
-                if(typeof x === 'string') {
-                    return toStrongSubredditState({name: x, stateDescription: x}, {defaultFlags: 'i', generateDescription: true});
-                }
-                return toStrongSubredditState(x, {defaultFlags: 'i', generateDescription: true});
-            });
-            this.activityFilterFunc = async (x: Submission|Comment, author: RedditUser) => {
-                for(const ss of subStates) {
-                    if(await this.resources.testSubredditCriteria(x, ss, author)) {
-                        return false;
-                    }
-                }
-                return true;
-            };
-        }
+        this.criteria = criteria.map(x => {
+            const strongWindow = windowConfigToWindowCriteria(x.window);
+            const {
+                filterOn: {
+                    post,
+                } = {},
+            } = strongWindow;
+
+           if(post === undefined && (this.include !== undefined || this.exclude !== undefined)) {
+                const postFilter = historyFilterConfigToOptions({subreddits: {include, exclude}});
+                strongWindow.filterOn = {
+                ...(strongWindow.filterOn ?? {}),
+                    post: postFilter
+                };
+           }
+           return {
+               ...x,
+               window: strongWindow
+           }
+        });
+
+        // if(this.include.length > 0) {
+        //     const subStates = include.map((x) => {
+        //         if(typeof x === 'string') {
+        //             return toStrongSubredditState({name: x, stateDescription: x}, {defaultFlags: 'i', generateDescription: true});
+        //         }
+        //         return toStrongSubredditState(x, {defaultFlags: 'i', generateDescription: true});
+        //     });
+        //     this.activityFilterFunc = async (x: Submission|Comment, author: RedditUser) => {
+        //         for(const ss of subStates) {
+        //             if(await this.resources.testSubredditCriteria(x, ss, author)) {
+        //                 return true;
+        //             }
+        //         }
+        //         return false;
+        //     };
+        // } else if(this.exclude.length > 0) {
+        //     const subStates = exclude.map((x) => {
+        //         if(typeof x === 'string') {
+        //             return toStrongSubredditState({name: x, stateDescription: x}, {defaultFlags: 'i', generateDescription: true});
+        //         }
+        //         return toStrongSubredditState(x, {defaultFlags: 'i', generateDescription: true});
+        //     });
+        //     this.activityFilterFunc = async (x: Submission|Comment, author: RedditUser) => {
+        //         for(const ss of subStates) {
+        //             if(await this.resources.testSubredditCriteria(x, ss, author)) {
+        //                 return false;
+        //             }
+        //         }
+        //         return true;
+        //     };
+        // }
     }
 
     getKind(): string {
@@ -165,13 +188,13 @@ export class HistoryRule extends Rule {
 
             const {comment, window, submission, total, minActivityCount = 5} = criteria;
 
-            let activities = await this.resources.getAuthorActivities(item.author, {window: window});
-            const filteredActivities = [];
-            for(const a of activities) {
-                if(await this.activityFilterFunc(a, item.author)) {
-                    filteredActivities.push(a);
-                }
-            }
+            const [filteredActivities, {pre: activities}] = await this.resources.getAuthorActivitiesWithFilter(item.author, window);
+            // const filteredActivities = [];
+            // for(const a of activities) {
+            //     if(await this.activityFilterFunc(a, item.author)) {
+            //         filteredActivities.push(a);
+            //     }
+            // }
 
             if (filteredActivities.length < minActivityCount) {
                 continue;
@@ -415,7 +438,7 @@ interface HistoryConfig  {
      *
      * @examples [["mealtimevideos","askscience", "/onlyfans*\/i", {"over18": true}]]
      * */
-    include?: (string | SubredditState)[],
+    include?: (string | SubredditCriteria)[],
     /**
      * If present, activities will be counted only if they are **NOT** found in this list of Subreddits
      *
@@ -435,7 +458,7 @@ interface HistoryConfig  {
      *
      * @examples [["mealtimevideos","askscience", "/onlyfans*\/i", {"over18": true}]]
      * */
-    exclude?: (string | SubredditState)[],
+    exclude?: (string | SubredditCriteria)[],
 }
 
 export interface HistoryOptions extends HistoryConfig, RuleOptions {

@@ -1,14 +1,13 @@
 import {Check, CheckOptions} from "./index";
 import {
-    ActivityType,
-    FilterOptions,
-    MinimalOrFullFilter,
     RuleResult,
-    SubmissionState,
     UserResultCache
 } from "../Common/interfaces";
 import {Submission, Comment} from "snoowrap/dist/objects";
 import {buildFilter} from "../util";
+import {FilterOptions, MinimalOrFullFilter} from "../Common/Typings/Filters/FilterShapes";
+import {SubmissionState} from "../Common/Typings/Filters/FilterCriteria";
+import {ActivityType} from "../Common/Typings/Reddit";
 
 export interface SubmissionCheckOptions extends CheckOptions {
     itemIs?: MinimalOrFullFilter<SubmissionState>

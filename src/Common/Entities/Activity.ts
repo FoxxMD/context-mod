@@ -2,10 +2,10 @@ import {Entity, Column, PrimaryGeneratedColumn, ManyToOne, PrimaryColumn, OneToM
 import {AuthorEntity} from "./AuthorEntity";
 import {Subreddit} from "./Subreddit";
 import {CMEvent} from "./CMEvent";
-import {ActivityType} from "../interfaces";
 import Submission from "snoowrap/dist/objects/Submission";
 import {Comment} from "snoowrap";
 import {asComment, getActivityAuthorName, parseRedditFullname, redditThingTypeToPrefix} from "../../util";
+import {ActivityType} from "../Typings/Reddit";
 
 export interface ActivityEntityOptions {
     id: string

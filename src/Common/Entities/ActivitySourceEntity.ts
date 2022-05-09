@@ -1,13 +1,14 @@
 import {Entity, Column, PrimaryColumn, OneToMany, PrimaryGeneratedColumn, ManyToOne} from "typeorm";
 import {ManagerEntity} from "./ManagerEntity";
 import {RandomIdBaseEntity} from "./Base/RandomIdBaseEntity";
-import {ActivitySourceData, ActivitySourceTypes, PollOn} from "../interfaces";
+import {ActivitySourceData} from "../interfaces";
 import {CMEvent} from "./CMEvent";
 import {removeUndefinedKeys} from "../../util";
 import objectHash from "object-hash";
 import {Duration} from "dayjs/plugin/duration";
 import dayjs from "dayjs";
 import {ColumnDurationTransformer} from "./Transformers";
+import {ActivitySourceTypes, PollOn} from "../Typings/Atomic";
 
 export interface ActivitySourceEntityOptions extends ActivitySourceData {
     manager: ManagerEntity

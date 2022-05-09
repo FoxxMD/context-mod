@@ -5,13 +5,15 @@ import {
     asSubmission,
     comparisonTextOp, FAIL, isExternalUrlSubmission, isSubmission, parseGenericValueComparison,
     parseGenericValueOrPercentComparison, parseRegex, parseStringToRegex,
-    PASS, triggeredIndicator
+    PASS, triggeredIndicator, windowConfigToWindowCriteria
 } from "../util";
 import {
-    ActivityWindowType, JoinOperands, RuleResult,
+    RuleResult,
 } from "../Common/interfaces";
 import dayjs from 'dayjs';
 import {SimpleError} from "../Utils/Errors";
+import {JoinOperands} from "../Common/Typings/Atomic";
+import {ActivityWindowConfig} from "../Common/Typings/ActivityWindow";
 
 export interface RegexCriteria {
     /**
@@ -104,7 +106,7 @@ export interface RegexCriteria {
      * */
     mustMatchCurrent?: boolean
 
-    window?: ActivityWindowType
+    window?: ActivityWindowConfig
 }
 
 export class RegexRule extends Rule {
@@ -208,16 +210,18 @@ export class RegexRule extends Rule {
                 // our checking activity didn't meet threshold requirements and criteria does define window
                 // leh go
 
-                switch (lookAt) {
-                    case 'all':
-                        history = await this.resources.getAuthorActivities(item.author, {window: window});
-                        break;
-                    case 'submissions':
-                        history = await this.resources.getAuthorSubmissions(item.author, {window: window});
-                        break;
-                    case 'comments':
-                        history = await this.resources.getAuthorComments(item.author, {window: window});
+                const strongWindow = windowConfigToWindowCriteria(window);
+                if(strongWindow.fetch === undefined) {
+                    switch (lookAt) {
+                        case 'submissions':
+                            strongWindow.fetch = 'submission';
+                            break;
+                        case 'comments':
+                            strongWindow.fetch = 'comment';
+                    }
                 }
+
+                history = await this.resources.getAuthorActivities(item.author, strongWindow);
                 // remove current activity it exists in history so we don't count it twice
                 history = history.filter(x => x.id !== item.id);
                 const historyLength = history.length;

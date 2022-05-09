@@ -3,7 +3,7 @@ import Snoowrap, {Comment, Submission} from "snoowrap";
 import {ruleFactory} from "./RuleFactory";
 import {createAjvFactory, mergeArr} from "../util";
 import {Logger} from "winston";
-import {JoinCondition, JoinOperands, RuleResult, RuleSetResult} from "../Common/interfaces";
+import {JoinCondition, RuleResult, RuleSetResult} from "../Common/interfaces";
 import * as RuleSchema from '../Schema/Rule.json';
 import Ajv from 'ajv';
 import {RuleJson, RuleObjectJson, StructuredRuleObjectJson} from "../Common/types";
@@ -11,6 +11,7 @@ import {SubredditResources} from "../Subreddit/SubredditResources";
 import {runCheckOptions} from "../Subreddit/Manager";
 import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
 import {RuleSetResultEntity} from "../Common/Entities/RuleSetResultEntity";
+import {JoinOperands} from "../Common/Typings/Atomic";
 
 export class RuleSet implements IRuleSet {
     rules: Rule[] = [];

@@ -1,6 +1,7 @@
 import {Entity, Column, PrimaryColumn, OneToMany, PrimaryGeneratedColumn, ManyToOne, TableInheritance} from "typeorm";
-import {FilterCriteriaResult as IFilterCriteriaResult, JoinOperands} from "../../interfaces";
+import {FilterCriteriaResult as IFilterCriteriaResult} from "../../interfaces";
 import {RandomIdBaseEntity} from "../Base/RandomIdBaseEntity";
+import {JoinOperands} from "../../Typings/Atomic";
 //import {FilterCriteriaResult} from "./FilterCriteriaResult";
 
 export interface FilterResultOptions {

@@ -24,13 +24,11 @@ import {
     ActionedEvent,
     ActionResult,
     ActivityDispatch,
-    ActivitySource,
     CheckResult,
     CheckSummary,
     DEFAULT_POLLING_INTERVAL,
     DEFAULT_POLLING_LIMIT,
     FilterCriteriaDefaults,
-    Invokee,
     LogInfo,
     ManagerOptions,
     ManagerStateChangeOption,
@@ -38,16 +36,13 @@ import {
     NotificationEventPayload,
     PAUSED,
     PollingOptionsStrong,
-    PollOn,
     PostBehavior,
     ActivitySourceData,
-    DispatchSource,
     RUNNING,
     RunResult,
-    RunState,
     STOPPED,
     SYSTEM,
-    USER, RuleResult, DatabaseStatisticsOperatorConfig, recordOutputTypes, EventRetentionPolicyRange
+    USER, RuleResult, DatabaseStatisticsOperatorConfig
 } from "../Common/interfaces";
 import Submission from "snoowrap/dist/objects/Submission";
 import {activityIsRemoved, ItemContent, itemContentPeek} from "../Utils/SnoowrapUtils";
@@ -94,6 +89,15 @@ import {ActivitySourceEntity} from "../Common/Entities/ActivitySourceEntity";
 import {InvokeeType} from "../Common/Entities/InvokeeType";
 import {RunStateType} from "../Common/Entities/RunStateType";
 import {EntityRunState} from "../Common/Entities/EntityRunState/EntityRunState";
+import {
+    ActivitySource,
+    DispatchSource,
+    EventRetentionPolicyRange,
+    Invokee,
+    PollOn,
+    recordOutputTypes,
+    RunState
+} from "../Common/Typings/Atomic";
 
 export interface RunningState {
     state: RunState,

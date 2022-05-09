@@ -9,11 +9,7 @@ import {
     AfterLoad
 } from "typeorm";
 import {
-    ActivityDispatch,
-    ActivitySourceTypes,
-    DurationVal,
-    NonDispatchActivitySource,
-    onExistingFoundBehavior
+    ActivityDispatch
 } from "../interfaces";
 import {TimeAwareRandomBaseEntity} from "./Base/TimeAwareRandomBaseEntity";
 import {Duration} from "dayjs/plugin/duration";
@@ -25,6 +21,7 @@ import Submission from "snoowrap/dist/objects/Submission";
 import Comment from "snoowrap/dist/objects/Comment";
 import {ColumnDurationTransformer} from "./Transformers";
 import { RedditUser } from "snoowrap/dist/objects";
+import {ActivitySourceTypes, DurationVal, NonDispatchActivitySource, onExistingFoundBehavior} from "../Typings/Atomic";
 
 @Entity({name: 'DispatchedAction'})
 export class DispatchedEntity extends TimeAwareRandomBaseEntity {

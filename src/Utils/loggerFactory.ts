@@ -3,11 +3,11 @@ import winston, {Logger} from "winston";
 import {DuplexTransport} from "winston-duplex";
 import {WinstonAdaptor} from 'typeorm-logger-adaptor/logger/winston';
 import {LoggerOptions} from 'typeorm';
-import {LoggerFactoryOptions} from "../Common/interfaces";
 import process from "process";
 import path from "path";
 import {defaultDataDir} from "../Common/defaults";
 import {ErrorWithCause} from "pony-cause";
+import {LoggerFactoryOptions} from "../Common/Typings/Logging";
 
 const {transports} = winston;
 

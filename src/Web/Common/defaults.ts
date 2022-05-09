@@ -1,8 +1,9 @@
 import {BotStats, BotStatusResponse, SubredditDataResponse} from "./interfaces";
 import {RunningState} from "../../Subreddit/Manager";
-import {Invokee, ManagerStats, RunState} from "../../Common/interfaces";
+import {ManagerStats} from "../../Common/interfaces";
 import {cacheStats } from "../../util";
 import {createHistoricalDisplayDefaults} from "../../Common/defaults";
+import {Invokee, RunState} from "../../Common/Typings/Atomic";
 
 const managerStats: ManagerStats = {
     cache: {

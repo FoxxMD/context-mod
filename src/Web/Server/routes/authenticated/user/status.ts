@@ -10,12 +10,13 @@ import {
 } from "../../../../../util";
 import {Manager} from "../../../../../Subreddit/Manager";
 import dayjs from "dayjs";
-import {DurationVal, LogInfo, ResourceStats, RUNNING, STOPPED, SYSTEM} from "../../../../../Common/interfaces";
+import {LogInfo, ResourceStats, RUNNING, STOPPED, SYSTEM} from "../../../../../Common/interfaces";
 import {BotStatusResponse} from "../../../../Common/interfaces";
 import winston from "winston";
 import {opStats} from "../../../../Common/util";
 import {authUserCheck, botRoute, subredditRoute} from "../../../middleware";
 import Bot from "../../../../../Bot";
+import {DurationVal} from "../../../../../Common/Typings/Atomic";
 
 const status = () => {
 

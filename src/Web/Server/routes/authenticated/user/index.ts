@@ -5,7 +5,7 @@ import winston from 'winston';
 import {COMMENT_URL_ID, parseLinkIdentifier, parseRedditThingsFromLink, SUBMISSION_URL_ID} from "../../../../../util";
 import {booleanMiddle} from "../../../../Common/middleware";
 import {Manager} from "../../../../../Subreddit/Manager";
-import {ActionedEvent, RedditThing} from "../../../../../Common/interfaces";
+import {ActionedEvent} from "../../../../../Common/interfaces";
 import {CMEvent, CMEvent as ActionedEventEntity} from "../../../../../Common/Entities/CMEvent";
 import {nanoid} from "nanoid";
 import dayjs from "dayjs";
@@ -19,6 +19,7 @@ import {
 import {filterResultsBuilder} from "../../../../../Utils/typeormUtils";
 import {Brackets} from "typeorm";
 import {Activity} from "../../../../../Common/Entities/Activity";
+import {RedditThing} from "../../../../../Common/Typings/Reddit";
 
 const commentReg = parseLinkIdentifier([COMMENT_URL_ID]);
 const submissionReg = parseLinkIdentifier([SUBMISSION_URL_ID]);

@@ -3,13 +3,15 @@ import {Comment} from "snoowrap";
 import Submission from "snoowrap/dist/objects/Submission";
 import {checkAuthorFilter} from "../Subreddit/SubredditResources";
 import {
-    AuthorCriteria,
-    AuthorOptions, MaybeAnonymousCriteria,
-    MaybeAnonymousOrStringCriteria,
-    NamedCriteria,
-    RuleResult
+    AuthorOptions, RuleResult
 } from "../Common/interfaces";
 import {buildFilter, normalizeCriteria} from "../util";
+import {
+    MaybeAnonymousCriteria,
+    MaybeAnonymousOrStringCriteria,
+    NamedCriteria
+} from "../Common/Typings/Filters/FilterShapes";
+import {AuthorCriteria} from "../Common/Typings/Filters/FilterCriteria";
 
 /**
  * Checks the author of the Activity against AuthorCriteria. This differs from a Rule's AuthorOptions as this is a full Rule and will only pass/fail, not skip.

@@ -2,8 +2,8 @@ import {
     ChildEntity, DataSource
 } from "typeorm";
 import {FilterCriteria, FilterCriteriaOptions, filterCriteriaTypeIdentifiers} from "./FilterCriteria";
-import {TypedActivityState} from "../../interfaces";
 import objectHash from "object-hash";
+import {TypedActivityState} from "../../Typings/Filters/FilterCriteria";
 
 @ChildEntity()
 export class ActivityStateFilterCriteria extends FilterCriteria<TypedActivityState> {

@@ -1,4 +1,3 @@
-import {DatabaseConfig, DatabaseDriverType} from "../Common/interfaces";
 import {SqljsConnectionOptions} from "typeorm/driver/sqljs/SqljsConnectionOptions";
 import {MysqlConnectionOptions} from "typeorm/driver/mysql/MysqlConnectionOptions";
 import {MongoConnectionOptions} from "typeorm/driver/mongodb/MongoConnectionOptions";
@@ -16,6 +15,7 @@ import process from "process";
 import {defaultDataDir} from "../Common/defaults";
 import {LoggerOptions} from "typeorm/logger/LoggerOptions";
 import {DataSourceOptions} from "typeorm/data-source/DataSourceOptions";
+import {DatabaseConfig, DatabaseDriverType} from "../Common/Typings/Database";
 
 
 const validDrivers = ['sqljs', 'better-sqlite3', 'mysql', 'mariadb', 'postgres'];

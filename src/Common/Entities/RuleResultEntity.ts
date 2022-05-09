@@ -12,10 +12,11 @@ import {RulePremise} from "./RulePremise";
 import {CheckResultEntity} from "./CheckResultEntity";
 import {ActivityStateFilterResult} from "./FilterCriteria/ActivityStateFilterResult";
 import {AuthorFilterResult} from "./FilterCriteria/AuthorFilterResult";
-import {AuthorCriteria, FilterResult as IFilterResult, FilterResult, TypedActivityState} from "../interfaces";
+import {FilterResult as IFilterResult, FilterResult} from "../interfaces";
 import {RandomIdBaseEntity} from "./Base/RandomIdBaseEntity";
 import {TimeAwareRandomBaseEntity} from "./Base/TimeAwareRandomBaseEntity";
 import {RuleSetResultEntity} from "./RuleSetResultEntity";
+import {AuthorCriteria, TypedActivityState} from "../Typings/Filters/FilterCriteria";
 
 export interface RuleResultEntityOptions {
     triggered?: boolean

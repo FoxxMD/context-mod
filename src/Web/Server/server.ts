@@ -8,7 +8,7 @@ import passport from 'passport';
 import tcpUsed from 'tcp-port-used';
 import {getLogger} from "../../Utils/loggerFactory";
 import LoggedError from "../../Utils/LoggedError";
-import {Invokee, LogInfo, OperatorConfigWithFileContext, RUNNING, STOPPED} from "../../Common/interfaces";
+import {LogInfo, OperatorConfigWithFileContext, RUNNING, STOPPED} from "../../Common/interfaces";
 import http from "http";
 import {heartbeat} from "./routes/authenticated/applicationRoutes";
 import logs from "./routes/authenticated/user/logs";
@@ -35,6 +35,7 @@ import {Manager} from "../../Subreddit/Manager";
 import {MESSAGE} from "triple-beam";
 import dayjs from "dayjs";
 import { sleep } from '../../util';
+import {Invokee} from "../../Common/Typings/Atomic";
 
 const server = addAsync(express());
 server.use(bodyParser.json());

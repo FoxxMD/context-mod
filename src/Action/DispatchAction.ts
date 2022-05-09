@@ -2,12 +2,13 @@ import {ActionJson, ActionConfig, ActionOptions} from "./index";
 import Action from "./index";
 import Snoowrap, {Comment, Submission} from "snoowrap";
 import {activityIsRemoved} from "../Utils/SnoowrapUtils";
-import {ActionProcessResult, ActionTarget, ActivityDispatchConfig, RuleResult} from "../Common/interfaces";
+import {ActionProcessResult, ActivityDispatchConfig, RuleResult} from "../Common/interfaces";
 import dayjs from "dayjs";
 import {activityDispatchConfigToDispatch, isSubmission, parseDurationValToDuration, randomId} from "../util";
 import {ActionTypes} from "../Common/types";
 import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
 import {runCheckOptions} from "../Subreddit/Manager";
+import {ActionTarget} from "../Common/Typings/Atomic";
 
 export class DispatchAction extends Action {
     dispatchData: ActivityDispatchConfig;

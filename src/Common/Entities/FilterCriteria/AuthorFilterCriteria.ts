@@ -3,7 +3,7 @@ import {
 } from "typeorm";
 import {FilterCriteria, FilterCriteriaOptions, filterCriteriaTypeIdentifiers} from "./FilterCriteria";
 import objectHash from "object-hash";
-import {AuthorCriteria} from "../../interfaces";
+import {AuthorCriteria} from "../../Typings/Filters/FilterCriteria";
 
 @ChildEntity()
 export class AuthorFilterCriteria extends FilterCriteria<AuthorCriteria> {

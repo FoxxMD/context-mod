@@ -6,9 +6,8 @@ import EventEmitter from "events";
 import {
     BotInstanceConfig, DatabaseStatisticsOperatorConfig,
     FilterCriteriaDefaults,
-    Invokee, LogInfo,
+    LogInfo,
     PAUSED,
-    PollOn,
     RUNNING,
     STOPPED,
     SYSTEM,
@@ -41,6 +40,7 @@ import {RunStateType} from "../Common/Entities/RunStateType";
 import {QueueRunState} from "../Common/Entities/EntityRunState/QueueRunState";
 import {EventsRunState} from "../Common/Entities/EntityRunState/EventsRunState";
 import {ManagerRunState} from "../Common/Entities/EntityRunState/ManagerRunState";
+import {Invokee, PollOn} from "../Common/Typings/Atomic";
 
 class Bot {
 

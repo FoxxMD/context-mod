@@ -12,8 +12,7 @@ import {
 import {RuleResultEntity} from "./RuleResultEntity";
 import {
     AuthorOptions, ItemOptions,
-    ObjectPremise,
-    TypedActivityStates
+    ObjectPremise
 } from "../interfaces";
 import objectHash from "object-hash";
 import {TimeAwareAndUpdatedBaseEntity} from "./Base/TimeAwareAndUpdatedBaseEntity";
@@ -21,6 +20,7 @@ import {TimeAwareRandomBaseEntity} from "./Base/TimeAwareRandomBaseEntity";
 import {RuleType} from "./RuleType";
 import {ManagerEntity} from "./ManagerEntity";
 import {capitalize} from "lodash";
+import {TypedActivityStates} from "../Typings/Filters/FilterCriteria";
 
 export interface RulePremiseOptions {
     kind: RuleType

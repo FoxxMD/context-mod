@@ -9,8 +9,7 @@ import {
     ObjectPremise,
     ResultContext,
     RuleResult as IRuleResult, RunnableBaseJson,
-    RunnableBaseOptions, StructuredRunnableBase,
-    TypedActivityStates
+    RunnableBaseOptions, StructuredRunnableBase
 } from "../Common/interfaces";
 import {runCheckOptions} from "../Subreddit/Manager";
 import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";

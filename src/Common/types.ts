@@ -18,9 +18,10 @@ import {RepostRuleJSONConfig} from "../Rule/RepostRule";
 import {DispatchActionJson} from "../Action/DispatchAction";
 import {CancelDispatchActionJson} from "../Action/CancelDispatchAction";
 import {SafeDictionary} from "ts-essentials";
-import {AuthorCriteria, FilterCriteriaPropertyResult, StructuredRunnableBase} from "./interfaces";
+import {FilterCriteriaPropertyResult, StructuredRunnableBase} from "./interfaces";
 import {ContributorActionJson} from "../Action/ContributorAction";
 import {RuleSetObjectJson} from "../Rule/RuleSet";
+import {AuthorCriteria} from "./Typings/Filters/FilterCriteria";
 
 export type RuleObjectJsonTypes = RecentActivityRuleJSONConfig | RepeatActivityJSONConfig | AuthorRuleJSONConfig | AttributionJSONConfig | HistoryJSONConfig | RegexRuleJSONConfig | RepostRuleJSONConfig
 export type RuleJson = RuleObjectJsonTypes | string;

@@ -1,11 +1,11 @@
 import {ChildEntity, ManyToOne, OneToMany} from "typeorm";
 import {FilterResult} from "./FilterResult";
 import {
-    AuthorCriteria,
     FilterCriteriaResult as IFilterCriteriaResult,
     FilterResult as IFilterResult,
 } from "../../interfaces";
 import {AuthorFilterCriteriaResult} from "./FilterCriteriaResult";
+import {AuthorCriteria} from "../../Typings/Filters/FilterCriteria";
 
 @ChildEntity()
 export class AuthorFilterResult extends FilterResult<AuthorCriteria> {

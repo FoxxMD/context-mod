@@ -1,11 +1,10 @@
-import Snoowrap from "snoowrap";
+import Snoowrap, {Listing} from "snoowrap";
 import objectHash from 'object-hash';
 import {
     activityIsDeleted, activityIsFiltered,
     activityIsRemoved,
-    AuthorActivitiesOptions,
     AuthorTypedActivitiesOptions, BOT_LINK,
-    getAuthorActivities
+    getAuthorHistoryAPIOptions
 } from "../Utils/SnoowrapUtils";
 import {map as mapAsync} from 'async';
 import winston, {Logger} from "winston";
@@ -55,43 +54,34 @@ import {
     userNoteCriteriaSummary,
     asComment,
     criteriaPassWithIncludeBehavior,
-    isRuleSetResult, frequencyEqualOrLargerThanMin, parseDurationValToDuration
+    isRuleSetResult,
+    frequencyEqualOrLargerThanMin,
+    parseDurationValToDuration,
+    windowConfigToWindowCriteria,
+    asStrongSubredditState, convertSubredditsRawToStrong, filterByTimeRequirement
 } from "../util";
 import LoggedError from "../Utils/LoggedError";
 import {
     BotInstanceConfig,
     CacheOptions,
-    CommentState,
     Footer,
     OperatorConfig,
     ResourceStats,
     StrongCache,
-    SubmissionState,
     CacheConfig,
     TTLConfig,
-    TypedActivityStates,
     UserResultCache,
     ActionedEvent,
-    SubredditState,
-    StrongSubredditState,
     ThirdPartyCredentialsJsonConfig,
     FilterCriteriaResult,
     FilterResult,
-    TypedActivityState,
     RequiredItemCrit,
     ItemCritPropHelper,
     ActivityDispatch,
     FilterCriteriaPropertyResult,
-    ActivitySource,
     HistoricalStatsDisplay,
-    UserNoteCriteria,
-    AuthorCriteria,
     AuthorOptions,
-    ItemOptions,
-    JoinOperands,
-    NamedCriteria,
-    ModeratorNameCriteria,
-    StatisticFrequency, StatisticFrequencyOption, statFrequencies, EventRetentionPolicyRange, DurationVal
+    ItemOptions
 } from "../Common/interfaces";
 import UserNotes from "./UserNotes";
 import Mustache from "mustache";
@@ -104,14 +94,14 @@ import {
     createHistoricalDisplayDefaults,
 } from "../Common/defaults";
 import {ExtendedSnoowrap} from "../Utils/SnoowrapClients";
-import dayjs from "dayjs";
+import dayjs, {Dayjs} from "dayjs";
 import ImageData from "../Common/ImageData";
 import {DataSource, Repository, SelectQueryBuilder, Between, LessThan, DeleteQueryBuilder} from "typeorm";
 import {CMEvent as ActionedEventEntity, CMEvent } from "../Common/Entities/CMEvent";
 import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
 import globrex from 'globrex';
 import {runMigrations} from "../Common/Migrations/CacheMigrationUtils";
-import {isStatusError, SimpleError} from "../Utils/Errors";
+import {isStatusError, MaybeSeriousErrorWithCause, SimpleError} from "../Utils/Errors";
 import {ErrorWithCause} from "pony-cause";
 import {AuthorCritPropHelper, RequiredAuthorCrit} from "../Common/types";
 import {ManagerEntity} from "../Common/Entities/ManagerEntity";
@@ -126,6 +116,30 @@ import {CheckResultEntity} from "../Common/Entities/CheckResultEntity";
 import {RuleSetResultEntity} from "../Common/Entities/RuleSetResultEntity";
 import {RulePremise} from "../Common/Entities/RulePremise";
 import cloneDeep from "lodash/cloneDeep";
+import {
+    AuthorCriteria, CommentState,
+    StrongSubredditCriteria, SubmissionState,
+    SubredditCriteria, TypedActivityState, TypedActivityStates,
+    UserNoteCriteria
+} from "../Common/Typings/Filters/FilterCriteria";
+import {
+    SnoowrapActivity,
+    ActivitySource, AuthorActivitiesFull,
+    DurationVal,
+    EventRetentionPolicyRange,
+    JoinOperands,
+    ModeratorNameCriteria, statFrequencies, StatisticFrequency,
+    StatisticFrequencyOption
+} from "../Common/Typings/Atomic";
+import {NamedCriteria} from "../Common/Typings/Filters/FilterShapes";
+import {
+    ActivityWindowCriteria,
+    HistoryFiltersOptions,
+    ListingFunc,
+    NamedListing
+} from "../Common/Typings/ActivityWindow";
+import {Duration} from "dayjs/plugin/duration";
+import {AuthorHistorySort} from "../Common/Typings/Reddit";
 
 export const DEFAULT_FOOTER = '\r\n*****\r\nThis action was performed by [a bot.]({{botLink}}) Mention a moderator or [send a modmail]({{modmailLink}}) if you any ideas, questions, or concerns about this action.';
 
@@ -1145,14 +1159,42 @@ export class SubredditResources {
         }
     }
 
-    async getAuthorActivities(user: RedditUser, options: AuthorTypedActivitiesOptions): Promise<Array<Submission | Comment>> {
+    async getAuthorActivities(user: RedditUser, options: ActivityWindowCriteria, customListing?: NamedListing): Promise<SnoowrapActivity[]> {
+
+        let listFuncName: string;
+        let listFunc: ListingFunc;
+
+        if(customListing !== undefined) {
+            listFuncName = customListing.name;
+            listFunc = customListing.func;
+        } else {
+            listFuncName = options.fetch ?? 'overview';
+            switch(options.fetch) {
+                case 'comment':
+                    listFunc = user.getComments;
+                    break;
+                case 'submission':
+                    listFunc = user.getSubmissions;
+                    break;
+                case 'overview':
+                default:
+                    listFunc = user.getOverview;
+            }
+        }
+
+        const criteriaWithDefaults = {
+            chunkSize: 100,
+            sort: 'new' as AuthorHistorySort,
+            ...options,
+        }
+
         const userName = getActivityAuthorName(user);
         if (this.authorTTL !== false) {
-            const hashObj: any = options;
+            const hashObj: any = criteriaWithDefaults;
             if (this.useSubredditAuthorCache) {
                 hashObj.subreddit = this.subreddit;
             }
-            const hash = `authorActivities-${userName}-${options.type || 'overview'}-${objectHash.sha1(hashObj)}`;
+            const hash = `authorActivities-${userName}-${listFuncName}-${objectHash.sha1(hashObj)}`;
 
             this.stats.cache.author.requests++;
             await this.stats.cache.author.identifierRequestCount.set(userName, (await this.stats.cache.author.identifierRequestCount.wrap(userName, () => 0) as number) + 1);
@@ -1164,7 +1206,8 @@ export class SubredditResources {
                     // @ts-ignore
                     user = await this.client.getUser(userName);
                 }
-                return await getAuthorActivities(user, options);
+                const [post] = await this.getActivities(listFunc, user, criteriaWithDefaults);
+                return post;
             }, {ttl: this.authorTTL});
             if (!miss) {
                 this.logger.debug(`Cache Hit: ${userName} (Hash ${hash})`);
@@ -1177,23 +1220,306 @@ export class SubredditResources {
             // @ts-ignore
             user = await this.client.getUser(userName);
         }
-        return await getAuthorActivities(user, {
+        const [post] = await this.getActivities(listFunc, user, criteriaWithDefaults);
+        return post;
+    }
+
+    async getAuthorActivitiesWithFilter(user: RedditUser, options: ActivityWindowCriteria, customListing?: NamedListing): Promise<AuthorActivitiesFull> {
+        let listFuncName: string;
+        let listFunc: ListingFunc;
+
+        if(customListing !== undefined) {
+            listFuncName = customListing.name;
+            listFunc = customListing.func;
+        } else {
+            listFuncName = options.fetch ?? 'overview';
+            switch(options.fetch) {
+                case 'comment':
+                    listFunc = user.getComments;
+                    break;
+                case 'submission':
+                    listFunc = user.getSubmissions;
+                    break;
+                case 'overview':
+                default:
+                    listFunc = user.getOverview;
+            }
+        }
+
+        const criteriaWithDefaults = {
+            chunkSize: 100,
+            sort: 'new' as AuthorHistorySort,
             ...options,
-            includeFilter: (items, states) => this.batchTestSubredditCriteria(items, states, user),
-            excludeFilter: (items, states) => this.batchTestSubredditCriteria(items, states, user,false),
-        });
+        }
+
+        const userName = getActivityAuthorName(user);
+        if (this.authorTTL !== false) {
+            const hashObj: any = criteriaWithDefaults;
+            if (this.useSubredditAuthorCache) {
+                hashObj.subreddit = this.subreddit;
+            }
+            const hash = `authorActivitiesFULL-${userName}-${listFuncName}-${objectHash.sha1(hashObj)}`;
+
+            this.stats.cache.author.requests++;
+            await this.stats.cache.author.identifierRequestCount.set(userName, (await this.stats.cache.author.identifierRequestCount.wrap(userName, () => 0) as number) + 1);
+            this.stats.cache.author.requestTimestamps.push(Date.now());
+            let miss = false;
+            const cacheVal = await this.cache.wrap(hash, async () => {
+                miss = true;
+                if(typeof user === 'string') {
+                    // @ts-ignore
+                    user = await this.client.getUser(userName);
+                }
+                return await this.getActivities(listFunc, user, criteriaWithDefaults);
+            }, {ttl: this.authorTTL});
+            if (!miss) {
+                this.logger.debug(`Cache Hit: ${userName} (Hash ${hash})`);
+            } else {
+                this.stats.cache.author.miss++;
+            }
+            return cacheVal as AuthorActivitiesFull;
+        }
+        if(typeof user === 'string') {
+            // @ts-ignore
+            user = await this.client.getUser(userName);
+        }
+        return await this.getActivities(listFunc, user, criteriaWithDefaults);
     }
 
-    async getAuthorComments(user: RedditUser, options: AuthorActivitiesOptions): Promise<Comment[]> {
-        return await this.getAuthorActivities(user, {...options, type: 'comment'}) as unknown as Promise<Comment[]>;
+    async getAuthorComments(user: RedditUser, options: ActivityWindowCriteria): Promise<Comment[]> {
+        return await this.getAuthorActivities(user, {...options, fetch: 'comment'}) as unknown as Promise<Comment[]>;
     }
 
-    async getAuthorSubmissions(user: RedditUser, options: AuthorActivitiesOptions): Promise<Submission[]> {
+    async getAuthorSubmissions(user: RedditUser, options: ActivityWindowCriteria): Promise<Submission[]> {
         return await this.getAuthorActivities(user, {
             ...options,
-            type: 'submission'
+            fetch: 'submission'
         }) as unknown as Promise<Submission[]>;
     }
+
+    async getActivities(listingFunc: ListingFunc, user: RedditUser, options: ActivityWindowCriteria): Promise<AuthorActivitiesFull> {
+
+        try {
+            const {
+                chunkSize: cs = 100,
+                satisfyOn,
+                count,
+                duration,
+            } = options;
+
+            let satisfiedCount: number | undefined,
+                satisfiedPreCount: number | undefined,
+                satisfiedEndtime: Dayjs | undefined,
+                satisfiedPreEndtime: Dayjs | undefined,
+                chunkSize = Math.min(cs, 100),
+                satisfy = satisfyOn;
+
+            satisfiedCount = count;
+
+            // if count is less than max limit (100) go ahead and just get that many. may result in faster response time for low numbers
+            if (satisfiedCount !== undefined) {
+                chunkSize = Math.min(chunkSize, satisfiedCount);
+            }
+
+            if (duration !== undefined) {
+                const endTime = dayjs();
+                satisfiedEndtime = endTime.subtract(duration.asMilliseconds(), 'milliseconds');
+            }
+
+            if (satisfiedCount === undefined && satisfiedEndtime === undefined) {
+                throw new Error('window value was not valid');
+            } else if (satisfy === 'all' && !(satisfiedCount !== undefined && satisfiedEndtime !== undefined)) {
+                // even though 'all' was requested we don't have two criteria so its really 'any' logic
+                satisfy = 'any';
+            }
+
+            if(options.filterOn?.pre !== undefined) {
+                if(typeof options.filterOn?.pre.max === 'number') {
+                    satisfiedPreCount = options.filterOn?.pre.max
+                } else {
+                    const endTime = dayjs();
+                    satisfiedPreEndtime = endTime.subtract(options.filterOn?.pre.max.asMilliseconds(), 'milliseconds');
+                }
+            }
+
+            let pre: SnoowrapActivity[] = [];
+            let unFilteredItems: SnoowrapActivity[] | undefined;
+            let post: SnoowrapActivity[] | undefined;
+
+            let preMaxHit: undefined | string;
+
+            let apiCallCount = 1;
+            let listing = await listingFunc(getAuthorHistoryAPIOptions(options));
+            let hitEnd = false;
+            let offset = chunkSize;
+            while (!hitEnd) {
+
+                let countOk = false,
+                    timeOk = false;
+
+                let listSlice = listing.slice(offset - chunkSize);
+                let preListSlice = await this.filterListingWithHistoryOptions(listSlice, user, options.filterOn?.pre);
+
+                // if (!keepRemoved) {
+                //     // snoowrap typings think 'removed' property does not exist on submission
+                //     // @ts-ignore
+                //     listSlice = listSlice.filter(x => !activityIsRemoved(x));
+                // }
+
+                // its more likely the time criteria is going to be hit before the count criteria
+                // so check this first
+                let truncatedItems: Array<Submission | Comment> = [];
+                if (satisfiedEndtime !== undefined) {
+                    const [filteredSome, truncatedItems] = filterByTimeRequirement(satisfiedEndtime, preListSlice);
+
+                    if (filteredSome) {
+                        if (satisfy === 'any') {
+                            // satisfied duration
+                            pre = pre.concat(truncatedItems);
+                            break;
+                        }
+                        timeOk = true;
+                    }
+                }
+
+                if (satisfiedCount !== undefined && pre.length + preListSlice.length >= satisfiedCount) {
+                    // satisfied count
+                    if (satisfy === 'any') {
+                        pre = pre.concat(preListSlice).slice(0, satisfiedCount);
+                        break;
+                    }
+                    countOk = true;
+                }
+
+                // if we've satisfied everything take whichever is bigger
+                if (satisfy === 'all' && countOk && timeOk) {
+                    if (satisfiedCount as number > pre.length + truncatedItems.length) {
+                        pre = pre.concat(preListSlice).slice(0, satisfiedCount);
+                    } else {
+                        pre = pre.concat(truncatedItems);
+                    }
+                    break;
+                }
+
+                // if we got this far neither count nor time was satisfied (or both) so just add all items from listing and fetch more if possible
+                pre = pre.concat(preListSlice);
+
+                if(satisfiedPreEndtime !== undefined || satisfiedPreCount !== undefined) {
+                    if(unFilteredItems === undefined) {
+                        unFilteredItems = [];
+                    }
+                    // window has pre filtering, need to check if fallback max would be hit
+                    if(satisfiedPreEndtime !== undefined) {
+                        const [filteredSome, truncatedItems] = filterByTimeRequirement(satisfiedPreEndtime, listSlice);
+                        if(filteredSome) {
+                            unFilteredItems = unFilteredItems.concat(truncatedItems);
+                            preMaxHit = (options.filterOn?.pre?.max as Duration).humanize();
+                            break;
+                        }
+                    }
+                    if(satisfiedPreCount !== undefined && unFilteredItems.length + listSlice.length >= satisfiedPreCount) {
+                        preMaxHit = `${options.filterOn?.pre?.max} Items`;
+                        unFilteredItems = unFilteredItems.concat(listSlice).slice(0, satisfiedPreCount)
+                        break;
+                    }
+                    unFilteredItems = unFilteredItems.concat(listSlice);
+                }
+
+                hitEnd = listing.isFinished;
+
+                if (!hitEnd) {
+                    apiCallCount++;
+                    offset += chunkSize;
+                    listing = await listing.fetchMore({amount: chunkSize, ...getAuthorHistoryAPIOptions(options)});
+                }
+            }
+            const itemCount = pre.length;
+
+            let itemCountAfterPost: number | undefined;
+            if(options.filterOn?.post !== undefined) {
+                post = await this.filterListingWithHistoryOptions(pre, user, options.filterOn?.post);
+                itemCountAfterPost = post.length;
+            }
+
+            const listStats: string[] = [`${listing.length} Activities Fetched (${apiCallCount} API Calls)`];
+            if(unFilteredItems !== undefined) {
+                let preStat = `${unFilteredItems.length} Before Pre Filter`;
+                if(preMaxHit !== undefined) {
+                    preStat += ` (Hit Max: ${preMaxHit})`;
+                }
+                listStats.push(preStat);
+                listStats.push(`${itemCount} Met Window Range After Pre Filter`);
+            } else {
+                listStats.push(`${itemCount} Met Window Range`);
+            }
+            if(itemCountAfterPost !== undefined) {
+                listStats.push(`${itemCountAfterPost} After Post Filter`)
+            }
+
+            this.logger.debug(listStats.join(' | '), {leaf: 'Activities Fetch'})
+
+            return Promise.resolve([post ?? pre, {raw: unFilteredItems ?? pre, pre, post: post ?? pre}]);
+        } catch (err: any) {
+            if(isStatusError(err)) {
+                switch(err.statusCode) {
+                    case 404:
+                        throw new SimpleError('Reddit returned a 404 for user history. Likely this user is shadowbanned.', {isSerious: false});
+                    case 403:
+                        throw new MaybeSeriousErrorWithCause('Reddit returned a 403 for user history, likely this user is suspended.', {cause: err, isSerious: false});
+                    default:
+                        throw err;
+                }
+
+            } else {
+                throw err;
+            }
+        }
+    }
+
+    async filterListingWithHistoryOptions(listing: SnoowrapActivity[], user: RedditUser, opts?: HistoryFiltersOptions): Promise<SnoowrapActivity[]> {
+        if(opts === undefined) {
+            return listing;
+        }
+
+        let filteredListing = [...listing];
+        if(filteredListing.length > 0 && opts.subreddits !== undefined) {
+            if(opts.subreddits.include !== undefined) {
+                filteredListing = await this.batchTestSubredditCriteria(filteredListing, opts.subreddits.include.map(x => x.criteria), user, true);
+            } else if(opts.subreddits.exclude !== undefined) {
+                // TODO use excludeCondition correctly?
+                filteredListing = await this.batchTestSubredditCriteria(filteredListing, opts.subreddits.exclude.map(x => x.criteria), user, false);
+            }
+        }
+        if(filteredListing.length > 0 && (opts.submissionState !== undefined || opts.commentState !== undefined || opts.activityState !== undefined)) {
+            const newFiltered = [];
+            for(const activity of filteredListing) {
+                let passes = true;
+                if(activity instanceof Submission && opts.submissionState !== undefined) {
+                    const [subPass] = await checkItemFilter(activity, opts.submissionState, this, this.logger);
+                    if(subPass) {
+                        passes = subPass;
+                    }
+                } else if(opts.commentState !== undefined) {
+                   const [comPasses] = await checkItemFilter(activity, opts.commentState, this, this.logger);
+                    if(comPasses) {
+                        passes = comPasses;
+                    }
+                } else if(opts.activityState !== undefined) {
+                    const [actPasses] = await checkItemFilter(activity, opts.activityState, this, this.logger);
+                    if(actPasses) {
+                        passes = actPasses;
+                    }
+                }
+                if(passes) {
+                    newFiltered.push(activity)
+                }
+            }
+            filteredListing = newFiltered;
+        }
+
+        return filteredListing;
+    }
+
 
     async getContent(val: string, subredditArg?: Subreddit): Promise<string> {
         const subreddit = subredditArg || this.subreddit;
@@ -1289,11 +1615,11 @@ export class SubredditResources {
         }
     }
 
-    async batchTestSubredditCriteria(items: (Comment | Submission)[], states: (SubredditState | StrongSubredditState)[], author: RedditUser, isInclude = true): Promise<(Comment | Submission)[]> {
+    async batchTestSubredditCriteria(items: (Comment | Submission)[], states: (SubredditCriteria | StrongSubredditCriteria)[], author: RedditUser, isInclude = true): Promise<(Comment | Submission)[]> {
         let passedItems: (Comment | Submission)[] = [];
         let unpassedItems: (Comment | Submission)[] = [];
 
-        const {nameOnly =  [], full = []} = states.reduce((acc: {nameOnly: (SubredditState | StrongSubredditState)[], full: (SubredditState | StrongSubredditState)[]}, curr) => {
+        const {nameOnly =  [], full = []} = states.reduce((acc: {nameOnly: (SubredditCriteria | StrongSubredditCriteria)[], full: (SubredditCriteria | StrongSubredditCriteria)[]}, curr) => {
             if(subredditStateIsNameOnly(curr)) {
                 return {...acc, nameOnly: acc.nameOnly.concat(curr)};
             }
@@ -1349,7 +1675,7 @@ export class SubredditResources {
         return passedItems;
     }
 
-    async testSubredditCriteria(item: (Comment | Submission), state: SubredditState | StrongSubredditState, author: RedditUser) {
+    async testSubredditCriteria(item: (Comment | Submission), state: SubredditCriteria | StrongSubredditCriteria, author: RedditUser) {
         if(Object.keys(state).length === 0) {
             return true;
         }
@@ -1502,7 +1828,7 @@ export class SubredditResources {
         return res;
     }
 
-    async isSubreddit (subreddit: Subreddit, stateCriteriaRaw: SubredditState | StrongSubredditState, author: RedditUser, logger: Logger) {
+    async isSubreddit (subreddit: Subreddit, stateCriteriaRaw: SubredditCriteria | StrongSubredditCriteria, author: RedditUser, logger: Logger) {
         const {stateDescription, ...stateCriteria} = stateCriteriaRaw;
 
         let fetchedUser: RedditUser | undefined;

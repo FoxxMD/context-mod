@@ -1,28 +1,28 @@
 import {SubmissionRule, SubmissionRuleJSONConfig} from "./SubmissionRule";
 import {
-    ActivityWindowType,
-    CommentState,
     DomainInfo,
     ReferenceSubmission,
-    RuleResult,
-    SubmissionState
+    RuleResult
 } from "../Common/interfaces";
 import {Rule, RuleOptions} from "./index";
 import Submission from "snoowrap/dist/objects/Submission";
 import {getAttributionIdentifier} from "../Utils/SnoowrapUtils";
 import dayjs from "dayjs";
 import {
-    asSubmission,
+    asSubmission, buildSubredditFilter,
     comparisonTextOp, convertSubredditsRawToStrong,
     FAIL,
     formatNumber, getActivitySubredditName, isSubmission,
     parseGenericValueOrPercentComparison,
     parseSubredditName,
-    PASS
+    PASS, windowConfigToWindowCriteria
 } from "../util";
 import { Comment } from "snoowrap/dist/objects";
 import as from "async";
 import {SimpleError} from "../Utils/Errors";
+import {CommentState, StrongSubredditCriteria, SubmissionState} from "../Common/Typings/Filters/FilterCriteria";
+import {ActivityWindowConfig, HistoryFiltersOptions} from "../Common/Typings/ActivityWindow";
+import {FilterOptions} from "../Common/Typings/Filters/FilterShapes";
 
 
 export interface AttributionCriteria {
@@ -38,7 +38,7 @@ export interface AttributionCriteria {
      * @default "> 10%"
      * */
     threshold: string
-    window: ActivityWindowType
+    window: ActivityWindowConfig
     /**
      * What activities to use for total count when determining what percentage an attribution comprises
      *
@@ -210,33 +210,68 @@ export class AttributionRule extends Rule {
 
             const {operator, value, isPercent, extra = ''} = parseGenericValueOrPercentComparison(threshold);
 
-            let activities = thresholdOn === 'submissions' ? await this.resources.getAuthorSubmissions(item.author, {window: window}) : await this.resources.getAuthorActivities(item.author, {window: window});
-
-            if(include.length > 0 || exclude.length > 0) {
-                const defaultOpts = {
-                    defaultFlags: 'i',
-                    generateDescription: true
-                };
-                if(include.length > 0) {
-                    const subStates = include.map(x => convertSubredditsRawToStrong(x, defaultOpts));
-                    activities = await this.resources.batchTestSubredditCriteria(activities, subStates, item.author);
-                } else {
-                    const subStates = exclude.map(x => convertSubredditsRawToStrong(x, defaultOpts));
-                    const toExclude = (await this.resources.batchTestSubredditCriteria(activities, subStates, item.author)).map(x => x.id);
-                    activities = activities.filter(x => !toExclude.includes(x.id));
+            const windowCriteria = windowConfigToWindowCriteria(window);
+            if(windowCriteria.fetch === undefined && thresholdOn === 'submissions') {
+                windowCriteria.fetch = 'submission';
+            }
+            if(windowCriteria.filterOn?.post === undefined) {
+                const filter: HistoryFiltersOptions = {};
+                if(include.length > 0 || exclude.length > 0) {
+                    filter.subreddits = buildSubredditFilter({include, exclude});
+                }
+                if(commentState !== undefined) {
+                    filter.commentState = {
+                        include: [
+                            {
+                                criteria: commentState
+                            }
+                        ]
+                    }
+                }
+                if(submissionState !== undefined) {
+                    filter.submissionState = {
+                        include: [
+                            {
+                                criteria: submissionState
+                            }
+                        ]
+                    }
+                }
+                if(Object.keys(filter).length > 0) {
+                    windowCriteria.filterOn = {
+                        ...(windowCriteria.filterOn ?? {}),
+                        post: filter
+                    }
                 }
             }
 
-            activities = await as.filter(activities, async (activity) => {
-                if (asSubmission(activity) && submissionState !== undefined) {
-                    const {passed} = await this.resources.testItemCriteria(activity, {criteria: submissionState}, this.logger);
-                    return passed;
-                } else if (commentState !== undefined) {
-                    const {passed} = await this.resources.testItemCriteria(activity, {criteria: commentState}, this.logger);
-                    return passed;
-                }
-                return true;
-            });
+            let activities = await this.resources.getAuthorActivities(item.author, windowCriteria);
+
+            // if(include.length > 0 || exclude.length > 0) {
+            //     const defaultOpts = {
+            //         defaultFlags: 'i',
+            //         generateDescription: true
+            //     };
+            //     if(include.length > 0) {
+            //         const subStates = include.map(x => convertSubredditsRawToStrong(x, defaultOpts));
+            //         activities = await this.resources.batchTestSubredditCriteria(activities, subStates, item.author);
+            //     } else {
+            //         const subStates = exclude.map(x => convertSubredditsRawToStrong(x, defaultOpts));
+            //         const toExclude = (await this.resources.batchTestSubredditCriteria(activities, subStates, item.author)).map(x => x.id);
+            //         activities = activities.filter(x => !toExclude.includes(x.id));
+            //     }
+            // }
+            //
+            // activities = await as.filter(activities, async (activity) => {
+            //     if (asSubmission(activity) && submissionState !== undefined) {
+            //         const {passed} = await this.resources.testItemCriteria(activity, {criteria: submissionState}, this.logger);
+            //         return passed;
+            //     } else if (commentState !== undefined) {
+            //         const {passed} = await this.resources.testItemCriteria(activity, {criteria: commentState}, this.logger);
+            //         return passed;
+            //     }
+            //     return true;
+            // });
 
             let activityTotal = 0;
             let firstActivity, lastActivity;
