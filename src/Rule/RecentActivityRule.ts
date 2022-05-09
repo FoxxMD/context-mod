@@ -40,8 +40,7 @@ import {
     SubmissionState,
     SubredditCriteria
 } from "../Common/Infrastructure/Filters/FilterCriteria";
-import {CompareValueOrPercent} from "../Common/Infrastructure/Atomic";
-import {ActivityWindow, FullActivityWindowConfig, ActivityWindowConfig} from "../Common/Infrastructure/ActivityWindow";
+import {ActivityWindow, ActivityWindowConfig} from "../Common/Infrastructure/ActivityWindow";
 
 const parseLink = parseUsableLinkIdentifier();
 
@@ -508,11 +507,19 @@ export class RecentActivityRule extends Rule {
  * */
 export interface ActivityThreshold {
     /**
+     * DEPRECATED - use `window.filterOn.post.submissionState` instead
+     *
      * When present, a Submission will only be counted if it meets this criteria
+     *
+     * @deprecationMessage use `window.filterOn.post.submissionState` instead
      * */
     submissionState?: SubmissionState
     /**
-     * When present, a Comment will only be counted if it meets this criteria
+     * DEPRECATED - use `window.filterOn.post.submissionState` instead
+     *
+     * When present, a Comment will only be counted if it meets this
+     *
+     * @deprecationMessage use `window.filterOn.post.submissionState` instead
      * */
     commentState?: CommentState
 
@@ -548,6 +555,8 @@ export interface ActivityThreshold {
     karma?: string
 
     /**
+     * DEPRECATED - use `window.filterOn.post.subreddits` instead
+     *
      * Activities will be counted if they are found in this list of Subreddits
      *
      * Each value in the list can be either:
@@ -558,6 +567,7 @@ export interface ActivityThreshold {
      *
      * EX `["mealtimevideos","askscience", "/onlyfans*\/i", {"over18": true}]`
      * @examples [["mealtimevideos","askscience", "/onlyfans*\/i", {"over18": true}]]
+     * @deprecationMessage use `window.filterOn.post.subreddits` instead
      * */
     subreddits?: (string | SubredditCriteria)[]
 
@@ -580,8 +590,11 @@ export interface ActivityThreshold {
 
 interface RecentActivityConfig extends ActivityWindow, ReferenceSubmission {
     /**
+     * DEPRECATED - use `window.fetch` instead
+     *
      * If present restricts the activities that are considered for count from SubThreshold
      * @examples ["submissions","comments"]
+     * @deprecationMessage use `window.fetch` instead
      * */
     lookAt?: 'comments' | 'submissions',
     /**

@@ -108,8 +108,19 @@ export interface FullActivityWindowConfig extends HistoryFiltersConfig {
      * */
     satisfyOn?: ActivityWindowSatisfiedOn;
 
+    /**
+     * Use to filter the Activities retrieved by subreddit or activity state
+     *
+     * Can be filtered **during** fetching using `pre` or **after** fetching results using `post`
+     * */
     filterOn?: {
+        /**
+         * Filters to run for each new chunk of Activities retrieved. `count` and `duration` conditions will be checked AFTER filtering the new chunk
+         * */
         pre?: PreHistoryFiltersConfig
+        /**
+         * Filters to run AFTER `count` and `duration` conditions have been triggered. Will filter the entire set of returned Activities.
+         * */
         post?: HistoryFiltersConfig
     }
 
@@ -133,28 +144,10 @@ export interface FullActivityWindowConfig extends HistoryFiltersConfig {
 
 export interface HistoryFiltersConfig {
     /**
-     * Filter which subreddits (case-insensitive) Activities are retrieved from.
+     * Filter Activities based on their Subreddit.
      *
-     * **Note:** Filtering occurs **before** `duration/count` checks are performed.
      * */
     subreddits?: FilterOptionsJson<SubredditCriteria>
-
-    // subreddits?: {
-    //     /**
-    //      * Include only results from these subreddits
-    //      *
-    //      * @examples [["mealtimevideos","askscience"]]
-    //      * */
-    //     include?: (string | SubredditState)[],
-    //     /**
-    //      * Exclude any results from these subreddits
-    //      *
-    //      * **Note:** `exclude` is ignored if `include` is present
-    //      *
-    //      * @examples [["mealtimevideos","askscience"]]
-    //      * */
-    //     exclude?: (string | SubredditState)[],
-    // }
 
     /**
      * When present, will only return Submissions retrieved from history that pass this filter

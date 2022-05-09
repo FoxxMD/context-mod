@@ -2,7 +2,10 @@ import {CompareValue, CompareValueOrPercent, DurationComparor, ModeratorNameCrit
 
 /**
  * Different attributes a `Subreddit` can be in. Only include a property if you want to check it.
- * @examples [{"over18": true}]
+ *
+ * Can also set as plain string as a shorthand for `name: /subredditName/i`
+ *
+ * @examples [{"over18": true}, "mealtimevideos"]
  * */
 export interface SubredditCriteria {
     /**

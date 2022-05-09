@@ -30,7 +30,7 @@ export class MigrationService {
     /**
      * Return clean list of names of tables existing only in relevant database/schema
      *
-     * @deprecated EntityMetadata.tablePath should return correct name
+     * @deprecationMessage EntityMetadata.tablePath should return correct name
      * */
     protected async getRelevantExistingTables(): Promise<ExistingTable[]> {
         const runner = this.database.createQueryRunner();

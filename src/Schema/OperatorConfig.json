@@ -306,6 +306,7 @@
                                 },
                                 "sharedMod": {
                                     "default": false,
+                                    "deprecationMessage": "use `shared` instead",
                                     "description": "DEPRECATED: See `shared`\n\n Using the ENV or ARG will sett `unmoderated` and `modqueue` on `shared`\n\n* ENV => `SHARE_MOD`\n* ARG => `--shareMod`",
                                     "type": "boolean"
                                 },
@@ -927,6 +928,7 @@
                     "type": "string"
                 },
                 "path": {
+                    "deprecationMessage": "use `logging.file.dirname` instead",
                     "description": "**DEPRECATED** - Use `file.dirname` instead\nThe absolute path to a directory where rotating log files should be stored.\n\n* If not present or `null` or `false` no log files will be created\n* If `true` logs will be stored at `[working directory]/logs`\n\n* ENV => `LOG_DIR`\n* ARG => `--logDir [dir]`",
                     "examples": [
                         "/var/log/contextmod"

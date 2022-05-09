@@ -41,9 +41,12 @@ export interface RegexCriteria {
     testOn?: ('title' | 'body' | 'url')[]
 
     /**
-     * **When used with `window`** determines what type of Activities to retrieve
+     * DEPRECATED - use `window.fetch` instead
+     *
+     * When used with `window` determines what type of Activities to retrieve
      *
      * @default "all"
+     * @deprecationMessage use `window.fetch` instead
      * */
     lookAt?: 'submissions' | 'comments' | 'all',
 

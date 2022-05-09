@@ -61,7 +61,7 @@ export interface LoggingOptions {
      * * ARG => `--logDir [dir]`
      *
      * @examples ["/var/log/contextmod"]
-     * @deprecated
+     * @deprecationMessage use `logging.file.dirname` instead
      * @see logging.file.dirname
      * */
     path?: string | boolean | null

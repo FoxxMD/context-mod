@@ -84,6 +84,8 @@ export interface AttributionCriteria {
     domainsCombined?: boolean,
 
     /**
+     * DEPRECATED - use `window.filterOn.post.subreddits` instead
+     *
      * When present, Activities WILL ONLY be counted if they are found in this list of Subreddits
      *
      * Each value in the list can be either:
@@ -94,9 +96,12 @@ export interface AttributionCriteria {
      *
      * EX `["mealtimevideos","askscience", "/onlyfans*\/i", {"over18": true}]`
      * @examples [["mealtimevideos","askscience", "/onlyfans*\/i", {"over18": true}]]
+     * @deprecationMessage use `window.filterOn.post.subreddits` instead
      * */
     include?: string[],
     /**
+     * DEPRECATED - use `window.filterOn.post.subreddits` instead
+     *
      * When present, Activities WILL NOT be counted if they are found in this list of Subreddits
      *
      * Each value in the list can be either:
@@ -107,15 +112,22 @@ export interface AttributionCriteria {
      *
      * EX `["mealtimevideos","askscience", "/onlyfans*\/i", {"over18": true}]`
      * @examples [["mealtimevideos","askscience", "/onlyfans*\/i", {"over18": true}]]
+     * @deprecationMessage use `window.filterOn.post.subreddits` instead
      * */
     exclude?: string[],
 
     /**
      * When present, Submissions from `window` will only be counted if they meet this criteria
+     *
+     * @deprecationMessage use `window.filterOn.post.submissionState` instead
      * */
     submissionState?: SubmissionState
     /**
+     * DEPRECATED - use `window.filterOn.post.commentState` instead
+     *
      * When present, Comments from `window` will only be counted if they meet this criteria
+     *
+     * @deprecationMessage use `window.filterOn.post.commentState` instead
      * */
     commentState?: CommentState
 

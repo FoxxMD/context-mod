@@ -117,7 +117,8 @@
             "properties": {
                 "commentState": {
                     "$ref": "#/definitions/CommentState",
-                    "description": "When present, a Comment will only be counted if it meets this criteria",
+                    "deprecationMessage": "use `window.filterOn.post.submissionState` instead",
+                    "description": "DEPRECATED - use `window.filterOn.post.submissionState` instead\n\nWhen present, a Comment will only be counted if it meets this",
                     "examples": [
                         {
                             "op": true,
@@ -132,7 +133,8 @@
                 },
                 "submissionState": {
                     "$ref": "#/definitions/SubmissionState",
-                    "description": "When present, a Submission will only be counted if it meets this criteria",
+                    "deprecationMessage": "use `window.filterOn.post.submissionState` instead",
+                    "description": "DEPRECATED - use `window.filterOn.post.submissionState` instead\n\nWhen present, a Submission will only be counted if it meets this criteria",
                     "examples": [
                         {
                             "over_18": true,
@@ -150,7 +152,8 @@
                     "type": "string"
                 },
                 "subreddits": {
-                    "description": "Activities will be counted if they are found in this list of Subreddits\n\nEach value in the list can be either:\n\n * string (name of subreddit)\n * regular expression to run on the subreddit name\n * `SubredditState`\n\nEX `[\"mealtimevideos\",\"askscience\", \"/onlyfans*\\/i\", {\"over18\": true}]`",
+                    "deprecationMessage": "use `window.filterOn.post.subreddits` instead",
+                    "description": "DEPRECATED - use `window.filterOn.post.subreddits` instead\n\nActivities will be counted if they are found in this list of Subreddits\n\nEach value in the list can be either:\n\n * string (name of subreddit)\n * regular expression to run on the subreddit name\n * `SubredditState`\n\nEX `[\"mealtimevideos\",\"askscience\", \"/onlyfans*\\/i\", {\"over18\": true}]`",
                     "examples": [
                         [
                             "mealtimevideos",
@@ -309,7 +312,8 @@
                 },
                 "commentState": {
                     "$ref": "#/definitions/CommentState",
-                    "description": "When present, Comments from `window` will only be counted if they meet this criteria",
+                    "deprecationMessage": "use `window.filterOn.post.commentState` instead",
+                    "description": "DEPRECATED - use `window.filterOn.post.commentState` instead\n\nWhen present, Comments from `window` will only be counted if they meet this criteria",
                     "examples": [
                         {
                             "op": true,
@@ -344,7 +348,8 @@
                     "type": "boolean"
                 },
                 "exclude": {
-                    "description": "When present, Activities WILL NOT be counted if they are found in this list of Subreddits\n\nEach value in the list can be either:\n\n * string (name of subreddit)\n * regular expression to run on the subreddit name\n * `SubredditState`\n\nEX `[\"mealtimevideos\",\"askscience\", \"/onlyfans*\\/i\", {\"over18\": true}]`",
+                    "deprecationMessage": "use `window.filterOn.post.subreddits` instead",
+                    "description": "DEPRECATED - use `window.filterOn.post.subreddits` instead\n\nWhen present, Activities WILL NOT be counted if they are found in this list of Subreddits\n\nEach value in the list can be either:\n\n * string (name of subreddit)\n * regular expression to run on the subreddit name\n * `SubredditState`\n\nEX `[\"mealtimevideos\",\"askscience\", \"/onlyfans*\\/i\", {\"over18\": true}]`",
                     "examples": [
                         [
                             "mealtimevideos",
@@ -361,7 +366,8 @@
                     "type": "array"
                 },
                 "include": {
-                    "description": "When present, Activities WILL ONLY be counted if they are found in this list of Subreddits\n\nEach value in the list can be either:\n\n * string (name of subreddit)\n * regular expression to run on the subreddit name\n * `SubredditState`\n\nEX `[\"mealtimevideos\",\"askscience\", \"/onlyfans*\\/i\", {\"over18\": true}]`",
+                    "deprecationMessage": "use `window.filterOn.post.subreddits` instead",
+                    "description": "DEPRECATED - use `window.filterOn.post.subreddits` instead\n\nWhen present, Activities WILL ONLY be counted if they are found in this list of Subreddits\n\nEach value in the list can be either:\n\n * string (name of subreddit)\n * regular expression to run on the subreddit name\n * `SubredditState`\n\nEX `[\"mealtimevideos\",\"askscience\", \"/onlyfans*\\/i\", {\"over18\": true}]`",
                     "examples": [
                         [
                             "mealtimevideos",
@@ -387,6 +393,7 @@
                 },
                 "submissionState": {
                     "$ref": "#/definitions/SubmissionState",
+                    "deprecationMessage": "use `window.filterOn.post.submissionState` instead",
                     "description": "When present, Submissions from `window` will only be counted if they meet this criteria",
                     "examples": [
                         {
@@ -2849,12 +2856,15 @@
                     "type": "string"
                 },
                 "filterOn": {
+                    "description": "Use to filter the Activities retrieved by subreddit or activity state\n\nCan be filtered **during** fetching using `pre` or **after** fetching results using `post`",
                     "properties": {
                         "post": {
-                            "$ref": "#/definitions/HistoryFiltersConfig"
+                            "$ref": "#/definitions/HistoryFiltersConfig",
+                            "description": "Filters to run AFTER `count` and `duration` conditions have been triggered. Will filter the entire set of returned Activities."
                         },
                         "pre": {
-                            "$ref": "#/definitions/PreHistoryFiltersConfig"
+                            "$ref": "#/definitions/PreHistoryFiltersConfig",
+                            "description": "Filters to run for each new chunk of Activities retrieved. `count` and `duration` conditions will be checked AFTER filtering the new chunk"
                         }
                     },
                     "type": "object"
@@ -2897,7 +2907,7 @@
                 },
                 "subreddits": {
                     "$ref": "#/definitions/FilterOptionsJson<SubredditCriteria>",
-                    "description": "Filter which subreddits (case-insensitive) Activities are retrieved from.\n\n**Note:** Filtering occurs **before** `duration/count` checks are performed."
+                    "description": "Filter Activities based on their Subreddit."
                 }
             },
             "type": "object"
@@ -2970,7 +2980,7 @@
                 },
                 "subreddits": {
                     "$ref": "#/definitions/FilterOptionsJson<SubredditCriteria>",
-                    "description": "Filter which subreddits (case-insensitive) Activities are retrieved from.\n\n**Note:** Filtering occurs **before** `duration/count` checks are performed."
+                    "description": "Filter Activities based on their Subreddit."
                 }
             },
             "type": "object"
@@ -3019,7 +3029,8 @@
                     "type": "array"
                 },
                 "exclude": {
-                    "description": "If present, activities will be counted only if they are **NOT** found in this list of Subreddits\n\nEach value in the list can be either:\n\n * string (name of subreddit)\n * regular expression to run on the subreddit name\n * `SubredditState`\n\nEX `[\"mealtimevideos\",\"askscience\", \"/onlyfans*\\/i\", {\"over18\": true}]`\n\n**Note:** This affects **post-window retrieval** activities. So that:\n\n* `activityTotal` is number of activities retrieved from `window` -- NOT post-filtering\n* all comparisons using **percentages** will compare **post-filtering** results against **activity count from window**\n* -- to run this rule where all activities are only from include/exclude filtering instead use include/exclude in `window`",
+                    "deprecationMessage": "In each History Criteria use `window.filterOn.post.subreddits` instead",
+                    "description": "DEPRECATED - In each History Criteria use `window.filterOn.post.subreddits` instead\n\nIf present, activities will be counted only if they are **NOT** found in this list of Subreddits\n\nEach value in the list can be either:\n\n * string (name of subreddit)\n * regular expression to run on the subreddit name\n * `SubredditState`\n\nEX `[\"mealtimevideos\",\"askscience\", \"/onlyfans*\\/i\", {\"over18\": true}]`\n\n**Note:** This affects **post-window retrieval** activities. So that:\n\n* `activityTotal` is number of activities retrieved from `window` -- NOT post-filtering\n* all comparisons using **percentages** will compare **post-filtering** results against **activity count from window**\n* -- to run this rule where all activities are only from include/exclude filtering instead use include/exclude in `window`",
                     "examples": [
                         [
                             "mealtimevideos",
@@ -3043,7 +3054,8 @@
                     "type": "array"
                 },
                 "include": {
-                    "description": "If present, activities will be counted only if they are found in this list of Subreddits.\n\nEach value in the list can be either:\n\n * string (name of subreddit)\n * regular expression to run on the subreddit name\n * `SubredditState`\n\nEX `[\"mealtimevideos\",\"askscience\", \"/onlyfans*\\/i\", {\"over18\": true}]`\n\n **Note:** This affects **post-window retrieval** activities. So that:\n\n* `activityTotal` is number of activities retrieved from `window` -- NOT post-filtering\n* all comparisons using **percentages** will compare **post-filtering** results against **activity count from window**\n* -- to run this rule where all activities are only from include/exclude filtering instead use include/exclude in `window`",
+                    "deprecationMessage": "In each History Criteria use `window.filterOn.post.subreddits` instead",
+                    "description": "DEPRECATED - In each History Criteria use `window.filterOn.post.subreddits` instead\n\nIf present, activities will be counted only if they are found in this list of Subreddits.\n\nEach value in the list can be either:\n\n * string (name of subreddit)\n * regular expression to run on the subreddit name\n * `SubredditState`\n\nEX `[\"mealtimevideos\",\"askscience\", \"/onlyfans*\\/i\", {\"over18\": true}]`\n\n **Note:** This affects **post-window retrieval** activities. So that:\n\n* `activityTotal` is number of activities retrieved from `window` -- NOT post-filtering\n* all comparisons using **percentages** will compare **post-filtering** results against **activity count from window**\n* -- to run this rule where all activities are only from include/exclude filtering instead use include/exclude in `window`",
                     "examples": [
                         [
                             "mealtimevideos",
@@ -3799,7 +3811,7 @@
                 },
                 "subreddits": {
                     "$ref": "#/definitions/FilterOptionsJson<SubredditCriteria>",
-                    "description": "Filter which subreddits (case-insensitive) Activities are retrieved from.\n\n**Note:** Filtering occurs **before** `duration/count` checks are performed."
+                    "description": "Filter Activities based on their Subreddit."
                 }
             },
             "required": [
@@ -3876,7 +3888,8 @@
                     "type": "string"
                 },
                 "lookAt": {
-                    "description": "If present restricts the activities that are considered for count from SubThreshold",
+                    "deprecationMessage": "use `window.fetch` instead",
+                    "description": "DEPRECATED - use `window.fetch` instead\n\nIf present restricts the activities that are considered for count from SubThreshold",
                     "enum": [
                         "comments",
                         "submissions"
@@ -3991,7 +4004,8 @@
                 },
                 "lookAt": {
                     "default": "all",
-                    "description": "**When used with `window`** determines what type of Activities to retrieve",
+                    "deprecationMessage": "use `window.fetch` instead",
+                    "description": "DEPRECATED - use `window.fetch` instead\n\nWhen used with `window` determines what type of Activities to retrieve",
                     "enum": [
                         "all",
                         "comments",
@@ -5510,11 +5524,12 @@
             "type": "object"
         },
         "SubredditCriteria": {
-            "description": "Different attributes a `Subreddit` can be in. Only include a property if you want to check it.",
+            "description": "Different attributes a `Subreddit` can be in. Only include a property if you want to check it.\n\nCan also set as plain string as a shorthand for `name: /subredditName/i`",
             "examples": [
                 {
                     "over18": true
-                }
+                },
+                "mealtimevideos"
             ],
             "properties": {
                 "isOwnProfile": {

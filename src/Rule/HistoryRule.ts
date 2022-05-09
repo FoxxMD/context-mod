@@ -382,6 +382,8 @@ interface HistoryConfig  {
     condition?: 'AND' | 'OR'
 
     /**
+     * DEPRECATED - In each History Criteria use `window.filterOn.post.subreddits` instead
+     *
      * If present, activities will be counted only if they are found in this list of Subreddits.
      *
      * Each value in the list can be either:
@@ -399,9 +401,12 @@ interface HistoryConfig  {
      * * -- to run this rule where all activities are only from include/exclude filtering instead use include/exclude in `window`
      *
      * @examples [["mealtimevideos","askscience", "/onlyfans*\/i", {"over18": true}]]
+     * @deprecationMessage In each History Criteria use `window.filterOn.post.subreddits` instead
      * */
     include?: (string | SubredditCriteria)[],
     /**
+     * DEPRECATED - In each History Criteria use `window.filterOn.post.subreddits` instead
+     *
      * If present, activities will be counted only if they are **NOT** found in this list of Subreddits
      *
      * Each value in the list can be either:
@@ -419,6 +424,7 @@ interface HistoryConfig  {
      * * -- to run this rule where all activities are only from include/exclude filtering instead use include/exclude in `window`
      *
      * @examples [["mealtimevideos","askscience", "/onlyfans*\/i", {"over18": true}]]
+     * @deprecationMessage In each History Criteria use `window.filterOn.post.subreddits` instead
      * */
     exclude?: (string | SubredditCriteria)[],
 }

@@ -1230,7 +1230,7 @@ export interface BotInstanceJsonConfig {
          * * ARG => `--shareMod`
          *
          * @default false
-         * @deprecated
+         * @deprecationMessage use `shared` instead
          * */
         sharedMod?: boolean,
 
