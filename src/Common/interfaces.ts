@@ -19,7 +19,7 @@ import {
     SubmissionState,
     TypedActivityState,
     TypedActivityStates
-} from "./Typings/Filters/FilterCriteria";
+} from "./Infrastructure/Filters/FilterCriteria";
 import {
     ActivitySourceTypes,
     CacheProvider,
@@ -38,16 +38,16 @@ import {
     SearchFacetType,
     StatisticFrequencyOption,
     StringOperator
-} from "./Typings/Atomic";
+} from "./Infrastructure/Atomic";
 import {
     FilterOptions,
     MinimalOrFullFilter,
     MinimalOrFullFilterJson,
     NamedCriteria
-} from "./Typings/Filters/FilterShapes";
-import {LoggingOptions, LogLevel, StrongLoggingOptions} from "./Typings/Logging";
-import {DatabaseConfig, DatabaseDriver, DatabaseDriverConfig, DatabaseDriverType} from "./Typings/Database";
-import {ActivityType} from "./Typings/Reddit";
+} from "./Infrastructure/Filters/FilterShapes";
+import {LoggingOptions, LogLevel, StrongLoggingOptions} from "./Infrastructure/Logging";
+import {DatabaseConfig, DatabaseDriver, DatabaseDriverConfig, DatabaseDriverType} from "./Infrastructure/Database";
+import {ActivityType} from "./Infrastructure/Reddit";
 
 
 export interface ReferenceSubmission {

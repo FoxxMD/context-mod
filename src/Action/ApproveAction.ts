@@ -7,7 +7,7 @@ import Comment from "snoowrap/dist/objects/Comment";
 import {ActionTypes} from "../Common/types";
 import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
 import {runCheckOptions} from "../Subreddit/Manager";
-import {ActionTarget} from "../Common/Typings/Atomic";
+import {ActionTarget} from "../Common/Infrastructure/Atomic";
 
 export class ApproveAction extends Action {
 

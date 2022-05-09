@@ -15,7 +15,7 @@ import process from "process";
 import {defaultDataDir} from "../Common/defaults";
 import {LoggerOptions} from "typeorm/logger/LoggerOptions";
 import {DataSourceOptions} from "typeorm/data-source/DataSourceOptions";
-import {DatabaseConfig, DatabaseDriverType} from "../Common/Typings/Database";
+import {DatabaseConfig, DatabaseDriverType} from "../Common/Infrastructure/Database";
 
 
 const validDrivers = ['sqljs', 'better-sqlite3', 'mysql', 'mariadb', 'postgres'];

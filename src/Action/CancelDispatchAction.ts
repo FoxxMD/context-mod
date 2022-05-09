@@ -12,7 +12,7 @@ import {isSubmission, parseDurationValToDuration} from "../util";
 import {ActionTypes} from "../Common/types";
 import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
 import {runCheckOptions} from "../Subreddit/Manager";
-import {ActionTarget, InclusiveActionTarget} from "../Common/Typings/Atomic";
+import {ActionTarget, InclusiveActionTarget} from "../Common/Infrastructure/Atomic";
 
 export class CancelDispatchAction extends Action {
     identifiers?: (string | null)[];

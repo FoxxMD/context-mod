@@ -12,8 +12,8 @@ import {
 } from "../Common/interfaces";
 import dayjs from 'dayjs';
 import {SimpleError} from "../Utils/Errors";
-import {JoinOperands} from "../Common/Typings/Atomic";
-import {ActivityWindowConfig} from "../Common/Typings/ActivityWindow";
+import {JoinOperands} from "../Common/Infrastructure/Atomic";
+import {ActivityWindowConfig} from "../Common/Infrastructure/ActivityWindow";
 
 export interface RegexCriteria {
     /**

@@ -9,7 +9,7 @@ import Comment from "snoowrap/dist/objects/Comment";
 import RedditUser from "snoowrap/dist/objects/RedditUser";
 import {RandomIdBaseEntity} from "./Base/RandomIdBaseEntity";
 import {TimeAwareRandomBaseEntity} from "./Base/TimeAwareRandomBaseEntity";
-import {AuthorCriteria, TypedActivityState} from "../Typings/Filters/FilterCriteria";
+import {AuthorCriteria, TypedActivityState} from "../Infrastructure/Filters/FilterCriteria";
 
 export interface ActionResultEntityOptions {
     run: boolean

@@ -1,6 +1,6 @@
 import {Entity, Column, PrimaryColumn, OneToMany, PrimaryGeneratedColumn} from "typeorm";
 import {Activity} from "./Activity";
-import {Invokee} from "../Typings/Atomic";
+import {Invokee} from "../Infrastructure/Atomic";
 
 @Entity()
 export class InvokeeType {

@@ -8,7 +8,7 @@ import {activityDispatchConfigToDispatch, isSubmission, parseDurationValToDurati
 import {ActionTypes} from "../Common/types";
 import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
 import {runCheckOptions} from "../Subreddit/Manager";
-import {ActionTarget} from "../Common/Typings/Atomic";
+import {ActionTarget} from "../Common/Infrastructure/Atomic";
 
 export class DispatchAction extends Action {
     dispatchData: ActivityDispatchConfig;

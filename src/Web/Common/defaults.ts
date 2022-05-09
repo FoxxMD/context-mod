@@ -3,7 +3,7 @@ import {RunningState} from "../../Subreddit/Manager";
 import {ManagerStats} from "../../Common/interfaces";
 import {cacheStats } from "../../util";
 import {createHistoricalDisplayDefaults} from "../../Common/defaults";
-import {Invokee, RunState} from "../../Common/Typings/Atomic";
+import {Invokee, RunState} from "../../Common/Infrastructure/Atomic";
 
 const managerStats: ManagerStats = {
     cache: {

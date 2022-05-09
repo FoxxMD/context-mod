@@ -20,9 +20,9 @@ import {
 import { Comment } from "snoowrap/dist/objects";
 import as from "async";
 import {SimpleError} from "../Utils/Errors";
-import {CommentState, StrongSubredditCriteria, SubmissionState} from "../Common/Typings/Filters/FilterCriteria";
-import {ActivityWindowConfig, HistoryFiltersOptions} from "../Common/Typings/ActivityWindow";
-import {FilterOptions} from "../Common/Typings/Filters/FilterShapes";
+import {CommentState, StrongSubredditCriteria, SubmissionState} from "../Common/Infrastructure/Filters/FilterCriteria";
+import {ActivityWindowConfig, HistoryFiltersOptions} from "../Common/Infrastructure/ActivityWindow";
+import {FilterOptions} from "../Common/Infrastructure/Filters/FilterShapes";
 
 
 export interface AttributionCriteria {

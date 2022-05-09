@@ -6,9 +6,9 @@ import {
 import {Submission, Comment} from "snoowrap/dist/objects";
 import { buildFilter } from "../util";
 import {CheckResultEntity} from "../Common/Entities/CheckResultEntity";
-import {FilterOptions, MinimalOrFullFilter} from "../Common/Typings/Filters/FilterShapes";
-import {CommentState} from "../Common/Typings/Filters/FilterCriteria";
-import {ActivityType} from "../Common/Typings/Reddit";
+import {FilterOptions, MinimalOrFullFilter} from "../Common/Infrastructure/Filters/FilterShapes";
+import {CommentState} from "../Common/Infrastructure/Filters/FilterCriteria";
+import {ActivityType} from "../Common/Infrastructure/Reddit";
 
 export interface CommentCheckOptions extends CheckOptions {
     itemIs?: MinimalOrFullFilter<CommentState>

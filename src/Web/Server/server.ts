@@ -35,7 +35,7 @@ import {Manager} from "../../Subreddit/Manager";
 import {MESSAGE} from "triple-beam";
 import dayjs from "dayjs";
 import { sleep } from '../../util';
-import {Invokee} from "../../Common/Typings/Atomic";
+import {Invokee} from "../../Common/Infrastructure/Atomic";
 
 const server = addAsync(express());
 server.use(bodyParser.json());

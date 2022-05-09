@@ -87,15 +87,15 @@ import {AuthorRuleConfig} from "./Rule/AuthorRule";
 import {
     CacheProvider,
     PollOn
-} from "./Common/Typings/Atomic";
+} from "./Common/Infrastructure/Atomic";
 import {
     FilterOptionsJson,
     MaybeAnonymousCriteria,
     MaybeAnonymousOrStringCriteria, MinimalOrFullFilter, MinimalOrFullFilterJson, NamedCriteria
-} from "./Common/Typings/Filters/FilterShapes";
-import {AuthorCriteria, TypedActivityState, TypedActivityStates} from "./Common/Typings/Filters/FilterCriteria";
-import {StrongLoggingOptions} from "./Common/Typings/Logging";
-import {DatabaseDriver, DatabaseDriverConfig, DatabaseDriverType} from "./Common/Typings/Database";
+} from "./Common/Infrastructure/Filters/FilterShapes";
+import {AuthorCriteria, TypedActivityState, TypedActivityStates} from "./Common/Infrastructure/Filters/FilterCriteria";
+import {StrongLoggingOptions} from "./Common/Infrastructure/Logging";
+import {DatabaseDriver, DatabaseDriverConfig, DatabaseDriverType} from "./Common/Infrastructure/Database";
 
 export interface ConfigBuilderOptions {
     logger: Logger,

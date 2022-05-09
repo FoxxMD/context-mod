@@ -16,7 +16,7 @@ import {FilterResult as IFilterResult, FilterResult} from "../interfaces";
 import {RandomIdBaseEntity} from "./Base/RandomIdBaseEntity";
 import {TimeAwareRandomBaseEntity} from "./Base/TimeAwareRandomBaseEntity";
 import {RuleSetResultEntity} from "./RuleSetResultEntity";
-import {AuthorCriteria, TypedActivityState} from "../Typings/Filters/FilterCriteria";
+import {AuthorCriteria, TypedActivityState} from "../Infrastructure/Filters/FilterCriteria";
 
 export interface RuleResultEntityOptions {
     triggered?: boolean

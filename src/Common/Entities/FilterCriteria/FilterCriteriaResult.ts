@@ -6,7 +6,7 @@ import {
 import {FilterResult} from "./FilterResult";
 import {RandomIdBaseEntity} from "../Base/RandomIdBaseEntity";
 import {AuthorFilterCriteria} from "./AuthorFilterCriteria";
-import {AuthorCriteria} from "../../Typings/Filters/FilterCriteria";
+import {AuthorCriteria} from "../../Infrastructure/Filters/FilterCriteria";
 
 export interface FilterCriteriaResultOptions<T> {
     behavior: string

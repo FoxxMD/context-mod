@@ -3,7 +3,7 @@ import {
 } from "typeorm";
 import {FilterCriteria, FilterCriteriaOptions, filterCriteriaTypeIdentifiers} from "./FilterCriteria";
 import objectHash from "object-hash";
-import {TypedActivityState} from "../../Typings/Filters/FilterCriteria";
+import {TypedActivityState} from "../../Infrastructure/Filters/FilterCriteria";
 
 @ChildEntity()
 export class ActivityStateFilterCriteria extends FilterCriteria<TypedActivityState> {

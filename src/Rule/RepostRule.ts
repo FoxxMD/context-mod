@@ -23,8 +23,8 @@ import leven from "leven";
 import {YoutubeClient, commentsAsRepostItems} from "../Utils/ThirdParty/YoutubeClient";
 import dayjs from "dayjs";
 import {rest} from "lodash";
-import {CompareValue, DurationComparor, JoinOperands, SearchFacetType} from "../Common/Typings/Atomic";
-import {ActivityWindow, ActivityWindowConfig} from "../Common/Typings/ActivityWindow";
+import {CompareValue, DurationComparor, JoinOperands, SearchFacetType} from "../Common/Infrastructure/Atomic";
+import {ActivityWindow, ActivityWindowConfig} from "../Common/Infrastructure/ActivityWindow";
 
 const parseYtIdentifier = parseUsableLinkIdentifier();
 

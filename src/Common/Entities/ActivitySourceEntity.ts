@@ -8,7 +8,7 @@ import objectHash from "object-hash";
 import {Duration} from "dayjs/plugin/duration";
 import dayjs from "dayjs";
 import {ColumnDurationTransformer} from "./Transformers";
-import {ActivitySourceTypes, PollOn} from "../Typings/Atomic";
+import {ActivitySourceTypes, PollOn} from "../Infrastructure/Atomic";
 
 export interface ActivitySourceEntityOptions extends ActivitySourceData {
     manager: ManagerEntity

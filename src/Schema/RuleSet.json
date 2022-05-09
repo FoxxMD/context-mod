@@ -1,6 +1,115 @@
 {
     "$schema": "http://json-schema.org/draft-07/schema#",
     "definitions": {
+        "ActivityState": {
+            "properties": {
+                "age": {
+                    "description": "A duration and how to compare it against a value\n\nThe syntax is `(< OR > OR <= OR >=) <number> <unit>` EX `> 100 days`, `<= 2 months`\n\n* EX `> 100 days` => Passes if the date being compared is before 100 days ago\n* EX `<= 2 months` => Passes if the date being compared is after or equal to 2 months\n\nUnit must be one of [DayJS Duration units](https://day.js.org/docs/en/durations/creating)\n\n[See] https://regexr.com/609n8 for example",
+                    "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(days|weeks|months|years|hours|minutes|seconds|milliseconds)\\s*$",
+                    "type": "string"
+                },
+                "approved": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "$ref": "#/definitions/ModeratorNameCriteria"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
+                        }
+                    ],
+                    "description": "* true/false => test whether Activity is approved or not\n* string or list of strings => test which moderator approved this Activity"
+                },
+                "deleted": {
+                    "type": "boolean"
+                },
+                "dispatched": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
+                        }
+                    ],
+                    "description": "Test whether the activity is present in dispatched/delayed activities\n\nNOTE: This is DOES NOT mean that THIS activity is from dispatch -- just that it exists there. To test whether THIS activity is from dispatch use `source`\n\n* `true` => activity exists in delayed activities\n* `false` => activity DOES NOT exist in delayed activities\n* `string` => activity exists in delayed activities with given identifier\n* `string[]` => activity exists in delayed activities with any of the given identifiers"
+                },
+                "distinguished": {
+                    "type": "boolean"
+                },
+                "filtered": {
+                    "type": "boolean"
+                },
+                "locked": {
+                    "type": "boolean"
+                },
+                "removed": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "$ref": "#/definitions/ModeratorNameCriteria"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
+                        }
+                    ],
+                    "description": "* true/false => test whether Activity is removed or not\n* string or list of strings => test which moderator removed this Activity"
+                },
+                "reports": {
+                    "description": "A string containing a comparison operator and a value to compare against\n\nThe syntax is `(< OR > OR <= OR >=) <number>`\n\n* EX `> 2`  => greater than 2 total reports\n\nDefaults to TOTAL reports on an Activity. Suffix the value with the report type to check that type:\n\n* EX `> 3 mod` => greater than 3 mod reports\n* EX `>= 1 user` => greater than 1 user report",
+                    "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
+                    "type": "string"
+                },
+                "score": {
+                    "description": "A string containing a comparison operator and a value to compare against\n\nThe syntax is `(< OR > OR <= OR >=) <number>`\n\n* EX `> 100`  => greater than 100",
+                    "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
+                    "type": "string"
+                },
+                "source": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "string"
+                        }
+                    ],
+                    "description": "Test where the current activity was sourced from.\n\nA source can be any of:\n\n* `poll` => activity was retrieved from polling a queue (unmoderated, modqueue, etc...)\n* `poll:[pollSource]` => activity was retrieved from specific polling source IE `poll:unmoderated` activity comes from unmoderated queue\n  * valid sources: unmoderated modqueue newComm newSub\n* `dispatch` => activity is from Dispatch Action\n* `dispatch:[identifier]` => activity is from Dispatch Action with specific identifier\n* `user` => activity was from user input (web dashboard)"
+                },
+                "spam": {
+                    "type": "boolean"
+                },
+                "stickied": {
+                    "type": "boolean"
+                }
+            },
+            "type": "object"
+        },
         "ActivityThreshold": {
             "additionalProperties": false,
             "description": "At least one count property must be present. If both are present then either can trigger the rule",
@@ -55,7 +164,7 @@
                     "items": {
                         "anyOf": [
                             {
-                                "$ref": "#/definitions/SubredditState"
+                                "$ref": "#/definitions/SubredditCriteria"
                             },
                             {
                                 "type": "string"
@@ -72,91 +181,6 @@
                     ],
                     "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
                     "type": "string"
-                }
-            },
-            "type": "object"
-        },
-        "ActivityWindowCriteria": {
-            "additionalProperties": false,
-            "description": "Multiple properties that may be used to define what range of Activity to retrieve.\n\nMay specify one, or both properties along with the `satisfyOn` property, to affect the retrieval behavior.",
-            "examples": [
-                {
-                    "count": 100,
-                    "duration": {
-                        "days": 90
-                    }
-                }
-            ],
-            "minProperties": 1,
-            "properties": {
-                "count": {
-                    "description": "The number of activities (submission/comments) to consider",
-                    "examples": [
-                        15
-                    ],
-                    "type": "number"
-                },
-                "duration": {
-                    "anyOf": [
-                        {
-                            "$ref": "#/definitions/DurationObject"
-                        },
-                        {
-                            "type": "string"
-                        }
-                    ],
-                    "description": "A value that specifies the amount of time to subtract from `NOW` to create a time range IE `NOW <---> [duration] ago`\n\nAcceptable values:\n\n**A `string` consisting of a value and a [Day.js](https://day.js.org/docs/en/durations/creating) time unit** ([test your value](https://regexr.com/61em3))\n\n* EX `9 days` => Range is `NOW <---> 9 days ago`\n\n**A [Day.js](https://day.js.org/docs/en/durations/creating) `object`**\n\n* EX `{\"days\": 90, \"minutes\": 15}` => Range is `NOW <---> 90 days and 15 minutes ago`\n\n**An [ISO 8601 duration](https://en.wikipedia.org/wiki/ISO_8601#Durations) `string`** ([test your value](https://regexr.com/61em9))\n\n* EX `PT15M` => 15 minutes => Range is `NOW <----> 15 minutes ago`",
-                    "examples": [
-                        "90 days",
-                        "PT15M",
-                        {
-                            "minutes": 15
-                        }
-                    ]
-                },
-                "satisfyOn": {
-                    "default": "any",
-                    "description": "Define the condition under which both criteria are considered met\n\n**If `any` then it will retrieve Activities until one of the criteria is met, whichever occurs first**\n\nEX `{\"count\": 100, duration: \"90 days\"}`:\n* If 90 days of activities = 40 activities => returns 40 activities\n* If 100 activities is only 20 days => 100 activities\n\n**If `all` then both criteria must be met.**\n\nEffectively, whichever criteria produces the most Activities...\n\nEX `{\"count\": 100, duration: \"90 days\"}`:\n* If at 90 days of activities => 40 activities, continue retrieving results until 100 => results in >90 days of activities\n* If at 100 activities => 20 days of activities, continue retrieving results until 90 days => results in >100 activities",
-                    "enum": [
-                        "all",
-                        "any"
-                    ],
-                    "examples": [
-                        "any"
-                    ],
-                    "type": "string"
-                },
-                "subreddits": {
-                    "description": "Filter which subreddits (case-insensitive) Activities are retrieved from.\n\n**Note:** Filtering occurs **before** `duration/count` checks are performed.",
-                    "properties": {
-                        "exclude": {
-                            "description": "Exclude any results from these subreddits\n\n**Note:** `exclude` is ignored if `include` is present",
-                            "examples": [
-                                [
-                                    "mealtimevideos",
-                                    "askscience"
-                                ]
-                            ],
-                            "items": {
-                                "type": "string"
-                            },
-                            "type": "array"
-                        },
-                        "include": {
-                            "description": "Include only results from these subreddits",
-                            "examples": [
-                                [
-                                    "mealtimevideos",
-                                    "askscience"
-                                ]
-                            ],
-                            "items": {
-                                "type": "string"
-                            },
-                            "type": "array"
-                        }
-                    },
-                    "type": "object"
                 }
             },
             "type": "object"
@@ -286,10 +310,10 @@
                 "window": {
                     "anyOf": [
                         {
-                            "$ref": "#/definitions/ActivityWindowCriteria"
+                            "$ref": "#/definitions/DurationObject"
                         },
                         {
-                            "$ref": "#/definitions/DurationObject"
+                            "$ref": "#/definitions/FullActivityWindowConfig"
                         },
                         {
                             "type": [
@@ -843,6 +867,132 @@
             },
             "type": "object"
         },
+        "FilterOptionsConfig<ActivityState>": {
+            "properties": {
+                "exclude": {
+                    "description": "Only runs if `include` is not present. Each Criteria is comprised of conditions that the filter (Author/Item) being checked must \"not\" pass. See excludeCondition for set behavior\n\nEX: `isMod: true, name: Automoderator` => Will pass if the Author IS NOT a mod and IS NOT named Automoderator",
+                    "items": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/definitions/ActivityState"
+                            },
+                            {
+                                "$ref": "#/definitions/NamedCriteria<ActivityState>"
+                            }
+                        ]
+                    },
+                    "type": "array"
+                },
+                "excludeCondition": {
+                    "default": "OR",
+                    "description": "* OR => if ANY exclude condition \"does not\" pass then the exclude test passes\n* AND => if ALL exclude conditions \"do not\" pass then the exclude test passes\n\nDefaults to OR",
+                    "enum": [
+                        "AND",
+                        "OR"
+                    ],
+                    "type": "string"
+                },
+                "include": {
+                    "description": "Will \"pass\" if any set of Criteria passes",
+                    "items": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/definitions/ActivityState"
+                            },
+                            {
+                                "$ref": "#/definitions/NamedCriteria<ActivityState>"
+                            }
+                        ]
+                    },
+                    "type": "array"
+                }
+            },
+            "type": "object"
+        },
+        "FilterOptionsConfig<CommentState>": {
+            "properties": {
+                "exclude": {
+                    "description": "Only runs if `include` is not present. Each Criteria is comprised of conditions that the filter (Author/Item) being checked must \"not\" pass. See excludeCondition for set behavior\n\nEX: `isMod: true, name: Automoderator` => Will pass if the Author IS NOT a mod and IS NOT named Automoderator",
+                    "items": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/definitions/CommentState"
+                            },
+                            {
+                                "$ref": "#/definitions/NamedCriteria<CommentState>"
+                            }
+                        ]
+                    },
+                    "type": "array"
+                },
+                "excludeCondition": {
+                    "default": "OR",
+                    "description": "* OR => if ANY exclude condition \"does not\" pass then the exclude test passes\n* AND => if ALL exclude conditions \"do not\" pass then the exclude test passes\n\nDefaults to OR",
+                    "enum": [
+                        "AND",
+                        "OR"
+                    ],
+                    "type": "string"
+                },
+                "include": {
+                    "description": "Will \"pass\" if any set of Criteria passes",
+                    "items": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/definitions/CommentState"
+                            },
+                            {
+                                "$ref": "#/definitions/NamedCriteria<CommentState>"
+                            }
+                        ]
+                    },
+                    "type": "array"
+                }
+            },
+            "type": "object"
+        },
+        "FilterOptionsConfig<SubmissionState>": {
+            "properties": {
+                "exclude": {
+                    "description": "Only runs if `include` is not present. Each Criteria is comprised of conditions that the filter (Author/Item) being checked must \"not\" pass. See excludeCondition for set behavior\n\nEX: `isMod: true, name: Automoderator` => Will pass if the Author IS NOT a mod and IS NOT named Automoderator",
+                    "items": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/definitions/SubmissionState"
+                            },
+                            {
+                                "$ref": "#/definitions/NamedCriteria<SubmissionState>"
+                            }
+                        ]
+                    },
+                    "type": "array"
+                },
+                "excludeCondition": {
+                    "default": "OR",
+                    "description": "* OR => if ANY exclude condition \"does not\" pass then the exclude test passes\n* AND => if ALL exclude conditions \"do not\" pass then the exclude test passes\n\nDefaults to OR",
+                    "enum": [
+                        "AND",
+                        "OR"
+                    ],
+                    "type": "string"
+                },
+                "include": {
+                    "description": "Will \"pass\" if any set of Criteria passes",
+                    "items": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/definitions/SubmissionState"
+                            },
+                            {
+                                "$ref": "#/definitions/NamedCriteria<SubmissionState>"
+                            }
+                        ]
+                    },
+                    "type": "array"
+                }
+            },
+            "type": "object"
+        },
         "FilterOptionsJson<AuthorCriteria>": {
             "properties": {
                 "exclude": {
@@ -880,6 +1030,54 @@
                             },
                             {
                                 "$ref": "#/definitions/NamedCriteria<AuthorCriteria>"
+                            },
+                            {
+                                "type": "string"
+                            }
+                        ]
+                    },
+                    "type": "array"
+                }
+            },
+            "type": "object"
+        },
+        "FilterOptionsJson<SubredditCriteria>": {
+            "properties": {
+                "exclude": {
+                    "description": "Only runs if `include` is not present. Each Criteria is comprised of conditions that the filter (Author/Item) being checked must \"not\" pass. See excludeCondition for set behavior\n\nEX: `isMod: true, name: Automoderator` => Will pass if the Author IS NOT a mod and IS NOT named Automoderator",
+                    "items": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/definitions/SubredditCriteria"
+                            },
+                            {
+                                "$ref": "#/definitions/NamedCriteria<SubredditCriteria>"
+                            },
+                            {
+                                "type": "string"
+                            }
+                        ]
+                    },
+                    "type": "array"
+                },
+                "excludeCondition": {
+                    "default": "OR",
+                    "description": "* OR => if ANY exclude condition \"does not\" pass then the exclude test passes\n* AND => if ALL exclude conditions \"do not\" pass then the exclude test passes\n\nDefaults to OR",
+                    "enum": [
+                        "AND",
+                        "OR"
+                    ],
+                    "type": "string"
+                },
+                "include": {
+                    "description": "Will \"pass\" if any set of Criteria passes",
+                    "items": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/definitions/SubredditCriteria"
+                            },
+                            {
+                                "$ref": "#/definitions/NamedCriteria<SubredditCriteria>"
                             },
                             {
                                 "type": "string"
@@ -945,6 +1143,122 @@
             },
             "type": "object"
         },
+        "FullActivityWindowConfig": {
+            "additionalProperties": false,
+            "description": "Multiple properties that may be used to define what range of Activity to retrieve.\n\nMay specify one, or both properties along with the `satisfyOn` property, to affect the retrieval behavior.",
+            "examples": [
+                {
+                    "count": 100,
+                    "duration": {
+                        "days": 90
+                    }
+                }
+            ],
+            "minProperties": 1,
+            "properties": {
+                "activityState": {
+                    "$ref": "#/definitions/FilterOptionsConfig<ActivityState>",
+                    "description": "When present, will only return Activities (Comment or Submission) retrieved from history that pass this filter"
+                },
+                "chunkSize": {
+                    "description": "The number of Activities to retrieve on each API call. Defaults to 100 (maximum allowed).\n\nThere is no reason to change this unless you are highly bandwidth-constrained and have a known problem space. Overridden by `count` when `count` <= 100",
+                    "type": "number"
+                },
+                "commentState": {
+                    "$ref": "#/definitions/FilterOptionsConfig<CommentState>",
+                    "description": "When present, will only return Comments retrieved from history that pass this filter\n\nTakes precedence over `activityState`"
+                },
+                "count": {
+                    "description": "The number of activities (submission/comments) to consider",
+                    "examples": [
+                        15
+                    ],
+                    "type": "number"
+                },
+                "duration": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/definitions/DurationObject"
+                        },
+                        {
+                            "type": "string"
+                        }
+                    ],
+                    "description": "A value that specifies the amount of time to subtract from `NOW` to create a time range IE `NOW <---> [duration] ago`\n\nAcceptable values:\n\n**A `string` consisting of a value and a [Day.js](https://day.js.org/docs/en/durations/creating) time unit** ([test your value](https://regexr.com/61em3))\n\n* EX `9 days` => Range is `NOW <---> 9 days ago`\n\n**A [Day.js](https://day.js.org/docs/en/durations/creating) `object`**\n\n* EX `{\"days\": 90, \"minutes\": 15}` => Range is `NOW <---> 90 days and 15 minutes ago`\n\n**An [ISO 8601 duration](https://en.wikipedia.org/wiki/ISO_8601#Durations) `string`** ([test your value](https://regexr.com/61em9))\n\n* EX `PT15M` => 15 minutes => Range is `NOW <----> 15 minutes ago`",
+                    "examples": [
+                        "90 days",
+                        "PT15M",
+                        {
+                            "minutes": 15
+                        }
+                    ]
+                },
+                "fetch": {
+                    "description": "Specify the type of Activity (Comment or Submission) to retrieve for the window.\n\nWill be overridden if the type is specified in a parent rule (with property such as 'lookAs')",
+                    "enum": [
+                        "all",
+                        "comment",
+                        "comments",
+                        "overview",
+                        "submission",
+                        "submissions"
+                    ],
+                    "type": "string"
+                },
+                "filterOn": {
+                    "properties": {
+                        "post": {
+                            "$ref": "#/definitions/HistoryFiltersConfig"
+                        },
+                        "pre": {
+                            "$ref": "#/definitions/PreHistoryFiltersConfig"
+                        }
+                    },
+                    "type": "object"
+                },
+                "satisfyOn": {
+                    "default": "any",
+                    "description": "Define the condition under which both criteria are considered met\n\n**If `any` then it will retrieve Activities until one of the criteria is met, whichever occurs first**\n\nEX `{\"count\": 100, duration: \"90 days\"}`:\n* If 90 days of activities = 40 activities => returns 40 activities\n* If 100 activities is only 20 days => 100 activities\n\n**If `all` then both criteria must be met.**\n\nEffectively, whichever criteria produces the most Activities...\n\nEX `{\"count\": 100, duration: \"90 days\"}`:\n* If at 90 days of activities => 40 activities, continue retrieving results until 100 => results in >90 days of activities\n* If at 100 activities => 20 days of activities, continue retrieving results until 90 days => results in >100 activities",
+                    "enum": [
+                        "all",
+                        "any"
+                    ],
+                    "examples": [
+                        "any"
+                    ],
+                    "type": "string"
+                },
+                "sort": {
+                    "enum": [
+                        "controversial",
+                        "hot",
+                        "new",
+                        "top"
+                    ],
+                    "type": "string"
+                },
+                "sortTime": {
+                    "enum": [
+                        "all",
+                        "day",
+                        "hour",
+                        "month",
+                        "week",
+                        "year"
+                    ],
+                    "type": "string"
+                },
+                "submissionState": {
+                    "$ref": "#/definitions/FilterOptionsConfig<SubmissionState>",
+                    "description": "When present, will only return Submissions retrieved from history that pass this filter\n\nTakes precedence over `activityState`"
+                },
+                "subreddits": {
+                    "$ref": "#/definitions/FilterOptionsJson<SubredditCriteria>",
+                    "description": "Filter which subreddits (case-insensitive) Activities are retrieved from.\n\n**Note:** Filtering occurs **before** `duration/count` checks are performed."
+                }
+            },
+            "type": "object"
+        },
         "HistoryCriteria": {
             "description": "Criteria will only trigger if ALL present thresholds (comment, submission, total) are met",
             "properties": {
@@ -974,10 +1288,10 @@
                 "window": {
                     "anyOf": [
                         {
-                            "$ref": "#/definitions/ActivityWindowCriteria"
+                            "$ref": "#/definitions/DurationObject"
                         },
                         {
-                            "$ref": "#/definitions/DurationObject"
+                            "$ref": "#/definitions/FullActivityWindowConfig"
                         },
                         {
                             "type": [
@@ -995,6 +1309,27 @@
             "required": [
                 "window"
             ],
+            "type": "object"
+        },
+        "HistoryFiltersConfig": {
+            "properties": {
+                "activityState": {
+                    "$ref": "#/definitions/FilterOptionsConfig<ActivityState>",
+                    "description": "When present, will only return Activities (Comment or Submission) retrieved from history that pass this filter"
+                },
+                "commentState": {
+                    "$ref": "#/definitions/FilterOptionsConfig<CommentState>",
+                    "description": "When present, will only return Comments retrieved from history that pass this filter\n\nTakes precedence over `activityState`"
+                },
+                "submissionState": {
+                    "$ref": "#/definitions/FilterOptionsConfig<SubmissionState>",
+                    "description": "When present, will only return Submissions retrieved from history that pass this filter\n\nTakes precedence over `activityState`"
+                },
+                "subreddits": {
+                    "$ref": "#/definitions/FilterOptionsJson<SubredditCriteria>",
+                    "description": "Filter which subreddits (case-insensitive) Activities are retrieved from.\n\n**Note:** Filtering occurs **before** `duration/count` checks are performed."
+                }
+            },
             "type": "object"
         },
         "HistoryJSONConfig": {
@@ -1055,7 +1390,7 @@
                     "items": {
                         "anyOf": [
                             {
-                                "$ref": "#/definitions/SubredditState"
+                                "$ref": "#/definitions/SubredditCriteria"
                             },
                             {
                                 "type": "string"
@@ -1079,7 +1414,7 @@
                     "items": {
                         "anyOf": [
                             {
-                                "$ref": "#/definitions/SubredditState"
+                                "$ref": "#/definitions/SubredditCriteria"
                             },
                             {
                                 "type": "string"
@@ -1236,10 +1571,66 @@
             ],
             "type": "object"
         },
+        "NamedCriteria<ActivityState>": {
+            "properties": {
+                "criteria": {
+                    "$ref": "#/definitions/ActivityState"
+                },
+                "name": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "criteria"
+            ],
+            "type": "object"
+        },
         "NamedCriteria<AuthorCriteria>": {
             "properties": {
                 "criteria": {
                     "$ref": "#/definitions/AuthorCriteria"
+                },
+                "name": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "criteria"
+            ],
+            "type": "object"
+        },
+        "NamedCriteria<CommentState>": {
+            "properties": {
+                "criteria": {
+                    "$ref": "#/definitions/CommentState"
+                },
+                "name": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "criteria"
+            ],
+            "type": "object"
+        },
+        "NamedCriteria<SubmissionState>": {
+            "properties": {
+                "criteria": {
+                    "$ref": "#/definitions/SubmissionState"
+                },
+                "name": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "criteria"
+            ],
+            "type": "object"
+        },
+        "NamedCriteria<SubredditCriteria>": {
+            "properties": {
+                "criteria": {
+                    "$ref": "#/definitions/SubredditCriteria"
                 },
                 "name": {
                     "type": "string"
@@ -1339,6 +1730,43 @@
                     "type": "object"
                 }
             },
+            "type": "object"
+        },
+        "PreHistoryFiltersConfig": {
+            "properties": {
+                "activityState": {
+                    "$ref": "#/definitions/FilterOptionsConfig<ActivityState>",
+                    "description": "When present, will only return Activities (Comment or Submission) retrieved from history that pass this filter"
+                },
+                "commentState": {
+                    "$ref": "#/definitions/FilterOptionsConfig<CommentState>",
+                    "description": "When present, will only return Comments retrieved from history that pass this filter\n\nTakes precedence over `activityState`"
+                },
+                "max": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/definitions/DurationObject"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "number"
+                            ]
+                        }
+                    ]
+                },
+                "submissionState": {
+                    "$ref": "#/definitions/FilterOptionsConfig<SubmissionState>",
+                    "description": "When present, will only return Submissions retrieved from history that pass this filter\n\nTakes precedence over `activityState`"
+                },
+                "subreddits": {
+                    "$ref": "#/definitions/FilterOptionsJson<SubredditCriteria>",
+                    "description": "Filter which subreddits (case-insensitive) Activities are retrieved from.\n\n**Note:** Filtering occurs **before** `duration/count` checks are performed."
+                }
+            },
+            "required": [
+                "max"
+            ],
             "type": "object"
         },
         "RecentActivityRuleJSONConfig": {
@@ -1445,10 +1873,10 @@
                 "window": {
                     "anyOf": [
                         {
-                            "$ref": "#/definitions/ActivityWindowCriteria"
+                            "$ref": "#/definitions/DurationObject"
                         },
                         {
-                            "$ref": "#/definitions/DurationObject"
+                            "$ref": "#/definitions/FullActivityWindowConfig"
                         },
                         {
                             "type": [
@@ -1589,10 +2017,10 @@
                 "window": {
                     "anyOf": [
                         {
-                            "$ref": "#/definitions/ActivityWindowCriteria"
+                            "$ref": "#/definitions/DurationObject"
                         },
                         {
-                            "$ref": "#/definitions/DurationObject"
+                            "$ref": "#/definitions/FullActivityWindowConfig"
                         },
                         {
                             "type": [
@@ -1761,7 +2189,7 @@
                     "items": {
                         "anyOf": [
                             {
-                                "$ref": "#/definitions/SubredditState"
+                                "$ref": "#/definitions/SubredditCriteria"
                             },
                             {
                                 "type": "string"
@@ -1789,7 +2217,7 @@
                     "items": {
                         "anyOf": [
                             {
-                                "$ref": "#/definitions/SubredditState"
+                                "$ref": "#/definitions/SubredditCriteria"
                             },
                             {
                                 "type": "string"
@@ -1884,10 +2312,10 @@
                 "window": {
                     "anyOf": [
                         {
-                            "$ref": "#/definitions/ActivityWindowCriteria"
+                            "$ref": "#/definitions/DurationObject"
                         },
                         {
-                            "$ref": "#/definitions/DurationObject"
+                            "$ref": "#/definitions/FullActivityWindowConfig"
                         },
                         {
                             "type": [
@@ -2019,10 +2447,10 @@
                 "window": {
                     "anyOf": [
                         {
-                            "$ref": "#/definitions/ActivityWindowCriteria"
+                            "$ref": "#/definitions/DurationObject"
                         },
                         {
-                            "$ref": "#/definitions/DurationObject"
+                            "$ref": "#/definitions/FullActivityWindowConfig"
                         },
                         {
                             "type": [
@@ -2222,10 +2650,10 @@
                 "window": {
                     "anyOf": [
                         {
-                            "$ref": "#/definitions/ActivityWindowCriteria"
+                            "$ref": "#/definitions/DurationObject"
                         },
                         {
-                            "$ref": "#/definitions/DurationObject"
+                            "$ref": "#/definitions/FullActivityWindowConfig"
                         },
                         {
                             "type": [
@@ -2433,7 +2861,7 @@
             },
             "type": "object"
         },
-        "SubredditState": {
+        "SubredditCriteria": {
             "description": "Different attributes a `Subreddit` can be in. Only include a property if you want to check it.",
             "examples": [
                 {

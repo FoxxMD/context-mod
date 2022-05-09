@@ -16,7 +16,7 @@ import {TimeAwareRandomBaseEntity} from "./Base/TimeAwareRandomBaseEntity";
 import {ActionType} from "./ActionType";
 import {ManagerEntity} from "./ManagerEntity";
 import {capitalize} from "lodash";
-import {TypedActivityStates} from "../Typings/Filters/FilterCriteria";
+import {TypedActivityStates} from "../Infrastructure/Filters/FilterCriteria";
 
 export interface ActionPremiseOptions {
     kind: ActionType

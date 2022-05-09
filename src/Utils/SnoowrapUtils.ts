@@ -33,9 +33,9 @@ import {Logger} from "winston";
 import {URL} from "url";
 import {isStatusError, MaybeSeriousErrorWithCause, SimpleError} from "./Errors";
 import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
-import {StrongSubredditCriteria, SubredditCriteria} from "../Common/Typings/Filters/FilterCriteria";
-import {DurationVal} from "../Common/Typings/Atomic";
-import {ActivityWindowCriteria} from "../Common/Typings/ActivityWindow";
+import {StrongSubredditCriteria, SubredditCriteria} from "../Common/Infrastructure/Filters/FilterCriteria";
+import {DurationVal} from "../Common/Infrastructure/Atomic";
+import {ActivityWindowCriteria} from "../Common/Infrastructure/ActivityWindow";
 
 export const BOT_LINK = 'https://www.reddit.com/r/ContextModBot/comments/otz396/introduction_to_contextmodbot';
 

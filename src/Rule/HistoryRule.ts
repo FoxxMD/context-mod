@@ -16,9 +16,9 @@ import {
     percentFromString, toStrongSubredditState, windowConfigToWindowCriteria
 } from "../util";
 import {Comment, RedditUser} from "snoowrap";
-import {SubredditCriteria} from "../Common/Typings/Filters/FilterCriteria";
-import {CompareValueOrPercent} from "../Common/Typings/Atomic";
-import {ActivityWindowConfig, ActivityWindowCriteria} from "../Common/Typings/ActivityWindow";
+import {SubredditCriteria} from "../Common/Infrastructure/Filters/FilterCriteria";
+import {CompareValueOrPercent} from "../Common/Infrastructure/Atomic";
+import {ActivityWindowConfig, ActivityWindowCriteria} from "../Common/Infrastructure/ActivityWindow";
 
 export interface CommentThresholdCriteria extends ThresholdCriteria {
     /**

@@ -22,8 +22,8 @@ import {RunEntity} from "../Common/Entities/RunEntity";
 import {RunResultEntity} from "../Common/Entities/RunResultEntity";
 import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
 import {RunnableBase} from "../Common/RunnableBase";
-import {AuthorCriteria, TypedActivityStates} from "../Common/Typings/Filters/FilterCriteria";
-import {PostBehaviorType} from "../Common/Typings/Atomic";
+import {AuthorCriteria, TypedActivityStates} from "../Common/Infrastructure/Filters/FilterCriteria";
+import {PostBehaviorType} from "../Common/Infrastructure/Atomic";
 
 export class Run extends RunnableBase {
     name: string;

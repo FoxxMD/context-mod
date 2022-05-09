@@ -238,5 +238,5 @@ export {RuleResult} from "./Common/interfaces";
 export {ResultContext} from "./Common/interfaces";
 export {isRuleSetResult} from "./util";
 export {AuthorOptions} from "./Common/interfaces";
-export {UserNoteCriteria} from "./Common/Typings/Filters/FilterCriteria";
-export {AuthorCriteria} from "./Common/Typings/Filters/FilterCriteria";
+export {UserNoteCriteria} from "./Common/Infrastructure/Filters/FilterCriteria";
+export {AuthorCriteria} from "./Common/Infrastructure/Filters/FilterCriteria";

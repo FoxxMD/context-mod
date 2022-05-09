@@ -10,8 +10,8 @@ import {constants} from "fs";
 import {Connection} from "typeorm";
 import {ErrorWithCause} from "pony-cause";
 import {MigrationService} from "./Common/MigrationService";
-import {Invokee} from "./Common/Typings/Atomic";
-import {DatabaseConfig} from "./Common/Typings/Database";
+import {Invokee} from "./Common/Infrastructure/Atomic";
+import {DatabaseConfig} from "./Common/Infrastructure/Database";
 
 export class App {
 

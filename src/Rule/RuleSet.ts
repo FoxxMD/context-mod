@@ -11,7 +11,7 @@ import {SubredditResources} from "../Subreddit/SubredditResources";
 import {runCheckOptions} from "../Subreddit/Manager";
 import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
 import {RuleSetResultEntity} from "../Common/Entities/RuleSetResultEntity";
-import {JoinOperands} from "../Common/Typings/Atomic";
+import {JoinOperands} from "../Common/Infrastructure/Atomic";
 
 export class RuleSet implements IRuleSet {
     rules: Rule[] = [];

@@ -6,7 +6,7 @@ import {checkAuthorFilter, checkItemFilter, SubredditResources} from "../Subredd
 import {Comment, Submission} from "snoowrap";
 import {runCheckOptions} from "../Subreddit/Manager";
 import {buildFilter} from "../util";
-import {AuthorCriteria, TypedActivityState} from "./Typings/Filters/FilterCriteria";
+import {AuthorCriteria, TypedActivityState} from "./Infrastructure/Filters/FilterCriteria";
 
 
 export abstract class RunnableBase {

@@ -19,7 +19,7 @@ import {
 import {filterResultsBuilder} from "../../../../../Utils/typeormUtils";
 import {Brackets} from "typeorm";
 import {Activity} from "../../../../../Common/Entities/Activity";
-import {RedditThing} from "../../../../../Common/Typings/Reddit";
+import {RedditThing} from "../../../../../Common/Infrastructure/Reddit";
 
 const commentReg = parseLinkIdentifier([COMMENT_URL_ID]);
 const submissionReg = parseLinkIdentifier([SUBMISSION_URL_ID]);

@@ -16,7 +16,7 @@ import winston from "winston";
 import {opStats} from "../../../../Common/util";
 import {authUserCheck, botRoute, subredditRoute} from "../../../middleware";
 import Bot from "../../../../../Bot";
-import {DurationVal} from "../../../../../Common/Typings/Atomic";
+import {DurationVal} from "../../../../../Common/Infrastructure/Atomic";
 
 const status = () => {
 

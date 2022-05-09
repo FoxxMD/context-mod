@@ -25,8 +25,8 @@ import {RuleSetResultEntity} from "./RuleSetResultEntity";
 import {CheckToRuleResultEntity} from "./RunnableAssociation/CheckToRuleResultEntity";
 import {CheckToRuleSetResultEntity} from "./RunnableAssociation/CheckToRuleSetResultEntity";
 import {isRuleSetResult} from "../../util";
-import {JoinOperands, RecordOutputType} from "../Typings/Atomic";
-import {AuthorCriteria, TypedActivityState} from "../Typings/Filters/FilterCriteria";
+import {JoinOperands, RecordOutputType} from "../Infrastructure/Atomic";
+import {AuthorCriteria, TypedActivityState} from "../Infrastructure/Filters/FilterCriteria";
 
 export interface CheckResultEntityOptions {
     triggered: boolean

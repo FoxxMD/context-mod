@@ -40,7 +40,7 @@ import {RunStateType} from "../Common/Entities/RunStateType";
 import {QueueRunState} from "../Common/Entities/EntityRunState/QueueRunState";
 import {EventsRunState} from "../Common/Entities/EntityRunState/EventsRunState";
 import {ManagerRunState} from "../Common/Entities/EntityRunState/ManagerRunState";
-import {Invokee, PollOn} from "../Common/Typings/Atomic";
+import {Invokee, PollOn} from "../Common/Infrastructure/Atomic";
 
 class Bot {
 

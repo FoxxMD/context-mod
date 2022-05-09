@@ -5,7 +5,7 @@ import {CMEvent} from "./CMEvent";
 import Submission from "snoowrap/dist/objects/Submission";
 import {Comment} from "snoowrap";
 import {asComment, getActivityAuthorName, parseRedditFullname, redditThingTypeToPrefix} from "../../util";
-import {ActivityType} from "../Typings/Reddit";
+import {ActivityType} from "../Infrastructure/Reddit";
 
 export interface ActivityEntityOptions {
     id: string

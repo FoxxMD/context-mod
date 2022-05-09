@@ -62,15 +62,15 @@ import {
     PostBehaviorType,
     RecordOutputType,
     recordOutputTypes
-} from "../Common/Typings/Atomic";
-import {FilterOptions, MinimalOrFullFilter, MinimalOrFullFilterJson} from "../Common/Typings/Filters/FilterShapes";
+} from "../Common/Infrastructure/Atomic";
+import {FilterOptions, MinimalOrFullFilter, MinimalOrFullFilterJson} from "../Common/Infrastructure/Filters/FilterShapes";
 import {
     CommentState,
     SubmissionState,
     TypedActivityState,
     TypedActivityStates
-} from "../Common/Typings/Filters/FilterCriteria";
-import {ActivityType} from "../Common/Typings/Reddit";
+} from "../Common/Infrastructure/Filters/FilterCriteria";
+import {ActivityType} from "../Common/Infrastructure/Reddit";
 
 const checkLogName = truncateStringToLength(25);
 

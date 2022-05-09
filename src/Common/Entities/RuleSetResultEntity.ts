@@ -20,8 +20,8 @@ import {RandomIdBaseEntity} from "./Base/RandomIdBaseEntity";
 import {TimeAwareRandomBaseEntity} from "./Base/TimeAwareRandomBaseEntity";
 import {RuleResultEntity} from "./RuleResultEntity";
 import {RuleSetToRuleResultEntity} from "./RunnableAssociation/RuleSetToRuleResultEntity";
-import {JoinOperands} from "../Typings/Atomic";
-import {AuthorCriteria, TypedActivityState} from "../Typings/Filters/FilterCriteria";
+import {JoinOperands} from "../Infrastructure/Atomic";
+import {AuthorCriteria, TypedActivityState} from "../Infrastructure/Filters/FilterCriteria";
 
 export interface RuleSetResultEntityOptions {
     triggered: boolean

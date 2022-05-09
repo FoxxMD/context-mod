@@ -10,8 +10,8 @@ import {
     MaybeAnonymousCriteria,
     MaybeAnonymousOrStringCriteria,
     NamedCriteria
-} from "../Common/Typings/Filters/FilterShapes";
-import {AuthorCriteria} from "../Common/Typings/Filters/FilterCriteria";
+} from "../Common/Infrastructure/Filters/FilterShapes";
+import {AuthorCriteria} from "../Common/Infrastructure/Filters/FilterCriteria";
 
 /**
  * Checks the author of the Activity against AuthorCriteria. This differs from a Rule's AuthorOptions as this is a full Rule and will only pass/fail, not skip.

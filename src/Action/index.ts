@@ -24,7 +24,7 @@ import { RunnableBase } from "../Common/RunnableBase";
 import {ActionResultEntity} from "../Common/Entities/ActionResultEntity";
 import {FindOptionsWhere} from "typeorm/find-options/FindOptionsWhere";
 import {RulePremise} from "../Common/Entities/RulePremise";
-import {AuthorCriteria, TypedActivityState, TypedActivityStates} from "../Common/Typings/Filters/FilterCriteria";
+import {AuthorCriteria, TypedActivityState, TypedActivityStates} from "../Common/Infrastructure/Filters/FilterCriteria";
 
 export abstract class Action extends RunnableBase {
     name?: string;

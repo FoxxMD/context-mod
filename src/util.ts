@@ -72,7 +72,7 @@ import {
     StrongSubredditCriteria, SubmissionState,
     SubredditCriteria, TypedActivityState, TypedActivityStates,
     UserNoteCriteria
-} from "./Common/Typings/Filters/FilterCriteria";
+} from "./Common/Infrastructure/Filters/FilterCriteria";
 import {
     SnoowrapActivity,
     ActivitySource,
@@ -82,28 +82,28 @@ import {
     statFrequencies, StatisticFrequency,
     StatisticFrequencyOption,
     StringOperator
-} from "./Common/Typings/Atomic";
-import {DurationComparison, GenericComparison} from "./Common/Typings/Comparisons";
+} from "./Common/Infrastructure/Atomic";
+import {DurationComparison, GenericComparison} from "./Common/Infrastructure/Comparisons";
 import {
     FilterOptions, FilterOptionsJson,
     MaybeAnonymousCriteria,
     MaybeAnonymousOrStringCriteria,
     MinimalOrFullFilter, MinimalOrFullMaybeAnonymousFilter,
     NamedCriteria
-} from "./Common/Typings/Filters/FilterShapes";
+} from "./Common/Infrastructure/Filters/FilterShapes";
 import {
     ActivityType,
     AuthorHistoryType,
     FullNameTypes,
     PermalinkRedditThings,
     RedditThing
-} from "./Common/Typings/Reddit";
+} from "./Common/Infrastructure/Reddit";
 import {
     FullActivityWindowConfig,
     ActivityWindowConfig,
     ActivityWindowCriteria,
     HistoryFiltersConfig, HistoryFiltersOptions
-} from "./Common/Typings/ActivityWindow";
+} from "./Common/Infrastructure/ActivityWindow";
 
 
 //import {ResembleSingleCallbackComparisonResult} from "resemblejs";

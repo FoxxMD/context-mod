@@ -7,7 +7,7 @@ import process from "process";
 import path from "path";
 import {defaultDataDir} from "../Common/defaults";
 import {ErrorWithCause} from "pony-cause";
-import {LoggerFactoryOptions} from "../Common/Typings/Logging";
+import {LoggerFactoryOptions} from "../Common/Infrastructure/Logging";
 
 const {transports} = winston;
 

@@ -21,7 +21,7 @@ import Submission from "snoowrap/dist/objects/Submission";
 import Comment from "snoowrap/dist/objects/Comment";
 import {ColumnDurationTransformer} from "./Transformers";
 import { RedditUser } from "snoowrap/dist/objects";
-import {ActivitySourceTypes, DurationVal, NonDispatchActivitySource, onExistingFoundBehavior} from "../Typings/Atomic";
+import {ActivitySourceTypes, DurationVal, NonDispatchActivitySource, onExistingFoundBehavior} from "../Infrastructure/Atomic";
 
 @Entity({name: 'DispatchedAction'})
 export class DispatchedEntity extends TimeAwareRandomBaseEntity {

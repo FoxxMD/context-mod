@@ -21,7 +21,7 @@ import {SafeDictionary} from "ts-essentials";
 import {FilterCriteriaPropertyResult, StructuredRunnableBase} from "./interfaces";
 import {ContributorActionJson} from "../Action/ContributorAction";
 import {RuleSetObjectJson} from "../Rule/RuleSet";
-import {AuthorCriteria} from "./Typings/Filters/FilterCriteria";
+import {AuthorCriteria} from "./Infrastructure/Filters/FilterCriteria";
 
 export type RuleObjectJsonTypes = RecentActivityRuleJSONConfig | RepeatActivityJSONConfig | AuthorRuleJSONConfig | AttributionJSONConfig | HistoryJSONConfig | RegexRuleJSONConfig | RepostRuleJSONConfig
 export type RuleJson = RuleObjectJsonTypes | string;

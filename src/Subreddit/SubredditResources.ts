@@ -121,7 +121,7 @@ import {
     StrongSubredditCriteria, SubmissionState,
     SubredditCriteria, TypedActivityState, TypedActivityStates,
     UserNoteCriteria
-} from "../Common/Typings/Filters/FilterCriteria";
+} from "../Common/Infrastructure/Filters/FilterCriteria";
 import {
     SnoowrapActivity,
     ActivitySource, AuthorActivitiesFull,
@@ -130,16 +130,16 @@ import {
     JoinOperands,
     ModeratorNameCriteria, statFrequencies, StatisticFrequency,
     StatisticFrequencyOption
-} from "../Common/Typings/Atomic";
-import {NamedCriteria} from "../Common/Typings/Filters/FilterShapes";
+} from "../Common/Infrastructure/Atomic";
+import {NamedCriteria} from "../Common/Infrastructure/Filters/FilterShapes";
 import {
     ActivityWindowCriteria,
     HistoryFiltersOptions,
     ListingFunc,
     NamedListing
-} from "../Common/Typings/ActivityWindow";
+} from "../Common/Infrastructure/ActivityWindow";
 import {Duration} from "dayjs/plugin/duration";
-import {AuthorHistorySort} from "../Common/Typings/Reddit";
+import {AuthorHistorySort} from "../Common/Infrastructure/Reddit";
 
 export const DEFAULT_FOOTER = '\r\n*****\r\nThis action was performed by [a bot.]({{botLink}}) Mention a moderator or [send a modmail]({{modmailLink}}) if you any ideas, questions, or concerns about this action.';
 

@@ -97,7 +97,7 @@ import {
     PollOn,
     recordOutputTypes,
     RunState
-} from "../Common/Typings/Atomic";
+} from "../Common/Infrastructure/Atomic";
 
 export interface RunningState {
     state: RunState,

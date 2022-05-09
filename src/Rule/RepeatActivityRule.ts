@@ -24,13 +24,13 @@ import {
 import Submission from "snoowrap/dist/objects/Submission";
 import dayjs from "dayjs";
 import Fuse from 'fuse.js'
-import {StrongSubredditCriteria, SubredditCriteria} from "../Common/Typings/Filters/FilterCriteria";
+import {StrongSubredditCriteria, SubredditCriteria} from "../Common/Infrastructure/Filters/FilterCriteria";
 import {
     ActivityWindow,
     ActivityWindowConfig,
     ActivityWindowCriteria,
     HistoryFiltersOptions
-} from "../Common/Typings/ActivityWindow";
+} from "../Common/Infrastructure/ActivityWindow";
 
 const parseUsableLinkIdentifier = linkParser();
 

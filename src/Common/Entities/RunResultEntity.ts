@@ -18,7 +18,7 @@ import {RuleResultEntity} from "./RuleResultEntity";
 import {CMEvent} from "./CMEvent";
 import {FilterResult as IFilterResult} from "../interfaces";
 import {TimeAwareRandomBaseEntity} from "./Base/TimeAwareRandomBaseEntity";
-import {AuthorCriteria, TypedActivityState} from "../Typings/Filters/FilterCriteria";
+import {AuthorCriteria, TypedActivityState} from "../Infrastructure/Filters/FilterCriteria";
 //import {RunToCheckResultEntity} from "./RunnableAssociation/RunToCheckResultEntity";
 
 export interface RunResultEntityOptions {

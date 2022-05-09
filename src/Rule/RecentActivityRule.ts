@@ -39,9 +39,9 @@ import {
     StrongSubredditCriteria,
     SubmissionState,
     SubredditCriteria
-} from "../Common/Typings/Filters/FilterCriteria";
-import {CompareValueOrPercent} from "../Common/Typings/Atomic";
-import {ActivityWindow, FullActivityWindowConfig, ActivityWindowConfig} from "../Common/Typings/ActivityWindow";
+} from "../Common/Infrastructure/Filters/FilterCriteria";
+import {CompareValueOrPercent} from "../Common/Infrastructure/Atomic";
+import {ActivityWindow, FullActivityWindowConfig, ActivityWindowConfig} from "../Common/Infrastructure/ActivityWindow";
 
 const parseLink = parseUsableLinkIdentifier();
 
