@@ -123,9 +123,7 @@ import {
     UserNoteCriteria
 } from "../Common/Infrastructure/Filters/FilterCriteria";
 import {
-    SnoowrapActivity,
-    ActivitySource, AuthorActivitiesFull,
-    DurationVal,
+    ActivitySource, DurationVal,
     EventRetentionPolicyRange,
     JoinOperands,
     ModeratorNameCriteria, statFrequencies, StatisticFrequency,
@@ -139,7 +137,12 @@ import {
     NamedListing
 } from "../Common/Infrastructure/ActivityWindow";
 import {Duration} from "dayjs/plugin/duration";
-import {AuthorHistorySort} from "../Common/Infrastructure/Reddit";
+import {
+
+    AuthorHistorySort,
+    CachedFetchedActivitiesResult, FetchedActivitiesResult,
+    SnoowrapActivity
+} from "../Common/Infrastructure/Reddit";
 
 export const DEFAULT_FOOTER = '\r\n*****\r\nThis action was performed by [a bot.]({{botLink}}) Mention a moderator or [send a modmail]({{modmailLink}}) if you any ideas, questions, or concerns about this action.';
 
@@ -1161,70 +1164,11 @@ export class SubredditResources {
 
     async getAuthorActivities(user: RedditUser, options: ActivityWindowCriteria, customListing?: NamedListing): Promise<SnoowrapActivity[]> {
 
-        let listFuncName: string;
-        let listFunc: ListingFunc;
-
-        if(customListing !== undefined) {
-            listFuncName = customListing.name;
-            listFunc = customListing.func;
-        } else {
-            listFuncName = options.fetch ?? 'overview';
-            switch(options.fetch) {
-                case 'comment':
-                    listFunc = user.getComments;
-                    break;
-                case 'submission':
-                    listFunc = user.getSubmissions;
-                    break;
-                case 'overview':
-                default:
-                    listFunc = user.getOverview;
-            }
-        }
-
-        const criteriaWithDefaults = {
-            chunkSize: 100,
-            sort: 'new' as AuthorHistorySort,
-            ...options,
-        }
-
-        const userName = getActivityAuthorName(user);
-        if (this.authorTTL !== false) {
-            const hashObj: any = criteriaWithDefaults;
-            if (this.useSubredditAuthorCache) {
-                hashObj.subreddit = this.subreddit;
-            }
-            const hash = `authorActivities-${userName}-${listFuncName}-${objectHash.sha1(hashObj)}`;
-
-            this.stats.cache.author.requests++;
-            await this.stats.cache.author.identifierRequestCount.set(userName, (await this.stats.cache.author.identifierRequestCount.wrap(userName, () => 0) as number) + 1);
-            this.stats.cache.author.requestTimestamps.push(Date.now());
-            let miss = false;
-            const cacheVal = await this.cache.wrap(hash, async () => {
-                miss = true;
-                if(typeof user === 'string') {
-                    // @ts-ignore
-                    user = await this.client.getUser(userName);
-                }
-                const [post] = await this.getActivities(listFunc, user, criteriaWithDefaults);
-                return post;
-            }, {ttl: this.authorTTL});
-            if (!miss) {
-                this.logger.debug(`Cache Hit: ${userName} (Hash ${hash})`);
-            } else {
-                this.stats.cache.author.miss++;
-            }
-            return cacheVal as Array<Submission | Comment>;
-        }
-        if(typeof user === 'string') {
-            // @ts-ignore
-            user = await this.client.getUser(userName);
-        }
-        const [post] = await this.getActivities(listFunc, user, criteriaWithDefaults);
+        const {post} = await this.getAuthorActivitiesWithFilter(user, options, customListing);
         return post;
     }
 
-    async getAuthorActivitiesWithFilter(user: RedditUser, options: ActivityWindowCriteria, customListing?: NamedListing): Promise<AuthorActivitiesFull> {
+    async getAuthorActivitiesWithFilter(user: RedditUser, options: ActivityWindowCriteria, customListing?: NamedListing): Promise<FetchedActivitiesResult> {
         let listFuncName: string;
         let listFunc: ListingFunc;
 
@@ -1235,14 +1179,14 @@ export class SubredditResources {
             listFuncName = options.fetch ?? 'overview';
             switch(options.fetch) {
                 case 'comment':
-                    listFunc = user.getComments;
+                    listFunc = (options?: object) => user.getComments(options);
                     break;
                 case 'submission':
-                    listFunc = user.getSubmissions;
+                    listFunc = (options?: object) => user.getSubmissions(options);
                     break;
                 case 'overview':
                 default:
-                    listFunc = user.getOverview;
+                    listFunc = (options?: object) => user.getOverview(options);
             }
         }
 
@@ -1252,38 +1196,7 @@ export class SubredditResources {
             ...options,
         }
 
-        const userName = getActivityAuthorName(user);
-        if (this.authorTTL !== false) {
-            const hashObj: any = criteriaWithDefaults;
-            if (this.useSubredditAuthorCache) {
-                hashObj.subreddit = this.subreddit;
-            }
-            const hash = `authorActivitiesFULL-${userName}-${listFuncName}-${objectHash.sha1(hashObj)}`;
-
-            this.stats.cache.author.requests++;
-            await this.stats.cache.author.identifierRequestCount.set(userName, (await this.stats.cache.author.identifierRequestCount.wrap(userName, () => 0) as number) + 1);
-            this.stats.cache.author.requestTimestamps.push(Date.now());
-            let miss = false;
-            const cacheVal = await this.cache.wrap(hash, async () => {
-                miss = true;
-                if(typeof user === 'string') {
-                    // @ts-ignore
-                    user = await this.client.getUser(userName);
-                }
-                return await this.getActivities(listFunc, user, criteriaWithDefaults);
-            }, {ttl: this.authorTTL});
-            if (!miss) {
-                this.logger.debug(`Cache Hit: ${userName} (Hash ${hash})`);
-            } else {
-                this.stats.cache.author.miss++;
-            }
-            return cacheVal as AuthorActivitiesFull;
-        }
-        if(typeof user === 'string') {
-            // @ts-ignore
-            user = await this.client.getUser(userName);
-        }
-        return await this.getActivities(listFunc, user, criteriaWithDefaults);
+        return await this.getActivities(user, criteriaWithDefaults, {func: listFunc, name: listFuncName});
     }
 
     async getAuthorComments(user: RedditUser, options: ActivityWindowCriteria): Promise<Comment[]> {
@@ -1297,143 +1210,230 @@ export class SubredditResources {
         }) as unknown as Promise<Submission[]>;
     }
 
-    async getActivities(listingFunc: ListingFunc, user: RedditUser, options: ActivityWindowCriteria): Promise<AuthorActivitiesFull> {
+    async getActivities(user: RedditUser, options: ActivityWindowCriteria, listingData: NamedListing): Promise<FetchedActivitiesResult> {
 
         try {
-            const {
-                chunkSize: cs = 100,
-                satisfyOn,
-                count,
-                duration,
-            } = options;
-
-            let satisfiedCount: number | undefined,
-                satisfiedPreCount: number | undefined,
-                satisfiedEndtime: Dayjs | undefined,
-                satisfiedPreEndtime: Dayjs | undefined,
-                chunkSize = Math.min(cs, 100),
-                satisfy = satisfyOn;
-
-            satisfiedCount = count;
-
-            // if count is less than max limit (100) go ahead and just get that many. may result in faster response time for low numbers
-            if (satisfiedCount !== undefined) {
-                chunkSize = Math.min(chunkSize, satisfiedCount);
-            }
-
-            if (duration !== undefined) {
-                const endTime = dayjs();
-                satisfiedEndtime = endTime.subtract(duration.asMilliseconds(), 'milliseconds');
-            }
-
-            if (satisfiedCount === undefined && satisfiedEndtime === undefined) {
-                throw new Error('window value was not valid');
-            } else if (satisfy === 'all' && !(satisfiedCount !== undefined && satisfiedEndtime !== undefined)) {
-                // even though 'all' was requested we don't have two criteria so its really 'any' logic
-                satisfy = 'any';
-            }
-
-            if(options.filterOn?.pre !== undefined) {
-                if(typeof options.filterOn?.pre.max === 'number') {
-                    satisfiedPreCount = options.filterOn?.pre.max
-                } else {
-                    const endTime = dayjs();
-                    satisfiedPreEndtime = endTime.subtract(options.filterOn?.pre.max.asMilliseconds(), 'milliseconds');
-                }
-            }
 
             let pre: SnoowrapActivity[] = [];
-            let unFilteredItems: SnoowrapActivity[] | undefined;
             let post: SnoowrapActivity[] | undefined;
+            let apiCount = 1;
+            let preMaxTrigger: undefined | string;
+            let rawCount: number = 0;
+            let fromCache = false;
 
-            let preMaxHit: undefined | string;
+            const hashObj = options;
 
-            let apiCallCount = 1;
-            let listing = await listingFunc(getAuthorHistoryAPIOptions(options));
-            let hitEnd = false;
-            let offset = chunkSize;
-            while (!hitEnd) {
+            // don't include post filter when determining cache hash
+            // because we can re-use the cache results from a 'pre' return to filter to post (no need to use api)
+            if(hashObj.filterOn !== undefined) {
+                delete hashObj.filterOn.post;
+            }
 
-                let countOk = false,
-                    timeOk = false;
+            const userName = getActivityAuthorName(user);
 
-                let listSlice = listing.slice(offset - chunkSize);
-                let preListSlice = await this.filterListingWithHistoryOptions(listSlice, user, options.filterOn?.pre);
+            const hash = objectHash.sha1(hashObj);
+            const cacheKey = `${userName}-${listingData.name}-${hash}`;
 
-                // if (!keepRemoved) {
-                //     // snoowrap typings think 'removed' property does not exist on submission
-                //     // @ts-ignore
-                //     listSlice = listSlice.filter(x => !activityIsRemoved(x));
-                // }
+            if (this.authorTTL !== false) {
+                if (this.useSubredditAuthorCache) {
+                    hashObj.subreddit = this.subreddit;
+                }
 
-                // its more likely the time criteria is going to be hit before the count criteria
-                // so check this first
-                let truncatedItems: Array<Submission | Comment> = [];
-                if (satisfiedEndtime !== undefined) {
-                    const [filteredSome, truncatedItems] = filterByTimeRequirement(satisfiedEndtime, preListSlice);
+                this.stats.cache.author.requests++;
+                await this.stats.cache.author.identifierRequestCount.set(userName, (await this.stats.cache.author.identifierRequestCount.wrap(userName, () => 0) as number) + 1);
+                this.stats.cache.author.requestTimestamps.push(Date.now());
 
-                    if (filteredSome) {
-                        if (satisfy === 'any') {
-                            // satisfied duration
-                            pre = pre.concat(truncatedItems);
-                            break;
+                const cacheVal = await this.cache.get(cacheKey);
+
+                if(cacheVal === undefined || cacheVal === null) {
+                    this.stats.cache.author.miss++;
+                } else {
+                    fromCache = true;
+                    const {
+                        pre: cachedPre,
+                        rawCount: cachedRawCount,
+                        apiCount: cachedApiCount,
+                        preMaxTrigger: cachedPreMaxTrigger,
+                    } = cacheVal as CachedFetchedActivitiesResult;
+
+                    rawCount = cachedRawCount;
+                    apiCount = cachedApiCount;
+                    preMaxTrigger = cachedPreMaxTrigger !== undefined && cachedPreMaxTrigger !== null ? cachedPreMaxTrigger : undefined;
+
+                    // convert cached activities into snoowrap activities
+                    pre = cachedPre.map(x => {
+                        const { author: authorName, subreddit: subredditName, ...rest } = x;
+                        const author = new RedditUser({name: authorName }, this.client, false);
+                        const subreddit = new Subreddit({display_name: subredditName as unknown as string}, this.client, false);
+                        if(asSubmission(x)) {
+                            const {comments, ...restSub} = rest as Submission;
+                            const subData = {...restSub, author, subreddit};
+                            if(rest.approved_by !== null && rest.approved_by !== undefined) {
+                                const approvedBy = new RedditUser({name: rest.approved_by as unknown as string}, this.client, false);
+                                subData.approved_by = approvedBy;
+                            }
+                            // we set as fetched since we have all(?) properties from json and have substituted relationships with proxies (author, subreddit)
+                            // makes sure proxy doesn't fetch activity again when trying to access undefined properties later
+                            const sub = new Submission(subData, this.client, true);
+                            return sub;
+                        } else if(asComment(x)) {
+                            const {replies, ...restComm} = rest as Comment;
+                            const commData = {
+                                ...restComm,
+                                author,
+                                subreddit,
+                                // see snoowrap Comment.js
+                                // we are faking empty replies since we don't have "more" link, currently, to build a proper Listing
+                                // and CM doesn't use comment replies at this point so this doesn't matter
+                                replies: ''
+                            };
+                            // we set as fetched since we have all(?) properties from json and have substituted relationships with proxies (author, subreddit)
+                            // makes sure proxy doesn't fetch activity again when trying to access undefined properties later
+                            const com = new Comment(commData, this.client, true);
+                            return com;
                         }
-                        timeOk = true;
-                    }
-                }
+                        return x;
+                    }) as SnoowrapActivity[];
 
-                if (satisfiedCount !== undefined && pre.length + preListSlice.length >= satisfiedCount) {
-                    // satisfied count
-                    if (satisfy === 'any') {
-                        pre = pre.concat(preListSlice).slice(0, satisfiedCount);
-                        break;
-                    }
-                    countOk = true;
-                }
-
-                // if we've satisfied everything take whichever is bigger
-                if (satisfy === 'all' && countOk && timeOk) {
-                    if (satisfiedCount as number > pre.length + truncatedItems.length) {
-                        pre = pre.concat(preListSlice).slice(0, satisfiedCount);
-                    } else {
-                        pre = pre.concat(truncatedItems);
-                    }
-                    break;
-                }
-
-                // if we got this far neither count nor time was satisfied (or both) so just add all items from listing and fetch more if possible
-                pre = pre.concat(preListSlice);
-
-                if(satisfiedPreEndtime !== undefined || satisfiedPreCount !== undefined) {
-                    if(unFilteredItems === undefined) {
-                        unFilteredItems = [];
-                    }
-                    // window has pre filtering, need to check if fallback max would be hit
-                    if(satisfiedPreEndtime !== undefined) {
-                        const [filteredSome, truncatedItems] = filterByTimeRequirement(satisfiedPreEndtime, listSlice);
-                        if(filteredSome) {
-                            unFilteredItems = unFilteredItems.concat(truncatedItems);
-                            preMaxHit = (options.filterOn?.pre?.max as Duration).humanize();
-                            break;
-                        }
-                    }
-                    if(satisfiedPreCount !== undefined && unFilteredItems.length + listSlice.length >= satisfiedPreCount) {
-                        preMaxHit = `${options.filterOn?.pre?.max} Items`;
-                        unFilteredItems = unFilteredItems.concat(listSlice).slice(0, satisfiedPreCount)
-                        break;
-                    }
-                    unFilteredItems = unFilteredItems.concat(listSlice);
-                }
-
-                hitEnd = listing.isFinished;
-
-                if (!hitEnd) {
-                    apiCallCount++;
-                    offset += chunkSize;
-                    listing = await listing.fetchMore({amount: chunkSize, ...getAuthorHistoryAPIOptions(options)});
+                    //this.logger.debug(`${rawCount} Fetched (Saved ${apiCallCount} API Calls!) | Cached ${pre.length} from Pre${preMaxHit !== undefined ? ` (Hit Pre Max: ${preMaxHit})` : ''} | Cache Hit: ${userName}-${listingData.name} (Hash ${hash})`, {leaf: 'Activities Fetch'});
                 }
             }
-            const itemCount = pre.length;
+
+            if(!fromCache) {
+
+                const {
+                    chunkSize: cs = 100,
+                    satisfyOn,
+                    count,
+                    duration,
+                } = options;
+
+                let satisfiedCount: number | undefined,
+                    satisfiedPreCount: number | undefined,
+                    satisfiedEndtime: Dayjs | undefined,
+                    satisfiedPreEndtime: Dayjs | undefined,
+                    chunkSize = Math.min(cs, 100),
+                    satisfy = satisfyOn;
+
+                satisfiedCount = count;
+
+                // if count is less than max limit (100) go ahead and just get that many. may result in faster response time for low numbers
+                if (satisfiedCount !== undefined) {
+                    chunkSize = Math.min(chunkSize, satisfiedCount);
+                }
+
+                if (duration !== undefined) {
+                    const endTime = dayjs();
+                    satisfiedEndtime = endTime.subtract(duration.asMilliseconds(), 'milliseconds');
+                }
+
+                if (satisfiedCount === undefined && satisfiedEndtime === undefined) {
+                    throw new Error('window value was not valid');
+                } else if (satisfy === 'all' && !(satisfiedCount !== undefined && satisfiedEndtime !== undefined)) {
+                    // even though 'all' was requested we don't have two criteria so its really 'any' logic
+                    satisfy = 'any';
+                }
+
+                if(options.filterOn?.pre !== undefined) {
+                    if(typeof options.filterOn?.pre.max === 'number') {
+                        satisfiedPreCount = options.filterOn?.pre.max
+                    } else {
+                        const endTime = dayjs();
+                        satisfiedPreEndtime = endTime.subtract(options.filterOn?.pre.max.asMilliseconds(), 'milliseconds');
+                    }
+                }
+
+                let unFilteredItems: SnoowrapActivity[] | undefined;
+
+
+                const { func: listingFunc } = listingData;
+
+
+                let listing = await listingFunc(getAuthorHistoryAPIOptions(options));
+                let hitEnd = false;
+                let offset = chunkSize;
+                while (!hitEnd) {
+
+                    let countOk = false,
+                        timeOk = false;
+
+                    let listSlice = listing.slice(offset - chunkSize);
+                    let preListSlice = await this.filterListingWithHistoryOptions(listSlice, user, options.filterOn?.pre);
+
+                    // its more likely the time criteria is going to be hit before the count criteria
+                    // so check this first
+                    let truncatedItems: Array<Submission | Comment> = [];
+                    if (satisfiedEndtime !== undefined) {
+                        const [filteredSome, truncatedItems] = filterByTimeRequirement(satisfiedEndtime, preListSlice);
+
+                        if (filteredSome) {
+                            if (satisfy === 'any') {
+                                // satisfied duration
+                                pre = pre.concat(truncatedItems);
+                                break;
+                            }
+                            timeOk = true;
+                        }
+                    }
+
+                    if (satisfiedCount !== undefined && pre.length + preListSlice.length >= satisfiedCount) {
+                        // satisfied count
+                        if (satisfy === 'any') {
+                            pre = pre.concat(preListSlice).slice(0, satisfiedCount);
+                            break;
+                        }
+                        countOk = true;
+                    }
+
+                    // if we've satisfied everything take whichever is bigger
+                    if (satisfy === 'all' && countOk && timeOk) {
+                        if (satisfiedCount as number > pre.length + truncatedItems.length) {
+                            pre = pre.concat(preListSlice).slice(0, satisfiedCount);
+                        } else {
+                            pre = pre.concat(truncatedItems);
+                        }
+                        break;
+                    }
+
+                    // if we got this far neither count nor time was satisfied (or both) so just add all items from listing and fetch more if possible
+                    pre = pre.concat(preListSlice);
+
+                    if(satisfiedPreEndtime !== undefined || satisfiedPreCount !== undefined) {
+                        if(unFilteredItems === undefined) {
+                            unFilteredItems = [];
+                        }
+                        // window has pre filtering, need to check if fallback max would be hit
+                        if(satisfiedPreEndtime !== undefined) {
+                            const [filteredSome, truncatedItems] = filterByTimeRequirement(satisfiedPreEndtime, listSlice);
+                            if(filteredSome) {
+                                unFilteredItems = unFilteredItems.concat(truncatedItems);
+                                preMaxTrigger = (options.filterOn?.pre?.max as Duration).humanize();
+                                break;
+                            }
+                        }
+                        if(satisfiedPreCount !== undefined && unFilteredItems.length + listSlice.length >= satisfiedPreCount) {
+                            preMaxTrigger = `${options.filterOn?.pre?.max} Items`;
+                            unFilteredItems = unFilteredItems.concat(listSlice).slice(0, satisfiedPreCount)
+                            break;
+                        }
+                        unFilteredItems = unFilteredItems.concat(listSlice);
+                    }
+
+                    hitEnd = listing.isFinished;
+
+                    if (!hitEnd) {
+                        apiCount++;
+                        offset += chunkSize;
+                        listing = await listing.fetchMore({amount: chunkSize, ...getAuthorHistoryAPIOptions(options)});
+                    }
+                }
+
+                rawCount = unFilteredItems !== undefined ? unFilteredItems.length : listing.length;
+
+                if(this.authorTTL !== false) {
+                    this.cache.set(cacheKey, {pre: pre, rawCount, apiCount, preMaxTrigger}, {ttl: this.authorTTL})
+                }
+            }
 
             let itemCountAfterPost: number | undefined;
             if(options.filterOn?.post !== undefined) {
@@ -1441,24 +1441,20 @@ export class SubredditResources {
                 itemCountAfterPost = post.length;
             }
 
-            const listStats: string[] = [`${listing.length} Activities Fetched (${apiCallCount} API Calls)`];
-            if(unFilteredItems !== undefined) {
-                let preStat = `${unFilteredItems.length} Before Pre Filter`;
-                if(preMaxHit !== undefined) {
-                    preStat += ` (Hit Max: ${preMaxHit})`;
-                }
-                listStats.push(preStat);
-                listStats.push(`${itemCount} Met Window Range After Pre Filter`);
-            } else {
-                listStats.push(`${itemCount} Met Window Range`);
-            }
+            const listStats: string[] = [`${rawCount} Activities ${fromCache ? 'From Cache' : 'Fetched'} (${apiCount} API Calls${fromCache ? ' saved! ' : ''})`];
+            listStats.push(`${pre.length} Met Window Range After Pre Filter${preMaxTrigger !== undefined ? `(Hit Pre Max: ${preMaxTrigger})`: ''}`);
+
             if(itemCountAfterPost !== undefined) {
                 listStats.push(`${itemCountAfterPost} After Post Filter`)
             }
 
+            if(fromCache) {
+                listStats.push(`Cache Fingerprint: ${cacheKey}`)
+            }
+
             this.logger.debug(listStats.join(' | '), {leaf: 'Activities Fetch'})
 
-            return Promise.resolve([post ?? pre, {raw: unFilteredItems ?? pre, pre, post: post ?? pre}]);
+            return Promise.resolve({pre, post: post ?? pre, rawCount, apiCount, preMaxTrigger});
         } catch (err: any) {
             if(isStatusError(err)) {
                 switch(err.statusCode) {

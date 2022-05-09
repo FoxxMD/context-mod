@@ -177,7 +177,8 @@ class Bot {
 
         this.logger.stream().on('log', (log: LogInfo) => {
             if(log.bot !== undefined && log.bot === this.getBotName() && log.subreddit === undefined) {
-                this.logs = [log, ...this.logs].slice(0, 301);
+                const combinedLogs = [log, ...this.logs];
+                this.logs = combinedLogs.slice(0, 301);
             }
         });
 

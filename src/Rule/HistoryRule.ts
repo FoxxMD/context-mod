@@ -134,38 +134,6 @@ export class HistoryRule extends Rule {
                window: strongWindow
            }
         });
-
-        // if(this.include.length > 0) {
-        //     const subStates = include.map((x) => {
-        //         if(typeof x === 'string') {
-        //             return toStrongSubredditState({name: x, stateDescription: x}, {defaultFlags: 'i', generateDescription: true});
-        //         }
-        //         return toStrongSubredditState(x, {defaultFlags: 'i', generateDescription: true});
-        //     });
-        //     this.activityFilterFunc = async (x: Submission|Comment, author: RedditUser) => {
-        //         for(const ss of subStates) {
-        //             if(await this.resources.testSubredditCriteria(x, ss, author)) {
-        //                 return true;
-        //             }
-        //         }
-        //         return false;
-        //     };
-        // } else if(this.exclude.length > 0) {
-        //     const subStates = exclude.map((x) => {
-        //         if(typeof x === 'string') {
-        //             return toStrongSubredditState({name: x, stateDescription: x}, {defaultFlags: 'i', generateDescription: true});
-        //         }
-        //         return toStrongSubredditState(x, {defaultFlags: 'i', generateDescription: true});
-        //     });
-        //     this.activityFilterFunc = async (x: Submission|Comment, author: RedditUser) => {
-        //         for(const ss of subStates) {
-        //             if(await this.resources.testSubredditCriteria(x, ss, author)) {
-        //                 return false;
-        //             }
-        //         }
-        //         return true;
-        //     };
-        // }
     }
 
     getKind(): string {
@@ -188,13 +156,7 @@ export class HistoryRule extends Rule {
 
             const {comment, window, submission, total, minActivityCount = 5} = criteria;
 
-            const [filteredActivities, {pre: activities}] = await this.resources.getAuthorActivitiesWithFilter(item.author, window);
-            // const filteredActivities = [];
-            // for(const a of activities) {
-            //     if(await this.activityFilterFunc(a, item.author)) {
-            //         filteredActivities.push(a);
-            //     }
-            // }
+            const {pre: activities, post: filteredActivities} = await this.resources.getAuthorActivitiesWithFilter(item.author, window);
 
             if (filteredActivities.length < minActivityCount) {
                 continue;

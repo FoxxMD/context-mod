@@ -74,7 +74,6 @@ import {
     UserNoteCriteria
 } from "./Common/Infrastructure/Filters/FilterCriteria";
 import {
-    SnoowrapActivity,
     ActivitySource,
     ActivitySourceTypes,
     CacheProvider,
@@ -96,7 +95,7 @@ import {
     AuthorHistoryType,
     FullNameTypes,
     PermalinkRedditThings,
-    RedditThing
+    RedditThing, SnoowrapActivity
 } from "./Common/Infrastructure/Reddit";
 import {
     FullActivityWindowConfig,
@@ -210,7 +209,12 @@ const isProbablyError = (val: any, errName = 'error') => {
 export const PASS = '✓';
 export const FAIL = '✘';
 
-export const truncateStringToLength = (length: number, truncStr = '...') => (str: string) => str.length > length ? `${str.slice(0, length - truncStr.length - 1)}${truncStr}` : str;
+export const truncateStringToLength = (length: number, truncStr = '...') => (str: string) => {
+    if(str.length > length) {
+        return `${str.slice(0, length - truncStr.length - 1)}${truncStr}`;
+    }
+    return str;
+};
 
 export const defaultFormat = (defaultLabel = 'App') => printf(({
                                                                    level,
@@ -1826,7 +1830,7 @@ export const snooLogWrapper = (logger: Logger) => {
  * */
 export const isSubmission = (value: any) => {
     try {
-        return value !== null && typeof value === 'object' && (value instanceof Submission || (value.name !== undefined && value.name.includes('t3_')) || value.domain !== undefined);
+        return value !== null && typeof value === 'object' && (value instanceof Submission || (value.name !== undefined && value.name.includes('t3_')));
     } catch (e) {
         return false;
     }

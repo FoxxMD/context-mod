@@ -1,5 +1,3 @@
-import { Submission, Comment } from "snoowrap/dist/objects";
-
 /**
  * A duration and how to compare it against a value
  *
@@ -172,6 +170,3 @@ export type ActivitySourceTypes = 'poll' | 'dispatch' | 'user'; // TODO
  * */
 export type ActivitySource = NonDispatchActivitySource | DispatchSource;
 
-export type SnoowrapActivity = Submission | Comment;
-
-export type AuthorActivitiesFull = [SnoowrapActivity[], {raw: SnoowrapActivity[], pre: SnoowrapActivity[], post: SnoowrapActivity[]}];
