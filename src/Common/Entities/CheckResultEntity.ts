@@ -15,8 +15,6 @@ import {RunResultEntity} from "./RunResultEntity";
 import {RuleResultEntity} from "./RuleResultEntity";
 import {ActionResultEntity} from "./ActionResultEntity";
 import {
-    FilterResult as IFilterResult,
-    FilterResult,
     RuleSetResult
 } from "../interfaces";
 import {RandomIdBaseEntity} from "./Base/RandomIdBaseEntity";
@@ -27,6 +25,7 @@ import {CheckToRuleSetResultEntity} from "./RunnableAssociation/CheckToRuleSetRe
 import {isRuleSetResult} from "../../util";
 import {JoinOperands, RecordOutputType} from "../Infrastructure/Atomic";
 import {AuthorCriteria, TypedActivityState} from "../Infrastructure/Filters/FilterCriteria";
+import {FilterResult, FilterResult as IFilterResult} from "../Infrastructure/Filters/FilterShapes";
 
 export interface CheckResultEntityOptions {
     triggered: boolean

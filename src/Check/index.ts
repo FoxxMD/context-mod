@@ -19,26 +19,18 @@ import {
 import {
     ActionResult,
     CheckResult,
-    ChecksActivityState,
     CheckSummary,
-    FilterResult,
     JoinCondition,
     NotificationEventPayload,
     PostBehavior, PostBehaviorOptionConfig, PostBehaviorOptionConfigStrong, PostBehaviorStrong,
     RuleResult,
-    RuleSetResult, RunnableBaseJson,
-    RunnableBaseOptions, StructuredRunnableBase,
-    UserResultCache
+    RuleSetResult, UserResultCache
 } from "../Common/interfaces";
 import * as RuleSchema from '../Schema/Rule.json';
 import * as RuleSetSchema from '../Schema/RuleSet.json';
 import * as ActionSchema from '../Schema/Action.json';
 import {
-    ActionObjectJson,
-    RuleJson,
-    RuleObjectJson,
-    ActionJson as ActionTypeJson,
-    StructuredRuleSetObjectJson, StructuredRuleObjectJson, StructuredActionObjectJson
+    ActionJson as ActionTypeJson
 } from "../Common/types";
 import {checkAuthorFilter, checkItemFilter, SubredditResources} from "../Subreddit/SubredditResources";
 import {AuthorCriteria, AuthorOptions} from '..';
@@ -63,7 +55,13 @@ import {
     RecordOutputType,
     recordOutputTypes
 } from "../Common/Infrastructure/Atomic";
-import {FilterOptions, MinimalOrFullFilter, MinimalOrFullFilterJson} from "../Common/Infrastructure/Filters/FilterShapes";
+import {
+    ChecksActivityState,
+    FilterOptions,
+    FilterResult,
+    MinimalOrFullFilter,
+    MinimalOrFullFilterJson
+} from "../Common/Infrastructure/Filters/FilterShapes";
 import {
     CommentState,
     SubmissionState,
@@ -71,6 +69,9 @@ import {
     TypedActivityStates
 } from "../Common/Infrastructure/Filters/FilterCriteria";
 import {ActivityType} from "../Common/Infrastructure/Reddit";
+import {RunnableBaseJson, RunnableBaseOptions, StructuredRunnableBase} from "../Common/Infrastructure/Runnable";
+import {RuleJson, StructuredRuleObjectJson, StructuredRuleSetObjectJson} from "../Common/Infrastructure/RuleShapes";
+import {ActionObjectJson, StructuredActionObjectJson} from "../Common/Infrastructure/ActionShapes";
 
 const checkLogName = truncateStringToLength(25);
 

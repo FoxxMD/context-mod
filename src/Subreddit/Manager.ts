@@ -11,7 +11,6 @@ import {
     findLastIndex,
     formatNumber, frequencyEqualOrLargerThanMin, getActivityAuthorName, isComment, isSubmission, likelyJson5,
     mergeArr, normalizeName,
-    parseFromJsonOrYamlToObject,
     parseRedditEntity,
     pollingInfo,
     resultsSummary,
@@ -28,7 +27,6 @@ import {
     CheckSummary,
     DEFAULT_POLLING_INTERVAL,
     DEFAULT_POLLING_LIMIT,
-    FilterCriteriaDefaults,
     LogInfo,
     ManagerOptions,
     ManagerStateChangeOption,
@@ -98,6 +96,8 @@ import {
     recordOutputTypes,
     RunState
 } from "../Common/Infrastructure/Atomic";
+import {parseFromJsonOrYamlToObject} from "../Common/Config/ConfigUtil";
+import {FilterCriteriaDefaults} from "../Common/Infrastructure/Filters/FilterShapes";
 
 export interface RunningState {
     state: RunState,

@@ -3,13 +3,13 @@ import {ActivityStateFilterResult} from "./FilterCriteria/ActivityStateFilterRes
 import {AuthorFilterResult} from "./FilterCriteria/AuthorFilterResult";
 import {CheckResultEntity} from "./CheckResultEntity";
 import {ActionPremise} from "./ActionPremise";
-import {FilterResult, FilterResult as IFilterResult} from "../interfaces";
 import Submission from "snoowrap/dist/objects/Submission";
 import Comment from "snoowrap/dist/objects/Comment";
 import RedditUser from "snoowrap/dist/objects/RedditUser";
 import {RandomIdBaseEntity} from "./Base/RandomIdBaseEntity";
 import {TimeAwareRandomBaseEntity} from "./Base/TimeAwareRandomBaseEntity";
 import {AuthorCriteria, TypedActivityState} from "../Infrastructure/Filters/FilterCriteria";
+import {FilterResult as IFilterResult, FilterResult} from "../Infrastructure/Filters/FilterShapes";
 
 export interface ActionResultEntityOptions {
     run: boolean

@@ -73,15 +73,10 @@ import {
     UserResultCache,
     ActionedEvent,
     ThirdPartyCredentialsJsonConfig,
-    FilterCriteriaResult,
-    FilterResult,
     RequiredItemCrit,
     ItemCritPropHelper,
     ActivityDispatch,
-    FilterCriteriaPropertyResult,
-    HistoricalStatsDisplay,
-    AuthorOptions,
-    ItemOptions
+    HistoricalStatsDisplay
 } from "../Common/interfaces";
 import UserNotes from "./UserNotes";
 import Mustache from "mustache";
@@ -103,7 +98,6 @@ import globrex from 'globrex';
 import {runMigrations} from "../Common/Migrations/CacheMigrationUtils";
 import {isStatusError, MaybeSeriousErrorWithCause, SimpleError} from "../Utils/Errors";
 import {ErrorWithCause} from "pony-cause";
-import {AuthorCritPropHelper, RequiredAuthorCrit} from "../Common/types";
 import {ManagerEntity} from "../Common/Entities/ManagerEntity";
 import {Bot} from "../Common/Entities/Bot";
 import {DispatchedEntity} from "../Common/Entities/DispatchedEntity";
@@ -117,7 +111,7 @@ import {RuleSetResultEntity} from "../Common/Entities/RuleSetResultEntity";
 import {RulePremise} from "../Common/Entities/RulePremise";
 import cloneDeep from "lodash/cloneDeep";
 import {
-    AuthorCriteria, CommentState,
+    AuthorCriteria, CommentState, RequiredAuthorCrit,
     StrongSubredditCriteria, SubmissionState,
     SubredditCriteria, TypedActivityState, TypedActivityStates,
     UserNoteCriteria
@@ -129,7 +123,13 @@ import {
     ModeratorNameCriteria, statFrequencies, StatisticFrequency,
     StatisticFrequencyOption
 } from "../Common/Infrastructure/Atomic";
-import {NamedCriteria} from "../Common/Infrastructure/Filters/FilterShapes";
+import {
+    AuthorOptions, FilterCriteriaPropertyResult,
+    FilterCriteriaResult,
+    FilterResult,
+    ItemOptions,
+    NamedCriteria
+} from "../Common/Infrastructure/Filters/FilterShapes";
 import {
     ActivityWindowCriteria,
     HistoryFiltersOptions,
@@ -143,6 +143,7 @@ import {
     CachedFetchedActivitiesResult, FetchedActivitiesResult,
     SnoowrapActivity
 } from "../Common/Infrastructure/Reddit";
+import {AuthorCritPropHelper} from "../Common/Infrastructure/Filters/AuthorCritPropHelper";
 
 export const DEFAULT_FOOTER = '\r\n*****\r\nThis action was performed by [a bot.]({{botLink}}) Mention a moderator or [send a modmail]({{modmailLink}}) if you any ideas, questions, or concerns about this action.';
 

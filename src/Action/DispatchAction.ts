@@ -5,10 +5,9 @@ import {activityIsRemoved} from "../Utils/SnoowrapUtils";
 import {ActionProcessResult, ActivityDispatchConfig, RuleResult} from "../Common/interfaces";
 import dayjs from "dayjs";
 import {activityDispatchConfigToDispatch, isSubmission, parseDurationValToDuration, randomId} from "../util";
-import {ActionTypes} from "../Common/types";
 import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
 import {runCheckOptions} from "../Subreddit/Manager";
-import {ActionTarget} from "../Common/Infrastructure/Atomic";
+import {ActionTarget, ActionTypes} from "../Common/Infrastructure/Atomic";
 
 export class DispatchAction extends Action {
     dispatchData: ActivityDispatchConfig;

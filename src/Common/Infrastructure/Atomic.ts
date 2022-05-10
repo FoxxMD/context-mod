@@ -12,6 +12,7 @@
  *
  * @pattern ^\s*(>|>=|<|<=)\s*(\d+)\s*(days|weeks|months|years|hours|minutes|seconds|milliseconds)\s*$
  * */
+
 export type DurationComparor = string;
 
 /**
@@ -170,3 +171,18 @@ export type ActivitySourceTypes = 'poll' | 'dispatch' | 'user'; // TODO
  * */
 export type ActivitySource = NonDispatchActivitySource | DispatchSource;
 
+export type ConfigFormat = 'json' | 'yaml';
+export type ActionTypes =
+    'comment'
+    | 'lock'
+    | 'remove'
+    | 'report'
+    | 'approve'
+    | 'ban'
+    | 'flair'
+    | 'usernote'
+    | 'message'
+    | 'userflair'
+    | 'dispatch'
+    | 'cancelDispatch'
+    | 'contributor';

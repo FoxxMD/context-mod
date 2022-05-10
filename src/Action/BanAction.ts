@@ -3,9 +3,9 @@ import Action from "./index";
 import Snoowrap, {Comment, Submission} from "snoowrap";
 import {renderContent} from "../Utils/SnoowrapUtils";
 import {ActionProcessResult, Footer, RuleResult} from "../Common/interfaces";
-import {ActionTypes} from "../Common/types";
 import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
 import {runCheckOptions} from "../Subreddit/Manager";
+import {ActionTypes} from "../Common/Infrastructure/Atomic";
 
 export class BanAction extends Action {
 

@@ -1,8 +1,8 @@
 import AbstractConfigDocument from "./AbstractConfigDocument";
 import {stringify, parse} from 'comment-json';
 import JSON5 from 'json5';
-import {ConfigFormat} from "../types";
 import {OperatorJsonConfig} from "../interfaces";
+import {ConfigFormat} from "../Infrastructure/Atomic";
 
 class JsonConfigDocument extends AbstractConfigDocument<OperatorJsonConfig> {
 

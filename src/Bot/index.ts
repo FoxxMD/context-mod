@@ -5,7 +5,6 @@ import {Duration} from "dayjs/plugin/duration";
 import EventEmitter from "events";
 import {
     BotInstanceConfig, DatabaseStatisticsOperatorConfig,
-    FilterCriteriaDefaults,
     LogInfo,
     PAUSED,
     RUNNING,
@@ -41,6 +40,7 @@ import {QueueRunState} from "../Common/Entities/EntityRunState/QueueRunState";
 import {EventsRunState} from "../Common/Entities/EntityRunState/EventsRunState";
 import {ManagerRunState} from "../Common/Entities/EntityRunState/ManagerRunState";
 import {Invokee, PollOn} from "../Common/Infrastructure/Atomic";
+import {FilterCriteriaDefaults} from "../Common/Infrastructure/Filters/FilterShapes";
 
 class Bot {
 

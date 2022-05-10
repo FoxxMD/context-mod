@@ -1383,19 +1383,22 @@
                     "items": {
                         "anyOf": [
                             {
+                                "$ref": "#/definitions/FlairActionJson"
+                            },
+                            {
+                                "$ref": "#/definitions/UserFlairActionJson"
+                            },
+                            {
                                 "$ref": "#/definitions/CommentActionJson"
+                            },
+                            {
+                                "$ref": "#/definitions/ReportActionJson"
                             },
                             {
                                 "$ref": "#/definitions/LockActionJson"
                             },
                             {
                                 "$ref": "#/definitions/RemoveActionJson"
-                            },
-                            {
-                                "$ref": "#/definitions/ReportActionJson"
-                            },
-                            {
-                                "$ref": "#/definitions/FlairActionJson"
                             },
                             {
                                 "$ref": "#/definitions/UserNoteActionJson"
@@ -1408,9 +1411,6 @@
                             },
                             {
                                 "$ref": "#/definitions/MessageActionJson"
-                            },
-                            {
-                                "$ref": "#/definitions/UserFlairActionJson"
                             },
                             {
                                 "$ref": "#/definitions/DispatchActionJson"
@@ -1563,6 +1563,9 @@
                     "items": {
                         "anyOf": [
                             {
+                                "$ref": "#/definitions/RecentActivityRuleJSONConfig"
+                            },
+                            {
                                 "$ref": "#/definitions/RepeatActivityJSONConfig"
                             },
                             {
@@ -1582,9 +1585,6 @@
                             },
                             {
                                 "$ref": "#/definitions/RuleSetJson"
-                            },
-                            {
-                                "$ref": "#/definitions/RecentActivityRuleJSONConfig"
                             },
                             {
                                 "type": "string"
@@ -4836,6 +4836,9 @@
                     "items": {
                         "anyOf": [
                             {
+                                "$ref": "#/definitions/RecentActivityRuleJSONConfig"
+                            },
+                            {
                                 "$ref": "#/definitions/RepeatActivityJSONConfig"
                             },
                             {
@@ -4852,9 +4855,6 @@
                             },
                             {
                                 "$ref": "#/definitions/RepostRuleJSONConfig"
-                            },
-                            {
-                                "$ref": "#/definitions/RecentActivityRuleJSONConfig"
                             },
                             {
                                 "type": "string"
@@ -5118,19 +5118,22 @@
                     "items": {
                         "anyOf": [
                             {
+                                "$ref": "#/definitions/FlairActionJson"
+                            },
+                            {
+                                "$ref": "#/definitions/UserFlairActionJson"
+                            },
+                            {
                                 "$ref": "#/definitions/CommentActionJson"
+                            },
+                            {
+                                "$ref": "#/definitions/ReportActionJson"
                             },
                             {
                                 "$ref": "#/definitions/LockActionJson"
                             },
                             {
                                 "$ref": "#/definitions/RemoveActionJson"
-                            },
-                            {
-                                "$ref": "#/definitions/ReportActionJson"
-                            },
-                            {
-                                "$ref": "#/definitions/FlairActionJson"
                             },
                             {
                                 "$ref": "#/definitions/UserNoteActionJson"
@@ -5143,9 +5146,6 @@
                             },
                             {
                                 "$ref": "#/definitions/MessageActionJson"
-                            },
-                            {
-                                "$ref": "#/definitions/UserFlairActionJson"
                             },
                             {
                                 "$ref": "#/definitions/DispatchActionJson"
@@ -5298,6 +5298,9 @@
                     "items": {
                         "anyOf": [
                             {
+                                "$ref": "#/definitions/RecentActivityRuleJSONConfig"
+                            },
+                            {
                                 "$ref": "#/definitions/RepeatActivityJSONConfig"
                             },
                             {
@@ -5317,9 +5320,6 @@
                             },
                             {
                                 "$ref": "#/definitions/RuleSetJson"
-                            },
-                            {
-                                "$ref": "#/definitions/RecentActivityRuleJSONConfig"
                             },
                             {
                                 "type": "string"

@@ -1,9 +1,9 @@
 import Action, {ActionConfig, ActionJson, ActionOptions} from './index';
 import {Comment, RedditUser, Submission} from 'snoowrap';
 import {ActionProcessResult, RuleResult} from '../Common/interfaces';
-import {ActionTypes} from "../Common/types";
 import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
 import {runCheckOptions} from "../Subreddit/Manager";
+import {ActionTypes} from "../Common/Infrastructure/Atomic";
 
 export class UserFlairAction extends Action {
   text?: string;

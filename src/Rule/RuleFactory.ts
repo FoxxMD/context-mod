@@ -9,7 +9,7 @@ import RegexRule, {RegexRuleJSONConfig} from "./RegexRule";
 import {SubredditResources} from "../Subreddit/SubredditResources";
 import Snoowrap from "snoowrap";
 import {RepostRule, RepostRuleJSONConfig} from "./RepostRule";
-import {StructuredFilter} from "../Common/interfaces";
+import {StructuredFilter} from "../Common/Infrastructure/Filters/FilterShapes";
 
 export function ruleFactory
 (config: StructuredRuleJson, logger: Logger, subredditName: string, resources: SubredditResources, client: Snoowrap): Rule {

@@ -4,12 +4,9 @@ import {Logger} from "winston";
 import {findResultByPremise, mergeArr} from "../util";
 import {checkAuthorFilter, checkItemFilter} from "../Subreddit/SubredditResources";
 import {
-    AuthorOptions,
-    ChecksActivityState,
     ObjectPremise,
     ResultContext,
-    RuleResult as IRuleResult, RunnableBaseJson,
-    RunnableBaseOptions, StructuredRunnableBase
+    RuleResult as IRuleResult
 } from "../Common/interfaces";
 import {runCheckOptions} from "../Subreddit/Manager";
 import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
@@ -18,6 +15,8 @@ import {RulePremise} from "../Common/Entities/RulePremise";
 import {capitalize} from "lodash";
 import {RunnableBase} from "../Common/RunnableBase";
 import {FindOptionsWhere} from "typeorm/find-options/FindOptionsWhere";
+import {RunnableBaseJson, RunnableBaseOptions, StructuredRunnableBase} from "../Common/Infrastructure/Runnable";
+import {AuthorOptions, ChecksActivityState} from "../Common/Infrastructure/Filters/FilterShapes";
 
 export interface RuleOptions extends RunnableBaseOptions {
     name?: string;

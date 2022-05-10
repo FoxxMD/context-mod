@@ -6,7 +6,7 @@ import {
     mergeArr, mergeFilters,
     normalizeName,
     overwriteMerge,
-    parseBool, parseFromJsonOrYamlToObject, randomId,
+    parseBool, randomId,
     readConfigFile, removeFromSourceIfKeysExistsInDestination,
     removeUndefinedKeys, resolvePathFromEnvWithRelative
 } from "./util";
@@ -34,23 +34,13 @@ import {
     RedditCredentials,
     BotCredentialsJsonConfig,
     BotCredentialsConfig,
-    FilterCriteriaDefaults,
     OperatorFileConfig,
-    PostBehavior,
-    AuthorOptions,
-    RunnableBaseJson,
-    RunnableBaseOptions,
-    StructuredRunnableBase, FilterCriteriaDefaultsJson
+    PostBehavior
 } from "./Common/interfaces";
 import {isRuleSetJSON, RuleSetJson, RuleSetObjectJson} from "./Rule/RuleSet";
 import deepEqual from "fast-deep-equal";
 import {
-    ActionJson,
-    ActionObjectJson,
-    ConfigFormat,
-    RuleJson,
-    RuleObjectJson, StructuredActionObjectJson, StructuredRuleObjectJson,
-    StructuredRuleSetObjectJson
+    ActionJson
 } from "./Common/types";
 import {isActionJson} from "./Action";
 import {getLogger, resolveLogDir} from "./Utils/loggerFactory";
@@ -78,17 +68,22 @@ import {
     OperatorConfigDocumentInterface,
     YamlOperatorConfigDocument
 } from "./Common/Config/Operator";
-import {ConfigDocumentInterface} from "./Common/Config/AbstractConfigDocument";
+import {
+    ConfigDocumentInterface
+} from "./Common/Config/AbstractConfigDocument";
 import {Document as YamlDocument} from "yaml";
 import {SimpleError} from "./Utils/Errors";
 import {ErrorWithCause} from "pony-cause";
 import {RunJson, RunStructuredJson} from "./Run";
 import {AuthorRuleConfig} from "./Rule/AuthorRule";
 import {
-    CacheProvider,
+    CacheProvider, ConfigFormat,
     PollOn
 } from "./Common/Infrastructure/Atomic";
 import {
+    AuthorOptions,
+    FilterCriteriaDefaults,
+    FilterCriteriaDefaultsJson,
     FilterOptionsJson,
     MaybeAnonymousCriteria,
     MaybeAnonymousOrStringCriteria, MinimalOrFullFilter, MinimalOrFullFilterJson, NamedCriteria
@@ -96,6 +91,15 @@ import {
 import {AuthorCriteria, TypedActivityState, TypedActivityStates} from "./Common/Infrastructure/Filters/FilterCriteria";
 import {StrongLoggingOptions} from "./Common/Infrastructure/Logging";
 import {DatabaseDriver, DatabaseDriverConfig, DatabaseDriverType} from "./Common/Infrastructure/Database";
+import {parseFromJsonOrYamlToObject} from "./Common/Config/ConfigUtil";
+import {RunnableBaseJson, RunnableBaseOptions, StructuredRunnableBase} from "./Common/Infrastructure/Runnable";
+import {
+    RuleJson,
+    RuleObjectJson,
+    StructuredRuleObjectJson,
+    StructuredRuleSetObjectJson
+} from "./Common/Infrastructure/RuleShapes";
+import {ActionObjectJson, StructuredActionObjectJson} from "./Common/Infrastructure/ActionShapes";
 
 export interface ConfigBuilderOptions {
     logger: Logger,

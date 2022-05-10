@@ -16,7 +16,7 @@ import EventEmitter from "events";
 import {DispatchAction, DispatchActionJson} from "./DispatchAction";
 import {CancelDispatchAction, CancelDispatchActionJson} from "./CancelDispatchAction";
 import ContributorAction, {ContributorActionJson} from "./ContributorAction";
-import {StructuredFilter} from "../Common/interfaces";
+import {StructuredFilter} from "../Common/Infrastructure/Filters/FilterShapes";
 
 export function actionFactory
 (config: StructuredActionJson, logger: Logger, subredditName: string, resources: SubredditResources, client: ExtendedSnoowrap, emitter: EventEmitter): Action {

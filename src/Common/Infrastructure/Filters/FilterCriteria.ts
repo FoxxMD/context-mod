@@ -359,3 +359,4 @@ export interface CommentState extends ActivityState {
 
 export type TypedActivityState = SubmissionState | CommentState;
 export type TypedActivityStates = TypedActivityState[];
+export type RequiredAuthorCrit = Required<AuthorCriteria>;

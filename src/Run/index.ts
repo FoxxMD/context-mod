@@ -1,10 +1,9 @@
 import {asStructuredCommentCheckJson, asStructuredSubmissionCheckJson, Check, CheckStructuredJson} from "../Check";
 import {
     ActionResult,
-    ActivityCheckJson, AuthorOptions, CheckResult, CheckSummary,
-    FilterCriteriaDefaults, FilterResult,
+    ActivityCheckJson, CheckResult, CheckSummary,
     PostBehavior, PostBehaviorOption,
-    RuleResult, RunnableBaseJson, RunnableBaseOptions, RunResult, StructuredRunnableBase
+    RuleResult, RunResult
 } from "../Common/interfaces";
 import {SubmissionCheck} from "../Check/SubmissionCheck";
 import {CommentCheck} from "../Check/CommentCheck";
@@ -24,6 +23,8 @@ import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
 import {RunnableBase} from "../Common/RunnableBase";
 import {AuthorCriteria, TypedActivityStates} from "../Common/Infrastructure/Filters/FilterCriteria";
 import {PostBehaviorType} from "../Common/Infrastructure/Atomic";
+import {RunnableBaseJson, RunnableBaseOptions, StructuredRunnableBase} from "../Common/Infrastructure/Runnable";
+import {AuthorOptions, FilterCriteriaDefaults, FilterResult} from "../Common/Infrastructure/Filters/FilterShapes";
 
 export class Run extends RunnableBase {
     name: string;

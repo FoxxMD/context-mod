@@ -4,9 +4,9 @@ import Submission from "snoowrap/dist/objects/Submission";
 import {renderContent} from "../Utils/SnoowrapUtils";
 import {ActionProcessResult, Footer, RequiredRichContent, RichContent, RuleResult} from "../Common/interfaces";
 import {truncateStringToLength} from "../util";
-import {ActionTypes} from "../Common/types";
 import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
 import {runCheckOptions} from "../Subreddit/Manager";
+import {ActionTypes} from "../Common/Infrastructure/Atomic";
 
 export class CommentAction extends Action {
     content: string;

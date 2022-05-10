@@ -11,7 +11,6 @@ import {
 } from "typeorm";
 import {RuleResultEntity} from "./RuleResultEntity";
 import {
-    AuthorOptions, ItemOptions,
     ObjectPremise
 } from "../interfaces";
 import objectHash from "object-hash";
@@ -21,6 +20,7 @@ import {RuleType} from "./RuleType";
 import {ManagerEntity} from "./ManagerEntity";
 import {capitalize} from "lodash";
 import {TypedActivityStates} from "../Infrastructure/Filters/FilterCriteria";
+import {AuthorOptions, ItemOptions} from "../Infrastructure/Filters/FilterShapes";
 
 export interface RulePremiseOptions {
     kind: RuleType

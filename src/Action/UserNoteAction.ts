@@ -5,9 +5,9 @@ import {renderContent} from "../Utils/SnoowrapUtils";
 import {UserNoteJson} from "../Subreddit/UserNotes";
 import Submission from "snoowrap/dist/objects/Submission";
 import {ActionProcessResult, RuleResult} from "../Common/interfaces";
-import {ActionTypes} from "../Common/types";
 import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
 import {runCheckOptions} from "../Subreddit/Manager";
+import {ActionTypes} from "../Common/Infrastructure/Atomic";
 
 
 export class UserNoteAction extends Action {

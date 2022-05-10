@@ -3,9 +3,9 @@ import Action, {ActionJson, ActionOptions} from "../index";
 import {ActionProcessResult, RuleResult} from "../../Common/interfaces";
 import Submission from 'snoowrap/dist/objects/Submission';
 import Comment from 'snoowrap/dist/objects/Comment';
-import {ActionTypes} from "../../Common/types";
 import {RuleResultEntity} from "../../Common/Entities/RuleResultEntity";
 import {runCheckOptions} from "../../Subreddit/Manager";
+import {ActionTypes} from "../../Common/Infrastructure/Atomic";
 
 export class FlairAction extends Action {
     text: string;

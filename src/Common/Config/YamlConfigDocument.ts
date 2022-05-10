@@ -1,6 +1,6 @@
 import AbstractConfigDocument from "./AbstractConfigDocument";
 import {Document, parseDocument} from 'yaml';
-import {ConfigFormat} from "../types";
+import {ConfigFormat} from "../Infrastructure/Atomic";
 
 class YamlConfigDocument extends AbstractConfigDocument<Document> {
 

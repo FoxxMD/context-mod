@@ -4,9 +4,9 @@ import Snoowrap, {Comment, Submission} from "snoowrap";
 import {truncateStringToLength} from "../util";
 import {renderContent} from "../Utils/SnoowrapUtils";
 import {ActionProcessResult, RichContent, RuleResult} from "../Common/interfaces";
-import {ActionTypes} from "../Common/types";
 import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
 import {runCheckOptions} from "../Subreddit/Manager";
+import {ActionTypes} from "../Common/Infrastructure/Atomic";
 
 // https://www.reddit.com/dev/api/oauth#POST_api_report
 // denotes 100 characters maximum

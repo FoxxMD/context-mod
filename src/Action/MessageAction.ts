@@ -13,9 +13,9 @@ import {
 } from "../util";
 import {SimpleError} from "../Utils/Errors";
 import {ErrorWithCause} from "pony-cause";
-import {ActionTypes} from "../Common/types";
 import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
 import {runCheckOptions} from "../Subreddit/Manager";
+import {ActionTypes} from "../Common/Infrastructure/Atomic";
 
 export class MessageAction extends Action {
     content: string;

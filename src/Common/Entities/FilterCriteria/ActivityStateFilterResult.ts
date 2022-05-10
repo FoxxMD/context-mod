@@ -1,8 +1,11 @@
 import {ChildEntity, OneToMany} from "typeorm";
 import {FilterResult} from "./FilterResult";
-import {FilterCriteriaResult as IFilterCriteriaResult, FilterResult as IFilterResult} from "../../interfaces";
 import {ActivityStateFilterCriteriaResult} from "./ActivityStateFilterCriteriaResult";
 import {TypedActivityState} from "../../Infrastructure/Filters/FilterCriteria";
+import {
+    FilterCriteriaResult as IFilterCriteriaResult,
+    FilterResult as IFilterResult
+} from "../../Infrastructure/Filters/FilterShapes";
 
 @ChildEntity()
 export class ActivityStateFilterResult extends FilterResult<TypedActivityState> {

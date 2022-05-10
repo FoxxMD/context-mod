@@ -1,5 +1,5 @@
 import {Entity, PrimaryColumn, Column, PrimaryGeneratedColumn} from "typeorm";
-import {ActionTypes} from "../types";
+import {ActionTypes} from "../Infrastructure/Atomic";
 
 @Entity()
 export class ActionType  {

@@ -3,10 +3,11 @@ import {Comment} from "snoowrap";
 import Submission from "snoowrap/dist/objects/Submission";
 import {checkAuthorFilter} from "../Subreddit/SubredditResources";
 import {
-    AuthorOptions, RuleResult
+    RuleResult
 } from "../Common/interfaces";
 import {buildFilter, normalizeCriteria} from "../util";
 import {
+    AuthorOptions,
     MaybeAnonymousCriteria,
     MaybeAnonymousOrStringCriteria,
     NamedCriteria

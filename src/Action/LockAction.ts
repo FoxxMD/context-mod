@@ -2,9 +2,9 @@ import {ActionJson, ActionConfig} from "./index";
 import Action from "./index";
 import Snoowrap, {Comment, Submission} from "snoowrap";
 import {ActionProcessResult, RuleResult} from "../Common/interfaces";
-import {ActionTypes} from "../Common/types";
 import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
 import {runCheckOptions} from "../Subreddit/Manager";
+import {ActionTypes} from "../Common/Infrastructure/Atomic";
 
 export class LockAction extends Action {
     getKind(): ActionTypes {

@@ -2988,6 +2988,9 @@
             "items": {
                 "anyOf": [
                     {
+                        "$ref": "#/definitions/RecentActivityRuleJSONConfig"
+                    },
+                    {
                         "$ref": "#/definitions/RepeatActivityJSONConfig"
                     },
                     {
@@ -3004,9 +3007,6 @@
                     },
                     {
                         "$ref": "#/definitions/RepostRuleJSONConfig"
-                    },
-                    {
-                        "$ref": "#/definitions/RecentActivityRuleJSONConfig"
                     },
                     {
                         "type": "string"

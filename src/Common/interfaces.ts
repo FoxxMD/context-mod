@@ -9,23 +9,18 @@ import {JsonOperatorConfigDocument, YamlOperatorConfigDocument} from "./Config/O
 import {CommentCheckJson, SubmissionCheckJson} from "../Check";
 import {SafeDictionary} from "ts-essentials";
 import {RuleResultEntity} from "./Entities/RuleResultEntity";
-import {Logger} from "winston";
-import {SubredditResources} from "../Subreddit/SubredditResources";
 import {Dayjs} from "dayjs";
 import {
     AuthorCriteria,
     CommentState,
-    FilterCriteriaDefaultBehavior,
     SubmissionState,
-    TypedActivityState,
-    TypedActivityStates
+    TypedActivityState
 } from "./Infrastructure/Filters/FilterCriteria";
 import {
     ActivitySourceTypes,
     CacheProvider,
     DurationVal,
     EventRetentionPolicyRange,
-    FilterBehavior,
     JoinOperands,
     NonDispatchActivitySource,
     NotificationEventType,
@@ -40,10 +35,12 @@ import {
     StringOperator
 } from "./Infrastructure/Atomic";
 import {
-    FilterOptions,
-    MinimalOrFullFilter,
-    MinimalOrFullFilterJson,
-    NamedCriteria
+    AuthorOptions,
+    FilterCriteriaDefaults,
+    FilterCriteriaDefaultsJson,
+    FilterCriteriaPropertyResult,
+    FilterResult,
+    ItemOptions
 } from "./Infrastructure/Filters/FilterShapes";
 import {LoggingOptions, LogLevel, StrongLoggingOptions} from "./Infrastructure/Logging";
 import {DatabaseConfig, DatabaseDriver, DatabaseDriverConfig, DatabaseDriverType} from "./Infrastructure/Database";
@@ -677,10 +674,6 @@ export interface ThresholdCriteria {
     condition: StringOperator
 }
 
-export interface ChecksActivityState {
-    itemIs?: TypedActivityStates
-}
-
 export interface DomainInfo {
     display: string,
     domain: string,
@@ -1024,51 +1017,12 @@ export interface SnoowrapOptions {
     timeoutCodes?: string[]
 }
 
-/**
- * If present then these Author criteria are checked before running. If criteria fails then this process is skipped.
- * @examples [{"include": [{"flairText": ["Contributor","Veteran"]}, {"isMod": true}]}]
- * */
-export interface AuthorOptions extends FilterOptions<AuthorCriteria> {
-}
-
-/**
- * A list of criteria to test the state of the `Activity` against before running. If criteria fails then this process is skipped.
- *
- * * @examples [{"include": [{"over_18": true, "removed': false}]}]
- * */
-export interface ItemOptions extends FilterOptions<TypedActivityState> {
-}
-
 // /**
 //  * A list of criteria to test the state of the `Activity` against before running. If criteria fails then this process is skipped.
 //  *
 //  * * @examples [{"include": [{"over_18": true, "removed': false}]}]
 //  * */
 // export type ItemOptions = FilterOptions<SubmissionState> | FilterOptions<CommentState>
-
-export interface FilterCriteriaDefaults extends Omit<FilterCriteriaDefaultsJson, 'itemIs' | 'authorIs'> {
-    itemIs?: MinimalOrFullFilter<TypedActivityState>
-    authorIs?: MinimalOrFullFilter<AuthorCriteria>
-}
-
-export interface FilterCriteriaDefaultsJson {
-    itemIs?: MinimalOrFullFilterJson<TypedActivityState>
-    /**
-     * Determine how itemIs defaults behave when itemIs is present on the check
-     *
-     * * merge => adds defaults to check's itemIs
-     * * replace => check itemIs will replace defaults (no defaults used)
-     * */
-    itemIsBehavior?: FilterCriteriaDefaultBehavior
-    /**
-     * Determine how authorIs defaults behave when authorIs is present on the check
-     *
-     * * merge => merges defaults with check's authorIs
-     * * replace => check authorIs will replace defaults (no defaults used)
-     * */
-    authorIs?: MinimalOrFullFilterJson<AuthorCriteria>
-    authorIsBehavior?: FilterCriteriaDefaultBehavior
-}
 
 
 export interface SubredditOverrides {
@@ -1881,27 +1835,6 @@ export interface DatabaseMigrationOptions {
     continueOnAutomatedBackup?: boolean
 }
 
-export interface FilterCriteriaPropertyResult<T> {
-    property: keyof T
-    found?: string | boolean | number | null | FilterResult<any>
-    passed?: null | boolean
-    reason?: string
-    behavior: FilterBehavior
-}
-
-export interface FilterCriteriaResult<T> {
-    behavior: FilterBehavior
-    criteria: NamedCriteria<T>//AuthorCriteria | TypedActivityStates
-    propertyResults: FilterCriteriaPropertyResult<T>[]
-    passed: boolean
-}
-
-export interface FilterResult<T> {
-    criteriaResults: FilterCriteriaResult<T>[]
-    join: JoinOperands
-    passed: boolean
-}
-
 export interface TextTransformOptions {
     /**
      * A set of search-and-replace operations to perform on text values before performing a match. Transformations are performed in the order they are defined.
@@ -2030,39 +1963,5 @@ export interface ObjectPremise {
     config: object
     itemIs?: ItemOptions
     authorIs?: AuthorOptions
-}
-
-export interface RunnableBaseOptions extends Omit<RunnableBaseJson, 'itemIs' | 'authorIs'> {
-    logger: Logger;
-    resources: SubredditResources
-    itemIs?: MinimalOrFullFilter<TypedActivityState>
-    authorIs?: MinimalOrFullFilter<AuthorCriteria>
-}
-
-export interface StructuredRunnableBase {
-    itemIs?: MinimalOrFullFilter<TypedActivityState>
-    authorIs?: MinimalOrFullFilter<AuthorCriteria>
-}
-
-export type  StructuredFilter<T> = Omit<T, 'authorIs' | 'itemIs'> & {
-    itemIs?: MinimalOrFullFilter<TypedActivityState>
-    authorIs?: MinimalOrFullFilter<AuthorCriteria>
-}
-
-export interface RunnableBaseJson {
-    /**
-     * A list of criteria to test the state of the `Activity` against before running the check.
-     *
-     * If any set of criteria passes the Check will be run. If the criteria fails then the Check will fail.
-     *
-     * * @examples [[{"over_18": true, "removed': false}]]
-     *
-     * */
-    itemIs?: MinimalOrFullFilterJson<TypedActivityState>
-
-    /**
-     * If present then these Author criteria are checked before running the Check. If criteria fails then the Check will fail.
-     * */
-    authorIs?: MinimalOrFullFilterJson<AuthorCriteria>
 }
 

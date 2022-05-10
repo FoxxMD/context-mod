@@ -13,18 +13,11 @@ import {
     ActionResult,
     ActivityDispatch,
     ActivityDispatchConfig,
-    AuthorOptions,
     CacheOptions,
     CheckSummary,
-    FilterCriteriaDefaults,
-    FilterCriteriaPropertyResult,
-    FilterCriteriaResult,
-    FilterResult,
     ImageComparisonResult,
     ItemCritPropHelper,
-    ItemOptions,
     LogInfo,
-    OperatorJsonConfig,
     PollingOptionsStrong,
     PostBehaviorOptionConfig,
     RegExResult,
@@ -34,12 +27,10 @@ import {
     ResourceStats,
     RuleResult,
     RuleSetResult,
-    RunnableBaseJson,
     RunResult,
     SearchAndReplaceRegExp,
     StringComparisonOptions
 } from "./Common/interfaces";
-import {Document as YamlDocument} from 'yaml'
 import InvalidRegexError from "./Utils/InvalidRegexError";
 import {accessSync, constants, promises} from "fs";
 import {cacheOptDefaults, VERSION} from "./Common/defaults";
@@ -54,40 +45,48 @@ import fetch from "node-fetch";
 import ImageData from "./Common/ImageData";
 import {Sharp, SharpOptions} from "sharp";
 import {ErrorWithCause, stackWithCauses} from "pony-cause";
-import {ConfigFormat} from "./Common/types";
 import stringSimilarity from 'string-similarity';
 import calculateCosineSimilarity from "./Utils/StringMatching/CosineSimilarity";
 import levenSimilarity from "./Utils/StringMatching/levenSimilarity";
 import {isRateLimitError, isRequestError, isScopeError, isStatusError, SimpleError} from "./Utils/Errors";
-import JsonConfigDocument from "./Common/Config/JsonConfigDocument";
-import YamlConfigDocument from "./Common/Config/YamlConfigDocument";
-import AbstractConfigDocument, {ConfigDocumentInterface} from "./Common/Config/AbstractConfigDocument";
 import merge from "deepmerge";
 import {RulePremise} from "./Common/Entities/RulePremise";
 import {RuleResultEntity as RuleResultEntity} from "./Common/Entities/RuleResultEntity";
 import {nanoid} from "nanoid";
 import {
     ActivityState,
-    AuthorCriteria, authorCriteriaProperties, CommentState, defaultStrongSubredditCriteriaOptions,
-    StrongSubredditCriteria, SubmissionState,
-    SubredditCriteria, TypedActivityState, TypedActivityStates,
+    AuthorCriteria,
+    authorCriteriaProperties,
+    CommentState,
+    defaultStrongSubredditCriteriaOptions,
+    StrongSubredditCriteria,
+    SubmissionState,
+    SubredditCriteria,
+    TypedActivityState,
     UserNoteCriteria
 } from "./Common/Infrastructure/Filters/FilterCriteria";
 import {
     ActivitySource,
     ActivitySourceTypes,
-    CacheProvider,
-    DurationVal, RedditEntity, RedditEntityType,
-    statFrequencies, StatisticFrequency,
+    CacheProvider, ConfigFormat,
+    DurationVal,
+    RedditEntity,
+    RedditEntityType,
+    statFrequencies,
+    StatisticFrequency,
     StatisticFrequencyOption,
     StringOperator
 } from "./Common/Infrastructure/Atomic";
 import {DurationComparison, GenericComparison} from "./Common/Infrastructure/Comparisons";
 import {
-    FilterOptions, FilterOptionsJson,
+    AuthorOptions,
+    FilterCriteriaDefaults, FilterCriteriaPropertyResult, FilterCriteriaResult,
+    FilterOptions,
+    FilterOptionsJson, FilterResult, ItemOptions,
     MaybeAnonymousCriteria,
     MaybeAnonymousOrStringCriteria,
-    MinimalOrFullFilter, MinimalOrFullMaybeAnonymousFilter,
+    MinimalOrFullFilter,
+    MinimalOrFullMaybeAnonymousFilter,
     NamedCriteria
 } from "./Common/Infrastructure/Filters/FilterShapes";
 import {
@@ -95,14 +94,17 @@ import {
     AuthorHistoryType,
     FullNameTypes,
     PermalinkRedditThings,
-    RedditThing, SnoowrapActivity
+    RedditThing,
+    SnoowrapActivity
 } from "./Common/Infrastructure/Reddit";
 import {
-    FullActivityWindowConfig,
     ActivityWindowConfig,
     ActivityWindowCriteria,
-    HistoryFiltersConfig, HistoryFiltersOptions
+    FullActivityWindowConfig,
+    HistoryFiltersConfig,
+    HistoryFiltersOptions
 } from "./Common/Infrastructure/ActivityWindow";
+import {RunnableBaseJson} from "./Common/Infrastructure/Runnable";
 
 
 //import {ResembleSingleCallbackComparisonResult} from "resemblejs";
@@ -697,66 +699,6 @@ export const isActivityWindowConfig = (val: any): val is FullActivityWindowConfi
             val.duration !== undefined;
     }
     return false;
-}
-
-export interface ConfigToObjectOptions {
-    location?: string,
-    jsonDocFunc?: (content: string, location?: string) => AbstractConfigDocument<OperatorJsonConfig>,
-    yamlDocFunc?: (content: string, location?: string) => AbstractConfigDocument<YamlDocument>
-}
-
-export const parseFromJsonOrYamlToObject = (content: string, options?: ConfigToObjectOptions): [ConfigFormat, ConfigDocumentInterface<YamlDocument | object>?, Error?, Error?] => {
-    let obj;
-    let configFormat: ConfigFormat = 'yaml';
-    let jsonErr,
-        yamlErr;
-
-    const likelyType = likelyJson5(content) ? 'json' : 'yaml';
-
-    const {
-        location,
-        jsonDocFunc = (content: string, location?: string) => new JsonConfigDocument(content, location),
-        yamlDocFunc = (content: string, location?: string) => new YamlConfigDocument(content, location),
-    } = options || {};
-
-    try {
-        const jsonObj = jsonDocFunc(content, location);
-        const output = jsonObj.toJS();
-        const oType = output === null ? 'null' : typeof output;
-        if (oType !== 'object') {
-            jsonErr = new SimpleError(`Parsing as json produced data of type '${oType}' (expected 'object')`);
-            obj = undefined;
-        } else {
-            obj = jsonObj;
-            configFormat = 'json';
-        }
-    } catch (err: any) {
-        jsonErr = err;
-    }
-
-    try {
-        const yamlObj = yamlDocFunc(content, location)
-        const output = yamlObj.toJS();
-        const oType = output === null ? 'null' : typeof output;
-        if (oType !== 'object') {
-            yamlErr = new SimpleError(`Parsing as yaml produced data of type '${oType}' (expected 'object')`);
-            obj = undefined;
-        } else if (obj === undefined && (likelyType !== 'json' || yamlObj.parsed.errors.length === 0)) {
-            configFormat = 'yaml';
-            if(yamlObj.parsed.errors.length !== 0) {
-                yamlErr = new Error(yamlObj.parsed.errors.join('\n'))
-            } else {
-                obj = yamlObj;
-            }
-        }
-    } catch (err: any) {
-        yamlErr = err;
-    }
-
-    if (obj === undefined) {
-        configFormat = likelyType;
-    }
-    return [configFormat, obj, jsonErr, yamlErr];
 }
 
 export const comparisonTextOp = (val1: number, strOp: string, val2: number): boolean => {

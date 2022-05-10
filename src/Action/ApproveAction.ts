@@ -4,10 +4,9 @@ import Snoowrap from "snoowrap";
 import {ActionProcessResult, RuleResult} from "../Common/interfaces";
 import Submission from "snoowrap/dist/objects/Submission";
 import Comment from "snoowrap/dist/objects/Comment";
-import {ActionTypes} from "../Common/types";
 import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
 import {runCheckOptions} from "../Subreddit/Manager";
-import {ActionTarget} from "../Common/Infrastructure/Atomic";
+import {ActionTarget, ActionTypes} from "../Common/Infrastructure/Atomic";
 
 export class ApproveAction extends Action {
 

@@ -6,12 +6,12 @@ import {Logger} from "winston";
 import {JoinCondition, RuleResult, RuleSetResult} from "../Common/interfaces";
 import * as RuleSchema from '../Schema/Rule.json';
 import Ajv from 'ajv';
-import {RuleJson, RuleObjectJson, StructuredRuleObjectJson} from "../Common/types";
 import {SubredditResources} from "../Subreddit/SubredditResources";
 import {runCheckOptions} from "../Subreddit/Manager";
 import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
 import {RuleSetResultEntity} from "../Common/Entities/RuleSetResultEntity";
 import {JoinOperands} from "../Common/Infrastructure/Atomic";
+import {RuleJson, RuleObjectJson, StructuredRuleObjectJson} from "../Common/Infrastructure/RuleShapes";
 
 export class RuleSet implements IRuleSet {
     rules: Rule[] = [];
