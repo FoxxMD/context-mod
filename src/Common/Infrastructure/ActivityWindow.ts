@@ -125,6 +125,11 @@ export interface FullActivityWindowConfig extends HistoryFiltersConfig {
     }
 
     /**
+     * Output additional information and all filter output to debug log
+     * */
+    debug?: boolean
+
+    /**
      * Specify the type of Activity (Comment or Submission) to retrieve for the window.
      *
      * Will be overridden if the type is specified in a parent rule (with property such as 'lookAs')
@@ -167,6 +172,13 @@ export interface HistoryFiltersConfig {
      * When present, will only return Activities (Comment or Submission) retrieved from history that pass this filter
      * */
     activityState?: FilterOptionsConfig<ActivityState>
+
+    /**
+     * Output individual filter results for each Activity tested to debug
+     *
+     * If present overrides `debug` set at window level.
+     * */
+    debug?: boolean
 }
 
 export interface PreHistoryFiltersConfig extends HistoryFiltersConfig {
@@ -183,6 +195,7 @@ export interface HistoryFiltersOptions {
     submissionState?: FilterOptions<SubmissionState>
     commentState?: FilterOptions<CommentState>
     activityState?: FilterOptions<ActivityState>
+    debug?: boolean
 }
 
 export interface PreHistoryFiltersOptions extends HistoryFiltersOptions {
@@ -193,6 +206,7 @@ export interface ActivityWindowCriteria {
     count?: number
     duration?: Duration
     satisfyOn: ActivityWindowSatisfiedOn
+    debug?: boolean
     filterOn?: {
         pre?: PreHistoryFiltersOptions
         post?: HistoryFiltersOptions

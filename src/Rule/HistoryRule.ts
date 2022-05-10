@@ -13,12 +13,13 @@ import {
     formatNumber, getActivitySubredditName, historyFilterConfigToOptions, isSubmission,
     parseGenericValueOrPercentComparison, parseSubredditName,
     PASS,
-    percentFromString, toStrongSubredditState, windowConfigToWindowCriteria
+    percentFromString, removeUndefinedKeys, toStrongSubredditState, windowConfigToWindowCriteria
 } from "../util";
 import {Comment, RedditUser} from "snoowrap";
 import {SubredditCriteria} from "../Common/Infrastructure/Filters/FilterCriteria";
 import {CompareValueOrPercent} from "../Common/Infrastructure/Atomic";
 import {ActivityWindowConfig, ActivityWindowCriteria} from "../Common/Infrastructure/ActivityWindow";
+import {ErrorWithCause} from "pony-cause";
 
 export interface CommentThresholdCriteria extends ThresholdCriteria {
     /**
@@ -111,22 +112,35 @@ export class HistoryRule extends Rule {
             throw new Error('Must provide at least one HistoryCriteria');
         }
 
+        // TODO should these be deprecated?
         this.include = include;
         this.exclude = exclude;
 
-        this.criteria = criteria.map(x => {
+        const postFilter = removeUndefinedKeys(historyFilterConfigToOptions({subreddits: {include, exclude}}));
+
+        this.criteria = criteria.map((x, index) => {
             const strongWindow = windowConfigToWindowCriteria(x.window);
             const {
                 filterOn: {
-                    post,
+                    post: {
+                        subreddits: {
+                            include: windowSubInclude = undefined,
+                            exclude: windowSubExclude = undefined,
+                        } = {}
+                    } = {},
                 } = {},
             } = strongWindow;
 
-           if(post === undefined && (this.include !== undefined || this.exclude !== undefined)) {
-                const postFilter = historyFilterConfigToOptions({subreddits: {include, exclude}});
+           if(postFilter !== undefined) {
+                if(postFilter.subreddits?.include !== undefined && windowSubInclude !== undefined) {
+                    this.logger.warn(`Rule defines both 'include' at top level and a criteria (#${index+1}) with a window with 'filterOn.post.subreddits.include' defined. Window filter takes precedence`);
+                }
+               if(postFilter.subreddits?.exclude !== undefined && windowSubExclude !== undefined) {
+                   this.logger.warn(`Rule defines both 'exclude' at top level and a criteria (#${index+1}) with a window with 'filterOn.post.subreddits.exclude' defined. Window filter takes precedence`);
+               }
                 strongWindow.filterOn = {
-                ...(strongWindow.filterOn ?? {}),
-                    post: postFilter
+                    post: postFilter,
+                    ...(strongWindow.filterOn ?? {}),
                 };
            }
            return {
@@ -381,9 +395,9 @@ interface HistoryConfig  {
      * */
     condition?: 'AND' | 'OR'
 
+    // DEPRECATED - In each History Criteria use `window.filterOn.post.subreddits` instead
+    // @deprecationMessage In each History Criteria use `window.filterOn.post.subreddits` instead
     /**
-     * DEPRECATED - In each History Criteria use `window.filterOn.post.subreddits` instead
-     *
      * If present, activities will be counted only if they are found in this list of Subreddits.
      *
      * Each value in the list can be either:
@@ -401,12 +415,12 @@ interface HistoryConfig  {
      * * -- to run this rule where all activities are only from include/exclude filtering instead use include/exclude in `window`
      *
      * @examples [["mealtimevideos","askscience", "/onlyfans*\/i", {"over18": true}]]
-     * @deprecationMessage In each History Criteria use `window.filterOn.post.subreddits` instead
      * */
     include?: (string | SubredditCriteria)[],
+
+    // DEPRECATED - In each History Criteria use `window.filterOn.post.subreddits` instead
+    // @deprecationMessage In each History Criteria use `window.filterOn.post.subreddits` instead
     /**
-     * DEPRECATED - In each History Criteria use `window.filterOn.post.subreddits` instead
-     *
      * If present, activities will be counted only if they are **NOT** found in this list of Subreddits
      *
      * Each value in the list can be either:
@@ -424,7 +438,6 @@ interface HistoryConfig  {
      * * -- to run this rule where all activities are only from include/exclude filtering instead use include/exclude in `window`
      *
      * @examples [["mealtimevideos","askscience", "/onlyfans*\/i", {"over18": true}]]
-     * @deprecationMessage In each History Criteria use `window.filterOn.post.subreddits` instead
      * */
     exclude?: (string | SubredditCriteria)[],
 }

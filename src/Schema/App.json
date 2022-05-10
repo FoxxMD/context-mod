@@ -117,8 +117,7 @@
             "properties": {
                 "commentState": {
                     "$ref": "#/definitions/CommentState",
-                    "deprecationMessage": "use `window.filterOn.post.submissionState` instead",
-                    "description": "DEPRECATED - use `window.filterOn.post.submissionState` instead\n\nWhen present, a Comment will only be counted if it meets this",
+                    "description": "When present, a Comment will only be counted if it meets this criteria",
                     "examples": [
                         {
                             "op": true,
@@ -133,8 +132,7 @@
                 },
                 "submissionState": {
                     "$ref": "#/definitions/SubmissionState",
-                    "deprecationMessage": "use `window.filterOn.post.submissionState` instead",
-                    "description": "DEPRECATED - use `window.filterOn.post.submissionState` instead\n\nWhen present, a Submission will only be counted if it meets this criteria",
+                    "description": "When present, a Submission will only be counted if it meets this criteria",
                     "examples": [
                         {
                             "over_18": true,
@@ -152,8 +150,7 @@
                     "type": "string"
                 },
                 "subreddits": {
-                    "deprecationMessage": "use `window.filterOn.post.subreddits` instead",
-                    "description": "DEPRECATED - use `window.filterOn.post.subreddits` instead\n\nActivities will be counted if they are found in this list of Subreddits\n\nEach value in the list can be either:\n\n * string (name of subreddit)\n * regular expression to run on the subreddit name\n * `SubredditState`\n\nEX `[\"mealtimevideos\",\"askscience\", \"/onlyfans*\\/i\", {\"over18\": true}]`",
+                    "description": "Activities will be counted if they are found in this list of Subreddits\n\nEach value in the list can be either:\n\n * string (name of subreddit)\n * regular expression to run on the subreddit name\n * `SubredditState`\n\nEX `[\"mealtimevideos\",\"askscience\", \"/onlyfans*\\/i\", {\"over18\": true}]`",
                     "examples": [
                         [
                             "mealtimevideos",
@@ -410,7 +407,8 @@
                 },
                 "thresholdOn": {
                     "default": "all",
-                    "description": "What activities to use for total count when determining what percentage an attribution comprises\n\nEX:\n\nAuthor has 100 activities, 40 are submissions and 60 are comments\n\n* If `submission` then if 10 submission are for Youtube Channel A then percentage => 10/40 = 25%\n* If `all` then if 10 submission are for Youtube Channel A then percentage => 10/100 = 10%",
+                    "deprecationMessage": "use `window.fetch` instead",
+                    "description": "DEPRECATED -- use `window.fetch` instead\n\nWhat activities to use for total count when determining what percentage an attribution comprises\n\nEX:\n\nAuthor has 100 activities, 40 are submissions and 60 are comments\n\n* If `submission` then if 10 submission are for Youtube Channel A then percentage => 10/40 = 25%\n* If `all` then if 10 submission are for Youtube Channel A then percentage => 10/100 = 10%",
                     "enum": [
                         "all",
                         "submissions"
@@ -2825,6 +2823,10 @@
                     ],
                     "type": "number"
                 },
+                "debug": {
+                    "description": "Output additional information and all filter output to debug log",
+                    "type": "boolean"
+                },
                 "duration": {
                     "anyOf": [
                         {
@@ -2974,6 +2976,10 @@
                     "$ref": "#/definitions/FilterOptionsConfig<CommentState>",
                     "description": "When present, will only return Comments retrieved from history that pass this filter\n\nTakes precedence over `activityState`"
                 },
+                "debug": {
+                    "description": "Output individual filter results for each Activity tested to debug\n\nIf present overrides `debug` set at window level.",
+                    "type": "boolean"
+                },
                 "submissionState": {
                     "$ref": "#/definitions/FilterOptionsConfig<SubmissionState>",
                     "description": "When present, will only return Submissions retrieved from history that pass this filter\n\nTakes precedence over `activityState`"
@@ -3029,8 +3035,7 @@
                     "type": "array"
                 },
                 "exclude": {
-                    "deprecationMessage": "In each History Criteria use `window.filterOn.post.subreddits` instead",
-                    "description": "DEPRECATED - In each History Criteria use `window.filterOn.post.subreddits` instead\n\nIf present, activities will be counted only if they are **NOT** found in this list of Subreddits\n\nEach value in the list can be either:\n\n * string (name of subreddit)\n * regular expression to run on the subreddit name\n * `SubredditState`\n\nEX `[\"mealtimevideos\",\"askscience\", \"/onlyfans*\\/i\", {\"over18\": true}]`\n\n**Note:** This affects **post-window retrieval** activities. So that:\n\n* `activityTotal` is number of activities retrieved from `window` -- NOT post-filtering\n* all comparisons using **percentages** will compare **post-filtering** results against **activity count from window**\n* -- to run this rule where all activities are only from include/exclude filtering instead use include/exclude in `window`",
+                    "description": "If present, activities will be counted only if they are **NOT** found in this list of Subreddits\n\nEach value in the list can be either:\n\n * string (name of subreddit)\n * regular expression to run on the subreddit name\n * `SubredditState`\n\nEX `[\"mealtimevideos\",\"askscience\", \"/onlyfans*\\/i\", {\"over18\": true}]`\n\n**Note:** This affects **post-window retrieval** activities. So that:\n\n* `activityTotal` is number of activities retrieved from `window` -- NOT post-filtering\n* all comparisons using **percentages** will compare **post-filtering** results against **activity count from window**\n* -- to run this rule where all activities are only from include/exclude filtering instead use include/exclude in `window`",
                     "examples": [
                         [
                             "mealtimevideos",
@@ -3054,8 +3059,7 @@
                     "type": "array"
                 },
                 "include": {
-                    "deprecationMessage": "In each History Criteria use `window.filterOn.post.subreddits` instead",
-                    "description": "DEPRECATED - In each History Criteria use `window.filterOn.post.subreddits` instead\n\nIf present, activities will be counted only if they are found in this list of Subreddits.\n\nEach value in the list can be either:\n\n * string (name of subreddit)\n * regular expression to run on the subreddit name\n * `SubredditState`\n\nEX `[\"mealtimevideos\",\"askscience\", \"/onlyfans*\\/i\", {\"over18\": true}]`\n\n **Note:** This affects **post-window retrieval** activities. So that:\n\n* `activityTotal` is number of activities retrieved from `window` -- NOT post-filtering\n* all comparisons using **percentages** will compare **post-filtering** results against **activity count from window**\n* -- to run this rule where all activities are only from include/exclude filtering instead use include/exclude in `window`",
+                    "description": "If present, activities will be counted only if they are found in this list of Subreddits.\n\nEach value in the list can be either:\n\n * string (name of subreddit)\n * regular expression to run on the subreddit name\n * `SubredditState`\n\nEX `[\"mealtimevideos\",\"askscience\", \"/onlyfans*\\/i\", {\"over18\": true}]`\n\n **Note:** This affects **post-window retrieval** activities. So that:\n\n* `activityTotal` is number of activities retrieved from `window` -- NOT post-filtering\n* all comparisons using **percentages** will compare **post-filtering** results against **activity count from window**\n* -- to run this rule where all activities are only from include/exclude filtering instead use include/exclude in `window`",
                     "examples": [
                         [
                             "mealtimevideos",
@@ -3791,6 +3795,10 @@
                 "commentState": {
                     "$ref": "#/definitions/FilterOptionsConfig<CommentState>",
                     "description": "When present, will only return Comments retrieved from history that pass this filter\n\nTakes precedence over `activityState`"
+                },
+                "debug": {
+                    "description": "Output individual filter results for each Activity tested to debug\n\nIf present overrides `debug` set at window level.",
+                    "type": "boolean"
                 },
                 "max": {
                     "anyOf": [

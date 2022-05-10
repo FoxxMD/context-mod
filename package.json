@@ -94,6 +94,7 @@
     "winston": "github:FoxxMD/winston#fbab8de969ecee578981c77846156c7f43b5f01e",
     "winston-daily-rotate-file": "^4.5.5",
     "winston-duplex": "^0.1.1",
+    "winston-null": "^2.0.0",
     "winston-transport": "^4.4.0",
     "yaml": "2.0.0-10",
     "zlib": "^1.0.5"

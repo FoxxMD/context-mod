@@ -127,6 +127,10 @@ export class RegexRule extends Rule {
         }
         this.criteria = criteria;
         this.condition = condition;
+
+        if(this.criteria.some(x => x.lookAt !== undefined)) {
+            this.logger.warn(`Some criteria use 'lookAt' which is deprecated. Use 'window.fetch' instead`);
+        }
     }
 
     getKind(): string {

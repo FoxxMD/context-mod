@@ -24,3 +24,11 @@ declare module 'snoowrap/dist/errors' {
         name: 'RateLimitError',
     }
 }
+
+declare module 'winston-null' {
+  import TransportStream from "winston-transport";
+
+    export class NullTransport extends TransportStream {
+
+    }
+}

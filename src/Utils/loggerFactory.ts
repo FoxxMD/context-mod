@@ -1,13 +1,12 @@
-import {castToBool, fileOrDirectoryIsWriteable, labelledFormat, logLevels, mergeArr, resolvePath} from "../util";
+import {castToBool, fileOrDirectoryIsWriteable, labelledFormat, logLevels, resolvePath} from "../util";
 import winston, {Logger} from "winston";
 import {DuplexTransport} from "winston-duplex";
-import {WinstonAdaptor} from 'typeorm-logger-adaptor/logger/winston';
-import {LoggerOptions} from 'typeorm';
 import process from "process";
 import path from "path";
 import {defaultDataDir} from "../Common/defaults";
 import {ErrorWithCause} from "pony-cause";
 import {LoggerFactoryOptions} from "../Common/Infrastructure/Logging";
+import {NullTransport} from 'winston-null';
 
 const {transports} = winston;
 
@@ -147,3 +146,15 @@ export const initLogger = async (args: any) => {
 
     return getLogger(initLoggerOptions, 'init');
 }
+export const snooLogWrapper = (logger: Logger) => {
+    return {
+        warn: (...args: any[]) => logger.warn(args.slice(0, 2).join(' '), [args.slice(2)]),
+        debug: (...args: any[]) => logger.debug(args.slice(0, 2).join(' '), [args.slice(2)]),
+        info: (...args: any[]) => logger.info(args.slice(0, 2).join(' '), [args.slice(2)]),
+        trace: (...args: any[]) => logger.debug(args.slice(0, 2).join(' '), [args.slice(2)]),
+    }
+}
+
+winston.loggers.add('noop', {transports: [new NullTransport()]});
+
+export const NoopLogger = winston.loggers.get('noop');

@@ -1,30 +1,25 @@
 import {asStructuredCommentCheckJson, asStructuredSubmissionCheckJson, Check, CheckStructuredJson} from "../Check";
 import {
-    ActionResult,
-    ActivityCheckJson, CheckResult, CheckSummary,
+    ActivityCheckJson,
     PostBehavior, PostBehaviorOption,
-    RuleResult, RunResult
+    RunResult
 } from "../Common/interfaces";
 import {SubmissionCheck} from "../Check/SubmissionCheck";
 import {CommentCheck} from "../Check/CommentCheck";
 import {Logger} from "winston";
-import {determineNewResults, FAIL, isSubmission, mergeArr, normalizeCriteria, normalizeName} from "../util";
-import {checkAuthorFilter, checkItemFilter, SubredditResources} from "../Subreddit/SubredditResources";
+import {determineNewResults, isSubmission, mergeArr, normalizeName} from "../util";
 import {ExtendedSnoowrap} from "../Utils/SnoowrapClients";
 import Submission from "snoowrap/dist/objects/Submission";
 import {Comment} from "snoowrap";
 import {runCheckOptions} from "../Subreddit/Manager";
-import {ErrorWithCause, stackWithCauses} from "pony-cause";
 import EventEmitter from "events";
 import {CheckProcessingError, RunProcessingError} from "../Utils/Errors";
 import {RunEntity} from "../Common/Entities/RunEntity";
 import {RunResultEntity} from "../Common/Entities/RunResultEntity";
 import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
 import {RunnableBase} from "../Common/RunnableBase";
-import {AuthorCriteria, TypedActivityStates} from "../Common/Infrastructure/Filters/FilterCriteria";
-import {PostBehaviorType} from "../Common/Infrastructure/Atomic";
 import {RunnableBaseJson, RunnableBaseOptions, StructuredRunnableBase} from "../Common/Infrastructure/Runnable";
-import {AuthorOptions, FilterCriteriaDefaults, FilterResult} from "../Common/Infrastructure/Filters/FilterShapes";
+import {FilterCriteriaDefaults} from "../Common/Infrastructure/Filters/FilterShapes";
 
 export class Run extends RunnableBase {
     name: string;

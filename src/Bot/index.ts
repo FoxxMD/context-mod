@@ -19,8 +19,7 @@ import {
     parseBool,
     parseDuration, parseMatchMessage, parseRedditEntity,
     parseSubredditName, RetryOptions,
-    sleep,
-    snooLogWrapper
+    sleep
 } from "../util";
 import {Manager} from "../Subreddit/Manager";
 import {ExtendedSnoowrap, ProxiedSnoowrap} from "../Utils/SnoowrapClients";
@@ -41,6 +40,7 @@ import {EventsRunState} from "../Common/Entities/EntityRunState/EventsRunState";
 import {ManagerRunState} from "../Common/Entities/EntityRunState/ManagerRunState";
 import {Invokee, PollOn} from "../Common/Infrastructure/Atomic";
 import {FilterCriteriaDefaults} from "../Common/Infrastructure/Filters/FilterShapes";
+import {snooLogWrapper} from "../Utils/loggerFactory";
 
 class Bot {
 

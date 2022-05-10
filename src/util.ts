@@ -68,7 +68,8 @@ import {
 import {
     ActivitySource,
     ActivitySourceTypes,
-    CacheProvider, ConfigFormat,
+    CacheProvider,
+    ConfigFormat,
     DurationVal,
     RedditEntity,
     RedditEntityType,
@@ -80,9 +81,13 @@ import {
 import {DurationComparison, GenericComparison} from "./Common/Infrastructure/Comparisons";
 import {
     AuthorOptions,
-    FilterCriteriaDefaults, FilterCriteriaPropertyResult, FilterCriteriaResult,
+    FilterCriteriaDefaults,
+    FilterCriteriaPropertyResult,
+    FilterCriteriaResult,
     FilterOptions,
-    FilterOptionsJson, FilterResult, ItemOptions,
+    FilterOptionsJson,
+    FilterResult,
+    ItemOptions,
     MaybeAnonymousCriteria,
     MaybeAnonymousOrStringCriteria,
     MinimalOrFullFilter,
@@ -555,8 +560,11 @@ export const filterCriteriaPropertySummary = <T>(val: FilterCriteriaPropertyResu
     return `${val.property as string} => ${passResult}${expected}${found}${val.reason !== undefined ? ` -- ${val.reason}` : ''}${val.behavior === 'exclude' ? ' (Exclude passes when Expected is not Found)' : ''}`;
 }
 
-export const createAjvFactory = (logger: Logger) => {
-    return  new Ajv({logger: logger, verbose: true, strict: "log", allowUnionTypes: true});
+export const createAjvFactory = (logger: Logger): Ajv => {
+    const validator =  new Ajv({logger: logger, verbose: true, strict: "log", allowUnionTypes: true});
+    // https://ajv.js.org/strict-mode.html#unknown-keywords
+    validator.addKeyword('deprecationMessage');
+    return validator;
 }
 
 export const percentFromString = (str: string): number => {
@@ -1525,7 +1533,7 @@ export const toStrongSubredditState = (s: SubredditCriteria, opts?: StrongSubred
 
     // if user provided a regex for "name" then add isUserProfile so we can do a SEPARATE check on the name specifically for user profile prefix
     // -- this way user can regex for a specific name but still filter by prefix
-    if(nameValOriginallyRegex) {
+    if(nameValOriginallyRegex && isUserProfile !== undefined) {
         strongState.isUserProfile = isUserProfile;
     }
 
@@ -1642,7 +1650,7 @@ export const fileOrDirectoryIsWriteable = (location: string) => {
 
 export const overwriteMerge = (destinationArray: any[], sourceArray: any[], options: any): any[] => sourceArray;
 
-export const removeUndefinedKeys = (obj: any) => {
+export const removeUndefinedKeys = <T extends Record<string, any>>(obj: T): T | undefined => {
     let newObj: any = {};
     Object.keys(obj).forEach((key) => {
         if(Array.isArray(obj[key])) {
@@ -1756,15 +1764,6 @@ function *setMinus(A: Array<any>, B: Array<any>) {
 
 export const difference = (a: Array<any>, b: Array<any>) => {
     return Array.from(setMinus(a, b));
-}
-
-export const snooLogWrapper = (logger: Logger) => {
-    return {
-        warn: (...args: any[]) => logger.warn(args.slice(0, 2).join(' '), [args.slice(2)]),
-        debug: (...args: any[]) => logger.debug(args.slice(0, 2).join(' '), [args.slice(2)]),
-        info: (...args: any[]) => logger.info(args.slice(0, 2).join(' '), [args.slice(2)]),
-        trace: (...args: any[]) => logger.debug(args.slice(0, 2).join(' '), [args.slice(2)]),
-    }
 }
 
 /**
@@ -2136,6 +2135,7 @@ export const windowConfigToWindowCriteria = (window: ActivityWindowConfig): Acti
         commentState,
         activityState,
         filterOn,
+        debug,
         fetch,
         ...rest
     } = crit;
@@ -2144,20 +2144,27 @@ export const windowConfigToWindowCriteria = (window: ActivityWindowConfig): Acti
         count,
         duration: duration !== undefined ? parseDurationValToDuration(duration) : undefined,
         satisfyOn,
-        fetch: fetch === undefined ? fetch : fetchToStrongHistoryType(fetch)
+        fetch: fetch === undefined ? fetch : fetchToStrongHistoryType(fetch),
+        debug
     };
 
     if(filterOn !== undefined) {
         const {pre, post} = filterOn;
         opts.filterOn = {};
         if(pre !== undefined) {
+            const {debug: preDebug = debug} = pre;
             opts.filterOn.pre = {
                 ...historyFilterConfigToOptions(pre),
-                max: typeof pre.max === 'number' ? pre.max : parseDurationValToDuration(pre.max)
+                max: typeof pre.max === 'number' ? pre.max : parseDurationValToDuration(pre.max),
+                debug: preDebug,
             }
         }
         if(post !== undefined) {
-            opts.filterOn.post = historyFilterConfigToOptions(post);
+            const {debug: postDebug = debug} = post;
+            opts.filterOn.post = {
+                ...historyFilterConfigToOptions(post),
+                debug: postDebug
+            }
         }
     }
 
@@ -2166,10 +2173,16 @@ export const windowConfigToWindowCriteria = (window: ActivityWindowConfig): Acti
         if(potentialPost !== undefined) {
             if(opts.filterOn === undefined) {
                 opts.filterOn = {
-                    post: potentialPost
+                    post: {
+                        ...potentialPost,
+                        debug,
+                    }
                 }
             } else {
-                opts.filterOn.post = potentialPost;
+                opts.filterOn.post = {
+                    ...potentialPost,
+                    debug
+                };
             }
         }
     }

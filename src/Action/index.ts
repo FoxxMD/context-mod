@@ -1,30 +1,24 @@
 import {Comment, Submission} from "snoowrap";
 import {Logger} from "winston";
-import {checkAuthorFilter, checkItemFilter, SubredditResources} from "../Subreddit/SubredditResources";
 import {
     ActionProcessResult,
-    ActionResult, ObjectPremise, RuleResult
+    ObjectPremise
 } from "../Common/interfaces";
-import {mergeArr, normalizeCriteria} from "../util";
+import {mergeArr} from "../util";
 import LoggedError from "../Utils/LoggedError";
 import {ExtendedSnoowrap} from '../Utils/SnoowrapClients';
 import {ErrorWithCause} from "pony-cause";
 import EventEmitter from "events";
 import {runCheckOptions} from "../Subreddit/Manager";
 import {ActionPremise} from "../Common/Entities/ActionPremise";
-import objectHash from "object-hash";
-import {RuleType} from "../Common/Entities/RuleType";
 import {ActionType} from "../Common/Entities/ActionType";
 import { capitalize } from "lodash";
 import { RuleResultEntity } from "../Common/Entities/RuleResultEntity";
 import { RunnableBase } from "../Common/RunnableBase";
 import {ActionResultEntity} from "../Common/Entities/ActionResultEntity";
 import {FindOptionsWhere} from "typeorm/find-options/FindOptionsWhere";
-import {RulePremise} from "../Common/Entities/RulePremise";
-import {AuthorCriteria, TypedActivityState, TypedActivityStates} from "../Common/Infrastructure/Filters/FilterCriteria";
 import {ActionTypes} from "../Common/Infrastructure/Atomic";
 import {RunnableBaseJson, RunnableBaseOptions, StructuredRunnableBase} from "../Common/Infrastructure/Runnable";
-import {AuthorOptions, ChecksActivityState, FilterResult} from "../Common/Infrastructure/Filters/FilterShapes";
 
 export abstract class Action extends RunnableBase {
     name?: string;

@@ -98,6 +98,9 @@ export class RecentActivityRule extends Rule {
             }
         };
         this.lookAt = lookAt;
+        if(this.lookAt !== undefined) {
+            this.logger.warn(`'lookAt' is deprecated and will be removed in a future version. Use 'window.fetch' instead`);
+        }
         this.useSubmissionAsReference = useSubmissionAsReference;
         this.window = window;
         this.thresholds = options.thresholds;
@@ -507,19 +510,11 @@ export class RecentActivityRule extends Rule {
  * */
 export interface ActivityThreshold {
     /**
-     * DEPRECATED - use `window.filterOn.post.submissionState` instead
-     *
      * When present, a Submission will only be counted if it meets this criteria
-     *
-     * @deprecationMessage use `window.filterOn.post.submissionState` instead
      * */
     submissionState?: SubmissionState
     /**
-     * DEPRECATED - use `window.filterOn.post.submissionState` instead
-     *
-     * When present, a Comment will only be counted if it meets this
-     *
-     * @deprecationMessage use `window.filterOn.post.submissionState` instead
+     * When present, a Comment will only be counted if it meets this criteria
      * */
     commentState?: CommentState
 
@@ -555,8 +550,6 @@ export interface ActivityThreshold {
     karma?: string
 
     /**
-     * DEPRECATED - use `window.filterOn.post.subreddits` instead
-     *
      * Activities will be counted if they are found in this list of Subreddits
      *
      * Each value in the list can be either:
@@ -567,7 +560,6 @@ export interface ActivityThreshold {
      *
      * EX `["mealtimevideos","askscience", "/onlyfans*\/i", {"over18": true}]`
      * @examples [["mealtimevideos","askscience", "/onlyfans*\/i", {"over18": true}]]
-     * @deprecationMessage use `window.filterOn.post.subreddits` instead
      * */
     subreddits?: (string | SubredditCriteria)[]
 

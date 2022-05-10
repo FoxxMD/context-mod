@@ -33,7 +33,7 @@ export abstract class RunnableBase {
         let itemRes: (FilterResult<TypedActivityState> | undefined);
         let authorRes: (FilterResult<AuthorCriteria> | undefined);
 
-        const [itemPass, itemFilterType, itemFilterResults] = await checkItemFilter(activity, this.itemIs, this.resources, this.logger, options.source);
+        const [itemPass, itemFilterType, itemFilterResults] = await checkItemFilter(activity, this.itemIs, this.resources, {source: options.source, logger: this.logger});
         if (!itemPass) {
             return [itemFilterResults, undefined];
         } else if(itemFilterType !== undefined) {

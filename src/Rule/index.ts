@@ -2,7 +2,6 @@ import Snoowrap, {Comment} from "snoowrap";
 import Submission from "snoowrap/dist/objects/Submission";
 import {Logger} from "winston";
 import {findResultByPremise, mergeArr} from "../util";
-import {checkAuthorFilter, checkItemFilter} from "../Subreddit/SubredditResources";
 import {
     ObjectPremise,
     ResultContext,
@@ -16,7 +15,6 @@ import {capitalize} from "lodash";
 import {RunnableBase} from "../Common/RunnableBase";
 import {FindOptionsWhere} from "typeorm/find-options/FindOptionsWhere";
 import {RunnableBaseJson, RunnableBaseOptions, StructuredRunnableBase} from "../Common/Infrastructure/Runnable";
-import {AuthorOptions, ChecksActivityState} from "../Common/Infrastructure/Filters/FilterShapes";
 
 export interface RuleOptions extends RunnableBaseOptions {
     name?: string;

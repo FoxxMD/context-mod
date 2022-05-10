@@ -59,7 +59,7 @@ export class ActivitySourceEntity {
             const hashObj = removeUndefinedKeys({
                 ...rest,
                 managerId: manager.id
-            });
+            }) as object;
             this.id = objectHash.sha1(hashObj);
         }
     }

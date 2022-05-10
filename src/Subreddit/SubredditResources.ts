@@ -144,6 +144,7 @@ import {
     SnoowrapActivity
 } from "../Common/Infrastructure/Reddit";
 import {AuthorCritPropHelper} from "../Common/Infrastructure/Filters/AuthorCritPropHelper";
+import {NoopLogger} from "../Utils/loggerFactory";
 
 export const DEFAULT_FOOTER = '\r\n*****\r\nThis action was performed by [a bot.]({{botLink}}) Mention a moderator or [send a modmail]({{modmailLink}}) if you any ideas, questions, or concerns about this action.';
 
@@ -986,7 +987,7 @@ export class SubredditResources {
     }
 
     // @ts-ignore
-    async getSubreddit(item: Submission | Comment) {
+    async getSubreddit(item: Submission | Comment, logger = this.logger) {
         try {
             let hash = '';
             const subName = getActivitySubredditName(item);
@@ -997,7 +998,7 @@ export class SubredditResources {
                 this.stats.cache.subreddit.requests++;
                 const cachedSubreddit = await this.cache.get(hash);
                 if (cachedSubreddit !== undefined && cachedSubreddit !== null) {
-                    this.logger.debug(`Cache Hit: Subreddit ${subName}`);
+                    logger.debug(`Cache Hit: Subreddit ${subName}`);
                     return new Subreddit(cachedSubreddit, this.client, false);
                 }
                 // @ts-ignore
@@ -1194,7 +1195,7 @@ export class SubredditResources {
         const criteriaWithDefaults = {
             chunkSize: 100,
             sort: 'new' as AuthorHistorySort,
-            ...options,
+            ...(cloneDeep(options)),
         }
 
         return await this.getActivities(user, criteriaWithDefaults, {func: listFunc, name: listFuncName});
@@ -1222,7 +1223,7 @@ export class SubredditResources {
             let rawCount: number = 0;
             let fromCache = false;
 
-            const hashObj = options;
+            const hashObj = cloneDeep(options);
 
             // don't include post filter when determining cache hash
             // because we can re-use the cache results from a 'pre' return to filter to post (no need to use api)
@@ -1477,35 +1478,31 @@ export class SubredditResources {
         if(opts === undefined) {
             return listing;
         }
+        const {debug = false} = opts;
 
         let filteredListing = [...listing];
         if(filteredListing.length > 0 && opts.subreddits !== undefined) {
+            const subredditTestOptions = debug ? {logger: undefined, includeIdentifier: true} : {logger: NoopLogger};
             if(opts.subreddits.include !== undefined) {
-                filteredListing = await this.batchTestSubredditCriteria(filteredListing, opts.subreddits.include.map(x => x.criteria), user, true);
+                filteredListing = await this.batchTestSubredditCriteria(filteredListing, opts.subreddits.include.map(x => x.criteria), user, subredditTestOptions);
             } else if(opts.subreddits.exclude !== undefined) {
                 // TODO use excludeCondition correctly?
-                filteredListing = await this.batchTestSubredditCriteria(filteredListing, opts.subreddits.exclude.map(x => x.criteria), user, false);
+                filteredListing = await this.batchTestSubredditCriteria(filteredListing, opts.subreddits.exclude.map(x => x.criteria), user, {...subredditTestOptions, isInclude: false});
             }
         }
         if(filteredListing.length > 0 && (opts.submissionState !== undefined || opts.commentState !== undefined || opts.activityState !== undefined)) {
             const newFiltered = [];
             for(const activity of filteredListing) {
                 let passes = true;
-                if(activity instanceof Submission && opts.submissionState !== undefined) {
-                    const [subPass] = await checkItemFilter(activity, opts.submissionState, this, this.logger);
-                    if(subPass) {
-                        passes = subPass;
-                    }
+                if(asSubmission(activity) && opts.submissionState !== undefined) {
+                    const [subPass, subPassType, filterResult] = await checkItemFilter(activity, opts.submissionState, this, {logger: debug ? this.logger : undefined});
+                    passes = subPass;
                 } else if(opts.commentState !== undefined) {
-                   const [comPasses] = await checkItemFilter(activity, opts.commentState, this, this.logger);
-                    if(comPasses) {
-                        passes = comPasses;
-                    }
+                   const [comPasses, comPassType, filterResult] = await checkItemFilter(activity, opts.commentState, this, {logger: debug ? this.logger : undefined});
+                    passes = comPasses;
                 } else if(opts.activityState !== undefined) {
-                    const [actPasses] = await checkItemFilter(activity, opts.activityState, this, this.logger);
-                    if(actPasses) {
-                        passes = actPasses;
-                    }
+                    const [actPasses, actPassType, filterResult] = await checkItemFilter(activity, opts.activityState, this, {logger: debug ? this.logger : undefined});
+                    passes = actPasses;
                 }
                 if(passes) {
                     newFiltered.push(activity)
@@ -1612,7 +1609,14 @@ export class SubredditResources {
         }
     }
 
-    async batchTestSubredditCriteria(items: (Comment | Submission)[], states: (SubredditCriteria | StrongSubredditCriteria)[], author: RedditUser, isInclude = true): Promise<(Comment | Submission)[]> {
+    // isInclude = true, logger: Logger = this.logger
+    async batchTestSubredditCriteria(items: SnoowrapActivity[], states: (SubredditCriteria | StrongSubredditCriteria)[], author: RedditUser, options?: {logger?: Logger, isInclude?: boolean, includeIdentifier?: boolean}): Promise<(Comment | Submission)[]> {
+        const {
+            logger = this.logger,
+            isInclude = true,
+            includeIdentifier = false,
+        } = options || {};
+
         let passedItems: (Comment | Submission)[] = [];
         let unpassedItems: (Comment | Submission)[] = [];
 
@@ -1623,6 +1627,13 @@ export class SubredditResources {
             return {...acc, full: acc.full.concat(curr)};
         }, {nameOnly: [], full: []});
 
+        const derivedLogger = (item: SnoowrapActivity) => {
+            if(!includeIdentifier) {
+                return logger;
+            }
+            return logger.child({labels: `${asSubmission(item) ? 'SUB' : 'COM'} ${item.id}`}, mergeArr);
+        }
+
         if(nameOnly.length === 0) {
             unpassedItems = items;
         } else {
@@ -1630,7 +1641,7 @@ export class SubredditResources {
                 const subName = getActivitySubredditName(item);
                 let matched = false;
                 for(const state of nameOnly) {
-                    if(await this.isSubreddit({display_name: subName} as Subreddit, state, author, this.logger)) {
+                    if(await this.isSubreddit({display_name: subName} as Subreddit, state, author, derivedLogger(item))) {
                         matched = true;
                         break;
                     }
@@ -1654,7 +1665,8 @@ export class SubredditResources {
             for(const item of unpassedItems) {
                 let matched = false;
                 for(const state of full) {
-                    if(await this.isSubreddit(await this.getSubreddit(item), state, author, this.logger)) {
+                    const logger = derivedLogger(item);
+                    if(await this.isSubreddit(await this.getSubreddit(item, logger), state, author, logger)) {
                         passedItems.push(item);
                         break;
                     }
@@ -1793,7 +1805,7 @@ export class SubredditResources {
                 this.stats.cache.itemCrit.requests++;
                 let itemResult = await this.cache.get(hash) as FilterCriteriaResult<TypedActivityState> | undefined | null;
                 if (itemResult !== undefined && itemResult !== null) {
-                    this.logger.debug(`Cache Hit: Item Check on ${item.name} (Hash ${hash})`);
+                    logger.debug(`Cache Hit: Item Check on ${item.name} (Hash ${hash})`);
                     //return cachedItem as boolean;
                 } else {
                     itemResult = await this.isItem(item, state, logger, include);
@@ -3135,9 +3147,19 @@ export const checkAuthorFilter = async (item: (Submission | Comment), filter: Au
     return [true, undefined, {criteriaResults: allCritResults, join: 'OR', passed: true}];
 }
 
-export const checkItemFilter = async (item: (Submission | Comment), filter: ItemOptions, resources: SubredditResources, parentLogger: Logger, source?: ActivitySource): Promise<[boolean, ('inclusive' | 'exclusive' | undefined), FilterResult<TypedActivityState>]> => {
-    const logger = parentLogger.child({labels: ['Item Filter']}, mergeArr);
+export const checkItemFilter = async (item: (Submission | Comment), filter: ItemOptions, resources: SubredditResources, options?: {logger?: Logger, source?: ActivitySource, includeIdentifier?: boolean}): Promise<[boolean, ('inclusive' | 'exclusive' | undefined), FilterResult<TypedActivityState>]> => {
 
+    const {
+        logger: parentLogger = NoopLogger,
+        source,
+        includeIdentifier = false,
+    } = options || {};
+
+    const labels = ['Item Filter'];
+    if(includeIdentifier) {
+        labels.push(`${asSubmission(item) ? 'SUB' : 'COM'} ${item.id}`);
+    }
+    const logger = parentLogger.child({labels}, mergeArr);
     const {
         include = [],
         excludeCondition = 'AND',
@@ -3298,7 +3320,7 @@ export const checkCommentSubmissionStates = async (item: Comment, submissionStat
         exclude: excludeCondition === undefined ? undefined : submissionStates.map(x => ({criteria: x}))
     }
 
-    const [subPass, _, subFilterResults] = await checkItemFilter(sub, subStatesFilter, resources, logger);
+    const [subPass, _, subFilterResults] = await checkItemFilter(sub, subStatesFilter, resources, {logger});
     const subPropertyResult: FilterCriteriaPropertyResult<CommentState> = {
         property: 'submissionState',
         behavior: excludeCondition !== undefined ? 'exclude' : 'include',

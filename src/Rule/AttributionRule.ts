@@ -9,10 +9,10 @@ import Submission from "snoowrap/dist/objects/Submission";
 import {getAttributionIdentifier} from "../Utils/SnoowrapUtils";
 import dayjs from "dayjs";
 import {
-    asSubmission, buildSubredditFilter,
+    asSubmission, buildFilter, buildSubredditFilter,
     comparisonTextOp, convertSubredditsRawToStrong,
     FAIL,
-    formatNumber, getActivitySubredditName, isSubmission,
+    formatNumber, getActivitySubredditName, isActivityWindowConfig, isSubmission,
     parseGenericValueOrPercentComparison,
     parseSubredditName,
     PASS, windowConfigToWindowCriteria
@@ -21,7 +21,11 @@ import { Comment } from "snoowrap/dist/objects";
 import as from "async";
 import {SimpleError} from "../Utils/Errors";
 import {CommentState, StrongSubredditCriteria, SubmissionState} from "../Common/Infrastructure/Filters/FilterCriteria";
-import {ActivityWindowConfig, HistoryFiltersOptions} from "../Common/Infrastructure/ActivityWindow";
+import {
+    ActivityWindowConfig,
+    ActivityWindowCriteria,
+    HistoryFiltersOptions
+} from "../Common/Infrastructure/ActivityWindow";
 import {FilterOptions} from "../Common/Infrastructure/Filters/FilterShapes";
 
 
@@ -40,6 +44,8 @@ export interface AttributionCriteria {
     threshold: string
     window: ActivityWindowConfig
     /**
+     * DEPRECATED -- use `window.fetch` instead
+     *
      * What activities to use for total count when determining what percentage an attribution comprises
      *
      * EX:
@@ -50,6 +56,7 @@ export interface AttributionCriteria {
      * * If `all` then if 10 submission are for Youtube Channel A then percentage => 10/100 = 10%
      *
      * @default all
+     * @deprecationMessage use `window.fetch` instead
      **/
     thresholdOn?: 'submissions' | 'all'
     /**
@@ -162,30 +169,150 @@ export interface AttributionCriteria {
     name?: string
 }
 
+export interface StrongAttributionCriteria extends Omit<AttributionCriteria, 'window' | 'include' | 'exclude' | 'submissionState' | 'commentState' | 'thresholdOn'> {
+    window: ActivityWindowCriteria
+}
+
 const SUBMISSION_DOMAIN = 'AGG:SELF';
 
-const defaultCriteria = [{threshold: '10%', window: 100}];
+const defaultCriteria = [{threshold: '10%', window: 100}] as AttributionCriteria[];
 
 interface DomainAgg {
     info: DomainInfo,
     count: number
 }
 
+interface AttributionData {
+    config: AttributionCriteria
+    criteria: StrongAttributionCriteria
+}
+
 export class AttributionRule extends Rule {
-    criteria: AttributionCriteria[];
+    criteria: AttributionData[];
     criteriaJoin: 'AND' | 'OR';
 
     constructor(options: AttributionOptions) {
         super(options);
         const {
-            criteria = defaultCriteria,
+            criteria: criterias = defaultCriteria,
             criteriaJoin = 'OR',
         } = options || {};
 
-        this.criteria = criteria;
+        this.criteria = [];
         this.criteriaJoin = criteriaJoin;
-        if (this.criteria.length === 0) {
+        if (criterias.length === 0) {
             throw new Error('Must provide at least one AttributionCriteria');
+        }
+
+        let index = 1;
+        for(const criteria of criterias) {
+
+            const {
+                threshold = '> 10%',
+                window,
+                thresholdOn,
+                minActivityCount = 10,
+                aggregateOn = ['link','media'],
+                consolidateMediaDomains = false,
+                domains = [],
+                domainsCombined = false,
+                include = [],
+                exclude = [],
+                commentState,
+                submissionState,
+            } = criteria;
+
+            const strongWindow = windowConfigToWindowCriteria(window);
+            if(thresholdOn !== undefined) {
+                this.logger.warn(`Criteria #${index} use 'thresholdOn' which is deprecated. Use 'window.fetch' on this Criteria instead`);
+                if(strongWindow.fetch !== undefined) {
+                    this.logger.warn(`Criteria #${index} defines both 'window.fetch' and 'thresholdOn'. Only one should be defined -- 'window.fetch' will take precedence.`);
+                } else if(thresholdOn === 'submissions') {
+                    strongWindow.fetch = 'submission';
+                }
+            }
+
+            const {
+                filterOn: {
+                    post: {
+                        subreddits: {
+                            include: windowSubInclude = undefined,
+                            exclude: windowSubExclude = undefined,
+                        } = {},
+                        commentState: windowCommentState = undefined,
+                        submissionState: windowSubmissionState = undefined,
+                    } = {},
+                } = {},
+            } = strongWindow;
+
+            const subFilter = include.length > 0 || exclude.length > 0 ? buildSubredditFilter({include, exclude}) : undefined;
+            if(subFilter !== undefined) {
+                this.logger.warn(`Criteria #${index} defines 'include' or 'exclude' which are deprecated. Use 'window.filterOn.post.subreddits' on this Criteria instead.`);
+
+                if(include.length > 0) {
+                    if(windowSubInclude !== undefined) {
+                        this.logger.warn(`Criteria #${index} defines a top-level 'include' and 'window.filterOn.subreddits.include'. Only one should be defined. Window filter will take precedence.`);
+                        subFilter.include = windowSubInclude;
+                    }
+                }
+                if(exclude.length > 0) {
+                    if(windowSubExclude !== undefined) {
+                        this.logger.warn(`Criteria #${index} defines a top-level 'exclude' and 'window.filterOn.subreddits.exclude'. Only one should be defined. Window filter will take precedence.`);
+                        subFilter.include = windowSubExclude;
+                    }
+                }
+                strongWindow.filterOn = {
+                ...(strongWindow.filterOn ?? {}),
+                    post: {
+                        ...(strongWindow.filterOn?.post ?? {}),
+                        ...subFilter,
+                    }
+                }
+            }
+
+            if(commentState !== undefined) {
+                this.logger.warn(`Criteria #${index} defines 'commentState' which is deprecated. Use 'window.filterOn.post.commentState' instead`);
+                if(windowCommentState !== undefined) {
+                    this.logger.warn(`Criteria #${index} both 'commentState' and 'window.filterOn.post.commentState'. Only one should be defined. Window filter will take precedence.`);
+                } else {
+                    strongWindow.filterOn = {
+                        ...(strongWindow.filterOn ?? {}),
+                        post: {
+                            ...(strongWindow.filterOn?.post ?? {}),
+                            commentState: buildFilter({include: [commentState]}),
+                        }
+                    }
+                }
+            }
+            if(submissionState !== undefined) {
+                this.logger.warn(`Criteria #${index} defines 'submissionState' which is deprecated. Use 'window.filterOn.post.submissionState' instead`);
+                if(windowSubmissionState !== undefined) {
+                    this.logger.warn(`Criteria #${index} both 'submissionState' and 'window.filterOn.post.submissionState'. Only one should be defined. Window filter will take precedence.`);
+                } else {
+                    strongWindow.filterOn = {
+                        ...(strongWindow.filterOn ?? {}),
+                        post: {
+                            ...(strongWindow.filterOn?.post ?? {}),
+                            submissionState: buildFilter({include: [submissionState]}),
+                        }
+                    }
+                }
+            }
+
+            this.criteria.push({
+                config: criteria,
+                criteria: {
+                    threshold,
+                    window: strongWindow,
+                    minActivityCount,
+                    aggregateOn,
+                    consolidateMediaDomains,
+                    domains,
+                    domainsCombined,
+                }
+            })
+
+            index++;
         }
     }
 
@@ -208,82 +335,16 @@ export class AttributionRule extends Rule {
             const {
                 threshold = '> 10%',
                 window,
-                thresholdOn = 'all',
                 minActivityCount = 10,
                 aggregateOn = ['link','media'],
                 consolidateMediaDomains = false,
                 domains = [],
                 domainsCombined = false,
-                include = [],
-                exclude = [],
-                commentState,
-                submissionState,
-            } = criteria;
+            } = criteria.criteria;
 
             const {operator, value, isPercent, extra = ''} = parseGenericValueOrPercentComparison(threshold);
 
-            const windowCriteria = windowConfigToWindowCriteria(window);
-            if(windowCriteria.fetch === undefined && thresholdOn === 'submissions') {
-                windowCriteria.fetch = 'submission';
-            }
-            if(windowCriteria.filterOn?.post === undefined) {
-                const filter: HistoryFiltersOptions = {};
-                if(include.length > 0 || exclude.length > 0) {
-                    filter.subreddits = buildSubredditFilter({include, exclude});
-                }
-                if(commentState !== undefined) {
-                    filter.commentState = {
-                        include: [
-                            {
-                                criteria: commentState
-                            }
-                        ]
-                    }
-                }
-                if(submissionState !== undefined) {
-                    filter.submissionState = {
-                        include: [
-                            {
-                                criteria: submissionState
-                            }
-                        ]
-                    }
-                }
-                if(Object.keys(filter).length > 0) {
-                    windowCriteria.filterOn = {
-                        ...(windowCriteria.filterOn ?? {}),
-                        post: filter
-                    }
-                }
-            }
-
-            let activities = await this.resources.getAuthorActivities(item.author, windowCriteria);
-
-            // if(include.length > 0 || exclude.length > 0) {
-            //     const defaultOpts = {
-            //         defaultFlags: 'i',
-            //         generateDescription: true
-            //     };
-            //     if(include.length > 0) {
-            //         const subStates = include.map(x => convertSubredditsRawToStrong(x, defaultOpts));
-            //         activities = await this.resources.batchTestSubredditCriteria(activities, subStates, item.author);
-            //     } else {
-            //         const subStates = exclude.map(x => convertSubredditsRawToStrong(x, defaultOpts));
-            //         const toExclude = (await this.resources.batchTestSubredditCriteria(activities, subStates, item.author)).map(x => x.id);
-            //         activities = activities.filter(x => !toExclude.includes(x.id));
-            //     }
-            // }
-            //
-            // activities = await as.filter(activities, async (activity) => {
-            //     if (asSubmission(activity) && submissionState !== undefined) {
-            //         const {passed} = await this.resources.testItemCriteria(activity, {criteria: submissionState}, this.logger);
-            //         return passed;
-            //     } else if (commentState !== undefined) {
-            //         const {passed} = await this.resources.testItemCriteria(activity, {criteria: commentState}, this.logger);
-            //         return passed;
-            //     }
-            //     return true;
-            // });
+            let activities = await this.resources.getAuthorActivities(item.author, window);
 
             let activityTotal = 0;
             let firstActivity, lastActivity;
@@ -316,7 +377,7 @@ export class AttributionRule extends Rule {
             });
             const realDomainIdents = realDomains.map(x => x.aliases).flat(1).map(x => x.toLowerCase());
 
-            const submissions: Submission[] = thresholdOn === 'submissions' ? activities as Submission[] : activities.filter(x => isSubmission(x)) as Submission[];
+            const submissions: Submission[] = window.fetch === 'submission' ? activities as Submission[] : activities.filter(x => isSubmission(x)) as Submission[];
             const aggregatedSubmissions = submissions.reduce((acc: Map<string, DomainAgg>, sub) => {
                 const domainInfo = getAttributionIdentifier(sub, consolidateMediaDomains)
 
@@ -435,7 +496,14 @@ export class AttributionRule extends Rule {
             aggDomains = [],
             activityTotal,
             activityTotalWindow,
-            criteria: {threshold, window}
+            criteria: {
+                criteria: {
+                    threshold
+                },
+                config: {
+                    window
+                }
+            }
         } = refCriteriaResults;
 
         const largestCount = aggDomains.reduce((acc, curr) => Math.max(acc, curr.count), 0);

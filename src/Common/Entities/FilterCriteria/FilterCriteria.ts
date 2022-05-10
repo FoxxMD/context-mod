@@ -41,7 +41,7 @@ export abstract class FilterCriteria<T> {
 
     constructor(data?: FilterCriteriaOptions<T>) {
         if(data !== undefined) {
-            this.criteria = removeUndefinedKeys(data.criteria);
+            this.criteria = removeUndefinedKeys(data.criteria) as T;
             this.hash = objectHash.sha1(this.criteria);
             this.name = data.name;
             this.generateId();

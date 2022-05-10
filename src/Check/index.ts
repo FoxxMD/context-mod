@@ -32,8 +32,7 @@ import * as ActionSchema from '../Schema/Action.json';
 import {
     ActionJson as ActionTypeJson
 } from "../Common/types";
-import {checkAuthorFilter, checkItemFilter, SubredditResources} from "../Subreddit/SubredditResources";
-import {AuthorCriteria, AuthorOptions} from '..';
+import  {SubredditResources} from "../Subreddit/SubredditResources";
 import {ExtendedSnoowrap} from '../Utils/SnoowrapClients';
 import {ActionProcessingError, CheckProcessingError, isRateLimitError} from "../Utils/Errors";
 import {ErrorWithCause, stackWithCauses} from "pony-cause";
@@ -48,7 +47,6 @@ import {RunnableBase} from "../Common/RunnableBase";
 import {ActionResultEntity} from "../Common/Entities/ActionResultEntity";
 import {RuleSetResultEntity} from "../Common/Entities/RuleSetResultEntity";
 import {CheckToRuleResultEntity} from "../Common/Entities/RunnableAssociation/CheckToRuleResultEntity";
-import {CheckToRuleSetResultEntity} from "../Common/Entities/RunnableAssociation/CheckToRuleSetResultEntity";
 import {
     JoinOperands,
     PostBehaviorType,
@@ -56,17 +54,12 @@ import {
     recordOutputTypes
 } from "../Common/Infrastructure/Atomic";
 import {
-    ChecksActivityState,
-    FilterOptions,
-    FilterResult,
     MinimalOrFullFilter,
     MinimalOrFullFilterJson
 } from "../Common/Infrastructure/Filters/FilterShapes";
 import {
     CommentState,
     SubmissionState,
-    TypedActivityState,
-    TypedActivityStates
 } from "../Common/Infrastructure/Filters/FilterCriteria";
 import {ActivityType} from "../Common/Infrastructure/Reddit";
 import {RunnableBaseJson, RunnableBaseOptions, StructuredRunnableBase} from "../Common/Infrastructure/Runnable";
