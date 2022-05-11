@@ -8,9 +8,9 @@ export class ActionType  {
     id!: number;
 
     @Column("varchar", {length: 200})
-    name!: ActionTypes
+    name!: string
 
-    constructor(name?: ActionTypes) {
+    constructor(name?: string) {
         if(name !== undefined) {
             this.name = name;
         }

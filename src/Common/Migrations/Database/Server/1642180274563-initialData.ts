@@ -16,7 +16,8 @@ export class initialData1642180274563 implements MigrationInterface {
             new RuleType('attribution'),
             new RuleType('history'),
             new RuleType('regex'),
-            new RuleType('repost')
+            new RuleType('repost'),
+            new RuleType('sentiment')
         ]);
         await queryRunner.manager.getRepository(ActionType).save([
             new ActionType('comment'),
@@ -32,6 +33,7 @@ export class initialData1642180274563 implements MigrationInterface {
             new ActionType('dispatch'),
             new ActionType('cancelDispatch'),
             new ActionType('contributor'),
+            new ActionType('modnote')
         ]);
         await queryRunner.manager.getRepository(InvokeeType).save([
             new InvokeeType('system'),
