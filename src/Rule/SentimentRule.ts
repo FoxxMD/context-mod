@@ -2,123 +2,26 @@ import {Rule, RuleJSONConfig, RuleOptions} from "./index";
 import {Comment} from "snoowrap";
 import Submission from "snoowrap/dist/objects/Submission";
 import {
-    asSubmission,
     comparisonTextOp, formatNumber,
-    parseStringToRegex,
     triggeredIndicator, windowConfigToWindowCriteria
 } from "../util";
-import {Scores, SentimentIntensityAnalyzer} from 'vader-sentiment';
 
 import dayjs from 'dayjs';
-import {CMError, SimpleError} from "../Utils/Errors";
-import InvalidRegexError from "../Utils/InvalidRegexError";
+import {map as mapAsync} from 'async';
 import {
-    asGenericComparison,
     GenericComparison,
-    parseGenericValueComparison, parseGenericValueOrPercentComparison,
+    parseGenericValueOrPercentComparison,
     RangedComparison
 } from "../Common/Infrastructure/Comparisons";
 import {ActivityWindowConfig, ActivityWindowCriteria} from "../Common/Infrastructure/ActivityWindow";
-import {StringOperator, VaderSentimentComparison} from "../Common/Infrastructure/Atomic";
+import {VaderSentimentComparison} from "../Common/Infrastructure/Atomic";
 import {RuleResult} from "../Common/interfaces";
 import {SnoowrapActivity} from "../Common/Infrastructure/Reddit";
-
-export const sentimentQuantifier = {
-    'extremely negative': -0.5,
-    'very negative': -0.2,
-    'negative': -0.05,
-    'neutral': 0,
-    'positive': 0.05,
-    'very positive': 0.2,
-    'extremely positive': 0.5,
-}
-
-const sentimentQuantifierEntries = Object.entries(sentimentQuantifier);
-
-const scoreToSentimentText = (val: number) => {
-    for(let i = 0; i < sentimentQuantifierEntries.length; i++) {
-        // hit max score (extremely positive)
-        if(i + 1 === sentimentQuantifierEntries.length && val > sentimentQuantifierEntries[i][1]) {
-            return sentimentQuantifierEntries[i][0];
-        }
-
-        // if score is between (inclusive start) current and next
-        if(i + 1 <= sentimentQuantifierEntries.length && val >= sentimentQuantifierEntries[i][1] && val < sentimentQuantifierEntries[i + 1][1]) {
-            return sentimentQuantifierEntries[i][0];
-        }
-
-        // if neither of those is hit and i = 0 then min score (extremely negative)
-        if(i === 0 && val < sentimentQuantifierEntries[i][1]) {
-            return sentimentQuantifierEntries[i][0];
-        }
-    }
-    throw new Error('should not hit this!');
-}
-
-interface ActivitySentimentResult {
-    passes: boolean,
-    scores: Scores,
-    sentiment: string
-    activity: SnoowrapActivity
-}
-
-export const textComparison = /(?<not>not)?\s*(?<modifier>very|extremely)?\s*(?<sentiment>positive|neutral|negative)/i;
-
-export const parseTextToNumberComparison = (val: string): RangedComparison | GenericComparison => {
-
-    let genericError: Error | undefined;
-    try {
-        return parseGenericValueComparison(val);
-    } catch (e) {
-        genericError = e as Error;
-        // now try text match
-    }
-
-    const matches = val.match(textComparison);
-    if (matches === null) {
-        const textError = new InvalidRegexError(textComparison, val);
-        throw new CMError(`Sentiment value did not match a valid numeric comparison or valid text: \n ${genericError.message} \n ${textError.message}`);
-    }
-    const groups = matches.groups as any;
-
-    const negate = groups.not !== undefined && groups.not !== '';
-
-    if(groups.sentiment === 'neutral') {
-        if(negate) {
-            return {
-                displayText: 'not neutral (not -0.49 to 0.49)',
-                range: [-0.49, 0.49],
-                not: true,
-            }
-        }
-        return {
-            displayText: 'is neutral (-0.49 to 0.49)',
-            range: [-0.49, 0.49],
-            not: false
-        }
-    }
-
-    const compoundSentimentText = `${groups.modifier !== undefined && groups.modifier !== '' ? `${groups.modifier} ` : ''}${groups.sentiment}`.toLocaleLowerCase();
-    // @ts-ignore
-    const numericVal = sentimentQuantifier[compoundSentimentText] as number;
-    if(numericVal === undefined) {
-        throw new CMError(`Sentiment given did not match any known phrases: '${compoundSentimentText}'`);
-    }
-
-    let operator: StringOperator;
-    if(negate) {
-        operator = numericVal > 0 ? '<' : '>';
-    } else {
-        operator = numericVal > 0 ? '>=' : '<=';
-    }
-
-    return {
-        operator,
-        value: numericVal,
-        isPercent: false,
-        displayText: `is${negate ? ' not ': ' '}${compoundSentimentText} (${operator} ${numericVal})`
-    }
-}
+import {
+    ActivitySentimentTestResult,
+    parseTextToNumberComparison,
+    testActivitySentiment
+} from "../Common/LangaugeProcessing";
 
 export class SentimentRule extends Rule {
 
@@ -166,10 +69,8 @@ export class SentimentRule extends Rule {
 
     protected async process(item: Submission | Comment): Promise<[boolean, RuleResult]> {
 
-        let criteriaResults = [];
-
-        let ogResult = this.testActivity(item, this.sentiment);
-        let historicResults: ActivitySentimentResult[] | undefined;
+        let ogResult = await this.testActivity(item, this.sentiment);
+        let historicResults: ActivitySentimentTestResult[] | undefined;
 
         if(this.historical !== undefined && (!this.historical.mustMatchCurrent || ogResult.passes)) {
             const {
@@ -178,7 +79,7 @@ export class SentimentRule extends Rule {
             } = this.historical;
             const history = await this.resources.getAuthorActivities(item.author, window);
 
-            historicResults = history.map(x => this.testActivity(x, sentiment));
+            historicResults = await mapAsync(history, async (x: SnoowrapActivity) => await this.testActivity(x, sentiment)); // history.map(x => this.testActivity(x, sentiment));
         }
 
 
@@ -197,8 +98,8 @@ export class SentimentRule extends Rule {
 
         if(historicResults === undefined) {
             triggered = ogResult.passes;
-            averageScore = ogResult.scores.compound;
-            logSummary.push(`${triggeredIndicator(triggered)} Current Activity Sentiment '${ogResult.sentiment} (${ogResult.scores.compound})' ${triggered ? 'PASSED' : 'DID NOT PASS'} sentiment test '${sentimentTest}'`);
+            averageScore = ogResult.scoreWeighted;
+            logSummary.push(`${triggeredIndicator(triggered)} Current Activity Sentiment '${ogResult.sentiment} (${ogResult.scoreWeighted})' ${triggered ? 'PASSED' : 'DID NOT PASS'} sentiment test '${sentimentTest}'`);
             if(!triggered && this.historical !== undefined && this.historical.mustMatchCurrent) {
                 logSummary.push(`Did not check Historical because 'mustMatchCurrent' is true`);
             }
@@ -212,8 +113,8 @@ export class SentimentRule extends Rule {
             totalMatchingText = totalMatching.displayText;
             const allResults = historicResults
             const passed = allResults.filter(x => x.passes);
-            averageScore = passed.reduce((acc, curr) => acc + curr.scores.compound,0) / passed.length;
-            averageWindowScore = allResults.reduce((acc, curr) => acc + curr.scores.compound,0) / allResults.length;
+            averageScore = passed.reduce((acc, curr) => acc + curr.scoreWeighted,0) / passed.length;
+            averageWindowScore = allResults.reduce((acc, curr) => acc + curr.scoreWeighted,0) / allResults.length;
 
             const firstActivity = allResults[0].activity;
             const lastActivity = allResults[allResults.length - 1].activity;
@@ -253,53 +154,8 @@ export class SentimentRule extends Rule {
         })]);
     }
 
-    protected testActivity(a: (Submission | Comment), criteria: GenericComparison | RangedComparison): ActivitySentimentResult {
-        // determine what content we are testing
-        let contents: string[] = [];
-        if (asSubmission(a)) {
-            for (const l of this.testOn) {
-                switch (l) {
-                    case 'title':
-                        contents.push(a.title);
-                        break;
-                    case 'body':
-                        if (a.is_self) {
-                            contents.push(a.selftext);
-                        }
-                        break;
-                }
-            }
-        } else {
-            contents.push(a.body)
-        }
-
-        const contentStr = contents.join(' ');
-        const scores = SentimentIntensityAnalyzer.polarity_scores(contentStr);
-        const textSentimentScore = scoreToSentimentText(scores.compound);
-
-        if (asGenericComparison(criteria)) {
-            return {
-                passes: comparisonTextOp(scores.compound, criteria.operator, criteria.value),
-                scores,
-                sentiment: textSentimentScore,
-                activity: a
-            }
-        } else {
-            if (criteria.not) {
-                return {
-                    passes: scores.compound < criteria.range[0] || scores.compound > criteria.range[1],
-                    scores,
-                    sentiment: textSentimentScore,
-                    activity: a
-                }
-            }
-            return {
-                passes: scores.compound >= criteria.range[0] || scores.compound <= criteria.range[1],
-                scores,
-                sentiment: textSentimentScore,
-                activity: a
-            }
-        }
+    protected async testActivity(a: (Submission | Comment), criteria: GenericComparison | RangedComparison): Promise<ActivitySentimentTestResult> {
+        return await testActivitySentiment(a, criteria, {testOn: this.testOn});
     }
 }
 
