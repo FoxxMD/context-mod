@@ -37,8 +37,6 @@ import {
     mergeArr,
     parseDurationComparison,
     parseExternalUrl,
-    parseGenericValueComparison,
-    parseGenericValueOrPercentComparison,
     parseRedditEntity,
     parseStringToRegex,
     parseWikiContext,
@@ -145,6 +143,7 @@ import {
 } from "../Common/Infrastructure/Reddit";
 import {AuthorCritPropHelper} from "../Common/Infrastructure/Filters/AuthorCritPropHelper";
 import {NoopLogger} from "../Utils/loggerFactory";
+import {parseGenericValueComparison, parseGenericValueOrPercentComparison} from "../Common/Infrastructure/Comparisons";
 
 export const DEFAULT_FOOTER = '\r\n*****\r\nThis action was performed by [a bot.]({{botLink}}) Mention a moderator or [send a modmail]({{modmailLink}}) if you any ideas, questions, or concerns about this action.';
 

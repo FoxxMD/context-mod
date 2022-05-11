@@ -11,7 +11,7 @@ import {
     comparisonTextOp,
     FAIL,
     formatNumber, getActivitySubredditName, historyFilterConfigToOptions, isSubmission,
-    parseGenericValueOrPercentComparison, parseSubredditName,
+    parseSubredditName,
     PASS,
     percentFromString, removeUndefinedKeys, toStrongSubredditState, windowConfigToWindowCriteria
 } from "../util";
@@ -20,6 +20,7 @@ import {SubredditCriteria} from "../Common/Infrastructure/Filters/FilterCriteria
 import {CompareValueOrPercent} from "../Common/Infrastructure/Atomic";
 import {ActivityWindowConfig, ActivityWindowCriteria} from "../Common/Infrastructure/ActivityWindow";
 import {ErrorWithCause} from "pony-cause";
+import {parseGenericValueOrPercentComparison} from "../Common/Infrastructure/Comparisons";
 
 export interface CommentThresholdCriteria extends ThresholdCriteria {
     /**

@@ -4,12 +4,15 @@ import {
     COMMENT_URL_ID,
     parseDuration,
     parseDurationComparison,
-    parseGenericValueComparison,
-    parseGenericValueOrPercentComparison, parseLinkIdentifier,
+    parseLinkIdentifier,
     parseRedditEntity, removeUndefinedKeys, SUBMISSION_URL_ID
 } from "../src/util";
 import dayjs from "dayjs";
 import dduration, {DurationUnitType} from 'dayjs/plugin/duration.js';
+import {
+    parseGenericValueComparison,
+    parseGenericValueOrPercentComparison
+} from "../src/Common/Infrastructure/Comparisons";
 
 
 describe('Non-temporal Comparison Operations', function () {
