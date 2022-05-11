@@ -186,3 +186,35 @@ export type ActionTypes =
     | 'dispatch'
     | 'cancelDispatch'
     | 'contributor';
+
+/**
+ * Test the calculated VADER sentiment (compound) score for an Activity using this comparison. Can be either a numerical or natural language
+ *
+ * Sentiment values range from extremely negative to extremely positive in a numerical range of -0.5 to 0.5:
+ *
+ * * -0.5 => extremely negative
+ * * -0.2 => very negative
+ * * -0.5 => negative
+ * *    0 => neutral
+ * * 0.05 => positive
+ * *  0.2 => very positive
+ * *  0.5 => extremely positive
+ *
+ * The below examples are all equivocal. You can use either set of values as the value for `sentiment` (numerical comparisons or natural langauge)
+ *
+ * * `>= 0.05` = `is positive`
+ * * `<= 0.2` = `is very negative`
+ * * `< 0.05` = `is not positive`
+ * * `> -0.2` = `is not very negative`
+ *
+ * Special case:
+ *
+ * * `is neutral` equates to `> -0.5 and < 0.5`
+ * * `is not neutral` equates to `< -0.5 or > 0.5`
+ *
+ * More about VADER Sentiment: https://github.com/cjhutto/vaderSentiment
+ *
+ * @pattern ((>|>=|<|<=)\s*(-?\d?\.?\d+))|((not)?\s*(very|extremely)?\s*(positive|neutral|negative))
+ * @examples ["is negative", "> 0.2"]
+ * */
+export type VaderSentimentComparison = string;
