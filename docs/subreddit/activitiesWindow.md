@@ -28,7 +28,7 @@ An **Activity Window** (`window`) is a group of properties that describe a **ran
 
 The main components of an Activity Window:
 
-* **Range** -- How many Activities (count) or what time period (duration) of Activities to fetch
+* **Range** -- How many Activities ([`count`](#count)) or what time period ([`duration`](#duration)) of Activities to fetch
 * **Type of Activities** -- When **fetching** from an Author's history, should it return overview (any Activities), just Submissions, or just Comments?
 * **Filters** -- How the retrieved Activities should be [filtered](/docs/subreddit/components/README.md#filters) before returning them to a Rule
 
@@ -141,7 +141,7 @@ You can ensure your string is valid by testing it [here.](https://regexr.com/61e
 
 ##### As ISO 8601 duration string
 
-If you're a real nerd you can also use a [standard duration](https://en.wikipedia.org/wiki/ISO_8601#Durations)) string.
+If you're a real nerd you can also use a [standard duration](https://en.wikipedia.org/wiki/ISO_8601#Durations) string.
 
 Examples
 
@@ -155,9 +155,10 @@ If you need to specify multiple units of time for your duration you can instead 
 
 ```yaml
 window:
-  days: 4
-  hours: 6
-  minutes: 20
+  duration:
+    days: 4
+    hours: 6
+    minutes: 20
 ```
 
 ## Specifying Range
@@ -221,12 +222,10 @@ Activities can be filtered **during** (`pre`) retrieval or **after** (`post`) re
 
 Regardless of when you are filtering Activities the shape of the filter is the same. Filter properties:
 
-* `subreddits` -- A [Filter Shape](/docs/subreddit/components/README.md#filter-shapes) for filtering by the Subreddit of each Activity
+* `subreddits` -- A [Filter Shape](/docs/subreddit/components/README.md#filter-shapes) for filtering by the [Subreddit Criteria](/docs/subreddit/components/README.md#subreddit-filter) of each Activity
 * `submissionState` -- A [Filter Shape](/docs/subreddit/components/README.md#filter-shapes) for [Submission Criteria](/docs/subreddit/components/README.md#item-filter). Will run only if filtering a Submission.
 * `commentState` -- A [Filter Shape](/docs/subreddit/components/README.md#filter-shapes) for [Comment Criteria](/docs/subreddit/components/README.md#item-filter). Will run only if filtering a Comment.
 * `activityState` -- A [Filter Shape](/docs/subreddit/components/README.md#filter-shapes) for either [Submission or Comment Criteria](/docs/subreddit/components/README.md#item-filter). Will run only if `submissionState` or `commentState` is not defined for their respective Activity types.
-
-Example
 
 In this example the filter only returns Activities:
 
@@ -267,11 +266,13 @@ This is useful when you want the Range conditions to be applied to an "already f
 
 #### `max` restriction
 
-However, `pre` introduces the possibility of **unsatisfied range conditions.** 
+However, `pre` introduces the possibility of **near impossible range conditions.** 
 
 For example, if you want 200 activities from a subreddit a user has never created activities in then CM would fetch the user's **entire history** before finishing since each chunk of Activities would be filtered to 0.
 
-To prevent this scenario all `pre` filters must also specify a `max` [range](#range) that tell CM "if X range of **non-filtered** Activities is reached stop immediately."
+To prevent this scenario all `pre` filters must also specify a `max` [range](#range) that tell CM:
+
+> if X range of **non-filtered** Activities is reached stop immediately
 
 #### `pre` Example
 
@@ -333,7 +334,7 @@ The list returned by `post` is what the Rule receives.
 
 #### Example
 
-Let's follow an example scenario where you want any Activities a user has in /r/mealtimevideos from their last 200 activities -- contrast this wording to the [`pre` example](#pre-example)
+Let's follow an example scenario where you want to get the last 200 activities from a User's history **and then** return any of those 200 that were made in /r/mealtimevideos -- contrast this wording to the [`pre` example](#pre-example)
 
 ```yaml
 window:

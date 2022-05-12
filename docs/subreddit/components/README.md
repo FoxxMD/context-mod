@@ -44,6 +44,7 @@ This list is not exhaustive. [For complete documentation on a subreddit's config
   * [Filter Types](#filter-types)
     * [Author Filter](#author-filter)
     * [Item Filter](#item-filter)
+    * [Subreddit Filter](#subreddit-filter)
   * [Named Filters](#named-filters)
 * [Common Patterns](#common-patterns)
   * [Conditions](#conditions)
@@ -737,6 +738,10 @@ Test for properties of an Activity:
 
 * [Comment Criteria](https://json-schema.app/view/%23%2Fdefinitions%2FCommentState?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Freddit-context-bot%2Fedge%2Fsrc%2FSchema%2FApp.json)
 * [Submission Criteria](https://json-schema.app/view/%23%2Fdefinitions%2FSubmissionState?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Freddit-context-bot%2Fedge%2Fsrc%2FSchema%2FApp.json)
+
+### Subreddit Filter
+
+Test for properties of the Subreddit an Activity belongs to. See [Schema documentation](https://json-schema.app/view/%23%2Fdefinitions%2FSubredditCriteria?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Freddit-context-bot%2Fedge%2Fsrc%2FSchema%2FApp.json)
 
 ## Named Filters
 
