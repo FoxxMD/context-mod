@@ -3,10 +3,12 @@
   "compilerOptions": {
     "sourceMap": true,
     "resolveJsonModule": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
     "typeRoots": [
       "./node_modules/@types",
       "./src/Web/types",
-      "./src/Common/typings"
+      "./src/Common/Typings"
     ]
   },
   "include": [

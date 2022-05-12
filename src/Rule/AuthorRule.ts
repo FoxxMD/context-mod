@@ -1,8 +1,18 @@
-import {Rule, RuleJSONConfig, RuleOptions, RuleResult} from "./index";
+import {Rule, RuleJSONConfig, RuleOptions} from "./index";
 import {Comment} from "snoowrap";
 import Submission from "snoowrap/dist/objects/Submission";
-import {Author, AuthorCriteria} from "../Author/Author";
 import {checkAuthorFilter} from "../Subreddit/SubredditResources";
+import {
+    RuleResult
+} from "../Common/interfaces";
+import {buildFilter, normalizeCriteria} from "../util";
+import {
+    AuthorOptions,
+    MaybeAnonymousCriteria,
+    MaybeAnonymousOrStringCriteria,
+    NamedCriteria
+} from "../Common/Infrastructure/Filters/FilterShapes";
+import {AuthorCriteria} from "../Common/Infrastructure/Filters/FilterCriteria";
 
 /**
  * Checks the author of the Activity against AuthorCriteria. This differs from a Rule's AuthorOptions as this is a full Rule and will only pass/fail, not skip.
@@ -13,15 +23,16 @@ export interface AuthorRuleConfig {
     /**
      * Will "pass" if any set of AuthorCriteria passes
      * */
-    include?: AuthorCriteria[];
+    include?: MaybeAnonymousCriteria<AuthorCriteria>[];
     /**
      * Only runs if include is not present. Will "pass" if any of set of the AuthorCriteria does not pass
      * */
-    exclude?: AuthorCriteria[];
+    exclude?: MaybeAnonymousCriteria<AuthorCriteria>[];
 }
 
-export interface AuthorRuleOptions extends AuthorRuleConfig, RuleOptions {
-
+export interface AuthorRuleOptions extends Omit<AuthorRuleConfig, 'include' | 'exclude'>, RuleOptions {
+    include?: NamedCriteria<AuthorCriteria>[]
+    exclude?: NamedCriteria<AuthorCriteria>[]
 }
 
 export interface AuthorRuleJSONConfig extends AuthorRuleConfig, RuleJSONConfig {
@@ -29,38 +40,29 @@ export interface AuthorRuleJSONConfig extends AuthorRuleConfig, RuleJSONConfig {
 }
 
 export class AuthorRule extends Rule {
-    include: AuthorCriteria[] = [];
-    exclude: AuthorCriteria[] = [];
+
+    authorOptions: AuthorOptions;
 
     constructor(options: AuthorRuleOptions) {
         super(options);
 
-        const {
-            include,
-            exclude,
-        } = options;
+        this.authorOptions = buildFilter(options ?? {});
 
-        this.include = include !== undefined ? include.map(x => new Author(x)) : [];
-        this.exclude = exclude !== undefined ? exclude.map(x => new Author(x)) : [];
-
-        if(this.include.length === 0 && this.exclude.length === 0) {
+        if(this.authorOptions.include?.length === 0 && this.authorOptions.exclude?.length === 0) {
             throw new Error('At least one of the properties [include,exclude] on Author Rule must not be empty');
         }
     }
 
     getKind(): string {
-        return "Author";
+        return "author";
     }
 
     protected getSpecificPremise(): object {
-        return {
-            include: this.include,
-            exclude: this.exclude,
-        };
+        return this.authorOptions;
     }
 
     protected async process(item: Comment | Submission): Promise<[boolean, RuleResult]> {
-        const [result, filterType] = await checkAuthorFilter(item, {include: this.include, exclude: this.exclude}, this.resources, this.logger);
+        const [result, filterType] = await checkAuthorFilter(item, this.authorOptions, this.resources, this.logger);
         return Promise.resolve([result, this.getResult(result)]);
     }
 }

@@ -6,13 +6,11 @@ import {
     asComment,
     asSubmission,
     cacheStats,
-    createHistoricalStatsDisplay,
     createRetryHandler,
     determineNewResults,
     findLastIndex,
-    formatNumber, getActivityAuthorName, isComment, isSubmission, likelyJson5,
+    formatNumber, frequencyEqualOrLargerThanMin, getActivityAuthorName, isComment, isSubmission, likelyJson5,
     mergeArr, normalizeName,
-    parseFromJsonOrYamlToObject,
     parseRedditEntity,
     pollingInfo,
     resultsSummary,
@@ -20,19 +18,15 @@ import {
     totalFromMapStats,
     triggeredIndicator,
 } from "../util";
-import {RuleResult} from "../Rule";
 import {ConfigBuilder, buildPollingOptions} from "../ConfigBuilder";
 import {
     ActionedEvent,
     ActionResult,
     ActivityDispatch,
-    ActivitySource,
     CheckResult,
     CheckSummary,
     DEFAULT_POLLING_INTERVAL,
     DEFAULT_POLLING_LIMIT,
-    FilterCriteriaDefaults,
-    Invokee,
     LogInfo,
     ManagerOptions,
     ManagerStateChangeOption,
@@ -40,19 +34,16 @@ import {
     NotificationEventPayload,
     PAUSED,
     PollingOptionsStrong,
-    PollOn,
     PostBehavior,
-    PostBehaviorTypes, DispatchAudit,
-    DispatchSource,
+    ActivitySourceData,
     RUNNING,
     RunResult,
-    RunState,
     STOPPED,
     SYSTEM,
-    USER
+    USER, RuleResult, DatabaseStatisticsOperatorConfig
 } from "../Common/interfaces";
 import Submission from "snoowrap/dist/objects/Submission";
-import {activityIsRemoved, itemContentPeek} from "../Utils/SnoowrapUtils";
+import {activityIsRemoved, ItemContent, itemContentPeek} from "../Utils/SnoowrapUtils";
 import LoggedError from "../Utils/LoggedError";
 import {
     BotResourcesManager,
@@ -69,16 +60,54 @@ import {queue, QueueObject} from 'async';
 import {JSONConfig} from "../JsonConfig";
 import {Check, CheckStructuredJson} from "../Check";
 import NotificationManager from "../Notification/NotificationManager";
-import {createHistoricalDefaults, historicalDefaults} from "../Common/defaults";
+import {createHistoricalDisplayDefaults} from "../Common/defaults";
 import {ExtendedSnoowrap} from "../Utils/SnoowrapClients";
-import {CMError, isRateLimitError, isStatusError, RunProcessingError} from "../Utils/Errors";
+import {
+    CMError,
+    definesSeriousError,
+    isRateLimitError,
+    isSeriousError,
+    isStatusError,
+    RunProcessingError
+} from "../Utils/Errors";
 import {ErrorWithCause, stackWithCauses} from "pony-cause";
 import {Run} from "../Run";
 import got from "got";
+import {Bot as BotEntity} from "../Common/Entities/Bot";
+import {ManagerEntity as ManagerEntity, RunningStateEntities} from "../Common/Entities/ManagerEntity";
+import {isRuleSet} from "../Rule/RuleSet";
+import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
+import {RunResultEntity} from "../Common/Entities/RunResultEntity";
+import {Repository} from "typeorm";
+import {Activity} from "../Common/Entities/Activity";
+import { AuthorEntity } from "../Common/Entities/AuthorEntity";
+import {CMEvent} from "../Common/Entities/CMEvent";
+import {nanoid} from "nanoid";
+import {ActivitySourceEntity} from "../Common/Entities/ActivitySourceEntity";
+import {InvokeeType} from "../Common/Entities/InvokeeType";
+import {RunStateType} from "../Common/Entities/RunStateType";
+import {EntityRunState} from "../Common/Entities/EntityRunState/EntityRunState";
+import {
+    ActivitySource,
+    DispatchSource,
+    EventRetentionPolicyRange,
+    Invokee,
+    PollOn,
+    recordOutputTypes,
+    RunState
+} from "../Common/Infrastructure/Atomic";
+import {parseFromJsonOrYamlToObject} from "../Common/Config/ConfigUtil";
+import {FilterCriteriaDefaults} from "../Common/Infrastructure/Filters/FilterShapes";
 
 export interface RunningState {
     state: RunState,
     causedBy: Invokee
+}
+
+export type RunningStateTypes = 'managerState' | 'eventsState' | 'queueState';
+
+export type RunningStates = {
+    [key in RunningStateTypes]: RunningState
 }
 
 export interface runCheckOptions {
@@ -91,7 +120,8 @@ export interface runCheckOptions {
     maxGotoDepth?: number
     source: ActivitySource
     initialGoto?: string
-    dispatchSource?: DispatchAudit
+    activitySource: ActivitySourceData
+    disableDispatchDelays?: boolean
 }
 
 export interface CheckTask {
@@ -99,12 +129,16 @@ export interface CheckTask {
     options: runCheckOptions
 }
 
-export interface RuntimeManagerOptions extends ManagerOptions {
+export interface RuntimeManagerOptions extends Omit<ManagerOptions, 'filterCriteriaDefaults'> {
     sharedStreams?: PollOn[];
     wikiLocation?: string;
     botName?: string;
     maxWorkers?: number;
     maxGotoDepth?: number
+    botEntity: BotEntity
+    managerEntity: ManagerEntity
+    filterCriteriaDefaults?: FilterCriteriaDefaults
+    statDefaults: DatabaseStatisticsOperatorConfig
 }
 
 interface QueuedIdentifier {
@@ -113,8 +147,10 @@ interface QueuedIdentifier {
     state: 'queued' | 'processing'
 }
 
-export class Manager extends EventEmitter {
+export class Manager extends EventEmitter implements RunningStates {
     subreddit: Subreddit;
+    botEntity: BotEntity;
+    managerEntity: ManagerEntity;
     client: ExtendedSnoowrap;
     logger: Logger;
     logs: LogInfo[] = [];
@@ -134,6 +170,8 @@ export class Manager extends EventEmitter {
     wikiFormat: ('yaml' | 'json') = 'yaml';
     filterCriteriaDefaults?: FilterCriteriaDefaults
     postCheckBehaviorDefaults?: PostBehavior
+    statDefaults: DatabaseStatisticsOperatorConfig
+    retentionOverride?: EventRetentionPolicyRange
     //wikiUpdateRunning: boolean = false;
 
     streams: Map<string, SPoll<Snoowrap.Submission | Snoowrap.Comment>> = new Map();
@@ -162,8 +200,7 @@ export class Manager extends EventEmitter {
 
     startedAt?: DayjsObj;
     validConfigLoaded: boolean = false;
-    running: boolean = false;
-    manuallyStopped: boolean = false;
+
     eventsState: RunningState = {
         state: STOPPED,
         causedBy: SYSTEM
@@ -172,7 +209,7 @@ export class Manager extends EventEmitter {
         state: STOPPED,
         causedBy: SYSTEM
     };
-    botState: RunningState = {
+    managerState: RunningState = {
         state: STOPPED,
         causedBy: SYSTEM
     }
@@ -194,14 +231,15 @@ export class Manager extends EventEmitter {
 
     processEmitter: EventEmitter = new EventEmitter();
 
+    activityRepo!: Repository<Activity>;
+    authorRepo!: Repository<AuthorEntity>
+    eventRepo!: Repository<CMEvent>;
+
     getStats = async (): Promise<ManagerStats> => {
         const data: any = {
             eventsAvg: formatNumber(this.eventsRollingAvg),
             rulesAvg: formatNumber(this.rulesUniqueRollingAvg),
-            historical: {
-                lastReload: createHistoricalStatsDisplay(createHistoricalDefaults()),
-                allTime: createHistoricalStatsDisplay(createHistoricalDefaults()),
-            },
+            historical: createHistoricalDisplayDefaults(),
             cache: {
                 provider: 'none',
                 currentKeyCount: 0,
@@ -236,10 +274,10 @@ export class Manager extends EventEmitter {
                 activityId: x.activity.name,
                 permalink: x.activity.permalink,
                 submissionId: asComment(x.activity) ? x.activity.link_id : undefined,
-                author: getActivityAuthorName(x.activity.author),
-                queuedAt: x.queuedAt,
-                durationMilli: x.duration.asMilliseconds(),
-                duration: x.duration.humanize(),
+                author: x.author,
+                queuedAt: x.queuedAt.unix(),
+                durationMilli: x.delay.asSeconds(),
+                duration: x.delay.humanize(),
                 source: `${x.action}${x.identifier !== undefined ? ` (${x.identifier})` : ''}`,
                 subreddit: this.subreddit.display_name_prefixed
             }
@@ -265,7 +303,11 @@ export class Manager extends EventEmitter {
             maxWorkers = 1,
             maxGotoDepth = 1,
             filterCriteriaDefaults,
-            postCheckBehaviorDefaults
+            postCheckBehaviorDefaults,
+            botEntity,
+            managerEntity,
+            statDefaults,
+            retention
         } = opts || {};
         this.displayLabel = opts.nickname || `${sub.display_name_prefixed}`;
         const getLabels = this.getCurrentLabels;
@@ -289,9 +331,19 @@ export class Manager extends EventEmitter {
         this.wikiLocation = wikiLocation;
         this.filterCriteriaDefaults = filterCriteriaDefaults;
         this.postCheckBehaviorDefaults = postCheckBehaviorDefaults;
+        this.statDefaults = statDefaults;
+        this.retentionOverride = retention;
         this.sharedStreams = sharedStreams;
         this.pollingRetryHandler = createRetryHandler({maxRequestRetry: 3, maxOtherRetry: 2}, this.logger);
         this.subreddit = sub;
+        this.botEntity = botEntity;
+
+        this.managerEntity = managerEntity;
+        // always init in stopped state but use last invokee to determine if we should start the manager automatically afterwards
+        this.eventsState = this.setInitialRunningState(managerEntity, 'eventsState');
+        this.queueState = this.setInitialRunningState(managerEntity, 'queueState');
+        this.managerState = this.setInitialRunningState(managerEntity, 'managerState');
+
         this.client = client;
         this.botName = botName;
         this.maxGotoDepth = maxGotoDepth;
@@ -307,7 +359,7 @@ export class Manager extends EventEmitter {
 
         this.eventsSampleInterval = setInterval((function(self) {
             return function() {
-                const et = self.resources !== undefined ? self.resources.stats.historical.allTime.eventsCheckedTotal : 0;
+                const et = self.resources !== undefined ? self.resources.stats.historical.eventsCheckedTotal : 0;
                 const rollingSample = self.eventsSample.slice(0, 7)
                 rollingSample.unshift(et)
                 self.eventsSample = rollingSample;
@@ -329,7 +381,7 @@ export class Manager extends EventEmitter {
         this.rulesUniqueSampleInterval = setInterval((function(self) {
             return function() {
                 const rollingSample = self.rulesUniqueSample.slice(0, 7)
-                const rt = self.resources !== undefined ? self.resources.stats.historical.allTime.rulesRunTotal - self.resources.stats.historical.allTime.rulesCachedTotal : 0;
+                const rt = self.resources !== undefined ? self.resources.stats.historical.rulesRunTotal - self.resources.stats.historical.rulesCachedTotal : 0;
                 rollingSample.unshift(rt);
                 self.rulesUniqueSample = rollingSample;
                 const diff = self.rulesUniqueSample.reduceRight((acc: number[], curr, index) => {
@@ -430,9 +482,11 @@ export class Manager extends EventEmitter {
                     }
                 });
                 if(existingDelayedToCancel.length > 0) {
-                    this.logger.debug(`Cancelling existing delayed activities due to activity being queued from non-dispatch sources: ${existingDelayedToCancel.map((x, index) => `[${index + 1}] Queued At ${dayjs.unix(x.queuedAt).format('YYYY-MM-DD HH:mm:ssZ')} for ${x.duration.humanize()}`).join(' ')}`);
+                    this.logger.debug(`Cancelling existing delayed activities due to activity being queued from non-dispatch sources: ${existingDelayedToCancel.map((x, index) => `[${index + 1}] Queued At ${x.queuedAt.format('YYYY-MM-DD HH:mm:ssZ')} for ${x.delay.humanize()}`).join(' ')}`);
                     const toCancelIds = existingDelayedToCancel.map(x => x.id);
-                    this.resources.delayedItems.filter(x => !toCancelIds.includes(x.id));
+                    for(const id of toCancelIds) {
+                        await this.resources.removeDelayedActivity(id);
+                    }
                 }
             }
         }
@@ -443,10 +497,27 @@ export class Manager extends EventEmitter {
         while(this.queueState.state === RUNNING) {
             let index = 0;
             for(const ar of this.resources.delayedItems) {
-                if(!ar.processing && dayjs.unix(ar.queuedAt).add(ar.duration.asMilliseconds(), 'milliseconds').isSameOrBefore(dayjs())) {
+                if(!ar.processing && ar.queuedAt.add(ar.delay).isSameOrBefore(dayjs())) {
                     this.logger.info(`Delayed Activity ${ar.activity.name} is being queued.`);
-                    const dispatchStr: DispatchSource = ar.identifier === undefined ? 'dispatch' : `dispatch:${ar.identifier}`;
-                    await this.firehose.push({activity: ar.activity, options: {refresh: true, source: dispatchStr, initialGoto: ar.goto, dispatchSource: {id: ar.id, queuedAt: ar.queuedAt, delay: ar.duration.humanize(), action: ar.action, goto: ar.goto, identifier: ar.identifier}}});
+                    await this.firehose.push({
+                        activity: ar.activity,
+                        options: {
+                            refresh: true,
+                            // @ts-ignore
+                            source: ar.identifier === undefined ? ar.type : `${ar.type}:${ar.identifier}`,
+                            initialGoto: ar.goto,
+                            activitySource: {
+                                id: ar.id,
+                                queuedAt: ar.queuedAt,
+                                delay: ar.delay,
+                                action: ar.action,
+                                goto: ar.goto,
+                                identifier: ar.identifier,
+                                type: ar.type
+                            },
+                            dryRun: ar.dryRun,
+                        }
+                    });
                     this.resources.delayedItems.splice(index, 1, {...ar, processing: true});
                 }
                 index++;
@@ -471,13 +542,17 @@ export class Manager extends EventEmitter {
                 try {
                     const itemMeta = this.queuedItemsMeta[queuedItemIndex];
                     this.queuedItemsMeta.splice(queuedItemIndex, 1, {...itemMeta, state: 'processing'});
-                    await this.handleActivity(task.activity, {refresh: itemMeta.shouldRefresh, ...task.options});
+                    await this.handleActivity(task.activity, {
+                        refresh: itemMeta.shouldRefresh,
+                        ...task.options,
+                        // use dryRun specified in task options if it exists (usually from manual user invocation or from dispatched action)
+                        dryRun: task.options.dryRun ?? this.dryRun
+                    });
                 } finally {
                     // always remove item meta regardless of success or failure since we are done with it meow
                     this.queuedItemsMeta.splice(queuedItemIndex, 1);
-                    if(task.options.dispatchSource?.id !== undefined) {
-                        const delayIndex = this.resources.delayedItems.findIndex(x => x.id === task.options.dispatchSource?.id);
-                        this.resources.delayedItems.splice(delayIndex, 1);
+                    if(task.options.activitySource?.id !== undefined) {
+                        await this.resources.removeDelayedActivity(task.options.activitySource?.id);
                     }
                 }
             }
@@ -506,7 +581,6 @@ export class Manager extends EventEmitter {
         try {
             const configBuilder = new ConfigBuilder({logger: this.logger});
             const validJson = configBuilder.validateJson(configObj);
-            const {checks, ...configManagerOpts} = validJson;
             const {
                 polling = [{pollOn: 'unmoderated', limit: DEFAULT_POLLING_LIMIT, interval: DEFAULT_POLLING_INTERVAL}],
                 caching,
@@ -514,11 +588,15 @@ export class Manager extends EventEmitter {
                 dryRun,
                 footer,
                 nickname,
+                databaseStatistics: {
+                    frequency = this.statDefaults.frequency,
+                } = {},
                 notifications,
+                retention,
                 queue: {
                     maxWorkers = undefined,
                 } = {},
-            } = configManagerOpts || {};
+            } = validJson || {};
             this.pollOptions = buildPollingOptions(polling);
             this.dryRun = this.globalDryRun || dryRun;
 
@@ -546,6 +624,12 @@ export class Manager extends EventEmitter {
             const eventContent = events.length === 0 ? 'None' : events.join(', ');
             this.logger.info(`Notification Info => Providers: ${notifierContent} | Events: ${eventContent}`);
 
+            let realStatFrequency = frequency;
+            if(realStatFrequency !== false && !frequencyEqualOrLargerThanMin(realStatFrequency, this.statDefaults.minFrequency)) {
+                this.logger.warn(`Specified database statistic frequency of '${realStatFrequency}' is shorter than minimum enforced by operator of '${this.statDefaults.minFrequency}' -- will fallback to '${this.statDefaults.minFrequency}'`);
+                realStatFrequency = this.statDefaults.minFrequency;
+            }
+
             let resourceConfig: SubredditResourceConfig = {
                 footer,
                 logger: this.logger,
@@ -553,6 +637,10 @@ export class Manager extends EventEmitter {
                 caching,
                 credentials,
                 client: this.client,
+                botEntity: this.botEntity,
+                managerEntity: this.managerEntity,
+                statFrequency: realStatFrequency,
+                retention: this.retentionOverride ?? retention
             };
             this.resources = await this.cacheManager.set(this.subreddit.display_name, resourceConfig);
             this.resources.setLogger(this.logger);
@@ -608,6 +696,42 @@ export class Manager extends EventEmitter {
                 this.logger.info(checkSummary);
             }
             this.validConfigLoaded = true;
+
+            // make sure all db related stuff gets initialized
+            for (const r of this.runs) {
+                await r.initialize();
+                for (const c of r.submissionChecks) {
+                    await c.initialize();
+                    for (const ru of c.rules) {
+                        if (isRuleSet(ru)) {
+                            for (const rule of ru.rules) {
+                                await rule.initialize();
+                            }
+                        } else {
+                            await ru.initialize();
+                        }
+                    }
+                    for (const a of c.actions) {
+                        await a.initialize();
+                    }
+                }
+                for (const c of r.commentChecks) {
+                    await c.initialize();
+                    for (const ru of c.rules) {
+                        if (isRuleSet(ru)) {
+                            for (const rule of ru.rules) {
+                                await rule.initialize();
+                            }
+                        } else {
+                            await ru.initialize();
+                        }
+                    }
+                    for (const a of c.actions) {
+                        await a.initialize();
+                    }
+                }
+            }
+
             if(this.eventsState.state === RUNNING) {
                 // need to update polling, potentially
                 await this.buildPolling();
@@ -749,11 +873,19 @@ export class Manager extends EventEmitter {
 
     async handleActivity(activity: (Submission | Comment), options: runCheckOptions): Promise<void> {
         const checkType = isSubmission(activity) ? 'Submission' : 'Comment';
-        let item = activity;
+        let item = activity,
+            runtimeShouldRefresh = false;
         const itemId = await item.id;
 
+        const {
+            delayUntil,
+            refresh = false,
+            initialGoto = '',
+            activitySource,
+            force = false,
+        } = options;
+
         if(await this.resources.hasRecentSelf(item)) {
-            const {force = false} = options;
             let recentMsg = `Found in Activities recently (last ${this.resources.selfTTL} seconds) modified/created by this bot`;
             if(force) {
                 this.logger.debug(`${recentMsg} but will run anyway because "force" option was true.`);
@@ -763,23 +895,34 @@ export class Manager extends EventEmitter {
             }
         }
 
-        const {
-            delayUntil,
-            refresh = false,
-            initialGoto = '',
-            dispatchSource,
-        } = options;
+        let activityEntity: Activity;
+        const existingEntity = await this.activityRepo.findOneBy({_id: item.name});
+        if(existingEntity === null) {
+            activityEntity = Activity.fromSnoowrapActivity(this.managerEntity.subreddit, activity);
+        } else {
+            activityEntity = existingEntity;
+        }
 
-        let allRuleResults: RuleResult[] = [];
-        const runResults: RunResult[] = [];
+        const event = new CMEvent();
+        event.triggered = false;
+        event.manager = this.managerEntity;
+        event.activity = activityEntity;
+        event.runResults = [];
+        event.queuedAt = dayjs(options.activitySource.queuedAt);
+        event.source = new ActivitySourceEntity({...options.activitySource, manager: this.managerEntity});
+
+
+        let allRuleResults: RuleResultEntity[] = [];
+        const runResults: RunResultEntity[] = [];
         const itemIdentifiers = [];
         itemIdentifiers.push(`${checkType === 'Submission' ? 'SUB' : 'COM'} ${itemId}`);
         this.currentLabels = itemIdentifiers;
         let ePeek = '';
+        let peekParts: ItemContent;
         try {
             const [peek, { content: peekContent }] = await itemContentPeek(item);
             ePeek = peekContent;
-            const dispatchStr = dispatchSource !== undefined ? ` (Dispatched by ${dispatchSource.action}${dispatchSource.identifier !== undefined ? ` | ${dispatchSource.identifier}` : ''}) ${peek}` : peek;
+            const dispatchStr = activitySource !== undefined ? ` (Dispatched by ${activitySource.action}${activitySource.identifier !== undefined ? ` | ${activitySource.identifier}` : ''}) ${peek}` : peek;
             this.logger.info(`<EVENT> ${dispatchStr}`);
         } catch (err: any) {
             this.logger.error(`Error occurred while generating item peek for ${checkType} Activity ${itemId}`, err);
@@ -787,7 +930,7 @@ export class Manager extends EventEmitter {
 
         let actionedEvent: ActionedEvent = {
             triggered: false,
-            subreddit: this.subreddit.display_name_prefixed,
+            subreddit: this.subreddit.display_name,
             activity: {
                 peek: ePeek,
                 link: item.permalink,
@@ -796,13 +939,11 @@ export class Manager extends EventEmitter {
                 author: item.author.name,
                 subreddit: item.subreddit_name_prefixed
             },
-            dispatchSource: dispatchSource,
+            dispatchSource: activitySource,
             timestamp: Date.now(),
             runResults: []
         }
         const startingApiLimit = this.client.ratelimitRemaining;
-
-        let wasRefreshed = false;
 
         try {
 
@@ -810,17 +951,34 @@ export class Manager extends EventEmitter {
                 const created = dayjs.unix(item.created_utc);
                 const diff = dayjs().diff(created, 's');
                 if (diff < delayUntil) {
-                    this.logger.verbose(`Delaying processing until Activity is ${delayUntil} seconds old (${delayUntil - diff}s)`);
-                    await sleep(delayUntil - diff);
-                    // @ts-ignore
-                    item = await activity.refresh();
-                    wasRefreshed = true;
+                    let delayMsg = `Activity should be ${delayUntil} seconds old before processing but is only ${diff} seconds old.`;
+                    const remaining = delayUntil - diff;
+                    if(remaining > 2) {
+                        // if activity should be delayed and amount of time to wait is non-trivial then we don't want to block the worker
+                        // so instead we will dispatch activity and re-process it later
+                        this.logger.verbose(`${delayMsg} Delay time remaining (${remaining}s) is non-trivial (more than 2 seconds) so activity will be re-queued to prevent blocking worker.`);
+                        await this.resources.addDelayedActivity({
+                            ...options.activitySource,
+                            cancelIfQueued: true,
+                            delay: dayjs.duration(remaining, 'seconds'),
+                            id: 'notUsed',
+                            queuedAt: dayjs(),
+                            processing: false,
+                            activity,
+                            author: getActivityAuthorName(activity.author),
+                        });
+                        return;
+                    } else {
+                        this.logger.verbose(`${delayMsg} Waiting ${remaining} second before processing, then refreshing data`);
+                        await sleep(remaining * 1000);
+                        runtimeShouldRefresh = true;
+                    }
                 }
             }
             // refresh signal from firehose if activity was ingested multiple times before processing or re-queued while processing
             // want to make sure we have the most recent data
-            if(!wasRefreshed && refresh === true) {
-                this.logger.verbose(`Refreshed data ${dispatchSource !== undefined ? 'b/c activity is from dispatch' : 'b/c activity was delayed'}`);
+            if(runtimeShouldRefresh || refresh) {
+                this.logger.verbose(`Refreshed data`);
                 // @ts-ignore
                 item = await activity.refresh();
             }
@@ -873,10 +1031,10 @@ export class Manager extends EventEmitter {
                     currRun = this.runs[runIndex];
                 }
 
-                const [runResult, postBehavior] = await currRun.handle(item,allRuleResults, runResults.filter(x => x.name === currRun.name), {...options, gotoContext, maxGotoDepth: this.maxGotoDepth});
+                const [runResult, postBehavior] = await currRun.handle(item,allRuleResults, runResults.filter(x => x.run.name === currRun.name), {...options, gotoContext, maxGotoDepth: this.maxGotoDepth});
                 runResults.push(runResult);
 
-                allRuleResults = allRuleResults.concat(determineNewResults(allRuleResults, (runResult.checkResults ?? []).map(x => x.ruleResults).flat()));
+                allRuleResults = allRuleResults.concat(determineNewResults(allRuleResults, (runResult.checkResults ?? []).map(x => x.allRuleResults ?? []).flat()));
 
                 switch (postBehavior.toLowerCase()) {
                     case 'next':
@@ -901,36 +1059,53 @@ export class Manager extends EventEmitter {
             }
             const processError = new ErrorWithCause('Activity processing terminated early due to unexpected error', {cause: err});
             this.logger.error(processError);
-            this.emit('error', err);
+            if(isSeriousError(err)) {
+                this.emit('error', err);
+            }
         } finally {
+            event.triggered = runResults.some(x => x.triggered);
             actionedEvent.triggered = runResults.some(x => x.triggered);
+            event.runResults = runResults;
             if(!actionedEvent.triggered) {
                 this.logger.verbose('No checks triggered');
             }
+
             try {
                 //actionedEvent.actionResults = runActions;
-                actionedEvent.runResults = runResults;
-                if(actionedEvent.triggered) {
-                    // only get parent submission info if we are actually going to use this event
-                    if(checkType === 'Comment') {
-                        try {
-                            // @ts-ignore
-                            const subProxy = await this.client.getSubmission(await item.link_id);
-                            const sub = await this.resources.getActivity(subProxy);
-                            const [peek, { content: peekContent, author, permalink }] = await itemContentPeek(sub);
-                            actionedEvent.parentSubmission = {
-                                peek: peekContent,
-                                author,
-                                subreddit: item.subreddit_name_prefixed,
-                                id: (item as Comment).link_id,
-                                type: 'comment',
-                                link: permalink
+                event.runResults = runResults;
+                //actionedEvent.runResults = runResults;
+
+                // determine if event should be recorded
+                const allOutputs = [...new Set(runResults.map(x => x.checkResults.map(y => y.recordOutputs ?? [])).flat(2).filter(x => recordOutputTypes.includes(x)))];
+                if(allOutputs.length > 0) {
+                    if(allOutputs.includes('database')) {
+                        // only get parent submission info if we are actually going to use this event
+                        if(checkType === 'Comment') {
+                            try {
+                                let subActivity: Activity | null = await this.activityRepo.findOneBy({_id: (item as Comment).link_id});
+                                if(subActivity === null) {
+                                    // @ts-ignore
+                                    const subProxy = await this.client.getSubmission((item as Comment).link_id);
+                                    const sub = await this.resources.getActivity(subProxy);
+                                    subActivity = await this.activityRepo.save(Activity.fromSnoowrapActivity(this.managerEntity.subreddit, sub));
+                                }
+                                event.activity.submission = subActivity;
+
+                                // const [peek, { content: peekContent, author, permalink }] = await itemContentPeek(sub);
+                                // actionedEvent.parentSubmission = {
+                                //     peek: peekContent,
+                                //     author,
+                                //     subreddit: item.subreddit_name_prefixed,
+                                //     id: (item as Comment).link_id,
+                                //     type: 'comment',
+                                //     link: permalink
+                                // }
+                            } catch (err: any) {
+                                this.logger.error(`Error occurred while generating item peek for ${checkType} Activity ${itemId}`, err);
                             }
-                        } catch (err: any) {
-                            this.logger.error(`Error occurred while generating item peek for ${checkType} Activity ${itemId}`, err);
                         }
+                        await this.eventRepo.save(event);
                     }
-                    await this.resources.addActionedEvent(actionedEvent);
                 }
 
                 const checksRun = actionedEvent.runResults.map(x => x.checkResults).flat().length;
@@ -945,7 +1120,7 @@ export class Manager extends EventEmitter {
             } finally {
                 this.resources.updateHistoricalStats({
                     eventsCheckedTotal: 1,
-                    eventsActionedTotal: actionedEvent.triggered ? 1 : 0,
+                    eventsActionedTotal: event.triggered ? 1 : 0,
                 });
             }
         }
@@ -1068,7 +1243,18 @@ export class Manager extends EventEmitter {
                         checkType = 'Comment';
                     }
                     if (checkType !== undefined) {
-                        this.firehose.push({activity: item, options: {delayUntil, source: `poll:${source}`}})
+                        this.firehose.push({
+                            activity: item, options: {
+                                delayUntil,
+                                source: `poll:${source}`,
+                                activitySource: {
+                                    queuedAt: dayjs(),
+                                    type: 'poll',
+                                    identifier: source,
+                                    id: nanoid(16)
+                                }
+                            }
+                        })
                     }
                 };
 
@@ -1137,17 +1323,24 @@ export class Manager extends EventEmitter {
         }
     }
 
-    startQueue(causedBy: Invokee = 'system', options?: ManagerStateChangeOption) {
+    async startQueue(causedBy: Invokee = 'system', options?: ManagerStateChangeOption) {
+
+        if(this.activityRepo === undefined) {
+            this.activityRepo = this.resources.database.getRepository(Activity);
+        }
+        if(this.authorRepo === undefined) {
+            this.authorRepo = this.resources.database.getRepository(AuthorEntity);
+        }
+        if(this.eventRepo === undefined) {
+            this.eventRepo = this.resources.database.getRepository(CMEvent);
+        }
+
         const {reason, suppressNotification = false} = options || {};
         if(this.queueState.state === RUNNING) {
             this.logger.info(`Activity processing queue is already RUNNING with (${this.queue.length()} queued activities)`);
         } else if (!this.validConfigLoaded) {
             this.logger.warn('Cannot start activity processing queue while manager has an invalid configuration');
         } else {
-            if(this.queueState.state === STOPPED) {
-                // extra precaution to make sure queue meta is cleared before starting queue
-                this.queuedItemsMeta = [];
-            }
             this.queue.resume();
             this.firehose.resume();
             this.logger.info(`Activity processing queue started RUNNING with ${this.queue.length()} queued activities`);
@@ -1159,6 +1352,7 @@ export class Manager extends EventEmitter {
             if(!suppressNotification) {
                 this.notificationManager.handle('runStateChanged', 'Queue Started', reason, causedBy);
             }
+            await this.syncRunningState('queueState');
         }
     }
 
@@ -1171,6 +1365,7 @@ export class Manager extends EventEmitter {
                     state: PAUSED,
                     causedBy
                 }
+                await this.syncRunningState('queueState');
             } else {
                 this.logger.info('Activity processing queue already PAUSED');
             }
@@ -1196,6 +1391,7 @@ export class Manager extends EventEmitter {
             if(!suppressNotification) {
                 this.notificationManager.handle('runStateChanged', 'Queue Paused', reason, causedBy)
             }
+            await this.syncRunningState('queueState');
         }
     }
 
@@ -1240,6 +1436,7 @@ export class Manager extends EventEmitter {
             if(!suppressNotification) {
                 this.notificationManager.handle('runStateChanged', 'Queue Stopped', reason, causedBy)
             }
+            await this.syncRunningState('queueState');
         }
     }
 
@@ -1254,7 +1451,6 @@ export class Manager extends EventEmitter {
         if(this.eventsState.state === RUNNING) {
             this.logger.info('Event polling already running');
         } else {
-
             if(this.eventsState.state === STOPPED) {
                 await this.buildPolling();
             }
@@ -1280,9 +1476,10 @@ export class Manager extends EventEmitter {
         if(!suppressNotification) {
             this.notificationManager.handle('runStateChanged', 'Events Polling Started', reason, causedBy)
         }
+        await this.syncRunningState('eventsState');
     }
 
-    pauseEvents(causedBy: Invokee = 'system', options?: ManagerStateChangeOption) {
+    async pauseEvents(causedBy: Invokee = 'system', options?: ManagerStateChangeOption) {
         const {reason, suppressNotification = false} = options || {};
         if(this.eventsState.state !== RUNNING) {
             this.logger.warn('Events must be in RUNNING state in order to be paused.');
@@ -1302,10 +1499,11 @@ export class Manager extends EventEmitter {
             if(!suppressNotification) {
                 this.notificationManager.handle('runStateChanged', 'Events Polling Paused', reason, causedBy)
             }
+            await this.syncRunningState('eventsState');
         }
     }
 
-    stopEvents(causedBy: Invokee = 'system', options?: ManagerStateChangeOption) {
+    async stopEvents(causedBy: Invokee = 'system', options?: ManagerStateChangeOption) {
         const {reason, suppressNotification = false} = options || {};
         if(this.eventsState.state !== STOPPED) {
             for (const s of this.streams.values()) {
@@ -1322,10 +1520,12 @@ export class Manager extends EventEmitter {
             if(!suppressNotification) {
                 this.notificationManager.handle('runStateChanged', 'Events Polling Stopped', reason, causedBy)
             }
+            await this.syncRunningState('eventsState');
         } else if(causedBy !== this.eventsState.causedBy) {
             this.logger.info(`Events STOPPED by ${causedBy}`);
             this.logger.info('Note: Polling behavior will be re-built from configuration when next started');
             this.eventsState.causedBy = causedBy;
+            await this.syncRunningState('eventsState');
         } else {
             this.logger.info('Events already STOPPED');
         }
@@ -1338,26 +1538,49 @@ export class Manager extends EventEmitter {
             return;
         }
         await this.startEvents(causedBy, {suppressNotification: true});
-        this.startQueue(causedBy, {suppressNotification: true});
-        this.botState = {
+        await this.startQueue(causedBy, {suppressNotification: true});
+        this.managerState = {
             state: RUNNING,
             causedBy
         }
         if(!suppressNotification) {
             this.notificationManager.handle('runStateChanged', 'Bot Started', reason, causedBy)
         }
+        await this.syncRunningState('managerState');
     }
 
     async stop(causedBy: Invokee = 'system', options?: ManagerStateChangeOption) {
         const {reason, suppressNotification = false} = options || {};
         this.stopEvents(causedBy, {suppressNotification: true});
         await this.stopQueue(causedBy, {suppressNotification: true});
-        this.botState = {
+        this.managerState = {
             state: STOPPED,
             causedBy
         }
         if(!suppressNotification) {
             this.notificationManager.handle('runStateChanged', 'Bot Stopped', reason, causedBy)
         }
+        await this.syncRunningState('managerState');
+    }
+
+    setInitialRunningState(managerEntity: RunningStateEntities, type: RunningStateTypes): RunningState {
+        if(managerEntity[type].runType.name === 'stopped' && managerEntity[type].invokee.name === 'user') {
+            return {state: STOPPED, causedBy: 'user'};
+        }
+        return {state: STOPPED, causedBy: 'system'};
+    }
+
+    async syncRunningStates() {
+        for(const s of ['managerState','eventsState','queueState'] as RunningStateTypes[]) {
+            await this.syncRunningState(s);
+        }
+    }
+
+    async syncRunningState(type: RunningStateTypes) {
+
+        this.managerEntity[type].invokee = await this.cacheManager.invokeeRepo.findOneBy({name: this[type].causedBy}) as InvokeeType
+        this.managerEntity[type].runType = await this.cacheManager.runTypeRepo.findOneBy({name: this[type].state}) as RunStateType
+
+        await this.cacheManager.defaultDatabase.getRepository(ManagerEntity).save(this.managerEntity);
     }
 }

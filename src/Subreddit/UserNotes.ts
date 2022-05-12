@@ -3,9 +3,9 @@ import Snoowrap, {Comment, RedditUser, WikiPage} from "snoowrap";
 import {
     COMMENT_URL_ID,
     deflateUserNotes, getActivityAuthorName,
-    inflateUserNotes,
+    inflateUserNotes, isSubmission,
     parseLinkIdentifier,
-    SUBMISSION_URL_ID
+    SUBMISSION_URL_ID, truncateStringToLength
 } from "../util";
 import Subreddit from "snoowrap/dist/objects/Subreddit";
 import {Logger} from "winston";
@@ -55,6 +55,10 @@ export interface RawNote {
 
 export type UserNotesConstants = Pick<any, "users" | "warnings">;
 
+// resolves as undefined when using truncateStringToLength from util.ts...probably a circular reference issue but can't address it right now
+// TODO refactor this to use truncateStringToLength
+const wikiReasonTruncateMax = (str: string) => str.length > 256 ? `${str.slice(0, 256 - '...'.length - 1)}...` : str;
+
 export class UserNotes {
     notesTTL: number | false;
     subreddit: Subreddit;
@@ -72,11 +76,11 @@ export class UserNotes {
     debounceCB: any;
     batchCount: number = 0;
 
-    constructor(ttl: number | boolean, subreddit: Subreddit, client: Snoowrap, logger: Logger, cache: Cache, cacheCB: Function) {
+    constructor(ttl: number | boolean, subreddit: string, client: Snoowrap, logger: Logger, cache: Cache, cacheCB: Function) {
         this.notesTTL = ttl === true ? 0 : ttl;
-        this.subreddit = subreddit;
+        this.subreddit = client.getSubreddit(subreddit);
         this.logger = logger;
-        this.identifier = `${this.subreddit.display_name}-usernotes`;
+        this.identifier = `${subreddit}-usernotes`;
         this.cache = cache;
         this.cacheCB = cacheCB;
         this.client = client;
@@ -115,14 +119,13 @@ export class UserNotes {
     // @ts-ignore
     async getMod() {
         if(this.mod === undefined) {
-            // idgaf
             // @ts-ignore
-            this.mod = await this.subreddit._r.getMe();
+            this.mod = await this.client.getMe();
         }
         return this.mod as RedditUser;
     }
 
-    async addUserNote(item: (Submission|Comment), type: string | number, text: string = ''): Promise<UserNote>
+    async addUserNote(item: (Submission|Comment), type: string | number, text: string = '', wikiEditReasonPrefix?: string): Promise<UserNote>
     {
         const payload = await this.retrieveData();
         const userName = getActivityAuthorName(item.author);
@@ -144,8 +147,14 @@ export class UserNotes {
         }
         payload.blob[userName].ns.push(newNote.toRaw(payload.constants));
 
+
+        let wikiEditReason = `Added ${type} for ${getActivityAuthorName(item.author)} on ${isSubmission(item) ? 'SUB' : 'COMM'} ${item.name}${text !== '' ? ` => ${text}` : ''}`;
+        if(wikiEditReasonPrefix !== undefined) {
+            wikiEditReason = `${wikiEditReasonPrefix} ${wikiEditReason}`;
+        }
+
         const existingNotes = await this.getUserNotes(item.author);
-        await this.saveData(payload);
+        await this.saveData(payload, wikiEditReason);
         if(this.notesTTL > 0) {
             existingNotes.push(newNote);
             this.users.set(userName, existingNotes);
@@ -191,10 +200,10 @@ export class UserNotes {
         }
     }
 
-    async saveData(payload: RawUserNotesPayload): Promise<RawUserNotesPayload> {
+    async saveData(payload: RawUserNotesPayload, reason: string = 'ContextBot edited usernotes'): Promise<RawUserNotesPayload> {
 
         const blob = deflateUserNotes(payload.blob);
-        const wikiPayload = {text: JSON.stringify({...payload, blob}), reason: 'ContextBot edited usernotes'};
+        const wikiPayload = {text: JSON.stringify({...payload, blob}), reason: wikiReasonTruncateMax(reason)};
         try {
             const wiki = this.client.getSubreddit(this.subreddit.display_name).getWikiPage('usernotes');
             if (this.notesTTL !== false) {

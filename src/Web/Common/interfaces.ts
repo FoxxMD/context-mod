@@ -49,6 +49,7 @@ export interface SubredditDataResponse {
     hardLimit?: number
     heartbeatHuman?: string
     heartbeat: number
+    retention: string
 }
 
 export interface BotStatusResponse {
@@ -77,9 +78,23 @@ export interface IUser {
 }
 
 export interface HeartbeatResponse {
+    ranMigrations: boolean
+    migrationBlocker?: string
     subreddits: string[]
     operators: string[]
     operatorDisplay?: string
     friendly?: string
     bots: BotInstance[]
+}
+
+
+export interface InviteData {
+    permissions: string[],
+    subreddits?: string[],
+    instance?: string,
+    clientId: string
+    clientSecret: string
+    redirectUri: string
+    creator: string
+    overwrite?: boolean
 }

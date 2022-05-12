@@ -175,6 +175,8 @@
                                                 </span>
                                                 <label>Slow Mode</label>
                                                 <span class="delayBy"><%= data.delayBy %></span>
+                                                <label>Retention</label>
+                                                <span><%= data.retention %></span>
                                             <% } %>
                                             <% if (data.name === 'All') { %>
                                                     <label>Status</label>
@@ -230,18 +232,18 @@
                                                     </span>
                                                 </span>
                                             </label>
-                                                <span>
-                                                    <span class="runningActivities"><%= data.runningActivities %></span> Processing /
-                                                    <span class="queuedActivities"><%= data.queuedActivities %></span> Queued /
-                                                    <span class="has-tooltip">
-                                                        <span style="margin-top:35px"
-                                                              class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2 space-y-3 p-2 text-left delayedItemsList'>
-                                                        </span>
-                                                    <span class="underline" style="text-decoration-style: dotted"><span class="delayedItemsCount"><%= data.delayedItems.length %></span> Delayed</span>
+                                            <span>
+                                                <span class="runningActivities"><%= data.runningActivities %></span> Processing /
+                                                <span class="queuedActivities"><%= data.queuedActivities %></span> Queued /
+                                                <span class="has-tooltip">
+                                                    <span style="margin-top:35px"
+                                                          class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2 space-y-3 p-2 text-left delayedItemsList'>
                                                     </span>
+                                                <span class="underline" style="text-decoration-style: dotted"><span class="delayedItemsCount"><%= data.delayedItems.length %></span> Delayed</span>
                                                 </span>
-                                                <label>Operated By</label>
-                                                <span><%= operatorDisplay %></span>
+                                            </span>
+                                            <label>Operated By</label>
+                                            <span><%= operatorDisplay %></span>
                                             <% if (data.name === 'All' && isOperator) { %>
                                                 <label>Operators</label>
                                                 <span><%= operators %></span>
@@ -388,65 +390,30 @@
                                         <div class="flex items-top justify-evenly">
                                             <div>
                                                 <div class="text-left font-semibold pb-2">Bot</div>
-                                                <% if (data.name !== 'All') { %><span class="text-center pb-2"><a
-                                                            data-subreddit="<%= data.name %>"
-                                                            data-stattype="reloadStats" class="statsToggle" href="">Last Reload</a> | <a
-                                                            data-subreddit="<%= data.name %>" data-stattype="allStats"
-                                                            class="statsToggle allStatsToggle"
-                                                            href="">All Time</a> </span>
-                                                <% } %>
-                                                <% if (data.name !== 'All') { %>
-                                                    <div data-subreddit="<%= data.name %>"
-                                                         class="stats botStats reloadStats mb-2">
-                                                        <label>Events</label>
-                                                        <span class="eventsCount">
-                                                            <%= data.stats.historical.lastReload.eventsCheckedTotal === undefined ? '-' : data.stats.historical.lastReload.eventsCheckedTotal %>
-                                                        </span>
-                                                        <label>Checks</label>
-                                                        <span class="has-tooltip">
-                                                        <span class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2'>
-                                                            <span><%= data.stats.historical.lastReload.checksTriggeredTotal %></span> Triggered / <span><%= data.stats.historical.lastReload.checksRunTotal %></span> Run / <span><%= data.stats.historical.lastReload.checksFromCacheTotal %></span> Cached
-                                                        </span>
-                                                            <span class="cursor-help underline" style="text-decoration-style: dotted"><span class="checksCount"><%= data.stats.historical.lastReload.checksTriggeredTotal %></span> Triggered</span>
-                                                    </span>
-
-                                                        <label>Rules</label>
-                                                        <span class="has-tooltip">
-                                                    <span class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2'>
-                                                        <span><%= data.stats.historical.lastReload.rulesTriggeredTotal %></span> Triggered / <span><%= data.stats.historical.lastReload.rulesCachedTotal %></span> Cached / <span><%= data.stats.historical.lastReload.rulesRunTotal %></span> Run
-                                                    </span>
-                                                    <span class="cursor-help cursor-help underline" style="text-decoration-style: dotted">
-                                                        <span class="rulesCount"><%= data.stats.historical.lastReload.rulesTriggeredTotal %></span> Triggered</span>
-                                                </span>
-
-                                                        <label>Actions</label>
-                                                        <span><span class="actionsCount"><%= data.stats.historical.lastReload.actionsRunTotal === undefined ? '0' : data.stats.historical.lastReload.actionsRunTotal %></span> Run</span>
-                                                    </div>
-                                                <% } %>
                                                 <div data-subreddit="<%= data.name %>" class="stats botStats allStats mb-2">
                                                     <label>Events</label>
                                                     <span class="eventsCount">
-                                                        <%= data.stats.historical.allTime.eventsCheckedTotal %>
+                                                        <%= data.stats.historical.eventsCheckedTotal %>
                                                     </span>
                                                     <label>Checks</label>
                                                     <span class="has-tooltip">
                                                         <span class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2'>
-                                                            <span><%= data.stats.historical.allTime.checksTriggeredTotal %></span> Triggered / <span><%= data.stats.historical.allTime.checksRunTotal %></span> Run / <span><%= data.stats.historical.allTime.checksFromCacheTotal %></span> Cached
+                                                            <span><%= data.stats.historical.checksTriggeredTotal %></span> Triggered / <span><%= data.stats.historical.checksRunTotal %></span> Run / <span><%= data.stats.historical.checksFromCacheTotal %></span> Cached
                                                         </span>
-                                                        <span class="cursor-help underline" style="text-decoration-style: dotted"><span class="checksCount"><%= data.stats.historical.allTime.checksTriggeredTotal %></span> Triggered</span>
+                                                        <span class="cursor-help underline" style="text-decoration-style: dotted"><span class="checksCount"><%= data.stats.historical.checksTriggeredTotal %></span> Triggered</span>
                                                     </span>
 
                                                     <label>Rules</label>
                                                     <span class="has-tooltip">
                                                         <span class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2'>
-                                                            <span><%= data.stats.historical.allTime.rulesTriggeredTotal %></span> Triggered / <span><%= data.stats.historical.allTime.rulesCachedTotal %></span> Cached / <span><%= data.stats.historical.allTime.rulesRunTotal %></span> Run
+                                                            <span><%= data.stats.historical.rulesTriggeredTotal %></span> Triggered / <span><%= data.stats.historical.rulesCachedTotal %></span> Cached / <span><%= data.stats.historical.rulesRunTotal %></span> Run
                                                         </span>
-                                                        <span class="cursor-help underline" style="text-decoration-style: dotted"><span class="rulesCount"><%= data.stats.historical.allTime.rulesTriggeredTotal %></span> Triggered</span>
+                                                        <span class="cursor-help underline" style="text-decoration-style: dotted"><span class="rulesCount"><%= data.stats.historical.rulesTriggeredTotal %></span> Triggered</span>
                                                     </span>
 
                                                     <label>Actions</label>
                                                     <span>
-                                                        <span><span class="actionsCount"><%= data.stats.historical.allTime.actionsRunTotal === undefined ? '0' : data.stats.historical.allTime.actionsRunTotal %></span> Run</span>
+                                                        <span><span class="actionsCount"><%= data.stats.historical.actionsRunTotal === undefined ? '0' : data.stats.historical.actionsRunTotal %></span> Run</span>
                                                     </span>
                                                 </div>
                                                 <% if (data.name !== 'All') { %>
@@ -654,10 +621,18 @@
                             <br/>
                             <div class="flex items-center justify-between flex-wrap">
                                 <div class="inline-flex items-center">
-                                    <input data-subreddit="<%= data.name %>" style="min-width: 420px;"
+                                    <div class="relative" style="width:550px; display: inline-block;">
+                                    <input data-subreddit="<%= data.name %>"
+                                           style="width: 100%;"
                                            class="border-gray-50 placeholder-gray-500 rounded mt-2 mb-3 p-2 text-black checkUrl"
                                            placeholder="<%= data.name === 'All' ? 'Run Bot on a permalink from any moderated Subreddit' : `Run Bot on a permalink using this Subreddit's config` %>"/>
-
+                                        <div class="absolute inset-y-0 right-0 flex items-center">
+                                            <select id="delayOption" name="delayOption" class="py-0 pl-2 pr-1 outline-0 focus:outline-0 focus:shadow-none border-transparent bg-white text-gray-500 sm:text-sm">
+                                                <option value="asis">As-Is</option>
+                                                <option value="disable">Disable Delays</option>
+                                            </select>
+                                        </div>
+                                    </div>
                                     <a class="hover:bg-gray-700 pointer-events-none opacity-20 no-underline rounded-md mx-4 py-2 px-3 border checkActions dryRunCheck" data-subreddit="<%= data.name %>" href="">Dry Run</a>
                                     <a class="hover:bg-gray-700 pointer-events-none opacity-20 no-underline rounded-md py-2 px-3 border checkActions runCheck" data-subreddit="<%= data.name %>" href="">Run</a>
                                 </div>
@@ -739,13 +714,17 @@
         el.addEventListener('click', e => {
             e.preventDefault();
             const subSection = e.target.closest('div.sub');
-            action = e.target.dataset.action;
-            subreddit = subSection.dataset.subreddit;
-            bot = subSection.dataset.bot;
-            type = e.target.dataset.type;
-            force = e.target.dataset.force === 'true';
+            const actionParams = new URLSearchParams();
 
-            fetch(`/api/action?instance=<%= instanceId %>&bot=${bot}&action=${action}&subreddit=${subreddit}&force=${force}&type=${type}`);
+            actionParams.append('action', e.target.dataset.action);
+            actionParams.append('subreddit', subSection.dataset.subreddit);
+            actionParams.append('bot', subSection.dataset.bot);
+            actionParams.append('force', e.target.dataset.force === 'true');
+            actionParams.append('instance', '<%= instanceId %>');
+            if(e.target.dataset.type !== undefined) {
+                actionParams.append('type', e.target.dataset.type);
+            }
+            fetch(`/api/action?${actionParams.toString()}`);
         });
     })
 
@@ -773,6 +752,7 @@
             const subreddit = e.target.dataset.subreddit;
             const subFilter = `.sub[data-subreddit="${subreddit}"]`;
             const urlInput = document.querySelector(`${subFilter} .checkUrl`);
+            const delayOpt = document.querySelector(`${subFilter} #delayOption`).value;
 
             const isDryun = e.target.classList.contains('dryRunCheck');
 
@@ -780,7 +760,7 @@
             bot = subSection.dataset.bot;
             const url = urlInput.value;
 
-            const fetchUrl = `/api/check?instance=<%= instanceId %>&bot=${bot}&url=${url}&dryRun=${isDryun ? 1 : 0}&subreddit=${subreddit}`;
+            const fetchUrl = `/api/check?instance=<%= instanceId %>&bot=${bot}&url=${url}&dryRun=${isDryun ? 1 : 0}&subreddit=${subreddit}&delayOption=${delayOpt}`;
             fetch(fetchUrl);
 
             urlInput.value = '';
@@ -788,24 +768,24 @@
         });
     });
 
-    document.querySelectorAll('.statsToggle').forEach(el => {
-        el.addEventListener('click', e => {
-            const subreddit = e.target.dataset.subreddit;
-            const statsClass = e.target.dataset.stattype;
-
-            e.preventDefault();
-            document.querySelectorAll(`[data-subreddit="${subreddit}"].statsToggle`).forEach(el => {
-                el.classList.remove('font-bold', 'no-underline', 'pointer-events-none');
-            });
-            e.target.classList.add('font-bold', 'no-underline', 'pointer-events-none');
-
-            document.querySelectorAll(`[data-subreddit="${subreddit}"].botStats`).forEach(el => {
-                el.classList.add('hidden');
-            });
-
-            document.querySelector(`[data-subreddit="${subreddit}"].botStats.${statsClass}`).classList.remove('hidden');
-        });
-    })
+    // document.querySelectorAll('.statsToggle').forEach(el => {
+    //     el.addEventListener('click', e => {
+    //         const subreddit = e.target.dataset.subreddit;
+    //         const statsClass = e.target.dataset.stattype;
+    //
+    //         e.preventDefault();
+    //         document.querySelectorAll(`[data-subreddit="${subreddit}"].statsToggle`).forEach(el => {
+    //             el.classList.remove('font-bold', 'no-underline', 'pointer-events-none');
+    //         });
+    //         e.target.classList.add('font-bold', 'no-underline', 'pointer-events-none');
+    //
+    //         document.querySelectorAll(`[data-subreddit="${subreddit}"].botStats`).forEach(el => {
+    //             el.classList.add('hidden');
+    //         });
+    //
+    //         document.querySelector(`[data-subreddit="${subreddit}"].botStats.${statsClass}`).classList.remove('hidden');
+    //     });
+    // })
 
     document.querySelectorAll('[data-bot].tabSelect').forEach(el => {
         el.addEventListener('click', e => {
@@ -979,8 +959,8 @@
         nestedTabs.classList.add('active');
     }
 
-    document.querySelectorAll('.stats.reloadStats').forEach(el => el.classList.add('hidden'));
-    document.querySelectorAll('.allStatsToggle').forEach(el => el.classList.add('font-bold', 'no-underline', 'pointer-events-none'));
+    //document.querySelectorAll('.stats.reloadStats').forEach(el => el.classList.add('hidden'));
+    //document.querySelectorAll('.allStatsToggle').forEach(el => el.classList.add('font-bold', 'no-underline', 'pointer-events-none'));
 </script>
 
 <script src="https://cdn.socket.io/4.1.2/socket.io.min.js" integrity="sha384-toS6mmwu70G0fw54EGlWWeA4z3dyJ+dlXBtSURSKN4vyRFOcxd3Bzjj/AoOwY+Rg" crossorigin="anonymous"></script>
@@ -1144,7 +1124,7 @@
             if(resp.delayedItems.length > 0) {
                 el.querySelector('.delayedItemsList').innerHTML = '';
                 const now = dayjs();
-                const sorted = resp.delayedItems.map(x => ({...x, dispatchAt: dayjs.unix(x.queuedAt + (x.durationMilli/1000))}));
+                const sorted = resp.delayedItems.map(x => ({...x, dispatchAt: dayjs.unix(x.queuedAt + (x.durationMilli))}));
                 sorted.sort((a, b) => {
                     return a.dispatchAt.isSameOrAfter(b.dispatchAt) ? 1 : -1
                 });
@@ -1173,10 +1153,10 @@
                 });
             }
 
-            el.querySelector('.allStats .eventsCount').innerHTML = resp.stats.historical.allTime.eventsCheckedTotal;
-            el.querySelector('.allStats .checksCount').innerHTML = resp.stats.historical.allTime.checksTriggeredTotal;
-            el.querySelector('.allStats .rulesCount').innerHTML = resp.stats.historical.allTime.rulesTriggeredTotal;
-            el.querySelector('.allStats .actionsCount').innerHTML = resp.stats.historical.allTime.actionsRunTotal;
+            el.querySelector('.allStats .eventsCount').innerHTML = resp.stats.historical.eventsCheckedTotal;
+            el.querySelector('.allStats .checksCount').innerHTML = resp.stats.historical.checksTriggeredTotal;
+            el.querySelector('.allStats .rulesCount').innerHTML = resp.stats.historical.rulesTriggeredTotal;
+            el.querySelector('.allStats .actionsCount').innerHTML = resp.stats.historical.actionsRunTotal;
 
             if(isAll) {
                 for(const elm of ['apiAvg','apiLimit','apiDepletion','nextHeartbeat', 'nextHeartbeatHuman', 'limitReset', 'limitResetHuman', 'nannyMode', 'startedAtHuman']) {
@@ -1189,11 +1169,6 @@
                     el.querySelector('.modPermissionsList').innerHTML = '';
                     el.querySelector('.modPermissionsList').insertAdjacentHTML('afterbegin', resp.permissions.map(x => `<li class="font-mono">${x}</li>`).join(''));
                 }
-
-                el.querySelector('.reloadStats .eventsCount').innerHTML = resp.stats.historical.lastReload.eventsCheckedTotal;
-                el.querySelector('.reloadStats .checksCount').innerHTML = resp.stats.historical.lastReload.checksTriggeredTotal;
-                el.querySelector('.reloadStats .rulesCount').innerHTML = resp.stats.historical.lastReload.rulesTriggeredTotal;
-                el.querySelector('.reloadStats .actionsCount').innerHTML = resp.stats.historical.lastReload.actionsRunTotal;
 
                 for(const elm of ['botState', 'queueState', 'eventsState']) {
                     const state = resp[elm];

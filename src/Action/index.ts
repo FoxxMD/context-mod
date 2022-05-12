@@ -1,103 +1,160 @@
 import {Comment, Submission} from "snoowrap";
 import {Logger} from "winston";
-import {RuleResult} from "../Rule";
-import {checkAuthorFilter, checkItemFilter, SubredditResources} from "../Subreddit/SubredditResources";
-import {ActionProcessResult, ActionResult, ChecksActivityState, TypedActivityStates} from "../Common/interfaces";
-import Author, {AuthorOptions} from "../Author/Author";
+import {
+    ActionProcessResult,
+    ObjectPremise
+} from "../Common/interfaces";
 import {mergeArr} from "../util";
 import LoggedError from "../Utils/LoggedError";
 import {ExtendedSnoowrap} from '../Utils/SnoowrapClients';
 import {ErrorWithCause} from "pony-cause";
 import EventEmitter from "events";
 import {runCheckOptions} from "../Subreddit/Manager";
+import {ActionPremise} from "../Common/Entities/ActionPremise";
+import {ActionType} from "../Common/Entities/ActionType";
+import { capitalize } from "lodash";
+import { RuleResultEntity } from "../Common/Entities/RuleResultEntity";
+import { RunnableBase } from "../Common/RunnableBase";
+import {ActionResultEntity} from "../Common/Entities/ActionResultEntity";
+import {FindOptionsWhere} from "typeorm/find-options/FindOptionsWhere";
+import {ActionTypes} from "../Common/Infrastructure/Atomic";
+import {RunnableBaseJson, RunnableBaseOptions, StructuredRunnableBase} from "../Common/Infrastructure/Runnable";
 
-export abstract class Action {
+export abstract class Action extends RunnableBase {
     name?: string;
     logger: Logger;
-    resources: SubredditResources;
     client: ExtendedSnoowrap;
-    authorIs: AuthorOptions;
-    itemIs: TypedActivityStates;
     dryRun: boolean;
     enabled: boolean;
     managerEmitter: EventEmitter;
+    // actionEntity: ActionEntity | null = null;
+    actionPremiseEntity: ActionPremise | null = null;
 
     constructor(options: ActionOptions) {
+        super(options);
         const {
             enable = true,
             name = this.getKind(),
-            resources,
             client,
             logger,
             subredditName,
             dryRun = false,
-            authorIs: {
-                excludeCondition = 'OR',
-                include = [],
-                exclude = [],
-            } = {},
-            itemIs = [],
             emitter,
         } = options;
 
         this.name = name;
         this.dryRun = dryRun;
         this.enabled = enable;
-        this.resources = resources;
         this.client = client;
         this.logger = logger.child({labels: [`Action ${this.getActionUniqueName()}`]}, mergeArr);
         this.managerEmitter = emitter;
-
-        this.authorIs = {
-            excludeCondition,
-            exclude: exclude.map(x => new Author(x)),
-            include: include.map(x => new Author(x)),
-        }
-
-        this.itemIs = itemIs;
     }
 
-    abstract getKind(): string;
+    abstract getKind(): ActionTypes;
 
     getActionUniqueName() {
-        return this.name === this.getKind() ? this.getKind() : `${this.getKind()} - ${this.name}`;
+        return this.name === this.getKind() ? capitalize(this.getKind()) : `${capitalize(this.getKind())} - ${this.name}`;
     }
 
-    async handle(item: Comment | Submission, ruleResults: RuleResult[], options: runCheckOptions): Promise<ActionResult> {
+    protected abstract getSpecificPremise(): object;
+
+    getPremise(): ObjectPremise {
+        const config = this.getSpecificPremise();
+        return {
+            kind: this.getKind(),
+            config: config,
+            authorIs: this.authorIs,
+            itemIs: this.itemIs,
+        };
+    }
+
+    async initialize() {
+        if (this.actionPremiseEntity === null) {
+            const prem = this.getPremise();
+            const kind = await this.resources.database.getRepository(ActionType).findOne({where: {name: this.getKind()}});
+
+            const candidatePremise = new ActionPremise({
+                name: this.name,
+                kind: kind as ActionType,
+                config: prem,
+                manager: this.resources.managerEntity,
+            })
+
+            const actionPremiseRepo = this.resources.database.getRepository(ActionPremise);
+
+            const searchCriteria: FindOptionsWhere<ActionPremise> = {
+                kind: {
+                    id: kind?.id
+                },
+                configHash: candidatePremise.configHash,
+                manager: {
+                    id: this.resources.managerEntity.id
+                },
+                itemIsConfigHash: candidatePremise.itemIsConfigHash,
+                authorIsConfigHash: candidatePremise.authorIsConfigHash,
+                name: this.name
+            };
+
+            if(this.name !== undefined) {
+                searchCriteria.name = this.name;
+            }
+
+            try {
+                this.actionPremiseEntity = await actionPremiseRepo.findOne({
+                    where: searchCriteria
+                });
+                if (this.actionPremiseEntity === null) {
+                    this.actionPremiseEntity = await actionPremiseRepo.save(candidatePremise);
+                }
+            } catch (err) {
+                const f = err;
+            }
+        }
+    }
+
+    async handle(item: Comment | Submission, ruleResults: RuleResultEntity[], options: runCheckOptions): Promise<ActionResultEntity> {
         const {dryRun: runtimeDryrun} = options;
         const dryRun = runtimeDryrun || this.dryRun;
 
-        let actRes: ActionResult = {
-            kind: this.getKind(),
-            name: this.getActionUniqueName(),
+        const actRes = new ActionResultEntity({
             run: false,
-            dryRun,
+            premise: this.actionPremiseEntity as ActionPremise,
             success: false,
-        };
+            dryRun,
+        });
+
+        if(!this.enabled) {
+            this.logger.info(`Not run because it is not enabled.`);
+            actRes.runReason = 'Not enabled'
+            return actRes;
+        }
+
         try {
-            const [itemPass, itemFilterType, itemFilterResults] = await checkItemFilter(item, this.itemIs, this.resources, this.logger, options.source);
-            if (!itemPass) {
-                this.logger.verbose(`Activity did not pass 'itemIs' test, Action not run`);
-                actRes.runReason = `Activity did not pass 'itemIs' test, Action not run`;
-                actRes.itemIs = itemFilterResults;
-                return actRes;
-            } else if(this.itemIs.length > 0) {
-                actRes.itemIs = itemFilterResults;
-            }
+            const filterResults = await this.runFilters(item, options);
+            const [itemRes, authorRes] = filterResults;
+            actRes.itemIs = itemRes;
+            actRes.authorIs = authorRes;
 
-            const [authPass, authFilterType, authorFilterResult] = await checkAuthorFilter(item, this.authorIs, this.resources, this.logger);
-            if(!authPass) {
-                this.logger.verbose(`${authFilterType} author criteria not matched, Action not run`);
-                actRes.runReason = `${authFilterType} author criteria not matched`;
-                actRes.authorIs = authorFilterResult;
-                return actRes;
-            } else if(authFilterType !== undefined) {
-                actRes.authorIs = authorFilterResult;
-            }
+            const filtersPassed = filterResults.every(x => x === undefined || x.passed);
+            let runReason = undefined;
 
-            actRes.run = true;
-            const results = await this.process(item, ruleResults, runtimeDryrun);
-            return {...actRes, ...results};
+            actRes.run = filtersPassed;
+            if(!filtersPassed) {
+                if(itemRes !== undefined && !itemRes.passed) {
+                    runReason = `Activity did not pass 'itemIs' test, Action not run`;
+                } else {
+                    runReason = `Activity did not pass 'authorIs' test, Action not run`;
+                }
+                actRes.runReason = runReason;
+                return actRes;
+            }
+            const results = await this.process(item, ruleResults, options);
+            actRes.success = results.success;
+            actRes.dryRun = results.dryRun;
+            actRes.result = results.result;
+            actRes.touchedEntities = results.touchedEntities ?? [];
+
+            return actRes;
         } catch (err: any) {
             if(!(err instanceof LoggedError)) {
                 const actionError = new ErrorWithCause('Action did not run successfully due to unexpected error', {cause: err});
@@ -109,18 +166,23 @@ export abstract class Action {
         }
     }
 
-    abstract process(item: Comment | Submission, ruleResults: RuleResult[], runtimeDryun?: boolean): Promise<ActionProcessResult>;
+    abstract process(item: Comment | Submission, ruleResults: RuleResultEntity[], options: runCheckOptions): Promise<ActionProcessResult>;
+
+    getRuntimeAwareDryrun(options: runCheckOptions): boolean {
+        const {dryRun: runtimeDryrun} = options;
+        return runtimeDryrun || this.dryRun;
+    }
 }
 
-export interface ActionOptions extends ActionConfig {
-    logger: Logger;
+export interface ActionOptions extends Omit<ActionConfig, 'authorIs' | 'itemIs'>, RunnableBaseOptions {
+    //logger: Logger;
     subredditName: string;
-    resources: SubredditResources;
+    //resources: SubredditResources;
     client: ExtendedSnoowrap;
     emitter: EventEmitter
 }
 
-export interface ActionConfig extends ChecksActivityState {
+export interface ActionConfig extends RunnableBaseJson {
     /**
      * An optional, but highly recommended, friendly name for this Action. If not present will default to `kind`.
      *
@@ -139,19 +201,6 @@ export interface ActionConfig extends ChecksActivityState {
     dryRun?: boolean;
 
     /**
-     * If present then these Author criteria are checked before running the Action. If criteria fails then the Action is not run.
-     * */
-    authorIs?: AuthorOptions
-
-    /**
-     * A list of criteria to test the state of the `Activity` against before running the Action.
-     *
-     * If any set of criteria passes the Action will be run.
-     *
-     * */
-    itemIs?: TypedActivityStates
-
-    /**
      * If set to `false` the Action will not be run
      *
      * @default true
@@ -164,7 +213,11 @@ export interface ActionJson extends ActionConfig {
     /**
      * The type of action that will be performed
      */
-    kind: 'comment' | 'lock' | 'remove' | 'report' | 'approve' | 'ban' | 'flair' | 'usernote' | 'message' | 'userflair' | 'dispatch' | 'cancelDispatch'
+    kind: ActionTypes
+}
+
+export interface StructuredActionJson extends Omit<ActionJson, 'itemIs' | 'authorIs'>, StructuredRunnableBase {
+
 }
 
 export const isActionJson = (obj: object): obj is ActionJson => {

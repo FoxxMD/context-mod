@@ -1,19 +1,26 @@
 import {Check, CheckOptions} from "./index";
-import {SubmissionState, UserResultCache} from "../Common/interfaces";
+import {
+    RuleResult,
+    UserResultCache
+} from "../Common/interfaces";
 import {Submission, Comment} from "snoowrap/dist/objects";
-import {RuleResult} from "../Rule";
+import {buildFilter} from "../util";
+import {FilterOptions, MinimalOrFullFilter} from "../Common/Infrastructure/Filters/FilterShapes";
+import {SubmissionState} from "../Common/Infrastructure/Filters/FilterCriteria";
+import {ActivityType} from "../Common/Infrastructure/Reddit";
+
+export interface SubmissionCheckOptions extends CheckOptions {
+    itemIs?: MinimalOrFullFilter<SubmissionState>
+}
 
 export class SubmissionCheck extends Check {
-    itemIs: SubmissionState[];
+    itemIs: FilterOptions<SubmissionState>;
+    checkType = 'submission' as ActivityType;
 
-    constructor(options: CheckOptions) {
+    constructor(options: SubmissionCheckOptions) {
         super(options);
         const {itemIs = []} = options;
-        this.itemIs = itemIs;
+        this.itemIs = buildFilter(itemIs);
         this.logSummary();
-    }
-
-    logSummary() {
-        super.logSummary('submission');
     }
 }

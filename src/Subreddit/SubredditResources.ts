@@ -1,91 +1,169 @@
-import Snoowrap from "snoowrap";
+import Snoowrap, {Listing} from "snoowrap";
 import objectHash from 'object-hash';
 import {
     activityIsDeleted, activityIsFiltered,
     activityIsRemoved,
-    AuthorActivitiesOptions,
     AuthorTypedActivitiesOptions, BOT_LINK,
-    getAuthorActivities
+    getAuthorHistoryAPIOptions
 } from "../Utils/SnoowrapUtils";
+import {map as mapAsync} from 'async';
 import winston, {Logger} from "winston";
 import as from 'async';
 import fetch from 'node-fetch';
 import {
     asActivity,
-    asSubmission, asUserNoteCriteria,
+    asSubmission,
+    asUserNoteCriteria,
     buildCacheOptionsFromProvider,
     buildCachePrefix,
     cacheStats,
     compareDurationValue,
     comparisonTextOp,
     createCacheManager,
-    createHistoricalStatsDisplay, escapeRegex, FAIL,
-    fetchExternalUrl, filterCriteriaSummary,
-    formatNumber, generateItemFilterHelpers,
+    escapeRegex,
+    FAIL,
+    fetchExternalUrl,
+    filterCriteriaSummary,
+    formatNumber,
+    generateItemFilterHelpers,
     getActivityAuthorName,
-    getActivitySubredditName, isComment, isCommentState,
-    isStrongSubredditState, isSubmission, isUser,
+    getActivitySubredditName,
+    isComment,
+    isCommentState,
+    isStrongSubredditState,
+    isSubmission,
+    isUser,
+    hashString,
     mergeArr,
     parseDurationComparison,
     parseExternalUrl,
-    parseGenericValueComparison, parseGenericValueOrPercentComparison,
-    parseRedditEntity, parseStringToRegex,
-    parseWikiContext, PASS, redisScanIterator, removeUndefinedKeys,
-    shouldCacheSubredditStateCriteriaResult, strToActivitySource,
-    subredditStateIsNameOnly, testMaybeStringRegex,
-    toStrongSubredditState, truncateStringToLength, userNoteCriteriaSummary
+    parseGenericValueComparison,
+    parseGenericValueOrPercentComparison,
+    parseRedditEntity,
+    parseStringToRegex,
+    parseWikiContext,
+    PASS,
+    redisScanIterator,
+    removeUndefinedKeys,
+    shouldCacheSubredditStateCriteriaResult,
+    strToActivitySource,
+    subredditStateIsNameOnly,
+    testMaybeStringRegex,
+    toStrongSubredditState,
+    truncateStringToLength,
+    userNoteCriteriaSummary,
+    asComment,
+    criteriaPassWithIncludeBehavior,
+    isRuleSetResult,
+    frequencyEqualOrLargerThanMin,
+    parseDurationValToDuration,
+    windowConfigToWindowCriteria,
+    asStrongSubredditState, convertSubredditsRawToStrong, filterByTimeRequirement
 } from "../util";
 import LoggedError from "../Utils/LoggedError";
 import {
     BotInstanceConfig,
     CacheOptions,
-    CommentState,
     Footer,
     OperatorConfig,
     ResourceStats,
     StrongCache,
-    SubmissionState,
     CacheConfig,
     TTLConfig,
-    TypedActivityStates,
     UserResultCache,
     ActionedEvent,
-    SubredditState,
-    StrongSubredditState,
-    HistoricalStats,
-    HistoricalStatUpdateData,
-    SubredditHistoricalStats,
-    SubredditHistoricalStatsDisplay,
     ThirdPartyCredentialsJsonConfig,
-    FilterCriteriaResult,
-    FilterResult,
-    TypedActivityState,
     RequiredItemCrit,
     ItemCritPropHelper,
     ActivityDispatch,
-    FilterCriteriaPropertyResult,
-    ActivitySource,
+    HistoricalStatsDisplay
 } from "../Common/interfaces";
 import UserNotes from "./UserNotes";
 import Mustache from "mustache";
 import he from "he";
-import {AuthorCriteria, AuthorOptions} from "../Author/Author";
 import {SPoll} from "./Streams";
 import {Cache} from 'cache-manager';
 import {Submission, Comment, Subreddit, RedditUser} from "snoowrap/dist/objects";
-import {cacheTTLDefaults, createHistoricalDefaults, historicalDefaults} from "../Common/defaults";
-import {check} from "tcp-port-used";
+import {
+    cacheTTLDefaults,
+    createHistoricalDisplayDefaults,
+} from "../Common/defaults";
 import {ExtendedSnoowrap} from "../Utils/SnoowrapClients";
-import dayjs from "dayjs";
+import dayjs, {Dayjs} from "dayjs";
 import ImageData from "../Common/ImageData";
+import {DataSource, Repository, SelectQueryBuilder, Between, LessThan, DeleteQueryBuilder} from "typeorm";
+import {CMEvent as ActionedEventEntity, CMEvent } from "../Common/Entities/CMEvent";
+import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
 import globrex from 'globrex';
 import {runMigrations} from "../Common/Migrations/CacheMigrationUtils";
-import {isStatusError, SimpleError} from "../Utils/Errors";
+import {isStatusError, MaybeSeriousErrorWithCause, SimpleError} from "../Utils/Errors";
 import {ErrorWithCause} from "pony-cause";
-import {UserNoteCriteria} from "../Rule";
-import {AuthorCritPropHelper, RequiredAuthorCrit} from "../Common/types";
+import {ManagerEntity} from "../Common/Entities/ManagerEntity";
+import {Bot} from "../Common/Entities/Bot";
+import {DispatchedEntity} from "../Common/Entities/DispatchedEntity";
+import {ActivitySourceEntity} from "../Common/Entities/ActivitySourceEntity";
+import {TotalStat} from "../Common/Entities/Stats/TotalStat";
+import {TimeSeriesStat} from "../Common/Entities/Stats/TimeSeriesStat";
+import {InvokeeType} from "../Common/Entities/InvokeeType";
+import {RunStateType} from "../Common/Entities/RunStateType";
+import {CheckResultEntity} from "../Common/Entities/CheckResultEntity";
+import {RuleSetResultEntity} from "../Common/Entities/RuleSetResultEntity";
+import {RulePremise} from "../Common/Entities/RulePremise";
+import cloneDeep from "lodash/cloneDeep";
+import {
+    AuthorCriteria, CommentState, RequiredAuthorCrit,
+    StrongSubredditCriteria, SubmissionState,
+    SubredditCriteria, TypedActivityState, TypedActivityStates,
+    UserNoteCriteria
+} from "../Common/Infrastructure/Filters/FilterCriteria";
+import {
+    ActivitySource, DurationVal,
+    EventRetentionPolicyRange,
+    JoinOperands,
+    ModeratorNameCriteria, statFrequencies, StatisticFrequency,
+    StatisticFrequencyOption
+} from "../Common/Infrastructure/Atomic";
+import {
+    AuthorOptions, FilterCriteriaPropertyResult,
+    FilterCriteriaResult,
+    FilterResult,
+    ItemOptions,
+    NamedCriteria
+} from "../Common/Infrastructure/Filters/FilterShapes";
+import {
+    ActivityWindowCriteria,
+    HistoryFiltersOptions,
+    ListingFunc,
+    NamedListing
+} from "../Common/Infrastructure/ActivityWindow";
+import {Duration} from "dayjs/plugin/duration";
+import {
+
+    AuthorHistorySort,
+    CachedFetchedActivitiesResult, FetchedActivitiesResult,
+    SnoowrapActivity
+} from "../Common/Infrastructure/Reddit";
+import {AuthorCritPropHelper} from "../Common/Infrastructure/Filters/AuthorCritPropHelper";
+import {NoopLogger} from "../Utils/loggerFactory";
 
 export const DEFAULT_FOOTER = '\r\n*****\r\nThis action was performed by [a bot.]({{botLink}}) Mention a moderator or [send a modmail]({{modmailLink}}) if you any ideas, questions, or concerns about this action.';
+
+/**
+ * Only used for migrating stats from cache to db
+ * */
+interface OldHistoricalStats {
+    eventsCheckedTotal: number
+    eventsActionedTotal: number
+    checksRun: Map<string, number>
+    checksFromCache: Map<string, number>
+    checksTriggered: Map<string, number>
+    rulesRun: Map<string, number>
+    //rulesCached: Map<string, number>
+    rulesCachedTotal: number
+    rulesTriggered: Map<string, number>
+    actionsRun: Map<string, number>
+    [index: string]: any
+}
 
 export interface SubredditResourceConfig extends Footer {
     caching?: CacheConfig,
@@ -93,6 +171,10 @@ export interface SubredditResourceConfig extends Footer {
     logger: Logger;
     client: ExtendedSnoowrap
     credentials?: ThirdPartyCredentialsJsonConfig
+    managerEntity: ManagerEntity
+    botEntity: Bot
+    statFrequency: StatisticFrequencyOption
+    retention?: EventRetentionPolicyRange
 }
 
 interface SubredditResourceOptions extends Footer {
@@ -101,12 +183,19 @@ interface SubredditResourceOptions extends Footer {
     cacheType: string;
     cacheSettingsHash: string
     subreddit: Subreddit,
+    database: DataSource
     logger: Logger;
     client: ExtendedSnoowrap;
     prefix?: string;
     actionedEventsMax: number;
     thirdPartyCredentials: ThirdPartyCredentialsJsonConfig
     delayedItems?: ActivityDispatch[]
+    botAccount?: string
+    botName: string
+    managerEntity: ManagerEntity
+    botEntity: Bot
+    statFrequency: StatisticFrequencyOption
+    retention?: EventRetentionPolicyRange
 }
 
 export interface SubredditResourceSetOptions extends CacheConfig, Footer {
@@ -123,10 +212,12 @@ export class SubredditResources {
     protected filterCriteriaTTL: number | false = cacheTTLDefaults.filterCriteriaTTL;
     public selfTTL: number | false = cacheTTLDefaults.selfTTL;
     name: string;
+    botName: string;
     protected logger: Logger;
     userNotes: UserNotes;
     footer: false | string = DEFAULT_FOOTER;
     subreddit: Subreddit
+    database: DataSource
     client: ExtendedSnoowrap
     cache: Cache
     cacheType: string
@@ -137,10 +228,22 @@ export class SubredditResources {
     actionedEventsMax: number;
     thirdPartyCredentials: ThirdPartyCredentialsJsonConfig;
     delayedItems: ActivityDispatch[] = [];
+    botAccount?: string;
+    dispatchedActivityRepo: Repository<DispatchedEntity>
+    activitySourceRepo: Repository<ActivitySourceEntity>
+    totalStatsRepo: Repository<TotalStat>
+    totalStatsEntities?: TotalStat[];
+    tsStatsRepo: Repository<TimeSeriesStat>
+    timeSeriesStatsEntities?: TimeSeriesStat[];
+    statFrequency: StatisticFrequencyOption
+    retention?: EventRetentionPolicyRange
+    managerEntity: ManagerEntity
+    botEntity: Bot
 
     stats: {
         cache: ResourceStats
-        historical: SubredditHistoricalStats
+        historical: HistoricalStatsDisplay
+        timeSeries: HistoricalStatsDisplay
     };
 
     constructor(name: string, options: SubredditResourceOptions) {
@@ -157,6 +260,8 @@ export class SubredditResources {
                 commentTTL,
                 subredditTTL,
             },
+            botName,
+            database,
             cache,
             prefix,
             cacheType,
@@ -165,11 +270,26 @@ export class SubredditResources {
             client,
             thirdPartyCredentials,
             delayedItems = [],
+            botAccount,
+            managerEntity,
+            botEntity,
+            statFrequency,
+            retention
         } = options || {};
 
+        this.managerEntity = managerEntity;
+        this.botEntity = botEntity;
+        this.botName = botName;
         this.delayedItems = delayedItems;
         this.cacheSettingsHash = cacheSettingsHash;
         this.cache = cache;
+        this.database = database;
+        this.dispatchedActivityRepo = this.database.getRepository(DispatchedEntity);
+        this.activitySourceRepo = this.database.getRepository(ActivitySourceEntity);
+        this.totalStatsRepo = this.database.getRepository(TotalStat);
+        this.tsStatsRepo = this.database.getRepository(TimeSeriesStat);
+        this.statFrequency = statFrequency;
+        this.retention = retention;
         this.prefix = prefix;
         this.client = client;
         this.cacheType = cacheType;
@@ -184,19 +304,18 @@ export class SubredditResources {
         this.subreddit = subreddit;
         this.thirdPartyCredentials = thirdPartyCredentials;
         this.name = name;
+        this.botAccount = botAccount;
         if (logger === undefined) {
             const alogger = winston.loggers.get('app')
-            this.logger = alogger.child({labels: [this.name, 'Resource Cache']}, mergeArr);
+            this.logger = alogger.child({labels: [this.name, 'Resources']}, mergeArr);
         } else {
-            this.logger = logger.child({labels: ['Resource Cache']}, mergeArr);
+            this.logger = logger.child({labels: ['Resources']}, mergeArr);
         }
 
         this.stats = {
             cache: cacheStats(),
-            historical: {
-                allTime: createHistoricalDefaults(),
-                lastReload: createHistoricalDefaults()
-            }
+            historical: createHistoricalDisplayDefaults(),
+            timeSeries: createHistoricalDisplayDefaults(),
         };
 
         const cacheUseCB = (miss: boolean) => {
@@ -204,7 +323,7 @@ export class SubredditResources {
             this.stats.cache.userNotes.requests++;
             this.stats.cache.userNotes.miss += miss ? 1 : 0;
         }
-        this.userNotes = new UserNotes(userNotesTTL, this.subreddit, this.client, this.logger, this.cache, cacheUseCB)
+        this.userNotes = new UserNotes(userNotesTTL, this.subreddit.display_name, this.client, this.logger, this.cache, cacheUseCB)
 
         if(this.cacheType === 'memory' && this.cacheSettingsHash !== 'default') {
             const min = Math.min(...([this.wikiTTL, this.authorTTL, this.submissionTTL, this.commentTTL, this.filterCriteriaTTL].filter(x => typeof x === 'number' && x !== 0) as number[]));
@@ -218,83 +337,302 @@ export class SubredditResources {
                 },min * 1000 * 2)
             }
         }
+
+        if(this.retention === undefined) {
+            this.logger.verbose('Events will be stored in database indefinitely.', {leaf: 'Event Retention'});
+        } else if(typeof this.retention === 'number') {
+            this.logger.verbose(`Will retain the last ${this.retention} events in database`, {leaf: 'Event Retention'});
+        } else {
+            try {
+                const dur = parseDurationValToDuration(this.retention as DurationVal);
+                this.logger.verbose(`Will retain events processed within the last ${dur.humanize()} in database`, {leaf: 'Event Retention'});
+            } catch (e) {
+                this.retention = undefined;
+                this.logger.error(new ErrorWithCause('Could not parse retention as a valid duration. Retention enforcement is disabled.', {cause: e}));
+            }
+        }
     }
 
-    async initHistoricalStats() {
-         const at = await this.cache.wrap(`${this.name}-historical-allTime`, () => createHistoricalDefaults(), {ttl: 0}) as object;
-         const rehydratedAt: any = {};
-         for(const [k, v] of Object.entries(at)) {
-             const t = typeof v;
-             if(t === 'number') {
-                 // simple number stat like eventsCheckedTotal
-                 rehydratedAt[k] = v;
-             } else if(Array.isArray(v)) {
-                 // a map stat that we have data for is serialized as an array of KV pairs
-                rehydratedAt[k] = new Map(v);
-             } else if(v === null || v === undefined || (t === 'object' && Object.keys(v).length === 0)) {
-                 // a map stat that was not serialized (for some reason) or serialized without any data
-                 rehydratedAt[k] = new Map();
-             } else {
-                 // ???? shouldn't get here
-                 this.logger.warn(`Did not recognize rehydrated historical stat "${k}" of type ${t}`);
-                 rehydratedAt[k] = v;
-             }
-         }
-         this.stats.historical.allTime = rehydratedAt as HistoricalStats;
+    async retentionCleanup() {
+        const logger = this.logger.child({labels: ['Event Retention'], mergeArr});
+        logger.debug('Starting cleanup');
+        if (this.retention === undefined) {
+            logger.debug('Nothing to cleanup because there is no retention policy! finished.');
+            return;
+        }
+        let count = 0;
+
+        try {
+            let deleteQuery: DeleteQueryBuilder<CMEvent>; // = this.database.getRepository(CMEvent).createQueryBuilder();
+
+            if (typeof this.retention === 'number') {
+                const idQuery = this.database.getRepository(CMEvent).createQueryBuilder('event');
+                idQuery
+                    .select('event.id')
+                    .where({manager: {id: this.managerEntity.id}})
+                    .orderBy('event._processedAt', 'DESC')
+                    .skip(this.retention);
+
+                const res = await idQuery.getRawMany();
+                count = res.length;
+
+                deleteQuery = this.database.getRepository(CMEvent).createQueryBuilder()
+                    .delete()
+                    .from(CMEvent, 'event')
+                    .whereInIds(res.map(x => x.event_id));
+
+                logger.debug(`Found ${count} Events past the first ${this.retention}`);
+            } else {
+                const dur = parseDurationValToDuration(this.retention as DurationVal);
+
+                const date = dayjs().subtract(dur.asSeconds(), 'second');
+
+                const res = await this.database.getRepository(CMEvent).createQueryBuilder('event')
+                    .select('event.id')
+                    .where({_processedAt: LessThan(date.toDate())})
+                    .andWhere('event.manager.id = :managerId', {managerId: this.managerEntity.id})
+                    .getRawMany();
+
+                count = res.length;
+
+                // for some reason cannot use "normal" where conditions for delete builder -- can only use "raw" parameters
+                // so have to use same approach as number and just whereIn all ids from count query
+
+                // deleteQuery = this.database.getRepository(CMEvent).createQueryBuilder()
+                //     .delete()
+                //     .from(CMEvent, 'event')
+                //     .where({_processedAt: LessThan(date.toDate())})
+                //     .andWhere('event.manager.id = :managerId', {managerId: this.managerEntity.id})
+
+                deleteQuery = this.database.getRepository(CMEvent).createQueryBuilder()
+                    .delete()
+                    .from(CMEvent, 'event')
+                    .whereInIds(res.map(x => x.event_id));
+
+                logger.debug(`Found ${count} Events older than ${date.format('YY-MM-DD HH:mm:ss z')} (${dur.humanize()})`);
+            }
+
+            if (count === 0) {
+                logger.debug('Nothing to be done, finished.');
+                return;
+            }
+
+            logger.debug(`Deleting Events...`);
+            await deleteQuery.execute();
+            logger.info(`Successfully enforced retention policy. ${count} Events deleted.`);
+        } catch (e) {
+            logger.error(new ErrorWithCause('Failed to enforce retention policy due to an error', {cause: e}));
+        }
     }
 
-    updateHistoricalStats(data: HistoricalStatUpdateData) {
+    async initDatabaseDelayedActivities() {
+        if(this.delayedItems.length === 0) {
+            const dispatchedActivities = await this.dispatchedActivityRepo.find({
+                where: {
+                    manager: {
+                        id: this.managerEntity.id
+                    }
+                },
+                relations: {
+                    manager: true
+                }
+            });
+            const now = dayjs();
+            for(const dAct of dispatchedActivities) {
+                const shouldDispatchAt = dAct.createdAt.add(dAct.delay.asSeconds(), 'seconds');
+                if(shouldDispatchAt.isBefore(now)) {
+                    let tardyHint = `Activity ${dAct.activityId} queued at ${dAct.createdAt.format('YYYY-MM-DD HH:mm:ssZ')} for ${dAct.delay.humanize()} is now LATE`;
+                    if(dAct.tardyTolerant === true) {
+                        tardyHint += ` but was configured as ALWAYS 'tardy tolerant' so will be dispatched immediately`;
+                    } else if(dAct.tardyTolerant === false) {
+                        tardyHint += ` and was not configured as 'tardy tolerant' so will be dropped`;
+                        this.logger.warn(tardyHint);
+                        await this.removeDelayedActivity(dAct.id);
+                        continue;
+                    } else {
+                        // see if its within tolerance
+                        const latest = shouldDispatchAt.add(dAct.tardyTolerant);
+                        if(latest.isBefore(now)) {
+                            tardyHint += `and IS NOT within tardy tolerance of ${dAct.tardyTolerant.humanize()} of planned dispatch time so will be dropped`;
+                            await this.removeDelayedActivity(dAct.id);
+                            continue;
+                        } else {
+                            tardyHint += `but is within tardy tolerance of ${dAct.tardyTolerant.humanize()} of planned dispatch time so will be dispatched immediately`;
+                        }
+                    }
+                }
+                // TODO make this less api heavy
+                this.delayedItems.push(await dAct.toActivityDispatch(this.client))
+            }
+        }
+    }
+
+    async addDelayedActivity(data: ActivityDispatch) {
+        const dEntity = await this.dispatchedActivityRepo.save(new DispatchedEntity({...data, manager: this.managerEntity}));
+        data.id = dEntity.id;
+        this.delayedItems.push(data);
+    }
+
+    async removeDelayedActivity(id: string) {
+        await this.dispatchedActivityRepo.delete(id);
+        this.delayedItems.filter(x => x.id !== id);
+    }
+
+    async initStats() {
+        // temp migration strategy to transition from cache to db
+        try {
+            let currentStats: HistoricalStatsDisplay = createHistoricalDisplayDefaults();
+            const totalStats = await this.totalStatsRepo.findBy({managerId: this.managerEntity.id});
+            if (totalStats.length === 0) {
+                const at = await this.cache.get(`${this.name}-historical-allTime`) as null | undefined | OldHistoricalStats;
+                if (at !== null && at !== undefined) {
+                    // convert to historical stat object
+                    const rehydratedAt: any = {};
+                    for (const [k, v] of Object.entries(at)) {
+                        const t = typeof v;
+                        if (t === 'number') {
+                            // simple number stat like eventsCheckedTotal
+                            rehydratedAt[k] = v;
+                        } else if (Array.isArray(v)) {
+                            // a map stat that we have data for is serialized as an array of KV pairs
+                            const statMap = new Map(v);
+                            // @ts-ignore
+                            rehydratedAt[`${k}Total`] = Array.from(statMap.values()).reduce((acc, curr) => acc + curr, 0)
+                        } else if (v === null || v === undefined || (t === 'object' && Object.keys(v).length === 0)) {
+                            // a map stat that was not serialized (for some reason) or serialized without any data
+                            rehydratedAt[k] = 0;
+                        } else {
+                            // ???? shouldn't get here
+                            this.logger.warn(`Did not recognize rehydrated historical stat "${k}" of type ${t}`);
+                            rehydratedAt[k] = v;
+                        }
+                    }
+                    currentStats = rehydratedAt as HistoricalStatsDisplay;
+                }
+                const now = dayjs();
+                const statEntities: TotalStat[] = [];
+                for (const [k, v] of Object.entries(currentStats)) {
+                    statEntities.push(new TotalStat({
+                        metric: k,
+                        value: v,
+                        manager: this.managerEntity,
+                        createdAt: now,
+                    }));
+                }
+                await this.totalStatsRepo.save(statEntities);
+                this.totalStatsEntities = statEntities;
+            } else {
+                this.totalStatsEntities = totalStats;
+                for (const [k, v] of Object.entries(currentStats)) {
+                    const matchedStat = totalStats.find(x => x.metric === k);
+                    if (matchedStat !== undefined) {
+                        currentStats[k] = matchedStat.value;
+                    } else {
+                        this.logger.warn(`Could not find historical stat matching '${k}' in the database, will default to 0`);
+                        currentStats[k] = v;
+                    }
+                }
+            }
+            this.stats.historical = currentStats;
+        } catch (e) {
+            this.logger.error(new ErrorWithCause('Failed to init historical stats', {cause: e}));
+        }
+
+        try {
+            if(this.statFrequency !== false) {
+                let currentStats: HistoricalStatsDisplay = createHistoricalDisplayDefaults();
+                let startRange = dayjs().set('second', 0);
+                for(const unit of statFrequencies) {
+                    if(unit !== 'week' && !frequencyEqualOrLargerThanMin(unit, this.statFrequency)) {
+                        startRange = startRange.set(unit, 0);
+                    }
+                    if(unit === 'week' && this.statFrequency === 'week') {
+                        // make sure we get beginning of week
+                        startRange = startRange.week(startRange.week());
+                    }
+                }
+                // set end range by +1 of whatever unit we are using
+                const endRange = this.statFrequency === 'week' ? startRange.clone().week(startRange.week() + 1) : startRange.clone().set(this.statFrequency, startRange.get(this.statFrequency) + 1);
+
+                const tsStats = await this.tsStatsRepo.findBy({
+                    managerId: this.managerEntity.id,
+                    granularity: this.statFrequency,
+                    // make sure its inclusive!
+                    _createdAt: Between(startRange.clone().subtract(1, 'second').toDate(), endRange.clone().add(1, 'second').toDate())
+                });
+
+                if(tsStats.length === 0) {
+                    const statEntities: TimeSeriesStat[] = [];
+                    for (const [k, v] of Object.entries(currentStats)) {
+                        statEntities.push(new TimeSeriesStat({
+                            metric: k,
+                            value: v,
+                            granularity: this.statFrequency,
+                            manager: this.managerEntity,
+                            createdAt: startRange,
+                        }));
+                    }
+                    this.timeSeriesStatsEntities = statEntities;
+                } else {
+                    this.timeSeriesStatsEntities = tsStats;
+                }
+
+                for (const [k, v] of Object.entries(currentStats)) {
+                    const matchedStat = this.timeSeriesStatsEntities.find(x => x.metric === k);
+                    if (matchedStat !== undefined) {
+                        currentStats[k] = matchedStat.value;
+                    } else {
+                        this.logger.warn(`Could not find time series stat matching '${k}' in the database, will default to 0`);
+                        currentStats[k] = v;
+                    }
+                }
+            }
+        } catch (e) {
+            this.logger.error(new ErrorWithCause('Failed to init frequency (time series) stats', {cause: e}));
+        }
+    }
+
+    updateHistoricalStats(data: Partial<HistoricalStatsDisplay>) {
         for(const [k, v] of Object.entries(data)) {
-            if(this.stats.historical.lastReload[k] !== undefined) {
-                if(typeof v === 'number') {
-                    this.stats.historical.lastReload[k] += v;
-                } else if(this.stats.historical.lastReload[k] instanceof Map) {
-                    const keys = Array.isArray(v) ? v : [v];
-                    for(const key of keys) {
-                        this.stats.historical.lastReload[k].set(key, (this.stats.historical.lastReload[k].get(key) || 0) + 1);
-                    }
-                }
+            if(this.stats.historical[k] !== undefined && v !== undefined) {
+                this.stats.historical[k] += v;
             }
-            if(this.stats.historical.allTime[k] !== undefined) {
-                if(typeof v === 'number') {
-                    this.stats.historical.allTime[k] += v;
-                } else if(this.stats.historical.allTime[k] instanceof Map) {
-                    const keys = Array.isArray(v) ? v : [v];
-                    for(const key of keys) {
-                        this.stats.historical.allTime[k].set(key, (this.stats.historical.allTime[k].get(key) || 0) + 1);
-                    }
-                }
+            if(this.stats.timeSeries[k] !== undefined && v !== undefined) {
+                this.stats.timeSeries[k] += v;
             }
         }
     }
 
-    getHistoricalDisplayStats(): SubredditHistoricalStatsDisplay {
-        return {
-            allTime: createHistoricalStatsDisplay(this.stats.historical.allTime),
-            lastReload: createHistoricalStatsDisplay(this.stats.historical.lastReload)
-        }
+    getHistoricalDisplayStats(): HistoricalStatsDisplay {
+        return this.stats.historical;
     }
 
     async saveHistoricalStats() {
-        const atSerializable: any = {};
-        for(const [k, v] of Object.entries(this.stats.historical.allTime)) {
-            if(v instanceof Map) {
-                atSerializable[k] = Array.from(v.entries());
-            } else {
-                atSerializable[k] = v;
-            }
-        }
-        await this.cache.set(`${this.name}-historical-allTime`, atSerializable, {ttl: 0});
+        if(this.totalStatsEntities !== undefined) {
+            for(const [k, v] of Object.entries(this.stats.historical)) {
+                const matchedStatIndex = this.totalStatsEntities.findIndex(x => x.metric === k);
+                if(matchedStatIndex !== -1) {
+                    this.totalStatsEntities[matchedStatIndex].value = v;
+                } else {
+                    this.logger.warn(`Could not find historical stat matching '${k}' in total stats??`);
+                }
 
-        // const lrSerializable: any = {};
-        // for(const [k, v] of Object.entries(this.stats.historical.lastReload)) {
-        //     if(v instanceof Map) {
-        //         lrSerializable[k] = Array.from(v.entries());
-        //     } else {
-        //         lrSerializable[k] = v;
-        //     }
-        // }
-        // await this.cache.set(`${this.name}-historical-lastReload`, lrSerializable, {ttl: 0});
+            }
+            await this.totalStatsRepo.save(this.totalStatsEntities);
+        }
+
+        if(this.timeSeriesStatsEntities !== undefined) {
+            for(const [k, v] of Object.entries(this.stats.timeSeries)) {
+                const matchedStatIndex = this.timeSeriesStatsEntities.findIndex(x => x.metric === k);
+                if(matchedStatIndex !== -1) {
+                    this.timeSeriesStatsEntities[matchedStatIndex].value = v;
+                } else {
+                    this.logger.warn(`Could not find time series stat matching '${k}' in total stats??`);
+                }
+
+            }
+            await this.tsStatsRepo.save(this.timeSeriesStatsEntities);
+        }
     }
 
     setHistoricalSaveInterval() {
@@ -453,18 +791,88 @@ export class SubredditResources {
     }
 
     setLogger(logger: Logger) {
-        this.logger = logger.child({labels: ['Resource Cache']}, mergeArr);
+        this.logger = logger.child({labels: ['Resources']}, mergeArr);
     }
 
-    async getActionedEvents(): Promise<ActionedEvent[]> {
-        return await this.cache.wrap(`actionedEvents-${this.subreddit.display_name}`, () => []);
+    async getActionedEventsBuilder(): Promise<SelectQueryBuilder<CMEvent>> {
+        const eventRepo = this.database.getRepository(ActionedEventEntity);
+        return eventRepo.createQueryBuilder("event")
+            .leftJoinAndSelect('event.source', 'source')
+            .leftJoinAndSelect('event.activity', 'activity')
+            .leftJoinAndSelect('activity.subreddit', 'subreddit')
+            .leftJoinAndSelect('activity.author', 'author')
+            .leftJoinAndSelect('event.runResults', 'runResults')
+            .leftJoinAndSelect('runResults._authorIs', 'rrAuthorIs')
+            .leftJoinAndSelect('runResults._itemIs', 'rrItemIs')
+            .leftJoinAndSelect('runResults.run', 'run')
+            .leftJoinAndSelect('runResults.checkResults', 'checkResults')
+            .leftJoinAndSelect('checkResults._authorIs', 'cAuthorIs')
+            .leftJoinAndSelect('checkResults._itemIs', 'cItemIs')
+            .leftJoinAndSelect('checkResults.ruleResults', 'ruleResults')
+            .leftJoinAndSelect('ruleResults._authorIs', 'rAuthorIs')
+            .leftJoinAndSelect('ruleResults._itemIs', 'rItemIs')
+            .leftJoinAndSelect('checkResults.actionResults', 'actionResults')
+            .leftJoinAndSelect('actionResults._authorIs', 'aAuthorIs')
+            .leftJoinAndSelect('actionResults._itemIs', 'aItemIs')
+            .andWhere('event.manager.id = :managerId', {managerId: this.managerEntity.id})
+            .orderBy('event.processedAt', 'DESC')
     }
 
-    async addActionedEvent(ae: ActionedEvent) {
-        const events = await this.cache.wrap(`actionedEvents-${this.subreddit.display_name}`, () => []) as ActionedEvent[];
-        events.unshift(ae);
-        await this.cache.set(`actionedEvents-${this.subreddit.display_name}`, events.slice(0, this.actionedEventsMax), {ttl: 0});
-    }
+    // async getActionedEvents(): Promise<ActionedEventEntity[]> {
+    //     const eventRepo = this.database.getRepository(ActionedEventEntity);
+    //     const events = await eventRepo.find({
+    //         where: {
+    //             manager: {
+    //                     id: this.managerEntity.id
+    //             }
+    //         },
+    //         order: {
+    //             // @ts-ignore
+    //             processedAt: 'DESC'
+    //         },
+    //         relations: {
+    //             source: true,
+    //             activity: {
+    //                 subreddit: true,
+    //                 author: true
+    //             },
+    //             runResults: {
+    //                 _authorIs: {
+    //                     criteriaResults: true
+    //                 },
+    //                 _itemIs: {
+    //                     criteriaResults: true
+    //                 },
+    //                 run: true,
+    //                 checkResults: {
+    //                     _authorIs: {
+    //                         criteriaResults: true
+    //                     },
+    //                     _itemIs: {
+    //                         criteriaResults: true
+    //                     },
+    //                     ruleResults: {
+    //                         _authorIs: {
+    //                             criteriaResults: true
+    //                         },
+    //                         _itemIs: {
+    //                             criteriaResults: true
+    //                         },
+    //                     },
+    //                     actionResults: {
+    //                         _authorIs: {
+    //                             criteriaResults: true
+    //                         },
+    //                         _itemIs: {
+    //                             criteriaResults: true
+    //                         },
+    //                     }
+    //                 }
+    //             },
+    //         }
+    //     })
+    //     return events;
+    // }
 
     async getActivity(item: Submission | Comment) {
         try {
@@ -579,7 +987,7 @@ export class SubredditResources {
     }
 
     // @ts-ignore
-    async getSubreddit(item: Submission | Comment) {
+    async getSubreddit(item: Submission | Comment, logger = this.logger) {
         try {
             let hash = '';
             const subName = getActivitySubredditName(item);
@@ -590,9 +998,8 @@ export class SubredditResources {
                 this.stats.cache.subreddit.requests++;
                 const cachedSubreddit = await this.cache.get(hash);
                 if (cachedSubreddit !== undefined && cachedSubreddit !== null) {
-                    this.logger.debug(`Cache Hit: Subreddit ${subName}`);
-                    // @ts-ignore
-                    return cachedSubreddit as Subreddit;
+                    logger.debug(`Cache Hit: Subreddit ${subName}`);
+                    return new Subreddit(cachedSubreddit, this.client, false);
                 }
                 // @ts-ignore
                 const subreddit = await this.client.getSubreddit(subName).fetch() as Subreddit;
@@ -613,7 +1020,8 @@ export class SubredditResources {
         }
     }
 
-    async getSubredditModerators(subredditVal: Subreddit | string) {
+    async getSubredditModerators(rawSubredditVal?: Subreddit | string) {
+        const subredditVal = rawSubredditVal ?? this.subreddit;
         const subName = typeof subredditVal === 'string' ? subredditVal : subredditVal.display_name;
         const hash = `sub-${subName}-moderators`;
         if (this.subredditTTL !== false) {
@@ -640,6 +1048,59 @@ export class SubredditResources {
         return mods;
     }
 
+    async getSubredditContributors(): Promise<RedditUser[]> {
+        const subName = this.subreddit.display_name;
+        const hash = `sub-${subName}-contributors`;
+        if (this.subredditTTL !== false) {
+            const cachedSubredditMods = await this.cache.get(hash);
+            if (cachedSubredditMods !== undefined && cachedSubredditMods !== null) {
+                this.logger.debug(`Cache Hit: Subreddit Contributors ${subName}`);
+                return (cachedSubredditMods as string[]).map(x => new RedditUser({name: x}, this.client, false));
+            }
+        }
+
+        let contributors = await this.subreddit.getContributors();
+        while(!contributors.isFinished) {
+            contributors = await contributors.fetchMore({amount: 100});
+        }
+
+        if (this.subredditTTL !== false) {
+            // @ts-ignore
+            await this.cache.set(hash, contributors.map(x => x.name), {ttl: this.subredditTTL});
+        }
+
+        return contributors.map(x => new RedditUser({name: x.name}, this.client, false));
+    }
+
+    async addUserToSubredditContributorsCache(user: RedditUser) {
+        const subName = this.subreddit.display_name;
+        const hash = `sub-${subName}-contributors`;
+        if (this.subredditTTL !== false) {
+            const cachedVal = await this.cache.get(hash);
+            if (cachedVal !== undefined && cachedVal !== null) {
+                const cacheContributors = cachedVal as string[];
+                if(!cacheContributors.includes(user.name)) {
+                    cacheContributors.push(user.name);
+                    await this.cache.set(hash, cacheContributors, {ttl: this.subredditTTL});
+                }
+            }
+        }
+    }
+
+    async removeUserFromSubredditContributorsCache(user: RedditUser) {
+        const subName = this.subreddit.display_name;
+        const hash = `sub-${subName}-contributors`;
+        if (this.subredditTTL !== false) {
+            const cachedVal = await this.cache.get(hash);
+            if (cachedVal !== undefined && cachedVal !== null) {
+                const cacheContributors = cachedVal as string[];
+                if(cacheContributors.includes(user.name)) {
+                    await this.cache.set(hash, cacheContributors.filter(x => x !== user.name), {ttl: this.subredditTTL});
+                }
+            }
+        }
+    }
+
     async hasSubreddit(name: string) {
         if (this.subredditTTL !== false) {
             const hash = `sub-${name}`;
@@ -658,6 +1119,9 @@ export class SubredditResources {
     // @ts-ignore
     async getAuthor(val: RedditUser | string) {
         const authorName = typeof val === 'string' ? val : val.name;
+        if(authorName === '[deleted]') {
+            throw new SimpleError(`User is '[deleted]', cannot retrieve`, {isSerious: false});
+        }
         const hash = `author-${authorName}`;
         if (this.authorTTL !== false) {
             const cachedAuthorData = await this.cache.get(hash);
@@ -682,62 +1146,374 @@ export class SubredditResources {
         } else {
             user = this.client.getUser(val);
         }
-        // @ts-ignore
-        user = await user.fetch();
-
-        if (this.authorTTL !== false) {
+        try {
             // @ts-ignore
-            await this.cache.set(hash, user, {ttl: this.authorTTL});
-        }
+            user = await user.fetch();
 
-        return user;
-    }
-
-    async getAuthorActivities(user: RedditUser, options: AuthorTypedActivitiesOptions): Promise<Array<Submission | Comment>> {
-        const userName = getActivityAuthorName(user);
-        if (this.authorTTL !== false) {
-            const hashObj: any = options;
-            if (this.useSubredditAuthorCache) {
-                hashObj.subreddit = this.subreddit;
+            if (this.authorTTL !== false) {
+                // @ts-ignore
+                await this.cache.set(hash, user, {ttl: this.authorTTL});
             }
-            const hash = `authorActivities-${userName}-${options.type || 'overview'}-${objectHash.sha1(hashObj)}`;
 
-            this.stats.cache.author.requests++;
-            await this.stats.cache.author.identifierRequestCount.set(userName, (await this.stats.cache.author.identifierRequestCount.wrap(userName, () => 0) as number) + 1);
-            this.stats.cache.author.requestTimestamps.push(Date.now());
-            let miss = false;
-            const cacheVal = await this.cache.wrap(hash, async () => {
-                miss = true;
-                if(typeof user === 'string') {
-                    // @ts-ignore
-                    user = await this.client.getUser(userName);
-                }
-                return await getAuthorActivities(user, options);
-            }, {ttl: this.authorTTL});
-            if (!miss) {
-                this.logger.debug(`Cache Hit: ${userName} (Hash ${hash})`);
-            } else {
-                this.stats.cache.author.miss++;
+            return user;
+        } catch (err) {
+            if(isStatusError(err) && err.statusCode === 404) {
+                throw new SimpleError(`Reddit returned a 404 for User '${authorName}'. Likely this user is shadowbanned.`, {isSerious: false});
             }
-            return cacheVal as Array<Submission | Comment>;
+            throw new ErrorWithCause(`Could not retrieve User '${authorName}'`, {cause: err});
         }
-        if(typeof user === 'string') {
-            // @ts-ignore
-            user = await this.client.getUser(userName);
-        }
-        return await getAuthorActivities(user, options);
     }
 
-    async getAuthorComments(user: RedditUser, options: AuthorActivitiesOptions): Promise<Comment[]> {
-        return await this.getAuthorActivities(user, {...options, type: 'comment'}) as unknown as Promise<Comment[]>;
+    async getAuthorActivities(user: RedditUser, options: ActivityWindowCriteria, customListing?: NamedListing): Promise<SnoowrapActivity[]> {
+
+        const {post} = await this.getAuthorActivitiesWithFilter(user, options, customListing);
+        return post;
     }
 
-    async getAuthorSubmissions(user: RedditUser, options: AuthorActivitiesOptions): Promise<Submission[]> {
+    async getAuthorActivitiesWithFilter(user: RedditUser, options: ActivityWindowCriteria, customListing?: NamedListing): Promise<FetchedActivitiesResult> {
+        let listFuncName: string;
+        let listFunc: ListingFunc;
+
+        if(customListing !== undefined) {
+            listFuncName = customListing.name;
+            listFunc = customListing.func;
+        } else {
+            listFuncName = options.fetch ?? 'overview';
+            switch(options.fetch) {
+                case 'comment':
+                    listFunc = (options?: object) => user.getComments(options);
+                    break;
+                case 'submission':
+                    listFunc = (options?: object) => user.getSubmissions(options);
+                    break;
+                case 'overview':
+                default:
+                    listFunc = (options?: object) => user.getOverview(options);
+            }
+        }
+
+        const criteriaWithDefaults = {
+            chunkSize: 100,
+            sort: 'new' as AuthorHistorySort,
+            ...(cloneDeep(options)),
+        }
+
+        return await this.getActivities(user, criteriaWithDefaults, {func: listFunc, name: listFuncName});
+    }
+
+    async getAuthorComments(user: RedditUser, options: ActivityWindowCriteria): Promise<Comment[]> {
+        return await this.getAuthorActivities(user, {...options, fetch: 'comment'}) as unknown as Promise<Comment[]>;
+    }
+
+    async getAuthorSubmissions(user: RedditUser, options: ActivityWindowCriteria): Promise<Submission[]> {
         return await this.getAuthorActivities(user, {
             ...options,
-            type: 'submission'
+            fetch: 'submission'
         }) as unknown as Promise<Submission[]>;
     }
+
+    async getActivities(user: RedditUser, options: ActivityWindowCriteria, listingData: NamedListing): Promise<FetchedActivitiesResult> {
+
+        try {
+
+            let pre: SnoowrapActivity[] = [];
+            let post: SnoowrapActivity[] | undefined;
+            let apiCount = 1;
+            let preMaxTrigger: undefined | string;
+            let rawCount: number = 0;
+            let fromCache = false;
+
+            const hashObj = cloneDeep(options);
+
+            // don't include post filter when determining cache hash
+            // because we can re-use the cache results from a 'pre' return to filter to post (no need to use api)
+            if(hashObj.filterOn !== undefined) {
+                delete hashObj.filterOn.post;
+            }
+
+            const userName = getActivityAuthorName(user);
+
+            const hash = objectHash.sha1(hashObj);
+            const cacheKey = `${userName}-${listingData.name}-${hash}`;
+
+            if (this.authorTTL !== false) {
+                if (this.useSubredditAuthorCache) {
+                    hashObj.subreddit = this.subreddit;
+                }
+
+                this.stats.cache.author.requests++;
+                await this.stats.cache.author.identifierRequestCount.set(userName, (await this.stats.cache.author.identifierRequestCount.wrap(userName, () => 0) as number) + 1);
+                this.stats.cache.author.requestTimestamps.push(Date.now());
+
+                const cacheVal = await this.cache.get(cacheKey);
+
+                if(cacheVal === undefined || cacheVal === null) {
+                    this.stats.cache.author.miss++;
+                } else {
+                    fromCache = true;
+                    const {
+                        pre: cachedPre,
+                        rawCount: cachedRawCount,
+                        apiCount: cachedApiCount,
+                        preMaxTrigger: cachedPreMaxTrigger,
+                    } = cacheVal as CachedFetchedActivitiesResult;
+
+                    rawCount = cachedRawCount;
+                    apiCount = cachedApiCount;
+                    preMaxTrigger = cachedPreMaxTrigger !== undefined && cachedPreMaxTrigger !== null ? cachedPreMaxTrigger : undefined;
+
+                    // convert cached activities into snoowrap activities
+                    pre = cachedPre.map(x => {
+                        const { author: authorName, subreddit: subredditName, ...rest } = x;
+                        const author = new RedditUser({name: authorName }, this.client, false);
+                        const subreddit = new Subreddit({display_name: subredditName as unknown as string}, this.client, false);
+                        if(asSubmission(x)) {
+                            const {comments, ...restSub} = rest as Submission;
+                            const subData = {...restSub, author, subreddit};
+                            if(rest.approved_by !== null && rest.approved_by !== undefined) {
+                                const approvedBy = new RedditUser({name: rest.approved_by as unknown as string}, this.client, false);
+                                subData.approved_by = approvedBy;
+                            }
+                            // we set as fetched since we have all(?) properties from json and have substituted relationships with proxies (author, subreddit)
+                            // makes sure proxy doesn't fetch activity again when trying to access undefined properties later
+                            const sub = new Submission(subData, this.client, true);
+                            return sub;
+                        } else if(asComment(x)) {
+                            const {replies, ...restComm} = rest as Comment;
+                            const commData = {
+                                ...restComm,
+                                author,
+                                subreddit,
+                                // see snoowrap Comment.js
+                                // we are faking empty replies since we don't have "more" link, currently, to build a proper Listing
+                                // and CM doesn't use comment replies at this point so this doesn't matter
+                                replies: ''
+                            };
+                            // we set as fetched since we have all(?) properties from json and have substituted relationships with proxies (author, subreddit)
+                            // makes sure proxy doesn't fetch activity again when trying to access undefined properties later
+                            const com = new Comment(commData, this.client, true);
+                            return com;
+                        }
+                        return x;
+                    }) as SnoowrapActivity[];
+
+                    //this.logger.debug(`${rawCount} Fetched (Saved ${apiCallCount} API Calls!) | Cached ${pre.length} from Pre${preMaxHit !== undefined ? ` (Hit Pre Max: ${preMaxHit})` : ''} | Cache Hit: ${userName}-${listingData.name} (Hash ${hash})`, {leaf: 'Activities Fetch'});
+                }
+            }
+
+            if(!fromCache) {
+
+                const {
+                    chunkSize: cs = 100,
+                    satisfyOn,
+                    count,
+                    duration,
+                } = options;
+
+                let satisfiedCount: number | undefined,
+                    satisfiedPreCount: number | undefined,
+                    satisfiedEndtime: Dayjs | undefined,
+                    satisfiedPreEndtime: Dayjs | undefined,
+                    chunkSize = Math.min(cs, 100),
+                    satisfy = satisfyOn;
+
+                satisfiedCount = count;
+
+                // if count is less than max limit (100) go ahead and just get that many. may result in faster response time for low numbers
+                if (satisfiedCount !== undefined) {
+                    chunkSize = Math.min(chunkSize, satisfiedCount);
+                }
+
+                if (duration !== undefined) {
+                    const endTime = dayjs();
+                    satisfiedEndtime = endTime.subtract(duration.asMilliseconds(), 'milliseconds');
+                }
+
+                if (satisfiedCount === undefined && satisfiedEndtime === undefined) {
+                    throw new Error('window value was not valid');
+                } else if (satisfy === 'all' && !(satisfiedCount !== undefined && satisfiedEndtime !== undefined)) {
+                    // even though 'all' was requested we don't have two criteria so its really 'any' logic
+                    satisfy = 'any';
+                }
+
+                if(options.filterOn?.pre !== undefined) {
+                    if(typeof options.filterOn?.pre.max === 'number') {
+                        satisfiedPreCount = options.filterOn?.pre.max
+                    } else {
+                        const endTime = dayjs();
+                        satisfiedPreEndtime = endTime.subtract(options.filterOn?.pre.max.asMilliseconds(), 'milliseconds');
+                    }
+                }
+
+                let unFilteredItems: SnoowrapActivity[] | undefined;
+
+
+                const { func: listingFunc } = listingData;
+
+
+                let listing = await listingFunc(getAuthorHistoryAPIOptions(options));
+                let hitEnd = false;
+                let offset = chunkSize;
+                while (!hitEnd) {
+
+                    let countOk = false,
+                        timeOk = false;
+
+                    let listSlice = listing.slice(offset - chunkSize);
+                    let preListSlice = await this.filterListingWithHistoryOptions(listSlice, user, options.filterOn?.pre);
+
+                    // its more likely the time criteria is going to be hit before the count criteria
+                    // so check this first
+                    let truncatedItems: Array<Submission | Comment> = [];
+                    if (satisfiedEndtime !== undefined) {
+                        const [filteredSome, truncatedItems] = filterByTimeRequirement(satisfiedEndtime, preListSlice);
+
+                        if (filteredSome) {
+                            if (satisfy === 'any') {
+                                // satisfied duration
+                                pre = pre.concat(truncatedItems);
+                                break;
+                            }
+                            timeOk = true;
+                        }
+                    }
+
+                    if (satisfiedCount !== undefined && pre.length + preListSlice.length >= satisfiedCount) {
+                        // satisfied count
+                        if (satisfy === 'any') {
+                            pre = pre.concat(preListSlice).slice(0, satisfiedCount);
+                            break;
+                        }
+                        countOk = true;
+                    }
+
+                    // if we've satisfied everything take whichever is bigger
+                    if (satisfy === 'all' && countOk && timeOk) {
+                        if (satisfiedCount as number > pre.length + truncatedItems.length) {
+                            pre = pre.concat(preListSlice).slice(0, satisfiedCount);
+                        } else {
+                            pre = pre.concat(truncatedItems);
+                        }
+                        break;
+                    }
+
+                    // if we got this far neither count nor time was satisfied (or both) so just add all items from listing and fetch more if possible
+                    pre = pre.concat(preListSlice);
+
+                    if(satisfiedPreEndtime !== undefined || satisfiedPreCount !== undefined) {
+                        if(unFilteredItems === undefined) {
+                            unFilteredItems = [];
+                        }
+                        // window has pre filtering, need to check if fallback max would be hit
+                        if(satisfiedPreEndtime !== undefined) {
+                            const [filteredSome, truncatedItems] = filterByTimeRequirement(satisfiedPreEndtime, listSlice);
+                            if(filteredSome) {
+                                unFilteredItems = unFilteredItems.concat(truncatedItems);
+                                preMaxTrigger = (options.filterOn?.pre?.max as Duration).humanize();
+                                break;
+                            }
+                        }
+                        if(satisfiedPreCount !== undefined && unFilteredItems.length + listSlice.length >= satisfiedPreCount) {
+                            preMaxTrigger = `${options.filterOn?.pre?.max} Items`;
+                            unFilteredItems = unFilteredItems.concat(listSlice).slice(0, satisfiedPreCount)
+                            break;
+                        }
+                        unFilteredItems = unFilteredItems.concat(listSlice);
+                    }
+
+                    hitEnd = listing.isFinished;
+
+                    if (!hitEnd) {
+                        apiCount++;
+                        offset += chunkSize;
+                        listing = await listing.fetchMore({amount: chunkSize, ...getAuthorHistoryAPIOptions(options)});
+                    }
+                }
+
+                rawCount = unFilteredItems !== undefined ? unFilteredItems.length : listing.length;
+
+                if(this.authorTTL !== false) {
+                    this.cache.set(cacheKey, {pre: pre, rawCount, apiCount, preMaxTrigger}, {ttl: this.authorTTL})
+                }
+            }
+
+            let itemCountAfterPost: number | undefined;
+            if(options.filterOn?.post !== undefined) {
+                post = await this.filterListingWithHistoryOptions(pre, user, options.filterOn?.post);
+                itemCountAfterPost = post.length;
+            }
+
+            const listStats: string[] = [`${rawCount} Activities ${fromCache ? 'From Cache' : 'Fetched'} (${apiCount} API Calls${fromCache ? ' saved! ' : ''})`];
+            listStats.push(`${pre.length} Met Window Range After Pre Filter${preMaxTrigger !== undefined ? `(Hit Pre Max: ${preMaxTrigger})`: ''}`);
+
+            if(itemCountAfterPost !== undefined) {
+                listStats.push(`${itemCountAfterPost} After Post Filter`)
+            }
+
+            if(fromCache) {
+                listStats.push(`Cache Fingerprint: ${cacheKey}`)
+            }
+
+            this.logger.debug(listStats.join(' | '), {leaf: 'Activities Fetch'})
+
+            return Promise.resolve({pre, post: post ?? pre, rawCount, apiCount, preMaxTrigger});
+        } catch (err: any) {
+            if(isStatusError(err)) {
+                switch(err.statusCode) {
+                    case 404:
+                        throw new SimpleError('Reddit returned a 404 for user history. Likely this user is shadowbanned.', {isSerious: false});
+                    case 403:
+                        throw new MaybeSeriousErrorWithCause('Reddit returned a 403 for user history, likely this user is suspended.', {cause: err, isSerious: false});
+                    default:
+                        throw err;
+                }
+
+            } else {
+                throw err;
+            }
+        }
+    }
+
+    async filterListingWithHistoryOptions(listing: SnoowrapActivity[], user: RedditUser, opts?: HistoryFiltersOptions): Promise<SnoowrapActivity[]> {
+        if(opts === undefined) {
+            return listing;
+        }
+        const {debug = false} = opts;
+
+        let filteredListing = [...listing];
+        if(filteredListing.length > 0 && opts.subreddits !== undefined) {
+            const subredditTestOptions = debug ? {logger: undefined, includeIdentifier: true} : {logger: NoopLogger};
+            if(opts.subreddits.include !== undefined) {
+                filteredListing = await this.batchTestSubredditCriteria(filteredListing, opts.subreddits.include.map(x => x.criteria), user, subredditTestOptions);
+            } else if(opts.subreddits.exclude !== undefined) {
+                // TODO use excludeCondition correctly?
+                filteredListing = await this.batchTestSubredditCriteria(filteredListing, opts.subreddits.exclude.map(x => x.criteria), user, {...subredditTestOptions, isInclude: false});
+            }
+        }
+        if(filteredListing.length > 0 && (opts.submissionState !== undefined || opts.commentState !== undefined || opts.activityState !== undefined)) {
+            const newFiltered = [];
+            for(const activity of filteredListing) {
+                let passes = true;
+                if(asSubmission(activity) && opts.submissionState !== undefined) {
+                    const [subPass, subPassType, filterResult] = await checkItemFilter(activity, opts.submissionState, this, {logger: debug ? this.logger : undefined});
+                    passes = subPass;
+                } else if(opts.commentState !== undefined) {
+                   const [comPasses, comPassType, filterResult] = await checkItemFilter(activity, opts.commentState, this, {logger: debug ? this.logger : undefined});
+                    passes = comPasses;
+                } else if(opts.activityState !== undefined) {
+                    const [actPasses, actPassType, filterResult] = await checkItemFilter(activity, opts.activityState, this, {logger: debug ? this.logger : undefined});
+                    passes = actPasses;
+                }
+                if(passes) {
+                    newFiltered.push(activity)
+                }
+            }
+            filteredListing = newFiltered;
+        }
+
+        return filteredListing;
+    }
+
 
     async getContent(val: string, subredditArg?: Subreddit): Promise<string> {
         const subreddit = subredditArg || this.subreddit;
@@ -833,40 +1609,74 @@ export class SubredditResources {
         }
     }
 
-    async batchTestSubredditCriteria(items: (Comment | Submission)[], states: (SubredditState | StrongSubredditState)[]): Promise<(Comment | Submission)[]> {
+    // isInclude = true, logger: Logger = this.logger
+    async batchTestSubredditCriteria(items: SnoowrapActivity[], states: (SubredditCriteria | StrongSubredditCriteria)[], author: RedditUser, options?: {logger?: Logger, isInclude?: boolean, includeIdentifier?: boolean}): Promise<(Comment | Submission)[]> {
+        const {
+            logger = this.logger,
+            isInclude = true,
+            includeIdentifier = false,
+        } = options || {};
+
         let passedItems: (Comment | Submission)[] = [];
         let unpassedItems: (Comment | Submission)[] = [];
 
-        const {nameOnly =  [], full = []} = states.reduce((acc: {nameOnly: (SubredditState | StrongSubredditState)[], full: (SubredditState | StrongSubredditState)[]}, curr) => {
+        const {nameOnly =  [], full = []} = states.reduce((acc: {nameOnly: (SubredditCriteria | StrongSubredditCriteria)[], full: (SubredditCriteria | StrongSubredditCriteria)[]}, curr) => {
             if(subredditStateIsNameOnly(curr)) {
                 return {...acc, nameOnly: acc.nameOnly.concat(curr)};
             }
             return {...acc, full: acc.full.concat(curr)};
         }, {nameOnly: [], full: []});
 
+        const derivedLogger = (item: SnoowrapActivity) => {
+            if(!includeIdentifier) {
+                return logger;
+            }
+            return logger.child({labels: `${asSubmission(item) ? 'SUB' : 'COM'} ${item.id}`}, mergeArr);
+        }
+
         if(nameOnly.length === 0) {
             unpassedItems = items;
         } else {
             for(const item of items) {
                 const subName = getActivitySubredditName(item);
+                let matched = false;
                 for(const state of nameOnly) {
-                    if(await this.isSubreddit({display_name: subName} as Subreddit, state, this.logger)) {
-                        passedItems.push(item);
+                    if(await this.isSubreddit({display_name: subName} as Subreddit, state, author, derivedLogger(item))) {
+                        matched = true;
                         break;
                     }
                 }
-                unpassedItems.push(item);
+                if(matched) {
+                    if(isInclude) {
+                        passedItems.push(item);
+                    } else {
+                        unpassedItems.push(item);
+                    }
+                } else if(!isInclude) {
+                    passedItems.push(item);
+                } else {
+                    unpassedItems.push(item);
+                }
             }
         }
 
         if(unpassedItems.length > 0 && full.length > 0) {
             await this.cacheSubreddits(unpassedItems.map(x => x.subreddit));
             for(const item of unpassedItems) {
+                let matched = false;
                 for(const state of full) {
-                    if(await this.isSubreddit(await this.getSubreddit(item), state, this.logger)) {
+                    const logger = derivedLogger(item);
+                    if(await this.isSubreddit(await this.getSubreddit(item, logger), state, author, logger)) {
                         passedItems.push(item);
                         break;
                     }
+                }
+                if(matched) {
+                    if(isInclude) {
+                        passedItems.push(item);
+                    }
+                } else if(!isInclude) {
+                    passedItems.push(item);
                 }
             }
         }
@@ -874,18 +1684,15 @@ export class SubredditResources {
         return passedItems;
     }
 
-    async testSubredditCriteria(item: (Comment | Submission), state: SubredditState | StrongSubredditState) {
+    async testSubredditCriteria(item: (Comment | Submission), state: SubredditCriteria | StrongSubredditCriteria, author: RedditUser) {
         if(Object.keys(state).length === 0) {
             return true;
         }
         // optimize for name-only criteria checks
         // -- we don't need to store cache results for this since we know subreddit name is always available from item (no request required)
-        const critCount = Object.entries(state).filter(([key, val]) => {
-            return val !== undefined && !['name','stateDescription'].includes(key);
-        }).length;
-        if(critCount === 0) {
+        if(subredditStateIsNameOnly(state)) {
             const subName = getActivitySubredditName(item);
-            return await this.isSubreddit({display_name: subName} as Subreddit, state, this.logger);
+            return await this.isSubreddit({display_name: subName} as Subreddit, state, author, this.logger);
         }
 
         // see comments on shouldCacheSubredditStateCriteriaResult() for why this is needed
@@ -900,7 +1707,7 @@ export class SubredditResources {
                     this.logger.debug(`Cache Hit: Subreddit Check on ${getActivitySubredditName(item)} (Hash ${hash})`);
                     return cachedItem as boolean;
                 }
-                const itemResult = await this.isSubreddit(await this.getSubreddit(item), state, this.logger);
+                const itemResult = await this.isSubreddit(await this.getSubreddit(item), state, author, this.logger);
                 this.stats.cache.subredditCrit.miss++;
                 await this.cache.set(hash, itemResult, {ttl: this.filterCriteriaTTL});
                 return itemResult;
@@ -912,10 +1719,12 @@ export class SubredditResources {
             }
         }
 
-        return await this.isSubreddit(await this.getSubreddit(item), state, this.logger);
+        return await this.isSubreddit(await this.getSubreddit(item), state, author, this.logger);
     }
 
-    async testAuthorCriteria(item: (Comment | Submission), authorOpts: AuthorCriteria, include = true): Promise<FilterCriteriaResult<AuthorCriteria>> {
+    async testAuthorCriteria(item: (Comment | Submission), authorOptsObj: NamedCriteria<AuthorCriteria>, include = true): Promise<FilterCriteriaResult<AuthorCriteria>> {
+        const {criteria: authorOpts} = authorOptsObj;
+
         if (this.filterCriteriaTTL !== false) {
             // in the criteria check we only actually use the `item` to get the author flair
             // which will be the same for the entire subreddit
@@ -937,19 +1746,23 @@ export class SubredditResources {
             } else {
                 this.stats.cache.authorCrit.miss++;
                 cachedAuthorTest = await this.isAuthor(item, authorOpts, include);
+                cachedAuthorTest.criteria = cloneDeep(authorOptsObj);
                 await this.cache.set(hash, cachedAuthorTest, {ttl: this.filterCriteriaTTL});
                 return cachedAuthorTest;
             }
         }
 
-        return await this.isAuthor(item, authorOpts, include);
+        const res = await this.isAuthor(item, authorOpts, include);
+        res.criteria = cloneDeep(authorOptsObj);
+        return res;
     }
 
-    async testItemCriteria(i: (Comment | Submission), activityState: TypedActivityState, logger: Logger, source?: ActivitySource): Promise<FilterCriteriaResult<TypedActivityState>> {
+    async testItemCriteria(i: (Comment | Submission), activityStateObj: NamedCriteria<TypedActivityState>, logger: Logger, include = true, source?: ActivitySource): Promise<FilterCriteriaResult<TypedActivityState>> {
+        const {criteria: activityState} = activityStateObj;
         if(Object.keys(activityState).length === 0) {
             return {
-                behavior: 'include',
-                criteria: activityState,
+                behavior: include ? 'include' : 'exclude',
+                criteria: cloneDeep(activityStateObj),
                 propertyResults: [],
                 passed: true
             }
@@ -964,10 +1777,10 @@ export class SubredditResources {
             // -- additionally we keep that data in-memory (for now??) so its always accessible and doesn't need to be stored in cache
             let runtimeRes: FilterCriteriaResult<(SubmissionState & CommentState)> | undefined;
             if(dispatched !== undefined || stateSource !== undefined) {
-                runtimeRes = await this.isItem(item, {dispatched, source: stateSource}, logger, source);
+                runtimeRes = await this.isItem(item, {dispatched, source: stateSource}, logger, include, source);
                 if(!runtimeRes.passed) {
                     // if dispatched does not pass can return early and avoid testing the rest of the item
-                    const [propResultsMap, definedStateCriteria] = generateItemFilterHelpers(rest);
+                    const [propResultsMap, definedStateCriteria] = generateItemFilterHelpers(rest, include);
                     if(dispatched !== undefined) {
                         propResultsMap.dispatched = runtimeRes.propertyResults.find(x => x.property === 'dispatched');
                     }
@@ -976,8 +1789,8 @@ export class SubredditResources {
                     }
 
                     return {
-                        behavior: 'include',
-                        criteria: activityState,
+                        behavior: include ? 'include' : 'exclude',
+                        criteria: cloneDeep(activityStateObj),
                         propertyResults: Object.values(propResultsMap),
                         passed: false
                     }
@@ -986,16 +1799,16 @@ export class SubredditResources {
 
             try {
                 // only cache non-runtime state and results
-                const hash = `itemCrit-${item.name}-${objectHash.sha1(state)}`;
+                const hash = `itemCrit-${item.name}-${objectHash.sha1({...state, include})}`;
                 await this.stats.cache.itemCrit.identifierRequestCount.set(hash, (await this.stats.cache.itemCrit.identifierRequestCount.wrap(hash, () => 0) as number) + 1);
                 this.stats.cache.itemCrit.requestTimestamps.push(Date.now());
                 this.stats.cache.itemCrit.requests++;
                 let itemResult = await this.cache.get(hash) as FilterCriteriaResult<TypedActivityState> | undefined | null;
                 if (itemResult !== undefined && itemResult !== null) {
-                    this.logger.debug(`Cache Hit: Item Check on ${item.name} (Hash ${hash})`);
+                    logger.debug(`Cache Hit: Item Check on ${item.name} (Hash ${hash})`);
                     //return cachedItem as boolean;
                 } else {
-                    itemResult = await this.isItem(item, state, logger);
+                    itemResult = await this.isItem(item, state, logger, include);
                 }
                 this.stats.cache.itemCrit.miss++;
                 await this.cache.set(hash, itemResult, {ttl: this.filterCriteriaTTL});
@@ -1009,7 +1822,7 @@ export class SubredditResources {
                         itemResult.propertyResults.push(runtimeRes.propertyResults.find(x => x.property === 'source') as FilterCriteriaPropertyResult<TypedActivityState>);
                     }
                 }
-
+                itemResult.criteria = cloneDeep(activityStateObj);
                 return itemResult;
             } catch (err: any) {
                 if (err.logged !== true) {
@@ -1019,11 +1832,23 @@ export class SubredditResources {
             }
         }
 
-        return await this.isItem(i, activityState, logger, source);
+        const res = await this.isItem(i, activityState, logger, include, source);
+        res.criteria = cloneDeep(activityStateObj);
+        return res;
     }
 
-    async isSubreddit (subreddit: Subreddit, stateCriteriaRaw: SubredditState | StrongSubredditState, logger: Logger) {
+    async isSubreddit (subreddit: Subreddit, stateCriteriaRaw: SubredditCriteria | StrongSubredditCriteria, author: RedditUser, logger: Logger) {
         const {stateDescription, ...stateCriteria} = stateCriteriaRaw;
+
+        let fetchedUser: RedditUser | undefined;
+        // @ts-ignore
+        const user = async (): Promise<RedditUser> => {
+            if(fetchedUser === undefined) {
+                fetchedUser = await this.getAuthor(author);
+            }
+            // @ts-ignore
+            return fetchedUser;
+        }
 
         if (Object.keys(stateCriteria).length === 0) {
             return true;
@@ -1064,6 +1889,17 @@ export class SubredditResources {
                                 return false
                             }
                             break;
+                        case 'isOwnProfile':
+                            // @ts-ignore
+                            const ownSub = (await user()).subreddit?.display_name.display_name;
+                            const isOwn = subreddit.display_name === ownSub
+                            // @ts-ignore
+                            if (crit[k] !== isOwn) {
+                                // @ts-ignore
+                                log.debug(`Failed: Expected => ${k}:${crit[k]} | Found => ${k}:${isOwn}`)
+                                return false
+                            }
+                            break;
                         default:
                             // @ts-ignore
                             if (subreddit[k] !== undefined) {
@@ -1085,18 +1921,18 @@ export class SubredditResources {
         })() as boolean;
     }
 
-    async isItem (item: Submission | Comment, stateCriteria: TypedActivityState, logger: Logger, source?: ActivitySource): Promise<FilterCriteriaResult<(SubmissionState & CommentState)>> {
+    async isItem (item: Submission | Comment, stateCriteria: TypedActivityState, logger: Logger, include: boolean, source?: ActivitySource): Promise<FilterCriteriaResult<(SubmissionState & CommentState)>> {
 
         //const definedStateCriteria = (removeUndefinedKeys(stateCriteria) as RequiredItemCrit);
 
-        const [propResultsMap, definedStateCriteria] = generateItemFilterHelpers(stateCriteria);
+        const [propResultsMap, definedStateCriteria] = generateItemFilterHelpers(stateCriteria, include);
 
         const log = logger.child({leaf: 'Item Check'}, mergeArr);
 
         if(Object.keys(stateCriteria).length === 0) {
             return {
-                behavior: 'include',
-                criteria: stateCriteria,
+                behavior: include ? 'include' : 'exclude',
+                criteria: {criteria: stateCriteria},
                 propertyResults: [],
                 passed: true
             }
@@ -1121,7 +1957,7 @@ export class SubredditResources {
                     case 'submissionState':
                         if(isSubmission(item)) {
                             const subMsg = `'submissionState' is not allowed in 'itemIs' criteria when the main Activity is a Submission`;
-                            log.debug(subMsg);
+                            log.warn(subMsg);
                             propResultsMap.submissionState!.passed = true;
                             propResultsMap.submissionState!.reason = subMsg;
                             break;
@@ -1151,7 +1987,7 @@ export class SubredditResources {
                         let reason: string | undefined;
                         let identifiers: string[] | undefined;
                         if(found && typeof itemOptVal !== 'boolean') {
-                            identifiers = Array.isArray(itemOptVal) ? (itemOptVal as string[]) : [itemOptVal];
+                            identifiers = Array.isArray(itemOptVal) ? (itemOptVal as string[]) : [itemOptVal as string];
                             for(const i of identifiers) {
                                 const matchingDelayedIdentifier = matchingDelayedActivities.find(x => x.identifier === i);
                                 if(matchingDelayedIdentifier !== undefined) {
@@ -1163,13 +1999,13 @@ export class SubredditResources {
                                 reason = 'Found delayed activities but none matched dispatch identifier';
                             }
                         }
-                        propResultsMap.dispatched!.passed = found === itemOptVal || typeof found === 'string';
+                        propResultsMap.dispatched!.passed = criteriaPassWithIncludeBehavior(found === itemOptVal || typeof found === 'string', include);
                         propResultsMap.dispatched!.found = found;
                         propResultsMap.dispatched!.reason = reason;
                         break;
                     case 'source':
                         if(source === undefined) {
-                            propResultsMap.source!.passed = false;
+                            propResultsMap.source!.passed = !include;
                             propResultsMap.source!.found = 'Not From Source';
                             propResultsMap.source!.reason = 'Activity was not retrieved from a source (may be from cache)';
                             break;
@@ -1179,12 +2015,12 @@ export class SubredditResources {
                             const requestedSourcesVal: string[] = !Array.isArray(itemOptVal) ? [itemOptVal] as string[] : itemOptVal as string[];
                             const requestedSources = requestedSourcesVal.map(x => strToActivitySource(x).toLowerCase());
 
-                            propResultsMap.source!.passed = requestedSources.some(x => source.toLowerCase().includes(x))
+                            propResultsMap.source!.passed = criteriaPassWithIncludeBehavior(requestedSources.some(x => source.toLowerCase().includes(x)), include);
                             break;
                         }
                     case 'score':
                         const scoreCompare = parseGenericValueComparison(itemOptVal as string);
-                        propResultsMap.score!.passed = comparisonTextOp(item.score, scoreCompare.operator, scoreCompare.value);
+                        propResultsMap.score!.passed = criteriaPassWithIncludeBehavior(comparisonTextOp(item.score, scoreCompare.operator, scoreCompare.value), include);
                         propResultsMap.score!.found = item.score;
                         break;
                     case 'reports':
@@ -1216,16 +2052,67 @@ export class SubredditResources {
                             reportNum = item.mod_reports.length;
                         }
                         propResultsMap.reports!.found = `${reportNum} ${reportType}`;
-                        propResultsMap.reports!.passed = comparisonTextOp(reportNum, reportCompare.operator, reportCompare.value);
+                        propResultsMap.reports!.passed = criteriaPassWithIncludeBehavior(comparisonTextOp(reportNum, reportCompare.operator, reportCompare.value), include);
                         break;
                     case 'removed':
+
                         const removed = activityIsRemoved(item);
-                        propResultsMap.removed!.passed = removed === itemOptVal;
-                        propResultsMap.removed!.found = removed;
+
+                        if(typeof itemOptVal === 'boolean') {
+                            propResultsMap.removed!.passed = criteriaPassWithIncludeBehavior(removed === itemOptVal, include);
+                            propResultsMap.removed!.found = removed;
+                        } else if(!removed) {
+                            propResultsMap.removed!.passed = false;
+                            propResultsMap.removed!.found = 'Not Removed';
+                        } else {
+                            if(!item.can_mod_post || (item.banned_by === null || item.banned_by === undefined)) {
+                                propResultsMap.removed!.passed = false;
+                                propResultsMap.removed!.found = 'No moderator access';
+                                propResultsMap.removed!.reason = 'Could not determine who removed Activity b/c Bot is a not a moderator in the Activity\'s subreddit';
+                            } else {
+                                propResultsMap.removed!.found = `Removed by u/${item.banned_by.name}`;
+
+                                // TODO move normalization into normalizeCriteria after merging databaseSupport into edge
+                                let behavior: 'include' | 'exclude' = 'include';
+                                let names: string[] = [];
+                                if(typeof itemOptVal === 'string') {
+                                    names.push(itemOptVal);
+                                } else if(Array.isArray(itemOptVal)) {
+                                    names = itemOptVal as string[];
+                                } else {
+                                    const {
+                                        behavior: rBehavior = 'include',
+                                        name
+                                    } = itemOptVal as ModeratorNameCriteria;
+                                    behavior = rBehavior;
+                                    if(typeof name === 'string') {
+                                        names.push(name);
+                                    } else {
+                                        names = name;
+                                    }
+                                }
+                                names = [...new Set(names.map(x => {
+                                    const clean = x.trim();
+                                    if(x.toLocaleLowerCase() === 'self' && this.botAccount !== undefined) {
+                                        return this.botAccount.toLocaleLowerCase();
+                                    }
+                                    if(x.toLocaleLowerCase() === 'automod') {
+                                        return 'automoderator';
+                                    }
+                                    return clean;
+                                }))]
+                                const removedBy = item.banned_by.name.toLocaleLowerCase();
+                                if(behavior === 'include') {
+                                    propResultsMap.removed!.passed = names.some(x => x.toLocaleLowerCase().includes(removedBy));
+                                } else {
+                                    propResultsMap.removed!.passed = !names.some(x => x.toLocaleLowerCase().includes(removedBy));
+                                }
+                            }
+                        }
                         break;
                     case 'deleted':
                         const deleted = activityIsDeleted(item);
-                        propResultsMap.deleted!.passed = deleted === itemOptVal;
+                        propResultsMap.deleted!.passed = criteriaPassWithIncludeBehavior(deleted === itemOptVal, include);
                         propResultsMap.deleted!.found = deleted;
                         break;
                     case 'filtered':
@@ -1237,13 +2124,13 @@ export class SubredditResources {
                             break;
                         }
                         const filtered = activityIsFiltered(item);
-                        propResultsMap.filtered!.passed = filtered === itemOptVal;
+                        propResultsMap.filtered!.passed = criteriaPassWithIncludeBehavior(filtered === itemOptVal, include);
                         propResultsMap.filtered!.found = filtered;
                         break;
                     case 'age':
                         const created = dayjs.unix(await item.created);
                         const ageTest = compareDurationValue(parseDurationComparison(itemOptVal as string), created);
-                        propResultsMap.age!.passed = ageTest;
+                        propResultsMap.age!.passed = criteriaPassWithIncludeBehavior(ageTest, include);
                         propResultsMap.age!.found = created.format('MMMM D, YYYY h:mm A Z');
                         break;
                     case 'title':
@@ -1259,7 +2146,7 @@ export class SubredditResources {
 
                         try {
                             const [titlePass, reg] = testMaybeStringRegex(itemOptVal as string, item.title);
-                            propResultsMap.title!.passed = titlePass;
+                            propResultsMap.title!.passed = criteriaPassWithIncludeBehavior(titlePass, include);
                         } catch (err: any) {
                             propResultsMap.title!.passed = false;
                             propResultsMap.title!.reason = err.message;
@@ -1275,9 +2162,71 @@ export class SubredditResources {
                         }
 
                         propResultsMap.isRedditMediaDomain!.found = item.is_reddit_media_domain;
-                        propResultsMap.isRedditMediaDomain!.passed = item.is_reddit_media_domain === itemOptVal;
+                        propResultsMap.isRedditMediaDomain!.passed = criteriaPassWithIncludeBehavior(item.is_reddit_media_domain === itemOptVal, include);
                         break;
                     case 'approved':
+                        if(!item.can_mod_post) {
+                            const spamWarn = `Cannot test for '${k}' state on Activity in a subreddit bot account is not a moderator for. Skipping criteria...`
+                            log.debug(spamWarn);
+                            propResultsMap[k]!.passed = true;
+                            propResultsMap[k]!.reason = spamWarn;
+                            break;
+                        }
+
+                        if(typeof itemOptVal === 'boolean') {
+                            // @ts-ignore
+                            propResultsMap.approved!.found = item[k];
+                            propResultsMap.approved!.passed = propResultsMap[k]!.found === itemOptVal;
+                            // @ts-ignore
+                        } else if(!item.approved) {
+                            propResultsMap.removed!.passed = false;
+                            propResultsMap.removed!.found = 'Not Approved';
+                        } else {
+                            if(!item.can_mod_post || (item.approved_by === null || item.approved_by === undefined)) {
+                                propResultsMap.approved!.passed = false;
+                                propResultsMap.approved!.found = 'No moderator access';
+                                propResultsMap.approved!.reason = 'Could not determine who approved Activity b/c Bot is a not a moderator in the Activity\'s subreddit';
+                            } else {
+                                propResultsMap.approved!.found = `Approved by u/${item.approved_by.name}`;
+
+                                // TODO move normalization into normalizeCriteria after merging databaseSupport into edge
+                                let behavior: 'include' | 'exclude' = 'include';
+                                let names: string[] = [];
+                                if(typeof itemOptVal === 'string') {
+                                    names.push(itemOptVal);
+                                } else if(Array.isArray(itemOptVal)) {
+                                    names = itemOptVal as string[];
+                                } else {
+                                    const {
+                                        behavior: rBehavior = 'include',
+                                        name
+                                    } = itemOptVal as ModeratorNameCriteria;
+                                    behavior = rBehavior;
+                                    if(typeof name === 'string') {
+                                        names.push(name);
+                                    } else {
+                                        names = name;
+                                    }
+                                }
+                                names = [...new Set(names.map(x => {
+                                    const clean = x.trim();
+                                    if(x.toLocaleLowerCase() === 'self' && this.botAccount !== undefined) {
+                                        return this.botAccount.toLocaleLowerCase();
+                                    }
+                                    if(x.toLocaleLowerCase() === 'automod') {
+                                        return 'automoderator';
+                                    }
+                                    return clean;
+                                }))]
+                                const doneBy = item.approved_by.name.toLocaleLowerCase();
+                                if(behavior === 'include') {
+                                    propResultsMap.approved!.passed = names.some(x => x.toLocaleLowerCase().includes(doneBy));
+                                } else {
+                                    propResultsMap.approved!.passed = !names.some(x => x.toLocaleLowerCase().includes(doneBy));
+                                }
+                            }
+                        }
+                        break;
                     case 'spam':
                         if(!item.can_mod_post) {
                             const spamWarn = `Cannot test for '${k}' state on Activity in a subreddit bot account is not a moderator for. Skipping criteria...`
@@ -1288,7 +2237,7 @@ export class SubredditResources {
                         }
                         // @ts-ignore
                         propResultsMap[k]!.found = item[k];
-                        propResultsMap[k]!.passed = propResultsMap[k]!.found === itemOptVal;
+                        propResultsMap[k]!.passed = criteriaPassWithIncludeBehavior(propResultsMap[k]!.found === itemOptVal, include);
                         break;
                     case 'op':
                         if(isSubmission(item)) {
@@ -1299,7 +2248,7 @@ export class SubredditResources {
                             break;
                         }
                         propResultsMap.op!.found = (item as Comment).is_submitter;
-                        propResultsMap.op!.passed = propResultsMap.op!.found === itemOptVal;
+                        propResultsMap.op!.passed = criteriaPassWithIncludeBehavior(propResultsMap.op!.found === itemOptVal, include);
                         break;
                     case 'depth':
                         if(isSubmission(item)) {
@@ -1313,7 +2262,7 @@ export class SubredditResources {
 
                         const depth = (item as Comment).depth;
                         propResultsMap.depth!.found = depth;
-                        propResultsMap.depth!.passed = comparisonTextOp(depth, depthCompare.operator, depthCompare.value);
+                        propResultsMap.depth!.passed = criteriaPassWithIncludeBehavior(comparisonTextOp(depth, depthCompare.operator, depthCompare.value), include);
                         break;
                     case 'flairTemplate':
                     case 'link_flair_text':
@@ -1330,16 +2279,16 @@ export class SubredditResources {
 
                             if (typeof itemOptVal === 'boolean') {
                                 if (itemOptVal === true) {
-                                    propResultsMap[k]!.passed = propertyValue !== undefined && propertyValue !== null && propertyValue !== '';
+                                    propResultsMap[k]!.passed = criteriaPassWithIncludeBehavior(propertyValue !== undefined && propertyValue !== null && propertyValue !== '', include);
                                 } else {
-                                    propResultsMap[k]!.passed = propertyValue === undefined || propertyValue === null || propertyValue === '';
+                                    propResultsMap[k]!.passed = criteriaPassWithIncludeBehavior(propertyValue === undefined || propertyValue === null || propertyValue === '', include);
                                 }
                             } else if (propertyValue === undefined || propertyValue === null || propertyValue === '') {
                                 // if crit is not a boolean but property is "empty" then it'll never pass anyway
-                                propResultsMap[k]!.passed = false;
+                                propResultsMap[k]!.passed = !include;
                             } else {
                                 const expectedValues = typeof itemOptVal === 'string' ? [itemOptVal] : (itemOptVal as string[]);
-                                propResultsMap[k]!.passed = expectedValues.some(x => x.trim().toLowerCase() === propertyValue?.trim().toLowerCase());
+                                propResultsMap[k]!.passed = criteriaPassWithIncludeBehavior(expectedValues.some(x => x.trim().toLowerCase() === propertyValue?.trim().toLowerCase()), include);
                             }
                             break;
                         } else {
@@ -1368,7 +2317,7 @@ export class SubredditResources {
 
                         } else {
                             propResultsMap[k]!.found = val;
-                            propResultsMap[k]!.passed = val === itemOptVal;
+                            propResultsMap[k]!.passed = criteriaPassWithIncludeBehavior(val === itemOptVal, include);
                         }
                         break;
                 }
@@ -1386,8 +2335,8 @@ export class SubredditResources {
         const passed = propResults.filter(x => typeof x.passed === 'boolean').every(x => x.passed === true);
 
         return {
-            behavior: 'include',
-            criteria: stateCriteria,
+            behavior: include ? 'include' : 'exclude',
+            criteria: {criteria: cloneDeep(stateCriteria)},
             propertyResults: propResults,
             passed,
         };
@@ -1465,6 +2414,26 @@ export class SubredditResources {
                     if (k === 'shadowBanned') {
                         // we have already taken care of this with shadowban check above
                         continue;
+                    }
+
+                    // none of the criteria below are returned if the user is suspended
+                    switch(k) {
+                        case 'age':
+                        case 'linkKarma':
+                        case 'commentKarma':
+                        case 'verified':
+                        case 'description':
+                            // @ts-ignore
+                            if((await user()).is_suspended) {
+                                propResultsMap[k]!.passed = false;
+                                propResultsMap[k]!.reason = 'User is suspended';
+                                shouldContinue = false;
+                                break;
+                            }
+                    }
+
+                    if(!shouldContinue) {
+                        break;
                     }
 
                     const authorOptVal = definedAuthorOpts[k];
@@ -1565,10 +2534,20 @@ export class SubredditResources {
                         case 'isMod':
                             const mods: RedditUser[] = await this.getSubredditModerators(item.subreddit);
                             const isModerator = mods.some(x => x.name === authorName) || authorName.toLowerCase() === 'automoderator';
-                            const modMatch = authorOpts.isMod === isModerator;
+                            const modMatch = authorOptVal === isModerator;
                             propResultsMap.isMod!.found = isModerator;
                             propResultsMap.isMod!.passed = !((include && !modMatch) || (!include && modMatch));
                             if (!propResultsMap.isMod!.passed) {
+                                shouldContinue = false;
+                            }
+                            break;
+                        case 'isContributor':
+                            const contributors: RedditUser[] = await this.getSubredditContributors();
+                            const isContributor= contributors.some(x => x.name === authorName);
+                            const contributorMatch = authorOptVal === isContributor;
+                            propResultsMap.isContributor!.found = isContributor;
+                            propResultsMap.isContributor!.passed = !((include && !contributorMatch) || (!include && contributorMatch));
+                            if (!propResultsMap.isContributor!.passed) {
                                 shouldContinue = false;
                             }
                             break;
@@ -1749,7 +2728,7 @@ export class SubredditResources {
                 }
             } catch (err: any) {
                 if (isStatusError(err) && err.statusCode === 404) {
-                    throw new SimpleError('Reddit returned a 404 while trying to retrieve User profile. It is likely this user is shadowbanned.');
+                    throw new SimpleError('Reddit returned a 404 while trying to retrieve User profile. It is likely this user is shadowbanned.', {isSerious: false});
                 } else {
                     throw err;
                 }
@@ -1762,34 +2741,74 @@ export class SubredditResources {
 
         return {
             behavior: include ? 'include' : 'exclude',
-            criteria: authorOpts,
+            criteria: {criteria: cloneDeep(authorOpts)},
             propertyResults: propResults,
             passed,
         };
     }
 
-    async getCommentCheckCacheResult(item: Comment, checkConfig: object): Promise<UserResultCache | undefined> {
+    async getCommentCheckCacheResult(item: Comment, checkConfig: object): Promise<CheckResultEntity | Pick<CheckResultEntity, 'triggered' | 'results'> | undefined> {
         const userName = getActivityAuthorName(item.author);
         const hash = `commentUserResult-${userName}-${item.link_id}-${objectHash.sha1(checkConfig)}`;
         this.stats.cache.commentCheck.requests++;
         this.stats.cache.commentCheck.requestTimestamps.push(Date.now());
         await this.stats.cache.commentCheck.identifierRequestCount.set(hash, (await this.stats.cache.commentCheck.identifierRequestCount.wrap(hash, () => 0) as number) + 1);
-        let result = await this.cache.get(hash) as UserResultCache | undefined | null;
-        if(result === null) {
+        let result = await this.cache.get(hash) as { id: string, results: (RuleResultEntity | RuleSetResultEntity)[], triggered: boolean } | undefined | null;
+        if (result === null) {
             result = undefined;
         }
-        if(result === undefined) {
+        if (result === undefined) {
             this.stats.cache.commentCheck.miss++;
+            return result;
         }
+        const {id, results, triggered} = result;
         this.logger.debug(`Cache Hit: Comment Check for ${userName} in Submission ${item.link_id} (Hash ${hash})`);
-        return result;
+        // check if the Check was persisted since that would be easiest
+        const persisted = await this.database.getRepository(CheckResultEntity).findOne({where: {id}}) as CheckResultEntity;
+        if (persisted !== null) {
+            return persisted;
+        }
+        const hydratedResults: (RuleResultEntity | RuleSetResultEntity)[] = [];
+        const premiseRepo = this.database.getRepository(RulePremise);
+        for (const r of results) {
+            if (isRuleSetResult(r)) {
+                hydratedResults.push(new RuleSetResultEntity({
+                    triggered: r.triggered,
+                    condition: r.condition,
+                    results: await mapAsync(r.results, async (ruleResult: RuleResultEntity) => {
+                        const prem = await premiseRepo.findOneBy({
+                            configHash: ruleResult.premise.configHash,
+                            kindId: ruleResult.premise.kindId,
+                            managerId: ruleResult.premise.managerId,
+                        }) as RulePremise;
+                        return new RuleResultEntity({
+                            ...ruleResult,
+                            premise: prem,
+                            fromCache: true
+                        })
+                    })
+                }))
+            } else {
+                const prem = await premiseRepo.findOneBy({
+                    configHash: r.premise.configHash,
+                    kindId: r.premise.kindId,
+                    managerId: r.premise.managerId,
+                }) as RulePremise;
+                hydratedResults.push(new RuleResultEntity({
+                    ...r,
+                    premise: prem,
+                    fromCache: true
+                }));
+            }
+        }
+        return {results: hydratedResults, triggered};
     }
 
-    async setCommentCheckCacheResult(item: Comment, checkConfig: object, result: UserResultCache, ttl: number) {
+    async setCommentCheckCacheResult(item: Comment, checkConfig: object, result: CheckResultEntity, ttl: number) {
         const userName = getActivityAuthorName(item.author);
         const hash = `commentUserResult-${userName}-${item.link_id}-${objectHash.sha1(checkConfig)}`
-        await this.cache.set(hash, result, { ttl });
-        this.logger.debug(`Cached check result '${result.result}' for User ${userName} on Submission ${item.link_id} for ${ttl} seconds (Hash ${hash})`);
+        await this.cache.set(hash, {id: result.id, results: result.results, triggered: result.triggered}, { ttl });
+        this.logger.debug(`Cached check result '${result.check.name}' for User ${userName} on Submission ${item.link_id} for ${ttl} seconds (Hash ${hash})`);
     }
 
     async generateFooter(item: Submission | Comment, actionFooter?: false | string) {
@@ -1856,6 +2875,13 @@ export class BotResourcesManager {
     pruneInterval: any;
     defaultThirdPartyCredentials: ThirdPartyCredentialsJsonConfig;
     logger: Logger;
+    botAccount?: string;
+    defaultDatabase: DataSource
+    botName!: string
+    retention?: EventRetentionPolicyRange
+
+    invokeeRepo: Repository<InvokeeType>
+    runTypeRepo: Repository<RunStateType>
 
     constructor(config: BotInstanceConfig, logger: Logger) {
         const {
@@ -1877,6 +2903,10 @@ export class BotResourcesManager {
                 reddit,
                 ...thirdParty
             },
+            database,
+            databaseConfig: {
+                retention
+            } = {},
             caching,
         } = config;
         caching.provider.prefix = buildCachePrefix([caching.provider.prefix, 'SHARED']);
@@ -1884,8 +2914,13 @@ export class BotResourcesManager {
         this.cacheHash = objectHash.sha1(relevantCacheSettings);
         this.defaultCacheConfig = caching;
         this.defaultThirdPartyCredentials = thirdParty;
+        this.defaultDatabase = database;
         this.ttlDefaults = {authorTTL, userNotesTTL, wikiTTL, commentTTL, submissionTTL, filterCriteriaTTL, subredditTTL, selfTTL};
+        this.botName = name as string;
         this.logger = logger;
+        this.invokeeRepo = this.defaultDatabase.getRepository(InvokeeType);
+        this.runTypeRepo = this.defaultDatabase.getRepository(RunStateType);
+        this.retention = retention;
 
         const options = provider;
         this.cacheType = options.store;
@@ -1917,7 +2952,19 @@ export class BotResourcesManager {
 
     async set(subName: string, initOptions: SubredditResourceConfig): Promise<SubredditResources> {
         let hash = 'default';
-        const { caching, credentials, ...init } = initOptions;
+        const { caching, credentials, retention, ...init } = initOptions;
+
+        // const bEntity = await this.defaultDatabase.getRepository(Bot).findOne({where: {name: this.botName}}) as Bot;
+        // //const subreddit = this.defaultDatabase.getRepository(SubredditEntity).findOne({name: initOptions.subreddit.display_name});
+        // const mEntity = await this.defaultDatabase.getRepository(Manager).findOne({
+        //     where: {
+        //         name: subName,
+        //         bot: {
+        //             id: bEntity.id
+        //         }
+        //     },
+        //     relations: ['bot']
+        // });
 
         let opts: SubredditResourceOptions = {
             cache: this.defaultCache,
@@ -1927,6 +2974,9 @@ export class BotResourcesManager {
             thirdPartyCredentials: credentials ?? this.defaultThirdPartyCredentials,
             prefix: this.defaultCacheConfig.provider.prefix,
             actionedEventsMax: this.actionedEventsMaxDefault !== undefined ? Math.min(this.actionedEventsDefault, this.actionedEventsMaxDefault) : this.actionedEventsDefault,
+            database: this.defaultDatabase,
+            botName: this.botName,
+            retention: retention ?? this.retention,
             ...init,
         };
 
@@ -1954,6 +3004,9 @@ export class BotResourcesManager {
                     cacheSettingsHash: hash,
                     thirdPartyCredentials: credentials ?? this.defaultThirdPartyCredentials,
                     prefix: subPrefix,
+                    botName: this.botName,
+                    database: this.defaultDatabase,
+                    retention: retention ?? this.retention,
                     ...init,
                     ...trueRest,
                 };
@@ -1967,20 +3020,21 @@ export class BotResourcesManager {
         let resource: SubredditResources;
         const res = this.get(subName);
         if(res === undefined || res.cacheSettingsHash !== hash) {
-            resource = new SubredditResources(subName, {...opts, delayedItems: res?.delayedItems});
-            await resource.initHistoricalStats();
+            resource = new SubredditResources(subName, {...opts, delayedItems: res?.delayedItems, botAccount: this.botAccount});
+            await resource.initStats();
             resource.setHistoricalSaveInterval();
             this.resources.set(subName, resource);
         } else {
             // just set non-cache related settings
             resource = res;
+            resource.botAccount = this.botAccount;
             if(opts.footer !== resource.footer) {
                 resource.footer = opts.footer || DEFAULT_FOOTER;
             }
             // reset cache stats when configuration is reloaded
             resource.stats.cache = cacheStats();
         }
-        resource.stats.historical.lastReload = createHistoricalDefaults();
+        await resource.initDatabaseDelayedActivities();
 
         return resource;
     }
@@ -2093,56 +3147,63 @@ export const checkAuthorFilter = async (item: (Submission | Comment), filter: Au
     return [true, undefined, {criteriaResults: allCritResults, join: 'OR', passed: true}];
 }
 
-export const checkItemFilter = async (item: (Submission | Comment), filter: TypedActivityStates, resources: SubredditResources, parentLogger: Logger, source?: ActivitySource): Promise<[boolean, ('inclusive' | 'exclusive' | undefined), FilterResult<TypedActivityState>]> => {
-    const logger = parentLogger.child({labels: ['Item Filter']}, mergeArr);
+export const checkItemFilter = async (item: (Submission | Comment), filter: ItemOptions, resources: SubredditResources, options?: {logger?: Logger, source?: ActivitySource, includeIdentifier?: boolean}): Promise<[boolean, ('inclusive' | 'exclusive' | undefined), FilterResult<TypedActivityState>]> => {
+
+    const {
+        logger: parentLogger = NoopLogger,
+        source,
+        includeIdentifier = false,
+    } = options || {};
+
+    const labels = ['Item Filter'];
+    if(includeIdentifier) {
+        labels.push(`${asSubmission(item) ? 'SUB' : 'COM'} ${item.id}`);
+    }
+    const logger = parentLogger.child({labels}, mergeArr);
+    const {
+        include = [],
+        excludeCondition = 'AND',
+        exclude = [],
+    } = filter;
+    let itemPass = null;
 
     const allCritResults: FilterCriteriaResult<TypedActivityState>[] = [];
 
-    if(filter.length > 0) {
+    if(include.length > 0) {
         let index = 1
-        for(const state of filter) {
+        for(const namedState of include) {
+            const { criteria: state, name } = namedState;
             let critResult: FilterCriteriaResult<TypedActivityState>;
 
             // need to determine if criteria is for comment or submission state
             // and if its comment state WITH submission state then break apart testing into individual activity testing
-            if(isCommentState(state) && isComment(item) && state.submissionState !== undefined) {
+            if(isCommentState(state) && asComment(item) && state.submissionState !== undefined) {
                 const {submissionState, ...restCommentState} = state;
-                // test submission state first since it's more likely(??) we have crit results or cache data for this submission than for the comment
 
-                // get submission
-                // @ts-ignore
-                const subProxy = await resources.client.getSubmission(await item.link_id);
-                // @ts-ignore
-                const sub = await resources.getActivity(subProxy);
-                const [subPass, _, subFilterResults] = await checkItemFilter(sub, submissionState, resources, parentLogger);
-                const subPropertyResult: FilterCriteriaPropertyResult<CommentState> = {
-                    property: 'submissionState',
-                    behavior: 'include',
-                    passed: subPass,
-                    found: {
-                        join: 'OR',
-                        criteriaResults: subFilterResults.criteriaResults,
-                        passed: subPass,
-                    }
-                };
+                const [subPass, subPropertyResult] = await checkCommentSubmissionStates(item, submissionState, resources, parentLogger, source);
 
                 if(!subPass) {
                     // generate dummy results for the rest of the comment state since we don't need to test it
-                    const [propResultsMap, definedStateCriteria] = generateItemFilterHelpers(restCommentState);
+                    const [propResultsMap, definedStateCriteria] = generateItemFilterHelpers(restCommentState, true);
                     propResultsMap.submissionState = subPropertyResult;
                     critResult = {
                         behavior: 'include',
-                        criteria: state,
+                        criteria: cloneDeep(namedState),
                         propertyResults: Object.values(propResultsMap),
                         passed: false
                     }
                 } else {
-                    critResult = await resources.testItemCriteria(item, restCommentState, parentLogger, source);
-                    critResult.criteria = state;
+                    critResult = await resources.testItemCriteria(item, {criteria: restCommentState}, parentLogger, true, source);
+                    critResult.criteria = cloneDeep(namedState);
                     critResult.propertyResults.unshift(subPropertyResult);
                 }
             } else {
-                critResult = await resources.testItemCriteria(item, state, parentLogger, source);
+                critResult = await resources.testItemCriteria(item, namedState, parentLogger, true, source);
+            }
+
+            if(critResult.propertyResults.some(x => x.property === 'source')
+            && critResult.criteria.criteria.source === undefined) {
+                critResult.criteria.criteria.source = source;
             }
 
             //critResult = await resources.testItemCriteria(item, state, parentLogger);
@@ -2162,5 +3223,115 @@ export const checkItemFilter = async (item: (Submission | Comment), filter: Type
         return [false, 'inclusive', {criteriaResults: allCritResults, join: 'OR', passed: false}];
     }
 
+    if (exclude.length > 0) {
+        let index = 1;
+        const summaries: string[] = [];
+        for (const namedState of exclude) {
+
+            const { criteria: state, name } = namedState;
+
+            let critResult: FilterCriteriaResult<TypedActivityState>;
+
+            if(isCommentState(state) && asComment(item) && state.submissionState !== undefined) {
+                const {submissionState, ...restCommentState} = state;
+
+                const [subPass, subPropertyResult] = await checkCommentSubmissionStates(item, submissionState, resources, parentLogger, source);
+
+                if(!subPass) {
+                    // generate dummy results for the rest of the comment state since we don't need to test it
+                    const [propResultsMap, definedStateCriteria] = generateItemFilterHelpers(restCommentState, false);
+                    propResultsMap.submissionState = subPropertyResult;
+                    critResult = {
+                        behavior: 'include',
+                        criteria: {...namedState},
+                        propertyResults: Object.values(propResultsMap),
+                        passed: false
+                    }
+                } else {
+                    critResult = await resources.testItemCriteria(item, {criteria: restCommentState}, parentLogger, false, source);
+                    critResult.criteria = {...namedState};
+                    critResult.propertyResults.unshift(subPropertyResult);
+                }
+            } else {
+                critResult = await resources.testItemCriteria(item, namedState, parentLogger, false, source);
+            }
+
+            if(critResult.propertyResults.some(x => x.property === 'source')) {
+                critResult.criteria.criteria.source = source;
+            }
+
+            //critResult = await resources.testItemCriteria(item, state, parentLogger, false);
+            allCritResults.push(critResult);
+
+
+            const [summary, details] = filterCriteriaSummary(critResult);
+            if (critResult.passed) {
+                if (excludeCondition === 'OR') {
+                    logger.verbose(`${PASS} (OR) => Exclusive Item Criteria ${index} => ${summary}`);
+                    logger.debug(`Criteria Details: \n${details.join('\n')}`);
+                    itemPass = true;
+                    break;
+                }
+                summaries.push(summary);
+                logger.debug(`${PASS} (AND) => Exclusive Item Criteria ${index} => ${summary}`);
+                logger.debug(`Criteria Details: \n${details.join('\n')}`);
+            } else if (!critResult.passed) {
+                if (excludeCondition === 'AND') {
+                    logger.verbose(`${FAIL} (AND) => Exclusive Item Criteria ${index} => ${summary}`);
+                    logger.debug(`Criteria Details: \n${details.join('\n')}`);
+                    itemPass = false;
+                    break;
+                }
+                summaries.push(summary);
+                logger.debug(`${FAIL} (OR) => Exclusive Item Criteria ${index} => ${summary}`);
+                logger.debug(`Criteria Details: \n${details.join('\n')}`);
+            }
+            index++;
+        }
+        if (excludeCondition === 'AND' && itemPass === null) {
+            itemPass = true;
+        }
+        if (itemPass !== true) {
+            if (excludeCondition === 'OR') {
+                logger.verbose(`${FAIL} => Exclusive Item criteria not matched => ${summaries.length === 1 ? `${summaries[0]}` : '(many, see debug)'}`);
+            }
+            return [false, 'exclusive', {criteriaResults: allCritResults, join: excludeCondition, passed: false}]
+        } else if (excludeCondition === 'AND') {
+            logger.verbose(`${PASS} => Exclusive Item criteria matched => ${summaries.length === 1 ? `${summaries[0]}` : '(many, see debug)'}`);
+        }
+        return [true, 'exclusive', {criteriaResults: allCritResults, join: excludeCondition, passed: true}];
+    }
+
     return [true, undefined, {criteriaResults: allCritResults, join: 'OR', passed: true}];
+}
+
+export const checkCommentSubmissionStates = async (item: Comment, submissionStates: SubmissionState[], resources: SubredditResources, logger: Logger, source?: ActivitySource, excludeCondition?: JoinOperands): Promise<[boolean, FilterCriteriaPropertyResult<CommentState>]> => {
+    // test submission state first since it's more likely(??) we have crit results or cache data for this submission than for the comment
+
+    // get submission
+    // @ts-ignore
+    const subProxy = await resources.client.getSubmission(await item.link_id);
+    // @ts-ignore
+    const sub = await resources.getActivity(subProxy);
+
+    const subStatesFilter: ItemOptions = {
+        include: excludeCondition === undefined ? submissionStates.map(x => ({criteria: x})) : undefined,
+        excludeCondition,
+        exclude: excludeCondition === undefined ? undefined : submissionStates.map(x => ({criteria: x}))
+    }
+
+    const [subPass, _, subFilterResults] = await checkItemFilter(sub, subStatesFilter, resources, {logger});
+    const subPropertyResult: FilterCriteriaPropertyResult<CommentState> = {
+        property: 'submissionState',
+        behavior: excludeCondition !== undefined ? 'exclude' : 'include',
+        passed: subPass,
+        found: {
+            // TODO change this to exclude condition as well?
+            join: 'OR',
+            criteriaResults: subFilterResults.criteriaResults,
+            passed: subPass,
+        }
+    };
+
+    return [subPass, subPropertyResult];
 }

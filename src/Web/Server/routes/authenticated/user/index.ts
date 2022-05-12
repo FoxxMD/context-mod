@@ -2,10 +2,24 @@ import {Request, Response} from 'express';
 import {authUserCheck, botRoute, subredditRoute} from "../../../middleware";
 import Submission from "snoowrap/dist/objects/Submission";
 import winston from 'winston';
-import {COMMENT_URL_ID, parseLinkIdentifier, SUBMISSION_URL_ID} from "../../../../../util";
+import {COMMENT_URL_ID, parseLinkIdentifier, parseRedditThingsFromLink, SUBMISSION_URL_ID} from "../../../../../util";
 import {booleanMiddle} from "../../../../Common/middleware";
 import {Manager} from "../../../../../Subreddit/Manager";
 import {ActionedEvent} from "../../../../../Common/interfaces";
+import {CMEvent, CMEvent as ActionedEventEntity} from "../../../../../Common/Entities/CMEvent";
+import {nanoid} from "nanoid";
+import dayjs from "dayjs";
+import {
+    emptyEventResults,
+    EventConditions,
+    getDistinctEventIdsWhereQuery,
+    getFullEventsById,
+    paginateRequest
+} from "../../../../Common/util";
+import {filterResultsBuilder} from "../../../../../Utils/typeormUtils";
+import {Brackets} from "typeorm";
+import {Activity} from "../../../../../Common/Entities/Activity";
+import {RedditThing} from "../../../../../Common/Infrastructure/Reddit";
 
 const commentReg = parseLinkIdentifier([COMMENT_URL_ID]);
 const submissionReg = parseLinkIdentifier([SUBMISSION_URL_ID]);
@@ -60,6 +74,12 @@ export const deleteInviteRoute = [authUserCheck(), botRoute(), deleteInvite];
 
 const actionedEvents = async (req: Request, res: Response) => {
 
+    const {
+        permalink,
+        related,
+        author
+    } = req.query as any;
+
     let managers: Manager[] = [];
     const manager = req.manager as Manager | undefined;
     if(manager !== undefined) {
@@ -72,23 +92,45 @@ const actionedEvents = async (req: Request, res: Response) => {
         }
     }
 
-    let events: ActionedEvent[] = [];
-    for(const m of managers) {
-        if(m.resources !== undefined) {
-            events = events.concat(await m.resources.getActionedEvents());
+    const opts: EventConditions = {
+        managerIds: managers.map(x => x.managerEntity.id),
+        related,
+        author
+    };
+    if(permalink !== undefined) {
+        const things = parseRedditThingsFromLink(permalink);
+        const actRepo = req.serverBot.database.getRepository(Activity);
+
+        if(things.comment === undefined && things.submission === undefined) {
+            throw new Error('Could not parse comment or submission id from link');
         }
+
+        const idToUse = things.comment !== undefined ? things.comment.val : things.submission?.val;
+
+        const activity = await actRepo.findOne({where: {'_id': idToUse}, relations: {submission: true, author: true}});
+
+        if(activity === null) {
+            return res.json(emptyEventResults());
+        }
+
+        opts.activity = activity;
     }
 
-    events.sort((a, b) => b.timestamp - a.timestamp);
+    const paginatedIdResults = await paginateRequest(getDistinctEventIdsWhereQuery(req.serverBot.database, opts), req);
 
-    return res.json(events);
+    const hydratedResults = await getFullEventsById(req.serverBot.database, paginatedIdResults.data.map((x: CMEvent) => x.id)).getMany();
+
+
+    // TODO will need to refactor this if we switch to allowing subreddits to use their own datasources
+    //const results = await paginateRequest(query, req);
+    return res.json({...paginatedIdResults, data: hydratedResults});
 };
 export const actionedEventsRoute = [authUserCheck(), botRoute(), subredditRoute(false), actionedEvents];
 
 const action = async (req: Request, res: Response) => {
     const bot = req.serverBot;
 
-    const {url, dryRun = false, subreddit} = req.query as any;
+    const {url, dryRun = false, subreddit, delayOption = 'asis'} = req.query as any;
     const {name: userName} = req.user as Express.User;
 
     let a;
@@ -127,7 +169,20 @@ const action = async (req: Request, res: Response) => {
         // will run dryrun if specified or if running activity on subreddit it does not belong to
         const dr: boolean | undefined = (dryRun || manager.subreddit.display_name !== sub) ? true : undefined;
         manager.logger.info(`/u/${userName} Queued ${dr === true ? 'DRY RUN ' : ''}check on ${manager.subreddit.display_name !== sub ? 'FOREIGN ACTIVITY ' : ''}${url}`, {user: userName, subreddit});
-        await manager.firehose.push({activity, options: {dryRun: dr, force: true, source: 'user'}})
+        await manager.firehose.push({
+            activity, options: {
+                dryRun: dr,
+                disableDispatchDelays: delayOption !== 'asis',
+                force: true,
+                source: `user:${userName}`,
+                activitySource: {
+                    id: nanoid(16),
+                    type: 'user',
+                    identifier: userName,
+                    queuedAt: dayjs(),
+                }
+            }
+        })
     }
     res.send('OK');
 };

@@ -1,6 +1,24 @@
 {
     "$schema": "http://json-schema.org/draft-07/schema#",
     "definitions": {
+        "ActionTypes": {
+            "enum": [
+                "approve",
+                "ban",
+                "cancelDispatch",
+                "comment",
+                "contributor",
+                "dispatch",
+                "flair",
+                "lock",
+                "message",
+                "remove",
+                "report",
+                "userflair",
+                "usernote"
+            ],
+            "type": "string"
+        },
         "AuthorCriteria": {
             "additionalProperties": false,
             "description": "Criteria with which to test against the author of an Activity. The outcome of the test is based on:\n\n1. All present properties passing and\n2. If a property is a list then any value from the list matching",
@@ -106,6 +124,10 @@
                         "Approved"
                     ]
                 },
+                "isContributor": {
+                    "description": "Is the author an approved user (contributor)?",
+                    "type": "boolean"
+                },
                 "isMod": {
                     "description": "Is the author a moderator?",
                     "type": "boolean"
@@ -149,50 +171,6 @@
             },
             "type": "object"
         },
-        "AuthorOptions": {
-            "description": "If present then these Author criteria are checked before running the rule. If criteria fails then the rule is skipped.",
-            "examples": [
-                {
-                    "include": [
-                        {
-                            "flairText": [
-                                "Contributor",
-                                "Veteran"
-                            ]
-                        },
-                        {
-                            "isMod": true
-                        }
-                    ]
-                }
-            ],
-            "properties": {
-                "exclude": {
-                    "description": "Only runs if `include` is not present. Each AuthorCriteria is comprised of conditions that the Author being checked must \"not\" pass. See excludeCondition for set behavior\n\nEX: `isMod: true, name: Automoderator` => Will pass if the Author IS NOT a mod and IS NOT named Automoderator",
-                    "items": {
-                        "$ref": "#/definitions/AuthorCriteria"
-                    },
-                    "type": "array"
-                },
-                "excludeCondition": {
-                    "default": "OR",
-                    "description": "* OR => if ANY exclude condition \"does not\" pass then the exclude test passes\n* AND => if ALL exclude conditions \"do not\" pass then the exclude test passes\n\nDefaults to OR",
-                    "enum": [
-                        "AND",
-                        "OR"
-                    ],
-                    "type": "string"
-                },
-                "include": {
-                    "description": "Will \"pass\" if any set of AuthorCriteria passes",
-                    "items": {
-                        "$ref": "#/definitions/AuthorCriteria"
-                    },
-                    "type": "array"
-                }
-            },
-            "type": "object"
-        },
         "CommentState": {
             "description": "Different attributes a `Comment` can be in. Only include a property if you want to check it.",
             "examples": [
@@ -208,7 +186,24 @@
                     "type": "string"
                 },
                 "approved": {
-                    "type": "boolean"
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "$ref": "#/definitions/ModeratorNameCriteria"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
+                        }
+                    ],
+                    "description": "* true/false => test whether Activity is approved or not\n* string or list of strings => test which moderator approved this Activity"
                 },
                 "deleted": {
                     "type": "boolean"
@@ -249,7 +244,24 @@
                     "type": "boolean"
                 },
                 "removed": {
-                    "type": "boolean"
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "$ref": "#/definitions/ModeratorNameCriteria"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
+                        }
+                    ],
+                    "description": "* true/false => test whether Activity is removed or not\n* string or list of strings => test which moderator removed this Activity"
                 },
                 "reports": {
                     "description": "A string containing a comparison operator and a value to compare against\n\nThe syntax is `(< OR > OR <= OR >=) <number>`\n\n* EX `> 2`  => greater than 2 total reports\n\nDefaults to TOTAL reports on an Activity. Suffix the value with the report type to check that type:\n\n* EX `> 3 mod` => greater than 3 mod reports\n* EX `>= 1 user` => greater than 1 user report",
@@ -291,6 +303,171 @@
             },
             "type": "object"
         },
+        "FilterOptionsJson<AuthorCriteria>": {
+            "properties": {
+                "exclude": {
+                    "description": "Only runs if `include` is not present. Each Criteria is comprised of conditions that the filter (Author/Item) being checked must \"not\" pass. See excludeCondition for set behavior\n\nEX: `isMod: true, name: Automoderator` => Will pass if the Author IS NOT a mod and IS NOT named Automoderator",
+                    "items": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/definitions/AuthorCriteria"
+                            },
+                            {
+                                "$ref": "#/definitions/NamedCriteria<AuthorCriteria>"
+                            },
+                            {
+                                "type": "string"
+                            }
+                        ]
+                    },
+                    "type": "array"
+                },
+                "excludeCondition": {
+                    "default": "OR",
+                    "description": "* OR => if ANY exclude condition \"does not\" pass then the exclude test passes\n* AND => if ALL exclude conditions \"do not\" pass then the exclude test passes\n\nDefaults to OR",
+                    "enum": [
+                        "AND",
+                        "OR"
+                    ],
+                    "type": "string"
+                },
+                "include": {
+                    "description": "Will \"pass\" if any set of Criteria passes",
+                    "items": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/definitions/AuthorCriteria"
+                            },
+                            {
+                                "$ref": "#/definitions/NamedCriteria<AuthorCriteria>"
+                            },
+                            {
+                                "type": "string"
+                            }
+                        ]
+                    },
+                    "type": "array"
+                }
+            },
+            "type": "object"
+        },
+        "FilterOptionsJson<TypedActivityState>": {
+            "properties": {
+                "exclude": {
+                    "description": "Only runs if `include` is not present. Each Criteria is comprised of conditions that the filter (Author/Item) being checked must \"not\" pass. See excludeCondition for set behavior\n\nEX: `isMod: true, name: Automoderator` => Will pass if the Author IS NOT a mod and IS NOT named Automoderator",
+                    "items": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/definitions/SubmissionState"
+                            },
+                            {
+                                "$ref": "#/definitions/CommentState"
+                            },
+                            {
+                                "$ref": "#/definitions/NamedCriteria<TypedActivityState>"
+                            },
+                            {
+                                "type": "string"
+                            }
+                        ]
+                    },
+                    "type": "array"
+                },
+                "excludeCondition": {
+                    "default": "OR",
+                    "description": "* OR => if ANY exclude condition \"does not\" pass then the exclude test passes\n* AND => if ALL exclude conditions \"do not\" pass then the exclude test passes\n\nDefaults to OR",
+                    "enum": [
+                        "AND",
+                        "OR"
+                    ],
+                    "type": "string"
+                },
+                "include": {
+                    "description": "Will \"pass\" if any set of Criteria passes",
+                    "items": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/definitions/SubmissionState"
+                            },
+                            {
+                                "$ref": "#/definitions/CommentState"
+                            },
+                            {
+                                "$ref": "#/definitions/NamedCriteria<TypedActivityState>"
+                            },
+                            {
+                                "type": "string"
+                            }
+                        ]
+                    },
+                    "type": "array"
+                }
+            },
+            "type": "object"
+        },
+        "ModeratorNameCriteria": {
+            "properties": {
+                "behavior": {
+                    "enum": [
+                        "exclude",
+                        "include"
+                    ],
+                    "type": "string"
+                },
+                "name": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "string"
+                        }
+                    ]
+                }
+            },
+            "required": [
+                "name"
+            ],
+            "type": "object"
+        },
+        "NamedCriteria<AuthorCriteria>": {
+            "properties": {
+                "criteria": {
+                    "$ref": "#/definitions/AuthorCriteria"
+                },
+                "name": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "criteria"
+            ],
+            "type": "object"
+        },
+        "NamedCriteria<TypedActivityState>": {
+            "properties": {
+                "criteria": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/definitions/SubmissionState"
+                        },
+                        {
+                            "$ref": "#/definitions/CommentState"
+                        }
+                    ]
+                },
+                "name": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "criteria"
+            ],
+            "type": "object"
+        },
         "SubmissionState": {
             "description": "Different attributes a `Submission` can be in. Only include a property if you want to check it.",
             "examples": [
@@ -306,7 +483,24 @@
                     "type": "string"
                 },
                 "approved": {
-                    "type": "boolean"
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "$ref": "#/definitions/ModeratorNameCriteria"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
+                        }
+                    ],
+                    "description": "* true/false => test whether Activity is approved or not\n* string or list of strings => test which moderator approved this Activity"
                 },
                 "deleted": {
                     "type": "boolean"
@@ -403,7 +597,24 @@
                     "type": "boolean"
                 },
                 "removed": {
-                    "type": "boolean"
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "$ref": "#/definitions/ModeratorNameCriteria"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
+                        }
+                    ],
+                    "description": "* true/false => test whether Activity is removed or not\n* string or list of strings => test which moderator removed this Activity"
                 },
                 "reports": {
                     "description": "A string containing a comparison operator and a value to compare against\n\nThe syntax is `(< OR > OR <= OR >=) <number>`\n\n* EX `> 2`  => greater than 2 total reports\n\nDefaults to TOTAL reports on an Activity. Suffix the value with the report type to check that type:\n\n* EX `> 3 mod` => greater than 3 mod reports\n* EX `>= 1 user` => greater than 1 user report",
@@ -485,23 +696,28 @@
     },
     "properties": {
         "authorIs": {
-            "$ref": "#/definitions/AuthorOptions",
-            "description": "If present then these Author criteria are checked before running the Action. If criteria fails then the Action is not run.",
-            "examples": [
+            "anyOf": [
                 {
-                    "include": [
-                        {
-                            "flairText": [
-                                "Contributor",
-                                "Veteran"
-                            ]
-                        },
-                        {
-                            "isMod": true
-                        }
-                    ]
+                    "items": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/definitions/AuthorCriteria"
+                            },
+                            {
+                                "$ref": "#/definitions/NamedCriteria<AuthorCriteria>"
+                            },
+                            {
+                                "type": "string"
+                            }
+                        ]
+                    },
+                    "type": "array"
+                },
+                {
+                    "$ref": "#/definitions/FilterOptionsJson<AuthorCriteria>"
                 }
-            ]
+            ],
+            "description": "If present then these Author criteria are checked before running the Check. If criteria fails then the Check will fail."
         },
         "dryRun": {
             "default": false,
@@ -521,36 +737,35 @@
             "type": "boolean"
         },
         "itemIs": {
-            "description": "A list of criteria to test the state of the `Activity` against before running the Action.\n\nIf any set of criteria passes the Action will be run.",
-            "items": {
-                "anyOf": [
-                    {
-                        "$ref": "#/definitions/SubmissionState"
+            "anyOf": [
+                {
+                    "items": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/definitions/SubmissionState"
+                            },
+                            {
+                                "$ref": "#/definitions/CommentState"
+                            },
+                            {
+                                "$ref": "#/definitions/NamedCriteria<TypedActivityState>"
+                            },
+                            {
+                                "type": "string"
+                            }
+                        ]
                     },
-                    {
-                        "$ref": "#/definitions/CommentState"
-                    }
-                ]
-            },
-            "type": "array"
+                    "type": "array"
+                },
+                {
+                    "$ref": "#/definitions/FilterOptionsJson<TypedActivityState>"
+                }
+            ],
+            "description": "A list of criteria to test the state of the `Activity` against before running the check.\n\nIf any set of criteria passes the Check will be run. If the criteria fails then the Check will fail.\n\n* @examples [[{\"over_18\": true, \"removed': false}]]"
         },
         "kind": {
-            "description": "The type of action that will be performed",
-            "enum": [
-                "approve",
-                "ban",
-                "cancelDispatch",
-                "comment",
-                "dispatch",
-                "flair",
-                "lock",
-                "message",
-                "remove",
-                "report",
-                "userflair",
-                "usernote"
-            ],
-            "type": "string"
+            "$ref": "#/definitions/ActionTypes",
+            "description": "The type of action that will be performed"
         },
         "name": {
             "description": "An optional, but highly recommended, friendly name for this Action. If not present will default to `kind`.\n\nCan only contain letters, numbers, underscore, spaces, and dashes",

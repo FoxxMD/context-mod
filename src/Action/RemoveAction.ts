@@ -1,17 +1,19 @@
 import {ActionJson, ActionConfig, ActionOptions} from "./index";
 import Action from "./index";
 import Snoowrap, {Comment, Submission} from "snoowrap";
-import {RuleResult} from "../Rule";
 import {activityIsRemoved} from "../Utils/SnoowrapUtils";
-import {ActionProcessResult} from "../Common/interfaces";
+import {ActionProcessResult, RuleResult} from "../Common/interfaces";
 import dayjs from "dayjs";
 import {isSubmission} from "../util";
+import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
+import {runCheckOptions} from "../Subreddit/Manager";
+import {ActionTypes} from "../Common/Infrastructure/Atomic";
 
 export class RemoveAction extends Action {
     spam: boolean;
 
-    getKind() {
-        return 'Remove';
+    getKind(): ActionTypes {
+        return 'remove';
     }
 
     constructor(options: RemoveOptions) {
@@ -22,8 +24,8 @@ export class RemoveAction extends Action {
         this.spam = spam;
     }
 
-    async process(item: Comment | Submission, ruleResults: RuleResult[], runtimeDryrun?: boolean): Promise<ActionProcessResult> {
-        const dryRun = runtimeDryrun || this.dryRun;
+    async process(item: Comment | Submission, ruleResults: RuleResultEntity[], options: runCheckOptions): Promise<ActionProcessResult> {
+        const dryRun = this.getRuntimeAwareDryrun(options);
         const touchedEntities = [];
         // issue with snoowrap typings, doesn't think prop exists on Submission
         // @ts-ignore
@@ -52,9 +54,15 @@ export class RemoveAction extends Action {
             touchedEntities
         }
     }
+
+    protected getSpecificPremise(): object {
+        return {
+            spam: this.spam
+        }
+    }
 }
 
-export interface RemoveOptions extends RemoveActionConfig, ActionOptions {
+export interface RemoveOptions extends Omit<RemoveActionConfig, 'authorIs' | 'itemIs'>, ActionOptions {
 }
 
 export interface RemoveActionConfig extends ActionConfig {

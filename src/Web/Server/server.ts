@@ -1,32 +1,41 @@
-import {addAsync, Router} from '@awaitjs/express';
-import express, {Request, Response, NextFunction, RequestHandler} from 'express';
+import {addAsync} from '@awaitjs/express';
+import express, {Request, Response} from 'express';
 import bodyParser from 'body-parser';
 import {App} from "../../App";
-import {Transform} from "stream";
-import winston from 'winston';
 import {Server as SocketServer} from 'socket.io';
-import {Strategy as JwtStrategy, ExtractJwt} from 'passport-jwt';
+import {ExtractJwt, Strategy as JwtStrategy} from 'passport-jwt';
 import passport from 'passport';
 import tcpUsed from 'tcp-port-used';
-
 import {getLogger} from "../../Utils/loggerFactory";
 import LoggedError from "../../Utils/LoggedError";
-import {Invokee, LogInfo, OperatorConfigWithFileContext, RUNNING, STOPPED} from "../../Common/interfaces";
+import {LogInfo, OperatorConfigWithFileContext, RUNNING, STOPPED} from "../../Common/interfaces";
 import http from "http";
 import {heartbeat} from "./routes/authenticated/applicationRoutes";
 import logs from "./routes/authenticated/user/logs";
 import status from './routes/authenticated/user/status';
 import liveStats from './routes/authenticated/user/liveStats';
-import {actionedEventsRoute, actionRoute, configRoute, configLocationRoute, deleteInviteRoute, addInviteRoute, getInvitesRoute, cancelDelayedRoute} from "./routes/authenticated/user";
+import {
+    actionedEventsRoute,
+    actionRoute,
+    addInviteRoute,
+    cancelDelayedRoute,
+    configLocationRoute,
+    configRoute,
+    deleteInviteRoute,
+    getInvitesRoute
+} from "./routes/authenticated/user";
 import action from "./routes/authenticated/user/action";
 import {authUserCheck, botRoute} from "./middleware";
-import {opStats} from "../Common/util";
 import Bot from "../../Bot";
 import addBot from "./routes/authenticated/user/addBot";
 import ServerUser from "../Common/User/ServerUser";
 import {SimpleError} from "../../Utils/Errors";
 import {ErrorWithCause} from "pony-cause";
 import {Manager} from "../../Subreddit/Manager";
+import {MESSAGE} from "triple-beam";
+import dayjs from "dayjs";
+import { sleep } from '../../util';
+import {Invokee} from "../../Common/Infrastructure/Atomic";
 
 const server = addAsync(express());
 server.use(bodyParser.json());
@@ -155,9 +164,9 @@ const rcbServer = async function (options: OperatorConfigWithFileContext) {
                     error: b.error,
                     subreddits: req.user?.accessibleSubreddits(b).map((manager: Manager) => {
                         let indicator;
-                        if (manager.botState.state === RUNNING && manager.queueState.state === RUNNING && manager.eventsState.state === RUNNING) {
+                        if (manager.managerState.state === RUNNING && manager.queueState.state === RUNNING && manager.eventsState.state === RUNNING) {
                             indicator = 'green';
-                        } else if (manager.botState.state === STOPPED && manager.queueState.state === STOPPED && manager.eventsState.state === STOPPED) {
+                        } else if (manager.managerState.state === STOPPED && manager.queueState.state === STOPPED && manager.eventsState.state === STOPPED) {
                             indicator = 'red';
                         } else {
                             indicator = 'yellow';
@@ -201,31 +210,81 @@ const rcbServer = async function (options: OperatorConfigWithFileContext) {
 
     server.deleteAsync('/delayed', ...cancelDelayedRoute);
 
+    app = new App(options);
+
     const initBot = async (causedBy: Invokee = 'system') => {
-        if (app !== undefined) {
-            logger.info('A bot instance already exists. Attempting to stop event/queue processing first before building new bot.');
-            await app.destroy(causedBy);
-        }
-        const newApp = new App(options);
-        newApp.initBots(causedBy).catch((err: any) => {
-            if (newApp.error === undefined) {
-                newApp.error = err.message;
+        app.initBots(causedBy).catch((err: any) => {
+            if (app.error === undefined) {
+                app.error = err.message;
             }
             logger.error('Server is still ONLINE but bot cannot recover from this error and must be re-built');
             if (!err.logged || !(err instanceof LoggedError)) {
                 logger.error(err);
             }
         });
-        return newApp;
     }
 
     server.postAsync('/init', authUserCheck(), async (req, res) => {
         logger.info(`${(req.user as Express.User).name} requested the app to be re-built. Starting rebuild now...`, {subreddit: (req.user as Express.User).name});
-        app = await initBot('user');
+        await initBot('user');
+        res.send('OK');
     });
 
-    logger.info('Beginning bot init on startup...');
-    app = await initBot();
+    server.postAsync('/database/migrate', authUserCheck(), async (req, res) => {
+        // because log timestamps are only granular to seconds we need to make sure "now" is actually "before" the log statements we are about to make
+        const now = dayjs().subtract(1, 'second');
+        logger.info(`${(req.user as Express.User).name} invoked migrations. Starting migrations now...`, {subreddit: (req.user as Express.User).name});
+        try {
+            await app.doMigration();
+        } finally {
+            // get all by leaf
+            const dbLogs = sysLogs.filter(x => x.labels?.includes('Database') && dayjs(x.timestamp).isSameOrAfter(now));
+
+            dbLogs.reverse();
+            res.status(app.ranMigrations ? 200 : 500).send(dbLogs.map(x => x[MESSAGE]).join('\r\n'));
+        }
+    });
+
+    server.getAsync('/database/logs', authUserCheck(), async (req, res) => {
+        const dbLogs = sysLogs.filter(x => {
+            return x.labels?.includes('Database');
+        });
+
+        dbLogs.reverse();
+        res.send(dbLogs.map(x => x[MESSAGE]).join('\r\n'));
+    });
+
+    server.postAsync('/database/backup', authUserCheck(), async (req, res) => {
+        logger.info(`${(req.user as Express.User).name} invoked database backup. Trying to backup now...`, {subreddit: (req.user as Express.User).name});
+        // because log timestamps are only granular to seconds we need to make sure "now" is actually "before" the log statements we are about to make
+        const now = dayjs().subtract(1, 'second');
+        let status = 200;
+        try {
+            await app.backupDatabase();
+        } catch (e) {
+            status = 500;
+        }
+
+        const dbLogs = sysLogs.filter(x => {
+            const logTime = dayjs(x.timestamp);
+            // @ts-ignore
+            return x.leaf === 'Backup' && logTime.isSameOrAfter(now)
+        });
+
+        dbLogs.reverse();
+        res.status(status).send(dbLogs.map(x => x[MESSAGE]).join('\r\n'));
+    });
+
+    logger.info('Initializing database...');
+    try {
+        const dbReady = await app.initDatabase();
+        if(dbReady) {
+            logger.info('Initializing application...');
+            await initBot();
+        }
+    } catch (e: any) {
+        logger.error(new ErrorWithCause('Error occurred during database connection or migration. Cannot continue with starting bots.', {cause: e}));
+    }
 };
 
 export default rcbServer;

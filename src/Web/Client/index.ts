@@ -13,7 +13,7 @@ import {
     CheckSummary,
     RunResult,
     ActionedEvent,
-    ActionResult
+    ActionResult, RuleResult, EventActivity
 } from "../../Common/interfaces";
 import {
     buildCachePrefix,
@@ -22,7 +22,7 @@ import {
     intersect, isLogLineMinLevel,
     LogEntry, parseInstanceLogInfoName, parseInstanceLogName, parseRedditEntity,
     parseSubredditLogName, permissions,
-    randomId, replaceApplicationIdentifier, resultsSummary, sleep, triggeredIndicator
+    randomId, replaceApplicationIdentifier, resultsSummary, sleep, triggeredIndicator, truncateStringToLength
 } from "../../util";
 import {Cache} from "cache-manager";
 import session, {Session, SessionData} from "express-session";
@@ -54,17 +54,37 @@ import Autolinker from "autolinker";
 import path from "path";
 import {ExtendedSnoowrap} from "../../Utils/SnoowrapClients";
 import ClientUser from "../Common/User/ClientUser";
-import {BotStatusResponse} from "../Common/interfaces";
+import {BotStatusResponse, InviteData} from "../Common/interfaces";
 import {TransformableInfo} from "logform";
 import {SimpleError} from "../../Utils/Errors";
 import {ErrorWithCause} from "pony-cause";
-import {RuleResult} from "../../Rule";
 import {CMInstance} from "./CMInstance";
+import {CMEvent} from "../../Common/Entities/CMEvent";
+import { RulePremise } from "../../Common/Entities/RulePremise";
+import { ActionPremise } from "../../Common/Entities/ActionPremise";
+import {CacheStorageProvider, DatabaseStorageProvider} from "./StorageProvider";
+import {nanoid} from "nanoid";
+import {MigrationService} from "../../Common/MigrationService";
+import {WebSetting} from "../../Common/WebEntities/WebSetting";
+import {CheckResultEntity} from "../../Common/Entities/CheckResultEntity";
+import {RuleResultEntity} from "../../Common/Entities/RuleResultEntity";
+import {RuleSetResultEntity} from "../../Common/Entities/RuleSetResultEntity";
+import { PaginationAwareObject } from "../Common/util";
 
 const emitter = new EventEmitter();
 
 const app = addAsync(express());
 const jsonParser = bodyParser.json();
+
+const contentLinkingOptions = {
+    urls: false,
+    email: false,
+    phone: false,
+    mention: false,
+    hashtag: false,
+    stripPrefix: false,
+    sanitizeHtml: true,
+};
 
 // do not modify body if we are proxying it to server
 app.use((req, res, next) => {
@@ -125,7 +145,11 @@ const createToken = (bot: CMInstanceInterface, user?: Express.User | any, ) => {
     });
 }
 
+const peekTrunc = truncateStringToLength(200);
+
 const availableLevels = ['error', 'warn', 'info', 'verbose', 'debug'];
+
+let webLogs: LogInfo[] = [];
 
 const webClient = async (options: OperatorConfig) => {
     const {
@@ -134,18 +158,24 @@ const webClient = async (options: OperatorConfig) => {
             display,
         },
         userAgent: uaFragment,
+        // caching: {
+        //     provider: caching
+        // },
         web: {
-            port,
-            caching,
-            caching: {
-                prefix
+            database,
+            databaseConfig: {
+                migrations
             },
+            port,
+            storage: webStorage = 'database',
+            caching,
             invites: {
               maxAge: invitesMaxAge,
             },
             session: {
-                secret,
+                secret: sessionSecretFromConfig,
                 maxAge: sessionMaxAge,
+                storage: sessionStorage = 'database',
             },
             maxLogs,
             clients,
@@ -156,7 +186,10 @@ const webClient = async (options: OperatorConfig) => {
             },
             operators = [],
         },
+        //database
     } = options;
+
+    let sessionSecretSynced = false;
 
     const userAgent = getUserAgent(`web:contextBot:{VERSION}{FRAG}:dashboard`, uaFragment);
 
@@ -171,20 +204,62 @@ const webClient = async (options: OperatorConfig) => {
 
     logger.stream().on('log', (log: LogInfo) => {
         emitter.emit('log', log);
+        webLogs.unshift(log);
+        webLogs = webLogs.slice(0, 201);
+    });
+
+    const migrationService = new MigrationService({
+        type: 'web',
+        logger,
+        database,
+        options: migrations
     });
 
     if (await tcpUsed.check(port)) {
         throw new SimpleError(`Specified port for web interface (${port}) is in use or not available. Cannot start web server.`);
     }
 
-    if (caching.store === 'none') {
-        logger.warn(`Cannot use 'none' for web caching or else no one can use the interface...falling back to 'memory'`);
-        caching.store = 'memory';
-    }
-    //const webCachePrefix = buildCachePrefix([prefix, 'web']);
-    const webCache = createCacheManager({...caching, prefix: buildCachePrefix([prefix, 'web'])}) as Cache;
+    logger.info('Initializing database...');
+    let [ranMigrations, migrationBlocker] = await migrationService.initDatabase();
 
-    //const previousSessions = await webCache.get
+    app.use((req, res, next) => {
+
+        if(!ranMigrations && (req.url === '/' || req.url.indexOf('database') === -1)) {
+            return res.render('migrations', {
+                type: 'web',
+                ranMigrations: ranMigrations,
+                migrationBlocker: migrationBlocker,
+            });
+        } else {
+            next();
+        }
+    });
+
+    const storage = webStorage === 'database' ? new DatabaseStorageProvider({database, invitesMaxAge, logger}) : new CacheStorageProvider({...caching, invitesMaxAge, logger});
+
+    let sessionSecret: string;
+    if (sessionSecretFromConfig !== undefined) {
+        logger.debug('Using session secret defined in config');
+        sessionSecret = sessionSecretFromConfig;
+        sessionSecretSynced = true;
+    } else {
+        try {
+            let persistedSecret = await storage.getSessionSecret();
+            if (undefined === persistedSecret) {
+                storage.logger.debug('No session secret found in storage, generating new session secret and saving...');
+                sessionSecret = randomId();
+                await storage.setSessionSecret(sessionSecret);
+            } else {
+                storage.logger.debug('Using session secret found in from storage')
+                sessionSecret = persistedSecret;
+            }
+            sessionSecretSynced = true;
+        } catch (e) {
+            sessionSecret = randomId();
+            storage.logger.warn(new ErrorWithCause('Falling back to a random ID for session secret', {cause: e}));
+        }
+    }
+
     const connectedUsers: ConnectUserObj = {};
 
     //<editor-fold desc=Session and Auth>
@@ -194,19 +269,12 @@ const webClient = async (options: OperatorConfig) => {
 
     passport.serializeUser(async function (data: any, done) {
         const {user, subreddits, scope, token} = data;
-        //await webCache.set(`userSession-${user}`, { subreddits: subreddits.map((x: Subreddit) => x.display_name), isOperator: webOps.includes(user.toLowerCase()) }, {ttl: provider.ttl as number});
         done(null, { subreddits: subreddits.map((x: Subreddit) => x.display_name), isOperator: webOps.includes(user.toLowerCase()), name: user, scope, token, tokenExpiresAt: dayjs().unix() + (60 * 60) });
     });
 
     passport.deserializeUser(async function (obj: any, done) {
         const user = new ClientUser(obj.name, obj.subreddits, {token: obj.token, scope: obj.scope, webOperator: obj.isOperator, tokenExpiresAt: obj.tokenExpiresAt});
         done(null, user);
-        // const data = await webCache.get(`userSession-${obj}`) as object;
-        // if (data === undefined) {
-        //     done('Not Found');
-        // }
-        //
-        // done(null, {...data, name: obj as string} as Express.User);
     });
 
     passport.use('snoowrap', new CustomStrategy(
@@ -242,14 +310,22 @@ const webClient = async (options: OperatorConfig) => {
         }
     ));
 
+
+    let sessionStoreProvider = storage;
+    if(sessionStorage !== webStorage) {
+        sessionStoreProvider = sessionStorage === 'database' ? new DatabaseStorageProvider({database, invitesMaxAge, logger, loggerLabels: ['Session']}) : new CacheStorageProvider({...caching, invitesMaxAge, logger, loggerLabels: ['Session']});
+    }
     const sessionObj = session({
         cookie: {
             maxAge: sessionMaxAge * 1000,
         },
-        store: new CacheManagerStore(webCache, {prefix: 'sess:'}),
+        store: sessionStoreProvider.createSessionStore(sessionStorage === 'database' ? {
+            cleanupLimit: 2,
+            ttl: sessionMaxAge
+        } : {}),
         resave: false,
         saveUninitialized: false,
-        secret,
+        secret: sessionSecret,
     });
     app.use(sessionObj);
     app.use(passport.initialize());
@@ -316,7 +392,11 @@ const webClient = async (options: OperatorConfig) => {
                 return res.render('error', {error: errContent});
             }
             // @ts-ignore
-            const invite = await webCache.get(`invite:${req.session.inviteId}`) as InviteData;
+            const invite = await storage.inviteGet(req.session.inviteId);
+            if(invite === undefined) {
+                // @ts-ignore
+                return res.render('error', {error: `Could not find invite with id ${req.session.inviteId}?? This should happen!`});
+            }
             const client = await Snoowrap.fromAuthCode({
                 userAgent,
                 clientId: invite.clientId,
@@ -328,7 +408,7 @@ const webClient = async (options: OperatorConfig) => {
             const user = await client.getMe();
             const userName = `u/${user.name}`;
             // @ts-ignore
-            await webCache.del(`invite:${req.session.inviteId}`);
+            await storage.inviteDelete(req.session.inviteId);
             let data: any = {
                 accessToken: client.accessToken,
                 refreshToken: client.refreshToken,
@@ -381,11 +461,13 @@ const webClient = async (options: OperatorConfig) => {
                 const useCloseRedir: boolean = req.session.closeOnSuccess as any
                 // @ts-ignore
                 delete req.session.closeOnSuccess;
-                if(useCloseRedir === true) {
-                    return res.render('close');
-                } else {
-                    return res.redirect('/');
-                }
+                req.session.save((err) => {
+                    if(useCloseRedir === true) {
+                        return res.render('close');
+                    } else {
+                        return res.redirect('/');
+                    }
+                })
             });
         })(req, res, next);
     });
@@ -398,16 +480,6 @@ const webClient = async (options: OperatorConfig) => {
     });
 
     let token = randomId();
-    interface InviteData {
-        permissions: string[],
-        subreddits?: string,
-        instance?: string,
-        clientId: string
-        clientSecret: string
-        redirectUri: string
-        creator: string
-        overwrite?: boolean
-    }
 
     const helperAuthed = async (req: express.Request, res: express.Response, next: Function) => {
 
@@ -445,7 +517,7 @@ const webClient = async (options: OperatorConfig) => {
         if(inviteId === undefined) {
             return res.render('error', {error: '`invite` param is missing from URL'});
         }
-        const invite = await webCache.get(`invite:${inviteId}`) as InviteData | undefined | null;
+        const invite = await storage.inviteGet(inviteId as string);
         if(invite === undefined || invite === null) {
             return res.render('error', {error: 'Invite with the given id does not exist'});
         }
@@ -481,8 +553,8 @@ const webClient = async (options: OperatorConfig) => {
             return res.status(400).send('redirectUrl is required');
         }
 
-        const inviteId = code || randomId();
-        await webCache.set(`invite:${inviteId}`, {
+        const inviteId = code || nanoid(20);
+        await storage.inviteCreate(inviteId, {
             permissions,
             clientId: (ci || clientId).trim(),
             clientSecret: (ce || clientSecret).trim(),
@@ -490,7 +562,7 @@ const webClient = async (options: OperatorConfig) => {
             instance,
             subreddits: subreddits.trim() === '' ? [] : subreddits.split(',').map((x: string) => parseRedditEntity(x).name),
             creator: (req.user as Express.User).name,
-        }, {ttl: invitesMaxAge * 1000});
+        });
         return res.send(inviteId);
     });
 
@@ -499,7 +571,7 @@ const webClient = async (options: OperatorConfig) => {
         if(inviteId === undefined) {
             return res.render('error', {error: '`invite` param is missing from URL'});
         }
-        const invite = await webCache.get(`invite:${inviteId}`) as InviteData | undefined | null;
+        const invite = await storage.inviteGet(inviteId as string);
         if(invite === undefined || invite === null) {
             return res.render('error', {error: 'Invite with the given id does not exist'});
         }
@@ -736,7 +808,7 @@ const webClient = async (options: OperatorConfig) => {
     // botUserRouter.use([ensureAuthenticated, defaultSession, botWithPermissions, createUserToken]);
     // app.use(botUserRouter);
 
-    app.useAsync('/api/', [ensureAuthenticated, defaultSession, instanceWithPermissions, botWithPermissions(true), createUserToken], (req: express.Request, res: express.Response) => {
+    app.useAsync('/api/', [ensureAuthenticated, defaultSession, instanceWithPermissions, botWithPermissions(false), createUserToken], (req: express.Request, res: express.Response) => {
         req.headers.Authorization = `Bearer ${req.token}`
 
         const instance = req.instance as CMInstanceInterface;
@@ -803,7 +875,20 @@ const webClient = async (options: OperatorConfig) => {
         next();
     }
 
-    app.getAsync('/', [initHeartbeat, redirectBotsNotAuthed, ensureAuthenticated, defaultSession, defaultInstance, instanceWithPermissions, botWithPermissions(false, true), createUserToken], async (req: express.Request, res: express.Response) => {
+    const migrationRedirect = async (req: express.Request, res: express.Response, next: Function) => {
+        const instance = req.instance as CMInstance;
+        if(instance.bots.length === 0 && instance?.ranMigrations === false && instance?.migrationBlocker !== undefined) {
+            return res.render('migrations', {
+                type: 'app',
+                ranMigrations: instance.ranMigrations,
+                migrationBlocker: instance.migrationBlocker,
+                instance: instance.friendly
+            });
+        }
+        return next();
+    };
+
+    app.getAsync('/', [initHeartbeat, redirectBotsNotAuthed, ensureAuthenticated, defaultSession, defaultInstance, instanceWithPermissions, migrationRedirect, botWithPermissions(false, true), createUserToken], async (req: express.Request, res: express.Response) => {
 
         const user = req.user as Express.User;
         const instance = req.instance as CMInstance;
@@ -903,8 +988,8 @@ const webClient = async (options: OperatorConfig) => {
                 });
                 return {...x, subreddits: subredditsWithSimpleLogs};
             }),
-            botId: (req.instance as CMInstanceInterface).friendly,
-            instanceId: (req.instance as CMInstanceInterface).friendly,
+            botId: (req.instance as CMInstance).getName(),
+            instanceId: (req.instance as CMInstance).getName(),
             isOperator: isOp,
             system: isOp ? {
                 // @ts-ignore
@@ -977,20 +1062,124 @@ const webClient = async (options: OperatorConfig) => {
     });
 
     app.getAsync('/events', [ensureAuthenticatedApi, defaultSession, instanceWithPermissions, botWithPermissions(true), createUserToken], async (req: express.Request, res: express.Response) => {
-        const {subreddit} = req.query as any;
+        const {subreddit, page = 1, permalink, related, author} = req.query as any;
         const resp = await got.get(`${(req.instance as CMInstanceInterface).normalUrl}/events`, {
             headers: {
                 'Authorization': `Bearer ${req.token}`,
             },
             searchParams: {
                 subreddit,
-                bot: req.bot?.botName
+                bot: req.bot?.botName,
+                page,
+                permalink,
+                related,
+                author
             }
-        }).json() as [any];
+        }).json() as PaginationAwareObject;
 
-        const actionedEvents = resp.map((x: ActionedEvent) => {
+        const {data: eventData, ...pagination} = resp;
+
+        // for now just want to get this back in the same shape the ui expects so i don't have to refactor the entire events page
+        // @ts-ignore
+        const actionedEventsData: ActionedEvent[] = eventData.map((x: CMEvent) => {
+           const ea: EventActivity = {
+               peek: Autolinker.link(peekTrunc(x.activity.content), {
+                   email: false,
+                   phone: false,
+                   mention: false,
+                   hashtag: false,
+                   stripPrefix: false,
+                   sanitizeHtml: true,
+                   urls: false
+               }),
+               link: `https://reddit.com${x.activity.permalink}`,
+               type: x.activity.type,
+               subreddit: x.activity.subreddit.name,
+               id: x.activity.name,
+               author: x.activity.author.name
+           };
+           let submission: EventActivity | undefined;
+           if(x.activity.submission !== undefined && x.activity.submission !== null) {
+               submission = {
+                   peek: Autolinker.link(peekTrunc(x.activity.submission.content), {
+                       email: false,
+                       phone: false,
+                       mention: false,
+                       hashtag: false,
+                       stripPrefix: false,
+                       sanitizeHtml: true,
+                       urls: false
+                   }),
+                   link: `https://reddit.com${x.activity.submission.permalink}`,
+                   type: 'submission',
+                   subreddit: x.activity.subreddit.name,
+                   id: x.activity.submission.name,
+                   author: x.activity.submission.author.name
+               };
+           }
+           return {
+               activity: ea,
+               submission,
+               subreddit: x.activity.subreddit.name,
+               timestamp: dayjs(x.processedAt).local().format('YY-MM-DD HH:mm:ss z'),
+               triggered: x.triggered,
+               dispatchSource: {
+                   ...x.source,
+                   queuedAt: dayjs(x.queuedAt).local().format('YY-MM-DD HH:mm:ss z')
+               },
+               runResults: x.runResults.map(y => {
+                   return {
+                       name: y.run.name,
+                       triggered: y.triggered,
+                       reason: y.reason,
+                       error: y.error,
+                       itemIs: y._itemIs,
+                       authorIs: y._authorIs,
+                       checkResults: y.checkResults.map(z => {
+
+                           return {
+                               ...z,
+                               itemIs: z.itemIs,
+                               authorIs: z.authorIs,
+                               // @ts-ignore
+                               ruleResults: z.ruleResults?.map((a: RuleResultEntity | RuleSetResultEntity) => {
+                                   if('condition' in a) {
+                                       return {
+                                           ...a,
+                                           results: (a as RuleSetResultEntity).results.map(b => ({
+                                               ...b,
+                                               itemIs: b.itemIs,
+                                               authorIs: b.authorIs,
+                                               name: RulePremise.getFriendlyIdentifier(b.premise)
+                                           }))
+                                       }
+                                   }
+                                   const b = a as RuleResultEntity;
+                                   return {
+                                       ...b,
+                                       itemIs: b.itemIs,
+                                       authorIs: b.authorIs,
+                                       name: RulePremise.getFriendlyIdentifier(b.premise)
+                                   }
+                               }),
+                               actionResults: z.actionResults?.map(a => {
+                                   return {
+                                       ...a,
+                                       itemIs: a.itemIs,
+                                       authorIs: a.authorIs,
+                                       name: ActionPremise.getFriendlyIdentifier(a.premise)
+                                   }
+                               })
+                           }
+                       })
+                   }
+               })
+           }
+        });
+
+        const actionedEvents = actionedEventsData.map((x: ActionedEvent) => {
             const {timestamp, activity: {peek, link, ...restAct}, runResults = [], dispatchSource, ...rest} = x;
-            const time = dayjs(timestamp).local().format('YY-MM-DD HH:mm:ss z');
+            //const time = dayjs(timestamp).local().format('YY-MM-DD HH:mm:ss z');
             const formattedPeek = Autolinker.link(peek.replace(`https://reddit.com${link}`, ''), {
                 email: false,
                 phone: false,
@@ -1005,7 +1194,24 @@ const webClient = async (options: OperatorConfig) => {
                 const formattedCheckResults = checkResults.map((y: CheckSummary) => {
                     const {actionResults = [], ruleResults = [], triggered: checkTriggered, authorIs, itemIs, ...rest} = y;
 
+                    // @ts-ignore
                     const formattedRuleResults = ruleResults.map((z: RuleResult) => {
+                        if('condition' in z) {
+                            const y = z as unknown as RuleSetResultEntity;
+                            return {
+                                condition: y.condition,
+                                triggered: triggeredIndicator(y.triggered),
+                                results: y.results.map(a => {
+                                    const {triggered, result, ...restA} = a;
+                                    return {
+                                        ...restA,
+                                        triggered: triggeredIndicator(triggered ?? null, 'Skipped'),
+                                        result: result || '-',
+                                        // @ts-ignore
+                                        ...formatFilterData(a)
+                                }})
+                            }
+                        }
                         const {triggered, result, ...restY} = z;
                         return {
                             ...restY,
@@ -1029,15 +1235,31 @@ const webClient = async (options: OperatorConfig) => {
                             ...formatFilterData(z)
                         };
                     });
-
+                    let ruleSummary = '(No rules to run)';
+                    const filterData = formatFilterData(y);
+                    if(y.fromCache) {
+                        ruleSummary =  `Check result was found in cache: ${triggeredIndicator(checkTriggered, 'Skipped')}`;
+                    } else {
+                        const filterSummary = Object.entries(filterData).reduce((acc, [k,v]) => {
+                            if(v !== undefined && (v as any).passed === '✘') {
+                                return `Did not pass ${k} filter`;
+                            }
+                            return acc;
+                        }, '')
+                        if(filterSummary !== '') {
+                            ruleSummary = filterSummary;
+                        } else if(ruleResults.length > 0) {
+                            ruleSummary = resultsSummary(ruleResults, y.condition);
+                        }
+                    }
                     return {
                         ...rest,
                         triggered: triggeredIndicator(checkTriggered, 'Skipped'),
                         triggeredVal: checkTriggered,
                         ruleResults: formattedRuleResults,
                         actionResults: formattedActionResults,
-                        ruleSummary: y.fromCache ? `Check result was found in cache: ${triggeredIndicator(checkTriggered, 'Skipped')}` : resultsSummary(ruleResults, y.condition),
-                        ...formatFilterData(y)
+                        ruleSummary,
+                        ...filterData
                     }
                 });
 
@@ -1049,14 +1271,10 @@ const webClient = async (options: OperatorConfig) => {
                     ...formatFilterData(summ)
                 }
             });
-            let rrSource = dispatchSource === undefined ? dispatchSource : {
-                ...dispatchSource,
-                queuedAt: dayjs.unix(dispatchSource.queuedAt).local().format('YY-MM-DD HH:mm:ss z')
-            }
             return {
-                dispatchSource: rrSource,
+                dispatchSource,
                 ...rest,
-                timestamp: time,
+                timestamp,
                 activity: {
                     link,
                     peek: formattedPeek,
@@ -1070,8 +1288,61 @@ const webClient = async (options: OperatorConfig) => {
 
         return res.render('events', {
             data: actionedEvents,
+            pagination,
+            subreddit,
+            bot: req.bot?.botName,
+            instance: (req.instance as CMInstance).getName(),
             title: `${subreddit !== undefined ? `${subreddit} ` : ''}Actioned Events`
         });
+    });
+
+    app.postAsync('/database/migrate', [], async (req: express.Request, res: express.Response) => {
+        const now = dayjs().subtract(1, 'second');
+        logger.info(`User invoked migrations. Starting migrations now...`);
+
+        try {
+            await migrationService.doMigration();
+            ranMigrations = true;
+            migrationBlocker = undefined;
+        } finally {
+            if(ranMigrations && !sessionSecretSynced) {
+                // ensure session secret is synced
+                await storage.setSessionSecret(sessionSecret)
+            }
+            const dbLogs = webLogs.filter(x => x.labels?.includes('Database') && dayjs(x.timestamp).isSameOrAfter(now));
+            dbLogs.reverse();
+            res.status(ranMigrations ? 200 : 500).send(dbLogs.map(x => x[MESSAGE]).join('\r\n'));
+        }
+    });
+
+    app.getAsync('/database/logs', [], async (req: express.Request, res: express.Response) => {
+        const dbLogs = webLogs.filter(x => {
+            return x.labels?.includes('Database');
+        });
+
+        dbLogs.reverse();
+        res.send(dbLogs.map(x => x[MESSAGE]).join('\r\n'));
+    });
+
+    app.postAsync('/database/backup', [], async (req: express.Request, res: express.Response) => {
+        logger.info(`User invoked database backup. Trying to backup now...`);
+
+        const now = dayjs().subtract(1, 'second');
+        let status = 200;
+        try {
+            await migrationService.backupDatabase();
+        } catch (e) {
+            status = 500;
+        }
+
+        const dbLogs = webLogs.filter(x => {
+            const logTime = dayjs(x.timestamp);
+            // @ts-ignore
+            return x.leaf === 'Backup' && logTime.isSameOrAfter(now)
+        });
+
+        dbLogs.reverse();
+        res.status(status).send(dbLogs.map(x => x[MESSAGE]).join('\r\n'));
     });
 
     app.getAsync('/logs/settings/update',[ensureAuthenticated], async (req: express.Request, res: express.Response) => {

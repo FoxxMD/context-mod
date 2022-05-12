@@ -1,0 +1,7 @@
+#!/usr/bin/with-contenv bash
+
+# used https://github.com/linuxserver/docker-plex as a template
+
+exec \
+	s6-setuidgid abc \
+	/usr/local/bin/node /app/src/index.js run

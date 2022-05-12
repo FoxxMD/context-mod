@@ -8,6 +8,7 @@ import dduration from 'dayjs/plugin/duration.js';
 import relTime from 'dayjs/plugin/relativeTime.js';
 import sameafter from 'dayjs/plugin/isSameOrAfter.js';
 import samebefore from 'dayjs/plugin/isSameOrBefore.js';
+import weekOfYear from 'dayjs/plugin/weekOfYear.js';
 import {Manager} from "./Subreddit/Manager";
 import {Command, Argument} from 'commander';
 
@@ -25,9 +26,10 @@ import Submission from "snoowrap/dist/objects/Submission";
 import {COMMENT_URL_ID, parseLinkIdentifier, SUBMISSION_URL_ID} from "./util";
 import LoggedError from "./Utils/LoggedError";
 import {buildOperatorConfigWithDefaults, parseOperatorConfigFromSources} from "./ConfigBuilder";
-import {getLogger} from "./Utils/loggerFactory";
+import {getLogger, initLogger} from "./Utils/loggerFactory";
 import Bot from "./Bot";
 import {isScopeError} from "./Utils/Errors";
+import {nanoid} from "nanoid";
 
 dayjs.extend(utc);
 dayjs.extend(dduration);
@@ -36,6 +38,7 @@ dayjs.extend(sameafter);
 dayjs.extend(samebefore);
 dayjs.extend(tz);
 dayjs.extend(advancedFormat);
+dayjs.extend(weekOfYear);
 
 const commentReg = parseLinkIdentifier([COMMENT_URL_ID]);
 const submissionReg = parseLinkIdentifier([SUBMISSION_URL_ID]);
@@ -64,8 +67,10 @@ const program = new Command();
             .allowUnknownOption();
         runCommand = addOptions(runCommand, getUniversalWebOptions());
         runCommand.action(async (interfaceVal, opts) => {
-            const [opConfig, fileConfig] = await parseOperatorConfigFromSources({...opts, mode: interfaceVal});
-            const config = buildOperatorConfigWithDefaults(opConfig);
+            const args = {...opts, mode: interfaceVal};
+            await initLogger(args)
+            const [opConfig, fileConfig] = await parseOperatorConfigFromSources(args);
+            const config = await buildOperatorConfigWithDefaults(opConfig);
             const {
                 mode,
             } = config;
@@ -93,8 +98,9 @@ const program = new Command();
         checkCommand
             .addOption(checks)
             .action(async (activityIdentifier, type, botVal, commandOptions = {}) => {
+                await initLogger(commandOptions);
                 const [opConfig, fileConfig] = await parseOperatorConfigFromSources(commandOptions);
-                const config = buildOperatorConfigWithDefaults(opConfig);
+                const config = await buildOperatorConfigWithDefaults(opConfig);
                 const {checks = []} = commandOptions;
                 app = new App({...config, fileConfig});
 
@@ -154,7 +160,15 @@ const program = new Command();
                     await b.buildManagers([sub]);
                     if(b.subManagers.length > 0) {
                        const manager = b.subManagers[0];
-                        await manager.handleActivity(activity, {checkNames: checks, source: 'user'});
+                        await manager.handleActivity(activity, {
+                            checkNames: checks,
+                            source: 'user',
+                            activitySource: {
+                                id: nanoid(16),
+                                type: 'user',
+                                queuedAt: dayjs(),
+                            }
+                        });
                         break;
                     }
                 }
@@ -170,8 +184,9 @@ const program = new Command();
         unmodCommand
             .addOption(checks)
             .action(async (subreddits = [], botVal, opts = {}) => {
+                await initLogger(opts);
                 const [opConfig, fileConfig] = await parseOperatorConfigFromSources(opts);
-                const config = buildOperatorConfigWithDefaults(opConfig);
+                const config = await buildOperatorConfigWithDefaults(opConfig);
                 const {checks = []} = opts;
                 const logger = winston.loggers.get('app');
                 let bots: Bot[] = [];
@@ -192,7 +207,15 @@ const program = new Command();
                         for (const a of activities.reverse()) {
                             manager.firehose.push({
                                 activity: a,
-                                options: {checkNames: checks, source: 'user'}
+                                options: {
+                                    checkNames: checks,
+                                    source: 'user',
+                                    activitySource: {
+                                        id: nanoid(16),
+                                        type: 'user',
+                                        queuedAt: dayjs(),
+                                    }
+                                }
                             });
                         }
                     }
@@ -209,6 +232,11 @@ const program = new Command();
         process.kill(process.pid, 'SIGTERM');
     }
 }());
-export {Author} from "./Author/Author";
-export {AuthorCriteria} from "./Author/Author";
-export {AuthorOptions} from "./Author/Author";
+export {RuleSetResult} from "./Common/interfaces";
+export {FormattedRuleResult} from "./Common/interfaces";
+export {RuleResult} from "./Common/interfaces";
+export {ResultContext} from "./Common/interfaces";
+export {isRuleSetResult} from "./util";
+export {UserNoteCriteria} from "./Common/Infrastructure/Filters/FilterCriteria";
+export {AuthorCriteria} from "./Common/Infrastructure/Filters/FilterCriteria";
+export {AuthorOptions} from "./Common/Infrastructure/Filters/FilterShapes";

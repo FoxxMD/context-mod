@@ -1,0 +1,35 @@
+diff --git a/node_modules/snoowrap/dist/request_handler.js b/node_modules/snoowrap/dist/request_handler.js
+index 5a31f40..90cd5cb 100644
+--- a/node_modules/snoowrap/dist/request_handler.js
++++ b/node_modules/snoowrap/dist/request_handler.js
+@@ -144,6 +144,30 @@ function oauthRequest(options) {
+     }
+ 
+     throw e;
++  }).catch(function(e) {
++    const validCodes = _this._config.timeoutCodes || [];
++    if(validCodes.length === 0 || attempts >= _this._config.maxRetryAttempts) {
++      throw e;
++    }
++    // collect codes
++    const codes = [];
++    if(e.code !== undefined) {
++      codes.push(e.code);
++    }
++    if(e.cause !== undefined && e.cause.code !== undefined) {
++      codes.push(e.cause.code);
++    }
++    if(codes.length === 0) {
++      throw e;
++    }
++
++    const validCode = codes.find(x => validCodes.includes(x));
++    if(validCode === undefined) {
++      throw e;
++    }
++
++    _this._warn(`Got error with valid retry code (${validCode}) from request attempt to reddit -- ${e.message} --`, "Retrying request (attempt ".concat(attempts + 1, "/").concat(_this._config.maxRetryAttempts, ")..."));
++    return _this.oauthRequest(options, attempts + 1);
+   });
+ }
+ 

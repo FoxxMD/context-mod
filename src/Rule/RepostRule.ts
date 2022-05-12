@@ -1,4 +1,4 @@
-import {Rule, RuleJSONConfig, RuleOptions, RuleResult} from "./index";
+import {Rule, RuleJSONConfig, RuleOptions} from "./index";
 import {Listing, SearchOptions} from "snoowrap";
 import Submission from "snoowrap/dist/objects/Submission";
 import Comment from "snoowrap/dist/objects/Comment";
@@ -8,25 +8,23 @@ import {
     FAIL, formatNumber,
     isRepostItemResult, parseDurationComparison, parseGenericValueComparison,
     parseUsableLinkIdentifier,
-    PASS, searchAndReplace, stringSameness, triggeredIndicator, windowToActivityWindowCriteria, wordCount
+    PASS, searchAndReplace, stringSameness, triggeredIndicator, windowConfigToWindowCriteria, wordCount
 } from "../util";
 import {
-    ActivityWindow,
-    ActivityWindowType,
-    CompareValue, DurationComparor,
-    JoinOperands,
     RepostItem,
-    RepostItemResult,
+    RepostItemResult, RuleResult,
     SearchAndReplaceRegExp,
-    SearchFacetType, TextMatchOptions, TextTransformOptions,
+    TextMatchOptions, TextTransformOptions,
 } from "../Common/interfaces";
 import objectHash from "object-hash";
-import {getActivities, getAttributionIdentifier} from "../Utils/SnoowrapUtils";
+import {getAttributionIdentifier} from "../Utils/SnoowrapUtils";
 import Fuse from "fuse.js";
 import leven from "leven";
 import {YoutubeClient, commentsAsRepostItems} from "../Utils/ThirdParty/YoutubeClient";
 import dayjs from "dayjs";
 import {rest} from "lodash";
+import {CompareValue, DurationComparor, JoinOperands, SearchFacetType} from "../Common/Infrastructure/Atomic";
+import {ActivityWindow, ActivityWindowConfig} from "../Common/Infrastructure/ActivityWindow";
 
 const parseYtIdentifier = parseUsableLinkIdentifier();
 
@@ -239,7 +237,7 @@ export class RepostRule extends Rule {
     }
 
     getKind(): string {
-        return 'Repost';
+        return 'repost';
     }
 
     protected getSpecificPremise(): object {
@@ -288,7 +286,7 @@ export class RepostRule extends Rule {
             // in getDuplicate() options add "crossposts_only=1" to get only crossposts https://www.reddit.com/r/redditdev/comments/b4t5g4/get_all_the_subreddits_that_a_post_has_been/
             // if a submission is a crosspost it has "crosspost_parent" attribute https://www.reddit.com/r/redditdev/comments/l46y2l/check_if_post_is_a_crosspost/
 
-            const strongWindow = windowToActivityWindowCriteria(window);
+            const strongWindow = windowConfigToWindowCriteria(window);
 
             const candidateHash = `repostItems-${item instanceof Submission ? item.id : item.link_id}-${objectHash.sha1({
                 window,
@@ -342,13 +340,13 @@ export class RepostRule extends Rule {
 
                         if (['title', 'url'].includes(sf.kind)) {
                             let query: string;
-                            let searchFunc: (limit: number) => Promise<Listing<Submission | Comment>>;
+                            let searchFunc: (options?: object) => Promise<Listing<Submission | Comment>>;
                             if (sf.kind === 'title') {
                                 query = (await this.getSubmission(item)).title;
-                                searchFunc = (limit: number) => {
+                                searchFunc = (options?: object) => {
                                     let opts: SearchOptions = {
                                         query,
-                                        limit,
+                                        ...(options ?? {}),
                                         sort: 'relevance'
                                     };
                                     if (strongWindow.subreddits?.include !== undefined && strongWindow.subreddits?.include.length > 0) {
@@ -365,10 +363,10 @@ export class RepostRule extends Rule {
                                 } else {
                                     query = `url:${sub.url}`;
                                 }
-                                searchFunc = (limit: number) => {
+                                searchFunc = (options?: object) => {
                                     let opts: SearchOptions = {
                                         query,
-                                        limit,
+                                        ...(options ?? {}),
                                         sort: 'top'
                                     };
                                     if (strongWindow.subreddits?.include !== undefined && strongWindow.subreddits?.include.length > 0) {
@@ -378,11 +376,11 @@ export class RepostRule extends Rule {
                                     return this.client.search(opts);
                                 }
                             }
-                            subs = await getActivities(searchFunc, {window: strongWindow}) as Submission[];
+                            subs = await this.resources.getAuthorActivities(item.author, strongWindow, {func: searchFunc, name: 'repostSub'}) as Submission[];
                         } else {
 
                             if (dups === undefined) {
-                                let searchFunc: (limit: number) => Promise<Listing<Submission | Comment>> = (limit: number) => {
+                                let searchFunc = (options?: object) => {
                                     // this does not work correctly
                                     // see https://github.com/not-an-aardvark/snoowrap/issues/320
                                     // searchFunc = (limit: number) => {
@@ -391,13 +389,13 @@ export class RepostRule extends Rule {
                                     return this.client.oauthRequest({
                                         uri: `duplicates/${sub.id}`,
                                         qs: {
-                                            limit,
+                                            ...(options ?? {}),
                                         }
                                     }).then(x => {
                                         return Promise.resolve(x.comments) as Promise<Listing<Submission>>
                                     });
                                 };
-                                subs = await getActivities(searchFunc, {window: strongWindow}) as Submission[];
+                                subs = await this.resources.getAuthorActivities(item.author, strongWindow, {func: searchFunc, name: 'dupSearch'}) as Submission[];
                                 dups = subs;
                             } else {
                                 subs = dups;
@@ -493,21 +491,21 @@ export class RepostRule extends Rule {
                     let comments: Comment[] = [];
                     for (const sub of subs) {
 
-                        const commFunc = (limit: number) => {
+                        const commFunc = (options?: object) => {
                             return this.client.oauthRequest({
                                 uri: `${sub.subreddit_name_prefixed}/comments/${sub.id}`,
                                 // get ONLY top-level comments, sorted by Top
                                 qs: {
                                     sort: 'top',
                                     depth: 0,
-                                    limit,
+                                    ...(options ?? {}),
                                 }
                             }).then(x => {
                                 return x.comments as Promise<Listing<Comment>>
                             });
                         }
                         // and return the top 20 most popular
-                        const subComments = await getActivities(commFunc, {window: {count: 20}, skipReplies: true}) as Listing<Comment>;
+                        const subComments = await this.resources.getAuthorActivities(item.author, {...windowConfigToWindowCriteria({count: 20}), skipReplies: true}, {func: commFunc, name: 'repostComm'}) as Listing<Comment>;
                         comments = comments.concat(subComments);
                     }
 

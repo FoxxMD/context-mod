@@ -1,17 +1,19 @@
 import {ActionJson, ActionConfig, ActionOptions} from "./index";
 import Action from "./index";
 import Snoowrap from "snoowrap";
-import {RuleResult} from "../Rule";
-import {ActionProcessResult, ActionTarget} from "../Common/interfaces";
+import {ActionProcessResult, RuleResult} from "../Common/interfaces";
 import Submission from "snoowrap/dist/objects/Submission";
 import Comment from "snoowrap/dist/objects/Comment";
+import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
+import {runCheckOptions} from "../Subreddit/Manager";
+import {ActionTarget, ActionTypes} from "../Common/Infrastructure/Atomic";
 
 export class ApproveAction extends Action {
 
     targets: ActionTarget[]
 
-    getKind() {
-        return 'Approve';
+    getKind(): ActionTypes {
+        return 'approve';
     }
 
     constructor(options: ApproveOptions) {
@@ -23,8 +25,8 @@ export class ApproveAction extends Action {
         this.targets = targets;
     }
 
-    async process(item: Comment | Submission, ruleResults: RuleResult[], runtimeDryrun?: boolean): Promise<ActionProcessResult> {
-        const dryRun = runtimeDryrun || this.dryRun;
+    async process(item: Comment | Submission, ruleResults: RuleResultEntity[], options: runCheckOptions): Promise<ActionProcessResult> {
+        const dryRun = this.getRuntimeAwareDryrun(options);
         const touchedEntities = [];
 
         const realTargets = item instanceof Submission ? ['self'] : this.targets;
@@ -73,9 +75,15 @@ export class ApproveAction extends Action {
             touchedEntities
         }
     }
+
+    protected getSpecificPremise(): object {
+        return {
+            targets: this.targets
+        }
+    }
 }
 
-export interface ApproveOptions extends ApproveActionConfig, ActionOptions {}
+export interface ApproveOptions extends Omit<ApproveActionConfig, 'authorIs' | 'itemIs'>, ActionOptions {}
 
 export interface ApproveActionConfig extends ActionConfig {
     /**

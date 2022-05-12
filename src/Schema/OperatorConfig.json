@@ -106,6 +106,10 @@
                         "Approved"
                     ]
                 },
+                "isContributor": {
+                    "description": "Is the author an approved user (contributor)?",
+                    "type": "boolean"
+                },
                 "isMod": {
                     "description": "Is the author a moderator?",
                     "type": "boolean"
@@ -145,50 +149,6 @@
                 "verified": {
                     "description": "Does Author's account have a verified email?",
                     "type": "boolean"
-                }
-            },
-            "type": "object"
-        },
-        "AuthorOptions": {
-            "description": "If present then these Author criteria are checked before running the rule. If criteria fails then the rule is skipped.",
-            "examples": [
-                {
-                    "include": [
-                        {
-                            "flairText": [
-                                "Contributor",
-                                "Veteran"
-                            ]
-                        },
-                        {
-                            "isMod": true
-                        }
-                    ]
-                }
-            ],
-            "properties": {
-                "exclude": {
-                    "description": "Only runs if `include` is not present. Each AuthorCriteria is comprised of conditions that the Author being checked must \"not\" pass. See excludeCondition for set behavior\n\nEX: `isMod: true, name: Automoderator` => Will pass if the Author IS NOT a mod and IS NOT named Automoderator",
-                    "items": {
-                        "$ref": "#/definitions/AuthorCriteria"
-                    },
-                    "type": "array"
-                },
-                "excludeCondition": {
-                    "default": "OR",
-                    "description": "* OR => if ANY exclude condition \"does not\" pass then the exclude test passes\n* AND => if ALL exclude conditions \"do not\" pass then the exclude test passes\n\nDefaults to OR",
-                    "enum": [
-                        "AND",
-                        "OR"
-                    ],
-                    "type": "string"
-                },
-                "include": {
-                    "description": "Will \"pass\" if any set of AuthorCriteria passes",
-                    "items": {
-                        "$ref": "#/definitions/AuthorCriteria"
-                    },
-                    "type": "array"
                 }
             },
             "type": "object"
@@ -249,6 +209,29 @@
                             "$ref": "#/definitions/BotCredentialsJsonConfig"
                         }
                     ]
+                },
+                "databaseConfig": {
+                    "properties": {
+                        "retention": {
+                            "anyOf": [
+                                {
+                                    "$ref": "#/definitions/DurationObject"
+                                },
+                                {
+                                    "type": [
+                                        "string",
+                                        "number"
+                                    ]
+                                }
+                            ],
+                            "description": "Number of Events, or time range of events were processed during, that should continue to be stored in the database PER SUBREDDIT\n\nAny Events falling outside this criteria will be deleted\n\nLeave unspecified to disable deleting anything\n\nThis will override operator-level retention"
+                        }
+                    },
+                    "type": "object"
+                },
+                "databaseStatisticsDefaults": {
+                    "$ref": "#/definitions/DatabaseStatisticsOperatorJsonConfig",
+                    "description": "Set defaults for the frequency time series stats are collected. Will override top-level defaults"
                 },
                 "filterCriteriaDefaults": {
                     "$ref": "#/definitions/FilterCriteriaDefaults",
@@ -323,6 +306,7 @@
                                 },
                                 "sharedMod": {
                                     "default": false,
+                                    "deprecationMessage": "use `shared` instead",
                                     "description": "DEPRECATED: See `shared`\n\n Using the ENV or ARG will sett `unmoderated` and `modqueue` on `shared`\n\n* ENV => `SHARE_MOD`\n* ARG => `--shareMod`",
                                     "type": "boolean"
                                 },
@@ -503,7 +487,24 @@
                     "type": "string"
                 },
                 "approved": {
-                    "type": "boolean"
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "$ref": "#/definitions/ModeratorNameCriteria"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
+                        }
+                    ],
+                    "description": "* true/false => test whether Activity is approved or not\n* string or list of strings => test which moderator approved this Activity"
                 },
                 "deleted": {
                     "type": "boolean"
@@ -544,7 +545,24 @@
                     "type": "boolean"
                 },
                 "removed": {
-                    "type": "boolean"
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "$ref": "#/definitions/ModeratorNameCriteria"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
+                        }
+                    ],
+                    "description": "* true/false => test whether Activity is removed or not\n* string or list of strings => test which moderator removed this Activity"
                 },
                 "reports": {
                     "description": "A string containing a comparison operator and a value to compare against\n\nThe syntax is `(< OR > OR <= OR >=) <number>`\n\n* EX `> 2`  => greater than 2 total reports\n\nDefaults to TOTAL reports on an Activity. Suffix the value with the report type to check that type:\n\n* EX `> 3 mod` => greater than 3 mod reports\n* EX `>= 1 user` => greater than 1 user report",
@@ -586,6 +604,58 @@
             },
             "type": "object"
         },
+        "DatabaseDriverType": {
+            "enum": [
+                "better-sqlite3",
+                "mariadb",
+                "mysql",
+                "postgres",
+                "sqljs"
+            ],
+            "type": "string"
+        },
+        "DatabaseMigrationOptions": {
+            "properties": {
+                "continueOnAutomatedBackup": {
+                    "description": "When pending migrations are present at startup and this is set to `true` it directs CM to try to make a backup and, if successful, run migrations.",
+                    "type": "boolean"
+                },
+                "force": {
+                    "description": "When pending migrations are present at startup force migrations to run regardless of backup attempt or outcome",
+                    "type": "boolean"
+                }
+            },
+            "type": "object"
+        },
+        "DatabaseStatisticsOperatorJsonConfig": {
+            "properties": {
+                "frequency": {
+                    "description": "Specify the frequency for collecting time-series statistics.\n\nValid values are: 'minute','hour','day','week','month','year' OR false to disable collection",
+                    "enum": [
+                        "day",
+                        false,
+                        "hour",
+                        "minute",
+                        "month",
+                        "week",
+                        "year"
+                    ]
+                },
+                "minFrequency": {
+                    "description": "Specify the allowed minimum frequency for collecting time-series statistics. If the frequency set for a subreddit is smaller this will override it.\n\nValid values are: 'minute','hour','day','week','month','year' OR false to specify no minimum",
+                    "enum": [
+                        "day",
+                        false,
+                        "hour",
+                        "minute",
+                        "month",
+                        "week",
+                        "year"
+                    ]
+                }
+            },
+            "type": "object"
+        },
         "DiscordProviderConfig": {
             "properties": {
                 "name": {
@@ -608,24 +678,81 @@
             ],
             "type": "object"
         },
+        "DurationObject": {
+            "additionalProperties": false,
+            "description": "A [Day.js duration object](https://day.js.org/docs/en/durations/creating)",
+            "examples": [
+                {
+                    "hours": 1,
+                    "minutes": 30
+                }
+            ],
+            "minProperties": 1,
+            "properties": {
+                "days": {
+                    "examples": [
+                        7
+                    ],
+                    "type": "number"
+                },
+                "hours": {
+                    "examples": [
+                        4
+                    ],
+                    "type": "number"
+                },
+                "minutes": {
+                    "examples": [
+                        50
+                    ],
+                    "type": "number"
+                },
+                "months": {
+                    "examples": [
+                        3
+                    ],
+                    "type": "number"
+                },
+                "seconds": {
+                    "examples": [
+                        15
+                    ],
+                    "type": "number"
+                },
+                "weeks": {
+                    "examples": [
+                        2
+                    ],
+                    "type": "number"
+                },
+                "years": {
+                    "examples": [
+                        0
+                    ],
+                    "type": "number"
+                }
+            },
+            "type": "object"
+        },
         "FilterCriteriaDefaults": {
             "properties": {
                 "authorIs": {
-                    "$ref": "#/definitions/AuthorOptions",
-                    "description": "Determine how authorIs defaults behave when authorIs is present on the check\n\n* merge => merges defaults with check's authorIs\n* replace => check authorIs will replace defaults (no defaults used)",
-                    "examples": [
+                    "anyOf": [
                         {
-                            "include": [
-                                {
-                                    "flairText": [
-                                        "Contributor",
-                                        "Veteran"
-                                    ]
-                                },
-                                {
-                                    "isMod": true
-                                }
-                            ]
+                            "$ref": "#/definitions/FilterOptions<AuthorCriteria>"
+                        },
+                        {
+                            "items": {
+                                "anyOf": [
+                                    {
+                                        "$ref": "#/definitions/AuthorCriteria"
+                                    },
+                                    {
+                                        "$ref": "#/definitions/NamedCriteria<AuthorCriteria>"
+                                    }
+                                ]
+                            },
+                            "type": "array"
                         }
                     ]
                 },
@@ -637,17 +764,27 @@
                     "type": "string"
                 },
                 "itemIs": {
-                    "items": {
-                        "anyOf": [
-                            {
-                                "$ref": "#/definitions/SubmissionState"
+                    "anyOf": [
+                        {
+                            "$ref": "#/definitions/FilterOptions<TypedActivityState>"
+                        },
+                        {
+                            "items": {
+                                "anyOf": [
+                                    {
+                                        "$ref": "#/definitions/SubmissionState"
+                                    },
+                                    {
+                                        "$ref": "#/definitions/CommentState"
+                                    },
+                                    {
+                                        "$ref": "#/definitions/NamedCriteria<TypedActivityState>"
+                                    }
+                                ]
                             },
-                            {
-                                "$ref": "#/definitions/CommentState"
-                            }
-                        ]
-                    },
-                    "type": "array"
+                            "type": "array"
+                        }
+                    ]
                 },
                 "itemIsBehavior": {
                     "description": "Determine how itemIs defaults behave when itemIs is present on the check\n\n* merge => adds defaults to check's itemIs\n* replace => check itemIs will replace defaults (no defaults used)",
@@ -656,6 +793,62 @@
                         "replace"
                     ],
                     "type": "string"
+                }
+            },
+            "type": "object"
+        },
+        "FilterOptions<AuthorCriteria>": {
+            "properties": {
+                "exclude": {
+                    "description": "Only runs if `include` is not present. Each Criteria is comprised of conditions that the filter (Author/Item) being checked must \"not\" pass. See excludeCondition for set behavior\n\nEX: `isMod: true, name: Automoderator` => Will pass if the Author IS NOT a mod and IS NOT named Automoderator",
+                    "items": {
+                        "$ref": "#/definitions/NamedCriteria<AuthorCriteria>"
+                    },
+                    "type": "array"
+                },
+                "excludeCondition": {
+                    "default": "OR",
+                    "description": "* OR => if ANY exclude condition \"does not\" pass then the exclude test passes\n* AND => if ALL exclude conditions \"do not\" pass then the exclude test passes\n\nDefaults to OR",
+                    "enum": [
+                        "AND",
+                        "OR"
+                    ],
+                    "type": "string"
+                },
+                "include": {
+                    "description": "Will \"pass\" if any set of Criteria passes",
+                    "items": {
+                        "$ref": "#/definitions/NamedCriteria<AuthorCriteria>"
+                    },
+                    "type": "array"
+                }
+            },
+            "type": "object"
+        },
+        "FilterOptions<TypedActivityState>": {
+            "properties": {
+                "exclude": {
+                    "description": "Only runs if `include` is not present. Each Criteria is comprised of conditions that the filter (Author/Item) being checked must \"not\" pass. See excludeCondition for set behavior\n\nEX: `isMod: true, name: Automoderator` => Will pass if the Author IS NOT a mod and IS NOT named Automoderator",
+                    "items": {
+                        "$ref": "#/definitions/NamedCriteria<TypedActivityState>"
+                    },
+                    "type": "array"
+                },
+                "excludeCondition": {
+                    "default": "OR",
+                    "description": "* OR => if ANY exclude condition \"does not\" pass then the exclude test passes\n* AND => if ALL exclude conditions \"do not\" pass then the exclude test passes\n\nDefaults to OR",
+                    "enum": [
+                        "AND",
+                        "OR"
+                    ],
+                    "type": "string"
+                },
+                "include": {
+                    "description": "Will \"pass\" if any set of Criteria passes",
+                    "items": {
+                        "$ref": "#/definitions/NamedCriteria<TypedActivityState>"
+                    },
+                    "type": "array"
                 }
             },
             "type": "object"
@@ -688,7 +881,7 @@
                 "file": {
                     "allOf": [
                         {
-                            "$ref": "#/definitions/Omit<DailyRotateFileTransportOptions,\"stream\"|\"dirname\"|\"options\"|\"handleRejections\"|\"format\"|\"handleExceptions\"|\"log\"|\"logv\"|\"close\">"
+                            "$ref": "#/definitions/Omit<DailyRotateFileTransportOptions,\"stream\"|\"log\"|\"dirname\"|\"options\"|\"handleRejections\"|\"format\"|\"handleExceptions\"|\"logv\"|\"close\">"
                         },
                         {
                             "properties": {
@@ -735,6 +928,7 @@
                     "type": "string"
                 },
                 "path": {
+                    "deprecationMessage": "use `logging.file.dirname` instead",
                     "description": "**DEPRECATED** - Use `file.dirname` instead\nThe absolute path to a directory where rotating log files should be stored.\n\n* If not present or `null` or `false` no log files will be created\n* If `true` logs will be stored at `[working directory]/logs`\n\n* ENV => `LOG_DIR`\n* ARG => `--logDir [dir]`",
                     "examples": [
                         "/var/log/contextmod"
@@ -748,7 +942,7 @@
                 "stream": {
                     "allOf": [
                         {
-                            "$ref": "#/definitions/Omit<DuplexTransportOptions,\"name\"|\"stream\"|\"handleRejections\"|\"format\"|\"handleExceptions\"|\"log\"|\"logv\"|\"close\">"
+                            "$ref": "#/definitions/Omit<DuplexTransportOptions,\"name\"|\"stream\"|\"log\"|\"handleRejections\"|\"format\"|\"handleExceptions\"|\"logv\"|\"close\">"
                         },
                         {
                             "properties": {
@@ -769,6 +963,69 @@
                     "description": "Options for logging to api/web"
                 }
             },
+            "type": "object"
+        },
+        "ModeratorNameCriteria": {
+            "properties": {
+                "behavior": {
+                    "enum": [
+                        "exclude",
+                        "include"
+                    ],
+                    "type": "string"
+                },
+                "name": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "string"
+                        }
+                    ]
+                }
+            },
+            "required": [
+                "name"
+            ],
+            "type": "object"
+        },
+        "NamedCriteria<AuthorCriteria>": {
+            "properties": {
+                "criteria": {
+                    "$ref": "#/definitions/AuthorCriteria"
+                },
+                "name": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "criteria"
+            ],
+            "type": "object"
+        },
+        "NamedCriteria<TypedActivityState>": {
+            "properties": {
+                "criteria": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/definitions/SubmissionState"
+                        },
+                        {
+                            "$ref": "#/definitions/CommentState"
+                        }
+                    ]
+                },
+                "name": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "criteria"
+            ],
             "type": "object"
         },
         "NotificationConfig": {
@@ -836,7 +1093,7 @@
             ],
             "type": "object"
         },
-        "Omit<DailyRotateFileTransportOptions,\"stream\"|\"dirname\"|\"options\"|\"handleRejections\"|\"format\"|\"handleExceptions\"|\"log\"|\"logv\"|\"close\">": {
+        "Omit<DailyRotateFileTransportOptions,\"stream\"|\"log\"|\"dirname\"|\"options\"|\"handleRejections\"|\"format\"|\"handleExceptions\"|\"logv\"|\"close\">": {
             "properties": {
                 "auditFile": {
                     "description": "A string representing the name of the name of the audit file. (default: './hash-audit.json')",
@@ -896,6 +1153,10 @@
                     "description": "A boolean whether or not to generate file name from \"datePattern\" in UTC format. (default: false)",
                     "type": "boolean"
                 },
+                "watchLog": {
+                    "description": "Watch the current file being written to and recreate it in case of accidental deletion. (default: FALSE)",
+                    "type": "boolean"
+                },
                 "zippedArchive": {
                     "description": "A boolean to define whether or not to gzip archived log files. (default 'false')",
                     "type": "boolean"
@@ -903,7 +1164,7 @@
             },
             "type": "object"
         },
-        "Omit<DuplexTransportOptions,\"name\"|\"stream\"|\"handleRejections\"|\"format\"|\"handleExceptions\"|\"log\"|\"logv\"|\"close\">": {
+        "Omit<DuplexTransportOptions,\"name\"|\"stream\"|\"log\"|\"handleRejections\"|\"format\"|\"handleExceptions\"|\"logv\"|\"close\">": {
             "properties": {
                 "dump": {
                     "type": "boolean"
@@ -1090,14 +1351,61 @@
         "PostBehavior": {
             "properties": {
                 "postFail": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/definitions/PostBehaviorOptionConfig"
+                        },
+                        {
+                            "type": "string"
+                        }
+                    ],
                     "default": "next",
-                    "description": "Do this behavior if a Check is NOT triggered",
-                    "type": "string"
+                    "description": "Do this behavior if a Check is NOT triggered"
                 },
                 "postTrigger": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/definitions/PostBehaviorOptionConfig"
+                        },
+                        {
+                            "type": "string"
+                        }
+                    ],
                     "default": "nextRun",
-                    "description": "Do this behavior if a Check is triggered",
+                    "description": "Do this behavior if a Check is triggered"
+                }
+            },
+            "type": "object"
+        },
+        "PostBehaviorOptionConfig": {
+            "properties": {
+                "behavior": {
+                    "description": "The possible behaviors that can occur after a check has run\n\n* next => continue to next Check/Run\n* stop => stop CM lifecycle for this activity (immediately end)\n* nextRun => skip any remaining Checks in this Run and start the next Run\n* goto:[path] => specify a run[.check] to jump to",
                     "type": "string"
+                },
+                "recordTo": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "description": "Possible outputs to store event details to",
+                                "enum": [
+                                    "database",
+                                    "influx"
+                                ],
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "enum": [
+                                "database",
+                                false,
+                                "influx",
+                                true
+                            ]
+                        }
+                    ],
+                    "description": "Possible options for output:\n\n* true -> store to all\n* false -> store to none\n* string -> store to this one output\n* list -> store to these specified outputs"
                 }
             },
             "type": "object"
@@ -1151,12 +1459,41 @@
                     "description": "Manually set the debug status for snoowrap\n\nWhen snoowrap has `debug: true` it will log the http status response of reddit api requests to at the `debug` level\n\n* Set to `true` to always output\n* Set to `false` to never output\n\nIf not present or `null` will be set based on `logLevel`\n\n* ENV => `SNOO_DEBUG`\n* ARG => `--snooDebug`",
                     "type": "boolean"
                 },
+                "maxRetryAttempts": {
+                    "default": 2,
+                    "description": "Set the maximum number of times snoowrap will retry a request if it encounters one of the codes specified in either retryErrorCodes or timeoutCodes\n\nEach retry attempt is delayed by an exponential falloff timer",
+                    "examples": [
+                        2
+                    ],
+                    "type": "number"
+                },
                 "proxy": {
                     "description": "Proxy all requests to Reddit's API through this endpoint\n\n* ENV => `PROXY`\n* ARG => `--proxy <proxyEndpoint>`",
                     "examples": [
                         "http://localhost:4443"
                     ],
                     "type": "string"
+                },
+                "retryErrorCodes": {
+                    "default": [
+                        502,
+                        503,
+                        504,
+                        522
+                    ],
+                    "description": "Specify the HTTP Status codes that should be valid for retrying a request\n\nDefaults: 502, 503, 504, 522",
+                    "items": {
+                        "type": "number"
+                    },
+                    "type": "array"
+                },
+                "timeoutCodes": {
+                    "default": "['ESOCKETTIMEDOUT', 'ETIMEDOUT', 'ECONNRESET']",
+                    "description": "Specify the error codes that should be valid for retrying a request.\n\nThese are used to make snoowrap retry if a request times out or reddit's api response times out -- which happens occasionally for no reason.\n\nYou most likely do not need to change these. However, if you want snoowrap to always fail on a network issue set this to an empty array\n\nDefaults: 'ESOCKETTIMEDOUT', 'ETIMEDOUT', 'ECONNRESET'",
+                    "items": {
+                        "type": "string"
+                    },
+                    "type": "array"
                 }
             },
             "type": "object"
@@ -1176,7 +1513,24 @@
                     "type": "string"
                 },
                 "approved": {
-                    "type": "boolean"
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "$ref": "#/definitions/ModeratorNameCriteria"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
+                        }
+                    ],
+                    "description": "* true/false => test whether Activity is approved or not\n* string or list of strings => test which moderator approved this Activity"
                 },
                 "deleted": {
                     "type": "boolean"
@@ -1273,7 +1627,24 @@
                     "type": "boolean"
                 },
                 "removed": {
-                    "type": "boolean"
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "$ref": "#/definitions/ModeratorNameCriteria"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "boolean"
+                            ]
+                        }
+                    ],
+                    "description": "* true/false => test whether Activity is removed or not\n* string or list of strings => test which moderator removed this Activity"
                 },
                 "reports": {
                     "description": "A string containing a comparison operator and a value to compare against\n\nThe syntax is `(< OR > OR <= OR >=) <number>`\n\n* EX `> 2`  => greater than 2 total reports\n\nDefaults to TOTAL reports on an Activity. Suffix the value with the report type to check that type:\n\n* EX `> 3 mod` => greater than 3 mod reports\n* EX `>= 1 user` => greater than 1 user report",
@@ -1317,6 +1688,29 @@
         },
         "SubredditOverrides": {
             "properties": {
+                "databaseConfig": {
+                    "properties": {
+                        "retention": {
+                            "anyOf": [
+                                {
+                                    "$ref": "#/definitions/DurationObject"
+                                },
+                                {
+                                    "type": [
+                                        "string",
+                                        "number"
+                                    ]
+                                }
+                            ],
+                            "description": "Number of Events, or time range of events were processed during, that should continue to be stored in the database.\n\nAny Events falling outside this criteria will be deleted\n\nLeave unspecified to disable deleting anything\n\nThis will override any retention value set in the subreddit's config"
+                        }
+                    },
+                    "type": "object"
+                },
+                "databaseStatisticsDefaults": {
+                    "$ref": "#/definitions/DatabaseStatisticsOperatorJsonConfig",
+                    "description": "Set defaults for the frequency time series stats are collected. Will override bot-level defaults"
+                },
                 "flowControlDefaults": {
                     "properties": {
                         "maxGotoDepth": {
@@ -1460,6 +1854,86 @@
         "credentials": {
             "$ref": "#/definitions/ThirdPartyCredentialsJsonConfig"
         },
+        "databaseConfig": {
+            "description": "Database backend to use for persistent APPLICATION data\n\nDefaults to 'sqljs' which stores data in a file",
+            "properties": {
+                "connection": {
+                    "anyOf": [
+                        {
+                            "additionalProperties": {},
+                            "properties": {
+                                "logging": {
+                                    "anyOf": [
+                                        {
+                                            "items": {
+                                                "enum": [
+                                                    "error",
+                                                    "info",
+                                                    "log",
+                                                    "migration",
+                                                    "query",
+                                                    "schema",
+                                                    "warn"
+                                                ],
+                                                "type": "string"
+                                            },
+                                            "type": "array"
+                                        },
+                                        {
+                                            "enum": [
+                                                "all",
+                                                false,
+                                                true
+                                            ]
+                                        }
+                                    ],
+                                    "description": "Set the type of logging typeorm should output\n\nDefaults to errors, warnings, and schema (migration progress)"
+                                },
+                                "type": {
+                                    "$ref": "#/definitions/DatabaseDriverType"
+                                }
+                            },
+                            "required": [
+                                "type"
+                            ],
+                            "type": "object"
+                        },
+                        {
+                            "enum": [
+                                "better-sqlite3",
+                                "mariadb",
+                                "mysql",
+                                "postgres",
+                                "sqljs"
+                            ],
+                            "type": "string"
+                        }
+                    ]
+                },
+                "migrations": {
+                    "$ref": "#/definitions/DatabaseMigrationOptions"
+                },
+                "retention": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/definitions/DurationObject"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "number"
+                            ]
+                        }
+                    ],
+                    "description": "Number of Events, or time range of events were processed during, that should continue to be stored in the database PER SUBREDDIT\n\nAny Events falling outside this criteria will be deleted\n\nLeave unspecified to disable deleting anything"
+                }
+            },
+            "type": "object"
+        },
+        "databaseStatisticsDefaults": {
+            "$ref": "#/definitions/DatabaseStatisticsOperatorJsonConfig",
+            "description": "Set defaults for the frequency time series stats are collected"
+        },
         "logging": {
             "$ref": "#/definitions/LoggingOptions",
             "description": "Settings to configure global logging defaults"
@@ -1563,6 +2037,68 @@
                         }
                     ]
                 },
+                "databaseConfig": {
+                    "description": "Database backend to use for persistent WEB data\n\nIf none is provided the top-level database provider is used",
+                    "properties": {
+                        "connection": {
+                            "anyOf": [
+                                {
+                                    "additionalProperties": {},
+                                    "properties": {
+                                        "logging": {
+                                            "anyOf": [
+                                                {
+                                                    "items": {
+                                                        "enum": [
+                                                            "error",
+                                                            "info",
+                                                            "log",
+                                                            "migration",
+                                                            "query",
+                                                            "schema",
+                                                            "warn"
+                                                        ],
+                                                        "type": "string"
+                                                    },
+                                                    "type": "array"
+                                                },
+                                                {
+                                                    "enum": [
+                                                        "all",
+                                                        false,
+                                                        true
+                                                    ]
+                                                }
+                                            ],
+                                            "description": "Set the type of logging typeorm should output\n\nDefaults to errors, warnings, and schema (migration progress)"
+                                        },
+                                        "type": {
+                                            "$ref": "#/definitions/DatabaseDriverType"
+                                        }
+                                    },
+                                    "required": [
+                                        "type"
+                                    ],
+                                    "type": "object"
+                                },
+                                {
+                                    "enum": [
+                                        "better-sqlite3",
+                                        "mariadb",
+                                        "mysql",
+                                        "postgres",
+                                        "sqljs"
+                                    ],
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "migrations": {
+                            "$ref": "#/definitions/DatabaseMigrationOptions"
+                        }
+                    },
+                    "type": "object"
+                },
                 "invites": {
                     "description": "Settings related to oauth flow invites",
                     "properties": {
@@ -1634,9 +2170,25 @@
                                 "definitelyARandomString"
                             ],
                             "type": "string"
+                        },
+                        "storage": {
+                            "description": "Specify backend storage to use for persisting client sessions. If specified this will overwrite parent-level `storage` settings.\n\nMay be useful if using `database` for general web client storage but have heavy traffic and want sessions to be more performant (using `cache`)",
+                            "enum": [
+                                "cache",
+                                "database"
+                            ],
+                            "type": "string"
                         }
                     },
                     "type": "object"
+                },
+                "storage": {
+                    "description": "Storage provider type to use for sessions and other web client specific data\n\nDefaults to `database` if none is provided\n\n* Specify `database` to use top-level database\n* Specify `cache` to use top-level cache\n\nNOTE: `database` should almost always be used. Cache would only be necessary if this instance experiences heavy traffic",
+                    "enum": [
+                        "cache",
+                        "database"
+                    ],
+                    "type": "string"
                 }
             },
             "type": "object"

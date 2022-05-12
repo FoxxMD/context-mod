@@ -1,46 +1,44 @@
-import {Check, CheckStructuredJson} from "../Check";
+import {asStructuredCommentCheckJson, asStructuredSubmissionCheckJson, Check, CheckStructuredJson} from "../Check";
 import {
-    ActionResult,
-    ActivityCheckJson, CheckResult, CheckSummary,
-    FilterCriteriaDefaults, FilterResult,
-    PostBehavior,
-    PostBehaviorTypes, RunResult,
-    TypedActivityStates
+    ActivityCheckJson,
+    PostBehavior, PostBehaviorOption,
+    RunResult
 } from "../Common/interfaces";
 import {SubmissionCheck} from "../Check/SubmissionCheck";
 import {CommentCheck} from "../Check/CommentCheck";
 import {Logger} from "winston";
-import {determineNewResults, FAIL, isSubmission, mergeArr, normalizeName} from "../util";
-import {checkAuthorFilter, checkItemFilter, SubredditResources} from "../Subreddit/SubredditResources";
+import {determineNewResults, isSubmission, mergeArr, normalizeName} from "../util";
 import {ExtendedSnoowrap} from "../Utils/SnoowrapClients";
-import {Author, AuthorCriteria, AuthorOptions} from "../Author/Author";
 import Submission from "snoowrap/dist/objects/Submission";
 import {Comment} from "snoowrap";
 import {runCheckOptions} from "../Subreddit/Manager";
-import {RuleResult} from "../Rule";
-import {ErrorWithCause, stackWithCauses} from "pony-cause";
 import EventEmitter from "events";
 import {CheckProcessingError, RunProcessingError} from "../Utils/Errors";
+import {RunEntity} from "../Common/Entities/RunEntity";
+import {RunResultEntity} from "../Common/Entities/RunResultEntity";
+import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
+import {RunnableBase} from "../Common/RunnableBase";
+import {RunnableBaseJson, RunnableBaseOptions, StructuredRunnableBase} from "../Common/Infrastructure/Runnable";
+import {FilterCriteriaDefaults} from "../Common/Infrastructure/Filters/FilterShapes";
 
-export class Run {
+export class Run extends RunnableBase {
     name: string;
     submissionChecks: SubmissionCheck[] = [];
     commentChecks: CommentCheck[] = [];
-    postFail?: PostBehaviorTypes;
-    postTrigger?: PostBehaviorTypes;
+    postFail?: PostBehaviorOption;
+    postTrigger?: PostBehaviorOption;
     filterCriteriaDefaults?: FilterCriteriaDefaults
     logger: Logger;
     client: ExtendedSnoowrap;
     subredditName: string;
-    resources: SubredditResources;
     dryRun?: boolean;
-    itemIs: TypedActivityStates;
-    authorIs: AuthorOptions;
     enabled: boolean;
     emitter: EventEmitter;
+    runEntity!: RunEntity
 
 
     constructor(options: RunOptions) {
+        super(options);
         const {
             name,
             checks = [],
@@ -49,22 +47,14 @@ export class Run {
             postTrigger,
             filterCriteriaDefaults,
             logger,
-            resources,
             client,
             subredditName,
             dryRun,
-            authorIs: {
-                include = [],
-                excludeCondition,
-                exclude = [],
-            } = {},
-            itemIs = [],
             enable = true,
 
         } = options;
         this.name = name;
         this.logger = logger.child({labels: [`RUN ${name}`]}, mergeArr);
-        this.resources = resources;
         this.client = client;
         this.subredditName = subredditName;
         this.postFail = postFail;
@@ -72,12 +62,6 @@ export class Run {
         this.filterCriteriaDefaults = filterCriteriaDefaults;
         this.dryRun = dryRun;
         this.enabled = enable;
-        this.itemIs = itemIs;
-        this.authorIs = {
-            excludeCondition,
-            exclude: exclude.map(x => new Author(x)),
-            include: include.map(x => new Author(x)),
-        }
         this.emitter = emitter;
 
         for(const c of checks) {
@@ -90,15 +74,45 @@ export class Run {
                 resources: this.resources,
                 client: this.client,
             };
-            if (c.kind === 'comment') {
+            if (asStructuredCommentCheckJson(checkConfig)) {
                 this.commentChecks.push(new CommentCheck(checkConfig));
-            } else if (c.kind === 'submission') {
+            } else if (asStructuredSubmissionCheckJson(checkConfig)) {
                 this.submissionChecks.push(new SubmissionCheck(checkConfig));
             }
         }
     }
 
-    async handle(activity: (Submission | Comment), initAllRuleResults: RuleResult[], existingRunResults: RunResult[] = [], options: runCheckOptions): Promise<[RunResult, string]> {
+    async initialize() {
+        if (this.runEntity === undefined) {
+            const runRepo = this.resources.database.getRepository(RunEntity);
+            const re = await runRepo.findOne({
+                where: {
+                    name: this.name,
+                    manager: {
+                        id: this.resources.managerEntity.id
+                    }
+                }, relations: {
+                    manager: true
+                }
+            });
+            if(re !== null) {
+                this.runEntity = re;
+            } else {
+                this.runEntity = await runRepo.save(new RunEntity({name: this.name, manager: this.resources.managerEntity}));
+            }
+        }
+        for(const c of this.commentChecks) {
+            c.runEntity = this.runEntity;
+        }
+        for(const c of this.submissionChecks) {
+            c.runEntity = this.runEntity;
+        }
+    }
+
+    async handle(activity: (Submission | Comment), initAllRuleResults: RuleResultEntity[], existingRunResults: RunResultEntity[] = [], options: runCheckOptions): Promise<[RunResultEntity, string]> {
+
+        const runResultEnt = new RunResultEntity({run: this.runEntity});
+        runResultEnt.checkResults = [];
 
         let allRuleResults = initAllRuleResults;
         let continueRunIteration = true;
@@ -115,20 +129,23 @@ export class Run {
         } = options;
 
         if(!this.enabled) {
+            runResultEnt.reason = 'Not enabled';
             runResult.error = 'Not enabled';
-            return [runResult, postBehavior];
+            return [runResultEnt, postBehavior];
         }
 
         if (isSubmission(activity)) {
             if (this.submissionChecks.length === 0) {
                 const msg = 'Skipping b/c Run did not contain any submission Checks';
                 this.logger.debug(msg);
-                return [{...runResult, reason: msg}, postBehavior];
+                runResultEnt.reason = msg;
+                return [runResultEnt, postBehavior];
             }
         } else if (this.commentChecks.length === 0) {
             const msg = 'Skipping b/c Run did not contain any comment Checks';
             this.logger.debug(msg);
-            return [{...runResult, reason: msg}, postBehavior];
+            runResultEnt.reason = msg;
+            return [runResultEnt, postBehavior];
         }
 
         let gotoContext = optGotoContext;
@@ -142,26 +159,16 @@ export class Run {
 
         try {
 
-            const [itemPass, itemFilterType, itemFilterResults] = await checkItemFilter(activity, this.itemIs, this.resources, this.logger, source)
-            if (!itemPass) {
-                this.logger.verbose(`${FAIL} => Item did not pass 'itemIs' test`);
-                return [{
-                    ...runResult,
-                    triggered: false,
-                    itemIs: itemFilterResults
-                }, postBehavior];
-            } else if (this.itemIs.length > 0) {
-                runResult.itemIs = itemFilterResults;
-            }
+            const filterResults = await this.runFilters(activity, options);
+            const [itemRes, authorRes] = filterResults;
+            runResult.itemIs = itemRes;
+            runResultEnt.itemIs = itemRes;
+            runResult.authorIs = authorRes;
+            runResultEnt.authorIs = authorRes;
 
-            const [authFilterPass, authFilterType, authorFilterResult] = await checkAuthorFilter(activity, this.authorIs, this.resources, this.logger);
-            if (!authFilterPass) {
-                return [{
-                    ...runResult,
-                    authorIs: authorFilterResult
-                }, postBehavior];
-            } else if (authFilterType !== undefined) {
-                runResult.authorIs = authorFilterResult;
+            const filtersPassed = filterResults.every(x => x === undefined || x.passed);
+            if(!filtersPassed) {
+                return [runResultEnt, postBehavior];
             }
 
             while (continueCheckIteration && (checkIndex < checks.length || gotoContext !== '')) {
@@ -192,16 +199,18 @@ export class Run {
                     check = checks[checkIndex];
                 }
 
-                if(existingRunResults.some(x => x.checkResults?.map(y => y.name).includes(check.name))) {
+                if(existingRunResults.some(x => x.checkResults?.map(y => y.check.name).includes(check.name))) {
                     throw new Error(`The check "${check.name}" has already been run once. This indicates a possible endless loop may occur so CM will terminate processing this activity to save you from yourself!`);
                 }
 
                 const checkSummary = await check.handle(activity, allRuleResults, options);
                 postBehavior = checkSummary.postBehavior;
 
-                allRuleResults = allRuleResults.concat(determineNewResults(allRuleResults, checkSummary.ruleResults));
+                allRuleResults = allRuleResults.concat(determineNewResults(allRuleResults, checkSummary.allRuleResults ?? []));
 
-                runResult.checkResults.push(checkSummary);
+                runResultEnt.checkResults.push(checkSummary);
+
+                //runResult.checkResults.push(checkSummary);
 
                 switch (checkSummary.postBehavior.toLowerCase()) {
                     case 'next':
@@ -234,23 +243,27 @@ export class Run {
                         }
                 }
             }
+            runResultEnt.triggered = runResultEnt.checkResults.some(x => x.triggered);
             runResult.triggered = runResult.checkResults.some(x => x.triggered);
-            return [runResult, postBehavior]
+            return [runResultEnt, postBehavior]
         } catch (err: any) {
             if(err instanceof CheckProcessingError && err.result !== undefined) {
-                runResult.checkResults.push(err.result);
+                runResultEnt.checkResults.push(err.result);
+                //runResult.checkResults.push(err.result);
             }
             if(runResult.error === undefined) {
+                runResultEnt.error = `Run failed due to uncaught exception: ${err.message}`;
                 runResult.error = `Run failed due to uncaught exception: ${err.message}`;
             }
+            runResultEnt.triggered = runResult.checkResults.some(x => x.triggered);
             runResult.triggered = runResult.checkResults.some(x => x.triggered);
 
-            throw new RunProcessingError(`[RUN ${this.name}] An uncaught exception occurred while processing Run`, {cause: err}, runResult);
+            throw new RunProcessingError(`[RUN ${this.name}] An uncaught exception occurred while processing Run`, {cause: err}, runResultEnt);
         }
     }
 }
 
-export interface IRun extends PostBehavior {
+export interface IRun extends PostBehavior, RunnableBaseJson {
     /**
      * Friendly name for this Run EX "flairsRun"
      *
@@ -275,20 +288,6 @@ export interface IRun extends PostBehavior {
     dryRun?: boolean;
 
     /**
-     * A list of criteria to test the state of the `Activity` against before running the check.
-     *
-     * If any set of criteria passes the Check will be run. If the criteria fails then the Check will fail.
-     *
-     * * @examples [[{"over_18": true, "removed': false}]]
-     * */
-    itemIs?: TypedActivityStates
-
-    /**
-     * If present then these Author criteria are checked before running the Check. If criteria fails then the Check will fail.
-     * */
-    authorIs?: AuthorOptions
-
-    /**
      * Should this Run be executed by the bot?
      *
      * @default true
@@ -297,13 +296,13 @@ export interface IRun extends PostBehavior {
     enable?: boolean,
 }
 
-export interface RunOptions extends IRun {
+export interface RunOptions extends RunStructuredJson, RunnableBaseOptions {
     // submissionChecks?: SubmissionCheck[]
     // commentChecks?: CommentCheck[]
-    checks: CheckStructuredJson[]
+    //checks: CheckStructuredJson[]
     name: string
-    logger: Logger
-    resources: SubredditResources
+    //logger: Logger
+    //resources: SubredditResources
     client: ExtendedSnoowrap
     subredditName: string;
     emitter: EventEmitter;
@@ -313,6 +312,6 @@ export interface RunJson extends IRun {
     checks: ActivityCheckJson[]
 }
 
-export interface RunStructuredJson extends RunJson {
+export interface RunStructuredJson extends Omit<RunJson, 'authorIs' | 'itemIs' | 'checks'>, StructuredRunnableBase {
     checks: CheckStructuredJson[]
 }

@@ -1,9 +1,11 @@
 import {ActionJson, ActionConfig, ActionOptions} from "./index";
 import Action from "./index";
 import Snoowrap, {Comment, Submission} from "snoowrap";
-import {RuleResult} from "../Rule";
 import {renderContent} from "../Utils/SnoowrapUtils";
-import {ActionProcessResult, Footer} from "../Common/interfaces";
+import {ActionProcessResult, Footer, RuleResult} from "../Common/interfaces";
+import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
+import {runCheckOptions} from "../Subreddit/Manager";
+import {ActionTypes} from "../Common/Infrastructure/Atomic";
 
 export class BanAction extends Action {
 
@@ -29,12 +31,12 @@ export class BanAction extends Action {
         this.note = note;
     }
 
-    getKind() {
-        return 'Ban';
+    getKind(): ActionTypes {
+        return 'ban';
     }
 
-    async process(item: Comment | Submission, ruleResults: RuleResult[], runtimeDryrun?: boolean): Promise<ActionProcessResult> {
-        const dryRun = runtimeDryrun || this.dryRun;
+    async process(item: Comment | Submission, ruleResults: RuleResultEntity[], options: runCheckOptions): Promise<ActionProcessResult> {
+        const dryRun = this.getRuntimeAwareDryrun(options);
         const content = this.message === undefined ? undefined : await this.resources.getContent(this.message, item.subreddit);
         const renderedBody = content === undefined ? undefined : await renderContent(content, item, ruleResults, this.resources.userNotes);
         const renderedContent = renderedBody === undefined ? undefined : `${renderedBody}${await this.resources.generateFooter(item, this.footer)}`;
@@ -66,6 +68,16 @@ export class BanAction extends Action {
             result: `Banned ${item.author.name} ${durText}${this.reason !== undefined ? ` (${this.reason})` : ''}`,
             touchedEntities
         };
+    }
+
+    protected getSpecificPremise(): object {
+        return {
+            message: this.message,
+            duration: this.duration,
+            reason: this.reason,
+            note: this.note,
+            footer: this.footer
+        }
     }
 }
 
@@ -105,7 +117,7 @@ export interface BanActionConfig extends ActionConfig, Footer {
     note?: string
 }
 
-export interface BanActionOptions extends BanActionConfig, ActionOptions {
+export interface BanActionOptions extends Omit<BanActionConfig, 'authorIs' | 'itemIs'>, ActionOptions {
 }
 
 /**

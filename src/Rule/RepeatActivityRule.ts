@@ -1,11 +1,11 @@
-import {Rule, RuleJSONConfig, RuleOptions, RuleResult} from "./index";
-import {Comment} from "snoowrap";
+import {Rule, RuleJSONConfig, RuleOptions} from "./index";
+import {Comment, RedditUser} from "snoowrap";
 import {
     activityWindowText,
     asSubmission,
     comparisonTextOp,
     FAIL,
-    getActivitySubredditName,
+    getActivitySubredditName, isActivityWindowConfig,
     isExternalUrlSubmission,
     isRedditMedia,
     parseGenericValueComparison,
@@ -15,18 +15,22 @@ import {
     searchAndReplace,
     stringSameness,
     subredditStateIsNameOnly,
-    toStrongSubredditState
+    toStrongSubredditState, windowConfigToWindowCriteria
 } from "../util";
 import {
-    ActivityWindow,
-    ActivityWindowType,
-    ReferenceSubmission, SearchAndReplaceRegExp,
-    StrongSubredditState,
-    SubredditState, TextMatchOptions, TextTransformOptions
+    ReferenceSubmission, RuleResult, SearchAndReplaceRegExp,
+    TextMatchOptions, TextTransformOptions
 } from "../Common/interfaces";
 import Submission from "snoowrap/dist/objects/Submission";
 import dayjs from "dayjs";
 import Fuse from 'fuse.js'
+import {StrongSubredditCriteria, SubredditCriteria} from "../Common/Infrastructure/Filters/FilterCriteria";
+import {
+    ActivityWindow,
+    ActivityWindowConfig,
+    ActivityWindowCriteria,
+    HistoryFiltersOptions
+} from "../Common/Infrastructure/ActivityWindow";
 
 const parseUsableLinkIdentifier = linkParser();
 
@@ -42,14 +46,14 @@ interface RepeatActivityReducer {
 
 export class RepeatActivityRule extends Rule {
     threshold: string;
-    window: ActivityWindowType;
+    window: ActivityWindowConfig;
     gapAllowance?: number;
     useSubmissionAsReference: boolean;
     lookAt: 'submissions' | 'all';
-    include: (string | SubredditState)[];
-    exclude: (string | SubredditState)[];
+    include: (string | SubredditCriteria)[];
+    exclude: (string | SubredditCriteria)[];
     hasFullSubredditCrits: boolean = false;
-    activityFilterFunc: (x: Submission|Comment) => Promise<boolean> = async (x) => true;
+    activityFilterFunc: (x: Submission|Comment, author: RedditUser) => Promise<boolean> = async (x) => true;
     keepRemoved: boolean;
     minWordCount: number;
     transformations: SearchAndReplaceRegExp[]
@@ -92,9 +96,9 @@ export class RepeatActivityRule extends Rule {
                 return toStrongSubredditState(x, {defaultFlags: 'i', generateDescription: true});
             });
             this.hasFullSubredditCrits = !subStates.every(x => subredditStateIsNameOnly(x));
-            this.activityFilterFunc = async (x: Submission|Comment) => {
+            this.activityFilterFunc = async (x: Submission|Comment, author: RedditUser) => {
                 for(const ss of subStates) {
-                    if(await this.resources.testSubredditCriteria(x, ss)) {
+                    if(await this.resources.testSubredditCriteria(x, ss, author)) {
                         return true;
                     }
                 }
@@ -108,9 +112,9 @@ export class RepeatActivityRule extends Rule {
                 return toStrongSubredditState(x, {defaultFlags: 'i', generateDescription: true});
             });
             this.hasFullSubredditCrits = !subStates.every(x => subredditStateIsNameOnly(x));
-            this.activityFilterFunc = async (x: Submission|Comment) => {
+            this.activityFilterFunc = async (x: Submission|Comment, author: RedditUser) => {
                 for(const ss of subStates) {
-                    if(await this.resources.testSubredditCriteria(x, ss)) {
+                    if(await this.resources.testSubredditCriteria(x, ss, author)) {
                         return false;
                     }
                 }
@@ -121,7 +125,7 @@ export class RepeatActivityRule extends Rule {
     }
 
     getKind(): string {
-        return 'Repeat';
+        return 'repeat';
     }
 
     getSpecificPremise(): object {
@@ -135,6 +139,7 @@ export class RepeatActivityRule extends Rule {
         }
     }
 
+    // TODO unify matching logic with recent and repost rules
     getActivityIdentifier(activity: (Submission | Comment), length = 200, transform = true) {
         let identifier: string;
         if (asSubmission(activity)) {
@@ -173,14 +178,39 @@ export class RepeatActivityRule extends Rule {
         }
 
         let activities: (Submission | Comment)[] = [];
-        switch (this.lookAt) {
-            case 'submissions':
-                activities = await this.resources.getAuthorSubmissions(item.author, {window: this.window, keepRemoved: this.keepRemoved});
-                break;
-            default:
-                activities = await this.resources.getAuthorActivities(item.author, {window: this.window, keepRemoved: this.keepRemoved});
-                break;
+        let postFilter: HistoryFiltersOptions;
+        const ruleConfiguredWindow: ActivityWindowCriteria = windowConfigToWindowCriteria(this.window);
+        if (!this.keepRemoved) {
+            postFilter = {
+                activityState: {
+                    include: [
+                        {
+                            criteria: {
+                                removed: false
+                            }
+                        }
+                    ]
+                }
+            }
+            if(ruleConfiguredWindow.filterOn?.post === undefined) {
+                ruleConfiguredWindow.filterOn = {
+                    ...(ruleConfiguredWindow.filterOn ?? {}),
+                    post: postFilter
+                }
+            }
         }
+        if(!isActivityWindowConfig(this.window)) {
+            switch (this.lookAt) {
+                case 'submissions':
+                    ruleConfiguredWindow.fetch = 'submission';
+                    break;
+                default:
+                    ruleConfiguredWindow.fetch = 'overview';
+                    break;
+            }
+        }
+
+        activities = await this.resources.getAuthorActivities(item.author, ruleConfiguredWindow);
 
         if(this.hasFullSubredditCrits) {
             // go ahead and cache subreddits now
@@ -196,7 +226,7 @@ export class RepeatActivityRule extends Rule {
 
             const isUrl = isExternalUrlSubmission(activity);
             //let fu = new Fuse([identifier], !isUrl ? fuzzyOptions : {...fuzzyOptions, distance: 5});
-            const validSub = await this.activityFilterFunc(activity);
+            const validSub = await this.activityFilterFunc(activity, item.author);
             let minMet = identifier.length >= this.minWordCount;
 
             let updatedAllSets = [...allSets];
@@ -270,14 +300,28 @@ export class RepeatActivityRule extends Rule {
         if (this.useSubmissionAsReference) {
             applicableGroupedActivities = new Map();
             let identifier = this.getActivityIdentifier(item);
+            // look for exact match first
             let referenceSubmissions = identifierGroupedActivities.get(identifier);
-            if(referenceSubmissions === undefined && isExternalUrlSubmission(item)) {
-                // if external url sub then try by title
-                identifier = (item as Submission).title;
-                referenceSubmissions = identifierGroupedActivities.get(identifier);
-                if(referenceSubmissions === undefined) {
-                    // didn't get by title so go back to url since that's the default
-                    identifier = this.getActivityIdentifier(item);
+            if(referenceSubmissions === undefined) {
+                if(isExternalUrlSubmission(item)) {
+                    // if external url sub then try by title
+                    identifier = (item as Submission).title;
+                    referenceSubmissions = identifierGroupedActivities.get(identifier);
+                    if(referenceSubmissions === undefined) {
+                        // didn't get by title so go back to url since that's the default
+                        identifier = this.getActivityIdentifier(item);
+                    }
+                } else if(asSubmission(item) && item.is_self) {
+                    // if is self post then identifier is made up of title and body so identifiers may not be *exact* if title varies or body varies
+                    // -- try to find identifying sets by using string sameness on set identifiers
+                    let fuzzySets: (Submission | Comment)[] = [];
+                    for(const [k, v] of identifierGroupedActivities.entries()) {
+                        const strMatchResults = stringSameness(k, identifier);
+                        if (strMatchResults.highScoreWeighted >= this.matchScore) {
+                            fuzzySets = fuzzySets.concat(v);
+                        }
+                    }
+                    referenceSubmissions = [fuzzySets.flat()];
                 }
             }
 
@@ -384,7 +428,7 @@ interface RepeatActivityConfig extends ActivityWindow, ReferenceSubmission, Text
      * EX `["mealtimevideos","askscience", "/onlyfans*\/i", {"over18": true}]`
      * @examples [["mealtimevideos","askscience", "/onlyfans*\/i", {"over18": true}]]
      * */
-    include?: (string | SubredditState)[],
+    include?: (string | SubredditCriteria)[],
     /**
      * If present, activities will be counted only if they are **NOT** found in this list of Subreddits
      *
@@ -397,7 +441,7 @@ interface RepeatActivityConfig extends ActivityWindow, ReferenceSubmission, Text
      * EX `["mealtimevideos","askscience", "/onlyfans*\/i", {"over18": true}]`
      * @examples [["mealtimevideos","askscience", "/onlyfans*\/i", {"over18": true}]]
      * */
-    exclude?: (string | SubredditState)[],
+    exclude?: (string | SubredditCriteria)[],
 
     /**
      * If present determines which activities to consider for gapAllowance.
