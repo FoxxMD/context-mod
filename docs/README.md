@@ -141,7 +141,7 @@ An **Action** is some action the bot can take against the checked Activity (comm
 
 **Runs, Checks, Rules, and Actions** all have two additional (optional) criteria "pre-tests". These tests are different from rules/checks in these ways:
 
-* Filters test against the **current state** of the Activity (or it's Author) being processed, rather than looking at history/context/etc...
+* Filters test against the **current state** of the Activity, the Author of the Activity, or the Subreddit of the Activity -- rather than looking at history/context/etc...
 * Filter test results only determine if the Run, Check, Rule, or Action **should run** -- rather than triggering it
   * When the filter test **passes** the thing being tested continues to process as usual
   * When the filter test **fails** the thing being tested **fails**.

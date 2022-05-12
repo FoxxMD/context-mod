@@ -21,6 +21,7 @@ Feature Highlights for **Moderators:**
 * Support Activity filtering based on:
   * [Author criteria](/docs/subreddit/components/README.md#author-filter) (name, css flair/text, age, karma, moderator status, [Toolbox User Notes](https://www.reddit.com/r/toolbox/wiki/docs/usernotes), and more!)
   * [Activity state](/docs/subreddit/components/README.md#item-filter) (removed, locked, distinguished, etc...)
+  * State of Subreddit Activity is in [Subreddit](/docs/subreddit/components/README.md#subreddit-filter) (nsfw, name, profile, etc...)
 * Rules and Actions support [named references](/docs/subreddit/components/README.md#named-rules) -- **write once, reference anywhere**
 * Powerful [logic control](/docs/subreddit/components/advancedConcepts/flowControl.md) (if, then, goto)
 * [Delay/re-process activities](/docs/subreddit/components/README.md#dispatch) using arbitrary rules
