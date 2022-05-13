@@ -23,6 +23,9 @@
             "$ref": "#/definitions/RepostRuleJSONConfig"
         },
         {
+            "$ref": "#/definitions/SentimentRuleJSONConfig"
+        },
+        {
             "type": "string"
         }
     ],
@@ -1295,6 +1298,60 @@
                     "description": "Filter Activities based on their Subreddit."
                 }
             },
+            "type": "object"
+        },
+        "HistoricalSentimentConfig": {
+            "description": "Test the Sentiment of Activities from the Author history\n\nIf this is defined then the `totalMatching` threshold must pass for the Rule to trigger\n\nIf `sentiment` is defined here it overrides the top-level `sentiment` value",
+            "properties": {
+                "mustMatchCurrent": {
+                    "default": false,
+                    "description": "When `true` the original Activity being checked MUST match desired sentiment before the Rule considers any history",
+                    "type": "boolean"
+                },
+                "sentiment": {
+                    "description": "Test the calculated VADER sentiment (compound) score for an Activity using this comparison. Can be either a numerical or natural language\n\nSentiment values range from extremely negative to extremely positive in a numerical range of -1 to +1:\n\n* -0.6 => extremely negative\n* -0.3 => very negative\n* -0.1 => negative\n*    0 => neutral\n*  0.1 => positive\n*  0.3 => very positive\n*  0.6 => extremely positive\n\nThe below examples are all equivocal. You can use either set of values as the value for `sentiment` (numerical comparisons or natural langauge)\n\n* `>= 0.1` = `is positive`\n* `<= 0.3` = `is very negative`\n* `< 0.1` = `is not positive`\n* `> -0.3` = `is not very negative`\n\nSpecial case:\n\n* `is neutral` equates to `> -0.1 and < 0.1`\n* `is not neutral` equates to `< -0.1 or > 0.1`\n\nContextMod uses a normalized, weighted average from these sentiment tools:\n\n* NLP.js (english, french, german, and spanish) https://github.com/axa-group/nlp.js/blob/master/docs/v3/sentiment-analysis.md\n* (english only) vaderSentiment-js https://github.com/vaderSentiment/vaderSentiment-js/\n* (english only) wink-sentiment https://github.com/winkjs/wink-sentiment\n\nMore about the sentiment algorithms used:\n* VADER https://github.com/cjhutto/vaderSentiment\n* AFINN http://corpustext.com/reference/sentiment_afinn.html\n* Senticon https://ieeexplore.ieee.org/document/8721408\n* Pattern https://github.com/clips/pattern\n* wink https://github.com/winkjs/wink-sentiment",
+                    "examples": [
+                        "is negative",
+                        "> 0.2"
+                    ],
+                    "pattern": "((>|>=|<|<=)\\s*(-?\\d?\\.?\\d+))|((not)?\\s*(very|extremely)?\\s*(positive|neutral|negative))",
+                    "type": "string"
+                },
+                "totalMatching": {
+                    "default": "> 0",
+                    "description": "A string containing a comparison operator and a value to compare Activities from history that pass the given `sentiment` comparison\n\nThe syntax is `(< OR > OR <= OR >=) <number>[percent sign]`\n\n* EX `> 12`  => greater than 12 activities passed given `sentiment` comparison\n* EX `<= 10%` => less than 10% of all Activities from history passed given `sentiment` comparison",
+                    "examples": [
+                        "> 0",
+                        "> 10%"
+                    ],
+                    "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
+                    "type": "string"
+                },
+                "window": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/definitions/DurationObject"
+                        },
+                        {
+                            "$ref": "#/definitions/FullActivityWindowConfig"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "number"
+                            ]
+                        }
+                    ],
+                    "description": "A value to define the range of Activities to retrieve.\n\nAcceptable values:\n\n**`ActivityWindowCriteria` object**\n\nAllows specify multiple range properties and more specific behavior\n\n**A `number` of Activities to retrieve**\n\n* EX `100` => 100 Activities\n\n*****\n\nAny of the below values that specify the amount of time to subtract from `NOW` to create a time range IE `NOW <---> [duration] ago`\n\nAcceptable values:\n\n**A `string` consisting of a value and a [Day.js](https://day.js.org/docs/en/durations/creating#list-of-all-available-units) time UNIT**\n\n* EX `9 days` => Range is `NOW <---> 9 days ago`\n\n**A [Day.js](https://day.js.org/docs/en/durations/creating) `object`**\n\n* EX `{\"days\": 90, \"minutes\": 15}` => Range is `NOW <---> 90 days and 15 minutes ago`\n\n**An [ISO 8601 duration](https://en.wikipedia.org/wiki/ISO_8601#Durations) `string`**\n\n* EX `PT15M` => 15 minutes => Range is `NOW <----> 15 minutes ago`",
+                    "examples": [
+                        "90 days"
+                    ]
+                }
+            },
+            "required": [
+                "totalMatching",
+                "window"
+            ],
             "type": "object"
         },
         "HistoryCriteria": {
@@ -2718,6 +2775,113 @@
             },
             "required": [
                 "kind"
+            ],
+            "type": "object"
+        },
+        "SentimentRuleJSONConfig": {
+            "description": "Test the calculated VADER sentiment for an Activity to determine if the text context is negative, neutral, or positive in tone.\n\nMore about VADER Sentiment: https://github.com/cjhutto/vaderSentiment",
+            "properties": {
+                "authorIs": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "anyOf": [
+                                    {
+                                        "$ref": "#/definitions/AuthorCriteria"
+                                    },
+                                    {
+                                        "$ref": "#/definitions/NamedCriteria<AuthorCriteria>"
+                                    },
+                                    {
+                                        "type": "string"
+                                    }
+                                ]
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "$ref": "#/definitions/FilterOptionsJson<AuthorCriteria>"
+                        }
+                    ],
+                    "description": "If present then these Author criteria are checked before running the Check. If criteria fails then the Check will fail."
+                },
+                "historical": {
+                    "$ref": "#/definitions/HistoricalSentimentConfig",
+                    "description": "Test the Sentiment of Activities from the Author history\n\nIf this is defined then the `totalMatching` threshold must pass for the Rule to trigger\n\nIf `sentiment` is defined here it overrides the top-level `sentiment` value"
+                },
+                "itemIs": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "anyOf": [
+                                    {
+                                        "$ref": "#/definitions/SubmissionState"
+                                    },
+                                    {
+                                        "$ref": "#/definitions/CommentState"
+                                    },
+                                    {
+                                        "$ref": "#/definitions/NamedCriteria<TypedActivityState>"
+                                    },
+                                    {
+                                        "type": "string"
+                                    }
+                                ]
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "$ref": "#/definitions/FilterOptionsJson<TypedActivityState>"
+                        }
+                    ],
+                    "description": "A list of criteria to test the state of the `Activity` against before running the check.\n\nIf any set of criteria passes the Check will be run. If the criteria fails then the Check will fail.\n\n* @examples [[{\"over_18\": true, \"removed': false}]]"
+                },
+                "kind": {
+                    "description": "The kind of rule to run",
+                    "enum": [
+                        "sentiment"
+                    ],
+                    "examples": [
+                        "sentiment"
+                    ],
+                    "type": "string"
+                },
+                "name": {
+                    "description": "An optional, but highly recommended, friendly name for this rule. If not present will default to `kind`.\n\nCan only contain letters, numbers, underscore, spaces, and dashes\n\nname is used to reference Rule result data during Action content templating. See CommentAction or ReportAction for more details.",
+                    "examples": [
+                        "myNewRule"
+                    ],
+                    "pattern": "^[a-zA-Z]([\\w -]*[\\w])?$",
+                    "type": "string"
+                },
+                "sentiment": {
+                    "description": "Test the calculated VADER sentiment (compound) score for an Activity using this comparison. Can be either a numerical or natural language\n\nSentiment values range from extremely negative to extremely positive in a numerical range of -1 to +1:\n\n* -0.6 => extremely negative\n* -0.3 => very negative\n* -0.1 => negative\n*    0 => neutral\n*  0.1 => positive\n*  0.3 => very positive\n*  0.6 => extremely positive\n\nThe below examples are all equivocal. You can use either set of values as the value for `sentiment` (numerical comparisons or natural langauge)\n\n* `>= 0.1` = `is positive`\n* `<= 0.3` = `is very negative`\n* `< 0.1` = `is not positive`\n* `> -0.3` = `is not very negative`\n\nSpecial case:\n\n* `is neutral` equates to `> -0.1 and < 0.1`\n* `is not neutral` equates to `< -0.1 or > 0.1`\n\nContextMod uses a normalized, weighted average from these sentiment tools:\n\n* NLP.js (english, french, german, and spanish) https://github.com/axa-group/nlp.js/blob/master/docs/v3/sentiment-analysis.md\n* (english only) vaderSentiment-js https://github.com/vaderSentiment/vaderSentiment-js/\n* (english only) wink-sentiment https://github.com/winkjs/wink-sentiment\n\nMore about the sentiment algorithms used:\n* VADER https://github.com/cjhutto/vaderSentiment\n* AFINN http://corpustext.com/reference/sentiment_afinn.html\n* Senticon https://ieeexplore.ieee.org/document/8721408\n* Pattern https://github.com/clips/pattern\n* wink https://github.com/winkjs/wink-sentiment",
+                    "examples": [
+                        "is negative",
+                        "> 0.2"
+                    ],
+                    "pattern": "((>|>=|<|<=)\\s*(-?\\d?\\.?\\d+))|((not)?\\s*(very|extremely)?\\s*(positive|neutral|negative))",
+                    "type": "string"
+                },
+                "testOn": {
+                    "default": [
+                        "title",
+                        "body"
+                    ],
+                    "description": "Which content from an Activity to test for `sentiment` against\n\nOnly used if the Activity being tested is a Submission -- Comments are only tested against their body\n\nIf more than one type of content is specified then all text is tested together as one string",
+                    "items": {
+                        "enum": [
+                            "body",
+                            "title"
+                        ],
+                        "type": "string"
+                    },
+                    "type": "array"
+                }
+            },
+            "required": [
+                "kind",
+                "sentiment"
             ],
             "type": "object"
         },

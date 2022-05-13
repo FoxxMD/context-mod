@@ -8,7 +8,6 @@ import {
     getActivitySubredditName, isActivityWindowConfig,
     isExternalUrlSubmission,
     isRedditMedia,
-    parseGenericValueComparison,
     parseSubredditName,
     parseUsableLinkIdentifier as linkParser,
     PASS,
@@ -31,6 +30,7 @@ import {
     ActivityWindowCriteria,
     HistoryFiltersOptions
 } from "../Common/Infrastructure/ActivityWindow";
+import {parseGenericValueComparison} from "../Common/Infrastructure/Comparisons";
 
 const parseUsableLinkIdentifier = linkParser();
 

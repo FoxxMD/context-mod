@@ -10,6 +10,7 @@ import {SubredditResources} from "../Subreddit/SubredditResources";
 import Snoowrap from "snoowrap";
 import {RepostRule, RepostRuleJSONConfig} from "./RepostRule";
 import {StructuredFilter} from "../Common/Infrastructure/Filters/FilterShapes";
+import {SentimentRule, SentimentRuleJSONConfig} from "./SentimentRule";
 
 export function ruleFactory
 (config: StructuredRuleJson, logger: Logger, subredditName: string, resources: SubredditResources, client: Snoowrap): Rule {
@@ -37,7 +38,10 @@ export function ruleFactory
         case 'repost':
             cfg = config as StructuredFilter<RepostRuleJSONConfig>;
             return new RepostRule({...cfg, logger, subredditName, resources, client});
+        case 'sentiment':
+            cfg = config as StructuredFilter<SentimentRuleJSONConfig>;
+            return new SentimentRule({...cfg, logger, subredditName, resources, client});
         default:
-            throw new Error('rule "kind" was not recognized.');
+            throw new Error(`Rule with kind '${config.kind}' was not recognized.`);
     }
 }

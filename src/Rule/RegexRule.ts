@@ -3,8 +3,7 @@ import {Comment} from "snoowrap";
 import Submission from "snoowrap/dist/objects/Submission";
 import {
     asSubmission,
-    comparisonTextOp, FAIL, isExternalUrlSubmission, isSubmission, parseGenericValueComparison,
-    parseGenericValueOrPercentComparison, parseRegex, parseStringToRegex,
+    comparisonTextOp, FAIL, isExternalUrlSubmission, isSubmission, parseRegex, parseStringToRegex,
     PASS, triggeredIndicator, windowConfigToWindowCriteria
 } from "../util";
 import {
@@ -14,6 +13,7 @@ import dayjs from 'dayjs';
 import {SimpleError} from "../Utils/Errors";
 import {JoinOperands} from "../Common/Infrastructure/Atomic";
 import {ActivityWindowConfig} from "../Common/Infrastructure/ActivityWindow";
+import {parseGenericValueComparison, parseGenericValueOrPercentComparison} from "../Common/Infrastructure/Comparisons";
 
 export interface RegexCriteria {
     /**

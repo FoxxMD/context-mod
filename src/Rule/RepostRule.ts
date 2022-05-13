@@ -6,8 +6,7 @@ import {
     compareDurationValue,
     comparisonTextOp,
     FAIL, formatNumber,
-    isRepostItemResult, parseDurationComparison, parseGenericValueComparison,
-    parseUsableLinkIdentifier,
+    isRepostItemResult, parseDurationComparison, parseUsableLinkIdentifier,
     PASS, searchAndReplace, stringSameness, triggeredIndicator, windowConfigToWindowCriteria, wordCount
 } from "../util";
 import {
@@ -25,6 +24,7 @@ import dayjs from "dayjs";
 import {rest} from "lodash";
 import {CompareValue, DurationComparor, JoinOperands, SearchFacetType} from "../Common/Infrastructure/Atomic";
 import {ActivityWindow, ActivityWindowConfig} from "../Common/Infrastructure/ActivityWindow";
+import {parseGenericValueComparison} from "../Common/Infrastructure/Comparisons";
 
 const parseYtIdentifier = parseUsableLinkIdentifier();
 
