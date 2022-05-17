@@ -489,7 +489,7 @@ export class Manager extends EventEmitter implements RunningStates {
             //
             // if we insert the same item again because it is currently being processed AND THEN we get the item AGAIN we only want to update the newest meta
             // so search the array backwards to get the neweset only
-            const queuedItemIndex = findLastIndex(this.queuedItemsMeta, x => x.id === task.activity.id);
+            const queuedItemIndex = findLastIndex(this.queuedItemsMeta, x => x.id === task.activity.name);
             if(queuedItemIndex !== -1) {
                 const itemMeta = this.queuedItemsMeta[queuedItemIndex];
                 let msg = `Item ${itemMeta.id} is already ${itemMeta.state}.`;
@@ -498,11 +498,11 @@ export class Manager extends EventEmitter implements RunningStates {
                     this.queuedItemsMeta.splice(queuedItemIndex, 1, {...itemMeta, shouldRefresh: true});
                 } else {
                     this.logger.debug(`${msg} Re-queuing item but will also refresh data before processing.`);
-                    this.queuedItemsMeta.push({id: task.activity.id, shouldRefresh: true, state: 'queued'});
+                    this.queuedItemsMeta.push({id: task.activity.name, shouldRefresh: true, state: 'queued'});
                     this.queue.push(task);
                 }
             } else {
-                this.queuedItemsMeta.push({id: task.activity.id, shouldRefresh: false, state: 'queued'});
+                this.queuedItemsMeta.push({id: task.activity.name, shouldRefresh: false, state: 'queued'});
                 this.queue.push(task);
             }
 
@@ -544,7 +544,7 @@ export class Manager extends EventEmitter implements RunningStates {
                     await sleep(this.delayBy * 1000);
                 }
 
-                const queuedItemIndex = this.queuedItemsMeta.findIndex(x => x.id === task.activity.id);
+                const queuedItemIndex = this.queuedItemsMeta.findIndex(x => x.id === task.activity.name);
                 try {
                     const itemMeta = this.queuedItemsMeta[queuedItemIndex];
                     this.queuedItemsMeta.splice(queuedItemIndex, 1, {...itemMeta, state: 'processing'});
