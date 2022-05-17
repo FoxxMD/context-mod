@@ -276,8 +276,7 @@ export class Manager extends EventEmitter implements RunningStates {
                 submissionId: asComment(x.activity) ? x.activity.link_id : undefined,
                 author: x.author,
                 queuedAt: x.queuedAt.unix(),
-                durationMilli: x.delay.asSeconds(),
-                duration: x.delay.humanize(),
+                duration: x.delay.asSeconds(),
                 source: `${x.action}${x.identifier !== undefined ? ` (${x.identifier})` : ''}`,
                 subreddit: this.subreddit.display_name_prefixed
             }

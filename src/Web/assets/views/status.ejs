@@ -1124,15 +1124,18 @@
             if(resp.delayedItems.length > 0) {
                 el.querySelector('.delayedItemsList').innerHTML = '';
                 const now = dayjs();
-                const sorted = resp.delayedItems.map(x => ({...x, dispatchAt: dayjs.unix(x.queuedAt + (x.durationMilli))}));
+                const sorted = resp.delayedItems.map(x => ({...x, queuedAtUnix: x.queuedAt, queuedAt: dayjs.unix(x.queuedAt), dispatchAt: dayjs.unix(x.queuedAt + x.duration)}));
                 sorted.sort((a, b) => {
                     return a.dispatchAt.isSameOrAfter(b.dispatchAt) ? 1 : -1
                 });
                 const delayedItemDivs = sorted.map(x => {
-                    const diffUntilNow = x.dispatchAt.diff(now)
-                    const durationUntilNow = dayjs.duration(diffUntilNow);
+                    const diffUntilNow = x.dispatchAt.diff(now);
+                    const durationUntilNow = dayjs.duration(diffUntilNow, 'ms');
+                    const queuedAtDisplay = x.queuedAt.format('HH:mm:ss z');
+                    const durationDayjs = dayjs.duration(x.duration, 'seconds');
+                    const durationDisplay = durationDayjs.humanize();
                     const cancelLink = `<a href="#" data-id="${x.id}" data-subreddit="${x.subreddit}" class="delayCancel">CANCEL</a>`;
-                    return `<div>A <a href="https://reddit.com${x.permalink}">${x.submissionId !== undefined ? 'Comment' : 'Submssion'}</a>${isAll ? ` in <a href="https://reddit.com${x.subreddit}">${x.subreddit}</a> ` : ''} by <a href="https://reddit.com/u/${x.author}">${x.author}</a> queued by ${x.source} at ${dayjs.unix(x.queuedAt).format('HH:mm:ss z')} for ${x.duration} (dispatches in ${durationUntilNow.humanize()}) -- ${cancelLink}</div>`;
+                    return `<div>A <a href="https://reddit.com${x.permalink}">${x.submissionId !== undefined ? 'Comment' : 'Submssion'}</a>${isAll ? ` in <a href="https://reddit.com${x.subreddit}">${x.subreddit}</a> ` : ''} by <a href="https://reddit.com/u/${x.author}">${x.author}</a> queued by ${x.source} at ${queuedAtDisplay} for ${durationDisplay} (dispatches ${durationUntilNow.humanize(true)}) -- ${cancelLink}</div>`;
                 });
                 el.querySelector('.delayedItemsList').insertAdjacentHTML('afterbegin', delayedItemDivs.join(''));
                 el.querySelectorAll('.delayedItemsList .delayCancel').forEach(elm => {
