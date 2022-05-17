@@ -913,7 +913,7 @@ export class SubredditResources {
                 return await item.fetch();
             }
         } catch (err: any) {
-            throw new Error('Error while trying to fetch a cached Activity', err);
+            throw new ErrorWithCause('Error while trying to fetch a cached Activity', {cause: err});
         }
     }
 
