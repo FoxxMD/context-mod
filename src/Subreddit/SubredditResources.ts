@@ -439,6 +439,7 @@ export class SubredditResources {
             const now = dayjs();
             for(const dAct of dispatchedActivities) {
                 const shouldDispatchAt = dAct.createdAt.add(dAct.delay.asSeconds(), 'seconds');
+                let tardyHint = '';
                 if(shouldDispatchAt.isBefore(now)) {
                     let tardyHint = `Activity ${dAct.activityId} queued at ${dAct.createdAt.format('YYYY-MM-DD HH:mm:ssZ')} for ${dAct.delay.humanize()} is now LATE`;
                     if(dAct.tardyTolerant === true) {
@@ -452,7 +453,8 @@ export class SubredditResources {
                         // see if its within tolerance
                         const latest = shouldDispatchAt.add(dAct.tardyTolerant);
                         if(latest.isBefore(now)) {
-                            tardyHint += `and IS NOT within tardy tolerance of ${dAct.tardyTolerant.humanize()} of planned dispatch time so will be dropped`;
+                            tardyHint += ` and IS NOT within tardy tolerance of ${dAct.tardyTolerant.humanize()} of planned dispatch time so will be dropped`;
+                            this.logger.warn(tardyHint);
                             await this.removeDelayedActivity(dAct.id);
                             continue;
                         } else {
@@ -460,8 +462,14 @@ export class SubredditResources {
                         }
                     }
                 }
-                // TODO make this less api heavy
-                this.delayedItems.push(await dAct.toActivityDispatch(this.client))
+                if(tardyHint !== '') {
+                    this.logger.warn(tardyHint);
+                }
+                try {
+                    this.delayedItems.push(await dAct.toActivityDispatch(this.client))
+                } catch (e) {
+                    this.logger.warn(new ErrorWithCause(`Unable to add Activity ${dAct.activityId} from database delayed activities to in-app delayed activities queue`, {cause: e}));
+                }
             }
         }
     }
@@ -474,7 +482,7 @@ export class SubredditResources {
 
     async removeDelayedActivity(id: string) {
         await this.dispatchedActivityRepo.delete(id);
-        this.delayedItems.filter(x => x.id !== id);
+        this.delayedItems = this.delayedItems.filter(x => x.id !== id);
     }
 
     async initStats() {

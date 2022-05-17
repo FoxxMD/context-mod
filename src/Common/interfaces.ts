@@ -1942,7 +1942,6 @@ export interface ActivityDispatch extends Omit<ActivityDispatchConfig, 'delay'| 
     author: string
     delay: Duration
     tardyTolerant?: boolean | Duration
-    processing: boolean
     action?: string
     type: ActivitySourceTypes
     dryRun?: boolean

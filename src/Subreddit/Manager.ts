@@ -274,7 +274,7 @@ export class Manager extends EventEmitter implements RunningStates {
             return {
                 id: x.id,
                 activityId: x.activity.name,
-                permalink: x.activity.permalink,
+                permalink: x.activity.permalink, // TODO construct this without having to fetch activity
                 submissionId: asComment(x.activity) ? x.activity.link_id : undefined,
                 author: x.author,
                 queuedAt: x.queuedAt.unix(),
@@ -406,7 +406,7 @@ export class Manager extends EventEmitter implements RunningStates {
                     let index = 0;
                     let anyQueued = false;
                     for(const ar of self.resources.delayedItems) {
-                        if(!ar.processing && ar.queuedAt.add(ar.delay).isSameOrBefore(dayjs())) {
+                        if(ar.queuedAt.add(ar.delay).isSameOrBefore(dayjs())) {
                             anyQueued = true;
                             self.logger.info(`Activity ${ar.activity.name} dispatched at ${ar.queuedAt.format('HH:mm:ss z')} (delayed for ${ar.delay.humanize()}) is now being queued.`, {leaf: 'Delayed Activities'});
                             self.firehose.push({
@@ -428,7 +428,7 @@ export class Manager extends EventEmitter implements RunningStates {
                                     dryRun: ar.dryRun,
                                 }
                             });
-                            self.resources.delayedItems.splice(index, 1, {...ar, processing: true});
+                            self.resources.removeDelayedActivity(ar.id);
                         }
                         index++;
                     }
@@ -557,9 +557,6 @@ export class Manager extends EventEmitter implements RunningStates {
                 } finally {
                     // always remove item meta regardless of success or failure since we are done with it meow
                     this.queuedItemsMeta.splice(queuedItemIndex, 1);
-                    if(task.options.activitySource?.id !== undefined) {
-                        await this.resources.removeDelayedActivity(task.options.activitySource?.id);
-                    }
                 }
             }
             , maxWorkers);
@@ -881,7 +878,6 @@ export class Manager extends EventEmitter implements RunningStates {
         const checkType = isSubmission(activity) ? 'Submission' : 'Comment';
         let item = activity,
             runtimeShouldRefresh = false;
-        const itemId = await item.id;
 
         const {
             delayUntil,
@@ -890,6 +886,14 @@ export class Manager extends EventEmitter implements RunningStates {
             activitySource,
             force = false,
         } = options;
+
+        if(refresh) {
+            this.logger.verbose(`Refreshed data`);
+            // @ts-ignore
+            item = await activity.refresh();
+        }
+
+        const itemId = await item.id;
 
         if(await this.resources.hasRecentSelf(item)) {
             let recentMsg = `Found in Activities recently (last ${this.resources.selfTTL} seconds) modified/created by this bot`;
@@ -969,7 +973,6 @@ export class Manager extends EventEmitter implements RunningStates {
                             delay: dayjs.duration(remaining, 'seconds'),
                             id: 'notUsed',
                             queuedAt: dayjs(),
-                            processing: false,
                             activity,
                             author: getActivityAuthorName(activity.author),
                         });
@@ -983,7 +986,7 @@ export class Manager extends EventEmitter implements RunningStates {
             }
             // refresh signal from firehose if activity was ingested multiple times before processing or re-queued while processing
             // want to make sure we have the most recent data
-            if(runtimeShouldRefresh || refresh) {
+            if(runtimeShouldRefresh) {
                 this.logger.verbose(`Refreshed data`);
                 // @ts-ignore
                 item = await activity.refresh();

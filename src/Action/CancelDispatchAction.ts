@@ -72,7 +72,7 @@ export class CancelDispatchAction extends Action {
                     matchedDispatchIdentifier = this.identifiers.filter(x => x !== null).includes(x.identifier);
                 }
                 const matched = matchedId && matchedDispatchIdentifier;
-                if(matched && x.processing) {
+                if(matched) {
                     this.logger.debug(`Cannot remove ${isSubmission(x.activity) ? 'Submission' : 'Comment'} ${x.activity.name} because it is currently processing`);
                     return false;
                 }
