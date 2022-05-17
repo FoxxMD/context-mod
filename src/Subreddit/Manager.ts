@@ -229,6 +229,8 @@ export class Manager extends EventEmitter implements RunningStates {
     rulesUniqueRollingAvg: number = 0;
     actionedEvents: ActionedEvent[] = [];
 
+    delayedQueueInterval: any;
+
     processEmitter: EventEmitter = new EventEmitter();
 
     activityRepo!: Repository<Activity>;
@@ -398,6 +400,45 @@ export class Manager extends EventEmitter implements RunningStates {
             }
         })(this), 10000);
 
+        this.delayedQueueInterval = setInterval((function(self) {
+            return function() {
+                if(!self.queue.paused && self.resources !== undefined) {
+                    let index = 0;
+                    let anyQueued = false;
+                    for(const ar of self.resources.delayedItems) {
+                        if(!ar.processing && ar.queuedAt.add(ar.delay).isSameOrBefore(dayjs())) {
+                            anyQueued = true;
+                            self.logger.info(`Activity ${ar.activity.name} dispatched at ${ar.queuedAt.format('HH:mm:ss z')} (delayed for ${ar.delay.humanize()}) is now being queued.`, {leaf: 'Delayed Activities'});
+                            self.firehose.push({
+                                activity: ar.activity,
+                                options: {
+                                    refresh: true,
+                                    // @ts-ignore
+                                    source: ar.identifier === undefined ? ar.type : `${ar.type}:${ar.identifier}`,
+                                    initialGoto: ar.goto,
+                                    activitySource: {
+                                        id: ar.id,
+                                        queuedAt: ar.queuedAt,
+                                        delay: ar.delay,
+                                        action: ar.action,
+                                        goto: ar.goto,
+                                        identifier: ar.identifier,
+                                        type: ar.type
+                                    },
+                                    dryRun: ar.dryRun,
+                                }
+                            });
+                            self.resources.delayedItems.splice(index, 1, {...ar, processing: true});
+                        }
+                        index++;
+                    }
+                    if(!anyQueued) {
+                        self.logger.debug('No Activities ready to queue', {leaf: 'Delayed Activities'});
+                    }
+                }
+            }
+        })(this), 5000); // every 5 seconds
+
         this.processEmitter.on('notify', (payload: NotificationEventPayload) => {
            this.notificationManager.handle(payload.type, payload.title, payload.body, payload.causedBy, payload.logLevel);
         });
@@ -490,40 +531,6 @@ export class Manager extends EventEmitter implements RunningStates {
             }
         }
         , 1);
-    }
-
-    protected async startDelayQueue() {
-        while(this.queueState.state === RUNNING) {
-            let index = 0;
-            for(const ar of this.resources.delayedItems) {
-                if(!ar.processing && ar.queuedAt.add(ar.delay).isSameOrBefore(dayjs())) {
-                    this.logger.info(`Delayed Activity ${ar.activity.name} is being queued.`);
-                    await this.firehose.push({
-                        activity: ar.activity,
-                        options: {
-                            refresh: true,
-                            // @ts-ignore
-                            source: ar.identifier === undefined ? ar.type : `${ar.type}:${ar.identifier}`,
-                            initialGoto: ar.goto,
-                            activitySource: {
-                                id: ar.id,
-                                queuedAt: ar.queuedAt,
-                                delay: ar.delay,
-                                action: ar.action,
-                                goto: ar.goto,
-                                identifier: ar.identifier,
-                                type: ar.type
-                            },
-                            dryRun: ar.dryRun,
-                        }
-                    });
-                    this.resources.delayedItems.splice(index, 1, {...ar, processing: true});
-                }
-                index++;
-            }
-            // sleep for 5 seconds
-            await sleep(5000);
-        }
     }
 
     protected generateQueue(maxWorkers: number) {
@@ -1347,7 +1354,6 @@ export class Manager extends EventEmitter implements RunningStates {
                 state: RUNNING,
                 causedBy
             }
-            this.startDelayQueue();
             if(!suppressNotification) {
                 this.notificationManager.handle('runStateChanged', 'Queue Started', reason, causedBy);
             }

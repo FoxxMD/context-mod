@@ -258,7 +258,7 @@ export const defaultFormat = (defaultLabel = 'App') => printf(({
     }
 
     let nodes = labels;
-    if (leaf !== null && leaf !== undefined) {
+    if (leaf !== null && leaf !== undefined && !nodes.includes(leaf)) {
         nodes.push(leaf);
     }
     const labelContent = `${nodes.map((x: string) => `[${x}]`).join(' ')}`;
