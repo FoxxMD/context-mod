@@ -913,39 +913,43 @@ export class SubredditResources {
                 return await item.fetch();
             }
         } catch (err: any) {
-            this.logger.error('Error while trying to fetch a cached activity', err);
-            throw err.logged;
+            throw new Error('Error while trying to fetch a cached Activity', err);
         }
     }
 
     // @ts-ignore
     public async setActivity(item: Submission | Comment, tryToFetch = true)
     {
-        let hash = '';
-        if(this.submissionTTL !== false && isSubmission(item)) {
-            hash = `sub-${item.name}`;
-            if(tryToFetch && item instanceof Submission) {
-                // @ts-ignore
-                const itemToCache = await item.fetch();
-                await this.cache.set(hash, itemToCache, {ttl: this.submissionTTL});
-                return itemToCache;
-            } else {
-                // @ts-ignore
-                await this.cache.set(hash, item, {ttl: this.submissionTTL});
-                return item;
+        try {
+            let hash = '';
+            if (this.submissionTTL !== false && isSubmission(item)) {
+                hash = `sub-${item.name}`;
+                if (tryToFetch && item instanceof Submission) {
+                    // @ts-ignore
+                    const itemToCache = await item.fetch();
+                    await this.cache.set(hash, itemToCache, {ttl: this.submissionTTL});
+                    return itemToCache;
+                } else {
+                    // @ts-ignore
+                    await this.cache.set(hash, item, {ttl: this.submissionTTL});
+                    return item;
+                }
+            } else if (this.commentTTL !== false) {
+                hash = `comm-${item.name}`;
+                if (tryToFetch && item instanceof Comment) {
+                    // @ts-ignore
+                    const itemToCache = await item.fetch();
+                    await this.cache.set(hash, itemToCache, {ttl: this.commentTTL});
+                    return itemToCache;
+                } else {
+                    // @ts-ignore
+                    await this.cache.set(hash, item, {ttl: this.commentTTL});
+                    return item;
+                }
             }
-        } else if(this.commentTTL !== false){
-            hash = `comm-${item.name}`;
-            if(tryToFetch && item instanceof Comment) {
-                // @ts-ignore
-                const itemToCache = await item.fetch();
-                await this.cache.set(hash, itemToCache, {ttl: this.commentTTL});
-                return itemToCache;
-            } else {
-                // @ts-ignore
-                await this.cache.set(hash, item, {ttl: this.commentTTL});
-                return item;
-            }
+            return item;
+        } catch (e) {
+            throw new ErrorWithCause('Error occurred while trying to add Activity to cache', {cause: e});
         }
     }
 
@@ -1022,7 +1026,7 @@ export class SubredditResources {
                 return subreddit as Subreddit;
             }
         } catch (err: any) {
-            this.logger.error('Error while trying to fetch a cached activity', err);
+            this.logger.error('Error while trying to fetch a cached subreddit', err);
             throw err.logged;
         }
     }
