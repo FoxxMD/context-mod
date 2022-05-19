@@ -1676,6 +1676,7 @@ export interface LogInfo {
     labels?: string[]
     bot?: string
     user?: string
+    transport?: string[]
 }
 
 export interface ActionResult extends ActionProcessResult {

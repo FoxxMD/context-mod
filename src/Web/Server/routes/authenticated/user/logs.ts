@@ -27,6 +27,12 @@ const logs = () => {
         booleanMiddle([{
             name: 'stream',
             defaultVal: false
+        }, {
+            name: 'formatted',
+            defaultVal: true,
+        }, {
+            name: 'transports',
+            defaultVal: false
         }])
     ];
 
@@ -37,7 +43,11 @@ const logs = () => {
         const userName = req.user?.name as string;
         const isOperator = req.user?.isInstanceOperator(req.botApp);
         const realManagers = req.botApp.bots.map(x => req.user?.accessibleSubreddits(x).map(x => x.displayLabel)).flat() as string[];
-        const {level = 'verbose', stream, limit = 200, sort = 'descending', streamObjects = false, formatted = true} = req.query;
+        const {level = 'verbose', stream, limit = 200, sort = 'descending', streamObjects = false, formatted: formattedVal = true, transports: transportsVal = false} = req.query;
+
+        const formatted = formattedVal as boolean;
+        const transports = transportsVal as boolean;
+
         if (stream) {
             const origin = req.header('X-Forwarded-For') ?? req.header('host');
             try {
@@ -46,11 +56,7 @@ const logs = () => {
                         const {subreddit: subName, user} = log;
                         if (isOperator || (subName !== undefined && (realManagers.includes(subName) || (user !== undefined && user.includes(userName))))) {
                             if(streamObjects) {
-                                let obj: any = log;
-                                if(!formatted) {
-                                    const {[MESSAGE]: fMessage, ...rest} = log;
-                                    obj = rest;
-                                }
+                                let obj: any = transformLog(log, {formatted, transports });
                                 res.write(`${JSON.stringify(obj)}\r\n`);
                             } else if(formatted) {
                                 res.write(`${log[MESSAGE]}\r\n`)
@@ -114,15 +120,9 @@ const logs = () => {
                 botArr.push({
                     name: b.getBotName(),
                     system: systemLogs,
-                    all: formatted ? allLogs.map(x => {
-                        const {[MESSAGE]: fMessage, ...rest} = x;
-                        return {...rest, formatted: fMessage};
-                    }) : allLogs,
+                    all: allLogs.map(x => transformLog(x, {formatted, transports })),
                     subreddits: allReq ? [] : [...managerLogs.entries()].reduce((acc: any[], curr) => {
-                        const l = formatted ? curr[1].map(x => {
-                            const {[MESSAGE]: fMessage, ...rest} = x;
-                            return {...rest, formatted: fMessage};
-                            }) : curr[1];
+                        const l = curr[1].map(x => transformLog(x, {formatted, transports }));
                         acc.push({name: curr[0], logs: l});
                         return acc;
                     }, [])
@@ -133,6 +133,25 @@ const logs = () => {
     };
 
     return [...middleware, response];
+}
+
+const transformLog = (obj: LogInfo, options: { formatted: boolean, transports: boolean }) => {
+    const {
+        [MESSAGE]: fMessage,
+        transport,
+        //@ts-ignore
+        name, // name is the name of the last transport
+        ...rest
+    } = obj;
+    const transformed: any = rest;
+    if (options.formatted) {
+        transformed.formatted = fMessage;
+    }
+    if (options.transports) {
+        transformed.transport = transport;
+        transformed.name = name;
+    }
+    return transformed;
 }
 
 export default logs;

@@ -672,41 +672,9 @@
     dayjs.extend(window.dayjs_plugin_duration)
     dayjs.extend(window.dayjs_plugin_relativeTime)
     dayjs.extend(window.dayjs_plugin_isSameOrAfter)
-    window.formattedTime = (short, full) => `<span class="has-tooltip"><span style="margin-top:35px" class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black space-y-3 p-2 text-left'>${full}</span><span>${short}</span></span>`;
-    window.formatLogLineToHtml = (log, timestamp = undefined) => {
-        const val = typeof log === 'string' ? log : log['MESSAGE'];
-        const logContent = Autolinker.link(val, {
-            email: false,
-            phone: false,
-            mention: false,
-            hashtag: false,
-            stripPrefix: false,
-            sanitizeHtml: true,
-        })
-            .replace(/(\s*debug\s*):/i, '<span class="debug blue">$1</span>:')
-            .replace(/(\s*warn\s*):/i, '<span class="warn yellow">$1</span>:')
-            .replace(/(\s*info\s*):/i, '<span class="info green">$1</span>:')
-            .replace(/(\s*error\s*):/i, '<span class="error red">$1</span>:')
-            .replace(/(\s*verbose\s*):/i, '<span class="error purple">$1</span>:')
-            .replaceAll('\n', '<br />');
-        //.replace(HYPERLINK_REGEX, '<a target="_blank" href="$&">$&</a>');
-        let line = '';
-
-        let timestampString = timestamp;
-        if(timestamp === undefined && typeof log !== 'string') {
-            timestampString = log.timestamp;
-        }
-
-        if(timestampString !== undefined) {
-            const timeStampReplacement = formattedTime(dayjs(timestampString).format('HH:mm:ss z'), timestampString);
-            const splitLine = logContent.split(timestampString);
-            line = `<div class="logLine">${splitLine[0]}${timeStampReplacement}<span style="white-space: pre-wrap">${splitLine[1]}</span></div>`;
-        } else {
-            line = `<div style="white-space: pre-wrap" class="logLine">${logContent}</div>`
-        }
-        return line;
-    }
 </script>
+<script src="public/browserBundle.js"></script>
+<script src="public/logUtils.js"></script>
 <script>
     window.sort = 'desc';
 
@@ -887,14 +855,16 @@
                 sort = document.querySelector(`[data-subreddit="${subreddit}"] [data-type="sort"]`).value;
                 limitSel = document.querySelector(`[data-subreddit="${subreddit}"] [data-type="limit"]`).value;
 
-                fetch(`/api/logs?instance=<%= instanceId %>&bot=${bot}&subreddit=${subreddit}&level=${level}&sort=${sort}&limit=${limitSel}&stream=false&formatted=true`).then((resp) => {
+                fetch(`/api/logs?instance=<%= instanceId %>&bot=${bot}&subreddit=${subreddit}&level=${level}&sort=${sort}&limit=${limitSel}&stream=false&formatted=false`).then((resp) => {
                     if (!resp.ok) {
                         console.error('Response was not OK from logs GET');
                     } else {
                         resp.json().then((data) => {
                             const logContainer = document.querySelector(`[data-subreddit="${subreddit}"] .logs`);
                             const logLines = (subreddit.toLowerCase() === 'all' ? data[0].all : data[0].subreddits[0].logs).map(x => {
-                                let fString = x.formatted;
+                                debugger;
+                                const logObj = window.formatLog(x);
+                                let fString = logObj[window.beam.MESSAGE];
                                 if(x.bot !== undefined) {
                                     fString = fString.replace(`~${x.bot}~ `, '');
                                 }
