@@ -383,7 +383,7 @@ dist
 **/src/**/*.js
 **/tests/**/*.js
 **/tests/**/*.map
-!src/Web/assets/*
+!src/Web/assets/**
 **/src/**/*.map
 /**/*.sqlite
 /**/*.bak

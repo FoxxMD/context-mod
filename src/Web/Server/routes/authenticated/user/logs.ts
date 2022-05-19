@@ -33,6 +33,9 @@ const logs = () => {
         }, {
             name: 'transports',
             defaultVal: false
+        }, {
+            name: 'streamObjects',
+            defaultVal: false
         }])
     ];
 

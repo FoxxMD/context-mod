@@ -666,6 +666,7 @@
 <script src="https://unpkg.com/dayjs@1.10.7/plugin/duration.js"></script>
 <script src="https://unpkg.com/dayjs@1.10.7/plugin/relativeTime.js"></script>
 <script src="https://unpkg.com/dayjs@1.10.7/plugin/isSameOrAfter.js"></script>
+<script src="https://unpkg.com/superagent" crossorigin="anonymous"></script>
 <script>
     dayjs.extend(window.dayjs_plugin_timezone)
     dayjs.extend(window.dayjs_plugin_advancedFormat)
@@ -673,6 +674,7 @@
     dayjs.extend(window.dayjs_plugin_relativeTime)
     dayjs.extend(window.dayjs_plugin_isSameOrAfter)
 </script>
+<script src="public/TextEncoderStream.js"></script>
 <script src="public/browserBundle.js"></script>
 <script src="public/logUtils.js"></script>
 <script>
@@ -856,33 +858,42 @@
 
 
     function getLogBlock(bot, subreddit) {
+
+        console.log(`Getting initial logs for ${bot} ${subreddit}`);
+
         level = document.querySelector(`[data-subreddit="${subreddit}"] [data-type="level"]`).value;
         sort = document.querySelector(`[data-subreddit="${subreddit}"] [data-type="sort"]`).value;
         limitSel = document.querySelector(`[data-subreddit="${subreddit}"] [data-type="limit"]`).value;
 
-        fetch(`/api/logs?instance=<%= instanceId %>&bot=${bot}&subreddit=${subreddit}&level=${level}&sort=${sort}&limit=${limitSel}&stream=false&formatted=false`).then((resp) => {
-            if (!resp.ok) {
-                console.error('Response was not OK from logs GET');
-            } else {
-                resp.json().then((data) => {
-                    const logContainer = document.querySelector(`.sub[data-bot="${bot}"] .logs[data-subreddit="${subreddit}"]`);
-                    const logLines = (subreddit.toLowerCase() === 'all' ? data[0].all : data[0].subreddits[0].logs).map(x => {
-                        const logObj = window.formatLog(x);
-                        let fString = logObj[window.beam.MESSAGE];
-                        if(x.bot !== undefined) {
-                            fString = fString.replace(`~${x.bot}~ `, '');
-                        }
-                        if(x.subreddit !== undefined && subreddit !== 'All') {
-                            fString = fString.replace(`{${x.subreddit}} `, '');
-                        }
-                        return window.formatLogLineToHtml(fString, x.timestamp)
-                    }).join('');
-                    logContainer.insertAdjacentHTML('afterbegin', logLines);
-                    //activeSub.classList.add('seen');
-                });
-            }
-        }).catch((err) => {
-            console.log(err);
+        return new Promise((resolve, reject) => {
+            fetch(`/api/logs?instance=<%= instanceId %>&bot=${bot}&subreddit=${subreddit}&level=${level}&sort=${sort}&limit=${limitSel}&stream=false&formatted=false`).then((resp) => {
+                if (!resp.ok) {
+                    console.error('Response was not OK from logs GET');
+                    reject('Response was not OK from logs GET');
+                } else {
+                    resp.json().then((data) => {
+                        const logContainer = document.querySelector(`.sub[data-bot="${bot}"] .logs[data-subreddit="${subreddit}"]`);
+                        const logLines = (subreddit.toLowerCase() === 'all' ? data[0].all : data[0].subreddits[0].logs).map(x => {
+                            const logObj = window.formatLog(x);
+                            let fString = logObj[window.beam.MESSAGE];
+                            if(x.bot !== undefined) {
+                                fString = fString.replace(`~${x.bot}~ `, '');
+                            }
+                            if(x.subreddit !== undefined && subreddit !== 'All') {
+                                fString = fString.replace(`{${x.subreddit}} `, '');
+                            }
+                            return window.formatLogLineToHtml(fString, x.timestamp)
+                        }).join('');
+                        logContainer.insertAdjacentHTML('afterbegin', logLines);
+                        console.log(`Done with initial logs for ${bot} ${subreddit}`);
+                        resolve();
+                        //activeSub.classList.add('seen');
+                    });
+                }
+            }).catch((err) => {
+                console.log(err);
+                reject(err);
+            });
         });
     }
 
@@ -898,20 +909,175 @@
         }).observe(element);
     }
 
-    document.querySelectorAll('.logs').forEach(el => {
+    function getStreamingLogs(sub, bot) {
+
+        console.log(`Getting stream for ${bot} ${sub}`);
+
+        level = document.querySelector(`[data-subreddit="${sub}"] [data-type="level"]`).value;
+        sort = document.querySelector(`[data-subreddit="${sub}"] [data-type="sort"]`).value;
+        limitSel = document.querySelector(`[data-subreddit="${sub}"] [data-type="limit"]`).value;
+
+        const logContainer = document.querySelector(`.sub[data-bot="${bot}"] .logs[data-subreddit="${sub}"]`);
+
+        let textBuffer = '';
+
+        var controller = new AbortController();
+        var signal = controller.signal;
+
+        let lastFlush;
+        let bufferTimeout;
+
+        let bufferedLogs = [];
+
+        const formattedMsg = (x) => {
+            const logObj = window.formatLog(x);
+            let fString = logObj[window.beam.MESSAGE];
+            if(x.bot !== undefined) {
+                fString = fString.replace(`~${x.bot}~ `, '');
+            }
+            if(x.subreddit !== undefined && sub !== 'All') {
+                fString = fString.replace(`{${x.subreddit}} `, '');
+            }
+            return window.formatLogLineToHtml(fString, x.timestamp);
+        }
+
+        const flushLogs = () => {
+            let existingLogs;
+
+            //const el = document.querySelector(`[data-subreddit="${sub}"][data-bot="${bot}"].sub`);
+            //const logContainer = el.querySelector(`.logs`);
+
+            if(window.sort === 'desc' || window.sort === 'descending') {
+                bufferedLogs.forEach((l) => {
+                    logContainer.insertAdjacentHTML('afterbegin', formattedMsg(l));
+                })
+                existingLogs = Array.from(logContainer.querySelectorAll(`.logLine`));
+                logContainer.replaceChildren(...existingLogs.slice(0, limitSel));
+            } else {
+                bufferedLogs.forEach((l) => {
+                    logContainer.insertAdjacentHTML('beforeend', formattedMsg(l));
+                    existingLogs = Array.from(logContainer.querySelectorAll(`.logLine`));
+                    const overLimit = limitSel - existingLogs.length;
+                    logContainer.replaceChildren(...existingLogs.slice(overLimit -1, limitSel));
+                })
+            }
+            lastFlush = Date.now();
+            bufferedLogs = [];
+        }
+
+        const fetchPromise = fetch(`/api/logs?instance=<%= instanceId %>&bot=${bot}&subreddit=${sub}&level=${level}&sort=${sort}&limit=${limitSel}&stream=true&streamObjects=true&formatted=false`, {signal})
+            .then(response => response.body)
+            .then(rs =>
+                rs.pipeThrough(new TextDecoderStream())
+                    .pipeThrough(new TransformStream({
+                        transform(chunk, controller) {
+                            textBuffer += chunk;
+                            const lines = textBuffer.split('\n');
+                            for (const line of lines.slice(0, -1)) {
+                                controller.enqueue(line);
+                            }
+                            textBuffer = lines.slice(-1)[0];
+                        },
+                        flush(controller) {
+                            if (textBuffer) {
+                                controller.enqueue(textBuffer);
+                            }
+                        }
+                    }))
+
+                    // Parse JSON objects
+                    .pipeThrough(new TransformStream({
+                        transform(line, controller) {
+                            if (line) {
+                                controller.enqueue(
+                                    JSON.parse(line)
+                                );
+                            }
+                        }
+                    }))
+            ).catch((e) => {
+                console.warn(e);
+            });
+
+        fetchPromise.then(async res => {
+            const reader = res.getReader();
+            let keepReading = true;
+            while(keepReading) {
+                const {done, value} = await reader.read();
+                if(done) {
+                    keepReading = false;
+                    console.log('done');
+                }
+                if(value) {
+                    //console.log(`((Logged For ${bot} ${sub})) ${value.message}`);
+
+                    bufferedLogs.push(value);
+
+                    if(lastFlush !== undefined && bufferTimeout !== undefined && ((Date.now() - lastFlush)/1000) > 3) {
+                        //console.log('Immediate flush');
+                        clearTimeout(bufferTimeout);
+                        bufferTimeout = undefined;
+                        flushLogs();
+                    } else {
+                        //console.log('Using timeout');
+                        clearTimeout(bufferTimeout);
+                        bufferTimeout = setTimeout(() => {flushLogs();}, 1000);
+                    }
+                }
+            }
+            /*                function read() {
+                                reader.read().then(({done, value}) => {
+                                    if(done) {
+                                        console.log('done');
+                                        return;
+                                    }
+                                    if(value) {
+                                        console.log(value);
+                                        read();
+                                    }
+                                });
+                            }
+                            read();*/
+        }).catch((e) => {
+            if(e.name !== 'AbortError') {
+                console.error(e);
+            }
+        });
+
+        recentlySeen = recentlySeen.set(`${bot}.${sub}`, {fetch: fetchPromise, controller});
+    }
+
+    document.querySelectorAll('.sub').forEach(el => {
         const sub = el.dataset.subreddit;
-        const bot = el.closest('.sub').dataset.bot;
+        const bot = el.dataset.bot;
         //console.log(`Focused on ${bot} ${sub}`);
         onVisible(el, () => {
             console.log(`Focused on ${bot} ${sub}`);
-            getLogBlock(bot, sub);
-        });
 
-        // el.addEventListener('focus', e => {
-        // const sub = e.target.dataset.subreddit;
-        // const bot = e.target.closest('.sub').dataset.bot;
-        // console.log(`Focused on ${bot} ${sub}`);
-        // });
+            const identifier = `${bot}.${sub}`;
+
+            recentlySeen.forEach((value, key) => {
+                const {timeout, ...rest} = value;
+                if(key === identifier && timeout !== undefined) {
+                    console.log('Clearing timeout on own already set');
+                    clearTimeout(timeout);
+                    recentlySeen.set(key, rest);
+                } else if(key !== identifier && timeout === undefined) {
+                    const t = setTimeout(() => {
+                        console.log(`timeout expired, stopping logging for ${key}`);
+                        rest.controller.abort();
+                        recentlySeen.delete(key);
+                    },15000);
+                    recentlySeen.set(key, {timeout: t, ...rest});
+                }
+            });
+
+            if(!recentlySeen.has(identifier)) {
+                getLogBlock(bot, sub).then(() => {
+                    getStreamingLogs(sub, bot);
+                });
+            }
+        });
     });
 
 
@@ -988,85 +1154,9 @@
         let shownBot = searchParams.get('bot');
         window.socket.emit('viewing', {bot: shownBot, subreddit: shownSub});
 
-        socket.on("log", data => {
-            const {
-                subreddit,
-                bot,
-                subredditMessage,
-                allMessage,
-                formattedMessage
-            } = data;
-            if(bot === undefined && subreddit === undefined) {
-                const sys = bufferedBot.get('system');
-                if(sys !== undefined) {
-                    sys.set('All', sys.get('All').concat(formattedMessage));
-                    bufferedBot.set('system', sys);
-                }
-            }
-            if(bot !== undefined) {
-                bufferedBot.set('All', bufferedBot.get('All').concat(allMessage));
+        // TODO web logging
+        // socket.on('log')
 
-                const buffBot = bufferedBot.get(bot) || newBufferedLogs();
-                buffBot.set('All', buffBot.get('All').concat(allMessage));
-                if (subreddit !== undefined) {
-                    buffBot.set(subreddit, (buffBot.get(subreddit) || []).concat(subredditMessage));
-                }
-                bufferedBot.set(bot, buffBot);
-            }
-
-
-            const flushLogs = () => {
-                bufferedBot.forEach((subLogs, botName) => {
-                    if(botName === 'All') {
-                        return;
-                    }
-                    subLogs.forEach((logs, subKey) => {
-                        // check sub exists -- may be a web log
-                        const el = document.querySelector(`[data-subreddit="${subKey}"][data-bot="${botName}"].sub.seen`);
-                        if(null !== el) {
-                            const limit = Number.parseInt(document.querySelector(`[data-subreddit="${subKey}"] [data-type="limit"]`).value);
-                            const logContainer = el.querySelector(`.logs`);
-                            let existingLogs;
-                            if(window.sort === 'desc' || window.sort === 'descending') {
-                                logs.forEach((l) => {
-                                    logContainer.insertAdjacentHTML('afterbegin', l);
-                                })
-                                existingLogs = Array.from(el.querySelectorAll(`.logs .logLine`));
-                                logContainer.replaceChildren(...existingLogs.slice(0, limit));
-                            } else {
-                                logs.forEach((l) => {
-                                    logContainer.insertAdjacentHTML('beforeend', l);
-                                    existingLogs = Array.from(el.querySelectorAll(`.logs .logLine`));
-                                    const overLimit = limit - existingLogs.length;
-                                    logContainer.replaceChildren(...existingLogs.slice(overLimit -1, limit));
-                                })
-                            }
-                        }
-                    });
-                });
-                lastFlush = Date.now();
-                bufferedBot = newBufferedBot();
-                //bufferedLogs = newBufferedLogs();
-                //console.log('Flushed Logs');
-            }
-
-            if(lastFlush !== undefined && bufferTimeout !== undefined && ((Date.now() - lastFlush)/1000) > 3) {
-                //console.log('Immediate flush');
-                clearTimeout(bufferTimeout);
-                bufferTimeout = undefined;
-                flushLogs();
-            } else {
-                //console.log('Using timeout');
-                clearTimeout(bufferTimeout);
-                bufferTimeout = setTimeout(() => {flushLogs();}, 1000);
-            }
-        });
-        socket.on("logClear", data => {
-            data.forEach((obj) => {
-                const n = obj.name === 'all' ? 'All' : obj.name;
-                document.querySelector(`[data-subreddit="${n}"].logs`).innerHTML = obj.logs;
-            })
-        });
         const subIndicators = ['red', 'green', 'yellow'];
         socket.on('opStats', (resp) => {
             for(const b of resp) {
