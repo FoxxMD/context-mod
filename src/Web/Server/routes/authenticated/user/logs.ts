@@ -48,15 +48,51 @@ const logs = () => {
         const formatted = formattedVal as boolean;
         const transports = transportsVal as boolean;
 
+        let bots: Bot[] = [];
+        if(req.serverBot !== undefined) {
+            bots = [req.serverBot];
+        } else {
+            bots = req.user?.accessibleBots(req.botApp.bots) as Bot[];
+        }
+
+        let managers: Manager[] = [];
+
+        if(req.manager !== undefined) {
+            managers = [req.manager];
+        } else {
+            for(const b of bots) {
+                managers = managers.concat(req.user?.accessibleSubreddits(b) as Manager[]);
+            }
+        }
+
+        //const allReq = req.query.subreddit !== undefined && (req.query.subreddit as string).toLowerCase() === 'all';
+
         if (stream) {
+
+            const requestedManagers = managers.map(x => x.displayLabel);
+            const requestedBots = bots.map(x => x.botName);
+
             const origin = req.header('X-Forwarded-For') ?? req.header('host');
             try {
                 logger.stream().on('log', (log: LogInfo) => {
                     if (isLogLineMinLevel(log, level as string)) {
-                        const {subreddit: subName, user} = log;
-                        if (isOperator || (subName !== undefined && (realManagers.includes(subName) || (user !== undefined && user.includes(userName))))) {
+                        const {subreddit: subName, bot, user} = log;
+                        let canAccess = false;
+                        if(user !== undefined && user.includes(userName)) {
+                            canAccess = true;
+                        } else if(subName !== undefined || bot !== undefined) {
+                            if(subName === undefined) {
+                                canAccess = requestedBots.includes(bot);
+                            } else {
+                                canAccess = requestedManagers.includes(subName);
+                            }
+                        } else if(isOperator) {
+                            canAccess = true;
+                        }
+
+                        if (canAccess) {
                             if(streamObjects) {
-                                let obj: any = transformLog(log, {formatted, transports });
+                                let obj: any = transformLog(log, {formatted, transports});
                                 res.write(`${JSON.stringify(obj)}\r\n`);
                             } else if(formatted) {
                                 res.write(`${log[MESSAGE]}\r\n`)
@@ -80,12 +116,6 @@ const logs = () => {
                 res.destroy();
             }
         } else {
-            let bots: Bot[] = [];
-            if(req.serverBot !== undefined) {
-                bots = [req.serverBot];
-            } else {
-                bots = req.user?.accessibleBots(req.botApp.bots) as Bot[];
-            }
 
             const allReq = req.query.subreddit !== undefined && (req.query.subreddit as string).toLowerCase() === 'all';
 

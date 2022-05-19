@@ -846,46 +846,72 @@
                 history.pushState(null, '', newRelativePathQuery);
             }
             const activeSub = document.querySelector(`[data-subreddit="${subreddit}"][data-bot="${bot}"].sub`);
-            if(!activeSub.classList.contains('seen')) {
-                //firstSub.classList.add('seen');
-
-                //subreddit = firstSub.dataset.subreddit;
-                //bot = subSection.dataset.bot;
-                level = document.querySelector(`[data-subreddit="${subreddit}"] [data-type="level"]`).value;
-                sort = document.querySelector(`[data-subreddit="${subreddit}"] [data-type="sort"]`).value;
-                limitSel = document.querySelector(`[data-subreddit="${subreddit}"] [data-type="limit"]`).value;
-
-                fetch(`/api/logs?instance=<%= instanceId %>&bot=${bot}&subreddit=${subreddit}&level=${level}&sort=${sort}&limit=${limitSel}&stream=false&formatted=false`).then((resp) => {
-                    if (!resp.ok) {
-                        console.error('Response was not OK from logs GET');
-                    } else {
-                        resp.json().then((data) => {
-                            const logContainer = document.querySelector(`[data-subreddit="${subreddit}"] .logs`);
-                            const logLines = (subreddit.toLowerCase() === 'all' ? data[0].all : data[0].subreddits[0].logs).map(x => {
-                                debugger;
-                                const logObj = window.formatLog(x);
-                                let fString = logObj[window.beam.MESSAGE];
-                                if(x.bot !== undefined) {
-                                    fString = fString.replace(`~${x.bot}~ `, '');
-                                }
-                                if(x.subreddit !== undefined && subreddit !== 'All') {
-                                    fString = fString.replace(`{${x.subreddit}} `, '');
-                                }
-                                return window.formatLogLineToHtml(fString, x.timestamp)
-                            }).join('');
-                            logContainer.insertAdjacentHTML('afterbegin', logLines);
-                            activeSub.classList.add('seen');
-                        });
-                    }
-                }).catch((err) => {
-                    console.log(err);
-                });
-
-            }
             if(window.socket !== undefined) {
                 window.socket.emit('viewing', {bot, subreddit});
             }
         });
+    });
+
+    let recentlySeen = new Map();
+
+
+    function getLogBlock(bot, subreddit) {
+        level = document.querySelector(`[data-subreddit="${subreddit}"] [data-type="level"]`).value;
+        sort = document.querySelector(`[data-subreddit="${subreddit}"] [data-type="sort"]`).value;
+        limitSel = document.querySelector(`[data-subreddit="${subreddit}"] [data-type="limit"]`).value;
+
+        fetch(`/api/logs?instance=<%= instanceId %>&bot=${bot}&subreddit=${subreddit}&level=${level}&sort=${sort}&limit=${limitSel}&stream=false&formatted=false`).then((resp) => {
+            if (!resp.ok) {
+                console.error('Response was not OK from logs GET');
+            } else {
+                resp.json().then((data) => {
+                    const logContainer = document.querySelector(`.sub[data-bot="${bot}"] .logs[data-subreddit="${subreddit}"]`);
+                    const logLines = (subreddit.toLowerCase() === 'all' ? data[0].all : data[0].subreddits[0].logs).map(x => {
+                        const logObj = window.formatLog(x);
+                        let fString = logObj[window.beam.MESSAGE];
+                        if(x.bot !== undefined) {
+                            fString = fString.replace(`~${x.bot}~ `, '');
+                        }
+                        if(x.subreddit !== undefined && subreddit !== 'All') {
+                            fString = fString.replace(`{${x.subreddit}} `, '');
+                        }
+                        return window.formatLogLineToHtml(fString, x.timestamp)
+                    }).join('');
+                    logContainer.insertAdjacentHTML('afterbegin', logLines);
+                    //activeSub.classList.add('seen');
+                });
+            }
+        }).catch((err) => {
+            console.log(err);
+        });
+    }
+
+    // https://stackoverflow.com/a/66394121/1469797
+    function onVisible(element, callback) {
+        new IntersectionObserver((entries, observer) => {
+            entries.forEach(entry => {
+                if(entry.intersectionRatio > 0) {
+                    callback(element);
+                    //observer.disconnect();
+                }
+            });
+        }).observe(element);
+    }
+
+    document.querySelectorAll('.logs').forEach(el => {
+        const sub = el.dataset.subreddit;
+        const bot = el.closest('.sub').dataset.bot;
+        //console.log(`Focused on ${bot} ${sub}`);
+        onVisible(el, () => {
+            console.log(`Focused on ${bot} ${sub}`);
+            getLogBlock(bot, sub);
+        });
+
+        // el.addEventListener('focus', e => {
+        // const sub = e.target.dataset.subreddit;
+        // const bot = e.target.closest('.sub').dataset.bot;
+        // console.log(`Focused on ${bot} ${sub}`);
+        // });
     });
 
 

@@ -1458,10 +1458,10 @@ const webClient = async (options: OperatorConfig) => {
                     if(session.authBotId !== undefined) {
                         // streaming logs and stats from client
                         const newStreams: (AbortController | NodeJS.Timeout)[] = [];
-                        const ac = startLogStream(session, user);
-                        if(ac !== undefined) {
-                            newStreams.push(ac);
-                        }
+                        // const ac = startLogStream(session, user);
+                        // if(ac !== undefined) {
+                        //     newStreams.push(ac);
+                        // }
                         const interval = setInterval(async () => {
                             try {
                                 const resp = await got.get(`${bot.normalUrl}/stats`, {
