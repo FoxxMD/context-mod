@@ -88,7 +88,8 @@ export class CacheStorageProvider extends StorageProvider {
 
     constructor(caching: CacheOptions & StorageProviderOptions) {
         super(caching);
-        this.cache = createCacheManager({...caching, prefix: buildCachePrefix(['web'])}) as Cache;
+        const {logger, invitesMaxAge, loggerLabels, ...restCache } = caching;
+        this.cache = createCacheManager({...restCache, prefix: buildCachePrefix(['web'])}) as Cache;
         this.logger.debug('Using CACHE');
         if (caching.store === 'none') {
             this.logger.warn(`Using 'none' as cache provider means no one will be able to access the interface since sessions will never be persisted!`);
