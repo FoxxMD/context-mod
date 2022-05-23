@@ -858,7 +858,7 @@
 
     function getLogBlock(bot, subreddit) {
 
-        console.log(`Getting initial logs for ${bot} ${subreddit}`);
+        console.debug(`Getting initial logs for ${bot} ${subreddit}`);
 
         level = document.querySelector(`[data-subreddit="${subreddit}"] [data-type="level"]`).value;
         sort = document.querySelector(`[data-subreddit="${subreddit}"] [data-type="sort"]`).value;
@@ -884,7 +884,7 @@
                             return window.formatLogLineToHtml(fString, x.timestamp)
                         }).join('');
                         logContainer.insertAdjacentHTML('afterbegin', logLines);
-                        console.log(`Done with initial logs for ${bot} ${subreddit}`);
+                        console.debug(`Done with initial logs for ${bot} ${subreddit}`);
                         resolve();
                         //activeSub.classList.add('seen');
                     });
@@ -910,7 +910,7 @@
 
     function getStreamingLogs(sub, bot) {
 
-        console.log(`Getting stream for ${bot} ${sub}`);
+        console.debug(`Getting stream for ${bot} ${sub}`);
 
         level = document.querySelector(`[data-subreddit="${sub}"] [data-type="level"]`).value;
         sort = document.querySelector(`[data-subreddit="${sub}"] [data-type="sort"]`).value;
@@ -1005,7 +1005,7 @@
                 const {done, value} = await reader.read();
                 if(done) {
                     keepReading = false;
-                    console.log('done');
+                    console.debug('done');
                 }
                 if(value) {
                     //console.log(`((Logged For ${bot} ${sub})) ${value.message}`);
@@ -1043,7 +1043,105 @@
             }
         });
 
-        recentlySeen = recentlySeen.set(`${bot}.${sub}`, {fetch: fetchPromise, controller});
+        const existing = recentlySeen.get(`${bot}.${sub}`) || {};
+        recentlySeen.set(`${bot}.${sub}`, {...existing, fetch: fetchPromise, controller});
+    }
+
+    function updateLiveStats(resp) {
+        let el;
+        let isAll = resp.name.toLowerCase() === 'all';
+        if(isAll) {
+            // got all
+            el = document.querySelector(`[data-subreddit="All"][data-bot="${resp.bot}"].sub`);
+        } else {
+            // got subreddit
+            el = document.querySelector(`[data-subreddit="${resp.name}"].sub`);
+        }
+
+        if(resp.system.running && el.classList.contains('offline')) {
+            el.classList.remove('offline');
+        } else if(!resp.system.running && !el.classList.contains('offline')) {
+            el.classList.add('offline');
+        }
+
+        el.querySelector('.runningActivities').innerHTML = resp.runningActivities;
+        el.querySelector('.queuedActivities').innerHTML = resp.queuedActivities;
+        el.querySelector('.delayedItemsCount').innerHTML = resp.delayedItems.length;
+        el.querySelector('.delayedItemsList').innerHTML = 'No delayed Items!';
+        if(resp.delayedItems.length > 0) {
+            el.querySelector('.delayedItemsList').innerHTML = '';
+            const now = dayjs();
+            const sorted = resp.delayedItems.map(x => ({...x, queuedAtUnix: x.queuedAt, queuedAt: dayjs.unix(x.queuedAt), dispatchAt: dayjs.unix(x.queuedAt + x.duration)}));
+            sorted.sort((a, b) => {
+                return a.dispatchAt.isSameOrAfter(b.dispatchAt) ? 1 : -1
+            });
+            const delayedItemDivs = sorted.map(x => {
+                const diffUntilNow = x.dispatchAt.diff(now);
+                const durationUntilNow = dayjs.duration(diffUntilNow, 'ms');
+                const queuedAtDisplay = x.queuedAt.format('HH:mm:ss z');
+                const durationDayjs = dayjs.duration(x.duration, 'seconds');
+                const durationDisplay = durationDayjs.humanize();
+                const cancelLink = `<a href="#" data-id="${x.id}" data-subreddit="${x.subreddit}" class="delayCancel">CANCEL</a>`;
+                return `<div>A <a href="https://reddit.com${x.permalink}">${x.submissionId !== undefined ? 'Comment' : 'Submssion'}</a>${isAll ? ` in <a href="https://reddit.com${x.subreddit}">${x.subreddit}</a> ` : ''} by <a href="https://reddit.com/u/${x.author}">${x.author}</a> queued by ${x.source} at ${queuedAtDisplay} for ${durationDisplay} (dispatches ${durationUntilNow.humanize(true)}) -- ${cancelLink}</div>`;
+            });
+            el.querySelector('.delayedItemsList').insertAdjacentHTML('afterbegin', delayedItemDivs.join(''));
+            el.querySelectorAll('.delayedItemsList .delayCancel').forEach(elm => {
+                elm.addEventListener('click', e => {
+                    e.preventDefault();
+                    const id = e.target.dataset.id;
+                    const subreddit = e.target.dataset.subreddit;
+                    fetch(`/api/delayed?instance=<%= instanceId %>&bot=${resp.bot}&subreddit=${subreddit}&id=${id}`, {
+                        method: 'DELETE'
+                    }).then((resp) => {
+                        if (!resp.ok) {
+                            console.error('Response was not OK from delay cancel');
+                        } else {
+                            console.log('Removed ok');
+                        }
+                    });
+                });
+            });
+        }
+
+        el.querySelector('.allStats .eventsCount').innerHTML = resp.stats.historical.eventsCheckedTotal;
+        el.querySelector('.allStats .checksCount').innerHTML = resp.stats.historical.checksTriggeredTotal;
+        el.querySelector('.allStats .rulesCount').innerHTML = resp.stats.historical.rulesTriggeredTotal;
+        el.querySelector('.allStats .actionsCount').innerHTML = resp.stats.historical.actionsRunTotal;
+
+        if(isAll) {
+            for(const elm of ['apiAvg','apiLimit','apiDepletion','nextHeartbeat', 'nextHeartbeatHuman', 'limitReset', 'limitResetHuman', 'nannyMode', 'startedAtHuman']) {
+                el.querySelector(`#${elm}`).innerHTML = resp[elm];
+            }
+            el.querySelector(`.botStatus`).innerHTML = resp.system.running ? 'ONLINE' : 'OFFLINE';
+        } else {
+            if(el.querySelector('.modPermissionsCount').innerHTML != resp.permissions.length) {
+                el.querySelector('.modPermissionsCount').innerHTML = resp.permissions.length;
+                el.querySelector('.modPermissionsList').innerHTML = '';
+                el.querySelector('.modPermissionsList').insertAdjacentHTML('afterbegin', resp.permissions.map(x => `<li class="font-mono">${x}</li>`).join(''));
+            }
+
+            for(const elm of ['botState', 'queueState', 'eventsState']) {
+                const state = resp[elm];
+                el.querySelector(`.${elm}`).innerHTML = `${state.state}${state.causedBy === 'system' ? '' : ' (user)'}`;
+            }
+            for(const elm of ['startedAt', 'startedAtHuman', 'wikiLastCheck', 'wikiLastCheckHuman', 'wikiRevision', 'wikiRevisionHuman', 'validConfig', 'delayBy']) {
+                el.querySelector(`.${elm}`).innerHTML = resp[elm];
+            }
+            el.querySelector(`.commentCheckCount`).innerHTML = resp.checks.comments;
+            el.querySelector(`.submissionCheckCount`).innerHTML = resp.checks.submissions;
+
+            const newInner = resp.pollingInfo.map(x => `<li>${x}</li>`).join('');
+            if(el.querySelector(`.pollingInfo`).innerHTML !== newInner) {
+                el.querySelector(`.pollingInfo`).innerHTML = newInner;
+            }
+        }
+    }
+
+    function getLiveStats(bot, sub) {
+        console.debug(`Getting live stats for ${bot} ${sub}`)
+        const fetchPromise = fetch(`/api/liveStats?instance=<%= instanceId %>&bot=${bot}&subreddit=${sub}`)
+            .then(response => response.json())
+            .then(resp => updateLiveStats(resp));
     }
 
     document.querySelectorAll('.sub').forEach(el => {
@@ -1051,23 +1149,44 @@
         const bot = el.dataset.bot;
         //console.log(`Focused on ${bot} ${sub}`);
         onVisible(el, () => {
-            console.log(`Focused on ${bot} ${sub}`);
+            console.debug(`Focused on ${bot} ${sub}`);
 
             const identifier = `${bot}.${sub}`;
 
             recentlySeen.forEach((value, key) => {
-                const {timeout, ...rest} = value;
+                const {timeout, liveStatsInt, ...rest} = value;
                 if(key === identifier && timeout !== undefined) {
-                    console.log('Clearing timeout on own already set');
+
+                    console.debug('Clearing timeout on own already set');
                     clearTimeout(timeout);
                     recentlySeen.set(key, rest);
-                } else if(key !== identifier && timeout === undefined) {
-                    const t = setTimeout(() => {
-                        console.log(`timeout expired, stopping logging for ${key}`);
-                        rest.controller.abort();
-                        recentlySeen.delete(key);
-                    },15000);
-                    recentlySeen.set(key, {timeout: t, ...rest});
+
+                } else if(key !== identifier) {
+
+                    // stop live stats for tabs we are not viewing
+                    clearInterval(liveStatsInt);
+
+                    // set timeout for logs we are not viewing
+                    if(timeout === undefined) {
+                        const t = setTimeout(() => {
+                            const k = key;
+                            const val = recentlySeen.get(k);
+                            if(val !== undefined) {
+                                const {controller} = val;
+                                console.debug(`timeout expired, stopping live data for ${k}`);
+                                if(controller !== undefined) {
+                                    console.debug('Stopping logs');
+                                    controller.abort();
+                                }
+                                // if(liveStatInt !== undefined) {
+                                //     console.log('Stopping live stats');
+                                //     clearInterval(liveStatInt);
+                                // }
+                                recentlySeen.delete(k);
+                            }
+                        },15000);
+                        recentlySeen.set(key, {timeout: t, liveStatsInt, ...rest});
+                    }
                 }
             });
 
@@ -1076,6 +1195,12 @@
                     getStreamingLogs(sub, bot);
                 });
             }
+
+            // always get live stats for tab we just started viewing
+            getLiveStats(bot, sub);
+            const liveStatsInt = setInterval(() => getLiveStats(bot, sub), 5000);
+            recentlySeen.set(identifier, {liveStatsInt});
+
         });
     });
 
@@ -1184,97 +1309,6 @@
                 }
             }
 
-        });
-        socket.on('liveStats', (resp) => {
-            let el;
-            let isAll = resp.name.toLowerCase() === 'all';
-            if(isAll) {
-                // got all
-                el = document.querySelector(`[data-subreddit="All"][data-bot="${resp.bot}"].sub`);
-            } else {
-                // got subreddit
-                el = document.querySelector(`[data-subreddit="${resp.name}"].sub`);
-            }
-
-            if(resp.system.running && el.classList.contains('offline')) {
-                el.classList.remove('offline');
-            } else if(!resp.system.running && !el.classList.contains('offline')) {
-                el.classList.add('offline');
-            }
-
-            el.querySelector('.runningActivities').innerHTML = resp.runningActivities;
-            el.querySelector('.queuedActivities').innerHTML = resp.queuedActivities;
-            el.querySelector('.delayedItemsCount').innerHTML = resp.delayedItems.length;
-            el.querySelector('.delayedItemsList').innerHTML = 'No delayed Items!';
-            if(resp.delayedItems.length > 0) {
-                el.querySelector('.delayedItemsList').innerHTML = '';
-                const now = dayjs();
-                const sorted = resp.delayedItems.map(x => ({...x, queuedAtUnix: x.queuedAt, queuedAt: dayjs.unix(x.queuedAt), dispatchAt: dayjs.unix(x.queuedAt + x.duration)}));
-                sorted.sort((a, b) => {
-                    return a.dispatchAt.isSameOrAfter(b.dispatchAt) ? 1 : -1
-                });
-                const delayedItemDivs = sorted.map(x => {
-                    const diffUntilNow = x.dispatchAt.diff(now);
-                    const durationUntilNow = dayjs.duration(diffUntilNow, 'ms');
-                    const queuedAtDisplay = x.queuedAt.format('HH:mm:ss z');
-                    const durationDayjs = dayjs.duration(x.duration, 'seconds');
-                    const durationDisplay = durationDayjs.humanize();
-                    const cancelLink = `<a href="#" data-id="${x.id}" data-subreddit="${x.subreddit}" class="delayCancel">CANCEL</a>`;
-                    return `<div>A <a href="https://reddit.com${x.permalink}">${x.submissionId !== undefined ? 'Comment' : 'Submssion'}</a>${isAll ? ` in <a href="https://reddit.com${x.subreddit}">${x.subreddit}</a> ` : ''} by <a href="https://reddit.com/u/${x.author}">${x.author}</a> queued by ${x.source} at ${queuedAtDisplay} for ${durationDisplay} (dispatches ${durationUntilNow.humanize(true)}) -- ${cancelLink}</div>`;
-                });
-                el.querySelector('.delayedItemsList').insertAdjacentHTML('afterbegin', delayedItemDivs.join(''));
-                el.querySelectorAll('.delayedItemsList .delayCancel').forEach(elm => {
-                    elm.addEventListener('click', e => {
-                        e.preventDefault();
-                        const id = e.target.dataset.id;
-                        const subreddit = e.target.dataset.subreddit;
-                        fetch(`/api/delayed?instance=<%= instanceId %>&bot=${resp.bot}&subreddit=${subreddit}&id=${id}`, {
-                            method: 'DELETE'
-                        }).then((resp) => {
-                            if (!resp.ok) {
-                                console.error('Response was not OK from delay cancel');
-                            } else {
-                                console.log('Removed ok');
-                            }
-                        });
-                    });
-                });
-            }
-
-            el.querySelector('.allStats .eventsCount').innerHTML = resp.stats.historical.eventsCheckedTotal;
-            el.querySelector('.allStats .checksCount').innerHTML = resp.stats.historical.checksTriggeredTotal;
-            el.querySelector('.allStats .rulesCount').innerHTML = resp.stats.historical.rulesTriggeredTotal;
-            el.querySelector('.allStats .actionsCount').innerHTML = resp.stats.historical.actionsRunTotal;
-
-            if(isAll) {
-                for(const elm of ['apiAvg','apiLimit','apiDepletion','nextHeartbeat', 'nextHeartbeatHuman', 'limitReset', 'limitResetHuman', 'nannyMode', 'startedAtHuman']) {
-                    el.querySelector(`#${elm}`).innerHTML = resp[elm];
-                }
-                el.querySelector(`.botStatus`).innerHTML = resp.system.running ? 'ONLINE' : 'OFFLINE';
-            } else {
-                if(el.querySelector('.modPermissionsCount').innerHTML != resp.permissions.length) {
-                    el.querySelector('.modPermissionsCount').innerHTML = resp.permissions.length;
-                    el.querySelector('.modPermissionsList').innerHTML = '';
-                    el.querySelector('.modPermissionsList').insertAdjacentHTML('afterbegin', resp.permissions.map(x => `<li class="font-mono">${x}</li>`).join(''));
-                }
-
-                for(const elm of ['botState', 'queueState', 'eventsState']) {
-                    const state = resp[elm];
-                    el.querySelector(`.${elm}`).innerHTML = `${state.state}${state.causedBy === 'system' ? '' : ' (user)'}`;
-                }
-                for(const elm of ['startedAt', 'startedAtHuman', 'wikiLastCheck', 'wikiLastCheckHuman', 'wikiRevision', 'wikiRevisionHuman', 'validConfig', 'delayBy']) {
-                    el.querySelector(`.${elm}`).innerHTML = resp[elm];
-                }
-                el.querySelector(`.commentCheckCount`).innerHTML = resp.checks.comments;
-                el.querySelector(`.submissionCheckCount`).innerHTML = resp.checks.submissions;
-
-                const newInner = resp.pollingInfo.map(x => `<li>${x}</li>`).join('');
-                if(el.querySelector(`.pollingInfo`).innerHTML !== newInner) {
-                    el.querySelector(`.pollingInfo`).innerHTML = newInner;
-                }
-            }
-
-            //console.log(resp);
         });
     });
 

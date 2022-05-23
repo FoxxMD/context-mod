@@ -1280,42 +1280,6 @@ const webClient = async (options: OperatorConfig) => {
             clearSockStreams(socket.id);
             socket.join(session.id);
 
-            socket.on('viewing', (data) => {
-                if(user !== undefined) {
-                    const {subreddit, bot: botVal} = data;
-                    const currBot = cmInstances.find(x => x.getName() === session.botId);
-                    if(currBot !== undefined) {
-
-                        if(liveInterval !== undefined) {
-                            clearInterval(liveInterval)
-                        }
-
-                        const liveEmit = async () => {
-                            try {
-                                const resp = await got.get(`${currBot.normalUrl}/liveStats`, {
-                                    headers: {
-                                        'Authorization': `Bearer ${createToken(currBot, user)}`,
-                                    },
-                                    searchParams: {
-                                        bot: botVal,
-                                        subreddit
-                                    }
-                                });
-                                const stats = JSON.parse(resp.body);
-                                io.to(session.id).emit('liveStats', stats);
-                            } catch (err: any) {
-                                currBot.logger.error(new ErrorWithCause('Could not retrieve live stats', {cause: err}));
-                            }
-                        }
-
-                        // do an initial get
-                        liveEmit();
-                        // and then every 5 seconds after that
-                        liveInterval = setInterval(async () => await liveEmit(), 5000);
-                    }
-                }
-            });
-
             if(session.botId !== undefined) {
                 const bot = cmInstances.find(x => x.getName() === session.botId);
                 if(bot !== undefined) {

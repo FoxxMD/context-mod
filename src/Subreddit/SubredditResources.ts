@@ -749,7 +749,7 @@ export class SubredditResources {
             req: acc.req + curr.requests,
         }), {miss: 0, req: 0});
         const cacheKeys = Object.keys(this.stats.cache);
-        return {
+        const res = {
             cache: {
                 // TODO could probably combine these two
                 totalRequests: totals.req,
@@ -777,24 +777,29 @@ export class SubredditResources {
 
                     if(acc[curr].requestTimestamps.length > 1) {
                         // calculate average time between request
-                        const diffData = acc[curr].requestTimestamps.reduce((acc, curr: number) => {
-                            if(acc.last === 0) {
-                                acc.last = curr;
-                                return acc;
+                        const diffData = acc[curr].requestTimestamps.reduce((accTimestampData, curr: number) => {
+                            if(accTimestampData.last === 0) {
+                                accTimestampData.last = curr;
+                                return accTimestampData;
                             }
-                            acc.diffs.push(curr - acc.last);
-                            acc.last = curr;
-                            return acc;
+                            accTimestampData.diffs.push(curr - accTimestampData.last);
+                            accTimestampData.last = curr;
+                            return accTimestampData;
                         },{last: 0, diffs: [] as number[]});
                         const avgDiff = diffData.diffs.reduce((acc, curr) => acc + curr, 0) / diffData.diffs.length;
 
                         acc[curr].averageTimeBetweenHits = formatNumber(avgDiff/1000);
                     }
 
+                    const {requestTimestamps, identifierRequestCount, ...rest} = acc[curr];
+                    // @ts-ignore
+                    acc[curr] = rest;
+
                     return acc;
-                }, Promise.resolve(this.stats.cache))
+                }, Promise.resolve({...this.stats.cache}))
             }
         }
+        return res;
     }
 
     setLogger(logger: Logger) {

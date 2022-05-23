@@ -136,6 +136,9 @@ const liveStats = () => {
                 acc[curr].missPercent = `${formatNumber(per, {toFixed: 0})}%`;
                 acc[curr].identifierAverageHit = formatNumber(acc[curr].identifierAverageHit);
                 acc[curr].averageTimeBetweenHits = formatNumber(acc[curr].averageTimeBetweenHits)
+
+                delete acc[curr].requestTimestamps;
+                delete acc[curr].identifierRequestCount;
                 return acc;
             }, cumRaw);
             const cacheReq = subManagerData.reduce((acc, curr) => acc + curr.stats.cache.totalRequests, 0);
