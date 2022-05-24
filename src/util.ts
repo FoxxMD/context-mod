@@ -1,5 +1,4 @@
 import winston, {Logger} from "winston";
-import jsonStringify from 'safe-stable-stringify';
 import dayjs, {Dayjs, OpUnitType} from 'dayjs';
 import {Duration} from 'dayjs/plugin/duration.js';
 import Ajv from "ajv";
@@ -239,7 +238,7 @@ export const defaultFormat = (defaultLabel = 'App') => printf(({
                                                                    stack,
                                                                    ...rest
                                                                }) => {
-    let stringifyValue = splatObj !== undefined ? jsonStringify(splatObj) : '';
+    let stringifyValue = splatObj !== undefined ? JSON.stringify(splatObj) : '';
     let msg = message;
     let stackMsg = '';
     if (stack !== undefined) {

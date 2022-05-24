@@ -2,7 +2,6 @@ import fetch from "node-fetch";
 import {Submission} from "snoowrap/dist/objects";
 import {URL} from "url";
 import {absPercentDifference, getSharpAsync, isValidImageURL} from "../util";
-import sizeOf from "image-size";
 import {Sharp} from "sharp";
 import {blockhash} from "./blockhash/blockhash";
 import {SimpleError} from "../Utils/Errors";

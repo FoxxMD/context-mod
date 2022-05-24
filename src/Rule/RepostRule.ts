@@ -17,8 +17,6 @@ import {
 } from "../Common/interfaces";
 import objectHash from "object-hash";
 import {getAttributionIdentifier} from "../Utils/SnoowrapUtils";
-import Fuse from "fuse.js";
-import leven from "leven";
 import {YoutubeClient, commentsAsRepostItems} from "../Utils/ThirdParty/YoutubeClient";
 import dayjs from "dayjs";
 import {rest} from "lodash";
