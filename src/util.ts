@@ -2756,10 +2756,20 @@ export const filterByTimeRequirement = (satisfiedEndtime: Dayjs, listSlice: Snoo
     return [truncatedItems.length !== listSlice.length, truncatedItems]
 }
 
-export const between = (val: number, a: number, b: number, inclusive: boolean): boolean => {
+export const between = (val: number, a: number, b: number, inclusiveMin: boolean = false, inclusiveMax: boolean = false): boolean => {
     var min = Math.min(a, b),
         max = Math.max(a, b);
 
-    return inclusive ? val >= min && val <= max : val > min && val < max;
+    if(!inclusiveMin && !inclusiveMax) {
+        return val > min && val < max;
+    }
+    if(inclusiveMin && inclusiveMax) {
+        return val >= min && val <= max;
+    }
+    if(inclusiveMin) {
+        return val >= min && val < max;
+    }
 
+    // inclusive max
+    return val > min && val <= max;
 }

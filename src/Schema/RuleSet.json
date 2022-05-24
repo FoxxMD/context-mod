@@ -2817,6 +2817,10 @@
                     ],
                     "type": "string"
                 },
+                "languageHint": {
+                    "description": "Make the analyzer assume a language if it cannot determine one itself.\n\nThis is very useful for the analyzer when it is parsing short pieces of content. For example, if you know your subreddit is majority english speakers this will make the analyzer return \"neutral\" sentiment instead of \"not detected language\".",
+                    "type": "string"
+                },
                 "name": {
                     "description": "An optional, but highly recommended, friendly name for this rule. If not present will default to `kind`.\n\nCan only contain letters, numbers, underscore, spaces, and dashes\n\nname is used to reference Rule result data during Action content templating. See CommentAction or ReportAction for more details.",
                     "examples": [

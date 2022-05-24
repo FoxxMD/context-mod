@@ -18,6 +18,7 @@ import {VaderSentimentComparison} from "../Common/Infrastructure/Atomic";
 import {RuleResult} from "../Common/interfaces";
 import {SnoowrapActivity} from "../Common/Infrastructure/Reddit";
 import {
+    ActivitySentimentOptions,
     ActivitySentimentTestResult,
     parseTextToNumberComparison,
     testActivitySentiment
@@ -201,7 +202,7 @@ interface HistoricalSentiment extends Omit<HistoricalSentimentConfig, 'sentiment
     totalMatching: GenericComparison
 }
 
-interface SentimentConfig {
+interface SentimentConfig extends ActivitySentimentOptions {
 
     sentiment: VaderSentimentComparison
 

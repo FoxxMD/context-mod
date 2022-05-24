@@ -1,4 +1,6 @@
-import {Language, SentimentManager} from 'node-nlp';
+import {containerBootstrap} from '@nlpjs/core';
+import {Language} from '@nlpjs/language';
+import {Nlp} from '@nlpjs/nlp';
 import {SentimentIntensityAnalyzer} from 'vader-sentiment';
 import wink from 'wink-sentiment';
 import {SnoowrapActivity} from "./Infrastructure/Reddit";
@@ -8,10 +10,14 @@ import {
     parseGenericValueComparison,
     RangedComparison
 } from "./Infrastructure/Comparisons";
-import {asSubmission, between, comparisonTextOp} from "../util";
+import {asSubmission, between, comparisonTextOp, formatNumber} from "../util";
 import {CMError, MaybeSeriousErrorWithCause} from "../Utils/Errors";
 import InvalidRegexError from "../Utils/InvalidRegexError";
 import {StringOperator} from "./Infrastructure/Atomic";
+import {LangEs} from "@nlpjs/lang-es";
+import {LangDe} from "@nlpjs/lang-de";
+import {LangEn} from "@nlpjs/lang-en";
+import {LangFr} from "@nlpjs/lang-fr";
 
 export type SentimentAnalysisType = 'vader' | 'afinn' | 'senticon' | 'pattern' | 'wink';
 
@@ -57,8 +63,8 @@ export const sentimentQuantifierRanges = [
 ]
 
 const scoreToSentimentText = (val: number) => {
-    for(const segment of sentimentQuantifierRanges) {
-        if(between(val, segment.range[0], segment.range[1], false)) {
+    for (const segment of sentimentQuantifierRanges) {
+        if (between(val, segment.range[0], segment.range[1], false, true)) {
             return segment.quant;
         }
     }
@@ -70,6 +76,9 @@ export interface SentimentResult {
     type: SentimentAnalysisType
     sentiment: string
     weight: number
+    tokens: number
+    matchedTokens?: number,
+    usableResult: true | string
 }
 
 export interface ActivitySentiment {
@@ -79,7 +88,12 @@ export interface ActivitySentiment {
     sentiment: string
     sentimentWeighted: string
     activity: SnoowrapActivity
-    language: string
+    locale: string
+    guessedLanguage: string
+    guessedLanguageConfidence: number
+    usedLanguage: string
+    usableScore: boolean
+    reason?: string
 }
 
 export interface ActivitySentimentTestResult extends ActivitySentiment {
@@ -89,6 +103,13 @@ export interface ActivitySentimentTestResult extends ActivitySentiment {
 
 export interface ActivitySentimentOptions {
     testOn?: ('title' | 'body')[]
+    /**
+     * Make the analyzer assume a language if it cannot determine one itself.
+     *
+     * This is very useful for the analyzer when it is parsing short pieces of content. For example, if you know your subreddit is majority english speakers this will make the analyzer return "neutral" sentiment instead of "not detected language".
+     *
+     * */
+    languageHint?: string
 }
 
 export type SentimentCriteriaTest = GenericComparison | RangedComparison;
@@ -116,8 +137,8 @@ export const parseTextToNumberComparison = (val: string): RangedComparison | Gen
 
     const negate = groups.not !== undefined && groups.not !== '';
 
-    if(groups.sentiment === 'neutral') {
-        if(negate) {
+    if (groups.sentiment === 'neutral') {
+        if (negate) {
             return {
                 displayText: 'not neutral (not -0.49 to 0.49)',
                 range: [-1, 1],
@@ -134,12 +155,12 @@ export const parseTextToNumberComparison = (val: string): RangedComparison | Gen
     const compoundSentimentText = `${groups.modifier !== undefined && groups.modifier !== '' ? `${groups.modifier} ` : ''}${groups.sentiment}`.toLocaleLowerCase();
     // @ts-ignore
     const numericVal = sentimentQuantifier[compoundSentimentText] as number;
-    if(numericVal === undefined) {
+    if (numericVal === undefined) {
         throw new CMError(`Sentiment given did not match any known phrases: '${compoundSentimentText}'`);
     }
 
     let operator: StringOperator;
-    if(negate) {
+    if (negate) {
         operator = numericVal > 0 ? '<' : '>';
     } else {
         operator = numericVal > 0 ? '>=' : '<=';
@@ -149,17 +170,37 @@ export const parseTextToNumberComparison = (val: string): RangedComparison | Gen
         operator,
         value: numericVal,
         isPercent: false,
-        displayText: `is${negate ? ' not ': ' '}${compoundSentimentText} (${operator} ${numericVal})`
+        displayText: `is${negate ? ' not ' : ' '}${compoundSentimentText} (${operator} ${numericVal})`
     }
 }
 
-const nlpAnalyzer = new SentimentManager();
-const langDetect = new Language();
+let nlp: Nlp;
+let container: any;
+
+const bootstrapNlp = async () => {
+
+    container = await containerBootstrap();
+    container.use(Language);
+    container.use(Nlp);
+    container.use(LangEs);
+    container.use(LangDe);
+    container.use(LangEn);
+    container.use(LangFr);
+    nlp = container.get('nlp');
+    nlp.settings.autoSave = false;
+    nlp.addLanguage('en');
+    nlp.addLanguage('es');
+    nlp.addLanguage('de');
+    nlp.addLanguage('fr');
+    nlp.nluManager.guesser.processExtraSentences();
+    await nlp.train();
+}
 
 export const getActivitySentiment = async (item: SnoowrapActivity, options?: ActivitySentimentOptions): Promise<ActivitySentiment> => {
 
     const {
-        testOn = ['body', 'title']
+        testOn = ['body', 'title'],
+        languageHint,
     } = options || {};
 
     // determine what content we are testing
@@ -183,66 +224,120 @@ export const getActivitySentiment = async (item: SnoowrapActivity, options?: Act
 
     const contentStr = contents.join(' ');
 
-    const guess = langDetect.guessBest(contentStr);
-
-    if (availableSentimentLanguages.includes(guess.alpha2)) {
-        const results: SentimentResult[] = [];
-
-        const nlpResult = await nlpAnalyzer.process(guess.alpha2, contentStr);
-
-        results.push({
-            comparative: nlpResult.comparative,
-            type: nlpResult.type as SentimentAnalysisType,
-            sentiment: scoreToSentimentText(nlpResult.comparative),
-            weight: 1
-        });
-
-        if (guess.alpha2 === 'en') {
-            const score = SentimentIntensityAnalyzer.polarity_scores(contentStr);
-            results.push({
-                comparative: score.compound,
-                type: 'vader',
-                sentiment: scoreToSentimentText(score.compound),
-                // may want to weight higher in the future...
-                weight: 1
-            });
-
-            const winkScore = wink(contentStr);
-            // normalizedScore is range of -5 to +5 -- convert to -1 to +1
-            const winkAdjusted = (winkScore.normalizedScore * 2) / 10;
-            results.push({
-                comparative: winkAdjusted,
-                type: 'wink',
-                sentiment: scoreToSentimentText(winkAdjusted),
-                weight: 1
-            })
-        }
-
-        const score = results.reduce((acc, curr) => acc + curr.comparative, 0) / results.length;
-        const sentiment = scoreToSentimentText(score);
-
-        const weightSum = results.reduce((acc, curr) => acc + curr.weight, 0);
-        const weightedScores = results.reduce((acc, curr) => acc + (curr.weight * curr.comparative), 0);
-        const weightedScore = weightedScores / weightSum;
-        const weightedSentiment = scoreToSentimentText(weightedScore);
-
-        return {
-            results,
-            score,
-            sentiment,
-            scoreWeighted: weightedScore,
-            sentimentWeighted: weightedSentiment,
-            activity: item,
-            language: guess.language
-        }
-
-    } else {
-        throw new MaybeSeriousErrorWithCause(`Cannot test sentiment for unsupported language ${guess.language}`);
+    if (nlp === undefined) {
+        await bootstrapNlp();
     }
+
+    const lang = container.get('Language') as Language;
+    // would like to improve this https://github.com/axa-group/nlp.js/issues/761
+    const guesses = lang.guess(contentStr, null, 4);
+    const bestLang = guesses[0];
+    const guess = guesses.find(x => availableSentimentLanguages.includes(x.alpha2)) || {
+        alpha2: undefined,
+        language: undefined
+    };
+
+    let usedLanguage = guess.alpha2 ?? bestLang.alpha2;
+
+    const spaceNormalizedTokens = contentStr.trim().split(' ').filter(x => x !== ''.trim());
+
+    const isShortContent = spaceNormalizedTokens.length <= 4;
+
+    const results: SentimentResult[] = [];
+
+    const nlpResult = await nlp.process(guess.alpha2 ?? 'en', contentStr);
+
+    results.push({
+        comparative: nlpResult.sentiment.average,
+        type: nlpResult.sentiment.type as SentimentAnalysisType,
+        sentiment: scoreToSentimentText(nlpResult.sentiment.average),
+        weight: 1,
+        matchedTokens: nlpResult.sentiment.numHits,
+        tokens: nlpResult.sentiment.numWords,
+        usableResult: guess.alpha2 !== undefined ? true : (nlpResult.sentiment.numHits / nlpResult.sentiment.numWords) >= 0.5 ? true : `${isShortContent ? 'Content was too short to guess language' : 'Unsupported language'} and less than 50% of tokens matched`,
+    });
+
+    if (isShortContent || (guess.alpha2 ?? languageHint) === 'en') {
+
+        // neg post neu are ratios of *recognized* tokens in the content
+        // when neu is close to 1 its either extremely neutral or no tokens were recognized
+        const vaderScore = SentimentIntensityAnalyzer.polarity_scores(contentStr);
+        const vaderRes: SentimentResult = {
+            comparative: vaderScore.compound,
+            type: 'vader',
+            sentiment: scoreToSentimentText(vaderScore.compound),
+            // may want to weight higher in the future...
+            weight: 1,
+            tokens: spaceNormalizedTokens.length,
+            usableResult: (guess.alpha2 ?? languageHint) === 'en' ? true : (vaderScore.neu < 0.5 ? true : `Unable to guess language and unable to determine if more than 50% of tokens are negative or not matched`)
+        };
+        results.push(vaderRes);
+
+        const winkScore = wink(contentStr);
+        const matchedTokens = winkScore.tokenizedPhrase.filter(x => x.score !== undefined);
+        const matchedMeaningfulTokens = winkScore.tokenizedPhrase.filter(x => x.tag === 'word' || x.tag === 'emoji');
+        // normalizedScore is range of -5 to +5 -- convert to -1 to +1
+        const winkAdjusted = (winkScore.normalizedScore * 2) / 10;
+        const winkRes: SentimentResult = {
+            comparative: winkAdjusted,
+            type: 'wink',
+            sentiment: scoreToSentimentText(winkAdjusted),
+            weight: 1,
+            matchedTokens: matchedTokens.length,
+            tokens: winkScore.tokenizedPhrase.length,
+            usableResult: (guess.alpha2 ?? languageHint) === 'en' ? true : ((matchedTokens.length / matchedMeaningfulTokens.length) > 0.5 ? true : 'Unable to guess language and less than 50% of tokens matched')
+        };
+        results.push(winkRes);
+
+        if(vaderRes.usableResult || winkRes.usableResult) {
+            // since we are confident enough to use one of these then we are assuming language is mostly english
+            usedLanguage = 'en';
+        }
+    }
+
+    const score = results.reduce((acc, curr) => acc + curr.comparative, 0) / results.length;
+    const sentiment = scoreToSentimentText(score);
+
+    const weightSum = results.reduce((acc, curr) => acc + curr.weight, 0);
+    const weightedScores = results.reduce((acc, curr) => acc + (curr.weight * curr.comparative), 0);
+    const weightedScore = weightedScores / weightSum;
+    const weightedSentiment = scoreToSentimentText(weightedScore);
+
+    const actSentResult: ActivitySentiment = {
+        results,
+        score,
+        sentiment,
+        scoreWeighted: weightedScore,
+        sentimentWeighted: weightedSentiment,
+        activity: item,
+        locale: bestLang.alpha2,
+        guessedLanguage: bestLang.language,
+        guessedLanguageConfidence: formatNumber(bestLang.score),
+        usedLanguage,
+        usableScore: results.filter(x => x.usableResult === true).length > 0,
+    }
+
+    if (!actSentResult.usableScore) {
+        if (isShortContent) {
+            actSentResult.reason = 'Content may be supported language but was too short to guess accurately and no algorithm matched enough tokens to be considered confident.';
+        } else {
+            actSentResult.reason = 'Unsupported language'
+        }
+    }
+
+    return actSentResult;
 }
 
 export const testActivitySentiment = async (item: SnoowrapActivity, criteria: SentimentCriteriaTest, options?: ActivitySentimentOptions): Promise<ActivitySentimentTestResult> => {
     const sentimentResult = await getActivitySentiment(item, options);
+
+    if (!sentimentResult.usableScore) {
+        return {
+            passes: false,
+            test: criteria,
+            ...sentimentResult,
+        }
+    }
 
     if (asGenericComparison(criteria)) {
         return {
