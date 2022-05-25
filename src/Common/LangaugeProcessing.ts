@@ -1,5 +1,5 @@
 import {containerBootstrap} from '@nlpjs/core';
-import {Language} from '@nlpjs/language';
+import {Language, LanguageGuess, LanguageType} from '@nlpjs/language';
 import {Nlp} from '@nlpjs/nlp';
 import {SentimentIntensityAnalyzer} from 'vader-sentiment';
 import wink from 'wink-sentiment';
@@ -81,24 +81,29 @@ export interface SentimentResult {
     usableResult: true | string
 }
 
-export interface ActivitySentiment {
+export interface StringSentiment {
     results: SentimentResult[]
     score: number
     scoreWeighted: number
     sentiment: string
     sentimentWeighted: string
-    activity: SnoowrapActivity
-    locale: string
-    guessedLanguage: string
-    guessedLanguageConfidence: number
-    usedLanguage: string
+    guessedLanguage: LanguageGuessResult
+    usedLanguage: LanguageType
     usableScore: boolean
     reason?: string
 }
 
-export interface ActivitySentimentTestResult extends ActivitySentiment {
+export interface ActivitySentiment extends StringSentiment {
+    activity: SnoowrapActivity
+}
+
+export interface StringSentimentTestResult extends StringSentiment {
     passes: boolean
     test: GenericComparison | RangedComparison
+}
+
+export interface ActivitySentimentTestResult extends StringSentimentTestResult {
+    activity: SnoowrapActivity
 }
 
 export interface ActivitySentimentOptions {
@@ -108,8 +113,40 @@ export interface ActivitySentimentOptions {
      *
      * This is very useful for the analyzer when it is parsing short pieces of content. For example, if you know your subreddit is majority english speakers this will make the analyzer return "neutral" sentiment instead of "not detected language".
      *
+     * Defaults to 'en'
+     *
+     * @example ["en"]
+     * @default en
      * */
-    languageHint?: string
+    defaultLanguage?: string | null | false
+
+    /**
+     * Helps the analyzer coerce a low confidence language guess into a known-used languages in two ways:
+     *
+     * If the analyzer's
+     *   * *best* guess is NOT one of these
+     *     * but it did guess one of these
+     *     * and its guess is above requiredLanguageConfidence score then use the hinted language instead of best guess
+     *   * OR text content is very short (4 words or less)
+     *     * and the best guess was below the requiredLanguageConfidence score
+     *     * and none of guesses was a hinted language then use the defaultLanguage
+     *
+     * Defaults to popular romance languages: ['en', 'es', 'de', 'fr']
+     *
+     * @example [["en", "es", "de", "fr"]]
+     * @default ["en", "es", "de", "fr"]
+     * */
+    languageHints?: string[]
+
+    /**
+     * Required confidence to use a guessed language as the best guess. Score from 0 to 1.
+     *
+     * Defaults to 0.9
+     *
+     * @example [0.9]
+     * @default 0.9
+     * */
+    requiredLanguageConfidence?: number
 }
 
 export type SentimentCriteriaTest = GenericComparison | RangedComparison;
@@ -140,14 +177,14 @@ export const parseTextToNumberComparison = (val: string): RangedComparison | Gen
     if (groups.sentiment === 'neutral') {
         if (negate) {
             return {
-                displayText: 'not neutral (not -0.49 to 0.49)',
-                range: [-1, 1],
+                displayText: 'not neutral (not -0.1 to 0.1)',
+                range: [-0.1, 0.1],
                 not: true,
             }
         }
         return {
-            displayText: 'is neutral (-0.49 to 0.49)',
-            range: [-1, 1],
+            displayText: 'is neutral (-0.1 to 0.1)',
+            range: [-0.1, 0.1],
             not: false
         }
     }
@@ -196,11 +233,17 @@ const bootstrapNlp = async () => {
     await nlp.train();
 }
 
-export const getActivitySentiment = async (item: SnoowrapActivity, options?: ActivitySentimentOptions): Promise<ActivitySentiment> => {
+export const getNlp = async () => {
+    if (nlp === undefined) {
+        await bootstrapNlp();
+    }
 
+    return nlp;
+}
+
+export const getActivityContent = (item: SnoowrapActivity, options?: ActivitySentimentOptions): string => {
     const {
         testOn = ['body', 'title'],
-        languageHint,
     } = options || {};
 
     // determine what content we are testing
@@ -222,30 +265,106 @@ export const getActivitySentiment = async (item: SnoowrapActivity, options?: Act
         contents.push(item.body)
     }
 
-    const contentStr = contents.join(' ');
+    return contents.join(' ');
+}
+
+export const getLanguageTypeFromValue = async (val: string): Promise<LanguageType> => {
 
     if (nlp === undefined) {
         await bootstrapNlp();
     }
 
+    const langObj = container.get('Language') as Language;
+
+    const cleanVal = val.trim().toLocaleLowerCase();
+
+    const foundLang = Object.values(langObj.languagesAlpha2).find(x => x.alpha2 === cleanVal || x.alpha3 === cleanVal || x.name.toLocaleLowerCase() === cleanVal);
+    if (foundLang === undefined) {
+        throw new MaybeSeriousErrorWithCause(`Could not find Language with identifier '${val}'`, {isSerious: false});
+    }
+    const {alpha2, alpha3, name: language} = foundLang;
+    return {
+        alpha2,
+        alpha3,
+        language
+    };
+}
+
+export interface LanguageGuessResult {
+    bestGuess: LanguageGuess
+    guesses: LanguageGuess[]
+    requiredConfidence: number
+    sparse: boolean
+    language: LanguageType
+    usedDefault: boolean
+}
+
+export const getContentLanguage = async (content: string, options?: ActivitySentimentOptions): Promise<LanguageGuessResult> => {
+
+    const {
+        defaultLanguage = 'en',
+        requiredLanguageConfidence = 0.9,
+        languageHints = availableSentimentLanguages
+    } = options || {};
+
+    if (nlp === undefined) {
+        await bootstrapNlp();
+    }
+
+    const spaceNormalizedTokens = content.trim().split(' ').filter(x => x !== ''.trim());
+
     const lang = container.get('Language') as Language;
     // would like to improve this https://github.com/axa-group/nlp.js/issues/761
-    const guesses = lang.guess(contentStr, null, 4);
-    const bestLang = guesses[0];
-    const guess = guesses.find(x => availableSentimentLanguages.includes(x.alpha2)) || {
-        alpha2: undefined,
-        language: undefined
-    };
+    const guesses = lang.guess(content, null, 4);
+    let bestLang = guesses[0];
+    const shortContent = spaceNormalizedTokens.length <= 4;
 
-    let usedLanguage = guess.alpha2 ?? bestLang.alpha2;
+    const altBest = languageHints.includes(bestLang.alpha2) ? undefined : guesses.find(x => x.score >= requiredLanguageConfidence && languageHints.includes(x.alpha2));
+
+    // coerce best guess into a supported language that has a good enough confidence
+    if(!shortContent && altBest !== undefined) {
+        bestLang = altBest;
+    }
+
+    let usedLang: LanguageType = bestLang;
+    let usedDefault = false;
+
+    if (typeof defaultLanguage === 'string' && (bestLang.score < requiredLanguageConfidence || (shortContent && !languageHints.includes(bestLang.alpha2)))) {
+        usedLang = await getLanguageTypeFromValue(defaultLanguage);
+        usedDefault = true;
+    }
+
+    return {
+        guesses,
+        bestGuess: bestLang,
+        requiredConfidence: requiredLanguageConfidence,
+        sparse: shortContent,
+        language: usedLang,
+        usedDefault
+    }
+}
+
+export const getActivitySentiment = async (item: SnoowrapActivity, options?: ActivitySentimentOptions): Promise<ActivitySentiment> => {
+
+    const result = await getStringSentiment(getActivityContent(item, options), options);
+
+    return {
+        ...result,
+        activity: item
+    }
+}
+
+export const getStringSentiment = async (contentStr: string, options?: ActivitySentimentOptions): Promise<StringSentiment> => {
+
+    const langResult = await getContentLanguage(contentStr, options);
+
+    let usedLanguage: LanguageType = langResult.language;
 
     const spaceNormalizedTokens = contentStr.trim().split(' ').filter(x => x !== ''.trim());
 
-    const isShortContent = spaceNormalizedTokens.length <= 4;
-
     const results: SentimentResult[] = [];
 
-    const nlpResult = await nlp.process(guess.alpha2 ?? 'en', contentStr);
+    const nlpResult = await nlp.process(langResult.language.alpha2, contentStr);
 
     results.push({
         comparative: nlpResult.sentiment.average,
@@ -254,10 +373,15 @@ export const getActivitySentiment = async (item: SnoowrapActivity, options?: Act
         weight: 1,
         matchedTokens: nlpResult.sentiment.numHits,
         tokens: nlpResult.sentiment.numWords,
-        usableResult: guess.alpha2 !== undefined ? true : (nlpResult.sentiment.numHits / nlpResult.sentiment.numWords) >= 0.5 ? true : `${isShortContent ? 'Content was too short to guess language' : 'Unsupported language'} and less than 50% of tokens matched`,
+        usableResult: availableSentimentLanguages.includes(langResult.language.alpha2) ? true : (nlpResult.sentiment.numHits / nlpResult.sentiment.numWords) >= 0.5 ? true : `${langResult.sparse ? 'Content was too short to guess language' : 'Unsupported language'} and less than 50% of tokens matched`,
     });
 
-    if (isShortContent || (guess.alpha2 ?? languageHint) === 'en') {
+    // only run vader/wink if either
+    //
+    // * content was short which means we aren't confident on language guess
+    // * OR language is english (guessed or explicitly set as language fallback by user due to low confidence)
+    //
+    if (langResult.sparse || langResult.language.alpha2 === 'en') {
 
         // neg post neu are ratios of *recognized* tokens in the content
         // when neu is close to 1 its either extremely neutral or no tokens were recognized
@@ -269,7 +393,7 @@ export const getActivitySentiment = async (item: SnoowrapActivity, options?: Act
             // may want to weight higher in the future...
             weight: 1,
             tokens: spaceNormalizedTokens.length,
-            usableResult: (guess.alpha2 ?? languageHint) === 'en' ? true : (vaderScore.neu < 0.5 ? true : `Unable to guess language and unable to determine if more than 50% of tokens are negative or not matched`)
+            usableResult: langResult.language.alpha2 === 'en' ? true : (vaderScore.neu < 0.5 ? true : `Unable to guess language and unable to determine if more than 50% of tokens are negative or not matched`)
         };
         results.push(vaderRes);
 
@@ -285,13 +409,13 @@ export const getActivitySentiment = async (item: SnoowrapActivity, options?: Act
             weight: 1,
             matchedTokens: matchedTokens.length,
             tokens: winkScore.tokenizedPhrase.length,
-            usableResult: (guess.alpha2 ?? languageHint) === 'en' ? true : ((matchedTokens.length / matchedMeaningfulTokens.length) > 0.5 ? true : 'Unable to guess language and less than 50% of tokens matched')
+            usableResult: langResult.language.alpha2 === 'en' ? true : ((matchedTokens.length / matchedMeaningfulTokens.length) > 0.5 ? true : 'Unable to guess language and less than 50% of tokens matched')
         };
         results.push(winkRes);
 
-        if(vaderRes.usableResult || winkRes.usableResult) {
+        if ((vaderRes.usableResult == true || winkRes.usableResult === true) && usedLanguage.alpha2 !== 'en') {
             // since we are confident enough to use one of these then we are assuming language is mostly english
-            usedLanguage = 'en';
+            usedLanguage = await getLanguageTypeFromValue('en');
         }
     }
 
@@ -303,22 +427,19 @@ export const getActivitySentiment = async (item: SnoowrapActivity, options?: Act
     const weightedScore = weightedScores / weightSum;
     const weightedSentiment = scoreToSentimentText(weightedScore);
 
-    const actSentResult: ActivitySentiment = {
+    const actSentResult: StringSentiment = {
         results,
         score,
         sentiment,
         scoreWeighted: weightedScore,
         sentimentWeighted: weightedSentiment,
-        activity: item,
-        locale: bestLang.alpha2,
-        guessedLanguage: bestLang.language,
-        guessedLanguageConfidence: formatNumber(bestLang.score),
+        guessedLanguage: langResult,
         usedLanguage,
         usableScore: results.filter(x => x.usableResult === true).length > 0,
     }
 
     if (!actSentResult.usableScore) {
-        if (isShortContent) {
+        if (actSentResult.guessedLanguage.sparse) {
             actSentResult.reason = 'Content may be supported language but was too short to guess accurately and no algorithm matched enough tokens to be considered confident.';
         } else {
             actSentResult.reason = 'Unsupported language'
@@ -330,6 +451,16 @@ export const getActivitySentiment = async (item: SnoowrapActivity, options?: Act
 
 export const testActivitySentiment = async (item: SnoowrapActivity, criteria: SentimentCriteriaTest, options?: ActivitySentimentOptions): Promise<ActivitySentimentTestResult> => {
     const sentimentResult = await getActivitySentiment(item, options);
+
+    const testResult = testSentiment(sentimentResult, criteria);
+
+    return {
+        ...testResult,
+        activity: item
+    }
+}
+
+export const testSentiment = (sentimentResult: StringSentiment, criteria: SentimentCriteriaTest): StringSentimentTestResult => {
 
     if (!sentimentResult.usableScore) {
         return {

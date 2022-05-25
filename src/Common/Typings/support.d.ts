@@ -54,10 +54,19 @@ declare module '@nlpjs/*' {
 
     declare module '@nlpjs/language' {
 
-        export interface LanguageGuess {
+        export interface LanguageType {
             alpha3: string,
             alpha2: string,
             language: string,
+        }
+
+        export interface LanguageObj {
+            alpha3: string,
+            alpha2: string,
+            name: string,
+        }
+
+        export interface LanguageGuess extends LanguageType {
             score: number
         }
 
@@ -65,6 +74,15 @@ declare module '@nlpjs/*' {
             guess(val: string, allowedList?: string[] | null, limit?: number): LanguageGuess[];
 
             guessBest(val: string, allowedList?: string[] | null): LanguageGuess;
+
+            /**
+             * Key is alpha2 lang IE en es de fr
+             * */
+            languagesAlpha2: Record<string, LanguageObj>;
+            /**
+             * Key is alpha3 lang IE eng spa deu fra
+             * */
+            languagesAlpha3: Record<string, LanguageObj>;
         }
     }
 

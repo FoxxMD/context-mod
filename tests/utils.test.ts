@@ -153,7 +153,7 @@ describe('Parsing Reddit Entity strings', function () {
 describe('Config Parsing', function () {
     describe('Deep pruning of undefined keys on config objects', function () {
         it('removes undefined keys from objects', function () {
-            const obj = {
+            const obj: {keyA: string, keyB: string, keyC?: string } = {
                 keyA: 'foo',
                 keyB: 'bar',
                 keyC: undefined
@@ -169,7 +169,7 @@ describe('Config Parsing', function () {
             assert.isUndefined(removeUndefinedKeys(obj))
         })
         it('ignores arrays', function () {
-            const obj = {
+            const obj: { keyA?: string, keyB: string, keyC: any[] } = {
                 keyA: undefined,
                 keyB: 'bar',
                 keyC: ['foo', 'bar']
