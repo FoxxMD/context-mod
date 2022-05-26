@@ -29,8 +29,6 @@ import session, {Session, SessionData} from "express-session";
 import Snoowrap, {Subreddit} from "snoowrap";
 import {getLogger} from "../../Utils/loggerFactory";
 import EventEmitter from "events";
-import stream, {Readable, Writable, Transform} from "stream";
-import winston from "winston";
 import tcpUsed from "tcp-port-used";
 import http from "http";
 import jwt from 'jsonwebtoken';
@@ -39,13 +37,6 @@ import got from 'got';
 import sharedSession from "express-socket.io-session";
 import dayjs from "dayjs";
 import httpProxy from 'http-proxy';
-import normalizeUrl from 'normalize-url';
-import GotRequest from "got/dist/source/core";
-import {prettyPrintJson} from "pretty-print-json";
-// @ts-ignore
-import DelimiterStream from 'delimiter-stream';
-import {pipeline} from 'stream/promises';
-import {defaultBotStatus} from "../Common/defaults";
 import {arrayMiddle, booleanMiddle} from "../Common/middleware";
 import {BotInstance, CMInstanceInterface} from "../interfaces";
 import { URL } from "url";
@@ -54,8 +45,6 @@ import Autolinker from "autolinker";
 import path from "path";
 import {ExtendedSnoowrap} from "../../Utils/SnoowrapClients";
 import ClientUser from "../Common/User/ClientUser";
-import {BotStatusResponse, InviteData} from "../Common/interfaces";
-import {TransformableInfo} from "logform";
 import {SimpleError} from "../../Utils/Errors";
 import {ErrorWithCause} from "pony-cause";
 import {CMInstance} from "./CMInstance";
@@ -65,8 +54,6 @@ import { ActionPremise } from "../../Common/Entities/ActionPremise";
 import {CacheStorageProvider, DatabaseStorageProvider} from "./StorageProvider";
 import {nanoid} from "nanoid";
 import {MigrationService} from "../../Common/MigrationService";
-import {WebSetting} from "../../Common/WebEntities/WebSetting";
-import {CheckResultEntity} from "../../Common/Entities/CheckResultEntity";
 import {RuleResultEntity} from "../../Common/Entities/RuleResultEntity";
 import {RuleSetResultEntity} from "../../Common/Entities/RuleSetResultEntity";
 import { PaginationAwareObject } from "../Common/util";
@@ -606,105 +593,9 @@ const webClient = async (options: OperatorConfig) => {
     const cmInstances: CMInstance[] = [];
     let init = false;
     const formatter = defaultFormat();
-    const formatTransform = formatter.transform as (info: TransformableInfo, opts?: any) => TransformableInfo;
 
     let server: http.Server,
         io: SocketServer;
-
-    const startLogStream = (sessionData: Session & Partial<SessionData>, user: Express.User) => {
-        // @ts-ignore
-        const sessionId = sessionData.id as string;
-        
-        if(connectedUsers[sessionId] !== undefined) {
-
-            const delim = new DelimiterStream({
-                delimiter: '\r\n',
-            });
-
-            const currInstance = cmInstances.find(x => x.getName() === sessionData.botId);
-            if(currInstance !== undefined) {
-                const ac = new AbortController();
-                const options = {
-                    signal: ac.signal,
-                };
-
-                const retryFn = (retryCount = 0, err: any = undefined) => {
-                    const delim = new DelimiterStream({
-                        delimiter: '\r\n',
-                    });
-
-                    if(err !== undefined) {
-                        // @ts-ignore
-                        currInstance.logger.warn(new ErrorWithCause(`Log streaming encountered an error, trying to reconnect (retries: ${retryCount})`, {cause: err}), {user: user.name});
-                    }
-                    const gotStream = got.stream.get(`${currInstance.normalUrl}/logs`, {
-                        retry: {
-                            limit: 5,
-                        },
-                        headers: {
-                            'Authorization': `Bearer ${createToken(currInstance, user)}`,
-                        },
-                        searchParams: {
-                            limit: sessionData.limit,
-                            sort: sessionData.sort,
-                            level: sessionData.level,
-                            stream: true,
-                            streamObjects: true,
-                            formatted: false,
-                        }
-                    });
-
-                    if(err !== undefined) {
-                        gotStream.once('data', () => {
-                            currInstance.logger.info('Streaming resumed', {instance: currInstance.getName(), user: user.name});
-                        });
-                    }
-
-                    gotStream.retryCount = retryCount;
-                    const s = pipeline(
-                        gotStream,
-                        delim,
-                        options
-                    ) as Promise<void>;
-
-                    // ECONNRESET
-                    s.catch((err) => {
-                        if(err.code !== 'ABORT_ERR' && err.code !== 'ERR_STREAM_PREMATURE_CLOSE') {
-                            // @ts-ignore
-                            currInstance.logger.error(new ErrorWithCause('Unexpected error, or too many retries, occurred while streaming logs', {cause: err}), {user: user.name});
-                        }
-                    });
-
-
-                    delim.on('data', (c: any) => {
-                        const logObj = JSON.parse(c) as LogInfo;
-                        let subredditMessage;
-                        let allMessage;
-                        if(logObj.subreddit !== undefined) {
-                            const {subreddit, bot, ...rest} = logObj
-                            // @ts-ignore
-                            subredditMessage = formatLogLineToHtml(formatter.transform(rest)[MESSAGE], rest.timestamp);
-                        }
-                        if(logObj.bot !== undefined) {
-                            const {bot, ...rest} = logObj
-                            // @ts-ignore
-                            allMessage = formatLogLineToHtml(formatter.transform(rest)[MESSAGE], rest.timestamp);
-                        }
-                        // @ts-ignore
-                        let formattedMessage = formatLogLineToHtml(formatter.transform(logObj)[MESSAGE], logObj.timestamp);
-                        io.to(sessionId).emit('log', {...logObj, subredditMessage, allMessage, formattedMessage});
-                    });
-
-                    gotStream.once('retry', retryFn);
-                }
-
-                retryFn();
-
-                return ac;
-            }
-            return undefined;
-        }
-    }
 
     try {
         server = await app.listen(port);
@@ -965,29 +856,7 @@ const webClient = async (options: OperatorConfig) => {
 
         res.render('status', {
             instances: shownInstances,
-            bots: resp.bots.map((x: BotStatusResponse) => {
-                const {subreddits = []} = x;
-                const subredditsWithSimpleLogs = subreddits.map(y => {
-                    let transformedLogs: string[];
-                    if(y.name === 'All') {
-                        // only need to remove bot name here
-                        transformedLogs = (y.logs as LogInfo[]).map((z: LogInfo) => {
-                           const {bot, ...rest} = z;
-                           // @ts-ignore
-                           return formatLogLineToHtml(formatter.transform(rest)[MESSAGE] as string, rest.timestamp);
-                        });
-                    } else {
-                        transformedLogs = (y.logs as LogInfo[]).map((z: LogInfo) => {
-                            const {bot, subreddit, ...rest} = z;
-                            // @ts-ignore
-                            return formatLogLineToHtml(formatter.transform(rest)[MESSAGE] as string, rest.timestamp);
-                        });
-                    }
-                    y.logs = transformedLogs;
-                    return y;
-                });
-                return {...x, subreddits: subredditsWithSimpleLogs};
-            }),
+            bots: resp.bots,
             botId: (req.instance as CMInstance).getName(),
             instanceId: (req.instance as CMInstance).getName(),
             isOperator: isOp,
@@ -1398,42 +1267,6 @@ const webClient = async (options: OperatorConfig) => {
             clearSockStreams(socket.id);
             socket.join(session.id);
 
-            socket.on('viewing', (data) => {
-                if(user !== undefined) {
-                    const {subreddit, bot: botVal} = data;
-                    const currBot = cmInstances.find(x => x.getName() === session.botId);
-                    if(currBot !== undefined) {
-
-                        if(liveInterval !== undefined) {
-                            clearInterval(liveInterval)
-                        }
-
-                        const liveEmit = async () => {
-                            try {
-                                const resp = await got.get(`${currBot.normalUrl}/liveStats`, {
-                                    headers: {
-                                        'Authorization': `Bearer ${createToken(currBot, user)}`,
-                                    },
-                                    searchParams: {
-                                        bot: botVal,
-                                        subreddit
-                                    }
-                                });
-                                const stats = JSON.parse(resp.body);
-                                io.to(session.id).emit('liveStats', stats);
-                            } catch (err: any) {
-                                currBot.logger.error(new ErrorWithCause('Could not retrieve live stats', {cause: err}));
-                            }
-                        }
-
-                        // do an initial get
-                        liveEmit();
-                        // and then every 5 seconds after that
-                        liveInterval = setInterval(async () => await liveEmit(), 5000);
-                    }
-                }
-            });
-
             if(session.botId !== undefined) {
                 const bot = cmInstances.find(x => x.getName() === session.botId);
                 if(bot !== undefined) {
@@ -1456,12 +1289,8 @@ const webClient = async (options: OperatorConfig) => {
 
                     // only setup streams if the user can actually access them (not just a web operator)
                     if(session.authBotId !== undefined) {
-                        // streaming logs and stats from client
+                        // streaming stats from client
                         const newStreams: (AbortController | NodeJS.Timeout)[] = [];
-                        const ac = startLogStream(session, user);
-                        if(ac !== undefined) {
-                            newStreams.push(ac);
-                        }
                         const interval = setInterval(async () => {
                             try {
                                 const resp = await got.get(`${bot.normalUrl}/stats`, {

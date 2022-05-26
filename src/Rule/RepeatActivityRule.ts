@@ -8,7 +8,6 @@ import {
     getActivitySubredditName, isActivityWindowConfig,
     isExternalUrlSubmission,
     isRedditMedia,
-    parseGenericValueComparison,
     parseSubredditName,
     parseUsableLinkIdentifier as linkParser,
     PASS,
@@ -23,7 +22,6 @@ import {
 } from "../Common/interfaces";
 import Submission from "snoowrap/dist/objects/Submission";
 import dayjs from "dayjs";
-import Fuse from 'fuse.js'
 import {StrongSubredditCriteria, SubredditCriteria} from "../Common/Infrastructure/Filters/FilterCriteria";
 import {
     ActivityWindow,
@@ -31,6 +29,7 @@ import {
     ActivityWindowCriteria,
     HistoryFiltersOptions
 } from "../Common/Infrastructure/ActivityWindow";
+import {parseGenericValueComparison} from "../Common/Infrastructure/Comparisons";
 
 const parseUsableLinkIdentifier = linkParser();
 

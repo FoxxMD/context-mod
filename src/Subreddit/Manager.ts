@@ -229,6 +229,8 @@ export class Manager extends EventEmitter implements RunningStates {
     rulesUniqueRollingAvg: number = 0;
     actionedEvents: ActionedEvent[] = [];
 
+    delayedQueueInterval: any;
+
     processEmitter: EventEmitter = new EventEmitter();
 
     activityRepo!: Repository<Activity>;
@@ -272,12 +274,11 @@ export class Manager extends EventEmitter implements RunningStates {
             return {
                 id: x.id,
                 activityId: x.activity.name,
-                permalink: x.activity.permalink,
+                permalink: x.activity.permalink, // TODO construct this without having to fetch activity
                 submissionId: asComment(x.activity) ? x.activity.link_id : undefined,
                 author: x.author,
                 queuedAt: x.queuedAt.unix(),
-                durationMilli: x.delay.asSeconds(),
-                duration: x.delay.humanize(),
+                duration: x.delay.asSeconds(),
                 source: `${x.action}${x.identifier !== undefined ? ` (${x.identifier})` : ''}`,
                 subreddit: this.subreddit.display_name_prefixed
             }
@@ -399,6 +400,45 @@ export class Manager extends EventEmitter implements RunningStates {
             }
         })(this), 10000);
 
+        this.delayedQueueInterval = setInterval((function(self) {
+            return function() {
+                if(!self.queue.paused && self.resources !== undefined) {
+                    let index = 0;
+                    let anyQueued = false;
+                    for(const ar of self.resources.delayedItems) {
+                        if(ar.queuedAt.add(ar.delay).isSameOrBefore(dayjs())) {
+                            anyQueued = true;
+                            self.logger.info(`Activity ${ar.activity.name} dispatched at ${ar.queuedAt.format('HH:mm:ss z')} (delayed for ${ar.delay.humanize()}) is now being queued.`, {leaf: 'Delayed Activities'});
+                            self.firehose.push({
+                                activity: ar.activity,
+                                options: {
+                                    refresh: true,
+                                    // @ts-ignore
+                                    source: ar.identifier === undefined ? ar.type : `${ar.type}:${ar.identifier}`,
+                                    initialGoto: ar.goto,
+                                    activitySource: {
+                                        id: ar.id,
+                                        queuedAt: ar.queuedAt,
+                                        delay: ar.delay,
+                                        action: ar.action,
+                                        goto: ar.goto,
+                                        identifier: ar.identifier,
+                                        type: ar.type
+                                    },
+                                    dryRun: ar.dryRun,
+                                }
+                            });
+                            self.resources.removeDelayedActivity(ar.id);
+                        }
+                        index++;
+                    }
+                    if(!anyQueued) {
+                        self.logger.debug('No Activities ready to queue', {leaf: 'Delayed Activities'});
+                    }
+                }
+            }
+        })(this), 5000); // every 5 seconds
+
         this.processEmitter.on('notify', (payload: NotificationEventPayload) => {
            this.notificationManager.handle(payload.type, payload.title, payload.body, payload.causedBy, payload.logLevel);
         });
@@ -449,7 +489,7 @@ export class Manager extends EventEmitter implements RunningStates {
             //
             // if we insert the same item again because it is currently being processed AND THEN we get the item AGAIN we only want to update the newest meta
             // so search the array backwards to get the neweset only
-            const queuedItemIndex = findLastIndex(this.queuedItemsMeta, x => x.id === task.activity.id);
+            const queuedItemIndex = findLastIndex(this.queuedItemsMeta, x => x.id === task.activity.name);
             if(queuedItemIndex !== -1) {
                 const itemMeta = this.queuedItemsMeta[queuedItemIndex];
                 let msg = `Item ${itemMeta.id} is already ${itemMeta.state}.`;
@@ -458,11 +498,11 @@ export class Manager extends EventEmitter implements RunningStates {
                     this.queuedItemsMeta.splice(queuedItemIndex, 1, {...itemMeta, shouldRefresh: true});
                 } else {
                     this.logger.debug(`${msg} Re-queuing item but will also refresh data before processing.`);
-                    this.queuedItemsMeta.push({id: task.activity.id, shouldRefresh: true, state: 'queued'});
+                    this.queuedItemsMeta.push({id: task.activity.name, shouldRefresh: true, state: 'queued'});
                     this.queue.push(task);
                 }
             } else {
-                this.queuedItemsMeta.push({id: task.activity.id, shouldRefresh: false, state: 'queued'});
+                this.queuedItemsMeta.push({id: task.activity.name, shouldRefresh: false, state: 'queued'});
                 this.queue.push(task);
             }
 
@@ -493,40 +533,6 @@ export class Manager extends EventEmitter implements RunningStates {
         , 1);
     }
 
-    protected async startDelayQueue() {
-        while(this.queueState.state === RUNNING) {
-            let index = 0;
-            for(const ar of this.resources.delayedItems) {
-                if(!ar.processing && ar.queuedAt.add(ar.delay).isSameOrBefore(dayjs())) {
-                    this.logger.info(`Delayed Activity ${ar.activity.name} is being queued.`);
-                    await this.firehose.push({
-                        activity: ar.activity,
-                        options: {
-                            refresh: true,
-                            // @ts-ignore
-                            source: ar.identifier === undefined ? ar.type : `${ar.type}:${ar.identifier}`,
-                            initialGoto: ar.goto,
-                            activitySource: {
-                                id: ar.id,
-                                queuedAt: ar.queuedAt,
-                                delay: ar.delay,
-                                action: ar.action,
-                                goto: ar.goto,
-                                identifier: ar.identifier,
-                                type: ar.type
-                            },
-                            dryRun: ar.dryRun,
-                        }
-                    });
-                    this.resources.delayedItems.splice(index, 1, {...ar, processing: true});
-                }
-                index++;
-            }
-            // sleep for 5 seconds
-            await sleep(5000);
-        }
-    }
-
     protected generateQueue(maxWorkers: number) {
         if (maxWorkers > 1) {
             this.logger.warn(`Setting max queue workers above 1 (specified: ${maxWorkers}) may have detrimental effects to log readability and api usage. Consult the documentation before using this advanced/experimental feature.`);
@@ -538,7 +544,7 @@ export class Manager extends EventEmitter implements RunningStates {
                     await sleep(this.delayBy * 1000);
                 }
 
-                const queuedItemIndex = this.queuedItemsMeta.findIndex(x => x.id === task.activity.id);
+                const queuedItemIndex = this.queuedItemsMeta.findIndex(x => x.id === task.activity.name);
                 try {
                     const itemMeta = this.queuedItemsMeta[queuedItemIndex];
                     this.queuedItemsMeta.splice(queuedItemIndex, 1, {...itemMeta, state: 'processing'});
@@ -551,9 +557,6 @@ export class Manager extends EventEmitter implements RunningStates {
                 } finally {
                     // always remove item meta regardless of success or failure since we are done with it meow
                     this.queuedItemsMeta.splice(queuedItemIndex, 1);
-                    if(task.options.activitySource?.id !== undefined) {
-                        await this.resources.removeDelayedActivity(task.options.activitySource?.id);
-                    }
                 }
             }
             , maxWorkers);
@@ -875,7 +878,6 @@ export class Manager extends EventEmitter implements RunningStates {
         const checkType = isSubmission(activity) ? 'Submission' : 'Comment';
         let item = activity,
             runtimeShouldRefresh = false;
-        const itemId = await item.id;
 
         const {
             delayUntil,
@@ -884,6 +886,14 @@ export class Manager extends EventEmitter implements RunningStates {
             activitySource,
             force = false,
         } = options;
+
+        if(refresh) {
+            this.logger.verbose(`Refreshed data`);
+            // @ts-ignore
+            item = await activity.refresh();
+        }
+
+        const itemId = await item.id;
 
         if(await this.resources.hasRecentSelf(item)) {
             let recentMsg = `Found in Activities recently (last ${this.resources.selfTTL} seconds) modified/created by this bot`;
@@ -963,7 +973,6 @@ export class Manager extends EventEmitter implements RunningStates {
                             delay: dayjs.duration(remaining, 'seconds'),
                             id: 'notUsed',
                             queuedAt: dayjs(),
-                            processing: false,
                             activity,
                             author: getActivityAuthorName(activity.author),
                         });
@@ -977,7 +986,7 @@ export class Manager extends EventEmitter implements RunningStates {
             }
             // refresh signal from firehose if activity was ingested multiple times before processing or re-queued while processing
             // want to make sure we have the most recent data
-            if(runtimeShouldRefresh || refresh) {
+            if(runtimeShouldRefresh) {
                 this.logger.verbose(`Refreshed data`);
                 // @ts-ignore
                 item = await activity.refresh();
@@ -1348,7 +1357,6 @@ export class Manager extends EventEmitter implements RunningStates {
                 state: RUNNING,
                 causedBy
             }
-            this.startDelayQueue();
             if(!suppressNotification) {
                 this.notificationManager.handle('runStateChanged', 'Queue Started', reason, causedBy);
             }

@@ -66,13 +66,13 @@ const status = () => {
 
         const subManagerData = [];
         for (const m of req.user?.accessibleSubreddits(bot) as Manager[]) {
-            const logs = req.manager === undefined || allReq || req.manager.getDisplay() === m.getDisplay() ? filterLogs(m.logs, {
-                    level: (level as string),
-                    // @ts-ignore
-                    sort,
-                    limit: limit as string,
-                    returnType: 'object'
-                }) as LogInfo[]: [];
+            // const logs = req.manager === undefined || allReq || req.manager.getDisplay() === m.getDisplay() ? filterLogs(m.logs, {
+            //         level: (level as string),
+            //         // @ts-ignore
+            //         sort,
+            //         limit: limit as string,
+            //         returnType: 'object'
+            //     }) as LogInfo[]: [];
 
             let retention = 'Unknown';
             if (m.resources !== undefined) {
@@ -89,7 +89,7 @@ const status = () => {
             const sd = {
                 name: m.displayLabel,
                 //linkName: s.replace(/\W/g, ''),
-                logs: logs || [], // provide a default empty value in case we truly have not logged anything for this subreddit yet
+                logs: [], // provide a default empty value in case we truly have not logged anything for this subreddit yet
                 botState: m.managerState,
                 eventsState: m.eventsState,
                 queueState: m.queueState,
@@ -237,14 +237,14 @@ const status = () => {
         const sharedSub = subManagerData.find(x => x.stats.cache.isShared);
         const sharedCount = sharedSub !== undefined ? sharedSub.stats.cache.currentKeyCount : 0;
         const scopes = req.user?.isInstanceOperator(bot) ? bot.client.scope : [];
-        const allSubLogs = subManagerData.map(x => x.logs).flat().sort(logSortFunc(sort as string)).slice(0, (limit as number) + 1);
-        const allLogs = filterLogs([...allSubLogs, ...(req.user?.isInstanceOperator(req.botApp) ? bot.logs : bot.logs.filter(x => x.user === req.user?.name))], {
-            level: (level as string),
-            // @ts-ignore
-            sort,
-            limit: limit as string,
-            returnType: 'object'
-        }) as LogInfo[];
+        //const allSubLogs = subManagerData.map(x => x.logs).flat().sort(logSortFunc(sort as string)).slice(0, (limit as number) + 1);
+        // const allLogs = filterLogs([...allSubLogs, ...(req.user?.isInstanceOperator(req.botApp) ? bot.logs : bot.logs.filter(x => x.user === req.user?.name))], {
+        //     level: (level as string),
+        //     // @ts-ignore
+        //     sort,
+        //     limit: limit as string,
+        //     returnType: 'object'
+        // }) as LogInfo[];
         let allManagerData: any = {
             name: 'All',
             status: bot.running ? 'RUNNING' : 'NOT RUNNING',
@@ -261,7 +261,7 @@ const status = () => {
                 causedBy: SYSTEM
             },
             dryRun: boolToString(bot.dryRun === true),
-            logs: allLogs,
+            logs: [],
             checks: checks,
             softLimit: bot.softLimit,
             hardLimit: bot.hardLimit,

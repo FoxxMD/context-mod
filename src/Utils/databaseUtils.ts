@@ -3,6 +3,7 @@ import {MysqlConnectionOptions} from "typeorm/driver/mysql/MysqlConnectionOption
 import {MongoConnectionOptions} from "typeorm/driver/mongodb/MongoConnectionOptions";
 import {PostgresConnectionOptions} from "typeorm/driver/postgres/PostgresConnectionOptions";
 import {resolve, parse as parsePath} from 'path';
+// https://stackoverflow.com/questions/49618719/why-does-typeorm-need-reflect-metadata
 import "reflect-metadata";
 import {DataSource} from "typeorm";
 import {castToBool, fileOrDirectoryIsWriteable, mergeArr, resolvePath} from "../util";

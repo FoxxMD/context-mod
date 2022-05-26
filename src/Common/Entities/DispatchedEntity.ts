@@ -152,6 +152,9 @@ export class DispatchedEntity extends TimeAwareRandomBaseEntity {
 
     async toActivityDispatch(client: ExtendedSnoowrap): Promise<ActivityDispatch> {
         const redditThing = parseRedditFullname(this.activityId);
+        if(redditThing === undefined) {
+            throw new Error(`Could not parse reddit ID from value '${this.activityId}'`);
+        }
         let activity: Comment | Submission;
         if (redditThing?.type === 'comment') {
             // @ts-ignore
@@ -161,12 +164,12 @@ export class DispatchedEntity extends TimeAwareRandomBaseEntity {
             activity = await client.getSubmission(redditThing.id);
         }
         activity.author = new RedditUser({name: this.author}, client, false);
+        activity.id  = redditThing.id;
         return {
             id: this.id,
             queuedAt: this.createdAt,
             activity,
             delay: this.delay,
-            processing: false,
             action: this.action,
             goto: this.goto,
             onExistingFound: this.onExistingFound,

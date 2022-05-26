@@ -186,3 +186,46 @@ export type ActionTypes =
     | 'dispatch'
     | 'cancelDispatch'
     | 'contributor';
+
+/**
+ * Test the calculated VADER sentiment (compound) score for an Activity using this comparison. Can be either a numerical or natural language
+ *
+ * Sentiment values range from extremely negative to extremely positive in a numerical range of -1 to +1:
+ *
+ * * -0.6 => extremely negative
+ * * -0.3 => very negative
+ * * -0.1 => negative
+ * *    0 => neutral
+ * *  0.1 => positive
+ * *  0.3 => very positive
+ * *  0.6 => extremely positive
+ *
+ * The below examples are all equivocal. You can use either set of values as the value for `sentiment` (numerical comparisons or natural langauge)
+ *
+ * * `>= 0.1` = `is positive`
+ * * `<= 0.3` = `is very negative`
+ * * `< 0.1` = `is not positive`
+ * * `> -0.3` = `is not very negative`
+ *
+ * Special case:
+ *
+ * * `is neutral` equates to `> -0.1 and < 0.1`
+ * * `is not neutral` equates to `< -0.1 or > 0.1`
+ *
+ * ContextMod uses a normalized, weighted average from these sentiment tools:
+ *
+ * * NLP.js (english, french, german, and spanish) https://github.com/axa-group/nlp.js/blob/master/docs/v3/sentiment-analysis.md
+ * * (english only) vaderSentiment-js https://github.com/vaderSentiment/vaderSentiment-js/
+ * * (english only) wink-sentiment https://github.com/winkjs/wink-sentiment
+ *
+ * More about the sentiment algorithms used:
+ * * VADER https://github.com/cjhutto/vaderSentiment
+ * * AFINN http://corpustext.com/reference/sentiment_afinn.html
+ * * Senticon https://ieeexplore.ieee.org/document/8721408
+ * * Pattern https://github.com/clips/pattern
+ * * wink https://github.com/winkjs/wink-sentiment
+ *
+ * @pattern ((>|>=|<|<=)\s*(-?\d?\.?\d+))|((not)?\s*(very|extremely)?\s*(positive|neutral|negative))
+ * @examples ["is negative", "> 0.2"]
+ * */
+export type VaderSentimentComparison = string;

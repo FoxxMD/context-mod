@@ -1,5 +1,4 @@
 import winston, {Logger} from "winston";
-import jsonStringify from 'safe-stable-stringify';
 import dayjs, {Dayjs, OpUnitType} from 'dayjs';
 import {Duration} from 'dayjs/plugin/duration.js';
 import Ajv from "ajv";
@@ -78,7 +77,7 @@ import {
     StatisticFrequencyOption,
     StringOperator
 } from "./Common/Infrastructure/Atomic";
-import {DurationComparison, GenericComparison} from "./Common/Infrastructure/Comparisons";
+import {DurationComparison} from "./Common/Infrastructure/Comparisons";
 import {
     AuthorOptions,
     FilterCriteriaDefaults,
@@ -239,7 +238,7 @@ export const defaultFormat = (defaultLabel = 'App') => printf(({
                                                                    stack,
                                                                    ...rest
                                                                }) => {
-    let stringifyValue = splatObj !== undefined ? jsonStringify(splatObj) : '';
+    let stringifyValue = splatObj !== undefined ? JSON.stringify(splatObj) : '';
     let msg = message;
     let stackMsg = '';
     if (stack !== undefined) {
@@ -258,7 +257,7 @@ export const defaultFormat = (defaultLabel = 'App') => printf(({
     }
 
     let nodes = labels;
-    if (leaf !== null && leaf !== undefined) {
+    if (leaf !== null && leaf !== undefined && !nodes.includes(leaf)) {
         nodes.push(leaf);
     }
     const labelContent = `${nodes.map((x: string) => `[${x}]`).join(' ')}`;
@@ -721,42 +720,6 @@ export const comparisonTextOp = (val1: number, strOp: string, val2: number): boo
             return val1 <= val2;
         default:
             throw new Error(`${strOp} was not a recognized operator`);
-    }
-}
-
-const GENERIC_VALUE_COMPARISON = /^\s*(?<opStr>>|>=|<|<=)\s*(?<value>\d+)(?<extra>\s+.*)*$/
-const GENERIC_VALUE_COMPARISON_URL = 'https://regexr.com/60dq4';
-export const parseGenericValueComparison = (val: string): GenericComparison => {
-    const matches = val.match(GENERIC_VALUE_COMPARISON);
-    if (matches === null) {
-        throw new InvalidRegexError(GENERIC_VALUE_COMPARISON, val, GENERIC_VALUE_COMPARISON_URL)
-    }
-    const groups = matches.groups as any;
-
-    return {
-        operator: groups.opStr as StringOperator,
-        value: Number.parseFloat(groups.value),
-        isPercent: false,
-        extra: groups.extra,
-        displayText: `${groups.opStr} ${groups.value}`
-    }
-}
-
-const GENERIC_VALUE_PERCENT_COMPARISON = /^\s*(?<opStr>>|>=|<|<=)\s*(?<value>\d+)\s*(?<percent>%?)(?<extra>.*)$/
-const GENERIC_VALUE_PERCENT_COMPARISON_URL = 'https://regexr.com/60a16';
-export const parseGenericValueOrPercentComparison = (val: string): GenericComparison => {
-    const matches = val.match(GENERIC_VALUE_PERCENT_COMPARISON);
-    if (matches === null) {
-        throw new InvalidRegexError(GENERIC_VALUE_PERCENT_COMPARISON, val, GENERIC_VALUE_PERCENT_COMPARISON_URL)
-    }
-    const groups = matches.groups as any;
-
-    return {
-        operator: groups.opStr as StringOperator,
-        value: Number.parseFloat(groups.value),
-        isPercent: groups.percent !== '',
-        extra: groups.extra,
-        displayText: `${groups.opStr} ${groups.value}${groups.percent === undefined || groups.percent === '' ? '': '%'}`
     }
 }
 
@@ -2666,7 +2629,6 @@ export const activityDispatchConfigToDispatch = (config: ActivityDispatchConfig,
         delay: parseDurationValToDuration(config.delay),
         tardyTolerant: tolerantVal,
         queuedAt: dayjs().utc(),
-        processing: false,
         id: nanoid(16),
         activity,
         action,
@@ -2792,4 +2754,22 @@ export const filterByTimeRequirement = (satisfiedEndtime: Dayjs, listSlice: Snoo
     });
 
     return [truncatedItems.length !== listSlice.length, truncatedItems]
+}
+
+export const between = (val: number, a: number, b: number, inclusiveMin: boolean = false, inclusiveMax: boolean = false): boolean => {
+    var min = Math.min(a, b),
+        max = Math.max(a, b);
+
+    if(!inclusiveMin && !inclusiveMax) {
+        return val > min && val < max;
+    }
+    if(inclusiveMin && inclusiveMax) {
+        return val >= min && val <= max;
+    }
+    if(inclusiveMin) {
+        return val >= min && val < max;
+    }
+
+    // inclusive max
+    return val > min && val <= max;
 }

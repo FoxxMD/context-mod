@@ -79,6 +79,7 @@ export class ActionPremise extends TimeAwareRandomBaseEntity  {
             this.active = data.active ?? true;
             this.configHash = objectHash.sha1(data.config);
             this.manager = data.manager;
+            this.managerId = data.manager.id;
             this.name = data.name;
 
             const {

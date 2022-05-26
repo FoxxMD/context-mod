@@ -111,7 +111,9 @@ COPY --from=build --chown=abc:abc /app /app
 
 RUN npm install --production \
     && npm cache clean --force \
-    && chown abc:abc node_modules
+    && chown abc:abc node_modules \
+    && rm -rf node_modules/ts-node \
+    && rm -rf node_modules/typescript
 
 ENV NPM_CONFIG_LOGLEVEL debug
 

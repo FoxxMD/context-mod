@@ -37,8 +37,6 @@ import {
     mergeArr,
     parseDurationComparison,
     parseExternalUrl,
-    parseGenericValueComparison,
-    parseGenericValueOrPercentComparison,
     parseRedditEntity,
     parseStringToRegex,
     parseWikiContext,
@@ -145,6 +143,7 @@ import {
 } from "../Common/Infrastructure/Reddit";
 import {AuthorCritPropHelper} from "../Common/Infrastructure/Filters/AuthorCritPropHelper";
 import {NoopLogger} from "../Utils/loggerFactory";
+import {parseGenericValueComparison, parseGenericValueOrPercentComparison} from "../Common/Infrastructure/Comparisons";
 
 export const DEFAULT_FOOTER = '\r\n*****\r\nThis action was performed by [a bot.]({{botLink}}) Mention a moderator or [send a modmail]({{modmailLink}}) if you any ideas, questions, or concerns about this action.';
 
@@ -440,6 +439,7 @@ export class SubredditResources {
             const now = dayjs();
             for(const dAct of dispatchedActivities) {
                 const shouldDispatchAt = dAct.createdAt.add(dAct.delay.asSeconds(), 'seconds');
+                let tardyHint = '';
                 if(shouldDispatchAt.isBefore(now)) {
                     let tardyHint = `Activity ${dAct.activityId} queued at ${dAct.createdAt.format('YYYY-MM-DD HH:mm:ssZ')} for ${dAct.delay.humanize()} is now LATE`;
                     if(dAct.tardyTolerant === true) {
@@ -453,7 +453,8 @@ export class SubredditResources {
                         // see if its within tolerance
                         const latest = shouldDispatchAt.add(dAct.tardyTolerant);
                         if(latest.isBefore(now)) {
-                            tardyHint += `and IS NOT within tardy tolerance of ${dAct.tardyTolerant.humanize()} of planned dispatch time so will be dropped`;
+                            tardyHint += ` and IS NOT within tardy tolerance of ${dAct.tardyTolerant.humanize()} of planned dispatch time so will be dropped`;
+                            this.logger.warn(tardyHint);
                             await this.removeDelayedActivity(dAct.id);
                             continue;
                         } else {
@@ -461,8 +462,14 @@ export class SubredditResources {
                         }
                     }
                 }
-                // TODO make this less api heavy
-                this.delayedItems.push(await dAct.toActivityDispatch(this.client))
+                if(tardyHint !== '') {
+                    this.logger.warn(tardyHint);
+                }
+                try {
+                    this.delayedItems.push(await dAct.toActivityDispatch(this.client))
+                } catch (e) {
+                    this.logger.warn(new ErrorWithCause(`Unable to add Activity ${dAct.activityId} from database delayed activities to in-app delayed activities queue`, {cause: e}));
+                }
             }
         }
     }
@@ -475,7 +482,7 @@ export class SubredditResources {
 
     async removeDelayedActivity(id: string) {
         await this.dispatchedActivityRepo.delete(id);
-        this.delayedItems.filter(x => x.id !== id);
+        this.delayedItems = this.delayedItems.filter(x => x.id !== id);
     }
 
     async initStats() {
@@ -742,7 +749,7 @@ export class SubredditResources {
             req: acc.req + curr.requests,
         }), {miss: 0, req: 0});
         const cacheKeys = Object.keys(this.stats.cache);
-        return {
+        const res = {
             cache: {
                 // TODO could probably combine these two
                 totalRequests: totals.req,
@@ -770,24 +777,29 @@ export class SubredditResources {
 
                     if(acc[curr].requestTimestamps.length > 1) {
                         // calculate average time between request
-                        const diffData = acc[curr].requestTimestamps.reduce((acc, curr: number) => {
-                            if(acc.last === 0) {
-                                acc.last = curr;
-                                return acc;
+                        const diffData = acc[curr].requestTimestamps.reduce((accTimestampData, curr: number) => {
+                            if(accTimestampData.last === 0) {
+                                accTimestampData.last = curr;
+                                return accTimestampData;
                             }
-                            acc.diffs.push(curr - acc.last);
-                            acc.last = curr;
-                            return acc;
+                            accTimestampData.diffs.push(curr - accTimestampData.last);
+                            accTimestampData.last = curr;
+                            return accTimestampData;
                         },{last: 0, diffs: [] as number[]});
                         const avgDiff = diffData.diffs.reduce((acc, curr) => acc + curr, 0) / diffData.diffs.length;
 
                         acc[curr].averageTimeBetweenHits = formatNumber(avgDiff/1000);
                     }
 
+                    const {requestTimestamps, identifierRequestCount, ...rest} = acc[curr];
+                    // @ts-ignore
+                    acc[curr] = rest;
+
                     return acc;
-                }, Promise.resolve(this.stats.cache))
+                }, Promise.resolve({...this.stats.cache}))
             }
         }
+        return res;
     }
 
     setLogger(logger: Logger) {
@@ -906,39 +918,43 @@ export class SubredditResources {
                 return await item.fetch();
             }
         } catch (err: any) {
-            this.logger.error('Error while trying to fetch a cached activity', err);
-            throw err.logged;
+            throw new ErrorWithCause('Error while trying to fetch a cached Activity', {cause: err});
         }
     }
 
     // @ts-ignore
     public async setActivity(item: Submission | Comment, tryToFetch = true)
     {
-        let hash = '';
-        if(this.submissionTTL !== false && isSubmission(item)) {
-            hash = `sub-${item.name}`;
-            if(tryToFetch && item instanceof Submission) {
-                // @ts-ignore
-                const itemToCache = await item.fetch();
-                await this.cache.set(hash, itemToCache, {ttl: this.submissionTTL});
-                return itemToCache;
-            } else {
-                // @ts-ignore
-                await this.cache.set(hash, item, {ttl: this.submissionTTL});
-                return item;
+        try {
+            let hash = '';
+            if (this.submissionTTL !== false && isSubmission(item)) {
+                hash = `sub-${item.name}`;
+                if (tryToFetch && item instanceof Submission) {
+                    // @ts-ignore
+                    const itemToCache = await item.fetch();
+                    await this.cache.set(hash, itemToCache, {ttl: this.submissionTTL});
+                    return itemToCache;
+                } else {
+                    // @ts-ignore
+                    await this.cache.set(hash, item, {ttl: this.submissionTTL});
+                    return item;
+                }
+            } else if (this.commentTTL !== false) {
+                hash = `comm-${item.name}`;
+                if (tryToFetch && item instanceof Comment) {
+                    // @ts-ignore
+                    const itemToCache = await item.fetch();
+                    await this.cache.set(hash, itemToCache, {ttl: this.commentTTL});
+                    return itemToCache;
+                } else {
+                    // @ts-ignore
+                    await this.cache.set(hash, item, {ttl: this.commentTTL});
+                    return item;
+                }
             }
-        } else if(this.commentTTL !== false){
-            hash = `comm-${item.name}`;
-            if(tryToFetch && item instanceof Comment) {
-                // @ts-ignore
-                const itemToCache = await item.fetch();
-                await this.cache.set(hash, itemToCache, {ttl: this.commentTTL});
-                return itemToCache;
-            } else {
-                // @ts-ignore
-                await this.cache.set(hash, item, {ttl: this.commentTTL});
-                return item;
-            }
+            return item;
+        } catch (e) {
+            throw new ErrorWithCause('Error occurred while trying to add Activity to cache', {cause: e});
         }
     }
 
@@ -1015,7 +1031,7 @@ export class SubredditResources {
                 return subreddit as Subreddit;
             }
         } catch (err: any) {
-            this.logger.error('Error while trying to fetch a cached activity', err);
+            this.logger.error('Error while trying to fetch a cached subreddit', err);
             throw err.logged;
         }
     }

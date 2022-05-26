@@ -13,7 +13,6 @@ import {
     comparisonTextOp, convertSubredditsRawToStrong,
     FAIL,
     formatNumber, getActivitySubredditName, isActivityWindowConfig, isSubmission,
-    parseGenericValueOrPercentComparison,
     parseSubredditName,
     PASS, windowConfigToWindowCriteria
 } from "../util";
@@ -27,6 +26,7 @@ import {
     HistoryFiltersOptions
 } from "../Common/Infrastructure/ActivityWindow";
 import {FilterOptions} from "../Common/Infrastructure/Filters/FilterShapes";
+import {parseGenericValueOrPercentComparison} from "../Common/Infrastructure/Comparisons";
 
 
 export interface AttributionCriteria {

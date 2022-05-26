@@ -1676,6 +1676,7 @@ export interface LogInfo {
     labels?: string[]
     bot?: string
     user?: string
+    transport?: string[]
 }
 
 export interface ActionResult extends ActionProcessResult {
@@ -1942,7 +1943,6 @@ export interface ActivityDispatch extends Omit<ActivityDispatchConfig, 'delay'| 
     author: string
     delay: Duration
     tardyTolerant?: boolean | Duration
-    processing: boolean
     action?: string
     type: ActivitySourceTypes
     dryRun?: boolean

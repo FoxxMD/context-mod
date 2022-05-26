@@ -71,12 +71,7 @@ export class CancelDispatchAction extends Action {
                 } else {
                     matchedDispatchIdentifier = this.identifiers.filter(x => x !== null).includes(x.identifier);
                 }
-                const matched = matchedId && matchedDispatchIdentifier;
-                if(matched && x.processing) {
-                    this.logger.debug(`Cannot remove ${isSubmission(x.activity) ? 'Submission' : 'Comment'} ${x.activity.name} because it is currently processing`);
-                    return false;
-                }
-                return matched;
+                return matchedId && matchedDispatchIdentifier;
             });
             let cancelCrit;
             if (this.identifiers === undefined) {

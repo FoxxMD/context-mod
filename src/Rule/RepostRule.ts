@@ -6,8 +6,7 @@ import {
     compareDurationValue,
     comparisonTextOp,
     FAIL, formatNumber,
-    isRepostItemResult, parseDurationComparison, parseGenericValueComparison,
-    parseUsableLinkIdentifier,
+    isRepostItemResult, parseDurationComparison, parseUsableLinkIdentifier,
     PASS, searchAndReplace, stringSameness, triggeredIndicator, windowConfigToWindowCriteria, wordCount
 } from "../util";
 import {
@@ -18,13 +17,12 @@ import {
 } from "../Common/interfaces";
 import objectHash from "object-hash";
 import {getAttributionIdentifier} from "../Utils/SnoowrapUtils";
-import Fuse from "fuse.js";
-import leven from "leven";
 import {YoutubeClient, commentsAsRepostItems} from "../Utils/ThirdParty/YoutubeClient";
 import dayjs from "dayjs";
 import {rest} from "lodash";
 import {CompareValue, DurationComparor, JoinOperands, SearchFacetType} from "../Common/Infrastructure/Atomic";
 import {ActivityWindow, ActivityWindowConfig} from "../Common/Infrastructure/ActivityWindow";
+import {parseGenericValueComparison} from "../Common/Infrastructure/Comparisons";
 
 const parseYtIdentifier = parseUsableLinkIdentifier();
 
