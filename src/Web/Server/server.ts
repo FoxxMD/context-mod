@@ -41,6 +41,12 @@ const server = addAsync(express());
 server.use(bodyParser.json());
 server.use(bodyParser.urlencoded({extended: false}));
 
+server.use((req, res, next) => {
+    // https://developers.google.com/search/docs/advanced/crawling/block-indexing#http-response-header
+    res.setHeader('X-Robots-Tag', 'noindex');
+    next();
+});
+
 declare module 'express-session' {
     interface SessionData {
         user: string,

@@ -82,13 +82,26 @@ app.use((req, res, next) => {
     }
 });
 
+const staticHeaders = (res: express.Response, path: string, stat: object) => {
+    res.setHeader('X-Robots-Tag', 'noindex');
+}
+const staticOpts = {
+    setHeaders: staticHeaders
+}
+
 app.use(bodyParser.urlencoded({extended: false}));
 //app.use(cookieParser());
 app.set('views', `${__dirname}/../assets/views`);
 app.set('view engine', 'ejs');
-app.use('/public', express.static(`${__dirname}/../assets/public`));
-app.use('/monaco', express.static(`${__dirname}/../../../node_modules/monaco-editor/`));
-app.use('/schemas', express.static(`${__dirname}/../../Schema/`));
+app.use('/public', express.static(`${__dirname}/../assets/public`, staticOpts));
+app.use('/monaco', express.static(`${__dirname}/../../../node_modules/monaco-editor/`, staticOpts));
+app.use('/schemas', express.static(`${__dirname}/../../Schema/`, staticOpts));
+
+app.use((req, res, next) => {
+    // https://developers.google.com/search/docs/advanced/crawling/block-indexing#http-response-header
+    res.setHeader('X-Robots-Tag', 'noindex');
+    next();
+});
 
 const userAgent = `web:contextBot:web`;
 
