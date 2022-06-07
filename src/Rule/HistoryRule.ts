@@ -1,19 +1,26 @@
 
-import {ActivityWindowType, CompareValueOrPercent, SubredditState, ThresholdCriteria} from "../Common/interfaces";
-import {Rule, RuleJSONConfig, RuleOptions, RuleResult} from "./index";
+import {
+    RuleResult,
+    ThresholdCriteria
+} from "../Common/interfaces";
+import {Rule, RuleJSONConfig, RuleOptions} from "./index";
 import Submission from "snoowrap/dist/objects/Submission";
-import {getAuthorActivities} from "../Utils/SnoowrapUtils";
 import dayjs from "dayjs";
 import {
     asSubmission,
     comparisonTextOp,
     FAIL,
-    formatNumber, getActivitySubredditName, isSubmission,
-    parseGenericValueOrPercentComparison, parseSubredditName,
+    formatNumber, getActivitySubredditName, historyFilterConfigToOptions, isSubmission,
+    parseSubredditName,
     PASS,
-    percentFromString, toStrongSubredditState
+    percentFromString, removeUndefinedKeys, toStrongSubredditState, windowConfigToWindowCriteria
 } from "../util";
-import {Comment} from "snoowrap";
+import {Comment, RedditUser} from "snoowrap";
+import {SubredditCriteria} from "../Common/Infrastructure/Filters/FilterCriteria";
+import {CompareValueOrPercent} from "../Common/Infrastructure/Atomic";
+import {ActivityWindowConfig, ActivityWindowCriteria} from "../Common/Infrastructure/ActivityWindow";
+import {ErrorWithCause} from "pony-cause";
+import {parseGenericValueOrPercentComparison} from "../Common/Infrastructure/Comparisons";
 
 export interface CommentThresholdCriteria extends ThresholdCriteria {
     /**
@@ -71,7 +78,7 @@ export interface HistoryCriteria {
      * */
     total?: CompareValueOrPercent
 
-    window: ActivityWindowType
+    window: ActivityWindowConfig
 
     /**
      * The minimum number of **filtered** activities that must exist from the `window` results for this criteria to run
@@ -81,66 +88,71 @@ export interface HistoryCriteria {
     name?: string
 }
 
+interface StrongCriteria extends Omit<HistoryCriteria, 'window'> {
+    window: ActivityWindowCriteria
+}
+
 export class HistoryRule extends Rule {
-    criteria: HistoryCriteria[];
+    criteria: StrongCriteria[];
     condition: 'AND' | 'OR';
-    include: (string | SubredditState)[];
-    exclude: (string | SubredditState)[];
-    activityFilterFunc: (x: Submission|Comment) => Promise<boolean> = async (x) => true;
+    include?: (string | SubredditCriteria)[];
+    exclude?: (string | SubredditCriteria)[];
+    //activityFilterFunc: (x: Submission|Comment, author: RedditUser) => Promise<boolean> = async (x) => true;
 
     constructor(options: HistoryOptions) {
         super(options);
         const {
             criteria,
             condition = 'OR',
-            include = [],
-            exclude = [],
+            include,
+            exclude,
         } = options || {};
 
-        this.criteria = criteria;
         this.condition = condition;
-        if (this.criteria.length === 0) {
+        if (criteria.length === 0) {
             throw new Error('Must provide at least one HistoryCriteria');
         }
 
+        // TODO should these be deprecated?
         this.include = include;
         this.exclude = exclude;
 
-        if(this.include.length > 0) {
-            const subStates = include.map((x) => {
-                if(typeof x === 'string') {
-                    return toStrongSubredditState({name: x, stateDescription: x}, {defaultFlags: 'i', generateDescription: true});
+        const postFilter = removeUndefinedKeys(historyFilterConfigToOptions({subreddits: {include, exclude}}));
+
+        this.criteria = criteria.map((x, index) => {
+            const strongWindow = windowConfigToWindowCriteria(x.window);
+            const {
+                filterOn: {
+                    post: {
+                        subreddits: {
+                            include: windowSubInclude = undefined,
+                            exclude: windowSubExclude = undefined,
+                        } = {}
+                    } = {},
+                } = {},
+            } = strongWindow;
+
+           if(postFilter !== undefined) {
+                if(postFilter.subreddits?.include !== undefined && windowSubInclude !== undefined) {
+                    this.logger.warn(`Rule defines both 'include' at top level and a criteria (#${index+1}) with a window with 'filterOn.post.subreddits.include' defined. Window filter takes precedence`);
                 }
-                return toStrongSubredditState(x, {defaultFlags: 'i', generateDescription: true});
-            });
-            this.activityFilterFunc = async (x: Submission|Comment) => {
-                for(const ss of subStates) {
-                    if(await this.resources.testSubredditCriteria(x, ss)) {
-                        return true;
-                    }
-                }
-                return false;
-            };
-        } else if(this.exclude.length > 0) {
-            const subStates = exclude.map((x) => {
-                if(typeof x === 'string') {
-                    return toStrongSubredditState({name: x, stateDescription: x}, {defaultFlags: 'i', generateDescription: true});
-                }
-                return toStrongSubredditState(x, {defaultFlags: 'i', generateDescription: true});
-            });
-            this.activityFilterFunc = async (x: Submission|Comment) => {
-                for(const ss of subStates) {
-                    if(await this.resources.testSubredditCriteria(x, ss)) {
-                        return false;
-                    }
-                }
-                return true;
-            };
-        }
+               if(postFilter.subreddits?.exclude !== undefined && windowSubExclude !== undefined) {
+                   this.logger.warn(`Rule defines both 'exclude' at top level and a criteria (#${index+1}) with a window with 'filterOn.post.subreddits.exclude' defined. Window filter takes precedence`);
+               }
+                strongWindow.filterOn = {
+                    post: postFilter,
+                    ...(strongWindow.filterOn ?? {}),
+                };
+           }
+           return {
+               ...x,
+               window: strongWindow
+           }
+        });
     }
 
     getKind(): string {
-        return "History";
+        return "history";
     }
 
     protected getSpecificPremise(): object {
@@ -159,13 +171,7 @@ export class HistoryRule extends Rule {
 
             const {comment, window, submission, total, minActivityCount = 5} = criteria;
 
-            let activities = await this.resources.getAuthorActivities(item.author, {window: window});
-            const filteredActivities = [];
-            for(const a of activities) {
-                if(await this.activityFilterFunc(a)) {
-                    filteredActivities.push(a);
-                }
-            }
+            const {pre: activities, post: filteredActivities} = await this.resources.getAuthorActivitiesWithFilter(item.author, window);
 
             if (filteredActivities.length < minActivityCount) {
                 continue;
@@ -390,6 +396,8 @@ interface HistoryConfig  {
      * */
     condition?: 'AND' | 'OR'
 
+    // DEPRECATED - In each History Criteria use `window.filterOn.post.subreddits` instead
+    // @deprecationMessage In each History Criteria use `window.filterOn.post.subreddits` instead
     /**
      * If present, activities will be counted only if they are found in this list of Subreddits.
      *
@@ -409,7 +417,10 @@ interface HistoryConfig  {
      *
      * @examples [["mealtimevideos","askscience", "/onlyfans*\/i", {"over18": true}]]
      * */
-    include?: (string | SubredditState)[],
+    include?: (string | SubredditCriteria)[],
+
+    // DEPRECATED - In each History Criteria use `window.filterOn.post.subreddits` instead
+    // @deprecationMessage In each History Criteria use `window.filterOn.post.subreddits` instead
     /**
      * If present, activities will be counted only if they are **NOT** found in this list of Subreddits
      *
@@ -429,7 +440,7 @@ interface HistoryConfig  {
      *
      * @examples [["mealtimevideos","askscience", "/onlyfans*\/i", {"over18": true}]]
      * */
-    exclude?: (string | SubredditState)[],
+    exclude?: (string | SubredditCriteria)[],
 }
 
 export interface HistoryOptions extends HistoryConfig, RuleOptions {

@@ -1,233 +1,51 @@
 import {Duration} from "dayjs/plugin/duration";
 import {Cache} from 'cache-manager';
 import {MESSAGE} from 'triple-beam';
-import Poll from "snoostorm/out/util/Poll";
-import Snoowrap from "snoowrap";
-import {RuleResult} from "../Rule";
-import {IncomingMessage} from "http";
 import Submission from "snoowrap/dist/objects/Submission";
 import Comment from "snoowrap/dist/objects/Comment";
 import RedditUser from "snoowrap/dist/objects/RedditUser";
-import {AuthorCriteria, AuthorOptions} from "../Author/Author";
-import {ConfigFormat} from "./types";
-import AbstractConfigDocument, {ConfigDocumentInterface} from "./Config/AbstractConfigDocument";
-import {Document as YamlDocument} from 'yaml';
+import {DataSource} from "typeorm";
 import {JsonOperatorConfigDocument, YamlOperatorConfigDocument} from "./Config/Operator";
-import {ConsoleTransportOptions} from "winston/lib/winston/transports";
-import {DailyRotateFileTransportOptions} from "winston-daily-rotate-file";
-import {DuplexTransportOptions} from "winston-duplex/dist/DuplexTransport";
 import {CommentCheckJson, SubmissionCheckJson} from "../Check";
 import {SafeDictionary} from "ts-essentials";
+import {RuleResultEntity} from "./Entities/RuleResultEntity";
+import {Dayjs} from "dayjs";
+import {
+    AuthorCriteria,
+    CommentState,
+    SubmissionState,
+    TypedActivityState
+} from "./Infrastructure/Filters/FilterCriteria";
+import {
+    ActivitySourceTypes,
+    CacheProvider,
+    DurationVal,
+    EventRetentionPolicyRange,
+    JoinOperands,
+    NonDispatchActivitySource,
+    NotificationEventType,
+    NotificationProvider,
+    onExistingFoundBehavior,
+    PollOn,
+    PostBehaviorType,
+    RecordOutputOption,
+    RecordOutputType,
+    SearchFacetType,
+    StatisticFrequencyOption,
+    StringOperator
+} from "./Infrastructure/Atomic";
+import {
+    AuthorOptions,
+    FilterCriteriaDefaults,
+    FilterCriteriaDefaultsJson,
+    FilterCriteriaPropertyResult,
+    FilterResult,
+    ItemOptions
+} from "./Infrastructure/Filters/FilterShapes";
+import {LoggingOptions, LogLevel, StrongLoggingOptions} from "./Infrastructure/Logging";
+import {DatabaseConfig, DatabaseDriver, DatabaseDriverConfig, DatabaseDriverType} from "./Infrastructure/Database";
+import {ActivityType} from "./Infrastructure/Reddit";
 
-/**
- * An ISO 8601 Duration
- * @pattern ^(-?)P(?=\d|T\d)(?:(\d+)Y)?(?:(\d+)M)?(?:(\d+)([DW]))?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?)?$
- * */
-export type ISO8601 = string;
-
-/**
- * A shorthand value for a DayJS duration consisting of a number value and time unit
- *
- * * EX `9 days`
- * * EX `3 months`
- * @pattern ^\s*(?<time>\d+)\s*(?<unit>days?|weeks?|months?|years?|hours?|minutes?|seconds?|milliseconds?)\s*$
- * */
-export type DayJSShorthand = string;
-export type DurationString = DayJSShorthand | ISO8601;
-
-/**
- * A value to define the range of Activities to retrieve.
- *
- * Acceptable values:
- *
- * **`ActivityWindowCriteria` object**
- *
- * Allows specify multiple range properties and more specific behavior
- *
- * **A `number` of Activities to retrieve**
- *
- * * EX `100` => 100 Activities
- *
- * *****
- *
- * Any of the below values that specify the amount of time to subtract from `NOW` to create a time range IE `NOW <---> [duration] ago`
- *
- * Acceptable values:
- *
- * **A `string` consisting of a value and a [Day.js](https://day.js.org/docs/en/durations/creating#list-of-all-available-units) time UNIT**
- *
- * * EX `9 days` => Range is `NOW <---> 9 days ago`
- *
- * **A [Day.js](https://day.js.org/docs/en/durations/creating) `object`**
- *
- * * EX `{"days": 90, "minutes": 15}` => Range is `NOW <---> 90 days and 15 minutes ago`
- *
- * **An [ISO 8601 duration](https://en.wikipedia.org/wiki/ISO_8601#Durations) `string`**
- *
- * * EX `PT15M` => 15 minutes => Range is `NOW <----> 15 minutes ago`
- *
- * @examples ["90 days"]
- * */
-export type ActivityWindowType = ActivityWindowCriteria | DurationVal | number;
-export type DurationVal = DurationString | DurationObject;
-
-/**
- * Multiple properties that may be used to define what range of Activity to retrieve.
- *
- * May specify one, or both properties along with the `satisfyOn` property, to affect the retrieval behavior.
- *
- * @examples [{"count": 100, "duration": {"days": 90}}]
- * @minProperties 1
- * @additionalProperties false
- * */
-export interface ActivityWindowCriteria {
-    /**
-     * The number of activities (submission/comments) to consider
-     * @examples [15]
-     * */
-    count?: number,
-    /**
-     * A value that specifies the amount of time to subtract from `NOW` to create a time range IE `NOW <---> [duration] ago`
-     *
-     * Acceptable values:
-     *
-     * **A `string` consisting of a value and a [Day.js](https://day.js.org/docs/en/durations/creating) time unit** ([test your value](https://regexr.com/61em3))
-     *
-     * * EX `9 days` => Range is `NOW <---> 9 days ago`
-     *
-     * **A [Day.js](https://day.js.org/docs/en/durations/creating) `object`**
-     *
-     * * EX `{"days": 90, "minutes": 15}` => Range is `NOW <---> 90 days and 15 minutes ago`
-     *
-     * **An [ISO 8601 duration](https://en.wikipedia.org/wiki/ISO_8601#Durations) `string`** ([test your value](https://regexr.com/61em9))
-     *
-     * * EX `PT15M` => 15 minutes => Range is `NOW <----> 15 minutes ago`
-     *
-     * @examples ["90 days", "PT15M", {"minutes": 15}]
-     * */
-    duration?: DurationVal
-
-    /**
-     * Define the condition under which both criteria are considered met
-     *
-     * **If `any` then it will retrieve Activities until one of the criteria is met, whichever occurs first**
-     *
-     * EX `{"count": 100, duration: "90 days"}`:
-     * * If 90 days of activities = 40 activities => returns 40 activities
-     * * If 100 activities is only 20 days => 100 activities
-     *
-     * **If `all` then both criteria must be met.**
-     *
-     * Effectively, whichever criteria produces the most Activities...
-     *
-     * EX `{"count": 100, duration: "90 days"}`:
-     * * If at 90 days of activities => 40 activities, continue retrieving results until 100 => results in >90 days of activities
-     * * If at 100 activities => 20 days of activities, continue retrieving results until 90 days => results in >100 activities
-     *
-     * @examples ["any"]
-     * @default any
-     * */
-    satisfyOn?: 'any' | 'all';
-
-    /**
-     * Filter which subreddits (case-insensitive) Activities are retrieved from.
-     *
-     * **Note:** Filtering occurs **before** `duration/count` checks are performed.
-     * */
-    subreddits?: {
-        /**
-         * Include only results from these subreddits
-         *
-         * @examples [["mealtimevideos","askscience"]]
-         * */
-        include?: string[],
-        /**
-         * Exclude any results from these subreddits
-         *
-         * **Note:** `exclude` is ignored if `include` is present
-         *
-         * @examples [["mealtimevideos","askscience"]]
-         * */
-        exclude?: string[],
-    }
-}
-
-/**
- * A [Day.js duration object](https://day.js.org/docs/en/durations/creating)
- *
- * @examples [{"minutes": 30, "hours": 1}]
- * @minProperties 1
- * @additionalProperties false
- * */
-export interface DurationObject {
-    /**
-     * @examples [15]
-     * */
-    seconds?: number
-    /**
-     * @examples [50]
-     * */
-    minutes?: number
-    /**
-     * @examples [4]
-     * */
-    hours?: number
-    /**
-     * @examples [7]
-     * */
-    days?: number
-    /**
-     * @examples [2]
-     * */
-    weeks?: number
-    /**
-     * @examples [3]
-     * */
-    months?: number
-    /**
-     * @examples [0]
-     * */
-    years?: number
-}
-
-export interface DurationComparison {
-    operator: StringOperator,
-    duration: Duration
-}
-
-export interface GenericComparison {
-    operator: StringOperator,
-    value: number,
-    isPercent: boolean,
-    extra?: string,
-    displayText: string,
-}
-
-
-export const windowExample: ActivityWindowType[] = [
-    15,
-    'PT1M',
-    {
-        count: 10
-    },
-    {
-        duration: {
-            hours: 5
-        }
-    },
-    {
-        count: 5,
-        duration: {
-            minutes: 15
-        }
-    }
-];
-
-
-export interface ActivityWindow {
-
-    window?: ActivityWindowType,
-}
 
 export interface ReferenceSubmission {
     /**
@@ -458,28 +276,6 @@ export interface RequiredRichContent extends RichContent {
     content: string
 }
 
-/**
- * A list of subreddits (case-insensitive) to look for.
- *
- * EX ["mealtimevideos","askscience"]
- * @examples ["mealtimevideos","askscience"]
- * @minItems 1
- * */
-export type SubredditList = string[];
-
-export interface SubredditCriteria {
-    /**
-     * A list of Subreddits (by name, case-insensitive) to look for.
-     *
-     * EX ["mealtimevideos","askscience"]
-     * @examples [["mealtimevideos","askscience"]]
-     * @minItems 1
-     * */
-    subreddits: string[]
-}
-
-export type JoinOperands = 'OR' | 'AND';
-
 export interface JoinCondition {
     /**
      * Under what condition should a set of run `Rule` objects be considered "successful"?
@@ -493,8 +289,6 @@ export interface JoinCondition {
      * */
     condition?: JoinOperands,
 }
-
-export type PollOn = 'unmoderated' | 'modqueue' | 'newSub' | 'newComm';
 
 export interface PollingOptionsStrong extends PollingOptions {
     limit: number,
@@ -837,7 +631,7 @@ export interface ManagerOptions {
      *
      * Default behavior is to exclude all mods and automoderator from checks
      * */
-    filterCriteriaDefaults?: FilterCriteriaDefaults
+    filterCriteriaDefaults?: FilterCriteriaDefaultsJson
 
     /**
      * Set the default post-check behavior for all checks. If this property is specified it will override any defaults passed from the bot's config
@@ -848,48 +642,19 @@ export interface ManagerOptions {
      * * postTrigger => nextRun
      * */
     postCheckBehaviorDefaults?: PostBehavior
+
+    databaseStatistics?: DatabaseStatisticsJsonConfig
+
+    /**
+     * Number of Events, or time range of events were processed during, that should continue to be stored in the database.
+     *
+     * Any Events falling outside this criteria will be deleted
+     *
+     * Leave unspecified to disable deleting anything
+     *
+     * */
+    retention?: EventRetentionPolicyRange
 }
-
-/**
- * A string containing a comparison operator and a value to compare against
- *
- * The syntax is `(< OR > OR <= OR >=) <number>`
- *
- * * EX `> 100`  => greater than 100
- *
- * @pattern ^\s*(>|>=|<|<=)\s*(\d+)\s*(%?)(.*)$
- * */
-export type CompareValue = string;
-
-/**
- * A duration and how to compare it against a value
- *
- * The syntax is `(< OR > OR <= OR >=) <number> <unit>` EX `> 100 days`, `<= 2 months`
- *
- * * EX `> 100 days` => Passes if the date being compared is before 100 days ago
- * * EX `<= 2 months` => Passes if the date being compared is after or equal to 2 months
- *
- * Unit must be one of [DayJS Duration units](https://day.js.org/docs/en/durations/creating)
- *
- * [See] https://regexr.com/609n8 for example
- *
- * @pattern ^\s*(>|>=|<|<=)\s*(\d+)\s*(days|weeks|months|years|hours|minutes|seconds|milliseconds)\s*$
- * */
-export type DurationComparor = string;
-
-/**
- * A string containing a comparison operator and a value to compare against
- *
- * The syntax is `(< OR > OR <= OR >=) <number>[percent sign]`
- *
- * * EX `> 100`  => greater than 100
- * * EX `<= 75%` => less than or equal to 75%
- *
- * @pattern ^\s*(>|>=|<|<=)\s*(\d+)\s*(%?)(.*)$
- * */
-export type CompareValueOrPercent = string;
-
-export type StringOperator = '>' | '>=' | '<' | '<=';
 
 export interface ThresholdCriteria {
     /**
@@ -909,172 +674,6 @@ export interface ThresholdCriteria {
     condition: StringOperator
 }
 
-export interface ChecksActivityState {
-    itemIs?: TypedActivityStates
-}
-
-export interface ActivityState {
-    removed?: boolean
-    filtered?: boolean
-    deleted?: boolean
-    locked?: boolean
-    spam?: boolean
-    stickied?: boolean
-    distinguished?: boolean
-    approved?: boolean
-    score?: CompareValue
-    /**
-     * A string containing a comparison operator and a value to compare against
-     *
-     * The syntax is `(< OR > OR <= OR >=) <number>`
-     *
-     * * EX `> 2`  => greater than 2 total reports
-     *
-     * Defaults to TOTAL reports on an Activity. Suffix the value with the report type to check that type:
-     *
-     * * EX `> 3 mod` => greater than 3 mod reports
-     * * EX `>= 1 user` => greater than 1 user report
-     *
-     * @pattern ^\s*(>|>=|<|<=)\s*(\d+)\s*(%?)(.*)$
-     * */
-    reports?: CompareValue
-    age?: DurationComparor
-    /**
-     * Test whether the activity is present in dispatched/delayed activities
-     *
-     * NOTE: This is DOES NOT mean that THIS activity is from dispatch -- just that it exists there. To test whether THIS activity is from dispatch use `source`
-     *
-     * * `true` => activity exists in delayed activities
-     * * `false` => activity DOES NOT exist in delayed activities
-     * * `string` => activity exists in delayed activities with given identifier
-     * * `string[]` => activity exists in delayed activities with any of the given identifiers
-     *
-     * */
-    dispatched?: boolean | string | string[]
-
-
-    // can use ActivitySource | ActivitySource[] here because of issues with generating json schema, see ActivitySource comments
-    /**
-     * Test where the current activity was sourced from.
-     *
-     * A source can be any of:
-     *
-     * * `poll` => activity was retrieved from polling a queue (unmoderated, modqueue, etc...)
-     * * `poll:[pollSource]` => activity was retrieved from specific polling source IE `poll:unmoderated` activity comes from unmoderated queue
-     *   * valid sources: unmoderated modqueue newComm newSub
-     * * `dispatch` => activity is from Dispatch Action
-     * * `dispatch:[identifier]` => activity is from Dispatch Action with specific identifier
-     * * `user` => activity was from user input (web dashboard)
-     *
-     * */
-    source?: string | string[]
-}
-
-/**
- * Different attributes a `Submission` can be in. Only include a property if you want to check it.
- * @examples [{"over_18": true, "removed": false}]
- * */
-export interface SubmissionState extends ActivityState {
-    pinned?: boolean
-    spoiler?: boolean
-    /**
-     * NSFW
-     * */
-    over_18?: boolean
-    is_self?: boolean
-    /**
-     * A valid regular expression to match against the title of the submission
-     * */
-    title?: string
-
-    /**
-     * * If `true` then passes if flair has ANY text
-     * * If `false` then passes if flair has NO text
-     * */
-    link_flair_text?: boolean | string | string[]
-    /**
-     * * If `true` then passes if flair has ANY css
-     * * If `false` then passes if flair has NO css
-     * */
-    link_flair_css_class?: boolean | string | string[]
-    /**
-     * * If `true` then passes if there is ANY flair template id
-     * * If `false` then passes if there is NO flair template id
-     * */
-    flairTemplate?: boolean | string | string[]
-    /**
-     * Is the submission a reddit-hosted image or video?
-     * */
-    isRedditMediaDomain?: boolean
-}
-
-// properties calculated/derived by CM -- not provided as plain values by reddit
-export const cmActivityProperties = ['submissionState','score','reports','removed','deleted','filtered','age','title'];
-
-/**
- * Different attributes a `Comment` can be in. Only include a property if you want to check it.
- * @examples [{"op": true, "removed": false}]
- * */
-export interface CommentState extends ActivityState {
-    /**
-     * Is this Comment Author also the Author of the Submission this comment is in?
-     * */
-    op?: boolean
-    /**
-     * A list of SubmissionState attributes to test the Submission this comment is in
-     * */
-    submissionState?: SubmissionState[]
-
-    /**
-     * The (nested) level of a comment.
-     *
-     * * 0 mean the comment is at top-level (replying to submission)
-     * * non-zero, Nth value means the comment has N parent comments
-     * */
-    depth?: DurationComparor
-}
-
-/**
- * Different attributes a `Subreddit` can be in. Only include a property if you want to check it.
- * @examples [{"over18": true}]
- * */
-export interface SubredditState {
-    /**
-     * Is subreddit quarantined?
-     * */
-    quarantine?: boolean
-    /**
-     * Is subreddit NSFW/over 18?
-     *
-     * **Note**: This is **mod-controlled flag** so it is up to the mods of the subreddit to correctly mark their subreddit as NSFW
-     * */
-    over18?: boolean
-    /**
-     * The name the subreddit.
-     *
-     * Can be a normal string (will check case-insensitive) or a regular expression
-     *
-     * EX `["mealtimevideos", "/onlyfans*\/i"]`
-     *
-     * @examples ["mealtimevideos", "/onlyfans*\/i"]
-     * */
-    name?: string | RegExp
-    /**
-     * A friendly description of what this State is trying to parse
-     * */
-    stateDescription?: string
-
-    isUserProfile?: boolean
-}
-
-export interface StrongSubredditState extends SubredditState {
-    name?: RegExp
-}
-
-export type TypedActivityState = SubmissionState | CommentState;
-
-export type TypedActivityStates = TypedActivityState[];
-
 export interface DomainInfo {
     display: string,
     domain: string,
@@ -1086,10 +685,8 @@ export interface DomainInfo {
 export const DEFAULT_POLLING_INTERVAL = 30;
 export const DEFAULT_POLLING_LIMIT = 50;
 
-export type Invokee = 'system' | 'user';
 export const SYSTEM = 'system';
 export const USER = 'user';
-export type RunState = 'running' | 'paused' | 'stopped';
 export const STOPPED = 'stopped';
 export const RUNNING = 'running';
 export const PAUSED = 'paused';
@@ -1132,101 +729,6 @@ export interface RegExResult {
     global: GlobalRegExResult[]
 }
 
-type LogLevel = "error" | "warn" | "info" | "verbose" | "debug";
-
-export type LogConsoleOptions = Pick<ConsoleTransportOptions, 'silent' | 'eol' | 'stderrLevels' | 'consoleWarnLevels'> & {
-    level?: LogLevel
-}
-
-export type LogFileOptions = Omit<DailyRotateFileTransportOptions, 'stream' | 'handleRejections' | 'options' | 'handleExceptions' | 'format' | 'log' | 'logv' | 'close' | 'dirname'> & {
-    level?: LogLevel
-    /**
-     * The absolute path to a directory where rotating log files should be stored.
-     *
-     * * If not present or `null` or `false` no log files will be created
-     * * If `true` logs will be stored at `[working directory]/logs`
-     *
-     * * ENV => `LOG_DIR`
-     * * ARG => `--logDir [dir]`
-     *
-     * @examples ["/var/log/contextmod"]
-     * */
-    dirname?: string | boolean | null
-}
-
-// export type StrongFileOptions = LogFileOptions & {
-//     dirname?: string
-// }
-
-export type LogStreamOptions = Omit<DuplexTransportOptions, 'name' | 'stream' | 'handleRejections' | 'handleExceptions' | 'format' | 'log' | 'logv' | 'close'> & {
-    level?: LogLevel
-}
-
-export interface LoggingOptions  {
-    /**
-     * The minimum log level to output. The log level set will output logs at its level **and all levels above it:**
-     *
-     *  * `error`
-     *  * `warn`
-     *  * `info`
-     *  * `verbose`
-     *  * `debug`
-     *
-     *  Note: `verbose` will display *a lot* of information on the status/result of run rules/checks/actions etc. which is very useful for testing configurations. Once your bot is stable changing the level to `info` will reduce log noise.
-     *
-     *  * ENV => `LOG_LEVEL`
-     *  * ARG => `--logLevel <level>`
-     *
-     *  @default "verbose"
-     *  @examples ["verbose"]
-     * */
-    level?: LogLevel,
-    /**
-     * **DEPRECATED** - Use `file.dirname` instead
-     * The absolute path to a directory where rotating log files should be stored.
-     *
-     * * If not present or `null` or `false` no log files will be created
-     * * If `true` logs will be stored at `[working directory]/logs`
-     *
-     * * ENV => `LOG_DIR`
-     * * ARG => `--logDir [dir]`
-     *
-     * @examples ["/var/log/contextmod"]
-     * @deprecated
-     * @see logging.file.dirname
-     * */
-    path?: string | boolean | null
-
-    /**
-     * Options for Rotating File logging
-     * */
-    file?: LogFileOptions
-    /**
-     * Options for logging to api/web
-     * */
-    stream?: LogStreamOptions
-    /**
-     * Options for logging to console
-     * */
-    console?: LogConsoleOptions
-}
-
-export type StrongLoggingOptions = Required<Pick<LoggingOptions, 'stream' | 'console' | 'file'>> & {
-    level?: LogLevel
-};
-
-export type LoggerFactoryOptions = StrongLoggingOptions & {
-    additionalTransports?: any[]
-    defaultLabel?: string
-}
-/**
- * Available cache providers
- * */
-export type CacheProvider = 'memory' | 'redis' | 'none';
-
-// export type StrongCache = SubredditCacheConfig & {
-//     provider: CacheOptions
-// }
 export type StrongCache = {
     authorTTL: number | boolean,
     userNotesTTL: number | boolean,
@@ -1300,10 +802,6 @@ export interface CacheOptions {
 
     [key:string]: any
 }
-
-export type NotificationProvider = 'discord';
-
-export type NotificationEventType = 'runStateChanged' | 'pollingError' | 'eventActioned' | 'configUpdated'
 
 export interface NotificationEventPayload  {
     type: NotificationEventType,
@@ -1519,31 +1017,34 @@ export interface SnoowrapOptions {
     timeoutCodes?: string[]
 }
 
-export type FilterCriteriaDefaultBehavior = 'replace' | 'merge';
+// /**
+//  * A list of criteria to test the state of the `Activity` against before running. If criteria fails then this process is skipped.
+//  *
+//  * * @examples [{"include": [{"over_18": true, "removed': false}]}]
+//  * */
+// export type ItemOptions = FilterOptions<SubmissionState> | FilterOptions<CommentState>
 
-export interface FilterCriteriaDefaults {
-    itemIs?: TypedActivityStates
-    /**
-     * Determine how itemIs defaults behave when itemIs is present on the check
-     *
-     * * merge => adds defaults to check's itemIs
-     * * replace => check itemIs will replace defaults (no defaults used)
-     * */
-    itemIsBehavior?: FilterCriteriaDefaultBehavior
-    /**
-     * Determine how authorIs defaults behave when authorIs is present on the check
-     *
-     * * merge => merges defaults with check's authorIs
-     * * replace => check authorIs will replace defaults (no defaults used)
-     * */
-    authorIs?: AuthorOptions
-    authorIsBehavior?: FilterCriteriaDefaultBehavior
-}
 
 export interface SubredditOverrides {
     name: string
     flowControlDefaults?: {
         maxGotoDepth?: number
+    }
+    /**
+     * Set defaults for the frequency time series stats are collected. Will override bot-level defaults
+     * */
+    databaseStatisticsDefaults?: DatabaseStatisticsOperatorJsonConfig
+    databaseConfig?: {
+        /**
+         * Number of Events, or time range of events were processed during, that should continue to be stored in the database.
+         *
+         * Any Events falling outside this criteria will be deleted
+         *
+         * Leave unspecified to disable deleting anything
+         *
+         * This will override any retention value set in the subreddit's config
+         * */
+        retention?: EventRetentionPolicyRange
     }
 }
 
@@ -1586,6 +1087,24 @@ export interface BotInstanceJsonConfig {
 
     flowControlDefaults?: {
         maxGotoDepth?: number
+    }
+
+    /**
+     * Set defaults for the frequency time series stats are collected. Will override top-level defaults
+     * */
+    databaseStatisticsDefaults?: DatabaseStatisticsOperatorJsonConfig
+
+    databaseConfig?: {
+        /**
+         * Number of Events, or time range of events were processed during, that should continue to be stored in the database PER SUBREDDIT
+         *
+         * Any Events falling outside this criteria will be deleted
+         *
+         * Leave unspecified to disable deleting anything
+         *
+         * This will override operator-level retention
+         * */
+        retention?: EventRetentionPolicyRange
     }
 
     /**
@@ -1665,7 +1184,7 @@ export interface BotInstanceJsonConfig {
          * * ARG => `--shareMod`
          *
          * @default false
-         * @deprecated
+         * @deprecationMessage use `shared` instead
          * */
         sharedMod?: boolean,
 
@@ -1732,6 +1251,34 @@ export interface BotInstanceJsonConfig {
     }
 }
 
+export interface DatabaseStatisticsJsonConfig {
+    /**
+     * Specify the frequency for collecting time-series statistics.
+     *
+     * Valid values are: 'minute','hour','day','week','month','year' OR false to disable collection
+     *
+     * */
+    frequency?: StatisticFrequencyOption
+}
+
+export interface DatabaseStatisticsConfig extends DatabaseStatisticsJsonConfig {
+    frequency: StatisticFrequencyOption
+}
+
+export interface DatabaseStatisticsOperatorJsonConfig extends DatabaseStatisticsJsonConfig {
+    /**
+     * Specify the allowed minimum frequency for collecting time-series statistics. If the frequency set for a subreddit is smaller this will override it.
+     *
+     * Valid values are: 'minute','hour','day','week','month','year' OR false to specify no minimum
+     *
+     * */
+    minFrequency?: StatisticFrequencyOption
+}
+
+export interface DatabaseStatisticsOperatorConfig extends DatabaseStatisticsConfig {
+    minFrequency: StatisticFrequencyOption
+}
+
 /**
  * Configuration for application-level settings IE for running the bot instance
  *
@@ -1795,9 +1342,35 @@ export interface OperatorJsonConfig {
     caching?: OperatorCacheConfig
 
     /**
+     * Database backend to use for persistent APPLICATION data
+     *
+     * Defaults to 'sqljs' which stores data in a file
+     * */
+    databaseConfig?: {
+        // can't use DatabaseConfig here because generating the schema complains about unsupported symbol and a circular reference
+        // ...also including all those options makes the schema huge
+        connection?: DatabaseDriverType | DatabaseDriverConfig,
+        migrations?: DatabaseMigrationOptions
+        /**
+         * Number of Events, or time range of events were processed during, that should continue to be stored in the database PER SUBREDDIT
+         *
+         * Any Events falling outside this criteria will be deleted
+         *
+         * Leave unspecified to disable deleting anything
+         *
+         * */
+        retention?: EventRetentionPolicyRange
+    }
+
+    /**
      * Set global snoowrap options as well as default snoowrap config for all bots that don't specify their own
      * */
     snoowrap?: SnoowrapOptions
+
+    /**
+     * Set defaults for the frequency time series stats are collected
+     * */
+    databaseStatisticsDefaults?: DatabaseStatisticsOperatorJsonConfig
 
     bots?: BotInstanceJsonConfig[]
 
@@ -1828,11 +1401,34 @@ export interface OperatorJsonConfig {
         port?: number,
 
         /**
+         * Database backend to use for persistent WEB data
+         *
+         * If none is provided the top-level database provider is used
+         * */
+        databaseConfig?: {
+            connection?: DatabaseDriver,
+            migrations?: DatabaseMigrationOptions
+        }
+
+        /**
          * Caching provider to use for session and invite data
          *
          * If none is provided the top-level caching provider is used
          * */
         caching?: 'memory' | 'redis' | CacheOptions
+
+        /**
+         * Storage provider type to use for sessions and other web client specific data
+         *
+         * Defaults to `database` if none is provided
+         *
+         * * Specify `database` to use top-level database
+         * * Specify `cache` to use top-level cache
+         *
+         * NOTE: `database` should almost always be used. Cache would only be necessary if this instance experiences heavy traffic
+         *
+         * */
+        storage?: 'database' | 'cache'
         /**
          * Settings to configure the behavior of user sessions -- the session is what the web interface uses to identify logged in users.
          * */
@@ -1856,6 +1452,13 @@ export interface OperatorJsonConfig {
              * @examples ["definitelyARandomString"]
              * */
             secret?: string,
+
+            /**
+             * Specify backend storage to use for persisting client sessions. If specified this will overwrite parent-level `storage` settings.
+             *
+             * May be useful if using `database` for general web client storage but have heavy traffic and want sessions to be more performant (using `cache`)
+             * */
+            storage?: 'database' | 'cache'
         }
 
         /**
@@ -1962,7 +1565,9 @@ export interface BotCredentialsConfig extends ThirdPartyCredentialsJsonConfig {
 
 export interface BotInstanceConfig extends BotInstanceJsonConfig {
     credentials: BotCredentialsJsonConfig
+    database: DataSource
     snoowrap: SnoowrapOptions
+    databaseStatisticsDefaults: DatabaseStatisticsOperatorConfig
     subreddits: {
         names?: string[],
         exclude?: string[],
@@ -1997,12 +1602,25 @@ export interface OperatorConfig extends OperatorJsonConfig {
     notifications?: NotificationConfig
     logging: StrongLoggingOptions,
     caching: StrongCache,
+    databaseConfig: {
+        connection: DatabaseConfig,
+        migrations: DatabaseMigrationOptions
+        retention?: EventRetentionPolicyRange
+    }
+    database: DataSource
     web: {
-        port: number,
+        database: DataSource,
+        databaseConfig: {
+            connection: DatabaseConfig,
+            migrations: DatabaseMigrationOptions
+        }
         caching: CacheOptions,
+        port: number,
+        storage?: 'database' | 'cache'
         session: {
             maxAge: number,
-            secret: string,
+            secret?: string,
+            storage?: 'database' | 'cache'
         },
         invites: {
           maxAge: number
@@ -2018,6 +1636,7 @@ export interface OperatorConfig extends OperatorJsonConfig {
         secret: string,
         friendly?: string,
     }
+    databaseStatisticsDefaults: DatabaseStatisticsOperatorConfig
     bots: BotInstanceConfig[]
     credentials: ThirdPartyCredentialsJsonConfig
 }
@@ -2057,9 +1676,11 @@ export interface LogInfo {
     labels?: string[]
     bot?: string
     user?: string
+    transport?: string[]
 }
 
 export interface ActionResult extends ActionProcessResult {
+    premise: ObjectPremise
     kind: string,
     name: string,
     run: boolean,
@@ -2091,12 +1712,39 @@ export interface ActionedEvent {
     subreddit: string,
     triggered: boolean,
     runResults: RunResult[]
-    dispatchSource?: DispatchAudit
+    dispatchSource?: ActivitySourceData
+}
+
+export interface ResultContext {
+    result?: string
+    data?: any
+}
+
+export interface RuleResult extends ResultContext {
+    premise: ObjectPremise
+    kind: string
+    name: string
+    triggered: (boolean | null)
+    fromCache?: boolean
+    itemIs?: FilterResult<TypedActivityState>
+    authorIs?: FilterResult<AuthorCriteria>
+}
+
+export type FormattedRuleResult = RuleResult & {
+    triggered: string
+    result: string
+}
+
+export interface RuleSetResult {
+    results: RuleResultEntity[],
+    condition: 'OR' | 'AND',
+    triggered: boolean
 }
 
 export interface CheckResult {
     triggered: boolean
-    ruleResults: RuleResult[]
+    ruleResults: RuleResultEntity[]
+    ruleSetResults?: RuleSetResult[]
     itemIs?: FilterResult<TypedActivityState>
     authorIs?: FilterResult<AuthorCriteria>
     fromCache?: boolean
@@ -2123,17 +1771,10 @@ export interface RunResult {
 
 export interface UserResultCache {
     result: boolean,
-    ruleResults: RuleResult[]
+    ruleResults: RuleResultEntity[]
 }
 
-export type RedditEntityType = 'user' | 'subreddit';
-
-export interface RedditEntity {
-    name: string
-    type: RedditEntityType
-}
-
-export interface HistoricalStatsDisplay extends HistoricalStats {
+export interface HistoricalStatsDisplay {
     checksRunTotal: number
     checksFromCacheTotal: number
     checksTriggeredTotal: number
@@ -2141,54 +1782,15 @@ export interface HistoricalStatsDisplay extends HistoricalStats {
     rulesCachedTotal: number
     rulesTriggeredTotal: number
     actionsRunTotal: number
-}
-
-export interface HistoricalStats {
     eventsCheckedTotal: number
     eventsActionedTotal: number
-    checksRun: Map<string, number>
-    checksFromCache: Map<string, number>
-    checksTriggered: Map<string, number>
-    rulesRun: Map<string, number>
-    //rulesCached: Map<string, number>
-    rulesCachedTotal: number
-    rulesTriggered: Map<string, number>
-    actionsRun: Map<string, number>
     [index: string]: any
 }
 
-export interface SubredditHistoricalStats {
-    allTime: HistoricalStats
-    lastReload: HistoricalStats
-}
-
-export interface SubredditHistoricalStatsDisplay {
-    allTime: HistoricalStatsDisplay
-    lastReload: HistoricalStatsDisplay
-}
-
 export interface ManagerStats {
-    // eventsCheckedTotal: number
-    // eventsCheckedSinceStartTotal: number
     eventsAvg: number
-    // checksRunTotal: number
-    // checksRunSinceStartTotal: number
-    // checksTriggered: number
-    // checksTriggeredTotal: number
-    // checksTriggeredSinceStart: number
-    // checksTriggeredSinceStartTotal: number
-    // rulesRunTotal: number
-    // rulesRunSinceStartTotal: number
-    // rulesCachedTotal: number
-    // rulesCachedSinceStartTotal: number
-    // rulesTriggeredTotal: number
-    // rulesTriggeredSinceStartTotal: number
     rulesAvg: number
-    // actionsRun: number
-    // actionsRunTotal: number
-    // actionsRunSinceStart: number,
-    // actionsRunSinceStartTotal: number
-    historical: SubredditHistoricalStatsDisplay
+    historical: HistoricalStatsDisplay
     cache: {
         provider: string,
         currentKeyCount: number,
@@ -2200,20 +1802,6 @@ export interface ManagerStats {
         types: ResourceStats
     },
 }
-
-export interface HistoricalStatUpdateData {
-    eventsCheckedTotal?: number
-    eventsActionedTotal?: number
-    checksRun?: string[] | string
-    checksTriggered?: string[] | string
-    checksFromCache?: string[] | string
-    actionsRun?: string[] | string
-    rulesRun?: string[] | string
-    rulesCachedTotal?: number
-    rulesTriggered?: string[] | string
-}
-
-export type SearchFacetType = 'title' | 'url' | 'duplicates' | 'crossposts' | 'external';
 
 export interface RepostItem {
     value: string
@@ -2237,27 +1825,15 @@ export interface StringComparisonOptions {
     transforms?: ((str: string) => string)[]
 }
 
-export interface FilterCriteriaPropertyResult<T> {
-    property: keyof T
-    found?: string | boolean | number | null | FilterResult<any>
-    passed?: null | boolean
-    reason?: string
-    behavior: FilterBehavior
-}
-
-export interface FilterCriteriaResult<T> {
-    behavior: FilterBehavior
-    criteria: T//AuthorCriteria | TypedActivityStates
-    propertyResults: FilterCriteriaPropertyResult<T>[]
-    passed: boolean
-}
-
-export type FilterBehavior = 'include' | 'exclude'
-
-export interface FilterResult<T> {
-    criteriaResults: FilterCriteriaResult<T>[]
-    join: JoinOperands
-    passed: boolean
+export interface DatabaseMigrationOptions {
+    /**
+     * When pending migrations are present at startup force migrations to run regardless of backup attempt or outcome
+     * */
+    force?: boolean,
+    /**
+     * When pending migrations are present at startup and this is set to `true` it directs CM to try to make a backup and, if successful, run migrations.
+     * */
+    continueOnAutomatedBackup?: boolean
 }
 
 export interface TextTransformOptions {
@@ -2315,17 +1891,16 @@ export interface TextMatchOptions {
 
 export type ActivityCheckJson = SubmissionCheckJson | CommentCheckJson;
 
-export type GotoPath = `goto:${string}`;
-/**
- * The possible behaviors that can occur after a check has run
- *
- * * next => continue to next Check/Run
- * * stop => stop CM lifecycle for this activity (immediately end)
- * * nextRun => skip any remaining Checks in this Run and start the next Run
- * * goto:[path] => specify a run[.check] to jump to
- *
- * */
-export type PostBehaviorTypes = 'next' | 'stop' | 'nextRun' | string;
+export interface PostBehaviorOptionConfig {
+    recordTo?: RecordOutputOption
+    behavior?: PostBehaviorType
+}
+
+export interface PostBehaviorOptionConfigStrong extends Required<Omit<PostBehaviorOptionConfig, 'recordTo'>> {
+    recordTo: RecordOutputType[]
+}
+
+export type PostBehaviorOption = PostBehaviorType | PostBehaviorOptionConfig;
 
 export interface PostBehavior {
     /**
@@ -2334,73 +1909,59 @@ export interface PostBehavior {
      * @default nextRun
      * @example ["nextRun"]
      * */
-    postTrigger?: PostBehaviorTypes
+    postTrigger?: PostBehaviorOption
     /**
      * Do this behavior if a Check is NOT triggered
      *
      * @default next
      * @example ["next"]
      * */
-    postFail?: PostBehaviorTypes
+    postFail?: PostBehaviorOption
 }
 
-export type ActivityType = 'submission' | 'comment';
+export interface PostBehaviorStrong {
+    postTrigger: PostBehaviorOptionConfigStrong
+    postFail: PostBehaviorOptionConfigStrong
+}
 
 export type ItemCritPropHelper = SafeDictionary<FilterCriteriaPropertyResult<(CommentState & SubmissionState)>, keyof (CommentState & SubmissionState)>;
 export type RequiredItemCrit = Required<(CommentState & SubmissionState)>;
-
-export type onExistingFoundBehavior = 'replace' | 'skip' | 'ignore';
 
 export interface ActivityDispatchConfig {
     identifier?: string
     cancelIfQueued?: boolean | NonDispatchActivitySource | NonDispatchActivitySource[]
     goto?: string
     onExistingFound?: onExistingFoundBehavior
+    tardyTolerant?: boolean | DurationVal
     delay: DurationVal
 }
 
-export interface ActivityDispatch extends ActivityDispatchConfig {
+export interface ActivityDispatch extends Omit<ActivityDispatchConfig, 'delay'| 'tardyTolerant'> {
     id: string
-    queuedAt: number
+    queuedAt: Dayjs
     activity: Submission | Comment
-    duration: Duration
-    processing: boolean
-    action: string
+    author: string
+    delay: Duration
+    tardyTolerant?: boolean | Duration
+    action?: string
+    type: ActivitySourceTypes
+    dryRun?: boolean
 }
 
-export interface DispatchAudit {
+export interface ActivitySourceData {
     goto?: string
-    queuedAt: number
-    action: string,
-    delay: string,
+    queuedAt: Dayjs
+    action?: string,
+    delay?: Duration,
+    type: ActivitySourceTypes
     id: string
     identifier?: string
 }
 
-export type ActionTarget = 'self' | 'parent';
+export interface ObjectPremise {
+    kind: string
+    config: object
+    itemIs?: ItemOptions
+    authorIs?: AuthorOptions
+}
 
-export type InclusiveActionTarget = ActionTarget | 'any';
-
-export type DispatchSource = 'dispatch' | `dispatch:${string}`;
-
-export type NonDispatchActivitySource = 'poll' | `poll:${PollOn}` | 'user';
-
-// TODO
-// https://github.com/YousefED/typescript-json-schema/issues/426
-// https://github.com/YousefED/typescript-json-schema/issues/425
-// @pattern ^(((poll|dispatch)(:\w+)?)|user)$
-// @type string
-/**
- * Where an Activity was retrieved from
- *
- * Source can be any of:
- *
- * * `poll` => activity was retrieved from polling a queue (unmoderated, modqueue, etc...)
- * * `poll:[pollSource]` => activity was retrieved from specific polling source IE `poll:unmoderated` activity comes from unmoderated queue
- * * `dispatch` => activity is from Dispatch Action
- * * `dispatch:[identifier]` => activity is from Dispatch Action with specific identifier
- * * `user` => activity was from user input (web dashboard)
- *
- *
- * */
-export type ActivitySource = NonDispatchActivitySource | DispatchSource;

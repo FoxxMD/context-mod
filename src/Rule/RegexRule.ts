@@ -1,17 +1,19 @@
-import {Rule, RuleJSONConfig, RuleOptions, RuleResult} from "./index";
+import {Rule, RuleJSONConfig, RuleOptions} from "./index";
 import {Comment} from "snoowrap";
 import Submission from "snoowrap/dist/objects/Submission";
 import {
     asSubmission,
-    comparisonTextOp, FAIL, isExternalUrlSubmission, isSubmission, parseGenericValueComparison,
-    parseGenericValueOrPercentComparison, parseRegex, parseStringToRegex,
-    PASS, triggeredIndicator
+    comparisonTextOp, FAIL, isExternalUrlSubmission, isSubmission, parseRegex, parseStringToRegex,
+    PASS, triggeredIndicator, windowConfigToWindowCriteria
 } from "../util";
 import {
-    ActivityWindowType, JoinOperands,
+    RuleResult,
 } from "../Common/interfaces";
 import dayjs from 'dayjs';
 import {SimpleError} from "../Utils/Errors";
+import {JoinOperands} from "../Common/Infrastructure/Atomic";
+import {ActivityWindowConfig} from "../Common/Infrastructure/ActivityWindow";
+import {parseGenericValueComparison, parseGenericValueOrPercentComparison} from "../Common/Infrastructure/Comparisons";
 
 export interface RegexCriteria {
     /**
@@ -39,9 +41,12 @@ export interface RegexCriteria {
     testOn?: ('title' | 'body' | 'url')[]
 
     /**
-     * **When used with `window`** determines what type of Activities to retrieve
+     * DEPRECATED - use `window.fetch` instead
+     *
+     * When used with `window` determines what type of Activities to retrieve
      *
      * @default "all"
+     * @deprecationMessage use `window.fetch` instead
      * */
     lookAt?: 'submissions' | 'comments' | 'all',
 
@@ -104,7 +109,7 @@ export interface RegexCriteria {
      * */
     mustMatchCurrent?: boolean
 
-    window?: ActivityWindowType
+    window?: ActivityWindowConfig
 }
 
 export class RegexRule extends Rule {
@@ -122,10 +127,14 @@ export class RegexRule extends Rule {
         }
         this.criteria = criteria;
         this.condition = condition;
+
+        if(this.criteria.some(x => x.lookAt !== undefined)) {
+            this.logger.warn(`Some criteria use 'lookAt' which is deprecated. Use 'window.fetch' instead`);
+        }
     }
 
     getKind(): string {
-        return 'Regex';
+        return 'regex';
     }
 
     getSpecificPremise(): object {
@@ -208,16 +217,18 @@ export class RegexRule extends Rule {
                 // our checking activity didn't meet threshold requirements and criteria does define window
                 // leh go
 
-                switch (lookAt) {
-                    case 'all':
-                        history = await this.resources.getAuthorActivities(item.author, {window: window});
-                        break;
-                    case 'submissions':
-                        history = await this.resources.getAuthorSubmissions(item.author, {window: window});
-                        break;
-                    case 'comments':
-                        history = await this.resources.getAuthorComments(item.author, {window: window});
+                const strongWindow = windowConfigToWindowCriteria(window);
+                if(strongWindow.fetch === undefined) {
+                    switch (lookAt) {
+                        case 'submissions':
+                            strongWindow.fetch = 'submission';
+                            break;
+                        case 'comments':
+                            strongWindow.fetch = 'comment';
+                    }
                 }
+
+                history = await this.resources.getAuthorActivities(item.author, strongWindow);
                 // remove current activity it exists in history so we don't count it twice
                 history = history.filter(x => x.id !== item.id);
                 const historyLength = history.length;

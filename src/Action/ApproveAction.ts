@@ -1,17 +1,20 @@
 import {ActionJson, ActionConfig, ActionOptions} from "./index";
 import Action from "./index";
 import Snoowrap from "snoowrap";
-import {RuleResult} from "../Rule";
-import {ActionProcessResult, ActionTarget} from "../Common/interfaces";
+import {ActionProcessResult, RuleResult} from "../Common/interfaces";
 import Submission from "snoowrap/dist/objects/Submission";
 import Comment from "snoowrap/dist/objects/Comment";
+import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
+import {runCheckOptions} from "../Subreddit/Manager";
+import {ActionTarget, ActionTypes} from "../Common/Infrastructure/Atomic";
+import {asComment, asSubmission} from "../util";
 
 export class ApproveAction extends Action {
 
     targets: ActionTarget[]
 
-    getKind() {
-        return 'Approve';
+    getKind(): ActionTypes {
+        return 'approve';
     }
 
     constructor(options: ApproveOptions) {
@@ -23,26 +26,28 @@ export class ApproveAction extends Action {
         this.targets = targets;
     }
 
-    async process(item: Comment | Submission, ruleResults: RuleResult[], runtimeDryrun?: boolean): Promise<ActionProcessResult> {
-        const dryRun = runtimeDryrun || this.dryRun;
+    async process(item: Comment | Submission, ruleResults: RuleResultEntity[], options: runCheckOptions): Promise<ActionProcessResult> {
+        const dryRun = this.getRuntimeAwareDryrun(options);
         const touchedEntities = [];
 
-        const realTargets = item instanceof Submission ? ['self'] : this.targets;
+        const realTargets = asSubmission(item) ? ['self'] : this.targets;
+
+        let msg: string[] = [];
 
         for(const target of realTargets) {
             let targetItem = item;
-            if(target !== 'self' && item instanceof Comment) {
+            if(target !== 'self' && asComment(item)) {
                 targetItem = await this.resources.getActivity(this.client.getSubmission(item.link_id));
             }
 
             // @ts-ignore
             if (targetItem.approved) {
-                const msg = `${target === 'self' ? 'Item' : 'Comment\'s parent Submission'} is already approved`;
+                msg.push(`${target === 'self' ? 'Item' : 'Comment\'s parent Submission'} is already approved??`);
                 this.logger.warn(msg);
                 return {
                     dryRun,
                     success: false,
-                    result: msg
+                    result: msg.join('|')
                 }
             }
 
@@ -51,6 +56,9 @@ export class ApproveAction extends Action {
                 if(target !== 'self' && !(targetItem instanceof Submission)) {
                     // @ts-ignore
                     targetItem = await this.client.getSubmission((item as Comment).link_id).fetch();
+                    msg.push(`Approving parent Submission ${targetItem.name}`);
+                } else {
+                    msg.push(`Approving self ${targetItem.name}`);
                 }
                 // @ts-ignore
                 touchedEntities.push(await targetItem.approve());
@@ -68,14 +76,21 @@ export class ApproveAction extends Action {
         }
 
         return {
+            result: msg.join(' | '),
             dryRun,
             success: true,
             touchedEntities
         }
     }
+
+    protected getSpecificPremise(): object {
+        return {
+            targets: this.targets
+        }
+    }
 }
 
-export interface ApproveOptions extends ApproveActionConfig, ActionOptions {}
+export interface ApproveOptions extends Omit<ApproveActionConfig, 'authorIs' | 'itemIs'>, ActionOptions {}
 
 export interface ApproveActionConfig extends ActionConfig {
     /**

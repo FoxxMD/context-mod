@@ -1,4 +1,4 @@
-import {ConfigFormat} from "../types";
+import {ConfigFormat} from "../Infrastructure/Atomic";
 
 export interface ConfigDocumentInterface<DocumentType> {
     format: ConfigFormat;

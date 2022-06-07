@@ -1,24 +1,39 @@
 import winston, {Logger} from "winston";
 import dayjs, {Dayjs} from "dayjs";
 import {getLogger} from "./Utils/loggerFactory";
-import {Invokee, OperatorConfig, OperatorConfigWithFileContext, OperatorFileConfig} from "./Common/interfaces";
+import {DatabaseMigrationOptions, OperatorConfig, OperatorConfigWithFileContext, OperatorFileConfig} from "./Common/interfaces";
 import Bot from "./Bot";
 import LoggedError from "./Utils/LoggedError";
-import {sleep} from "./util";
+import {mergeArr, sleep} from "./util";
+import {copyFile} from "fs/promises";
+import {constants} from "fs";
+import {Connection} from "typeorm";
+import {ErrorWithCause} from "pony-cause";
+import {MigrationService} from "./Common/MigrationService";
+import {Invokee} from "./Common/Infrastructure/Atomic";
+import {DatabaseConfig} from "./Common/Infrastructure/Database";
 
 export class App {
 
-    bots: Bot[]
+    bots: Bot[] = [];
     logger: Logger;
+    dbLogger: Logger;
+    database: Connection
     startedAt: Dayjs = dayjs();
+    ranMigrations: boolean = false;
+    migrationBlocker?: string;
+
+    config: OperatorConfig;
 
     error: any;
 
-    config: OperatorConfig;
     fileConfig: OperatorFileConfig;
+
+    migrationService: MigrationService;
 
     constructor(config: OperatorConfigWithFileContext) {
         const {
+            database,
             operator: {
                 name,
             },
@@ -32,10 +47,17 @@ export class App {
         this.fileConfig = fileConfig;
 
         this.logger = getLogger(config.logging);
+        this.dbLogger = this.logger.child({labels: ['Database']}, mergeArr);
+        this.database = database;
 
         this.logger.info(`Operators: ${name.length === 0 ? 'None Specified' : name.join(', ')}`)
 
-        this.bots = bots.map(x => new Bot(x, this.logger));
+        this.migrationService = new MigrationService({
+            type: 'app',
+            logger: this.logger,
+            database,
+            options: this.config.databaseConfig.migrations
+        });
 
         process.on('uncaughtException', (e) => {
             this.error = e;
@@ -69,7 +91,45 @@ export class App {
         }
     }
 
+    async doMigration() {
+        await this.migrationService.doMigration();
+        this.migrationBlocker = undefined;
+        this.ranMigrations = true;
+    }
+
+    async backupDatabase() {
+        await this.migrationService.backupDatabase();
+    }
+
+    async initDatabase() {
+        const [migrated, blocker] = await this.migrationService.initDatabase();
+        this.migrationBlocker = blocker;
+        this.ranMigrations = migrated;
+        return this.ranMigrations;
+    }
+
     async initBots(causedBy: Invokee = 'system') {
+        if(!this.ranMigrations) {
+            this.logger.error('Must run migrations before starting bots');
+            return;
+        }
+
+        if(this.bots.length > 0) {
+            this.logger.info('Bots already exist, will stop and destroy these before building new ones.');
+            await this.destroy(causedBy);
+        }
+        const {
+            bots = [],
+        } = this.config;
+
+        if(bots.length === 0) {
+            this.logger.warn('No bots were parsed from config! Add new bots from the web dashboard');
+        } else {
+            this.logger.verbose('Building bots...')
+        }
+
+        this.bots = bots.map(x => new Bot(x, this.logger));
+
         for (const b of this.bots) {
             if (b.error === undefined) {
                 try {

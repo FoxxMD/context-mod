@@ -1,16 +1,18 @@
 import {ActionJson, ActionConfig} from "./index";
 import Action from "./index";
 import Snoowrap, {Comment, Submission} from "snoowrap";
-import {RuleResult} from "../Rule";
-import {ActionProcessResult} from "../Common/interfaces";
+import {ActionProcessResult, RuleResult} from "../Common/interfaces";
+import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
+import {runCheckOptions} from "../Subreddit/Manager";
+import {ActionTypes} from "../Common/Infrastructure/Atomic";
 
 export class LockAction extends Action {
-    getKind() {
-        return 'Lock';
+    getKind(): ActionTypes {
+        return 'lock';
     }
 
-    async process(item: Comment | Submission, ruleResults: RuleResult[], runtimeDryrun?: boolean): Promise<ActionProcessResult> {
-        const dryRun = runtimeDryrun || this.dryRun;
+    async process(item: Comment | Submission, ruleResults: RuleResultEntity[], options: runCheckOptions): Promise<ActionProcessResult> {
+        const dryRun = this.getRuntimeAwareDryrun(options);
         const touchedEntities = [];
         //snoowrap typing issue, thinks comments can't be locked
         // @ts-ignore
@@ -36,6 +38,10 @@ export class LockAction extends Action {
             success: true,
             touchedEntities
         }
+    }
+
+    protected getSpecificPremise(): object {
+        return {};
     }
 }
 

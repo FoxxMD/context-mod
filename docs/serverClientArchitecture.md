@@ -1,7 +1,6 @@
-
 # Overview
 
-ContextMod's high-level functionality is separated into two **independently run** applications. 
+ContextMod's high-level functionality is separated into two **independently run** applications.
 
 Each application consists of an [Express](https://expressjs.com/) web server that executes the core logic for that application and communicates via HTTP API calls:
 
@@ -20,7 +19,7 @@ Communication between the applications is secured using [Json Web Tokens](https:
 
 ## Default Mode
 
-**ContextMod is designed to operate in a "monolith" mode by default.** 
+**ContextMod is designed to operate in a "monolith" mode by default.**
 
 This is done by assuming that when configuration is provided by **environmental variables or CLI arguments** the user's intention is to run the client/server together with only one bot, as if ContextMod is a monolith application. When using these configuration types the same values are parsed to both the server/client to ensure interoperability/transparent usage for the operator. Some examples of this in the **operator configuration**:
 

@@ -1,13 +1,14 @@
-import {Logger} from "winston";
+import winston, {Logger} from "winston";
 import {
-    buildCacheOptionsFromProvider, buildCachePrefix,
+    asNamedCriteria,
+    buildCacheOptionsFromProvider, buildCachePrefix, buildFilter, castToBool,
     createAjvFactory, fileOrDirectoryIsWriteable,
     mergeArr, mergeFilters,
     normalizeName,
     overwriteMerge,
-    parseBool, parseFromJsonOrYamlToObject, randomId,
+    parseBool, randomId,
     readConfigFile, removeFromSourceIfKeysExistsInDestination,
-    removeUndefinedKeys
+    removeUndefinedKeys, resolvePathFromEnvWithRelative
 } from "./util";
 import {CommentCheck} from "./Check/CommentCheck";
 import {SubmissionCheck} from "./Check/SubmissionCheck";
@@ -25,9 +26,7 @@ import {
     OperatorConfig,
     PollingOptions,
     PollingOptionsStrong,
-    PollOn,
     StrongCache,
-    CacheProvider,
     CacheOptions,
     BotInstanceJsonConfig,
     BotInstanceConfig,
@@ -35,31 +34,72 @@ import {
     RedditCredentials,
     BotCredentialsJsonConfig,
     BotCredentialsConfig,
-    FilterCriteriaDefaults, TypedActivityStates, OperatorFileConfig, PostBehavior
+    OperatorFileConfig,
+    PostBehavior
 } from "./Common/interfaces";
 import {isRuleSetJSON, RuleSetJson, RuleSetObjectJson} from "./Rule/RuleSet";
 import deepEqual from "fast-deep-equal";
-import {ActionJson, ActionObjectJson, ConfigFormat, RuleJson, RuleObjectJson} from "./Common/types";
+import {
+    ActionJson
+} from "./Common/types";
 import {isActionJson} from "./Action";
-import {getLogger} from "./Utils/loggerFactory";
+import {getLogger, resolveLogDir} from "./Utils/loggerFactory";
 import {GetEnvVars} from 'env-cmd';
 import {operatorConfig} from "./Utils/CommandConfig";
 import merge from 'deepmerge';
 import * as process from "process";
-import {cacheOptDefaults, cacheTTLDefaults, filterCriteriaDefault} from "./Common/defaults";
+import {
+    cacheOptDefaults,
+    cacheTTLDefaults,
+    defaultConfigFilenames,
+    defaultDataDir,
+    filterCriteriaDefault
+} from "./Common/defaults";
 import objectHash from "object-hash";
-import {AuthorCriteria, AuthorOptions} from "./Author/Author";
+import {
+    createAppDatabaseConnection,
+    createDatabaseConfig,
+    createDatabaseConnection,
+    createWebDatabaseConnection
+} from "./Utils/databaseUtils";
 import path from 'path';
 import {
     JsonOperatorConfigDocument,
     OperatorConfigDocumentInterface,
     YamlOperatorConfigDocument
 } from "./Common/Config/Operator";
-import {ConfigDocumentInterface} from "./Common/Config/AbstractConfigDocument";
+import {
+    ConfigDocumentInterface
+} from "./Common/Config/AbstractConfigDocument";
 import {Document as YamlDocument} from "yaml";
 import {SimpleError} from "./Utils/Errors";
 import {ErrorWithCause} from "pony-cause";
-import {RunStructuredJson} from "./Run";
+import {RunJson, RunStructuredJson} from "./Run";
+import {AuthorRuleConfig} from "./Rule/AuthorRule";
+import {
+    CacheProvider, ConfigFormat,
+    PollOn
+} from "./Common/Infrastructure/Atomic";
+import {
+    AuthorOptions,
+    FilterCriteriaDefaults,
+    FilterCriteriaDefaultsJson,
+    FilterOptionsJson,
+    MaybeAnonymousCriteria,
+    MaybeAnonymousOrStringCriteria, MinimalOrFullFilter, MinimalOrFullFilterJson, NamedCriteria
+} from "./Common/Infrastructure/Filters/FilterShapes";
+import {AuthorCriteria, TypedActivityState, TypedActivityStates} from "./Common/Infrastructure/Filters/FilterCriteria";
+import {StrongLoggingOptions} from "./Common/Infrastructure/Logging";
+import {DatabaseDriver, DatabaseDriverConfig, DatabaseDriverType} from "./Common/Infrastructure/Database";
+import {parseFromJsonOrYamlToObject} from "./Common/Config/ConfigUtil";
+import {RunnableBaseJson, RunnableBaseOptions, StructuredRunnableBase} from "./Common/Infrastructure/Runnable";
+import {
+    RuleJson,
+    RuleObjectJson,
+    StructuredRuleObjectJson,
+    StructuredRuleSetObjectJson
+} from "./Common/Infrastructure/RuleShapes";
+import {ActionObjectJson, StructuredActionObjectJson} from "./Common/Infrastructure/ActionShapes";
 
 export interface ConfigBuilderOptions {
     logger: Logger,
@@ -154,21 +194,29 @@ export class ConfigBuilder {
             }
         }
 
+        const [namedAuthorFilters, namedItemFilters] = extractNamedFilters({...config, runs: realRuns});
+
+        const configFilterDefaults = filterCriteriaDefaults === undefined ? undefined : buildDefaultFilterCriteriaFromJson(filterCriteriaDefaults, namedAuthorFilters, namedItemFilters);
+
         const structuredRuns: RunStructuredJson[] = [];
+
+        const namedFilters = insertNameFilters(namedAuthorFilters, namedItemFilters);
 
         for(const r of realRuns) {
 
             const {filterCriteriaDefaults: filterCriteriaDefaultsFromRun, postFail, postTrigger, authorIs, itemIs } = r;
 
-            const [derivedRunAuthorIs, derivedRunItemIs] = mergeFilters(r, filterCriteriaDefaults ?? filterCriteriaDefaultsFromBot);
+            const [derivedRunAuthorIs, derivedRunItemIs] = mergeFilters(namedFilters(r), configFilterDefaults ?? filterCriteriaDefaultsFromBot);
+
+            const configFilterDefaultsFromRun = filterCriteriaDefaultsFromRun === undefined ? undefined : buildDefaultFilterCriteriaFromJson(filterCriteriaDefaultsFromRun, namedAuthorFilters, namedItemFilters);
 
             const structuredChecks: CheckStructuredJson[] = [];
             for (const c of r.checks) {
                 const {rules = [], actions = [], authorIs = {}, itemIs = []} = c;
-                const strongRules = insertNamedRules(rules, namedRules);
-                const strongActions = insertNamedActions(actions, namedActions);
+                const strongRules = insertNamedRules(rules, namedRules, namedAuthorFilters, namedItemFilters);
+                const strongActions = insertNamedActions(actions, namedActions, namedAuthorFilters, namedItemFilters);
 
-                const [derivedAuthorIs, derivedItemIs] = mergeFilters(c, filterCriteriaDefaultsFromRun ?? (filterCriteriaDefaults ?? filterCriteriaDefaultsFromBot));
+                const [derivedAuthorIs, derivedItemIs] = mergeFilters(namedFilters(c), configFilterDefaultsFromRun ?? (configFilterDefaults ?? filterCriteriaDefaultsFromBot));
 
                 const postCheckBehaviors = Object.assign({}, postCheckBehaviorDefaultsFromBot, removeUndefinedKeys({postFail, postTrigger}));
 
@@ -221,6 +269,20 @@ export const buildPollingOptions = (values: (string | PollingOptions)[]): Pollin
     return opts;
 }
 
+export const buildDefaultFilterCriteriaFromJson = (val: FilterCriteriaDefaultsJson, namedAuthorFilters: Map<string, NamedCriteria<AuthorCriteria>>, namedItemFilters: Map<string, NamedCriteria<TypedActivityState>>): FilterCriteriaDefaults => {
+    const {
+        itemIs,
+        authorIs,
+        ...rest
+    } = val;
+    const def: FilterCriteriaDefaults = rest;
+
+    const fullFilters = insertNameFilters(namedAuthorFilters, namedItemFilters)(val);
+    def.itemIs = fullFilters.itemIs;
+    def.authorIs = fullFilters.authorIs;
+    return def;
+}
+
 export const extractNamedRules = (rules: Array<RuleSetJson | RuleJson>, namedRules: Map<string, RuleObjectJson> = new Map()): Map<string, RuleObjectJson> => {
     //const namedRules = new Map();
     for (const r of rules) {
@@ -257,22 +319,234 @@ export const extractNamedRules = (rules: Array<RuleSetJson | RuleJson>, namedRul
     return namedRules;
 }
 
-export const insertNamedRules = (rules: Array<RuleSetJson | RuleJson>, namedRules: Map<string, RuleObjectJson> = new Map()): Array<RuleSetObjectJson | RuleObjectJson> => {
-    const strongRules: Array<RuleSetObjectJson | RuleObjectJson> = [];
+type FilterJsonFuncArg<T> = (val: MaybeAnonymousOrStringCriteria<T>) => void;
+
+const addToNamedFilter= <T>(namedFilter: Map<string, NamedCriteria<T>>, filterName: string) => (val: MaybeAnonymousOrStringCriteria<T>) => {
+    if (typeof val === 'string') {
+        return;
+    }
+    if (asNamedCriteria(val) && val.name !== undefined) {
+        if (namedFilter.has(val.name.toLocaleLowerCase())) {
+            throw new Error(`names for ${filterName} filters must be unique (case-insensitive). Conflicting name ${val.name}`);
+        }
+        namedFilter.set(val.name.toLocaleLowerCase(), val);
+    }
+}
+
+const parseFilterJson = <T>(addToFilter: FilterJsonFuncArg<T>) => (val: MinimalOrFullFilterJson<T> | undefined) => {
+    if (val === undefined) {
+        return;
+    }
+    if (Array.isArray(val)) {
+        for (const v of val) {
+            addToFilter(v);
+        }
+    } else {
+        const {include = [], exclude = []} = val;
+        for (const v of include) {
+            addToFilter(v);
+        }
+        for (const v of exclude) {
+            addToFilter(v);
+        }
+    }
+}
+
+export const extractNamedFilters = (config: JSONConfig, namedAuthorFilters: Map<string, NamedCriteria<AuthorCriteria>> = new Map(), namedItemFilters: Map<string, NamedCriteria<TypedActivityState>> = new Map()): [Map<string, NamedCriteria<AuthorCriteria>>, Map<string, NamedCriteria<TypedActivityState>>] => {
+    const addToAuthors = addToNamedFilter(namedAuthorFilters, 'authorIs');
+    const addToItems = addToNamedFilter(namedItemFilters, 'itemIs');
+
+    const parseAuthorIs = parseFilterJson(addToAuthors);
+    const parseItemIs = parseFilterJson(addToItems);
+
+    // const parseAuthorIs = (val: MinimalOrFullFilterJson<AuthorCriteria> | undefined) => {
+    //     if (val === undefined) {
+    //         return;
+    //     }
+    //     if (Array.isArray(val)) {
+    //         for (const v of val) {
+    //             addToAuthors(v);
+    //         }
+    //     } else {
+    //         const {include = [], exclude = []} = val;
+    //         for (const v of include) {
+    //             addToAuthors(v);
+    //         }
+    //         for (const v of exclude) {
+    //             addToAuthors(v);
+    //         }
+    //     }
+    // }
+
+    // const parseItemIs = (val: MinimalOrFullFilterJson<TypedActivityState> | undefined) => {
+    //     if (val === undefined) {
+    //         return;
+    //     }
+    //     if (Array.isArray(val)) {
+    //         for (const v of val) {
+    //             addToItems(v);
+    //         }
+    //     } else {
+    //         const {include = [], exclude = []} = val;
+    //         for (const v of include) {
+    //             addToItems(v);
+    //         }
+    //         for (const v of exclude) {
+    //             addToItems(v);
+    //         }
+    //     }
+    // }
+
+    //const namedRules = new Map();
+
+    const {
+        filterCriteriaDefaults,
+        runs = []
+    } = config;
+
+    parseAuthorIs(filterCriteriaDefaults?.authorIs);
+    parseItemIs(filterCriteriaDefaults?.itemIs);
+
+    for (const r of runs as RunJson[]) {
+
+        const {
+            filterCriteriaDefaults: filterCriteriaDefaultsFromRun
+        } = r;
+
+        parseAuthorIs(filterCriteriaDefaults?.authorIs);
+        parseAuthorIs(r.authorIs);
+        parseItemIs(r.itemIs);
+        parseItemIs(filterCriteriaDefaults?.itemIs);
+
+        for(const c of r.checks) {
+             parseAuthorIs(c.authorIs);
+             parseItemIs(c.itemIs);
+
+             for(const ru of c.rules ?? []) {
+                 if(typeof ru === 'string') {
+                     continue;
+                 }
+                 if(isRuleSetJSON(ru)) {
+                     for(const rr of ru.rules) {
+                         if(typeof rr === 'string') {
+                             continue;
+                         }
+                         parseAuthorIs(rr.authorIs);
+                         parseItemIs(c.itemIs);
+                     }
+                 } else {
+                     parseAuthorIs(ru.authorIs);
+                     parseItemIs(c.itemIs);
+                 }
+             }
+             for(const a of c.actions ?? []) {
+                 if(typeof a === 'string') {
+                     continue;
+                 }
+                 parseAuthorIs(a.authorIs);
+                 parseItemIs(c.itemIs);
+             }
+        }
+    }
+    return [namedAuthorFilters, namedItemFilters];
+}
+
+const getNamedOrReturn = <T>(namedFilters: Map<string, NamedCriteria<T>>, filterName: string) => (x: MaybeAnonymousOrStringCriteria<T>): NamedCriteria<T> => {
+    if(typeof x === 'string') {
+        if(!namedFilters.has(x.toLocaleLowerCase())) {
+            throw new Error(`No named ${filterName} criteria with the name "${x}"`);
+        }
+        return namedFilters.get(x) as NamedCriteria<T>;
+    }
+    if(asNamedCriteria(x)) {
+        return x;
+    }
+    return {criteria: x};
+}
+
+
+export const insertNameFilters = (namedAuthorFilters: Map<string, NamedCriteria<AuthorCriteria>>, namedItemFilters: Map<string, NamedCriteria<TypedActivityState>>) => (val: RunnableBaseJson) => {
+
+    const getNamedAuthorOrReturn = getNamedOrReturn(namedAuthorFilters, 'authorIs');
+    const getNamedItemOrReturn = getNamedOrReturn(namedItemFilters, 'itemIs');
+
+    let runnableOpts: StructuredRunnableBase = {
+        authorIs: undefined,
+        itemIs: undefined,
+    }
+    if(val.authorIs !== undefined) {
+        if (Array.isArray(val.authorIs)) {
+            runnableOpts.authorIs = val.authorIs.map(x => getNamedAuthorOrReturn(x))
+        } else {
+            runnableOpts.authorIs = {};
+
+            const {include, exclude} = val.authorIs;
+            if(include !== undefined) {
+                runnableOpts.authorIs.include = include.map(x => getNamedAuthorOrReturn(x))
+            }
+            if(exclude !== undefined) {
+                runnableOpts.authorIs.exclude = exclude.map(x => getNamedAuthorOrReturn(x))
+            }
+        }
+    }
+    if(val.itemIs !== undefined) {
+        if (Array.isArray(val.itemIs)) {
+            runnableOpts.itemIs = val.itemIs.map(x => getNamedItemOrReturn(x))
+        } else {
+            runnableOpts.itemIs = {};
+
+            const {include, exclude} = val.itemIs;
+            if(include !== undefined) {
+                runnableOpts.itemIs.include = include.map(x => getNamedItemOrReturn(x))
+            }
+            if(exclude !== undefined) {
+                runnableOpts.itemIs.exclude = exclude.map(x => getNamedItemOrReturn(x))
+            }
+        }
+    }
+
+    return runnableOpts;
+}
+
+export const insertNamedRules = (rules: Array<RuleSetJson | RuleJson>, namedRules: Map<string, RuleObjectJson> = new Map(), namedAuthorFilters: Map<string, NamedCriteria<AuthorCriteria>> = new Map(), namedItemFilters: Map<string, NamedCriteria<TypedActivityState>> = new Map()): (StructuredRuleSetObjectJson | StructuredRuleObjectJson)[] => {
+
+    const namedFilters = insertNameFilters(namedAuthorFilters, namedItemFilters);
+
+    const strongRules: (StructuredRuleSetObjectJson | StructuredRuleObjectJson)[] = [];
     for (const r of rules) {
+        let rule: StructuredRuleObjectJson | undefined;
         if (typeof r === 'string') {
             const foundRule = namedRules.get(r.toLowerCase());
             if (foundRule === undefined) {
                 throw new Error(`No named Rule with the name ${r} was found`);
             }
-            strongRules.push(foundRule);
+            rule = {
+                ...foundRule,
+                ...namedFilters(foundRule)
+            } as StructuredRuleObjectJson
+            //strongRules.push(foundRule);
         } else if (isRuleSetJSON(r)) {
             const {rules: sr, ...rest} = r;
-            const setRules = insertNamedRules(sr, namedRules);
-            const strongSet = {rules: setRules, ...rest} as RuleSetObjectJson;
+            const setRules = insertNamedRules(sr, namedRules, namedAuthorFilters, namedItemFilters);
+            const strongSet = {rules: setRules, ...rest} as StructuredRuleSetObjectJson;
             strongRules.push(strongSet);
         } else {
-            strongRules.push(r);
+            rule = {...r, ...namedFilters(r)} as StructuredRuleObjectJson;
+        }
+
+        if(rule !== undefined) {
+            if(rule.kind === 'author') {
+                const authorRuleConfig = rule as (StructuredRuleObjectJson & AuthorRuleConfig);
+                const filters = namedFilters({authorIs: {include: authorRuleConfig.include, exclude: authorRuleConfig.exclude}});
+                const builtFilter = buildFilter(filters.authorIs as MinimalOrFullFilter<AuthorCriteria>);
+                rule = {
+                    ...rule,
+                    // @ts-ignore
+                    include: builtFilter.include,
+                    exclude: builtFilter.exclude
+                }
+            }
+            strongRules.push(rule as StructuredRuleObjectJson);
         }
     }
 
@@ -301,17 +575,20 @@ export const extractNamedActions = (actions: Array<ActionJson>, namedActions: Ma
     return namedActions;
 }
 
-export const insertNamedActions = (actions: Array<ActionJson>, namedActions: Map<string, ActionObjectJson> = new Map()): Array<ActionObjectJson> => {
-    const strongActions: Array<ActionObjectJson> = [];
+export const insertNamedActions = (actions: Array<ActionJson>, namedActions: Map<string, ActionObjectJson> = new Map(), namedAuthorFilters: Map<string, NamedCriteria<AuthorCriteria>> = new Map(), namedItemFilters: Map<string, NamedCriteria<TypedActivityState>> = new Map()): Array<StructuredActionObjectJson> => {
+
+    const namedFilters = insertNameFilters(namedAuthorFilters, namedItemFilters);
+
+    const strongActions: Array<StructuredActionObjectJson> = [];
     for (const a of actions) {
         if (typeof a === 'string') {
             const foundAction = namedActions.get(a.toLowerCase());
             if (foundAction === undefined) {
                 throw new Error(`No named Action with the name ${a} was found`);
             }
-            strongActions.push(foundAction);
+            strongActions.push({...foundAction, ...namedFilters(foundAction)} as StructuredActionObjectJson);
         } else {
-            strongActions.push(a);
+            strongActions.push({...a, ...namedFilters(a)} as StructuredActionObjectJson);
         }
     }
 
@@ -531,31 +808,18 @@ export const parseOpConfigFromEnv = (): OperatorJsonConfig => {
 // json config
 // args from cli
 export const parseOperatorConfigFromSources = async (args: any): Promise<[OperatorJsonConfig, OperatorFileConfig]> => {
-    const {logLevel = process.env.LOG_LEVEL ?? 'debug', logDir = process.env.LOG_DIR} = args || {};
-    const envPath = process.env.OPERATOR_ENV;
-    const initLoggerOptions = {
-        level: logLevel,
-        console: {
-            level: logLevel
-        },
-        file: {
-            level: logLevel,
-            dirname: logDir,
-        },
-        stream: {
-            level: logLevel
-        }
-    }
+    const {
+        dataDir = process.env.DATA_DIR ?? defaultDataDir
+    } = args || {};
+    const envPath = resolvePathFromEnvWithRelative(process.env.OPERATOR_ENV, dataDir, path.resolve(dataDir, './.env'));
 
-    // create a pre config logger to help with debugging
-    // default to debug if nothing is provided
-    const initLogger = getLogger(initLoggerOptions, 'init');
+    const initLogger = winston.loggers.get('init');
 
     try {
         const vars = await GetEnvVars({
             envFile: {
                 filePath: envPath,
-                fallback: true
+                //fallback: true
             }
         });
         // if we found variables in the file of at a fallback path then add them in before we do main arg parsing
@@ -566,43 +830,82 @@ export const parseOperatorConfigFromSources = async (args: any): Promise<[Operat
             }
         }
     } catch (err: any) {
-        let msg = 'No .env file found at default location (./env)';
-        if (envPath !== undefined) {
-            msg = `${msg} or OPERATOR_ENV path (${envPath})`;
+        if(err.message.includes('Failed to find .env file at path')) {
+            initLogger.warn(`${err.message} -- can be ignored if you didn't include one!`);
+        } else {
+            throw new ErrorWithCause('Error occurred while parsing .env file that preventing app from starting', {cause: err});
         }
-        initLogger.warn(`${msg} -- this may be normal if neither was provided.`);
-        // mimicking --silent from env-cmd
-        //swallow silently for now 😬
     }
 
-    const {operatorConfig = (process.env.OPERATOR_CONFIG ?? path.resolve(__dirname, '../config.yaml'))} = args;
+    const {
+        operatorConfig: opConfigVal = process.env.OPERATOR_CONFIG
+    } = args;
+    const resolvedOpConfigVal = resolvePathFromEnvWithRelative(opConfigVal, dataDir);
+    //(process.env.OPERATOR_CONFIG ?? path.resolve(__dirname, '../config.yaml'))
+    if(resolvedOpConfigVal === undefined) {
+        initLogger.debug(`No operator config explicitly specified. Will look for default configs (${defaultConfigFilenames.join(', ')}) at default path (${dataDir})`);
+    }
+    const opConfigCandidates: string[] = resolvedOpConfigVal !== undefined ? [resolvedOpConfigVal] : defaultConfigFilenames.map(x => path.resolve(dataDir, './', x));
+
     let configFromFile: OperatorJsonConfig = {};
     let fileConfigFormat: ConfigFormat | undefined = undefined;
-    let fileConfig: object = {};
     let rawConfig: string = '';
     let configDoc: YamlOperatorConfigDocument | JsonOperatorConfigDocument;
     let writeable = false;
-    try {
-        writeable = await fileOrDirectoryIsWriteable(operatorConfig);
-    } catch (e) {
-        initLogger.warn(`Issue while parsing operator config file location: ${e} \n This is only a problem if you do not have a config file but are planning on adding bots interactively.`);
+    let operatorConfig;
+    for(const opConfigPath of opConfigCandidates) {
+
+        try {
+            const [rawConfigValue, format] = await readConfigFile(opConfigPath);
+            rawConfig = rawConfigValue ?? '';
+            fileConfigFormat = format as ConfigFormat;
+            operatorConfig = opConfigPath;
+            initLogger.verbose(`Found operator config at ${operatorConfig}`);
+            break;
+        } catch (err: any) {
+            const {code} = err;
+            if (code === 'ENOENT' || code === 'EACCES') {
+                if(code === 'ENOENT') {
+                    initLogger.warn(`No operator config file found at ${opConfigPath}`);
+                } else if(code === 'EACCES') {
+                    let msg = `Operator config location ${opConfigPath} is not accessible due to permissions.`;
+                    if(castToBool(process.env.IS_DOCKER) === true) {
+                        msg += `Make sure you have specified user in docker run command! See https://github.com/FoxxMD/context-mod/blob/master/docs/gettingStartedOperator.md#docker-recommended`;
+                    }
+                    initLogger.warn(msg);
+                }
+
+                if (err.extension !== undefined) {
+                    fileConfigFormat = err.extension
+                }
+            } else {
+                throw new ErrorWithCause('Cannot continue app startup because operator config file exists but was not parseable.', {cause: err});
+            }
+        }
+    }
+
+    if (operatorConfig === undefined) {
+        if (resolvedOpConfigVal !== undefined) {
+            // user specified a config location but we could not find it so exit
+            throw new Error(`ARG/ENV specified an operator config location but could not find it. Will not continue with app startup.`);
+        } else {
+            // no user specified config location! may be OK if only using ENVs or blank slate
+            // set a default location for op config (will be created here since it does not exist)
+            operatorConfig = opConfigCandidates.find(x => x.includes('.yaml'));
+            initLogger.verbose(`Defaulting to ${operatorConfig} as operator config location (in the event it needs to be written)`);
+        }
     }
 
     try {
-        const [rawConfigValue, format] = await readConfigFile(operatorConfig, {log: initLogger});
-        rawConfig = rawConfigValue ?? '';
-        fileConfigFormat = format as ConfigFormat;
-    } catch (err: any) {
-        const {code} = err;
-        if (code === 'ENOENT') {
-            initLogger.warn('No operator config file found but will continue');
-            if (err.extension !== undefined) {
-                fileConfigFormat = err.extension
-            }
-        } else {
-            throw new ErrorWithCause('Cannot continue app startup because operator config file exists but was not parseable.', {cause: err});
+        writeable = fileOrDirectoryIsWriteable(operatorConfig as string);
+    } catch (e) {
+        let msg = `App does not have permission to WRITE to operator config location. This is only a problem if you plan on adding bots/subreddits via the UI.`;
+        if(castToBool(process.env.IS_DOCKER) === true) {
+            msg += `Make sure you have specified user in docker run command! See https://github.com/FoxxMD/context-mod/blob/master/docs/gettingStartedOperator.md#docker-recommended`;
         }
+        initLogger.warn(msg);
     }
+
     const [format, doc, jsonErr, yamlErr] = parseFromJsonOrYamlToObject(rawConfig, {
         location: operatorConfig,
         jsonDocFunc: (content, location) => new JsonOperatorConfigDocument(content, location),
@@ -695,7 +998,7 @@ export const parseOperatorConfigFromSources = async (args: any): Promise<[Operat
     }];
 }
 
-export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): OperatorConfig => {
+export const buildOperatorConfigWithDefaults = async (data: OperatorJsonConfig): Promise<OperatorConfig> => {
     const {
         mode = 'all',
         operator: {
@@ -703,21 +1006,37 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
             display = 'Anonymous',
         } = {},
         logging: {
-            level = 'verbose',
+            level = 'debug',
             path,
             file = {},
             console = {},
             stream = {},
         } = {},
+        logging,
         caching: opCache,
         userAgent,
+        databaseStatisticsDefaults: {
+            minFrequency = 'day',
+            frequency = 'day'
+        } = {},
+        databaseConfig: {
+            connection: dbConnection = (process.env.DB_DRIVER ?? 'sqljs') as DatabaseDriverType,
+            migrations = {},
+            retention,
+        } = {},
         web: {
             port = 8085,
             maxLogs = 200,
+            databaseConfig: {
+                connection: dbConnectionWeb = dbConnection,
+                migrations: migrationsWeb = migrations,
+            } = {},
             caching: webCaching = {},
+            storage: webStorage = undefined,
             session: {
-                secret = randomId(),
+                secret: sessionSecretFromConfig = undefined,
                 maxAge: sessionMaxAge = 86400,
+                storage: sessionStorage = undefined,
             } = {},
             invites: {
                 maxAge: inviteMaxAge = 0,
@@ -740,6 +1059,8 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
     let defaultProvider: CacheOptions;
     let opActionedEventsMax: number | undefined;
     let opActionedEventsDefault: number = 25;
+
+    const dataDir = process.env.DATA_DIR ?? defaultDataDir;
 
     if (opCache === undefined) {
         defaultProvider = {
@@ -793,6 +1114,32 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
          redirectUri: 'http://localhost:8085/callback'
      };
 
+    const loggingOptions: StrongLoggingOptions = {
+        level,
+        file: {
+            level: level,
+            dirname,
+            ...fileRest,
+        },
+        stream: {
+            level: level,
+            ...stream,
+        },
+        console: {
+            level: level,
+            ...console,
+        }
+    };
+    const appLogger = getLogger(loggingOptions, 'app');
+
+    const dbConfig = createDatabaseConfig(dbConnection);
+    let realdbConnectionWeb: DatabaseDriver = dbConnectionWeb;
+    if(typeof dbConnectionWeb === 'string') {
+        realdbConnectionWeb = dbConnectionWeb as DatabaseDriverType;
+    } else if(!(typeof dbConnection === 'string')) {
+        realdbConnectionWeb = {...dbConnection, ...dbConnectionWeb};
+    }
+    const webDbConfig = createDatabaseConfig(realdbConnectionWeb);
 
     const config: OperatorConfig = {
         mode,
@@ -800,37 +1147,39 @@ export const buildOperatorConfigWithDefaults = (data: OperatorJsonConfig): Opera
             name: defaultOperators,
             display,
         },
-        logging: {
-            level,
-            file: {
-                level: level,
-                dirname,
-                ...fileRest,
-            },
-            stream: {
-                level: level,
-                ...stream,
-            },
-            console: {
-                level: level,
-                ...console,
-            }
-        },
+        logging: loggingOptions,
         caching: cache,
         snoowrap: snoowrapOp,
+        databaseStatisticsDefaults: {
+            frequency,
+            minFrequency
+        },
+        database: await createAppDatabaseConnection(dbConfig, appLogger),
+        databaseConfig: {
+            connection: dbConfig,
+            migrations,
+            retention,
+        },
         userAgent,
         web: {
-            port,
+            database: await createWebDatabaseConnection(webDbConfig, appLogger),
+            databaseConfig: {
+                connection: webDbConfig,
+                migrations: migrationsWeb,
+            },
             caching: {
                 ...defaultProvider,
                 ...webCaching
             },
+            port,
+            storage: webStorage,
             invites: {
                 maxAge: inviteMaxAge,
             },
             session: {
-                secret,
+                secret: sessionSecretFromConfig,
                 maxAge: sessionMaxAge,
+                storage: sessionStorage
             },
             maxLogs,
             clients: clients === undefined ? [{host: 'localhost:8095', secret: apiSecret}] : clients,
@@ -860,6 +1209,11 @@ export const buildBotConfig = (data: BotInstanceJsonConfig, opConfig: OperatorCo
             provider: defaultProvider,
         } = {},
         userAgent,
+        database,
+        databaseStatisticsDefaults: statDefaultsFromOp,
+        databaseConfig: {
+            retention: retentionFromOp,
+        } = {},
     } = opConfig;
     const {
         name: botName,
@@ -881,6 +1235,10 @@ export const buildBotConfig = (data: BotInstanceJsonConfig, opConfig: OperatorCo
             hardLimit = 50
         } = {},
         snoowrap = snoowrapOp,
+        databaseStatisticsDefaults = {},
+        databaseConfig: {
+            retention,
+        } = {},
         flowControlDefaults,
         credentials = {},
         subreddits: {
@@ -990,19 +1348,35 @@ export const buildBotConfig = (data: BotInstanceJsonConfig, opConfig: OperatorCo
         realShared.push('modqueue');
     }
 
+    const botLevelStatDefaults = {...statDefaultsFromOp, ...databaseStatisticsDefaults};
+    const mergedOverrides = overrides.map(x => {
+        const {
+            databaseStatisticsDefaults: fromOverride = {},
+        } = x;
+        return {
+            ...x,
+            databaseStatisticsDefaults: {...botLevelStatDefaults, ...fromOverride}
+        }
+    });
+
     return {
         name: botName,
         snoowrap: snoowrap || {},
         flowControlDefaults,
         filterCriteriaDefaults,
         postCheckBehaviorDefaults,
+        database,
+        databaseStatisticsDefaults: botLevelStatDefaults,
+        databaseConfig: {
+          retention: retention ?? retentionFromOp
+        },
         subreddits: {
             names,
             exclude,
             wikiConfig,
             heartbeatInterval,
             dryRun,
-            overrides,
+            overrides: mergedOverrides,
         },
         credentials: botCreds,
         caching: botCache,

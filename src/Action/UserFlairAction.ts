@@ -1,7 +1,9 @@
 import Action, {ActionConfig, ActionJson, ActionOptions} from './index';
 import {Comment, RedditUser, Submission} from 'snoowrap';
-import {RuleResult} from '../Rule';
-import {ActionProcessResult} from '../Common/interfaces';
+import {ActionProcessResult, RuleResult} from '../Common/interfaces';
+import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
+import {runCheckOptions} from "../Subreddit/Manager";
+import {ActionTypes} from "../Common/Infrastructure/Atomic";
 
 export class UserFlairAction extends Action {
   text?: string;
@@ -16,12 +18,12 @@ export class UserFlairAction extends Action {
     this.flair_template_id = options.flair_template_id === null || options.flair_template_id === '' ? undefined : options.flair_template_id;
   }
 
-  getKind() {
-    return 'User Flair';
+  getKind(): ActionTypes {
+    return 'userflair';
   }
 
-  async process(item: Comment | Submission, ruleResults: RuleResult[], runtimeDryrun?: boolean): Promise<ActionProcessResult> {
-    const dryRun = runtimeDryrun || this.dryRun;
+  async process(item: Comment | Submission, ruleResults: RuleResultEntity[], options: runCheckOptions): Promise<ActionProcessResult> {
+    const dryRun = this.getRuntimeAwareDryrun(options);
     let flairParts = [];
 
     if (this.flair_template_id !== undefined) {
@@ -83,6 +85,14 @@ export class UserFlairAction extends Action {
       result: flairSummary,
     }
   }
+
+  protected getSpecificPremise(): object {
+    return {
+      text: this.text,
+      css: this.css,
+      flair_template_id: this.flair_template_id
+    }
+  }
 }
 
 /**
@@ -107,7 +117,7 @@ export interface UserFlairActionConfig extends ActionConfig {
   flair_template_id?: string;
 }
 
-export interface UserFlairActionOptions extends UserFlairActionConfig, ActionOptions {
+export interface UserFlairActionOptions extends Omit<UserFlairActionConfig, 'authorIs' | 'itemIs'>, ActionOptions {
 
 }
 

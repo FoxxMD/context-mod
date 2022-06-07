@@ -23,4 +23,6 @@ export interface CMInstanceInterface extends BotConnection {
     subreddits: string[]
     bots: BotInstance[]
     error?: string
+    ranMigrations: boolean
+    migrationBlocker?: string
 }

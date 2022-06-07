@@ -1,81 +1,114 @@
 import winston, {Logger} from "winston";
-import jsonStringify from 'safe-stable-stringify';
 import dayjs, {Dayjs, OpUnitType} from 'dayjs';
-import {FormattedRuleResult, isRuleSetResult, RulePremise, RuleResult, RuleSetResult, UserNoteCriteria} from "./Rule";
-import deepEqual from "fast-deep-equal";
 import {Duration} from 'dayjs/plugin/duration.js';
 import Ajv from "ajv";
 import {InvalidOptionArgumentError} from "commander";
-import {inflateSync, deflateSync} from "zlib";
+import {deflateSync, inflateSync} from "zlib";
 import pixelmatch from 'pixelmatch';
 import os from 'os';
+import pathUtil from 'path';
+import crypto, {createHash} from 'crypto';
 import {
-    ActionResult, ActivitySource,
-    ActivityWindowCriteria,
-    ActivityWindowType,
+    ActionResult,
+    ActivityDispatch,
+    ActivityDispatchConfig,
     CacheOptions,
-    CacheProvider,
-    CheckSummary, CommentState,
-    DurationComparison,
-    DurationVal,
-    FilterCriteriaDefaults,
-    FilterCriteriaPropertyResult,
-    FilterCriteriaResult,
-    FilterResult,
-    GenericComparison,
-    HistoricalStats,
-    HistoricalStatsDisplay,
+    CheckSummary,
     ImageComparisonResult,
-    //ImageData,
-    ImageDetection, ItemCritPropHelper,
-    //ImageDownloadOptions,
+    ItemCritPropHelper,
     LogInfo,
-    NamedGroup,
-    OperatorJsonConfig,
     PollingOptionsStrong,
-    RedditEntity,
-    RedditEntityType,
+    PostBehaviorOptionConfig,
     RegExResult,
     RepostItem,
-    RepostItemResult, RequiredItemCrit,
+    RepostItemResult,
+    RequiredItemCrit,
     ResourceStats,
+    RuleResult,
+    RuleSetResult,
     RunResult,
     SearchAndReplaceRegExp,
-    StringComparisonOptions,
-    StringOperator,
-    StrongSubredditState, SubmissionState,
-    SubredditState, TypedActivityState,
-    TypedActivityStates
+    StringComparisonOptions
 } from "./Common/interfaces";
-import { Document as YamlDocument } from 'yaml'
 import InvalidRegexError from "./Utils/InvalidRegexError";
-import {constants, promises} from "fs";
+import {accessSync, constants, promises} from "fs";
 import {cacheOptDefaults, VERSION} from "./Common/defaults";
 import cacheManager, {Cache} from "cache-manager";
 import redisStore from "cache-manager-redis-store";
-import crypto from "crypto";
 import Autolinker from 'autolinker';
 import {create as createMemoryStore} from './Utils/memoryStore';
-import {MESSAGE, LEVEL} from "triple-beam";
-import {RedditUser,Comment,Submission} from "snoowrap/dist/objects";
+import {LEVEL, MESSAGE} from "triple-beam";
+import {Comment, RedditUser, Submission} from "snoowrap/dist/objects";
 import reRegExp from '@stdlib/regexp-regexp';
-import fetch, {Response} from "node-fetch";
-import { URL } from "url";
+import fetch from "node-fetch";
 import ImageData from "./Common/ImageData";
 import {Sharp, SharpOptions} from "sharp";
 import {ErrorWithCause, stackWithCauses} from "pony-cause";
-import {ConfigFormat, ModNoteLabel, modNoteLabels, SetRandomInterval} from "./Common/types";
 import stringSimilarity from 'string-similarity';
 import calculateCosineSimilarity from "./Utils/StringMatching/CosineSimilarity";
 import levenSimilarity from "./Utils/StringMatching/levenSimilarity";
-import {SimpleError, isRateLimitError, isRequestError, isScopeError, isStatusError, CMError} from "./Utils/Errors";
-import {parse} from "path";
-import JsonConfigDocument from "./Common/Config/JsonConfigDocument";
-import YamlConfigDocument from "./Common/Config/YamlConfigDocument";
-import AbstractConfigDocument, {ConfigDocumentInterface} from "./Common/Config/AbstractConfigDocument";
-import LoggedError from "./Utils/LoggedError";
-import {AuthorOptions} from "./Author/Author";
+import {isRateLimitError, isRequestError, isScopeError, isStatusError, SimpleError} from "./Utils/Errors";
 import merge from "deepmerge";
+import {RulePremise} from "./Common/Entities/RulePremise";
+import {RuleResultEntity as RuleResultEntity} from "./Common/Entities/RuleResultEntity";
+import {nanoid} from "nanoid";
+import {
+    ActivityState,
+    AuthorCriteria,
+    authorCriteriaProperties,
+    CommentState,
+    defaultStrongSubredditCriteriaOptions,
+    StrongSubredditCriteria,
+    SubmissionState,
+    SubredditCriteria,
+    TypedActivityState,
+    UserNoteCriteria
+} from "./Common/Infrastructure/Filters/FilterCriteria";
+import {
+    ActivitySource,
+    ActivitySourceTypes,
+    CacheProvider,
+    ConfigFormat,
+    DurationVal,
+    RedditEntity,
+    RedditEntityType,
+    statFrequencies,
+    StatisticFrequency,
+    StatisticFrequencyOption,
+    StringOperator
+} from "./Common/Infrastructure/Atomic";
+import {DurationComparison} from "./Common/Infrastructure/Comparisons";
+import {
+    AuthorOptions,
+    FilterCriteriaDefaults,
+    FilterCriteriaPropertyResult,
+    FilterCriteriaResult,
+    FilterOptions,
+    FilterOptionsJson,
+    FilterResult,
+    ItemOptions,
+    MaybeAnonymousCriteria,
+    MaybeAnonymousOrStringCriteria,
+    MinimalOrFullFilter,
+    MinimalOrFullMaybeAnonymousFilter,
+    NamedCriteria
+} from "./Common/Infrastructure/Filters/FilterShapes";
+import {
+    ActivityType,
+    AuthorHistoryType,
+    FullNameTypes,
+    PermalinkRedditThings,
+    RedditThing,
+    SnoowrapActivity
+} from "./Common/Infrastructure/Reddit";
+import {
+    ActivityWindowConfig,
+    ActivityWindowCriteria,
+    FullActivityWindowConfig,
+    HistoryFiltersConfig,
+    HistoryFiltersOptions
+} from "./Common/Infrastructure/ActivityWindow";
+import {RunnableBaseJson} from "./Common/Infrastructure/Runnable";
 
 
 //import {ResembleSingleCallbackComparisonResult} from "resemblejs";
@@ -129,7 +162,8 @@ const errorAwareFormat = {
             if(includeStack) {
                 // so we have to create a dummy error and re-assign all error properties from our info object to it so we can get a proper stack trace
                 const dummyErr = new ErrorWithCause('');
-                for(const k in tinfo) {
+                const names = Object.getOwnPropertyNames(tinfo);
+                for(const k of names) {
                     if(dummyErr.hasOwnProperty(k) || k === 'cause') {
                         // @ts-ignore
                         dummyErr[k] = tinfo[k];
@@ -140,7 +174,7 @@ const errorAwareFormat = {
             }
         } else {
             const err = transformError(einfo.message);
-            info = Object.assign(einfo, err);
+            info = Object.assign({}, einfo, err);
             // @ts-ignore
             info.message = err.message;
             // @ts-ignore
@@ -148,10 +182,13 @@ const errorAwareFormat = {
 
             if(includeStack) {
                 const dummyErr = new ErrorWithCause('');
-                for(const k in err) {
+                // Error properties are not enumerable
+                // https://stackoverflow.com/a/18278145/1469797
+                const names = Object.getOwnPropertyNames(err);
+                for(const k of names) {
                     if(dummyErr.hasOwnProperty(k) || k === 'cause') {
                         // @ts-ignore
-                        dummyErr[k] = info[k];
+                        dummyErr[k] = err[k];
                     }
                 }
                 // @ts-ignore
@@ -178,7 +215,12 @@ const isProbablyError = (val: any, errName = 'error') => {
 export const PASS = '✓';
 export const FAIL = '✘';
 
-export const truncateStringToLength = (length: number, truncStr = '...') => (str: string) => str.length > length ? `${str.slice(0, length - truncStr.length - 1)}${truncStr}` : str;
+export const truncateStringToLength = (length: number, truncStr = '...') => (str: string) => {
+    if(str.length > length) {
+        return `${str.slice(0, length - truncStr.length - 1)}${truncStr}`;
+    }
+    return str;
+};
 
 export const defaultFormat = (defaultLabel = 'App') => printf(({
                                                                    level,
@@ -196,7 +238,7 @@ export const defaultFormat = (defaultLabel = 'App') => printf(({
                                                                    stack,
                                                                    ...rest
                                                                }) => {
-    let stringifyValue = splatObj !== undefined ? jsonStringify(splatObj) : '';
+    let stringifyValue = splatObj !== undefined ? JSON.stringify(splatObj) : '';
     let msg = message;
     let stackMsg = '';
     if (stack !== undefined) {
@@ -215,7 +257,7 @@ export const defaultFormat = (defaultLabel = 'App') => printf(({
     }
 
     let nodes = labels;
-    if (leaf !== null && leaf !== undefined) {
+    if (leaf !== null && leaf !== undefined && !nodes.includes(leaf)) {
         nodes.push(leaf);
     }
     const labelContent = `${nodes.map((x: string) => `[${x}]`).join(' ')}`;
@@ -306,20 +348,49 @@ export const parseLinkIdentifier = (regexes: RegExp[]) => {
 export const SUBMISSION_URL_ID: RegExp = /(?:^.+?)(?:reddit.com\/r)(?:\/[\w\d]+){2}(?:\/)([\w\d]*)/g;
 export const COMMENT_URL_ID: RegExp = /(?:^.+?)(?:reddit.com\/r)(?:\/[\w\d]+){4}(?:\/)([\w\d]*)/g;
 
+const commentReg = parseLinkIdentifier([COMMENT_URL_ID]);
+const submissionReg = parseLinkIdentifier([SUBMISSION_URL_ID]);
+
+export const parseRedditThingsFromLink = (val: string): PermalinkRedditThings => {
+    const commentId = commentReg(val);
+    const submissionId = submissionReg(val);
+    let comment: RedditThing | undefined;
+    let submission: RedditThing | undefined;
+
+    if (commentId !== undefined) {
+        comment = {
+            val: `t1_${commentId}`,
+            type: 'comment',
+            prefix: 't1',
+            id: commentId
+        }
+    }
+    if (submissionId !== undefined) {
+        submission = {
+            val: `t3_${submissionId}`,
+            type: 'submission',
+            prefix: 't3',
+            id: submissionId
+        }
+    }
+    return {
+        submission,
+        comment
+    }
+}
+
 export function sleep(ms: number) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-export const findResultByPremise = (premise: RulePremise, results: RuleResult[]): (RuleResult | undefined) => {
+export const findResultByPremise = (premise: RulePremise, results: RuleResultEntity[]): (RuleResultEntity | undefined) => {
     if (results.length === 0) {
         return undefined;
     }
-    return results.find((x) => {
-        return deepEqual(premise, x.premise);
-    })
+    return results.find(x => x.premise.configHash === premise.configHash);
 }
 
-export const determineNewResults = (existing: RuleResult[], val: RuleResult | RuleResult[]): RuleResult[] => {
+export const determineNewResults = (existing: RuleResultEntity[], val: RuleResultEntity | RuleResultEntity[]): RuleResultEntity[] => {
     const requestedResults = Array.isArray(val) ? val : [val];
     const combined = [...existing];
     const newResults = [];
@@ -335,7 +406,7 @@ export const determineNewResults = (existing: RuleResult[], val: RuleResult | Ru
     // }
 
     for (const result of requestedResults) {
-        const relevantExisting = combined.filter(x => x.premise.kind === result.premise.kind).find(x => deepEqual(x.premise, result.premise));
+        const relevantExisting = combined.filter(x => x.premise.kind.name === result.premise.kind.name).find(x => x.premise.configHash === result.premise.configHash);
         if (relevantExisting === undefined) {
             combined.push(result);
             newResults.push(result);
@@ -387,19 +458,28 @@ export const triggeredIndicator = (val: boolean | null, nullResultIndicator = '-
     return val ? PASS : FAIL;
 }
 
-export const resultsSummary = (results: (RuleResult|RuleSetResult)[], topLevelCondition: 'OR' | 'AND'): string => {
+export const isRuleSetResult = (obj: any): obj is RuleSetResult => {
+    return typeof obj === 'object' && Array.isArray(obj.results) && obj.condition !== undefined && obj.triggered !== undefined;
+}
+
+export const resultsSummary = (results: (RuleResultEntity|RuleSetResult)[], topLevelCondition: 'OR' | 'AND'): string => {
     const parts: string[] = results.map((x) => {
         if(isRuleSetResult(x)) {
             return `${triggeredIndicator(x.triggered)} (${resultsSummary(x.results, x.condition)}${x.results.length === 1 ? ` [${x.condition}]` : ''})`;
         }
-        const res = x as RuleResult;
-        return `${triggeredIndicator(x.triggered)} ${res.name}`;
+        const res = x as RuleResultEntity;
+        return `${triggeredIndicator(res.triggered ?? null)} ${RulePremise.getFriendlyIdentifier(res.premise)}`;
     });
     return parts.join(` ${topLevelCondition} `)
     //return results.map(x => x.name || x.premise.kind).join(' | ')
 }
 
-export const filterCriteriaSummary = <T>(val: FilterCriteriaResult<T>): [string, string[]] => {
+export interface FilterCriteriaSummary {
+    name?: string
+    summary: string
+    details: string[]
+}
+export const buildFilterCriteriaSummary = <T>(val: FilterCriteriaResult<T>): FilterCriteriaSummary => {
     // summarize properties relevant to result
     const passedProps = {props: val.propertyResults.filter(x => x.passed === true), name: 'Passed'};
     const failedProps = {props: val.propertyResults.filter(x => x.passed === false), name: 'Failed'};
@@ -414,7 +494,19 @@ export const filterCriteriaSummary = <T>(val: FilterCriteriaResult<T>): [string,
         propSummary.push(dnrProps);
     }
     const propSummaryStrArr = propSummary.map(x => `${x.props.length} ${x.name}${x.props.length > 0 ? ` (${x.props.map(y => y.property as string)})` : ''}`);
-    return [propSummaryStrArr.join(' | '), val.propertyResults.map(x => filterCriteriaPropertySummary(x, val.criteria))]
+    const summary = propSummaryStrArr.join(' | ');
+    const details = val.propertyResults.map(x => filterCriteriaPropertySummary(x, val.criteria.criteria));
+
+    return {
+        name: val.criteria.name,
+        summary,
+        details
+    }
+}
+
+export const filterCriteriaSummary = <T>(val: FilterCriteriaResult<T>): [string, string[]] => {
+    const deets = buildFilterCriteriaSummary(val);
+    return [deets.summary, deets.details];
 }
 
 export const filterCriteriaPropertySummary = <T>(val: FilterCriteriaPropertyResult<T>, criteria: T): string => {
@@ -429,13 +521,15 @@ export const filterCriteriaPropertySummary = <T>(val: FilterCriteriaPropertyResu
             passResult = triggeredIndicator(val.passed, 'Skipped');
             break;
     }
-    let found;
+    let found = '';
     if(val.passed === null || val.passed === undefined) {
         found = '';
     } else if(val.property === 'submissionState') {
-        const foundResult = val.found as FilterResult<SubmissionState>;
-        const criteriaResults = foundResult.criteriaResults.map((x, index) => `Criteria #${index + 1} => ${triggeredIndicator(x.passed)}\n   ${x.propertyResults.map(y => filterCriteriaPropertySummary(y, x.criteria)).join('\n    ')}`).join('\n  ');
-        found = `\n  ${criteriaResults}`;
+        const foundResult = val.found as FilterResult<SubmissionState> | undefined;
+        if(foundResult !== undefined) {
+            const criteriaResults = foundResult.criteriaResults.map((x, index) => `Criteria #${index + 1} => ${triggeredIndicator(x.passed)}\n   ${x.propertyResults.map(y => filterCriteriaPropertySummary(y, x.criteria.criteria)).join('\n    ')}`).join('\n  ');
+            found = `\n  ${criteriaResults}`;
+        }
     } else {
         found = ` => Found: ${val.found}`;
     }
@@ -443,11 +537,15 @@ export const filterCriteriaPropertySummary = <T>(val: FilterCriteriaPropertyResu
     let expected = '';
     if(val.property !== 'submissionState') {
         let crit: T[keyof T][];
-        if(Array.isArray(criteria[val.property])) {
+        let actualCriteria = ('criteria' in criteria) ?
             // @ts-ignore
-            crit = criteria[val.property];
+            criteria.criteria as T
+            : criteria;
+        if(Array.isArray(actualCriteria[val.property])) {
+            // @ts-ignore
+            crit = actualCriteria[val.property];
         } else {
-            crit = [criteria[val.property]];
+            crit = [actualCriteria[val.property]];
         }
         const expectedStrings = crit.map((x: any) => {
             if (asUserNoteCriteria(x)) {
@@ -461,8 +559,11 @@ export const filterCriteriaPropertySummary = <T>(val: FilterCriteriaPropertyResu
     return `${val.property as string} => ${passResult}${expected}${found}${val.reason !== undefined ? ` -- ${val.reason}` : ''}${val.behavior === 'exclude' ? ' (Exclude passes when Expected is not Found)' : ''}`;
 }
 
-export const createAjvFactory = (logger: Logger) => {
-    return  new Ajv({logger: logger, verbose: true, strict: "log", allowUnionTypes: true});
+export const createAjvFactory = (logger: Logger): Ajv => {
+    const validator =  new Ajv({logger: logger, verbose: true, strict: "log", allowUnionTypes: true});
+    // https://ajv.js.org/strict-mode.html#unknown-keywords
+    validator.addKeyword('deprecationMessage');
+    return validator;
 }
 
 export const percentFromString = (str: string): number => {
@@ -598,73 +699,13 @@ export const deflateUserNotes = (usersObject: object) => {
     return blob;
 }
 
-export const isActivityWindowCriteria = (val: any): val is ActivityWindowCriteria => {
+export const isActivityWindowConfig = (val: any): val is FullActivityWindowConfig => {
     if (val !== null && typeof val === 'object') {
         return (val.count !== undefined && typeof val.count === 'number') ||
             // close enough
             val.duration !== undefined;
     }
     return false;
-}
-
-export interface ConfigToObjectOptions {
-    location?: string,
-    jsonDocFunc?: (content: string, location?: string) => AbstractConfigDocument<OperatorJsonConfig>,
-    yamlDocFunc?: (content: string, location?: string) => AbstractConfigDocument<YamlDocument>
-}
-
-export const parseFromJsonOrYamlToObject = (content: string, options?: ConfigToObjectOptions): [ConfigFormat, ConfigDocumentInterface<YamlDocument | object>?, Error?, Error?] => {
-    let obj;
-    let configFormat: ConfigFormat = 'yaml';
-    let jsonErr,
-        yamlErr;
-
-    const likelyType = likelyJson5(content) ? 'json' : 'yaml';
-
-    const {
-        location,
-        jsonDocFunc = (content: string, location?: string) => new JsonConfigDocument(content, location),
-        yamlDocFunc = (content: string, location?: string) => new YamlConfigDocument(content, location),
-    } = options || {};
-
-    try {
-        const jsonObj = jsonDocFunc(content, location);
-        const output = jsonObj.toJS();
-        const oType = output === null ? 'null' : typeof output;
-        if (oType !== 'object') {
-            jsonErr = new SimpleError(`Parsing as json produced data of type '${oType}' (expected 'object')`);
-            obj = undefined;
-        } else {
-            obj = jsonObj;
-            configFormat = 'json';
-        }
-    } catch (err: any) {
-        jsonErr = err;
-    }
-
-    try {
-        const yamlObj = yamlDocFunc(content, location)
-        const output = yamlObj.toJS();
-        const oType = output === null ? 'null' : typeof output;
-        if (oType !== 'object') {
-            yamlErr = new SimpleError(`Parsing as yaml produced data of type '${oType}' (expected 'object')`);
-            obj = undefined;
-        } else if (obj === undefined && (likelyType !== 'json' || yamlObj.parsed.errors.length === 0)) {
-            configFormat = 'yaml';
-            if(yamlObj.parsed.errors.length !== 0) {
-                yamlErr = new Error(yamlObj.parsed.errors.join('\n'))
-            } else {
-                obj = yamlObj;
-            }
-        }
-    } catch (err: any) {
-        yamlErr = err;
-    }
-
-    if (obj === undefined) {
-        configFormat = likelyType;
-    }
-    return [configFormat, obj, jsonErr, yamlErr];
 }
 
 export const comparisonTextOp = (val1: number, strOp: string, val2: number): boolean => {
@@ -679,42 +720,6 @@ export const comparisonTextOp = (val1: number, strOp: string, val2: number): boo
             return val1 <= val2;
         default:
             throw new Error(`${strOp} was not a recognized operator`);
-    }
-}
-
-const GENERIC_VALUE_COMPARISON = /^\s*(?<opStr>>|>=|<|<=)\s*(?<value>\d+)(?<extra>\s+.*)*$/
-const GENERIC_VALUE_COMPARISON_URL = 'https://regexr.com/60dq4';
-export const parseGenericValueComparison = (val: string): GenericComparison => {
-    const matches = val.match(GENERIC_VALUE_COMPARISON);
-    if (matches === null) {
-        throw new InvalidRegexError(GENERIC_VALUE_COMPARISON, val, GENERIC_VALUE_COMPARISON_URL)
-    }
-    const groups = matches.groups as any;
-
-    return {
-        operator: groups.opStr as StringOperator,
-        value: Number.parseFloat(groups.value),
-        isPercent: false,
-        extra: groups.extra,
-        displayText: `${groups.opStr} ${groups.value}`
-    }
-}
-
-const GENERIC_VALUE_PERCENT_COMPARISON = /^\s*(?<opStr>>|>=|<|<=)\s*(?<value>\d+)\s*(?<percent>%?)(?<extra>.*)$/
-const GENERIC_VALUE_PERCENT_COMPARISON_URL = 'https://regexr.com/60a16';
-export const parseGenericValueOrPercentComparison = (val: string): GenericComparison => {
-    const matches = val.match(GENERIC_VALUE_PERCENT_COMPARISON);
-    if (matches === null) {
-        throw new InvalidRegexError(GENERIC_VALUE_PERCENT_COMPARISON, val, GENERIC_VALUE_PERCENT_COMPARISON_URL)
-    }
-    const groups = matches.groups as any;
-
-    return {
-        operator: groups.opStr as StringOperator,
-        value: Number.parseFloat(groups.value),
-        isPercent: groups.percent !== '',
-        extra: groups.extra,
-        displayText: `${groups.opStr} ${groups.value}${groups.percent === undefined ? '': '%'}`
     }
 }
 
@@ -1081,6 +1086,11 @@ const _transformError = (err: Error, seen: Set<Error>, matchOptions?: LogMatch) 
         return err;
     }
 
+    if(err instanceof SimpleError && err.stack !== undefined) {
+        // reduce stack to just error and originating line
+        err.stack = err.stack.split('\n').slice(0, 2).join('\n');
+    }
+
     try {
 
         // @ts-ignore
@@ -1423,7 +1433,7 @@ export const parseRegex = (reg: RegExp, val: string): RegExResult => {
     const m = val.match(reg)
     return {
         matched: m !== null,
-        matches: m !== null ? m.slice(0) : [],
+        matches: m !== null ? m.slice(0).filter(x => x !== undefined) : [],
         global: [],
     }
 }
@@ -1439,11 +1449,11 @@ export const testMaybeStringRegex = (test: string, subject: string, defaultFlags
     return [reg.test(subject), reg.toString()];
 }
 
-export const isStrongSubredditState = (value: SubredditState | StrongSubredditState) => {
+export const isStrongSubredditState = (value: SubredditCriteria | StrongSubredditCriteria) => {
     return value.name === undefined || value.name instanceof RegExp;
 }
 
-export const asStrongSubredditState = (value: any): value is StrongSubredditState => {
+export const asStrongSubredditState = (value: any): value is StrongSubredditCriteria => {
     return isStrongSubredditState(value);
 }
 
@@ -1452,7 +1462,7 @@ export interface StrongSubredditStateOptions {
     generateDescription?: boolean
 }
 
-export const toStrongSubredditState = (s: SubredditState, opts?: StrongSubredditStateOptions): StrongSubredditState => {
+export const toStrongSubredditState = (s: SubredditCriteria, opts?: StrongSubredditStateOptions): StrongSubredditCriteria => {
     const {defaultFlags = 'i', generateDescription = false} = opts || {};
     const {name: nameValRaw, stateDescription, isUserProfile, ...rest} = s;
 
@@ -1479,14 +1489,14 @@ export const toStrongSubredditState = (s: SubredditState, opts?: StrongSubreddit
             nameReg = nameValRaw;
         }
     }
-    const strongState: StrongSubredditState = {
+    const strongState: StrongSubredditCriteria = {
         ...rest,
         name: nameReg
     };
 
     // if user provided a regex for "name" then add isUserProfile so we can do a SEPARATE check on the name specifically for user profile prefix
     // -- this way user can regex for a specific name but still filter by prefix
-    if(nameValOriginallyRegex) {
+    if(nameValOriginallyRegex && isUserProfile !== undefined) {
         strongState.isUserProfile = isUserProfile;
     }
 
@@ -1499,19 +1509,22 @@ export const toStrongSubredditState = (s: SubredditState, opts?: StrongSubreddit
     return strongState;
 }
 
-export const convertSubredditsRawToStrong = (x: (SubredditState | string), opts: StrongSubredditStateOptions): StrongSubredditState => {
+export const convertSubredditsRawToStrong = (x: (SubredditCriteria | string | StrongSubredditCriteria), opts: StrongSubredditStateOptions): StrongSubredditCriteria => {
     if (typeof x === 'string') {
         return toStrongSubredditState({name: x, stateDescription: x}, opts);
+    }
+    if(asStrongSubredditState(x)) {
+        return x;
     }
     return toStrongSubredditState(x, opts);
 }
 
-export async function readConfigFile(path: string, opts: any): Promise<[string?, ConfigFormat?]> {
-    const {log, throwOnNotFound = true} = opts;
+export async function readConfigFile(path: string, opts?: any): Promise<[string?, ConfigFormat?]> {
+    const {log, throwOnNotFound = true} = opts || {};
     let extensionHint: ConfigFormat | undefined;
-    const fileInfo = parse(path);
-    if(fileInfo.ext !== undefined) {
-        switch(fileInfo.ext) {
+    const fileInfo = pathUtil.parse(path);
+    if (fileInfo.ext !== undefined) {
+        switch (fileInfo.ext) {
             case '.json':
             case '.json5':
                 extensionHint = 'json';
@@ -1530,19 +1543,37 @@ export async function readConfigFile(path: string, opts: any): Promise<[string?,
         if (code === 'ENOENT') {
             if (throwOnNotFound) {
                 if (log) {
-                    log.warn('No file found at given path', {filePath: path});
+                    log.warn(`No file found at path: ${path}`, {filePath: path});
                 }
                 e.extension = extensionHint;
-                throw e;
+                const sError = new SimpleError(`No file found at path: ${path}`);
+                sError.code = e.code;
+                // @ts-ignore
+                sError.extension = extensionHint;
+                throw sError;
             } else {
                 return [];
             }
-        } else if (log) {
-            log.warn(`Encountered error while parsing file`, {filePath: path});
-            log.error(e);
+        } else if (code === 'EACCES') {
+            if (log) {
+                log.warn(`Unable to access file path due to permissions: ${path}`, {filePath: path});
+            }
+            e.extension = extensionHint;
+            const sError = new SimpleError(`Unable to access file path due to permissions: ${path}`);
+            sError.code = e.code;
+            // @ts-ignore
+            sError.extension = extensionHint;
+            throw sError;
+        } else {
+            const err = new ErrorWithCause(`Encountered error while parsing file at ${path}`, {cause: e})
+            if (log) {
+                log.error(e);
+            }
+            e.extension = extensionHint;
+            // @ts-ignore
+            err.extension = extensionHint;
+            throw err;
         }
-        e.extension = extensionHint;
-        throw e;
     }
 }
 
@@ -1550,32 +1581,39 @@ export async function readConfigFile(path: string, opts: any): Promise<[string?,
 //     return (item && typeof item === 'object' && !Array.isArray(item));
 // }
 
-export const fileOrDirectoryIsWriteable = async (location: string) => {
-    const pathInfo = parse(location);
+export const fileOrDirectoryIsWriteable = (location: string) => {
+    const pathInfo = pathUtil.parse(location);
+    const isDir = pathInfo.ext === '';
     try {
-        await promises.access(location, constants.R_OK | constants.W_OK);
+        accessSync(location, constants.R_OK | constants.W_OK);
         return true;
     } catch (err: any) {
         const {code} = err;
         if (code === 'ENOENT') {
             // file doesn't exist, see if we can write to directory in which case we are good
             try {
-                await promises.access(pathInfo.dir, constants.R_OK | constants.W_OK)
+                accessSync(pathInfo.dir, constants.R_OK | constants.W_OK)
                 // we can write to dir
                 return true;
             } catch (accessError: any) {
-                // also can't access directory :(
-                throw new SimpleError(`No file exists at ${location} and application does not have permission to write to that directory`);
+                if(accessError.code === 'EACCES') {
+                    // also can't access directory :(
+                    throw new SimpleError(`No ${isDir ? 'directory' : 'file'} exists at ${location} and application does not have permission to write to the parent directory`);
+                } else {
+                    throw new ErrorWithCause(`No ${isDir ? 'directory' : 'file'} exists at ${location} and application is unable to access the parent directory due to a system error`, {cause: accessError});
+                }
             }
+        } else if(code === 'EACCES') {
+            throw new SimpleError(`${isDir ? 'Directory' : 'File'} exists at ${location} but application does not have permission to write to it.`);
         } else {
-            throw new SimpleError(`File exists at ${location} but application does have permission to write to it.`);
+            throw new ErrorWithCause(`${isDir ? 'Directory' : 'File'} exists at ${location} but application is unable to access it due to a system error`, {cause: err});
         }
     }
 }
 
 export const overwriteMerge = (destinationArray: any[], sourceArray: any[], options: any): any[] => sourceArray;
 
-export const removeUndefinedKeys = (obj: any) => {
+export const removeUndefinedKeys = <T extends Record<string, any>>(obj: T): T | undefined => {
     let newObj: any = {};
     Object.keys(obj).forEach((key) => {
         if(Array.isArray(obj[key])) {
@@ -1691,21 +1729,12 @@ export const difference = (a: Array<any>, b: Array<any>) => {
     return Array.from(setMinus(a, b));
 }
 
-export const snooLogWrapper = (logger: Logger) => {
-    return {
-        warn: (...args: any[]) => logger.warn(args.slice(0, 2).join(' '), [args.slice(2)]),
-        debug: (...args: any[]) => logger.debug(args.slice(0, 2).join(' '), [args.slice(2)]),
-        info: (...args: any[]) => logger.info(args.slice(0, 2).join(' '), [args.slice(2)]),
-        trace: (...args: any[]) => logger.debug(args.slice(0, 2).join(' '), [args.slice(2)]),
-    }
-}
-
 /**
  * Cached activities lose type information when deserialized so need to check properties as well to see if the object is the shape of a Submission
  * */
 export const isSubmission = (value: any) => {
     try {
-        return value !== null && typeof value === 'object' && (value instanceof Submission || (value.name !== undefined && value.name.includes('t3_')) || value.domain !== undefined);
+        return value !== null && typeof value === 'object' && (value instanceof Submission || (value.name !== undefined && value.name.includes('t3_')));
     } catch (e) {
         return false;
     }
@@ -1810,9 +1839,14 @@ export function findLastIndex<T>(array: Array<T>, predicate: (value: T, index: n
     return -1;
 }
 
-export const parseRuleResultsToMarkdownSummary = (ruleResults: RuleResult[]): string => {
-    const results = ruleResults.map((y: any) => {
-        const {triggered, result, name, ...restY} = y;
+export const parseRuleResultsToMarkdownSummary = (ruleResults: RuleResultEntity[]): string => {
+    const results = ruleResults.map((y) => {
+        let name = y.premise.name;
+        const kind = y.premise.kind.name;
+        if(name === undefined) {
+            name = kind;
+        }
+        const {triggered, result, ...restY} = y;
         let t = triggeredIndicator(false);
         if(triggered === null) {
             t = 'Skipped';
@@ -1991,20 +2025,6 @@ export const pixelImageCompare = async (data1: ImageData, data2: ImageData): Pro
 //     };
 // }
 
-export const createHistoricalStatsDisplay = (data: HistoricalStats): HistoricalStatsDisplay => {
-    const display: any = {};
-    for(const [k, v] of Object.entries(data)) {
-        if(v instanceof Map) {
-            display[k] = v;
-            display[`${k}Total`] = Array.from(v.values()).reduce((acc, curr) => acc + curr, 0);
-        } else {
-            display[k] = v;
-        }
-    }
-
-    return display as HistoricalStatsDisplay;
-}
-
 /**
  * Determine if the state criteria being checked are
  * 1 ) expensive to compute or
@@ -2013,7 +2033,7 @@ export const createHistoricalStatsDisplay = (data: HistoricalStats): HistoricalS
  * If neither then do not cache results as the number of unique keys (sub-state) increases AT LEAST linearly taking up space (especially in memory cache)
  * when they are probably not necessary to begin with
  * */
-export const shouldCacheSubredditStateCriteriaResult = (state: SubredditState | StrongSubredditState): boolean => {
+export const shouldCacheSubredditStateCriteriaResult = (state: SubredditCriteria | StrongSubredditCriteria): boolean => {
     // currently there are no scenarios where we need to cache results
     // since only things computed from state are comparisons for properties already cached on subreddit object
     // and regexes for name which aren't that costly
@@ -2021,7 +2041,7 @@ export const shouldCacheSubredditStateCriteriaResult = (state: SubredditState | 
     return false;
 }
 
-export const subredditStateIsNameOnly = (state: SubredditState | StrongSubredditState): boolean => {
+export const subredditStateIsNameOnly = (state: SubredditCriteria | StrongSubredditCriteria): boolean => {
     const critCount = Object.entries(state).filter(([key, val]) => {
         return val !== undefined && !['name','stateDescription', 'isUserProfile'].includes(key);
     }).length;
@@ -2040,10 +2060,28 @@ export const escapeRegex = (val: string) => {
     return val.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
 }
 
-export const windowToActivityWindowCriteria = (window: (Duration | ActivityWindowType | ActivityWindowCriteria)): ActivityWindowCriteria => {
-    let crit: ActivityWindowCriteria;
+export const fetchToStrongHistoryType = (fetch?: ActivityType | 'submissions' | 'comments' | 'all' | 'overview') => {
+    const cleanFetch = fetch !== undefined ? fetch.trim().toLocaleLowerCase() : undefined;
 
-    if (isActivityWindowCriteria(window)) {
+    let trueFetch: AuthorHistoryType;
+
+    if(cleanFetch === undefined) {
+        trueFetch = 'overview';
+    } else if(['overview','all'].includes(cleanFetch)) {
+        trueFetch = 'overview'
+    } else if(['submissions','submission'].includes(cleanFetch)) {
+        trueFetch = 'submission';
+    } else {
+        trueFetch = 'comment';
+    }
+
+    return trueFetch;
+}
+
+export const windowConfigToWindowCriteria = (window: ActivityWindowConfig): ActivityWindowCriteria => {
+    let crit: FullActivityWindowConfig;
+
+    if (isActivityWindowConfig(window)) {
         crit = window;
     } else if (typeof window === 'number') {
         crit = {count: window};
@@ -2055,24 +2093,82 @@ export const windowToActivityWindowCriteria = (window: (Duration | ActivityWindo
         satisfyOn = 'any',
         count,
         duration,
-        subreddits: {
-            include = [],
-            exclude = [],
-        } = {},
+        subreddits,
+        submissionState,
+        commentState,
+        activityState,
+        filterOn,
+        debug,
+        fetch,
+        ...rest
     } = crit;
 
-    const includes = include.map(x => parseSubredditName(x).toLowerCase());
-    const excludes = exclude.map(x => parseSubredditName(x).toLowerCase());
-
-    return {
-        satisfyOn,
+    let opts: ActivityWindowCriteria = {
         count,
-        duration,
-        subreddits: {
-            include: includes,
-            exclude: excludes
+        duration: duration !== undefined ? parseDurationValToDuration(duration) : undefined,
+        satisfyOn,
+        fetch: fetch === undefined ? fetch : fetchToStrongHistoryType(fetch),
+        debug
+    };
+
+    if(filterOn !== undefined) {
+        const {pre, post} = filterOn;
+        opts.filterOn = {};
+        if(pre !== undefined) {
+            const {debug: preDebug = debug} = pre;
+            opts.filterOn.pre = {
+                ...historyFilterConfigToOptions(pre),
+                max: typeof pre.max === 'number' ? pre.max : parseDurationValToDuration(pre.max),
+                debug: preDebug,
+            }
+        }
+        if(post !== undefined) {
+            const {debug: postDebug = debug} = post;
+            opts.filterOn.post = {
+                ...historyFilterConfigToOptions(post),
+                debug: postDebug
+            }
         }
     }
+
+    if(opts.filterOn?.post === undefined) {
+        const potentialPost = removeUndefinedKeys(historyFilterConfigToOptions({subreddits, submissionState, commentState, activityState}));
+        if(potentialPost !== undefined) {
+            if(opts.filterOn === undefined) {
+                opts.filterOn = {
+                    post: {
+                        ...potentialPost,
+                        debug,
+                    }
+                }
+            } else {
+                opts.filterOn.post = {
+                    ...potentialPost,
+                    debug
+                };
+            }
+        }
+    }
+
+    return {...rest, ...opts};
+}
+
+export const historyFilterConfigToOptions = (val: HistoryFiltersConfig): HistoryFiltersOptions => {
+    const opts: HistoryFiltersOptions = {};
+    if(val.subreddits !== undefined) {
+        opts.subreddits = buildSubredditFilter(val.subreddits);
+    }
+    if(val.activityState !== undefined) {
+        opts.activityState = buildFilter(val.activityState);
+    }
+    if(val.commentState !== undefined) {
+        opts.commentState = buildFilter(val.commentState);
+    }
+    if(val.submissionState !== undefined) {
+        opts.submissionState = buildFilter(val.submissionState);
+    }
+
+    return opts;
 }
 
 export const searchAndReplace = (val: string, ops: SearchAndReplaceRegExp[]) => {
@@ -2180,6 +2276,16 @@ export const likelyJson5 = (str: string): boolean => {
     return validStart;
 }
 
+export const hashString = (val: any): string => {
+    const hash = createHash('sha256');
+    if (typeof val !== 'string') {
+        hash.update(JSON.stringify(val));
+    } else {
+        hash.update(val);
+    }
+    return hash.digest('hex');
+}
+
 const defaultScanOptions = {
     COUNT: '100',
     MATCH: '*'
@@ -2215,53 +2321,173 @@ export async function* redisScanIterator(client: any, options: any = {}): AsyncI
     } while (cursor !== '0');
 }
 
-export const mergeFilters = (objectConfig: any, filterDefs: FilterCriteriaDefaults | undefined): [AuthorOptions, TypedActivityStates] => {
-    const {authorIs: aisVal = {}, itemIs: iisVal = []} = objectConfig || {};
-    const authorIs = aisVal as AuthorOptions;
-    const itemIs = iisVal as TypedActivityStates;
+export const mergeFilters = (objectConfig: RunnableBaseJson, filterDefs: FilterCriteriaDefaults | undefined): [AuthorOptions, ItemOptions] => {
+    const {authorIs: aisVal = {}, itemIs: iisVal = {}} = objectConfig || {};
+    const authorIs = buildFilter(aisVal as MinimalOrFullFilter<AuthorCriteria>);
+    const itemIs = buildFilter(iisVal as MinimalOrFullFilter<TypedActivityState>);
 
     const {
         authorIsBehavior = 'merge',
         itemIsBehavior = 'merge',
         authorIs: authorIsDefault = {},
-        itemIs: itemIsDefault = []
+        itemIs: itemIsDefault = {}
     } = filterDefs || {};
 
-    let derivedAuthorIs: AuthorOptions = authorIsDefault;
+    let derivedAuthorIs: AuthorOptions = buildFilter(authorIsDefault);
     if (authorIsBehavior === 'merge') {
         derivedAuthorIs = merge.all([authorIs, authorIsDefault], {arrayMerge: removeFromSourceIfKeysExistsInDestination});
     } else if (Object.keys(authorIs).length > 0) {
         derivedAuthorIs = authorIs;
     }
 
-    let derivedItemIs: TypedActivityStates = itemIsDefault;
+    let derivedItemIs: ItemOptions = buildFilter(itemIsDefault);
     if (itemIsBehavior === 'merge') {
-        derivedItemIs = [...itemIs, ...itemIsDefault];
-    } else if (itemIs.length > 0) {
+        derivedItemIs = merge.all([itemIs, itemIsDefault], {arrayMerge: removeFromSourceIfKeysExistsInDestination});
+    } else if (Object.keys(itemIs).length > 0) {
         derivedItemIs = itemIs;
     }
 
     return [derivedAuthorIs, derivedItemIs];
 }
 
+export const buildFilter = (filterVal: MinimalOrFullMaybeAnonymousFilter<AuthorCriteria | TypedActivityState | ActivityState>): FilterOptions<AuthorCriteria | TypedActivityState | ActivityState> => {
+    if(Array.isArray(filterVal)) {
+        const named = filterVal.map(x => normalizeCriteria(x));
+        return {
+            include: named,
+            excludeCondition: 'OR',
+            exclude: [],
+        }
+    } else {
+        const {
+            include = [],
+            exclude = [],
+            excludeCondition,
+        } = filterVal;
+        const namedInclude = include.map(x => normalizeCriteria(x));
+        const namedExclude = exclude.map(x => normalizeCriteria(x))
+        return {
+            excludeCondition,
+            include: namedInclude,
+            exclude: namedExclude,
+        }
+    }
+}
+
+// export const buildSubredditFilter = <T extends SubredditState>(filterVal: MinimalSingleOrFullFilter<T>): FilterOptions<T> => {
+
+export const buildSubredditFilter = (filterVal: FilterOptionsJson<SubredditCriteria>): FilterOptions<StrongSubredditCriteria> => {
+    if(Array.isArray(filterVal)) {
+        return {
+            include: filterVal
+                .map(x => normalizeSubredditState(x))
+                .map(x => ({
+                    ...x,
+                    criteria: convertSubredditsRawToStrong(x.criteria, defaultStrongSubredditCriteriaOptions)
+                })),
+            excludeCondition: 'OR',
+            exclude: [],
+        }
+    } else {
+        const {
+            include = [],
+            exclude = [],
+            excludeCondition,
+        } = filterVal;
+        return {
+            excludeCondition,
+            include: include.map(x => normalizeSubredditState(x))
+                .map(x => ({
+                    ...x,
+                    criteria: convertSubredditsRawToStrong(x.criteria, defaultStrongSubredditCriteriaOptions)
+                })),
+            exclude: exclude
+                .map(x => normalizeSubredditState(x))
+                .map(x => ({
+                    ...x,
+                    criteria: convertSubredditsRawToStrong(x.criteria, defaultStrongSubredditCriteriaOptions)
+                }))
+        }
+    }
+}
+
+export const normalizeSubredditState = <T extends SubredditCriteria>(options: MaybeAnonymousOrStringCriteria<T>): NamedCriteria<T> => {
+    let name: string | undefined;
+    let criteria: T;
+
+    if (asNamedCriteria(options)) {
+        criteria = options.criteria;
+        name = options.name;
+    } else if(typeof options === 'string') {
+        criteria = {name: options} as T;
+    } else {
+        criteria = options;
+    }
+
+    return {
+        name,
+        criteria
+    };
+}
+
+export const normalizeCriteria = <T extends AuthorCriteria | TypedActivityState | ActivityState>(options: MaybeAnonymousCriteria<T>): NamedCriteria<T> => {
+
+    let name: string | undefined;
+    let criteria: T;
+
+    if (asNamedCriteria(options)) {
+        criteria = options.criteria;
+        name = options.name;
+    } else {
+        criteria = options;
+    }
+
+    if (asAuthorCriteria(criteria)) {
+        if(criteria.flairCssClass !== undefined) {
+            criteria.flairCssClass = typeof criteria.flairCssClass === 'string' ? [criteria.flairCssClass] : criteria.flairCssClass;
+        }
+        if(criteria.flairText !== undefined) {
+            criteria.flairText = typeof criteria.flairText === 'string' ? [criteria.flairText] : criteria.flairText;
+        }
+        if(criteria.description !== undefined) {
+            criteria.description = Array.isArray(criteria.description) ? criteria.description : [criteria.description];
+        }
+    }
+
+    return {
+        name,
+        criteria
+    };
+}
+
+export const asNamedCriteria = <T>(val: MaybeAnonymousCriteria<T> | undefined): val is NamedCriteria<T> => {
+    if(val === undefined || typeof val === 'string') {
+        return false;
+    }
+    return 'criteria' in val;
+}
+
 export const formatFilterData = (result: (RunResult | CheckSummary | RuleResult | ActionResult)) => {
 
-    const formattedResult: any = {};
+    const formattedResult: any = {
+        authorIs: undefined,
+        itemIs: undefined
+    };
 
     const {authorIs, itemIs} = result;
 
-    if (authorIs !== undefined) {
+    if (authorIs !== undefined && authorIs !== null) {
         formattedResult.authorIs = {
             ...authorIs,
             passed: triggeredIndicator(authorIs.passed),
-            criteriaResults: authorIs.criteriaResults.map(x => filterCriteriaSummary(x))
+            criteriaResults: authorIs.criteriaResults.map(x => buildFilterCriteriaSummary(x))
         }
     }
-    if (itemIs !== undefined) {
+    if (itemIs !== undefined && itemIs !== null) {
         formattedResult.itemIs = {
             ...itemIs,
             passed: triggeredIndicator(itemIs.passed),
-            criteriaResults: itemIs.criteriaResults.map(x => filterCriteriaSummary(x))
+            criteriaResults: itemIs.criteriaResults.map(x => buildFilterCriteriaSummary(x))
         }
     }
 
@@ -2296,7 +2522,7 @@ export const parseDurationValToDuration = (val: DurationVal): Duration => {
     return duration;
 }
 
-export const generateItemFilterHelpers = (stateCriteria: TypedActivityState): [ItemCritPropHelper, RequiredItemCrit] => {
+export const generateItemFilterHelpers = (stateCriteria: TypedActivityState, include: boolean): [ItemCritPropHelper, RequiredItemCrit] => {
     const definedStateCriteria = (removeUndefinedKeys(stateCriteria) as RequiredItemCrit);
 
     if(definedStateCriteria === undefined) {
@@ -2307,7 +2533,7 @@ export const generateItemFilterHelpers = (stateCriteria: TypedActivityState): [I
         const key = (k as keyof (SubmissionState & CommentState));
         acc[key] = {
             property: key,
-            behavior: 'include',
+            behavior: include ? 'include' : 'exclude',
         };
         return acc;
     }, {});
@@ -2320,11 +2546,12 @@ export const isCommentState = (state: TypedActivityState): state is CommentState
 }
 const DISPATCH_REGEX: RegExp = /^dispatch:/i;
 const POLL_REGEX: RegExp = /^poll:/i;
+const USER_REGEX: RegExp = /^user:/i;
 export const asActivitySource = (val: string): val is ActivitySource => {
     if(['dispatch','poll','user'].some(x => x === val)) {
         return true;
     }
-    return DISPATCH_REGEX.test(val) || POLL_REGEX.test(val);
+    return DISPATCH_REGEX.test(val) || POLL_REGEX.test(val) || USER_REGEX.test(val);
 }
 
 export const strToActivitySource = (val: string): ActivitySource => {
@@ -2332,7 +2559,219 @@ export const strToActivitySource = (val: string): ActivitySource => {
     if (asActivitySource(cleanStr)) {
         return cleanStr;
     }
-    throw new SimpleError(`'${cleanStr}' is not a valid ActivitySource. Must be one of: dispatch, dispatch:[identifier], poll, poll:[identifier], user`);
+    throw new SimpleError(`'${cleanStr}' is not a valid ActivitySource. Must be one of: dispatch, dispatch:[identifier], poll, poll:[identifier], user, or user:[identifier]`);
+}
+
+export const prefixToReddThingType = (prefix: string): FullNameTypes => {
+    switch (prefix) {
+        case 't1':
+            return 'comment';
+        case 't2':
+            return 'user';
+        case 't3':
+            return 'submission';
+        case 't4':
+            return 'message';
+        case 't5':
+            return 'subreddit';
+        default:
+            throw new Error(`unrecognized prefix ${prefix}`);
+    }
+}
+
+export const redditThingTypeToPrefix = (type: FullNameTypes): string => {
+    switch (type) {
+        case 'comment':
+            return 't1';
+        case 'user':
+            return 't2';
+        case 'submission':
+            return 't3';
+        case 'message':
+            return 't4';
+        case 'subreddit':
+            return 't5';
+        default:
+            throw new Error(`unrecognized prefix ${type}`);
+    }
+}
+
+export const REDDIT_FULLNAME_REGEX: RegExp = /^(?<prefix>t\d)_(?<id>.+)/;
+export const parseRedditFullname = (str: string): RedditThing | undefined => {
+    const cleanStr = str.trim();
+    if (cleanStr.length === 0) {
+        throw new Error('Fullname cannot be empty or only whitespace');
+    }
+    const matches = cleanStr.match(REDDIT_FULLNAME_REGEX);
+    if (matches === null) {
+        return undefined;
+    }
+    const groups = matches.groups as any;
+    return {
+        val: cleanStr,
+        type: prefixToReddThingType(groups.prefix as string),
+        prefix: groups.prefix as string,
+        id: groups.id as string
+    }
+}
+
+export const activityDispatchConfigToDispatch = (config: ActivityDispatchConfig, activity: (Comment | Submission), type: ActivitySourceTypes, {action, dryRun}: {action?: string, dryRun?: boolean} = {}): ActivityDispatch => {
+    let tolerantVal: boolean | Duration | undefined;
+    if (config.tardyTolerant !== undefined) {
+        if (typeof config.tardyTolerant === 'boolean') {
+            tolerantVal = config.tardyTolerant;
+        } else {
+            tolerantVal = parseDurationValToDuration(config.tardyTolerant);
+        }
+    }
+    return {
+        ...config,
+        delay: parseDurationValToDuration(config.delay),
+        tardyTolerant: tolerantVal,
+        queuedAt: dayjs().utc(),
+        id: nanoid(16),
+        activity,
+        action,
+        dryRun,
+        type,
+        author: getActivityAuthorName(activity.author),
+    }
+}
+
+/**
+ * @see https://github.com/typeorm/typeorm/issues/873#issuecomment-502294597
+ */
+export const isNullOrUndefined = <T>(obj: T | null | undefined):obj is null | undefined => {
+    return typeof obj === "undefined" || obj === null
+}
+
+export const castToBool = (val: any, allowNumbers = true): boolean | undefined => {
+    if (val === null || val === undefined) {
+        return undefined;
+    }
+    if (typeof val === 'boolean') {
+        return val;
+    }
+    if (typeof val === 'number' && allowNumbers) {
+        if (val === 1) {
+            return true;
+        }
+        if (val === 0) {
+            return false;
+        }
+        return undefined;
+    } else if (typeof val === 'string') {
+        if (val.trim() === '') {
+            return undefined;
+        }
+        if(val.trim().toLocaleLowerCase() === 'true') {
+            return true;
+        }
+        if(val.trim().toLocaleLowerCase() === 'false') {
+            return false;
+        }
+        if(allowNumbers) {
+            if(Number.parseInt(val.trim()) === 1) {
+                return true;
+            }
+            if(Number.parseInt(val.trim()) === 0) {
+                return false;
+            }
+        }
+        return undefined;
+    }
+    return undefined;
+}
+
+export const resolvePath = (pathVal: string, relativeRoot: string) => {
+    const pathInfo = pathUtil.parse(pathVal);
+    // if path looks absolute then just resolve any relative parts and return as-is
+    if(pathInfo.root !== '') {
+        return pathUtil.resolve(pathVal);
+    }
+    // if there is no root then resolve it with relative root
+    if(pathInfo.dir === '') {
+        return pathUtil.resolve(relativeRoot, './', pathVal);
+    }
+    return pathUtil.resolve(relativeRoot, pathVal);
+}
+
+export const resolvePathFromEnvWithRelative = (pathVal: any, relativeRoot: string, defaultVal?: string) => {
+    if (pathVal === undefined || pathVal === null) {
+        return defaultVal;
+    } else if (typeof pathVal === 'string') {
+        if (pathVal.trim() === '') {
+            return defaultVal;
+        }
+        return resolvePath(pathVal.trim(), relativeRoot);
+    }
+    return defaultVal;
+}
+
+export const asAuthorCriteria = (val: any): val is AuthorCriteria => {
+    if (typeof val === 'object' && val !== null) {
+        const keys = Object.keys(val);
+        return intersect(keys, authorCriteriaProperties).length > 0;
+    }
+    return false;
+}
+
+export const criteriaPassWithIncludeBehavior = (passes: boolean, include: boolean) => {
+    // if inner statement IS TRUE then criteria FAILED
+    // so to get pass result reverse inner statement result
+    return !(
+        // DOES NOT PASS and INCLUDE => true
+        (include && !passes)
+        ||  // OR
+        // DOES PASS and DO NOT INCLUDE => true
+        (!include && passes)
+    );
+}
+
+export const frequencyEqualOrLargerThanMin = (val: StatisticFrequency, minFrequency: StatisticFrequencyOption): boolean => {
+    if(!minFrequency) {
+        return true;
+    }
+    return statFrequencies.indexOf(minFrequency) <= statFrequencies.indexOf(val);
+}
+
+export const asPostBehaviorOptionConfig = (val: any): val is PostBehaviorOptionConfig => {
+    if (null === val) {
+        return false;
+    }
+    if (typeof val === 'object') {
+        return 'recordTo' in val || 'behavior' in val;
+    }
+    return false;
+}
+
+export const filterByTimeRequirement = (satisfiedEndtime: Dayjs, listSlice: SnoowrapActivity[]): [boolean, SnoowrapActivity[]] => {
+    const truncatedItems: SnoowrapActivity[] = listSlice.filter((x) => {
+        const utc = x.created_utc * 1000;
+        const itemDate = dayjs(utc);
+        // @ts-ignore
+        return satisfiedEndtime.isBefore(itemDate);
+    });
+
+    return [truncatedItems.length !== listSlice.length, truncatedItems]
+}
+
+export const between = (val: number, a: number, b: number, inclusiveMin: boolean = false, inclusiveMax: boolean = false): boolean => {
+    var min = Math.min(a, b),
+        max = Math.max(a, b);
+
+    if(!inclusiveMin && !inclusiveMax) {
+        return val > min && val < max;
+    }
+    if(inclusiveMin && inclusiveMax) {
+        return val >= min && val <= max;
+    }
+    if(inclusiveMin) {
+        return val >= min && val < max;
+    }
+
+    // inclusive max
+    return val > min && val <= max;
 }
 
 export const toModNoteLabel = (val: string): ModNoteLabel => {

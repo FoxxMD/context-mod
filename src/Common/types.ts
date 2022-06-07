@@ -17,28 +17,13 @@ import {MessageActionJson} from "../Action/MessageAction";
 import {RepostRuleJSONConfig} from "../Rule/RepostRule";
 import {DispatchActionJson} from "../Action/DispatchAction";
 import {CancelDispatchActionJson} from "../Action/CancelDispatchAction";
-import {SafeDictionary} from "ts-essentials";
-import {FilterCriteriaPropertyResult} from "./interfaces";
-import {AuthorCriteria} from "../Author/Author";
+import {ContributorActionJson} from "../Action/ContributorAction";
+import {SentimentRuleJSONConfig} from "../Rule/SentimentRule";
 import {ModNoteActionJson} from "../Action/ModNoteAction";
 
-export type RuleJson = RecentActivityRuleJSONConfig | RepeatActivityJSONConfig | AuthorRuleJSONConfig | AttributionJSONConfig | HistoryJSONConfig | RegexRuleJSONConfig | RepostRuleJSONConfig | string;
-export type RuleObjectJson = Exclude<RuleJson, string>
+export type RuleObjectJsonTypes = RecentActivityRuleJSONConfig | RepeatActivityJSONConfig | AuthorRuleJSONConfig | AttributionJSONConfig | HistoryJSONConfig | RegexRuleJSONConfig | RepostRuleJSONConfig | SentimentRuleJSONConfig
 
-export type ActionJson = CommentActionJson | FlairActionJson | ReportActionJson | LockActionJson | RemoveActionJson | ApproveActionJson | BanActionJson | UserNoteActionJson | MessageActionJson | UserFlairActionJson | DispatchActionJson | CancelDispatchActionJson | ModNoteActionJson | string;
-export type ActionObjectJson = Exclude<ActionJson, string>;
-
-// borrowed from https://github.com/jabacchetta/set-random-interval/blob/master/src/index.ts
-export type SetRandomInterval = (
-    intervalFunction: () => void,
-    minDelay: number,
-    maxDelay: number,
-) => { clear: () => void };
-
-export type ConfigFormat = 'json' | 'yaml';
-
-export type AuthorCritPropHelper = SafeDictionary<FilterCriteriaPropertyResult<AuthorCriteria>, keyof AuthorCriteria>;
-export type RequiredAuthorCrit = Required<AuthorCriteria>;
+export type ActionJson = CommentActionJson | FlairActionJson | ReportActionJson | LockActionJson | RemoveActionJson | ApproveActionJson | BanActionJson | UserNoteActionJson | MessageActionJson | UserFlairActionJson | DispatchActionJson | CancelDispatchActionJson | ContributorActionJson | ModNoteActionJson | string;
 
 export type ModNoteLabel =
     'BOT_BAN'

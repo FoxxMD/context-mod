@@ -20,6 +20,8 @@ export class CMInstance implements CMInterface {
     subreddits: string[] = [];
     bots: BotInstance[] = [];
     error?: string | undefined;
+    ranMigrations: boolean = false;
+    migrationBlocker?: string
     host: string;
     secret: string;
 
@@ -67,7 +69,9 @@ export class CMInstance implements CMInterface {
             bots: this.bots,
             error: this.error,
             host: this.host,
-            secret: this.secret
+            secret: this.secret,
+            ranMigrations: this.ranMigrations,
+            migrationBlocker: this.migrationBlocker,
         }
     }
 
@@ -85,6 +89,8 @@ export class CMInstance implements CMInterface {
     updateFromHeartbeat = (resp: HeartbeatResponse, otherFriendlies: string[] = []) => {
         this.operators = resp.operators ?? [];
         this.operatorDisplay = resp.operatorDisplay ?? '';
+        this.ranMigrations = resp.ranMigrations;
+        this.migrationBlocker = resp.migrationBlocker;
 
         const fr = resp.friendly;
         if (fr !== undefined) {
@@ -96,6 +102,7 @@ export class CMInstance implements CMInterface {
         }
 
         this.subreddits = resp.subreddits;
+        //@ts-ignore
         this.bots = resp.bots.map(x => ({...x, instance: this}));
     }
 

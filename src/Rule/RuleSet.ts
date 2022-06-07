@@ -1,14 +1,17 @@
-import {IRule, Triggerable, Rule, RuleJSONConfig, RuleResult, RuleSetResult} from "./index";
+import {IRule, Triggerable, Rule, RuleJSONConfig, StructuredRuleJson} from "./index";
 import Snoowrap, {Comment, Submission} from "snoowrap";
 import {ruleFactory} from "./RuleFactory";
 import {createAjvFactory, mergeArr} from "../util";
 import {Logger} from "winston";
-import {JoinCondition, JoinOperands} from "../Common/interfaces";
+import {JoinCondition, RuleResult, RuleSetResult} from "../Common/interfaces";
 import * as RuleSchema from '../Schema/Rule.json';
 import Ajv from 'ajv';
-import {RuleJson, RuleObjectJson} from "../Common/types";
 import {SubredditResources} from "../Subreddit/SubredditResources";
 import {runCheckOptions} from "../Subreddit/Manager";
+import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
+import {RuleSetResultEntity} from "../Common/Entities/RuleSetResultEntity";
+import {JoinOperands} from "../Common/Infrastructure/Atomic";
+import {RuleJson, RuleObjectJson, StructuredRuleObjectJson} from "../Common/Infrastructure/RuleShapes";
 
 export class RuleSet implements IRuleSet {
     rules: Rule[] = [];
@@ -26,7 +29,7 @@ export class RuleSet implements IRuleSet {
             } else {
                 const valid = ajv.validate(RuleSchema, r);
                 if (valid) {
-                    this.rules.push(ruleFactory(r as RuleJSONConfig, logger, options.subredditName, options.resources, options.client));
+                    this.rules.push(ruleFactory(r, logger, options.subredditName, options.resources, options.client));
                 } else {
                     this.logger.warn('Could not build rule because of JSON errors', {}, {errors: ajv.errors, obj: r});
                 }
@@ -34,11 +37,15 @@ export class RuleSet implements IRuleSet {
         }
     }
 
-    async run(item: Comment | Submission, existingResults: RuleResult[] = [], options: runCheckOptions): Promise<[boolean, RuleSetResult]> {
-        let results: RuleResult[] = [];
+    async run(item: Comment | Submission, existingResults: RuleResultEntity[] = [], options: runCheckOptions): Promise<[boolean, RuleSetResult]> {
+        let results: RuleResultEntity[] = [];
         let runOne = false;
+        const combinedResults = [...existingResults];
         for (const r of this.rules) {
-            const combinedResults = [...existingResults, ...results];
+            if(results.length > 0) {
+                combinedResults.push(results.slice(results.length - 1)[0]);
+            }
+            //const combinedResults = [...existingResults, ...results];
             const [passed, result] = await r.run(item, combinedResults, options);
             //results = results.concat(determineNewResults(combinedResults, result));
             results.push(result);
@@ -67,13 +74,21 @@ export class RuleSet implements IRuleSet {
         return [true, this.generateResultSet(true, results)];
     }
 
-    generateResultSet(triggered: boolean, results: RuleResult[]): RuleSetResult {
+    generateResultSet(triggered: boolean, results: RuleResultEntity[]): RuleSetResult {
         return {
             results,
             triggered,
             condition: this.condition
         };
     }
+
+    // generateResultSet(triggered: boolean, results: RuleResultEntity[]): RuleSetResult {
+    //     return new RuleSetResultEntity({
+    //         triggered,
+    //         condition: this.condition,
+    //         ruleResults: results
+    //     });
+    // }
 }
 
 export interface IRuleSet extends JoinCondition {
@@ -84,7 +99,7 @@ export interface IRuleSet extends JoinCondition {
 }
 
 export interface RuleSetOptions extends IRuleSet {
-    rules: Array<IRule | RuleJSONConfig>,
+    rules: Array<StructuredRuleObjectJson>,
     logger: Logger
     subredditName: string
     resources: SubredditResources
@@ -108,4 +123,8 @@ export interface RuleSetObjectJson extends RuleSetJson {
 
 export const isRuleSetJSON = (obj: object): obj is RuleSetJson => {
     return (obj as RuleSetJson).rules !== undefined;
+}
+
+export const isRuleSet = (obj: object): obj is RuleSet => {
+    return (obj as RuleSet).rules !== undefined;
 }

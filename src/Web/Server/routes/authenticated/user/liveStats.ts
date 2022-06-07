@@ -68,17 +68,15 @@ const liveStats = () => {
                         comments: acc.checks.comments + curr.checks.comments,
                     },
                     historical: {
-                        allTime: {
-                            eventsCheckedTotal: acc.historical.allTime.eventsCheckedTotal + curr.stats.historical.allTime.eventsCheckedTotal,
-                            eventsActionedTotal: acc.historical.allTime.eventsActionedTotal + curr.stats.historical.allTime.eventsActionedTotal,
-                            checksRunTotal: acc.historical.allTime.checksRunTotal + curr.stats.historical.allTime.checksRunTotal,
-                            checksFromCacheTotal: acc.historical.allTime.checksFromCacheTotal + curr.stats.historical.allTime.checksFromCacheTotal,
-                            checksTriggeredTotal: acc.historical.allTime.checksTriggeredTotal + curr.stats.historical.allTime.checksTriggeredTotal,
-                            rulesRunTotal: acc.historical.allTime.rulesRunTotal + curr.stats.historical.allTime.rulesRunTotal,
-                            rulesCachedTotal: acc.historical.allTime.rulesCachedTotal + curr.stats.historical.allTime.rulesCachedTotal,
-                            rulesTriggeredTotal: acc.historical.allTime.rulesTriggeredTotal + curr.stats.historical.allTime.rulesTriggeredTotal,
-                            actionsRunTotal: acc.historical.allTime.actionsRunTotal + curr.stats.historical.allTime.actionsRunTotal,
-                        }
+                        eventsCheckedTotal: acc.historical.eventsCheckedTotal + curr.stats.historical.eventsCheckedTotal,
+                        eventsActionedTotal: acc.historical.eventsActionedTotal + curr.stats.historical.eventsActionedTotal,
+                        checksRunTotal: acc.historical.checksRunTotal + curr.stats.historical.checksRunTotal,
+                        checksFromCacheTotal: acc.historical.checksFromCacheTotal + curr.stats.historical.checksFromCacheTotal,
+                        checksTriggeredTotal: acc.historical.checksTriggeredTotal + curr.stats.historical.checksTriggeredTotal,
+                        rulesRunTotal: acc.historical.rulesRunTotal + curr.stats.historical.rulesRunTotal,
+                        rulesCachedTotal: acc.historical.rulesCachedTotal + curr.stats.historical.rulesCachedTotal,
+                        rulesTriggeredTotal: acc.historical.rulesTriggeredTotal + curr.stats.historical.rulesTriggeredTotal,
+                        actionsRunTotal: acc.historical.actionsRunTotal + curr.stats.historical.actionsRunTotal,
                     },
                     maxWorkers: acc.maxWorkers + curr.maxWorkers,
                     subMaxWorkers: acc.subMaxWorkers + curr.subMaxWorkers,
@@ -94,17 +92,15 @@ const liveStats = () => {
                     comments: 0,
                 },
                 historical: {
-                    allTime: {
-                        eventsCheckedTotal: 0,
-                        eventsActionedTotal: 0,
-                        checksRunTotal: 0,
-                        checksFromCacheTotal: 0,
-                        checksTriggeredTotal: 0,
-                        rulesRunTotal: 0,
-                        rulesCachedTotal: 0,
-                        rulesTriggeredTotal: 0,
-                        actionsRunTotal: 0,
-                    }
+                    eventsCheckedTotal: 0,
+                    eventsActionedTotal: 0,
+                    checksRunTotal: 0,
+                    checksFromCacheTotal: 0,
+                    checksTriggeredTotal: 0,
+                    rulesRunTotal: 0,
+                    rulesCachedTotal: 0,
+                    rulesTriggeredTotal: 0,
+                    actionsRunTotal: 0,
                 },
                 maxWorkers: 0,
                 subMaxWorkers: 0,
@@ -140,6 +136,9 @@ const liveStats = () => {
                 acc[curr].missPercent = `${formatNumber(per, {toFixed: 0})}%`;
                 acc[curr].identifierAverageHit = formatNumber(acc[curr].identifierAverageHit);
                 acc[curr].averageTimeBetweenHits = formatNumber(acc[curr].averageTimeBetweenHits)
+
+                delete acc[curr].requestTimestamps;
+                delete acc[curr].identifierRequestCount;
                 return acc;
             }, cumRaw);
             const cacheReq = subManagerData.reduce((acc, curr) => acc + curr.stats.cache.totalRequests, 0);
@@ -219,7 +218,7 @@ const liveStats = () => {
             // getting specific subreddit stats
             const sd = {
                 name: manager.displayLabel,
-                botState: manager.botState,
+                botState: manager.managerState,
                 eventsState: manager.eventsState,
                 queueState: manager.queueState,
                 indicator: 'gray',
@@ -252,9 +251,9 @@ const liveStats = () => {
             };
             // TODO replace indicator data with js on client page
             let indicator;
-            if (manager.botState.state === RUNNING && manager.queueState.state === RUNNING && manager.eventsState.state === RUNNING) {
+            if (manager.managerState.state === RUNNING && manager.queueState.state === RUNNING && manager.eventsState.state === RUNNING) {
                 indicator = 'green';
-            } else if (manager.botState.state === STOPPED && manager.queueState.state === STOPPED && manager.eventsState.state === STOPPED) {
+            } else if (manager.managerState.state === STOPPED && manager.queueState.state === STOPPED && manager.eventsState.state === STOPPED) {
                 indicator = 'red';
             } else {
                 indicator = 'yellow';

@@ -2,7 +2,7 @@
 
 ContextMod supports comparing image content, for the purpose of detecting duplicates, with two different but complimentary systems. Image comparison behavior is available for the following rules:
 
-* [Recent Activity](/docs/examples/recentActivity)
+* [Recent Activity](/docs/subreddit/components/recentActivity)
 * Repeat Activity (In-progress)
 
 To enable comparisons reference the example below (at the top-level of your rule) and configure as needed:

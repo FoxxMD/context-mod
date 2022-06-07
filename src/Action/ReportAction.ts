@@ -3,8 +3,10 @@ import Action from "./index";
 import Snoowrap, {Comment, Submission} from "snoowrap";
 import {truncateStringToLength} from "../util";
 import {renderContent} from "../Utils/SnoowrapUtils";
-import {RuleResult} from "../Rule";
-import {ActionProcessResult, RichContent} from "../Common/interfaces";
+import {ActionProcessResult, RichContent, RuleResult} from "../Common/interfaces";
+import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
+import {runCheckOptions} from "../Subreddit/Manager";
+import {ActionTypes} from "../Common/Infrastructure/Atomic";
 
 // https://www.reddit.com/dev/api/oauth#POST_api_report
 // denotes 100 characters maximum
@@ -19,12 +21,12 @@ export class ReportAction extends Action {
         this.content = options.content || '';
     }
 
-    getKind() {
-        return 'Report';
+    getKind(): ActionTypes {
+        return 'report';
     }
 
-    async process(item: Comment | Submission, ruleResults: RuleResult[], runtimeDryrun?: boolean): Promise<ActionProcessResult> {
-        const dryRun = runtimeDryrun || this.dryRun;
+    async process(item: Comment | Submission, ruleResults: RuleResultEntity[], options: runCheckOptions): Promise<ActionProcessResult> {
+        const dryRun = this.getRuntimeAwareDryrun(options);
         const content = await this.resources.getContent(this.content, item.subreddit);
         const renderedContent = await renderContent(content, item, ruleResults, this.resources.userNotes);
         this.logger.verbose(`Contents:\r\n${renderedContent}`);
@@ -36,6 +38,8 @@ export class ReportAction extends Action {
             // due to reddit not updating this in response (maybe)?? just increment stale activity
             item.num_reports++;
             await this.resources.resetCacheForItem(item);
+            // add to recent so we ignore activity when/if it is discovered by polling
+            await this.resources.setRecentSelf(item);
             touchedEntities.push(item);
         }
 
@@ -45,6 +49,12 @@ export class ReportAction extends Action {
             result: truncatedContent,
             touchedEntities
         };
+    }
+
+    protected getSpecificPremise(): object {
+        return {
+            content: this.content
+        }
     }
 }
 

@@ -1,18 +1,24 @@
 import {ActionJson, ActionConfig, ActionOptions} from "./index";
 import Action from "./index";
 import Snoowrap, {Comment, Submission} from "snoowrap";
-import {RuleResult} from "../Rule";
 import {activityIsRemoved} from "../Utils/SnoowrapUtils";
-import {ActionProcessResult, ActionTarget, ActivityDispatchConfig, InclusiveActionTarget} from "../Common/interfaces";
+import {
+    ActionProcessResult,
+    ActivityDispatchConfig,
+    RuleResult
+} from "../Common/interfaces";
 import dayjs from "dayjs";
 import {isSubmission, parseDurationValToDuration} from "../util";
+import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
+import {runCheckOptions} from "../Subreddit/Manager";
+import {ActionTarget, ActionTypes, InclusiveActionTarget} from "../Common/Infrastructure/Atomic";
 
 export class CancelDispatchAction extends Action {
     identifiers?: (string | null)[];
     targets: InclusiveActionTarget[];
 
-    getKind() {
-        return 'Cancel Dispatch';
+    getKind(): ActionTypes {
+        return 'cancelDispatch';
     }
 
     constructor(options: CancelDispatchOptions) {
@@ -29,8 +35,9 @@ export class CancelDispatchAction extends Action {
         this.targets = !Array.isArray(target) ? [target] : target;
     }
 
-    async process(item: Comment | Submission, ruleResults: RuleResult[], runtimeDryrun?: boolean): Promise<ActionProcessResult> {
-        const dryRun = runtimeDryrun || this.dryRun;
+    async process(item: Comment | Submission, ruleResults: RuleResultEntity[], options: runCheckOptions): Promise<ActionProcessResult> {
+        // see note in DispatchAction about missing runtimeDryrun
+        const dryRun = this.dryRun;
 
         const realTargets = isSubmission(item) ? this.targets.filter(x => x !== 'parent') : this.targets;
         if (this.targets.includes('parent') && isSubmission(item)) {
@@ -64,12 +71,7 @@ export class CancelDispatchAction extends Action {
                 } else {
                     matchedDispatchIdentifier = this.identifiers.filter(x => x !== null).includes(x.identifier);
                 }
-                const matched = matchedId && matchedDispatchIdentifier;
-                if(matched && x.processing) {
-                    this.logger.debug(`Cannot remove ${isSubmission(x.activity) ? 'Submission' : 'Comment'} ${x.activity.name} because it is currently processing`);
-                    return false;
-                }
-                return matched;
+                return matchedId && matchedDispatchIdentifier;
             });
             let cancelCrit;
             if (this.identifiers === undefined) {
@@ -107,7 +109,9 @@ export class CancelDispatchAction extends Action {
             this.logger.verbose(cancelResult);
             if (!dryRun) {
                 const activityIds = delayedItemsToRemove.map(x => x.id);
-                this.resources.delayedItems = this.resources.delayedItems.filter(x => !activityIds.includes(x.id));
+                for(const id of activityIds) {
+                    await this.resources.removeDelayedActivity(id);
+                }
             }
         }
 
@@ -117,9 +121,16 @@ export class CancelDispatchAction extends Action {
             result: cancelledActivities.length === 0 ? 'No Dispatch Actions cancelled' : `Cancelled Dispatch Actions: ${cancelledActivities.join(', ')}`,
         }
     }
+
+    protected getSpecificPremise(): object {
+        return {
+            identifiers: this.identifiers,
+            targets: this.targets,
+        }
+    }
 }
 
-export interface CancelDispatchOptions extends CancelDispatchActionConfig, ActionOptions {
+export interface CancelDispatchOptions extends Omit<CancelDispatchActionConfig, 'authorIs' | 'itemIs'>, ActionOptions {
 }
 
 export interface CancelDispatchActionConfig extends ActionConfig {

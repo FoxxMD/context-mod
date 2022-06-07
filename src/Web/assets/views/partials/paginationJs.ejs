@@ -1,0 +1,13 @@
+<script>
+    const paginationSearchParams = new URLSearchParams(window.location.search);
+
+    document.querySelectorAll(`.paginatorLink`).forEach((el) => {
+        el.addEventListener('click', (e) => {
+            e.preventDefault();
+            const page = e.currentTarget.dataset.page;
+            paginationSearchParams.set('page', page);
+            const newUrl = window.location.pathname + '?' + paginationSearchParams.toString();
+            window.location.href = newUrl;
+        })
+    });
+</script>

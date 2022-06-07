@@ -1,6 +1,7 @@
 import {Router} from '@awaitjs/express';
 import {Request, Response} from 'express';
 import {authUserCheck} from "../../middleware";
+import {HeartbeatResponse} from "../../../Common/interfaces";
 
 const router = Router();
 router.use(authUserCheck(false));
@@ -16,12 +17,16 @@ export const heartbeat = (opData: OperatorData) => {
         if(req.botApp === undefined) {
             return res.status(500).send('Application is initializing, try again in a few seconds');
         }
-        const heartbeatData = {
+        req.botApp.migrationBlocker
+        const heartbeatData: HeartbeatResponse = {
             subreddits: req.botApp.bots.map(y => y.subManagers.map(x => x.subreddit.display_name)).flat(),
+            // @ts-ignore
             bots: req.botApp.bots.map(x => ({botName: x.botName, subreddits: x.subManagers.map(y => y.displayLabel), running: x.running})),
             operators: opData.name,
             operatorDisplay: opData.display,
             friendly: opData.friendly,
+            ranMigrations: req.botApp.ranMigrations,
+            migrationBlocker: req.botApp.migrationBlocker,
             //friendly: req.botApp !== undefined ? req.botApp.botName : undefined,
             //running: req.botApp !== undefined ? req.botApp.heartBeating : false,
             //nanny: req.botApp !== undefined ? req.botApp.nannyMode : undefined,

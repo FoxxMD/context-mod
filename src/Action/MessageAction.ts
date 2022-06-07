@@ -2,8 +2,7 @@ import Action, {ActionJson, ActionOptions} from "./index";
 import {Comment, ComposeMessageParams} from "snoowrap";
 import Submission from "snoowrap/dist/objects/Submission";
 import {renderContent} from "../Utils/SnoowrapUtils";
-import {ActionProcessResult, Footer, RequiredRichContent, RichContent} from "../Common/interfaces";
-import {RuleResult} from "../Rule";
+import {ActionProcessResult, Footer, RequiredRichContent, RichContent, RuleResult} from "../Common/interfaces";
 import {
     asSubmission,
     boolToString,
@@ -14,6 +13,9 @@ import {
 } from "../util";
 import {SimpleError} from "../Utils/Errors";
 import {ErrorWithCause} from "pony-cause";
+import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
+import {runCheckOptions} from "../Subreddit/Manager";
+import {ActionTypes} from "../Common/Infrastructure/Atomic";
 
 export class MessageAction extends Action {
     content: string;
@@ -42,12 +44,12 @@ export class MessageAction extends Action {
         this.title = title;
     }
 
-    getKind() {
-        return 'Message';
+    getKind(): ActionTypes {
+        return 'message';
     }
 
-    async process(item: Comment | Submission, ruleResults: RuleResult[], runtimeDryrun?: boolean): Promise<ActionProcessResult> {
-        const dryRun = runtimeDryrun || this.dryRun;
+    async process(item: Comment | Submission, ruleResults: RuleResultEntity[], options: runCheckOptions): Promise<ActionProcessResult> {
+        const dryRun = this.getRuntimeAwareDryrun(options);
         const content = await this.resources.getContent(this.content);
         const body = await renderContent(content, item, ruleResults, this.resources.userNotes);
 
@@ -96,6 +98,19 @@ export class MessageAction extends Action {
             dryRun,
             success: true,
             result: truncateStringToLength(200)(msgPreview)
+        }
+    }
+
+    protected getSpecificPremise(): object {
+        return {
+            content: this.content,
+            lock: this.lock,
+            sticky: this.sticky,
+            distinguish: this.distinguish,
+            footer: this.footer,
+            title: this.title,
+            to: this.to,
+            asSubreddit: this.asSubreddit
         }
     }
 }

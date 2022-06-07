@@ -1,14 +1,12 @@
-import Snoowrap, {Comment, ConfigOptions, Submission, Subreddit} from "snoowrap";
+import Snoowrap, {Comment, ConfigOptions, RedditUser, Submission, Subreddit} from "snoowrap";
 import {Logger} from "winston";
 import dayjs, {Dayjs} from "dayjs";
 import {Duration} from "dayjs/plugin/duration";
 import EventEmitter from "events";
 import {
-    BotInstanceConfig,
-    FilterCriteriaDefaults,
-    Invokee, LogInfo,
+    BotInstanceConfig, DatabaseStatisticsOperatorConfig,
+    LogInfo,
     PAUSED,
-    PollOn,
     RUNNING,
     STOPPED,
     SYSTEM,
@@ -21,8 +19,7 @@ import {
     parseBool,
     parseDuration, parseMatchMessage, parseRedditEntity,
     parseSubredditName, RetryOptions,
-    sleep,
-    snooLogWrapper
+    sleep
 } from "../util";
 import {Manager} from "../Subreddit/Manager";
 import {ExtendedSnoowrap, ProxiedSnoowrap} from "../Utils/SnoowrapClients";
@@ -32,7 +29,18 @@ import LoggedError from "../Utils/LoggedError";
 import pEvent from "p-event";
 import {SimpleError, isRateLimitError, isRequestError, isScopeError, isStatusError, CMError} from "../Utils/Errors";
 import {ErrorWithCause} from "pony-cause";
-
+import {DataSource, Repository} from "typeorm";
+import {Bot as BotEntity} from '../Common/Entities/Bot';
+import {ManagerEntity as ManagerEntity} from '../Common/Entities/ManagerEntity';
+import {Subreddit as SubredditEntity} from '../Common/Entities/Subreddit';
+import {InvokeeType} from "../Common/Entities/InvokeeType";
+import {RunStateType} from "../Common/Entities/RunStateType";
+import {QueueRunState} from "../Common/Entities/EntityRunState/QueueRunState";
+import {EventsRunState} from "../Common/Entities/EntityRunState/EventsRunState";
+import {ManagerRunState} from "../Common/Entities/EntityRunState/ManagerRunState";
+import {Invokee, PollOn} from "../Common/Infrastructure/Atomic";
+import {FilterCriteriaDefaults} from "../Common/Infrastructure/Filters/FilterShapes";
+import {snooLogWrapper} from "../Utils/loggerFactory";
 
 class Bot {
 
@@ -59,6 +67,7 @@ class Bot {
     nannyRetryHandler: Function;
     managerRetryHandler: Function;
     nextExpiration: Dayjs = dayjs();
+    nextRetentionCheck: Dayjs = dayjs();
     botName?: string;
     botLink?: string;
     botAccount?: string;
@@ -80,6 +89,11 @@ class Bot {
     cacheManager: BotResourcesManager;
 
     config: BotInstanceConfig;
+
+    database: DataSource
+    invokeeRepo: Repository<InvokeeType>;
+    runTypeRepo: Repository<RunStateType>;
+    botEntity!: BotEntity
 
     getBotName = () => {
         return this.botName;
@@ -133,9 +147,13 @@ class Bot {
             nanny: {
                 softLimit,
                 hardLimit,
-            }
+            },
+            database,
         } = config;
 
+        this.database = database;
+        this.invokeeRepo = this.database.getRepository(InvokeeType);
+        this.runTypeRepo = this.database.getRepository(RunStateType);
         this.config = config;
         this.dryRun = parseBool(dryRun) === true ? true : undefined;
         this.softLimit = softLimit;
@@ -159,7 +177,8 @@ class Bot {
 
         this.logger.stream().on('log', (log: LogInfo) => {
             if(log.bot !== undefined && log.bot === this.getBotName() && log.subreddit === undefined) {
-                this.logs = [log, ...this.logs].slice(0, 301);
+                const combinedLogs = [log, ...this.logs];
+                this.logs = combinedLogs.slice(0, 301);
             }
         });
 
@@ -318,16 +337,32 @@ class Bot {
         let availSubs = [];
         // @ts-ignore
         const user = await this.client.getMe().fetch();
+        this.cacheManager.botName = user.name;
         this.botLink = `https://reddit.com/user/${user.name}`;
         this.botAccount = `u/${user.name}`;
         this.logger.info(`Reddit API Limit Remaining: ${this.client.ratelimitRemaining}`);
         this.logger.info(`Authenticated Account: u/${user.name}`);
+
+        if(this.cacheManager !== undefined) {
+            this.cacheManager.botAccount = user.name;
+        }
 
         const botNameFromConfig = this.botName !== undefined;
         if(this.botName === undefined) {
             this.botName = `u/${user.name}`;
         }
         this.logger.info(`Bot Name${botNameFromConfig ? ' (from config)' : ''}: ${this.botName}`);
+
+        const botRepo = this.database.getRepository(BotEntity);
+
+        let b = await botRepo.findOne({where: {name: this.botName}});
+        if(b === undefined || b === null) {
+            b = new BotEntity();
+            b.name = this.botName;
+            this.botEntity = await botRepo.save(b);
+        } else {
+            this.botEntity = b;
+        }
 
         let subListing = await this.client.getModeratedSubreddits({count: 100});
         while(!subListing.isFinished) {
@@ -390,7 +425,7 @@ class Bot {
         // get configs for subs we want to run on and build/validate them
         for (const sub of subsToRun) {
             try {
-                this.subManagers.push(this.createManager(sub));
+                this.subManagers.push(await this.createManager(sub));
             } catch (err: any) {
 
             }
@@ -511,23 +546,25 @@ class Bot {
 
     async initManager(manager: Manager) {
         try {
+            await manager.syncRunningStates();
             await manager.parseConfiguration('system', true, {suppressNotification: true, suppressChangeEvent: true});
         } catch (err: any) {
             if(err.logged !== true) {
-                const normalizedError = new ErrorWithCause(`Bot could not start manager because config was not valid`, {cause: err});
+                const normalizedError = new ErrorWithCause(`Bot could not initialize manager because config was not valid`, {cause: err});
                 // @ts-ignore
                 this.logger.error(normalizedError, {subreddit: manager.subreddit.display_name_prefixed});
             } else {
-                this.logger.error('Bot could not start manager because config was not valid', {subreddit: manager.subreddit.display_name_prefixed});
+                this.logger.error('Bot could not initialize manager because config was not valid', {subreddit: manager.subreddit.display_name_prefixed});
             }
         }
     }
 
-    createManager(sub: Subreddit): Manager {
+    async createManager(sub: Subreddit): Promise<Manager> {
         const {
             flowControlDefaults: {
                 maxGotoDepth: botMaxDefault
             } = {},
+            databaseStatisticsDefaults,
             subreddits: {
                 overrides = [],
             } = {}
@@ -544,8 +581,42 @@ class Bot {
         const {
             flowControlDefaults: {
                 maxGotoDepth: subMax = undefined,
-            } = {}
+            } = {},
+            databaseStatisticsDefaults: statDefaultsFromOverride,
+            databaseConfig: {
+                retention = undefined
+            } = {},
         } = override || {};
+
+        const managerRepo = this.database.getRepository(ManagerEntity);
+        const subRepo = this.database.getRepository(SubredditEntity)
+        let subreddit = await subRepo.findOne({where: {id: sub.name}});
+        if(subreddit === null) {
+            subreddit = await subRepo.save(new SubredditEntity({id: sub.name, name: sub.display_name}))
+        }
+        let managerEntity = await managerRepo.findOne({
+            where: {
+                bot: {
+                    id: this.botEntity.id
+                },
+                subreddit: {
+                    id: subreddit.id
+                }
+            },
+        });
+        if(managerEntity === undefined || managerEntity === null) {
+            const invokee = await this.invokeeRepo.findOneBy({name: SYSTEM}) as InvokeeType;
+            const runType = await this.runTypeRepo.findOneBy({name: STOPPED}) as RunStateType;
+
+            managerEntity = await managerRepo.save(new ManagerEntity({
+                name: sub.display_name,
+                bot: this.botEntity,
+                subreddit: subreddit as SubredditEntity,
+                queueState: new QueueRunState({invokee, runType}),
+                eventsState: new EventsRunState({invokee, runType}),
+                managerState: new ManagerRunState({invokee, runType})
+            }));
+        }
 
         const manager = new Manager(sub, this.client, this.logger, this.cacheManager, {
             dryRun: this.dryRun,
@@ -554,7 +625,11 @@ class Bot {
             botName: this.botName as string,
             maxWorkers: this.maxWorkers,
             filterCriteriaDefaults: this.filterCriteriaDefaults,
-            maxGotoDepth: subMax ?? botMaxDefault
+            maxGotoDepth: subMax ?? botMaxDefault,
+            botEntity: this.botEntity,
+            managerEntity: managerEntity as ManagerEntity,
+            statDefaults: (statDefaultsFromOverride ?? databaseStatisticsDefaults) as DatabaseStatisticsOperatorConfig,
+            retention,
         });
         // all errors from managers will count towards bot-level retry count
         manager.on('error', async (err) => await this.panicOnRetries(err));
@@ -598,7 +673,7 @@ class Bot {
                 const sub = await this.client.getSubreddit(name);
                 this.logger.info(`Attempting to add manager for r/${name}`);
                 try {
-                    const manager = this.createManager(sub);
+                    const manager =  await this.createManager(sub);
                     this.logger.info(`Starting manager for r/${name}`);
                     this.subManagers.push(manager);
                     await this.initManager(manager);
@@ -646,8 +721,12 @@ class Bot {
             this.error = 'All managers have invalid configs';
         }
         for (const manager of this.subManagers) {
-            if (manager.validConfigLoaded && manager.botState.state !== RUNNING) {
-                await manager.start(causedBy, {reason: 'Caused by application startup'});
+            if (manager.validConfigLoaded && manager.managerState.state !== RUNNING) {
+                if(manager.managerState.causedBy === USER) {
+                    manager.logger.info('NOT starting automatically manager because last known state was caused by user input. Manager must be started manually by user.');
+                } else {
+                    await manager.start(causedBy, {reason: 'Caused by application startup'});
+                }
                 await sleep(this.stagger);
             }
         }
@@ -666,7 +745,8 @@ class Bot {
             if (!this.running) {
                 break;
             }
-            if (dayjs().isSameOrAfter(this.nextNannyCheck)) {
+            const now = dayjs();
+            if (now.isSameOrAfter(this.nextNannyCheck)) {
                 try {
                     await this.runApiNanny();
                     this.nextNannyCheck = dayjs().add(10, 'second');
@@ -675,7 +755,7 @@ class Bot {
                     this.nextNannyCheck = dayjs().add(240, 'second');
                 }
             }
-            if(dayjs().isSameOrAfter(this.nextHeartbeat)) {
+            if(now.isSameOrAfter(this.nextHeartbeat)) {
                 try {
                     await this.heartbeat();
                     await this.checkModInvites();
@@ -684,8 +764,22 @@ class Bot {
                 }
                 this.nextHeartbeat = dayjs().add(this.heartbeatInterval, 'second');
             }
+            // run without awaiting as we don't know how long this might take and we don't want to pause the whole healthloop for it
+            this.retentionCleanup();
         }
         this.emitter.emit('healthStopped');
+    }
+
+    async retentionCleanup() {
+        const now = dayjs();
+        if(now.isSameOrAfter(this.nextRetentionCheck)) {
+            this.nextRetentionCheck = dayjs().add(30, 'minute');
+            for(const m of this.subManagers) {
+                if(m.resources !== undefined) {
+                    await m.resources.retentionCleanup();
+                }
+            }
+        }
     }
 
     async heartbeat() {
@@ -701,7 +795,7 @@ class Bot {
         let startedAny = false;
 
         for (const s of this.subManagers) {
-            if(s.botState.state === STOPPED && s.botState.causedBy === USER) {
+            if(s.managerState.state === STOPPED && s.managerState.causedBy === USER) {
                 this.logger.debug('Skipping config check/restart on heartbeat due to previously being stopped by user', {subreddit: s.displayLabel});
                 continue;
             }
@@ -725,11 +819,12 @@ class Bot {
                         await s.startEvents('system', {reason: newConfig ? 'Config updated on heartbeat triggered reload' : 'Heartbeat detected non-running events'});
                     }
                 }
-                if(s.botState.state !== RUNNING && s.eventsState.state === RUNNING && s.queueState.state === RUNNING) {
-                    s.botState = {
+                if(s.managerState.state !== RUNNING && s.eventsState.state === RUNNING && s.queueState.state === RUNNING) {
+                    s.managerState = {
                         state: RUNNING,
                         causedBy: 'system',
                     }
+                    await s.syncRunningState('managerState');
                 }
             } catch (err: any) {
                 if(s.eventsState.state === RUNNING) {

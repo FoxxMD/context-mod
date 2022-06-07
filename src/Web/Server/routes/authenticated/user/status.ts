@@ -5,7 +5,7 @@ import {
     filterLogBySubreddit, filterLogs,
     formatNumber,
     intersect,
-    LogEntry, logSortFunc,
+    LogEntry, logSortFunc, parseDurationValToDuration,
     pollingInfo
 } from "../../../../../util";
 import {Manager} from "../../../../../Subreddit/Manager";
@@ -16,6 +16,7 @@ import winston from "winston";
 import {opStats} from "../../../../Common/util";
 import {authUserCheck, botRoute, subredditRoute} from "../../../middleware";
 import Bot from "../../../../../Bot";
+import {DurationVal} from "../../../../../Common/Infrastructure/Atomic";
 
 const status = () => {
 
@@ -65,18 +66,31 @@ const status = () => {
 
         const subManagerData = [];
         for (const m of req.user?.accessibleSubreddits(bot) as Manager[]) {
-            const logs = req.manager === undefined || allReq || req.manager.getDisplay() === m.getDisplay() ? filterLogs(m.logs, {
-                    level: (level as string),
-                    // @ts-ignore
-                    sort,
-                    limit: limit as string,
-                    returnType: 'object'
-                }) as LogInfo[]: [];
+            // const logs = req.manager === undefined || allReq || req.manager.getDisplay() === m.getDisplay() ? filterLogs(m.logs, {
+            //         level: (level as string),
+            //         // @ts-ignore
+            //         sort,
+            //         limit: limit as string,
+            //         returnType: 'object'
+            //     }) as LogInfo[]: [];
+
+            let retention = 'Unknown';
+            if (m.resources !== undefined) {
+                if (m.resources.retention === undefined) {
+                    retention = 'Indefinite';
+                } else if (typeof m.resources.retention === 'number') {
+                    retention = `Last ${m.resources.retention}`;
+                } else {
+                    const dur = parseDurationValToDuration(m.resources.retention as DurationVal);
+                    retention = `Last ${dur.humanize()}`;
+                }
+            }
+
             const sd = {
                 name: m.displayLabel,
                 //linkName: s.replace(/\W/g, ''),
-                logs: logs || [], // provide a default empty value in case we truly have not logged anything for this subreddit yet
-                botState: m.botState,
+                logs: [], // provide a default empty value in case we truly have not logged anything for this subreddit yet
+                botState: m.managerState,
                 eventsState: m.eventsState,
                 queueState: m.queueState,
                 indicator: 'gray',
@@ -105,12 +119,13 @@ const status = () => {
                 startedAt: 'Not Started',
                 startedAtHuman: 'Not Started',
                 delayBy: m.delayBy === undefined ? 'No' : `Delayed by ${m.delayBy} sec`,
+                retention,
             };
             // TODO replace indicator data with js on client page
             let indicator;
-            if (m.botState.state === RUNNING && m.queueState.state === RUNNING && m.eventsState.state === RUNNING) {
+            if (m.managerState.state === RUNNING && m.queueState.state === RUNNING && m.eventsState.state === RUNNING) {
                 indicator = 'green';
-            } else if (m.botState.state === STOPPED && m.queueState.state === STOPPED && m.eventsState.state === STOPPED) {
+            } else if (m.managerState.state === STOPPED && m.queueState.state === STOPPED && m.eventsState.state === STOPPED) {
                 indicator = 'red';
             } else {
                 indicator = 'yellow';
@@ -147,17 +162,15 @@ const status = () => {
                     comments: acc.checks.comments + curr.checks.comments,
                 },
                 historical: {
-                    allTime: {
-                        eventsCheckedTotal: acc.historical.allTime.eventsCheckedTotal + curr.stats.historical.allTime.eventsCheckedTotal,
-                        eventsActionedTotal: acc.historical.allTime.eventsActionedTotal + curr.stats.historical.allTime.eventsActionedTotal,
-                        checksRunTotal: acc.historical.allTime.checksRunTotal + curr.stats.historical.allTime.checksRunTotal,
-                        checksFromCacheTotal: acc.historical.allTime.checksFromCacheTotal + curr.stats.historical.allTime.checksFromCacheTotal,
-                        checksTriggeredTotal: acc.historical.allTime.checksTriggeredTotal + curr.stats.historical.allTime.checksTriggeredTotal,
-                        rulesRunTotal: acc.historical.allTime.rulesRunTotal + curr.stats.historical.allTime.rulesRunTotal,
-                        rulesCachedTotal: acc.historical.allTime.rulesCachedTotal + curr.stats.historical.allTime.rulesCachedTotal,
-                        rulesTriggeredTotal: acc.historical.allTime.rulesTriggeredTotal + curr.stats.historical.allTime.rulesTriggeredTotal,
-                        actionsRunTotal: acc.historical.allTime.actionsRunTotal + curr.stats.historical.allTime.actionsRunTotal,
-                    }
+                    eventsCheckedTotal: acc.historical.eventsCheckedTotal + curr.stats.historical.eventsCheckedTotal,
+                    eventsActionedTotal: acc.historical.eventsActionedTotal + curr.stats.historical.eventsActionedTotal,
+                    checksRunTotal: acc.historical.checksRunTotal + curr.stats.historical.checksRunTotal,
+                    checksFromCacheTotal: acc.historical.checksFromCacheTotal + curr.stats.historical.checksFromCacheTotal,
+                    checksTriggeredTotal: acc.historical.checksTriggeredTotal + curr.stats.historical.checksTriggeredTotal,
+                    rulesRunTotal: acc.historical.rulesRunTotal + curr.stats.historical.rulesRunTotal,
+                    rulesCachedTotal: acc.historical.rulesCachedTotal + curr.stats.historical.rulesCachedTotal,
+                    rulesTriggeredTotal: acc.historical.rulesTriggeredTotal + curr.stats.historical.rulesTriggeredTotal,
+                    actionsRunTotal: acc.historical.actionsRunTotal + curr.stats.historical.actionsRunTotal,
                 },
                 maxWorkers: acc.maxWorkers + curr.maxWorkers,
                 subMaxWorkers: acc.subMaxWorkers + curr.subMaxWorkers,
@@ -173,17 +186,15 @@ const status = () => {
                 comments: 0,
             },
             historical: {
-                allTime: {
-                    eventsCheckedTotal: 0,
-                    eventsActionedTotal: 0,
-                    checksRunTotal: 0,
-                    checksFromCacheTotal: 0,
-                    checksTriggeredTotal: 0,
-                    rulesRunTotal: 0,
-                    rulesCachedTotal: 0,
-                    rulesTriggeredTotal: 0,
-                    actionsRunTotal: 0,
-                }
+                eventsCheckedTotal: 0,
+                eventsActionedTotal: 0,
+                checksRunTotal: 0,
+                checksFromCacheTotal: 0,
+                checksTriggeredTotal: 0,
+                rulesRunTotal: 0,
+                rulesCachedTotal: 0,
+                rulesTriggeredTotal: 0,
+                actionsRunTotal: 0,
             },
             maxWorkers: 0,
             subMaxWorkers: 0,
@@ -226,14 +237,14 @@ const status = () => {
         const sharedSub = subManagerData.find(x => x.stats.cache.isShared);
         const sharedCount = sharedSub !== undefined ? sharedSub.stats.cache.currentKeyCount : 0;
         const scopes = req.user?.isInstanceOperator(bot) ? bot.client.scope : [];
-        const allSubLogs = subManagerData.map(x => x.logs).flat().sort(logSortFunc(sort as string)).slice(0, (limit as number) + 1);
-        const allLogs = filterLogs([...allSubLogs, ...(req.user?.isInstanceOperator(req.botApp) ? bot.logs : bot.logs.filter(x => x.user === req.user?.name))], {
-            level: (level as string),
-            // @ts-ignore
-            sort,
-            limit: limit as string,
-            returnType: 'object'
-        }) as LogInfo[];
+        //const allSubLogs = subManagerData.map(x => x.logs).flat().sort(logSortFunc(sort as string)).slice(0, (limit as number) + 1);
+        // const allLogs = filterLogs([...allSubLogs, ...(req.user?.isInstanceOperator(req.botApp) ? bot.logs : bot.logs.filter(x => x.user === req.user?.name))], {
+        //     level: (level as string),
+        //     // @ts-ignore
+        //     sort,
+        //     limit: limit as string,
+        //     returnType: 'object'
+        // }) as LogInfo[];
         let allManagerData: any = {
             name: 'All',
             status: bot.running ? 'RUNNING' : 'NOT RUNNING',
@@ -250,7 +261,7 @@ const status = () => {
                 causedBy: SYSTEM
             },
             dryRun: boolToString(bot.dryRun === true),
-            logs: allLogs,
+            logs: [],
             checks: checks,
             softLimit: bot.softLimit,
             hardLimit: bot.hardLimit,

@@ -1,9 +1,11 @@
 import {SubmissionActionConfig} from "./index";
 import Action, {ActionJson, ActionOptions} from "../index";
-import {RuleResult} from "../../Rule";
-import {ActionProcessResult} from "../../Common/interfaces";
+import {ActionProcessResult, RuleResult} from "../../Common/interfaces";
 import Submission from 'snoowrap/dist/objects/Submission';
 import Comment from 'snoowrap/dist/objects/Comment';
+import {RuleResultEntity} from "../../Common/Entities/RuleResultEntity";
+import {runCheckOptions} from "../../Subreddit/Manager";
+import {ActionTypes} from "../../Common/Infrastructure/Atomic";
 
 export class FlairAction extends Action {
     text: string;
@@ -20,12 +22,12 @@ export class FlairAction extends Action {
         this.flair_template_id = options.flair_template_id || '';
     }
 
-    getKind() {
-        return 'Flair';
+    getKind(): ActionTypes {
+        return 'flair';
     }
 
-    async process(item: Comment | Submission, ruleResults: RuleResult[], runtimeDryrun?: boolean): Promise<ActionProcessResult> {
-        const dryRun = runtimeDryrun || this.dryRun;
+    async process(item: Comment | Submission, ruleResults: RuleResultEntity[], options: runCheckOptions): Promise<ActionProcessResult> {
+        const dryRun = this.getRuntimeAwareDryrun(options);
         let flairParts = [];
         if(this.text !== '') {
             flairParts.push(`Text: ${this.text}`);
@@ -68,6 +70,14 @@ export class FlairAction extends Action {
             result: flairSummary
         }
     }
+
+    protected getSpecificPremise(): object {
+        return {
+            text: this.text,
+            css: this.css,
+            flair_template_id: this.flair_template_id
+        }
+    }
 }
 
 /**
@@ -89,7 +99,7 @@ export interface FlairActionConfig extends SubmissionActionConfig {
     flair_template_id?: string,
 }
 
-export interface FlairActionOptions extends FlairActionConfig,ActionOptions {
+export interface FlairActionOptions extends Omit<FlairActionConfig, 'authorIs' | 'itemIs'>,ActionOptions {
 
 }
 

@@ -1,0 +1,14 @@
+{
+   "type": "sqljs",
+   "autoSave": true,
+   "location": "database.sqlite",
+   "synchronize": true,
+   "logging": "all",
+   "entities": [
+      "src/Common/Entities/**/*.js"
+   ],
+   "migrations": [
+      "src/Common/Migrations/Database/**/*.js"
+   ],
+   "subscribers": []
+}
