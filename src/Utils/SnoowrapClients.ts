@@ -125,8 +125,8 @@ export class ExtendedSnoowrap extends Snoowrap {
             uri: `/api/mod/notes`,
             method: 'post',
             form: requestData
-        }) as ModNoteRaw;
-        return new ModNote(response, this);
+        }) as { created: ModNoteRaw };
+        return new ModNote(response.created, this);
     }
 }
 
