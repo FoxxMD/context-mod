@@ -49,7 +49,7 @@ export function actionFactory
         case 'contributor':
             return new ContributorAction({...config as StructuredFilter<ContributorActionJson>, logger, subredditName, resources, client, emitter})
         case 'modnote':
-            return new ModNoteAction({...config as ModNoteActionJson, logger, subredditName, resources, client, emitter})
+            return new ModNoteAction({...config as StructuredFilter<ModNoteActionJson>, logger, subredditName, resources, client, emitter})
         default:
             throw new Error('rule "kind" was not recognized.');
     }

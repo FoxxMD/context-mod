@@ -38,7 +38,7 @@ import redisStore from "cache-manager-redis-store";
 import Autolinker from 'autolinker';
 import {create as createMemoryStore} from './Utils/memoryStore';
 import {LEVEL, MESSAGE} from "triple-beam";
-import {Comment, RedditUser, Submission} from "snoowrap/dist/objects";
+import {Comment, PrivateMessage, RedditUser, Submission, Subreddit} from "snoowrap/dist/objects";
 import reRegExp from '@stdlib/regexp-regexp';
 import fetch from "node-fetch";
 import ImageData from "./Common/ImageData";
@@ -69,7 +69,7 @@ import {
     ActivitySourceTypes,
     CacheProvider,
     ConfigFormat,
-    DurationVal,
+    DurationVal, ModUserNoteLabel, modUserNoteLabels,
     RedditEntity,
     RedditEntityType,
     statFrequencies,
@@ -109,6 +109,7 @@ import {
     HistoryFiltersOptions
 } from "./Common/Infrastructure/ActivityWindow";
 import {RunnableBaseJson} from "./Common/Infrastructure/Runnable";
+import Snoowrap from "snoowrap";
 
 
 //import {ResembleSingleCallbackComparisonResult} from "resemblejs";
@@ -2615,6 +2616,22 @@ export const parseRedditFullname = (str: string): RedditThing | undefined => {
     }
 }
 
+export const generateSnoowrapEntityFromRedditThing = (data: RedditThing, client: Snoowrap) => {
+    switch(data.type) {
+        case 'comment':
+            return new Comment({id: data.val}, client, false);
+        case 'submission':
+            return new Submission({id: data.val}, client, false);
+        case 'user':
+            return new RedditUser({id: data.val}, client, false);
+        case 'subreddit':
+            return new Subreddit({id: data.val}, client, false);
+        case 'message':
+            return new PrivateMessage({id: data.val}, client, false)
+
+    }
+}
+
 export const activityDispatchConfigToDispatch = (config: ActivityDispatchConfig, activity: (Comment | Submission), type: ActivitySourceTypes, {action, dryRun}: {action?: string, dryRun?: boolean} = {}): ActivityDispatch => {
     let tolerantVal: boolean | Duration | undefined;
     if (config.tardyTolerant !== undefined) {
@@ -2774,15 +2791,15 @@ export const between = (val: number, a: number, b: number, inclusiveMin: boolean
     return val > min && val <= max;
 }
 
-export const toModNoteLabel = (val: string): ModNoteLabel => {
+export const toModNoteLabel = (val: string): ModUserNoteLabel => {
     const cleanVal = val.trim().toUpperCase();
     if (asModNoteLabel(cleanVal)) {
         return cleanVal;
     }
-    throw new Error(`${val} is not a valid mod note label. Must be one of: ${modNoteLabels.join(', ')}`);
+    throw new Error(`${val} is not a valid mod note label. Must be one of: ${modUserNoteLabels.join(', ')}`);
 }
 
 
-export const asModNoteLabel = (val: string): val is ModNoteLabel => {
-    return modNoteLabels.includes(val);
+export const asModNoteLabel = (val: string): val is ModUserNoteLabel => {
+    return modUserNoteLabels.includes(val);
 }

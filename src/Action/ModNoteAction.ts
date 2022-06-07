@@ -2,11 +2,12 @@ import {ActionJson, ActionConfig, ActionOptions} from "./index";
 import Action from "./index";
 import {Comment} from "snoowrap";
 import {renderContent} from "../Utils/SnoowrapUtils";
-import {RuleResult} from "../Rule";
 import Submission from "snoowrap/dist/objects/Submission";
 import {ActionProcessResult, RichContent} from "../Common/interfaces";
-import {ModNoteLabel} from "../Common/types";
 import {toModNoteLabel} from "../util";
+import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
+import {runCheckOptions} from "../Subreddit/Manager";
+import {ActionTypes, ModUserNoteLabel} from "../Common/Infrastructure/Atomic";
 
 
 export class ModNoteAction extends Action {
@@ -24,12 +25,21 @@ export class ModNoteAction extends Action {
         this.referenceActivity = referenceActivity;
     }
 
-    getKind() {
-        return 'Mod Note';
+    getKind(): ActionTypes {
+        return 'modnote';
     }
 
-    async process(item: Comment | Submission, ruleResults: RuleResult[], runtimeDryrun?: boolean): Promise<ActionProcessResult> {
-        const dryRun = runtimeDryrun || this.dryRun;
+    protected getSpecificPremise(): object {
+        return {
+            content: this.content,
+            type: this.type,
+            allowDuplicate: this.allowDuplicate,
+            referenceActivity: this.referenceActivity,
+        }
+    }
+
+    async process(item: Comment | Submission, ruleResults: RuleResultEntity[], options: runCheckOptions): Promise<ActionProcessResult> {
+        const dryRun = this.getRuntimeAwareDryrun(options);
 
         const modLabel = this.type !== undefined ? toModNoteLabel(this.type) : undefined;
 
@@ -82,11 +92,11 @@ export interface ModNoteActionConfig extends ActionConfig, RichContent {
      * @default false
      * */
     allowDuplicate?: boolean,
-    type?: ModNoteLabel
+    type?: ModUserNoteLabel
     referenceActivity?: boolean
 }
 
-export interface ModNoteActionOptions extends ModNoteActionConfig, ActionOptions {
+export interface ModNoteActionOptions extends Omit<ModNoteActionConfig, 'authorIs' | 'itemIs'>, ActionOptions {
 }
 
 /**

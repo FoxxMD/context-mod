@@ -24,15 +24,3 @@ import {ModNoteActionJson} from "../Action/ModNoteAction";
 export type RuleObjectJsonTypes = RecentActivityRuleJSONConfig | RepeatActivityJSONConfig | AuthorRuleJSONConfig | AttributionJSONConfig | HistoryJSONConfig | RegexRuleJSONConfig | RepostRuleJSONConfig | SentimentRuleJSONConfig
 
 export type ActionJson = CommentActionJson | FlairActionJson | ReportActionJson | LockActionJson | RemoveActionJson | ApproveActionJson | BanActionJson | UserNoteActionJson | MessageActionJson | UserFlairActionJson | DispatchActionJson | CancelDispatchActionJson | ContributorActionJson | ModNoteActionJson | string;
-
-export type ModNoteLabel =
-    'BOT_BAN'
-    | 'PERMA_BAN'
-    | 'BAN'
-    | 'ABUSE_WARNING'
-    | 'SPAM_WARNING'
-    | 'SPAM_WATCH'
-    | 'SOLID_CONTRIBUTOR'
-    | 'HELPFUL_USER';
-
-export const modNoteLabels = ['BOT_BAN', 'PERMA_BAN', 'BAN', 'ABUSE_WARNING', 'SPAM_WARNING', 'SPAM_WATCH', 'SOLID_CONTRIBUTOR', 'HELPFUL_USER'];

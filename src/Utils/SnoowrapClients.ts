@@ -1,7 +1,8 @@
 import Snoowrap, {Listing, RedditUser} from "snoowrap";
 import {Submission, Subreddit, Comment} from "snoowrap/dist/objects";
 import {parseSubredditName} from "../util";
-import {ModNoteLabel} from "../Common/types";
+import {ModUserNoteLabel} from "../Common/Infrastructure/Atomic";
+import {ModNote, ModNoteRaw} from "../Subreddit/ModNotes/ModNote";
 
 // const proxyFactory = (endpoint: string) => {
 //     return class ProxiedSnoowrap extends Snoowrap {
@@ -19,8 +20,28 @@ export interface ModNoteData {
     user: RedditUser
     subreddit: Subreddit
     activity?: Submission | Comment
-    label?: ModNoteLabel
+    label?: ModUserNoteLabel
     note: string
+}
+
+export interface ModNoteGetOptions {
+    before?: string,
+    filter?: ModUserNoteLabel,
+    limit?: number
+}
+
+export interface ModNotesRaw {
+    mod_notes: ModNoteRaw[]
+    start_cursor: string
+    end_cursor: string
+    has_next_page: boolean
+}
+
+export interface ModNotesResponse {
+    notes: ModNote[]
+    startCursor: string
+    endCursor: string
+    isFinished: boolean
 }
 
 export class ExtendedSnoowrap extends Snoowrap {
@@ -63,31 +84,49 @@ export class ExtendedSnoowrap extends Snoowrap {
         });
     }
 
+    async getModNotes(subreddit: Subreddit, user: RedditUser, options: ModNoteGetOptions = {}): Promise<ModNotesResponse> {
+        const data: any = {
+            subreddit: subreddit.display_name,
+            user: user.name,
+            ...options
+        };
+        const response = await this.oauthRequest({
+            uri: `/api/mod/notes`,
+            method: 'get',
+            qs: data
+        }) as ModNotesRaw;
+        return {
+            notes: response.mod_notes.map(x => new ModNote(x, this)),
+            startCursor: response.start_cursor,
+            endCursor: response.end_cursor,
+            isFinished: !response.has_next_page
+        }
+    }
+
     /**
      * Add a Mod Note
      *
      * @see https://www.reddit.com/dev/api#POST_api_mod_notes
      * */
-    async addModNote(data: ModNoteData): Promise<any> {
+    async addModNote(data: ModNoteData): Promise<ModNote> {
         const {note, label} = data;
 
-        // can't use label or reddit_id (activity) on POST yet
-        // https://www.reddit.com/r/redditdev/comments/t8w861/comment/i0wk46b/?utm_source=reddit&utm_medium=web2x&context=3
         const requestData: any = {
             note,
-            //label,
+            label,
             subreddit: await data.subreddit.display_name,
             user: data.user.name,
         }
-        // if(data.activity !== undefined) {
-        //     requestData.reddit_id = await data.activity.name;
-        // }
+        if(data.activity !== undefined) {
+            requestData.reddit_id = await data.activity.name;
+        }
 
-        return await this.oauthRequest({
+        const response =await this.oauthRequest({
             uri: `/api/mod/notes`,
             method: 'post',
             form: requestData
-        });
+        }) as ModNoteRaw;
+        return new ModNote(response, this);
     }
 }
 
