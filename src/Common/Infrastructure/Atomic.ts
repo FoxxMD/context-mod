@@ -243,7 +243,7 @@ export type ModUserNoteLabel =
 
 export const modUserNoteLabels = ['BOT_BAN', 'PERMA_BAN', 'BAN', 'ABUSE_WARNING', 'SPAM_WARNING', 'SPAM_WATCH', 'SOLID_CONTRIBUTOR', 'HELPFUL_USER'];
 
-export type ModNoteType =
+export type ModActionType =
     'INVITE' |
     'NOTE' |
     'REMOVAL' |

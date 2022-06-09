@@ -1,4 +1,14 @@
-import {CompareValue, CompareValueOrPercent, DurationComparor, ModeratorNameCriteria, ModeratorNames} from "../Atomic";
+import {
+    CompareValue,
+    CompareValueOrPercent,
+    DurationComparor,
+    ModeratorNameCriteria,
+    ModeratorNames, ModActionType,
+    ModUserNoteLabel
+} from "../Atomic";
+import {ActivityType} from "../Reddit";
+import {GenericComparison, parseGenericValueComparison} from "../Comparisons";
+import {parseStringToRegexOrLiteralSearch} from "../../../util";
 
 /**
  * Different attributes a `Subreddit` can be in. Only include a property if you want to check it.
@@ -55,12 +65,7 @@ export const defaultStrongSubredditCriteriaOptions = {
 
 export type FilterCriteriaDefaultBehavior = 'replace' | 'merge';
 
-export interface UserNoteCriteria {
-    /**
-     * User Note type key to search for
-     * @examples ["spamwarn"]
-     * */
-    type: string;
+export interface UserSubredditHistoryCriteria {
     /**
      * Number of occurrences of this type. Ignored if `search` is `current`
      *
@@ -75,22 +80,22 @@ export interface UserNoteCriteria {
     count?: string;
 
     /**
-     * How to test the notes for this Author:
+     * How to test the Toolbox Notes or Mod Actions for this Author:
      *
      * ### current
      *
-     * Only the most recent note is checked for `type`
+     * Only the most recent note is checked for criteria
      *
      * ### total
      *
-     * The `count` comparison of `type` must be found within all notes
+     * `count` comparison of mod actions/notes must be found within all history
      *
      * * EX `count: > 3`   => Must have more than 3 notes of `type`, total
      * * EX `count: <= 25%` => Must have 25% or less of notes of `type`, total
      *
      * ### consecutive
      *
-     * The `count` **number** of `type` notes must be found in a row.
+     * The `count` **number** of mod actions/notes must be found in a row.
      *
      * You may also specify the time-based order in which to search the notes by specifying `ascending (asc)` or `descending (desc)` in the `count` value. Default is `descending`
      *
@@ -103,6 +108,79 @@ export interface UserNoteCriteria {
      * */
     search?: 'current' | 'consecutive' | 'total'
 }
+
+export interface UserNoteCriteria extends UserSubredditHistoryCriteria {
+    /**
+     * User Note type key to search for
+     * @examples ["spamwarn"]
+     * */
+    type: string;
+}
+
+export interface ModActionCriteria extends UserSubredditHistoryCriteria {
+    type?: ModActionType | ModActionType[]
+}
+
+export interface ModNoteCriteria extends ModActionCriteria {
+    noteType?: ModUserNoteLabel | ModUserNoteLabel[]
+    note?: string | string[]
+}
+
+export const asModNoteCriteria = (val: any): val is ModNoteCriteria => {
+    return val !== null && typeof val === 'object' && ('noteType' in val || 'note' in val);
+}
+
+export interface FullModNoteCriteria extends Omit<ModNoteCriteria, 'note' | 'count'> {
+    type?: ModActionType[]
+    count?: GenericComparison
+    noteType?: ModUserNoteLabel[]
+    note?: RegExp[]
+}
+
+export const toFullModNoteCriteria = (val: ModNoteCriteria): FullModNoteCriteria => {
+    return {
+        type: ['NOTE'],
+        count: val.count === undefined ? undefined : parseGenericValueComparison(val.count),
+        search: val.search,
+        noteType: val.noteType === undefined ? undefined : (Array.isArray(val.noteType) ? val.noteType : [val.noteType]),
+        note: val.note === undefined ? undefined : (Array.isArray(val.note) ? val.note.map(x => parseStringToRegexOrLiteralSearch(x)) : [parseStringToRegexOrLiteralSearch(val.note)]),
+    }
+}
+
+
+export interface ModLogCriteria extends ModActionCriteria {
+    action?: string | string[]
+    details?: string | string[]
+    description?: string | string[]
+    activityType?: ActivityType | ActivityType[]
+}
+
+export interface FullModLogCriteria extends Omit<ModLogCriteria, 'action' | 'details' | 'description' | 'count'> {
+    type?: ModActionType[]
+    count?: GenericComparison
+    action?: RegExp[]
+    details?: RegExp[]
+    description?: RegExp[]
+    activityType?: ActivityType[]
+}
+
+export const toFullModLogCriteria = (val: ModLogCriteria): FullModLogCriteria => {
+    return {
+        count: val.count === undefined ? undefined : parseGenericValueComparison(val.count),
+        search: val.search,
+        type: val.type === undefined ? undefined : (Array.isArray(val.type) ? val.type : [val.type]).map(x => x.toUpperCase()) as ModActionType[],
+        activityType: val.activityType === undefined ? undefined : (Array.isArray(val.activityType) ? val.activityType : [val.activityType]),
+        action: val.action === undefined ? undefined : (Array.isArray(val.action) ? val.action.map(x => parseStringToRegexOrLiteralSearch(x)) : [parseStringToRegexOrLiteralSearch(val.action)]),
+        description: val.description === undefined ? undefined : (Array.isArray(val.description) ? val.description.map(x => parseStringToRegexOrLiteralSearch(x)) : [parseStringToRegexOrLiteralSearch(val.description)]),
+        details: val.details === undefined ? undefined : (Array.isArray(val.details) ? val.details.map(x => parseStringToRegexOrLiteralSearch(x)) : [parseStringToRegexOrLiteralSearch(val.details)]),
+    }
+}
+
+
+export const asModLogCriteria = (val: any): val is ModLogCriteria => {
+    return val !== null && typeof val === 'object' && ('action' in val || 'details' in val || 'description' in val || 'activityType' in val);
+}
+
 
 export const authorCriteriaProperties = ['name', 'flairCssClass', 'flairText', 'flairTemplate', 'isMod', 'userNotes', 'age', 'linkKarma', 'commentKarma', 'totalKarma', 'verified', 'shadowBanned', 'description', 'isContributor'];
 
@@ -158,6 +236,8 @@ export interface AuthorCriteria {
      * A list of UserNote properties to check against the User Notes attached to this Author in this Subreddit (must have Toolbox enabled and used User Notes at least once)
      * */
     userNotes?: UserNoteCriteria[]
+
+    modActions?: (ModNoteCriteria | ModLogCriteria)[]
 
     /**
      * Test the age of the Author's account (when it was created) against this comparison

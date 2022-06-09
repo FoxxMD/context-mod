@@ -56,7 +56,12 @@ import {
     frequencyEqualOrLargerThanMin,
     parseDurationValToDuration,
     windowConfigToWindowCriteria,
-    asStrongSubredditState, convertSubredditsRawToStrong, filterByTimeRequirement, asSubreddit
+    asStrongSubredditState,
+    convertSubredditsRawToStrong,
+    filterByTimeRequirement,
+    asSubreddit,
+    modActionCriteriaSummary,
+    parseRedditFullname
 } from "../util";
 import LoggedError from "../Utils/LoggedError";
 import {
@@ -109,16 +114,19 @@ import {RuleSetResultEntity} from "../Common/Entities/RuleSetResultEntity";
 import {RulePremise} from "../Common/Entities/RulePremise";
 import cloneDeep from "lodash/cloneDeep";
 import {
-    AuthorCriteria, CommentState, RequiredAuthorCrit,
+    asModLogCriteria,
+    asModNoteCriteria,
+    AuthorCriteria, CommentState, ModLogCriteria, ModNoteCriteria, RequiredAuthorCrit,
     StrongSubredditCriteria, SubmissionState,
-    SubredditCriteria, TypedActivityState, TypedActivityStates,
+    SubredditCriteria, toFullModLogCriteria, toFullModNoteCriteria, TypedActivityState, TypedActivityStates,
     UserNoteCriteria
 } from "../Common/Infrastructure/Filters/FilterCriteria";
 import {
     ActivitySource, DurationVal,
     EventRetentionPolicyRange,
     JoinOperands,
-    ModeratorNameCriteria, statFrequencies, StatisticFrequency,
+    ModActionType,
+    ModeratorNameCriteria, ModUserNoteLabel, statFrequencies, StatisticFrequency,
     StatisticFrequencyOption
 } from "../Common/Infrastructure/Atomic";
 import {
@@ -137,6 +145,7 @@ import {
 import {Duration} from "dayjs/plugin/duration";
 import {
 
+    ActivityType,
     AuthorHistorySort,
     CachedFetchedActivitiesResult, FetchedActivitiesResult,
     SnoowrapActivity
@@ -2468,6 +2477,8 @@ export class SubredditResources {
                 ex = v.map(x => {
                     if (asUserNoteCriteria(x)) {
                         return userNoteCriteriaSummary(x);
+                    } else if(asModNoteCriteria(x) || asModLogCriteria(x)) {
+                        return modActionCriteriaSummary(x);
                     }
                     return x;
                 });
@@ -2778,25 +2789,28 @@ export class SubredditResources {
                                             }
                                             break;
                                         case 'consecutive':
+                                            if (isPercent) {
+                                                throw new SimpleError(`When comparing UserNotes with 'consecutive' search 'count' cannot be a percentage. Given: ${count}`);
+                                            }
+
                                             let orderedNotes = notes;
                                             if (order === 'descending') {
                                                 orderedNotes = [...notes];
                                                 orderedNotes.reverse();
                                             }
                                             let currCount = 0;
+                                            let maxCount = 0;
                                             for (const note of orderedNotes) {
                                                 if (note.noteType === type) {
                                                     currCount++;
+                                                    maxCount = Math.max(maxCount, currCount);
                                                 } else {
                                                     currCount = 0;
                                                 }
-                                                if (isPercent) {
-                                                    throw new SimpleError(`When comparing UserNotes with 'consecutive' search 'count' cannot be a percentage. Given: ${count}`);
-                                                }
-                                                foundNoteResult.push(`Found ${currCount} ${type} consecutively`);
-                                                if (comparisonTextOp(currCount, operator, value)) {
-                                                    return true;
-                                                }
+                                            }
+                                            foundNoteResult.push(`Found ${currCount} ${type} consecutively`);
+                                            if (comparisonTextOp(currCount, operator, value)) {
+                                                return true;
                                             }
                                             break;
                                         case 'total':
@@ -2823,6 +2837,180 @@ export class SubredditResources {
                             propResultsMap.userNotes!.found = foundNoteResult.join(' | ');
                             propResultsMap.userNotes!.passed = !((include && !noteResult) || (!include && noteResult));
                             if (!propResultsMap.userNotes!.passed) {
+                                shouldContinue = false;
+                            }
+                            break;
+                        case 'modActions':
+                            const modActions = await this.getAuthorModNotesByActivityAuthor(item);
+                            // TODO convert these prior to running filter so we don't have to do it every time
+                            const actionCriterias = authorOptVal as (ModNoteCriteria | ModLogCriteria)[];
+                            let actionResult: string[] = [];
+
+                            const actionsPass = () => {
+
+                                for (const actionCriteria of actionCriterias) {
+
+                                    const {search = 'current', count = '>= 1'} = actionCriteria;
+
+                                    let actionsToUse: ModNote[] = [];
+                                    if(asModNoteCriteria(actionCriteria)) {
+                                        actionsToUse.filter(x => x.type === 'NOTE');
+                                    } else {
+                                        actionsToUse = modActions;
+                                    }
+
+                                    if(search === 'current' && actionsToUse.length > 0) {
+                                        actionsToUse = [actionsToUse[0]];
+                                    }
+
+                                    let validActions: ModNote[] = [];
+                                    if (asModLogCriteria(actionCriteria)) {
+                                        const fullCrit = toFullModLogCriteria(actionCriteria);
+                                        const fullCritEntries = Object.entries(fullCrit);
+                                        validActions = actionsToUse.filter(x => {
+                                            for (const [k, v] of fullCritEntries) {
+                                                const key = k.toLocaleLowerCase();
+                                                if (['count', 'search'].includes(key)) {
+                                                    continue;
+                                                }
+                                                switch (key) {
+                                                    case 'type':
+                                                        if (!v.includes((x.type as ModActionType))) {
+                                                            return false
+                                                        }
+                                                        break;
+                                                    case 'activityType':
+                                                        const anyMatch = v.some((a: ActivityType) => {
+                                                            switch (a) {
+                                                                case 'submission':
+                                                                    if (x.action.actedOn instanceof Submission) {
+                                                                        return true;
+                                                                    }
+                                                                    break;
+                                                                case 'comment':
+                                                                    if (x.action.actedOn instanceof Comment) {
+                                                                        return true;
+                                                                    }
+                                                                    break;
+                                                            }
+                                                        });
+                                                        if (!anyMatch) {
+                                                            return false;
+                                                        }
+                                                        break;
+                                                    case 'description':
+                                                    case 'action':
+                                                    case 'details':
+                                                        const actionPropVal = x.action[key] as string;
+                                                        if (actionPropVal === undefined) {
+                                                            return false;
+                                                        }
+                                                        const anyPropMatch = v.some((y: RegExp) => y.test(actionPropVal));
+                                                        if (!anyPropMatch) {
+                                                            return false;
+                                                        }
+                                                } // case end
+
+                                            } // for each end
+
+                                            return true;
+                                        }); // filter end
+                                    } else {
+                                        const fullCrit = toFullModNoteCriteria(actionCriteria as ModNoteCriteria);
+                                        const fullCritEntries = Object.entries(fullCrit);
+                                        validActions = modActions.filter(x => {
+                                            for (const [k, v] of fullCritEntries) {
+                                                const key = k.toLocaleLowerCase();
+                                                if (['count', 'search'].includes(key)) {
+                                                    continue;
+                                                }
+                                                switch (key) {
+                                                    case 'noteType':
+                                                        if (!v.map((x: ModUserNoteLabel) => x.toUpperCase()).includes((x.note.label as ModUserNoteLabel))) {
+                                                            return false
+                                                        }
+                                                        break;
+                                                    case 'note':
+                                                        const actionPropVal = x.note.note;
+                                                        if (actionPropVal === undefined) {
+                                                            return false;
+                                                        }
+                                                        const anyPropMatch = v.some((y: RegExp) => y.test(actionPropVal));
+                                                        if (!anyPropMatch) {
+                                                            return false;
+                                                        }
+                                                } // case end
+
+                                            } // for each end
+
+                                            return true;
+                                        }); // filter end
+                                    }
+
+                                    const {
+                                        value,
+                                        operator,
+                                        isPercent,
+                                        extra = ''
+                                    } = parseGenericValueOrPercentComparison(count);
+
+                                    switch (search) {
+                                        case 'current':
+                                            if (modActions.length === 0) {
+                                                actionResult.push('No Mod Actions present');
+                                            } else {
+                                                actionResult.push('Current Action matches criteria');
+                                                return true;
+                                            }
+                                            break;
+                                        case 'consecutive':
+                                            if (isPercent) {
+                                                throw new SimpleError(`When comparing Mod Actions with 'search: consecutive' the 'count' value cannot be a percentage. Given: ${count}`);
+                                            }
+                                            const validActionIds = validActions.map(x => x.id);
+                                            const order = extra.includes('asc') ? 'ascending' : 'descending';
+                                            let orderedActions = actionsToUse;
+                                            if(order === 'descending') {
+                                                orderedActions = [...actionsToUse];
+                                                orderedActions.reverse();
+                                            }
+                                            let currCount = 0;
+                                            let maxCount = 0;
+                                            for(const action of orderedActions) {
+                                                if(validActionIds.includes(action.id)) {
+                                                    currCount++;
+                                                    maxCount = Math.max(maxCount, currCount);
+                                                } else {
+                                                    currCount = 0;
+                                                }
+                                            }
+                                            actionResult.push(`Found maximum of ${maxCount} consecutive Mod Actions that matched criteria`);
+                                            if (comparisonTextOp(currCount, operator, value)) {
+                                                return true;
+                                            }
+                                            break;
+                                        case 'total':
+                                            if (isPercent) {
+                                                // avoid divide by zero
+                                                const percent = notes.length === 0 ? 0 : validActions.length / actionsToUse.length;
+                                                foundNoteResult.push(`${formatNumber(percent)}% of ${actionsToUse.length} matched criteria`);
+                                                if (comparisonTextOp(percent, operator, value / 100)) {
+                                                    return true;
+                                                }
+                                            } else {
+                                                foundNoteResult.push(`${validActions.length} matched criteria`);
+                                                if (comparisonTextOp(validActions.length, operator, value)) {
+                                                    return true;
+                                                }
+                                            }
+                                    }
+                                } // criteria for loop ends
+                                return false;
+                            }
+                            const actionsResult = actionsPass();
+                            propResultsMap.modActions!.found = actionResult.join(' | ');
+                            propResultsMap.modActions!.passed = !((include && !actionsResult) || (!include && actionsResult));
+                            if (!propResultsMap.modActions!.passed) {
                                 shouldContinue = false;
                             }
                             break;

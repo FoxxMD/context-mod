@@ -53,11 +53,11 @@ import {RulePremise} from "./Common/Entities/RulePremise";
 import {RuleResultEntity as RuleResultEntity} from "./Common/Entities/RuleResultEntity";
 import {nanoid} from "nanoid";
 import {
-    ActivityState,
+    ActivityState, asModLogCriteria, asModNoteCriteria,
     AuthorCriteria,
     authorCriteriaProperties,
     CommentState,
-    defaultStrongSubredditCriteriaOptions,
+    defaultStrongSubredditCriteriaOptions, ModLogCriteria, ModNoteCriteria,
     StrongSubredditCriteria,
     SubmissionState,
     SubredditCriteria,
@@ -1413,6 +1413,18 @@ export const parseStringToRegex = (val: string, defaultFlags?: string): RegExp |
     return new RegExp(result[1], flags);
 }
 
+export const parseStringToRegexOrLiteralSearch = (val: string, defaultFlags: string = 'i'): RegExp => {
+    const maybeRegex = parseStringToRegex(val, defaultFlags);
+    if (maybeRegex !== undefined) {
+        return maybeRegex;
+    }
+    const literalSearchRegex = parseStringToRegex(`/${escapeRegex(val.trim())}/`, defaultFlags);
+    if (literalSearchRegex === undefined) {
+        throw new SimpleError(`Could not convert test value to a valid regex: ${val}`);
+    }
+    return literalSearchRegex;
+}
+
 export const parseRegex = (reg: RegExp, val: string): RegExResult => {
 
     if(reg.global) {
@@ -1796,6 +1808,20 @@ export const asUserNoteCriteria = (value: any): value is UserNoteCriteria => {
 
 export const userNoteCriteriaSummary = (val: UserNoteCriteria): string => {
     return `${val.count === undefined ? '>= 1' : val.count} of ${val.search === undefined ? 'current' : val.search} notes is ${val.type}`;
+}
+
+export const modActionCriteriaSummary = (val: (ModNoteCriteria | ModLogCriteria)): string => {
+    const isNote = asModNoteCriteria(val);
+    const preamble = `${val.count === undefined ? '>= 1' : val.count} of ${val.search === undefined ? 'current' : val.search} ${isNote ? 'notes' : 'actions'} is`;
+    const filters = Object.entries(val).reduce((acc: string[], curr) => {
+        if(['count', 'search'].includes(curr[0])) {
+            return acc;
+        }
+        const vals = Array.isArray(curr[1]) ? curr[1] : [curr[1]];
+       acc.push(`${curr[0]}: ${vals.join(' ,')}`)
+        return acc;
+    }, []);
+    return `${preamble} ${filters.join(' || ')}`;
 }
 
 /**
@@ -2465,6 +2491,30 @@ export const normalizeCriteria = <T extends AuthorCriteria | TypedActivityState 
         }
         if(criteria.description !== undefined) {
             criteria.description = Array.isArray(criteria.description) ? criteria.description : [criteria.description];
+        }
+        if(criteria.modActions !== undefined) {
+            criteria.modActions.map((x, index) => {
+                const common = {
+                    ...x,
+                    type: x.type === undefined ? undefined : (Array.isArray(x.type) ? x.type : [x.type])
+                }
+                if(asModNoteCriteria(x)) {
+                    return {
+                        ...common,
+                        noteType: x.noteType === undefined ? undefined : (Array.isArray(x.noteType) ? x.noteType : [x.noteType]),
+                        note: x.note === undefined ? undefined : (Array.isArray(x.note) ? x.note : [x.note]),
+                    }
+                } else if(asModLogCriteria(x)) {
+                    return {
+                        ...common,
+                        action: x.action === undefined ? undefined : (Array.isArray(x.action) ? x.action : [x.action]),
+                        details: x.details === undefined ? undefined : (Array.isArray(x.details) ? x.details : [x.details]),
+                        description: x.description === undefined ? undefined : (Array.isArray(x.description) ? x.description : [x.description]),
+                        activityType: x.activityType === undefined ? undefined : (Array.isArray(x.activityType) ? x.activityType : [x.activityType]),
+                    }
+                }
+                return common;
+            })
         }
     }
 

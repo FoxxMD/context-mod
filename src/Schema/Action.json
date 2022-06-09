@@ -138,6 +138,19 @@
                     "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
                     "type": "string"
                 },
+                "modActions": {
+                    "items": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/definitions/ModNoteCriteria"
+                            },
+                            {
+                                "$ref": "#/definitions/ModLogCriteria"
+                            }
+                        ]
+                    },
+                    "type": "array"
+                },
                 "name": {
                     "description": "A list of reddit usernames (case-insensitive) to match against. Do not include the \"u/\" prefix\n\n EX to match against /u/FoxxMD and /u/AnotherUser use [\"FoxxMD\",\"AnotherUser\"]",
                     "examples": [
@@ -406,6 +419,220 @@
             },
             "type": "object"
         },
+        "ModLogCriteria": {
+            "properties": {
+                "action": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "string"
+                        }
+                    ]
+                },
+                "activityType": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "enum": [
+                                    "comment",
+                                    "submission"
+                                ],
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "enum": [
+                                "comment",
+                                "submission"
+                            ],
+                            "type": "string"
+                        }
+                    ]
+                },
+                "count": {
+                    "default": ">= 1",
+                    "description": "Number of occurrences of this type. Ignored if `search` is `current`\n\nA string containing a comparison operator and/or a value to compare number of occurrences against\n\nThe syntax is `(< OR > OR <= OR >=) <number>[percent sign] [ascending|descending]`",
+                    "examples": [
+                        ">= 1"
+                    ],
+                    "pattern": "^\\s*(?<opStr>>|>=|<|<=)\\s*(?<value>\\d+)\\s*(?<percent>%?)\\s*(?<extra>asc.*|desc.*)*$",
+                    "type": "string"
+                },
+                "description": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "string"
+                        }
+                    ]
+                },
+                "details": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "string"
+                        }
+                    ]
+                },
+                "search": {
+                    "default": "current",
+                    "description": "How to test the Toolbox Notes or Mod Actions for this Author:\n\n### current\n\nOnly the most recent note is checked for criteria\n\n### total\n\n`count` comparison of mod actions/notes must be found within all history\n\n* EX `count: > 3`   => Must have more than 3 notes of `type`, total\n* EX `count: <= 25%` => Must have 25% or less of notes of `type`, total\n\n### consecutive\n\nThe `count` **number** of mod actions/notes must be found in a row.\n\nYou may also specify the time-based order in which to search the notes by specifying `ascending (asc)` or `descending (desc)` in the `count` value. Default is `descending`\n\n* EX `count: >= 3` => Must have 3 or more notes of `type` consecutively, in descending order\n* EX `count: < 2`  => Must have less than 2 notes of `type` consecutively, in descending order\n* EX `count: > 4 asc` => Must have greater than 4 notes of `type` consecutively, in ascending order",
+                    "enum": [
+                        "consecutive",
+                        "current",
+                        "total"
+                    ],
+                    "examples": [
+                        "current"
+                    ],
+                    "type": "string"
+                },
+                "type": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "enum": [
+                                    "APPROVAL",
+                                    "INVITE",
+                                    "NOTE",
+                                    "REMOVAL",
+                                    "SPAM"
+                                ],
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "enum": [
+                                "APPROVAL",
+                                "INVITE",
+                                "NOTE",
+                                "REMOVAL",
+                                "SPAM"
+                            ],
+                            "type": "string"
+                        }
+                    ]
+                }
+            },
+            "type": "object"
+        },
+        "ModNoteCriteria": {
+            "properties": {
+                "count": {
+                    "default": ">= 1",
+                    "description": "Number of occurrences of this type. Ignored if `search` is `current`\n\nA string containing a comparison operator and/or a value to compare number of occurrences against\n\nThe syntax is `(< OR > OR <= OR >=) <number>[percent sign] [ascending|descending]`",
+                    "examples": [
+                        ">= 1"
+                    ],
+                    "pattern": "^\\s*(?<opStr>>|>=|<|<=)\\s*(?<value>\\d+)\\s*(?<percent>%?)\\s*(?<extra>asc.*|desc.*)*$",
+                    "type": "string"
+                },
+                "note": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "string"
+                        }
+                    ]
+                },
+                "noteType": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "enum": [
+                                    "ABUSE_WARNING",
+                                    "BAN",
+                                    "BOT_BAN",
+                                    "HELPFUL_USER",
+                                    "PERMA_BAN",
+                                    "SOLID_CONTRIBUTOR",
+                                    "SPAM_WARNING",
+                                    "SPAM_WATCH"
+                                ],
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "enum": [
+                                "ABUSE_WARNING",
+                                "BAN",
+                                "BOT_BAN",
+                                "HELPFUL_USER",
+                                "PERMA_BAN",
+                                "SOLID_CONTRIBUTOR",
+                                "SPAM_WARNING",
+                                "SPAM_WATCH"
+                            ],
+                            "type": "string"
+                        }
+                    ]
+                },
+                "search": {
+                    "default": "current",
+                    "description": "How to test the Toolbox Notes or Mod Actions for this Author:\n\n### current\n\nOnly the most recent note is checked for criteria\n\n### total\n\n`count` comparison of mod actions/notes must be found within all history\n\n* EX `count: > 3`   => Must have more than 3 notes of `type`, total\n* EX `count: <= 25%` => Must have 25% or less of notes of `type`, total\n\n### consecutive\n\nThe `count` **number** of mod actions/notes must be found in a row.\n\nYou may also specify the time-based order in which to search the notes by specifying `ascending (asc)` or `descending (desc)` in the `count` value. Default is `descending`\n\n* EX `count: >= 3` => Must have 3 or more notes of `type` consecutively, in descending order\n* EX `count: < 2`  => Must have less than 2 notes of `type` consecutively, in descending order\n* EX `count: > 4 asc` => Must have greater than 4 notes of `type` consecutively, in ascending order",
+                    "enum": [
+                        "consecutive",
+                        "current",
+                        "total"
+                    ],
+                    "examples": [
+                        "current"
+                    ],
+                    "type": "string"
+                },
+                "type": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "enum": [
+                                    "APPROVAL",
+                                    "INVITE",
+                                    "NOTE",
+                                    "REMOVAL",
+                                    "SPAM"
+                                ],
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "enum": [
+                                "APPROVAL",
+                                "INVITE",
+                                "NOTE",
+                                "REMOVAL",
+                                "SPAM"
+                            ],
+                            "type": "string"
+                        }
+                    ]
+                }
+            },
+            "type": "object"
+        },
         "ModeratorNameCriteria": {
             "properties": {
                 "behavior": {
@@ -670,7 +897,7 @@
                 },
                 "search": {
                     "default": "current",
-                    "description": "How to test the notes for this Author:\n\n### current\n\nOnly the most recent note is checked for `type`\n\n### total\n\nThe `count` comparison of `type` must be found within all notes\n\n* EX `count: > 3`   => Must have more than 3 notes of `type`, total\n* EX `count: <= 25%` => Must have 25% or less of notes of `type`, total\n\n### consecutive\n\nThe `count` **number** of `type` notes must be found in a row.\n\nYou may also specify the time-based order in which to search the notes by specifying `ascending (asc)` or `descending (desc)` in the `count` value. Default is `descending`\n\n* EX `count: >= 3` => Must have 3 or more notes of `type` consecutively, in descending order\n* EX `count: < 2`  => Must have less than 2 notes of `type` consecutively, in descending order\n* EX `count: > 4 asc` => Must have greater than 4 notes of `type` consecutively, in ascending order",
+                    "description": "How to test the Toolbox Notes or Mod Actions for this Author:\n\n### current\n\nOnly the most recent note is checked for criteria\n\n### total\n\n`count` comparison of mod actions/notes must be found within all history\n\n* EX `count: > 3`   => Must have more than 3 notes of `type`, total\n* EX `count: <= 25%` => Must have 25% or less of notes of `type`, total\n\n### consecutive\n\nThe `count` **number** of mod actions/notes must be found in a row.\n\nYou may also specify the time-based order in which to search the notes by specifying `ascending (asc)` or `descending (desc)` in the `count` value. Default is `descending`\n\n* EX `count: >= 3` => Must have 3 or more notes of `type` consecutively, in descending order\n* EX `count: < 2`  => Must have less than 2 notes of `type` consecutively, in descending order\n* EX `count: > 4 asc` => Must have greater than 4 notes of `type` consecutively, in ascending order",
                     "enum": [
                         "consecutive",
                         "current",

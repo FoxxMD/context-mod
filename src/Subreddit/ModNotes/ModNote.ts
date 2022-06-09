@@ -5,7 +5,7 @@ import {ModUserNote, ModUserNoteRaw} from "./ModUserNote";
 import dayjs, {Dayjs} from "dayjs";
 import {generateSnoowrapEntityFromRedditThing, parseRedditFullname} from "../../util";
 import Snoowrap from "snoowrap";
-import {ModNoteType, ModUserNoteLabel} from "../../Common/Infrastructure/Atomic";
+import {ModActionType, ModUserNoteLabel} from "../../Common/Infrastructure/Atomic";
 import {RedditThing} from "../../Common/Infrastructure/Reddit";
 
 export interface ModNoteSnoowrapPopulated extends Omit<ModNoteRaw, 'subreddit' | 'user'> {
@@ -42,7 +42,7 @@ export interface ModNoteRaw {
     id: string
     created_at: number
     cursor?: string
-    type: ModNoteType | string
+    type: ModActionType | string
     mod_action_data: ModActionRaw
     user_note_data: ModUserNoteRaw
 }
@@ -59,7 +59,7 @@ export class ModNote {
     cursor?: string
     id: string
     subreddit: Subreddit
-    type: string
+    type: ModActionType | string
 
 
     constructor(data: ModNoteRaw, client: Snoowrap) {
