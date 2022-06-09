@@ -8,6 +8,7 @@ import {toModNoteLabel} from "../util";
 import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
 import {runCheckOptions} from "../Subreddit/Manager";
 import {ActionTypes, ModUserNoteLabel} from "../Common/Infrastructure/Atomic";
+import {ModNote} from "../Subreddit/ModNotes/ModNote";
 
 
 export class ModNoteAction extends Action {
@@ -69,7 +70,7 @@ export class ModNoteAction extends Action {
         //     }
         // }
         if (!dryRun) {
-            await this.client.addModNote({
+            await this.resources.addModNote({
                 label: modLabel,
                 note: renderedContent,
                 activity: this.referenceActivity ? item : undefined,

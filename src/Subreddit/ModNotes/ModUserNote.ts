@@ -5,9 +5,9 @@ import {generateSnoowrapEntityFromRedditThing, parseRedditFullname} from "../../
 import Snoowrap from "snoowrap";
 
 export interface ModUserNoteRaw {
-    note: string | null
-    reddit_id: string | null
-    label: string | null
+    note?: string | null
+    reddit_id?: string | null
+    label?: string | null
 }
 
 export class ModUserNote {
@@ -24,12 +24,24 @@ export class ModUserNote {
         this.note = note !== null ? note : undefined;
         this.label = label !== null ? label as ModUserNoteLabel : undefined;
 
-        if(reddit_id !== null && reddit_id !== undefined) {
+        if (reddit_id !== null && reddit_id !== undefined) {
             const thing = parseRedditFullname(reddit_id);
-            if(thing !== undefined) {
+            if (thing !== undefined) {
                 this.actedOn = generateSnoowrapEntityFromRedditThing(thing, client) as RedditUser | Submission | Comment;
             }
         }
+    }
+
+    toRaw(): ModUserNoteRaw {
+        return {
+            note: this.note,
+            reddit_id: this.actedOn !== undefined ? this.actedOn.id : undefined,
+            label: this.label
+        }
+    }
+
+    toJSON() {
+        return this.toRaw();
     }
 }
 

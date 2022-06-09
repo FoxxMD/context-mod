@@ -56,7 +56,7 @@ import {
     frequencyEqualOrLargerThanMin,
     parseDurationValToDuration,
     windowConfigToWindowCriteria,
-    asStrongSubredditState, convertSubredditsRawToStrong, filterByTimeRequirement
+    asStrongSubredditState, convertSubredditsRawToStrong, filterByTimeRequirement, asSubreddit
 } from "../util";
 import LoggedError from "../Utils/LoggedError";
 import {
@@ -144,6 +144,7 @@ import {
 import {AuthorCritPropHelper} from "../Common/Infrastructure/Filters/AuthorCritPropHelper";
 import {NoopLogger} from "../Utils/loggerFactory";
 import {parseGenericValueComparison, parseGenericValueOrPercentComparison} from "../Common/Infrastructure/Comparisons";
+import {asCreateModNoteData, CreateModNoteData, ModNote, ModNoteRaw} from "./ModNotes/ModNote";
 
 export const DEFAULT_FOOTER = '\r\n*****\r\nThis action was performed by [a bot.]({{botLink}}) Mention a moderator or [send a modmail]({{modmailLink}}) if you any ideas, questions, or concerns about this action.';
 
@@ -209,6 +210,7 @@ export class SubredditResources {
     protected submissionTTL: number | false = cacheTTLDefaults.submissionTTL;
     protected commentTTL: number | false = cacheTTLDefaults.commentTTL;
     protected filterCriteriaTTL: number | false = cacheTTLDefaults.filterCriteriaTTL;
+    protected modNotesTTL: number | false = cacheTTLDefaults.modNotesTTL;
     public selfTTL: number | false = cacheTTLDefaults.selfTTL;
     name: string;
     botName: string;
@@ -258,6 +260,7 @@ export class SubredditResources {
                 submissionTTL,
                 commentTTL,
                 subredditTTL,
+                modNotesTTL,
             },
             botName,
             database,
@@ -299,6 +302,7 @@ export class SubredditResources {
         this.subredditTTL = subredditTTL === true ? 0 : subredditTTL;
         this.wikiTTL = wikiTTL === true ? 0 : wikiTTL;
         this.filterCriteriaTTL = filterCriteriaTTL === true ? 0 : filterCriteriaTTL;
+        this.modNotesTTL = modNotesTTL === true ? 0 : modNotesTTL;
         this.selfTTL = selfTTL === true ? 0 : selfTTL;
         this.subreddit = subreddit;
         this.thirdPartyCredentials = thirdPartyCredentials;
@@ -1003,11 +1007,19 @@ export class SubredditResources {
     }
 
     // @ts-ignore
-    async getSubreddit(item: Submission | Comment, logger = this.logger) {
+    async getSubreddit(item: Submission | Comment | Subreddit | string, logger = this.logger) {
+        let subName = '';
+        if (typeof item === 'string') {
+            subName = item;
+        } else if (asSubreddit(item)) {
+            subName = item.display_name;
+        } else if (asSubmission(item) || asComment(item)) {
+            subName = getActivitySubredditName(item);
+        }
         try {
             let hash = '';
-            const subName = getActivitySubredditName(item);
             if (this.subredditTTL !== false) {
+
                 hash = `sub-${subName}`;
                 await this.stats.cache.subreddit.identifierRequestCount.set(hash, (await this.stats.cache.subreddit.identifierRequestCount.wrap(hash, () => 0) as number) + 1);
                 this.stats.cache.subreddit.requestTimestamps.push(Date.now());
@@ -1018,7 +1030,7 @@ export class SubredditResources {
                     return new Subreddit(cachedSubreddit, this.client, false);
                 }
                 // @ts-ignore
-                const subreddit = await this.client.getSubreddit(subName).fetch() as Subreddit;
+                const subreddit = await (item instanceof Subreddit ? item : this.client.getSubreddit(subName)).fetch() as Subreddit;
                 this.stats.cache.subreddit.miss++;
                 // @ts-ignore
                 await this.cache.set(hash, subreddit, {ttl: this.subredditTTL});
@@ -1026,7 +1038,7 @@ export class SubredditResources {
                 return subreddit as Subreddit;
             } else {
                 // @ts-ignore
-                let subreddit = await this.client.getSubreddit(subName);
+                let subreddit = await (item instanceof Subreddit ? item : this.client.getSubreddit(subName)).fetch();
 
                 return subreddit as Subreddit;
             }
@@ -1130,6 +1142,81 @@ export class SubredditResources {
             return val !== undefined && val !== null;
         }
         return false;
+    }
+
+    async getAuthorModNotesByActivity(activity: Comment | Submission) {
+        const author = activity.author instanceof RedditUser ? activity.author : getActivityAuthorName(activity.author);
+        return this.getAuthorModNotes(author);
+    }
+
+    async getAuthorModNotes(val: RedditUser | string) {
+
+        const authorName = typeof val === 'string' ? val : val.name;
+        if (authorName === '[deleted]') {
+            throw new SimpleError(`User is '[deleted]', cannot retrieve`, {isSerious: false});
+        }
+        const subredditName = this.subreddit.display_name
+
+        const hash = `authorModNotes-${subredditName}-${authorName}`;
+
+        if (this.modNotesTTL !== false) {
+            const cachedModNoteData = await this.cache.get(hash) as ModNoteRaw[] | null | undefined;
+            if (cachedModNoteData !== undefined && cachedModNoteData !== null) {
+                this.logger.debug(`Cache Hit: Author ModNotes ${authorName} in ${subredditName}`);
+
+                return cachedModNoteData.map(x => {
+                    const note = new ModNote(x, this.client);
+                    note.subreddit = this.subreddit;
+                    if (val instanceof RedditUser) {
+                        note.user = val;
+                    }
+                    return note;
+                });
+            }
+        }
+
+        const fetchedNotes = (await this.client.getModNotes(this.subreddit, val)).notes.map(x => {
+            x.subreddit = this.subreddit;
+            if (val instanceof RedditUser) {
+                x.user = val;
+            }
+            return x;
+        });
+
+        if (this.modNotesTTL !== false) {
+            // @ts-ignore
+            await this.cache.set(hash, fetchedNotes, {ttl: this.modNotesTTL});
+        }
+
+        return fetchedNotes;
+    }
+
+    async addModNote(note: CreateModNoteData | ModNote): Promise<ModNote> {
+        let data: CreateModNoteData;
+        if (asCreateModNoteData(note)) {
+            data = note;
+        } else {
+            data = {
+                user: note.user,
+                subreddit: this.subreddit,
+                activity: note.note.actedOn as Submission | Comment | RedditUser | undefined,
+                label: note.note.label,
+                note: note.note.note ?? '',
+            }
+        }
+
+        const newNote = await this.client.addModNote(data);
+
+        if (this.modNotesTTL !== false) {
+            const hash = `authorModNotes-${this.subreddit.display_name}-${data.user.name}`;
+            const cachedModNoteData = await this.cache.get(hash) as ModNoteRaw[] | null | undefined;
+            if (cachedModNoteData !== undefined && cachedModNoteData !== null) {
+                this.logger.debug(`Adding new Note ${newNote.id} to Author ${data.user.name} Note cache`);
+                await this.cache.set(hash, [newNote, ...cachedModNoteData], {ttl: this.modNotesTTL});
+            }
+        }
+
+        return newNote;
     }
 
     // @ts-ignore
@@ -2909,6 +2996,7 @@ export class BotResourcesManager {
                 submissionTTL,
                 subredditTTL,
                 filterCriteriaTTL,
+                modNotesTTL,
                 selfTTL,
                 provider,
                 actionedEventsMax,
@@ -2931,7 +3019,7 @@ export class BotResourcesManager {
         this.defaultCacheConfig = caching;
         this.defaultThirdPartyCredentials = thirdParty;
         this.defaultDatabase = database;
-        this.ttlDefaults = {authorTTL, userNotesTTL, wikiTTL, commentTTL, submissionTTL, filterCriteriaTTL, subredditTTL, selfTTL};
+        this.ttlDefaults = {authorTTL, userNotesTTL, wikiTTL, commentTTL, submissionTTL, filterCriteriaTTL, subredditTTL, selfTTL, modNotesTTL};
         this.botName = name as string;
         this.logger = logger;
         this.invokeeRepo = this.defaultDatabase.getRepository(InvokeeType);
