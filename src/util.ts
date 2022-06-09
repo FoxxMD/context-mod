@@ -1730,12 +1730,25 @@ export const difference = (a: Array<any>, b: Array<any>) => {
     return Array.from(setMinus(a, b));
 }
 
+// can use 'in' operator to check if object has a property with name WITHOUT TRIGGERING a snoowrap proxy to fetch
+export const isSubreddit = (value: any) => {
+    try {
+        return value !== null && typeof value === 'object' && (value instanceof Subreddit || ('id' in value && value.id !== undefined && value.id.includes('t5_')) || 'display_name' in value);
+    } catch (e) {
+        return false;
+    }
+}
+
+export const asSubreddit = (value: any): value is Subreddit => {
+    return isSubreddit(value);
+}
+
 /**
  * Cached activities lose type information when deserialized so need to check properties as well to see if the object is the shape of a Submission
  * */
 export const isSubmission = (value: any) => {
     try {
-        return value !== null && typeof value === 'object' && (value instanceof Submission || (value.name !== undefined && value.name.includes('t3_')));
+        return value !== null && typeof value === 'object' && (value instanceof Submission || ('name' in value && value.name !== undefined && value.name.includes('t3_')));
     } catch (e) {
         return false;
     }
@@ -1747,7 +1760,7 @@ export const asSubmission = (value: any): value is Submission => {
 
 export const isComment = (value: any) => {
     try {
-        return value !== null && typeof value === 'object' && (value instanceof Comment || value.name.includes('t1_'));
+        return value !== null && typeof value === 'object' && (value instanceof Comment || ('name' in value && value.name !== undefined && value.name.includes('t1_')));
     } catch (e) {
         return false;
     }
@@ -1763,7 +1776,7 @@ export const asActivity = (value: any): value is (Submission | Comment) => {
 
 export const isUser = (value: any) => {
     try {
-        return value !== null && typeof value === 'object' && (value instanceof RedditUser || value.name.includes('t2_'));
+        return value !== null && typeof value === 'object' && (value instanceof RedditUser || ('name' in value && value.name !== undefined && value.name.includes('t2_')));
     } catch(e) {
         return false;
     }
