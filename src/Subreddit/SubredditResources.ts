@@ -1144,8 +1144,11 @@ export class SubredditResources {
         return false;
     }
 
-    async getAuthorModNotesByActivity(activity: Comment | Submission) {
+    async getAuthorModNotesByActivityAuthor(activity: Comment | Submission) {
         const author = activity.author instanceof RedditUser ? activity.author : getActivityAuthorName(activity.author);
+        if (activity.subreddit.display_name !== this.subreddit.display_name) {
+            throw new SimpleError(`Can only get Modnotes for current moderator subreddit, Activity is from ${activity.subreddit.display_name}`, {isSerious: false});
+        }
         return this.getAuthorModNotes(author);
     }
 
