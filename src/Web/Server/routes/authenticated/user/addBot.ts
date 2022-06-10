@@ -31,13 +31,13 @@ const addBot = () => {
             const {
                 bots: botsFromConfig = []
             } = req.botApp.fileConfig.document.toJS();
-            if(botsFromConfig.length === 0 || botsFromConfig.some(x => x.name !== botData.name)) {
+            if (botsFromConfig.length === 0 || !botsFromConfig.some(x => x.name === botData.name)) {
                 req.botApp.logger.warn('Overwriting existing bot with the same name BUT this bot does not exist in the operator CONFIG FILE. You should check how you have provided config before next start or else this bot may be started twice (once from file, once from arg/env)');
-
             }
 
             await existingBot.destroy('system');
-            req.botApp.bots.filter(x => x.botAccount !== botData.name);
+            const existingBotIndex = req.botApp.bots.findIndex(x => x.botAccount === botData.name);
+            req.botApp.bots.splice(existingBotIndex, 1);
         }
 
         req.botApp.fileConfig.document.addBot(botData);
@@ -55,13 +55,8 @@ const addBot = () => {
                 return res.status(500).json(result);
             }
             await newBot.testClient();
-            await newBot.buildManagers();
-            newBot.runManagers('system').catch((err) => {
-                req.botApp.logger.error(`Unexpected error occurred while running Bot ${newBot.botName}. Bot must be re-built to restart`);
-                if (!err.logged || !(err instanceof LoggedError)) {
-                    req.botApp.logger.error(err);
-                }
-            });
+            // return response early so client doesn't have to wait for all managers to be built
+            res.json(result);
         } catch (err: any) {
             result.success = false;
             if (newBot.error === undefined) {
@@ -73,7 +68,22 @@ const addBot = () => {
                 req.botApp.logger.error(err);
             }
         }
-        return res.json(result);
+
+        try {
+            await newBot.buildManagers();
+            newBot.runManagers('system').catch((err) => {
+                req.botApp.logger.error(`Unexpected error occurred while running Bot ${newBot.botName}. Bot must be re-built to restart`);
+                if (!err.logged || !(err instanceof LoggedError)) {
+                    req.botApp.logger.error(err);
+                }
+            });
+        } catch (err: any) {
+            req.botApp.logger.error(`Bot ${newBot.botName} cannot recover from this error and must be re-built`);
+            if (!err.logged || !(err instanceof LoggedError)) {
+                req.botApp.logger.error(err);
+            }
+        }
+        return;
     }
     return [...middleware, response];
 }
