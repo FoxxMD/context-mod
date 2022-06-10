@@ -535,6 +535,27 @@
         },
         "ModNoteCriteria": {
             "properties": {
+                "activityType": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "enum": [
+                                    "comment",
+                                    "submission"
+                                ],
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "enum": [
+                                "comment",
+                                "submission"
+                            ],
+                            "type": "string"
+                        }
+                    ]
+                },
                 "count": {
                     "default": ">= 1",
                     "description": "Number of occurrences of this type. Ignored if `search` is `current`\n\nA string containing a comparison operator and/or a value to compare number of occurrences against\n\nThe syntax is `(< OR > OR <= OR >=) <number>[percent sign] [ascending|descending]`",

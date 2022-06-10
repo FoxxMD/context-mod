@@ -119,6 +119,13 @@ export interface UserNoteCriteria extends UserSubredditHistoryCriteria {
 
 export interface ModActionCriteria extends UserSubredditHistoryCriteria {
     type?: ModActionType | ModActionType[]
+    activityType?: ActivityType | ActivityType[]
+}
+
+export interface FullModActionCriteria extends Omit<ModActionCriteria, 'count'> {
+    type?: ModActionType[]
+    count?: GenericComparison
+    activityType?: ActivityType[]
 }
 
 export interface ModNoteCriteria extends ModActionCriteria {
@@ -126,15 +133,13 @@ export interface ModNoteCriteria extends ModActionCriteria {
     note?: string | string[]
 }
 
-export const asModNoteCriteria = (val: any): val is ModNoteCriteria => {
-    return val !== null && typeof val === 'object' && ('noteType' in val || 'note' in val);
-}
-
-export interface FullModNoteCriteria extends Omit<ModNoteCriteria, 'note' | 'count'> {
-    type?: ModActionType[]
-    count?: GenericComparison
+export interface FullModNoteCriteria extends FullModActionCriteria, Omit<ModNoteCriteria, 'note' | 'count' | 'type' | 'activityType'> {
     noteType?: ModUserNoteLabel[]
     note?: RegExp[]
+}
+
+export const asModNoteCriteria = (val: any): val is ModNoteCriteria => {
+    return val !== null && typeof val === 'object' && ('noteType' in val || 'note' in val);
 }
 
 export const toFullModNoteCriteria = (val: ModNoteCriteria): FullModNoteCriteria => {
@@ -142,6 +147,7 @@ export const toFullModNoteCriteria = (val: ModNoteCriteria): FullModNoteCriteria
         type: ['NOTE'],
         count: val.count === undefined ? undefined : parseGenericValueComparison(val.count),
         search: val.search,
+        activityType: val.activityType === undefined ? undefined : (Array.isArray(val.activityType) ? val.activityType : [val.activityType]),
         noteType: val.noteType === undefined ? undefined : (Array.isArray(val.noteType) ? val.noteType : [val.noteType]),
         note: val.note === undefined ? undefined : (Array.isArray(val.note) ? val.note.map(x => parseStringToRegexOrLiteralSearch(x)) : [parseStringToRegexOrLiteralSearch(val.note)]),
     }
@@ -152,17 +158,18 @@ export interface ModLogCriteria extends ModActionCriteria {
     action?: string | string[]
     details?: string | string[]
     description?: string | string[]
-    activityType?: ActivityType | ActivityType[]
 }
 
-export interface FullModLogCriteria extends Omit<ModLogCriteria, 'action' | 'details' | 'description' | 'count'> {
-    type?: ModActionType[]
-    count?: GenericComparison
+export interface FullModLogCriteria extends FullModActionCriteria, Omit<ModLogCriteria, 'action' | 'details' | 'description' | 'count' | 'type' | 'activityType'> {
     action?: RegExp[]
     details?: RegExp[]
     description?: RegExp[]
-    activityType?: ActivityType[]
 }
+
+export const asModLogCriteria = (val: any): val is ModLogCriteria => {
+    return val !== null && typeof val === 'object' && ('action' in val || 'details' in val || 'description' in val || 'activityType' in val);
+}
+
 
 export const toFullModLogCriteria = (val: ModLogCriteria): FullModLogCriteria => {
     return {
@@ -176,13 +183,7 @@ export const toFullModLogCriteria = (val: ModLogCriteria): FullModLogCriteria =>
     }
 }
 
-
-export const asModLogCriteria = (val: any): val is ModLogCriteria => {
-    return val !== null && typeof val === 'object' && ('action' in val || 'details' in val || 'description' in val || 'activityType' in val);
-}
-
-
-export const authorCriteriaProperties = ['name', 'flairCssClass', 'flairText', 'flairTemplate', 'isMod', 'userNotes', 'age', 'linkKarma', 'commentKarma', 'totalKarma', 'verified', 'shadowBanned', 'description', 'isContributor'];
+export const authorCriteriaProperties = ['name', 'flairCssClass', 'flairText', 'flairTemplate', 'isMod', 'userNotes', 'modActions', 'age', 'linkKarma', 'commentKarma', 'totalKarma', 'verified', 'shadowBanned', 'description', 'isContributor'];
 
 /**
  * Criteria with which to test against the author of an Activity. The outcome of the test is based on:

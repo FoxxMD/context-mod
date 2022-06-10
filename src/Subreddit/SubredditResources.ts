@@ -2939,6 +2939,26 @@ export class SubredditResources {
                                                         if (!anyPropMatch) {
                                                             return false;
                                                         }
+                                                        break;
+                                                    case 'activityType':
+                                                        const anyMatch = v.some((a: ActivityType) => {
+                                                            switch (a) {
+                                                                case 'submission':
+                                                                    if (x.action.actedOn instanceof Submission) {
+                                                                        return true;
+                                                                    }
+                                                                    break;
+                                                                case 'comment':
+                                                                    if (x.action.actedOn instanceof Comment) {
+                                                                        return true;
+                                                                    }
+                                                                    break;
+                                                            }
+                                                        });
+                                                        if (!anyMatch) {
+                                                            return false;
+                                                        }
+                                                        break;
                                                 } // case end
 
                                             } // for each end
