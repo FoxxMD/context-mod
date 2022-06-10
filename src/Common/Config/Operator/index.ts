@@ -1,6 +1,6 @@
 import YamlConfigDocument from "../YamlConfigDocument";
 import JsonConfigDocument from "../JsonConfigDocument";
-import {YAMLMap, YAMLSeq} from "yaml";
+import {YAMLMap, YAMLSeq, Pair, Scalar} from "yaml";
 import {BotInstanceJsonConfig, OperatorJsonConfig} from "../../interfaces";
 import {assign} from 'comment-json';
 
@@ -15,10 +15,12 @@ export class YamlOperatorConfigDocument extends YamlConfigDocument implements Op
         if (bots === undefined) {
             this.parsed.add({key: 'bots', value: [botData]});
         } else if (botData.name !== undefined) {
-            // overwrite if we find an existing
+            // granularly overwrite (merge) if we find an existing
             const existingIndex = bots.items.findIndex(x => (x as YAMLMap).get('name') === botData.name);
             if (existingIndex !== -1) {
-                this.parsed.setIn(['bots', existingIndex], botData);
+                const botObj = this.parsed.getIn(['bots', existingIndex]) as YAMLMap;
+                const mergedVal = mergeObjectToYaml(botData, botObj);
+                this.parsed.setIn(['bots', existingIndex], mergedVal);
             } else {
                 this.parsed.addIn(['bots'], botData);
             }
@@ -30,6 +32,24 @@ export class YamlOperatorConfigDocument extends YamlConfigDocument implements Op
     toJS(): OperatorJsonConfig  {
         return super.toJS();
     }
+}
+
+export const mergeObjectToYaml = (source: object, target: YAMLMap) => {
+    for (const [k, v] of Object.entries(source)) {
+        if (target.has(k)) {
+            const targetProp = target.get(k);
+            if (targetProp instanceof YAMLMap && typeof v === 'object') {
+                const merged = mergeObjectToYaml(v, targetProp);
+                target.set(k, merged)
+            } else {
+                // since target prop and value are not both objects don't bother merging, just overwrite (primitive or array)
+                target.set(k, v);
+            }
+        } else {
+            target.add({key: k, value: v});
+        }
+    }
+    return target;
 }
 
 export class JsonOperatorConfigDocument extends JsonConfigDocument implements OperatorConfigDocumentInterface {
