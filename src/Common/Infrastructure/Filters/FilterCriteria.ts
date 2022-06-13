@@ -71,11 +71,13 @@ export interface UserSubredditHistoryCriteria {
      *
      * A string containing a comparison operator and/or a value to compare number of occurrences against
      *
-     * The syntax is `(< OR > OR <= OR >=) <number>[percent sign] [ascending|descending]`
+     * The syntax is `(< OR > OR <= OR >=) <number>[percent sign] [in timeRange] [ascending|descending]`
+     *
+     * If `timeRange` is given then only notes/mod actions that occur between timeRange and NOW will be returned. `timeRange` is ignored if search is `current`
      *
      * @examples [">= 1"]
      * @default ">= 1"
-     * @pattern ^\s*(?<opStr>>|>=|<|<=)\s*(?<value>\d+)\s*(?<percent>%?)\s*(?<extra>asc.*|desc.*)*$
+     * @pattern ^\s*(?<opStr>>|>=|<|<=)\s*(?<value>\d+)\s*(?<percent>%?)\s*(?<duration>in\s+\d+\s*(days?|weeks?|months?|years?|hours?|minutes?|seconds?|milliseconds?))?\s*(?<extra>asc.*|desc.*)*$
      * */
     count?: string;
 
@@ -92,6 +94,7 @@ export interface UserSubredditHistoryCriteria {
      *
      * * EX `count: > 3`   => Must have more than 3 notes of `type`, total
      * * EX `count: <= 25%` => Must have 25% or less of notes of `type`, total
+     * * EX: `count: > 3 in 1 week` => Must have more than 3 notes within the last week
      *
      * ### consecutive
      *

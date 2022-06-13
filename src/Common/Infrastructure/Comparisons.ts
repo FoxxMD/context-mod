@@ -3,6 +3,7 @@ import {Duration} from "dayjs/plugin/duration";
 import InvalidRegexError from "../../Utils/InvalidRegexError";
 import dayjs, {Dayjs, OpUnitType} from "dayjs";
 import {SimpleError} from "../../Utils/Errors";
+import { parseDuration } from "../../util";
 
 export interface DurationComparison {
     operator: StringOperator,
@@ -15,6 +16,7 @@ export interface GenericComparison extends HasDisplayText {
     isPercent: boolean,
     extra?: string,
     displayText: string,
+    duration?: Duration
 }
 
 export interface HasDisplayText {
@@ -32,37 +34,58 @@ export const asGenericComparison = (val: any): val is GenericComparison => {
 
 export const GENERIC_VALUE_COMPARISON = /^\s*(?<opStr>>|>=|<|<=)\s*(?<value>-?\d?\.?\d+)(?<extra>\s+.*)*$/
 export const GENERIC_VALUE_COMPARISON_URL = 'https://regexr.com/60dq4';
-export const parseGenericValueComparison = (val: string): GenericComparison => {
-    const matches = val.match(GENERIC_VALUE_COMPARISON);
+export const parseGenericValueComparison = (val: string, options?: {
+    requireDuration?: boolean,
+    reg?: RegExp
+}): GenericComparison => {
+
+    const {
+        requireDuration = false,
+        reg = GENERIC_VALUE_COMPARISON,
+    } = options || {};
+
+    const matches = val.match(reg);
+
     if (matches === null) {
-        throw new InvalidRegexError(GENERIC_VALUE_COMPARISON, val, GENERIC_VALUE_COMPARISON_URL)
+        throw new InvalidRegexError(reg, val)
     }
+
     const groups = matches.groups as any;
+
+    let duration: Duration | undefined;
+
+    if(typeof groups.extra === 'string' && groups.extra.trim() !== '') {
+        try {
+            duration = parseDuration(groups.extra, false);
+        } catch (e) {
+            // if it returns an invalid regex just means they didn't
+            if (requireDuration || !(e instanceof InvalidRegexError)) {
+                throw e;
+            }
+        }
+    } else if(requireDuration) {
+        throw new SimpleError(`Comparison must contain a duration value but none was found. Given: ${val}`);
+    }
+
+    const displayParts = [`${groups.opStr} ${groups.value}`];
+    const hasPercent = typeof groups.percent === 'string' && groups.percent.trim() !== '';
+    if(hasPercent) {
+        displayParts.push('%');
+    }
 
     return {
         operator: groups.opStr as StringOperator,
         value: Number.parseFloat(groups.value),
-        isPercent: false,
+        isPercent: hasPercent,
         extra: groups.extra,
-        displayText: `${groups.opStr} ${groups.value}`
+        displayText: displayParts.join(''),
+        duration
     }
 }
-const GENERIC_VALUE_PERCENT_COMPARISON = /^\s*(?<opStr>>|>=|<|<=)\s*(?<value>\d+)\s*(?<percent>%?)(?<extra>.*)$/
+const GENERIC_VALUE_PERCENT_COMPARISON = /^\s*(?<opStr>>|>=|<|<=)\s*(?<value>\d+)\s*(?<percent>%)?(?<extra>.*)$/
 const GENERIC_VALUE_PERCENT_COMPARISON_URL = 'https://regexr.com/60a16';
-export const parseGenericValueOrPercentComparison = (val: string): GenericComparison => {
-    const matches = val.match(GENERIC_VALUE_PERCENT_COMPARISON);
-    if (matches === null) {
-        throw new InvalidRegexError(GENERIC_VALUE_PERCENT_COMPARISON, val, GENERIC_VALUE_PERCENT_COMPARISON_URL)
-    }
-    const groups = matches.groups as any;
-
-    return {
-        operator: groups.opStr as StringOperator,
-        value: Number.parseFloat(groups.value),
-        isPercent: groups.percent !== '',
-        extra: groups.extra,
-        displayText: `${groups.opStr} ${groups.value}${groups.percent === undefined || groups.percent === '' ? '' : '%'}`
-    }
+export const parseGenericValueOrPercentComparison = (val: string, options?: {requireDuration: boolean}): GenericComparison => {
+    return parseGenericValueComparison(val, {...(options ?? {}), reg: GENERIC_VALUE_PERCENT_COMPARISON});
 }
 /**
  * Named groups: operator, time, unit

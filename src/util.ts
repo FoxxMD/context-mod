@@ -713,10 +713,16 @@ export const isActivityWindowConfig = (val: any): val is FullActivityWindowConfi
     return false;
 }
 
+// string must only contain ISO8601 optionally wrapped by whitespace
 const ISO8601_REGEX: RegExp = /^(-?)P(?=\d|T\d)(?:(\d+)Y)?(?:(\d+)M)?(?:(\d+)([DW]))?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?)?$/;
+// finds ISO8601 in any part of a string
+const ISO8601_SUBSTRING_REGEX: RegExp = /(-?)P(?=\d|T\d)(?:(\d+)Y)?(?:(\d+)M)?(?:(\d+)([DW]))?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?)?/;
+// string must only duration optionally wrapped by whitespace
 const DURATION_REGEX: RegExp = /^\s*(?<time>\d+)\s*(?<unit>days?|weeks?|months?|years?|hours?|minutes?|seconds?|milliseconds?)\s*$/;
-export const parseDuration = (val: string): Duration => {
-    let matches = val.match(DURATION_REGEX);
+// finds duration in any part of the string
+const DURATION_SUBSTRING_REGEX: RegExp = /(?<time>\d+)\s*(?<unit>days?|weeks?|months?|years?|hours?|minutes?|seconds?|milliseconds?)/;
+export const parseDuration = (val: string, strict = true): Duration => {
+    let matches = val.match(strict ? DURATION_REGEX : DURATION_SUBSTRING_REGEX);
     if (matches !== null) {
         const groups = matches.groups as any;
         const dur: Duration = dayjs.duration(groups.time, groups.unit);
@@ -725,7 +731,7 @@ export const parseDuration = (val: string): Duration => {
         }
         return dur;
     }
-    matches = val.match(ISO8601_REGEX);
+    matches = val.match(strict ? ISO8601_REGEX : ISO8601_SUBSTRING_REGEX);
     if (matches !== null) {
         const dur: Duration = dayjs.duration(val);
         if (!dayjs.isDuration(dur)) {
@@ -733,7 +739,7 @@ export const parseDuration = (val: string): Duration => {
         }
         return dur;
     }
-    throw new InvalidRegexError([DURATION_REGEX, ISO8601_REGEX], val)
+    throw new InvalidRegexError([(strict ? DURATION_REGEX : DURATION_SUBSTRING_REGEX), (strict ? ISO8601_REGEX : ISO8601_SUBSTRING_REGEX)], val)
 }
 
 const SUBREDDIT_NAME_REGEX: RegExp = /^\s*(?:\/r\/|r\/)*(\w+)*\s*$/;

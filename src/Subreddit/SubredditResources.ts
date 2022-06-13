@@ -2781,8 +2781,10 @@ export class SubredditResources {
                                         value,
                                         operator,
                                         isPercent,
+                                        duration,
                                         extra = ''
                                     } = parseGenericValueOrPercentComparison(count);
+                                    const cutoffDate = duration === undefined ? undefined : dayjs().subtract(duration);
                                     const order = extra.includes('asc') ? 'ascending' : 'descending';
                                     switch (search) {
                                         case 'current':
@@ -2801,7 +2803,7 @@ export class SubredditResources {
                                                 throw new SimpleError(`When comparing UserNotes with 'consecutive' search 'count' cannot be a percentage. Given: ${count}`);
                                             }
 
-                                            let orderedNotes = notes;
+                                            let orderedNotes = cutoffDate === undefined ? notes : notes.filter(x => x.time.isSameOrAfter(cutoffDate));
                                             if (order === 'descending') {
                                                 orderedNotes = [...notes];
                                                 orderedNotes.reverse();
@@ -2822,7 +2824,7 @@ export class SubredditResources {
                                             }
                                             break;
                                         case 'total':
-                                            const filteredNotes = notes.filter(x => x.noteType === type);
+                                            const filteredNotes = notes.filter(x => x.noteType === type && cutoffDate === undefined || (x.time.isSameOrAfter(cutoffDate)));
                                             if (isPercent) {
                                                 // avoid divide by zero
                                                 const percent = notes.length === 0 ? 0 : filteredNotes.length / notes.length;
@@ -2860,6 +2862,16 @@ export class SubredditResources {
 
                                     const {search = 'current', count = '>= 1'} = actionCriteria;
 
+
+                                    const {
+                                        value,
+                                        operator,
+                                        isPercent,
+                                        duration,
+                                        extra = ''
+                                    } = parseGenericValueOrPercentComparison(count);
+                                    const cutoffDate = duration === undefined ? undefined : dayjs().subtract(duration);
+
                                     let actionsToUse: ModNote[] = [];
                                     if(asModNoteCriteria(actionCriteria)) {
                                         actionsToUse.filter(x => x.type === 'NOTE');
@@ -2876,6 +2888,12 @@ export class SubredditResources {
                                         const fullCrit = toFullModLogCriteria(actionCriteria);
                                         const fullCritEntries = Object.entries(fullCrit);
                                         validActions = actionsToUse.filter(x => {
+
+                                            // filter out any notes that occur before time range
+                                            if(cutoffDate !== undefined && x.createdAt.isBefore(cutoffDate)) {
+                                                return false;
+                                            }
+
                                             for (const [k, v] of fullCritEntries) {
                                                 const key = k.toLocaleLowerCase();
                                                 if (['count', 'search'].includes(key)) {
@@ -2927,6 +2945,12 @@ export class SubredditResources {
                                         const fullCrit = toFullModNoteCriteria(actionCriteria as ModNoteCriteria);
                                         const fullCritEntries = Object.entries(fullCrit);
                                         validActions = modActions.filter(x => {
+
+                                            // filter out any notes that occur before time range
+                                            if(cutoffDate !== undefined && x.createdAt.isBefore(cutoffDate)) {
+                                                return false;
+                                            }
+
                                             for (const [k, v] of fullCritEntries) {
                                                 const key = k.toLocaleLowerCase();
                                                 if (['count', 'search'].includes(key)) {
@@ -2974,13 +2998,6 @@ export class SubredditResources {
                                             return true;
                                         }); // filter end
                                     }
-
-                                    const {
-                                        value,
-                                        operator,
-                                        isPercent,
-                                        extra = ''
-                                    } = parseGenericValueOrPercentComparison(count);
 
                                     switch (search) {
                                         case 'current':
