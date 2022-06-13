@@ -116,7 +116,7 @@ import cloneDeep from "lodash/cloneDeep";
 import {
     asModLogCriteria,
     asModNoteCriteria,
-    AuthorCriteria, CommentState, ModLogCriteria, ModNoteCriteria, RequiredAuthorCrit,
+    AuthorCriteria, CommentState, ModLogCriteria, ModNoteCriteria, orderedAuthorCriteriaProps, RequiredAuthorCrit,
     StrongSubredditCriteria, SubmissionState,
     SubredditCriteria, toFullModLogCriteria, toFullModNoteCriteria, TypedActivityState, TypedActivityStates,
     UserNoteCriteria
@@ -1273,7 +1273,7 @@ export class SubredditResources {
             return user;
         } catch (err) {
             if(isStatusError(err) && err.statusCode === 404) {
-                throw new SimpleError(`Reddit returned a 404 for User '${authorName}'. Likely this user is shadowbanned.`, {isSerious: false});
+                throw new SimpleError(`Reddit returned a 404 for User '${authorName}'. Likely this user is shadowbanned.`, {isSerious: false, code: 404});
             }
             throw new ErrorWithCause(`Could not retrieve User '${authorName}'`, {cause: err});
         }
@@ -2249,7 +2249,7 @@ export class SubredditResources {
                         propResultsMap.age!.found = created.format('MMMM D, YYYY h:mm A Z');
                         break;
                     case 'title':
-                        if((item instanceof Comment)) {
+                        if(asComment(item)) {
                             const titleWarn ='`title` is not allowed in `itemIs` criteria when the main Activity is a Comment';
                             log.debug(titleWarn);
                             propResultsMap.title!.passed = true;
@@ -2268,7 +2268,7 @@ export class SubredditResources {
                         }
                         break;
                     case 'isRedditMediaDomain':
-                        if((item instanceof Comment)) {
+                        if(asComment(item)) {
                             const mediaWarn = '`isRedditMediaDomain` is not allowed in `itemIs` criteria when the main Activity is a Comment';
                             log.debug(mediaWarn);
                             propResultsMap.isRedditMediaDomain!.passed = true;
@@ -2355,7 +2355,7 @@ export class SubredditResources {
                         propResultsMap[k]!.passed = criteriaPassWithIncludeBehavior(propResultsMap[k]!.found === itemOptVal, include);
                         break;
                     case 'op':
-                        if(isSubmission(item)) {
+                        if(asSubmission(item)) {
                             const opWarn = `On a Submission the 'op' property will always be true. Did you mean to use this on a comment instead?`;
                             log.debug(opWarn);
                             propResultsMap.op!.passed = true;
@@ -2366,7 +2366,7 @@ export class SubredditResources {
                         propResultsMap.op!.passed = criteriaPassWithIncludeBehavior(propResultsMap.op!.found === itemOptVal, include);
                         break;
                     case 'depth':
-                        if(isSubmission(item)) {
+                        if(asSubmission(item)) {
                             const depthWarn = `Cannot test for 'depth' on a Submission`;
                             log.debug(depthWarn);
                             propResultsMap.depth!.passed = true;
@@ -2492,45 +2492,29 @@ export class SubredditResources {
             return acc;
         }, {});
 
-        const {shadowBanned} = authorOpts;
+        const keys = Object.keys(propResultsMap) as (keyof AuthorCriteria)[]
+        let orderedKeys: (keyof AuthorCriteria)[] = [];
 
-        if (shadowBanned !== undefined) {
-            try {
-                // @ts-ignore
-                await item.author.fetch();
-                // user is not shadowbanned
-                // if criteria specifies they SHOULD be shadowbanned then return false now
-                if (shadowBanned) {
-                    propResultsMap.shadowBanned!.found = false;
-                    propResultsMap.shadowBanned!.passed = false;
-                }
-            } catch (err: any) {
-                if (isStatusError(err) && err.statusCode === 404) {
-                    // user is shadowbanned
-                    // if criteria specifies they should not be shadowbanned then return false now
-                    if (!shadowBanned) {
-                        propResultsMap.shadowBanned!.found = true;
-                        propResultsMap.shadowBanned!.passed = false;
-                    }
-                } else {
-                    throw err;
-                }
+        // push existing keys that should be ordered to the front of the list
+        for(const oProp of orderedAuthorCriteriaProps) {
+            if(keys.includes(oProp)) {
+                orderedKeys.push(oProp);
             }
         }
 
+        // then add any keys not included as ordered but that exist onto the end of the list
+        // this way when we iterate all properties of the criteria we test all props that (probably) don't require API calls first
+        orderedKeys = orderedKeys.concat(keys.filter(x => !orderedKeys.includes(x)));
 
-
-        if (propResultsMap.shadowBanned === undefined || propResultsMap.shadowBanned.passed === undefined) {
             try {
                 const authorName = getActivityAuthorName(item.author);
 
-                const keys = Object.keys(propResultsMap) as (keyof AuthorCriteria)[]
-
                 let shouldContinue = true;
-                for (const k of keys) {
-                    if (k === 'shadowBanned') {
-                        // we have already taken care of this with shadowban check above
-                        continue;
+                for (const k of orderedKeys) {
+
+                    if(propResultsMap.shadowBanned !== undefined && propResultsMap.shadowBanned!.found === true) {
+                        // if we've determined the user is shadowbanned we can't get any info about them anyways so end criteria testing early
+                        break;
                     }
 
                     // none of the criteria below are returned if the user is suspended
@@ -2555,8 +2539,30 @@ export class SubredditResources {
 
                     const authorOptVal = definedAuthorOpts[k];
 
-                    //if (authorOpts[k] !== undefined) {
                     switch (k) {
+                        case 'shadowBanned':
+
+                            const isShadowBannedTest = async () => {
+                                try {
+                                    // @ts-ignore
+                                    await user();
+                                    return false;
+                                } catch (err: any) {
+                                    // see this.getAuthor() catch block
+                                    if('code' in err && err.code === 404) {
+                                        return true
+                                    }
+                                    throw err;
+                                }
+                            }
+
+                            propResultsMap.shadowBanned!.found = await isShadowBannedTest();
+                            const shadowPassed = (propResultsMap.shadowBanned!.found && authorOptVal === true) || (!propResultsMap.shadowBanned!.found && authorOptVal === false);
+                            propResultsMap.shadowBanned!.passed = criteriaPassWithIncludeBehavior(shadowPassed, include);
+                            if(propResultsMap.shadowBanned!.passed) {
+                                shouldContinue = false;
+                            }
+                            break;
                         case 'name':
                             const nameVal = authorOptVal as RequiredAuthorCrit['name'];
                             const authPass = () => {
@@ -2570,7 +2576,7 @@ export class SubredditResources {
                             }
                             const authResult = authPass();
                             propResultsMap.name!.found = authorName;
-                            propResultsMap.name!.passed = !((include && !authResult) || (!include && authResult));
+                            propResultsMap.name!.passed = criteriaPassWithIncludeBehavior(authResult, include);
                             if (!propResultsMap.name!.passed) {
                                 shouldContinue = false;
                             }
@@ -2595,7 +2601,7 @@ export class SubredditResources {
                                 cssResult = opts.some(x => x.trim().toLowerCase() === css.trim().toLowerCase())
                             }
 
-                            propResultsMap.flairCssClass!.passed = !((include && !cssResult) || (!include && cssResult));
+                            propResultsMap.flairCssClass!.passed = criteriaPassWithIncludeBehavior(cssResult, include);
                             if (!propResultsMap.flairCssClass!.passed) {
                                 shouldContinue = false;
                             }
@@ -2619,7 +2625,7 @@ export class SubredditResources {
                                 const opts = Array.isArray(authorOptVal) ? authorOptVal as string[] : [authorOptVal] as string[];
                                 textResult = opts.some(x => x.trim().toLowerCase() === text.trim().toLowerCase())
                             }
-                            propResultsMap.flairText!.passed = !((include && !textResult) || (!include && textResult));
+                            propResultsMap.flairText!.passed = criteriaPassWithIncludeBehavior(textResult, include);
                             if (!propResultsMap.flairText!.passed) {
                                 shouldContinue = false;
                             }
@@ -2643,7 +2649,7 @@ export class SubredditResources {
                                 templateResult = opts.some(x => x.trim() === templateId);
                             }
 
-                            propResultsMap.flairTemplate!.passed = !((include && !templateResult) || (!include && templateResult));
+                            propResultsMap.flairTemplate!.passed = criteriaPassWithIncludeBehavior(templateResult, include);
                             if (!propResultsMap.flairTemplate!.passed) {
                                 shouldContinue = false;
                             }
@@ -2653,7 +2659,7 @@ export class SubredditResources {
                             const isModerator = mods.some(x => x.name === authorName) || authorName.toLowerCase() === 'automoderator';
                             const modMatch = authorOptVal === isModerator;
                             propResultsMap.isMod!.found = isModerator;
-                            propResultsMap.isMod!.passed = !((include && !modMatch) || (!include && modMatch));
+                            propResultsMap.isMod!.passed = criteriaPassWithIncludeBehavior(modMatch, include);
                             if (!propResultsMap.isMod!.passed) {
                                 shouldContinue = false;
                             }
@@ -2663,7 +2669,7 @@ export class SubredditResources {
                             const isContributor= contributors.some(x => x.name === authorName);
                             const contributorMatch = authorOptVal === isContributor;
                             propResultsMap.isContributor!.found = isContributor;
-                            propResultsMap.isContributor!.passed = !((include && !contributorMatch) || (!include && contributorMatch));
+                            propResultsMap.isContributor!.passed = criteriaPassWithIncludeBehavior(contributorMatch, include);
                             if (!propResultsMap.isContributor!.passed) {
                                 shouldContinue = false;
                             }
@@ -2673,7 +2679,7 @@ export class SubredditResources {
                             const authorAge = dayjs.unix((await user()).created);
                             const ageTest = compareDurationValue(parseDurationComparison(await authorOpts.age as string), authorAge);
                             propResultsMap.age!.found = authorAge.fromNow(true);
-                            propResultsMap.age!.passed = !((include && !ageTest) || (!include && ageTest));
+                            propResultsMap.age!.passed = criteriaPassWithIncludeBehavior(ageTest, include);
                             if (!propResultsMap.age!.passed) {
                                 shouldContinue = false;
                             }
@@ -2690,7 +2696,7 @@ export class SubredditResources {
                                 lkMatch = comparisonTextOp(item.author.link_karma, lkCompare.operator, lkCompare.value);
                             }
                             propResultsMap.linkKarma!.found = tk;
-                            propResultsMap.linkKarma!.passed = !((include && !lkMatch) || (!include && lkMatch));
+                            propResultsMap.linkKarma!.passed = criteriaPassWithIncludeBehavior(lkMatch, include);
                             if (!propResultsMap.linkKarma!.passed) {
                                 shouldContinue = false;
                             }
@@ -2706,7 +2712,7 @@ export class SubredditResources {
                                 ckMatch = comparisonTextOp(item.author.comment_karma, ckCompare.operator, ckCompare.value);
                             }
                             propResultsMap.commentKarma!.found = ck;
-                            propResultsMap.commentKarma!.passed = !((include && !ckMatch) || (!include && ckMatch));
+                            propResultsMap.commentKarma!.passed = criteriaPassWithIncludeBehavior(ckMatch, include);
                             if (!propResultsMap.commentKarma!.passed) {
                                 shouldContinue = false;
                             }
@@ -2720,7 +2726,7 @@ export class SubredditResources {
                             }
                             const tkMatch = comparisonTextOp(totalKarma, tkCompare.operator, tkCompare.value);
                             propResultsMap.totalKarma!.found = totalKarma;
-                            propResultsMap.totalKarma!.passed = !((include && !tkMatch) || (!include && tkMatch));
+                            propResultsMap.totalKarma!.passed = criteriaPassWithIncludeBehavior(tkMatch, include);
                             if (!propResultsMap.totalKarma!.passed) {
                                 shouldContinue = false;
                             }
@@ -2730,7 +2736,7 @@ export class SubredditResources {
                             const verified = (await user()).has_verified_mail;
                             const vMatch = verified === authorOpts.verified as boolean;
                             propResultsMap.verified!.found = verified;
-                            propResultsMap.verified!.passed = !((include && !vMatch) || (!include && vMatch));
+                            propResultsMap.verified!.passed = criteriaPassWithIncludeBehavior(vMatch, include);
                             if (!propResultsMap.verified!.passed) {
                                 shouldContinue = false;
                             }
@@ -2756,7 +2762,7 @@ export class SubredditResources {
                                 }
                             }
                             propResultsMap.description!.found = typeof desc === 'string' ? truncateStringToLength(50)(desc) : desc;
-                            propResultsMap.description!.passed = !((include && !passed) || (!include && passed));
+                            propResultsMap.description!.passed = criteriaPassWithIncludeBehavior(passed, include);
                             if (!propResultsMap.description!.passed) {
                                 shouldContinue = false;
                             } else {
@@ -2835,7 +2841,7 @@ export class SubredditResources {
                             }
                             const noteResult = notePass();
                             propResultsMap.userNotes!.found = foundNoteResult.join(' | ');
-                            propResultsMap.userNotes!.passed = !((include && !noteResult) || (!include && noteResult));
+                            propResultsMap.userNotes!.passed = criteriaPassWithIncludeBehavior(noteResult, include);
                             if (!propResultsMap.userNotes!.passed) {
                                 shouldContinue = false;
                             }
@@ -3029,7 +3035,7 @@ export class SubredditResources {
                             }
                             const actionsResult = actionsPass();
                             propResultsMap.modActions!.found = actionResult.join(' | ');
-                            propResultsMap.modActions!.passed = !((include && !actionsResult) || (!include && actionsResult));
+                            propResultsMap.modActions!.passed = criteriaPassWithIncludeBehavior(actionsResult, include);
                             if (!propResultsMap.modActions!.passed) {
                                 shouldContinue = false;
                             }
@@ -3042,12 +3048,11 @@ export class SubredditResources {
                 }
             } catch (err: any) {
                 if (isStatusError(err) && err.statusCode === 404) {
-                    throw new SimpleError('Reddit returned a 404 while trying to retrieve User profile. It is likely this user is shadowbanned.', {isSerious: false});
+                    throw new SimpleError('Reddit returned a 404 while trying to retrieve User profile. It is likely this user is shadowbanned.', {isSerious: false, code: 404});
                 } else {
                     throw err;
                 }
             }
-        }
 
         // gather values and determine overall passed
         const propResults = Object.values(propResultsMap);
