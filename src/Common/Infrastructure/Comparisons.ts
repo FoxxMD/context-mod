@@ -1,6 +1,8 @@
 import {StringOperator} from "./Atomic";
 import {Duration} from "dayjs/plugin/duration";
 import InvalidRegexError from "../../Utils/InvalidRegexError";
+import dayjs, {Dayjs, OpUnitType} from "dayjs";
+import {SimpleError} from "../../Utils/Errors";
 
 export interface DurationComparison {
     operator: StringOperator,
@@ -60,5 +62,57 @@ export const parseGenericValueOrPercentComparison = (val: string): GenericCompar
         isPercent: groups.percent !== '',
         extra: groups.extra,
         displayText: `${groups.opStr} ${groups.value}${groups.percent === undefined || groups.percent === '' ? '' : '%'}`
+    }
+}
+/**
+ * Named groups: operator, time, unit
+ * */
+const DURATION_COMPARISON_REGEX: RegExp = /^\s*(?<opStr>>|>=|<|<=)\s*(?<time>\d+)\s*(?<unit>days?|weeks?|months?|years?|hours?|minutes?|seconds?|milliseconds?)\s*$/;
+const DURATION_COMPARISON_REGEX_URL = 'https://regexr.com/609n8';
+export const parseDurationComparison = (val: string): DurationComparison => {
+    const matches = val.match(DURATION_COMPARISON_REGEX);
+    if (matches === null) {
+        throw new InvalidRegexError(DURATION_COMPARISON_REGEX, val, DURATION_COMPARISON_REGEX_URL)
+    }
+    const groups = matches.groups as any;
+    const dur: Duration = dayjs.duration(groups.time, groups.unit);
+    if (!dayjs.isDuration(dur)) {
+        throw new SimpleError(`Parsed value '${val}' did not result in a valid Dayjs Duration`);
+    }
+    return {
+        operator: groups.opStr as StringOperator,
+        duration: dur
+    }
+}
+export const dateComparisonTextOp = (val1: Dayjs, strOp: StringOperator, val2: Dayjs, granularity?: OpUnitType): boolean => {
+    switch (strOp) {
+        case '>':
+            return val1.isBefore(val2, granularity);
+        case '>=':
+            return val1.isSameOrBefore(val2, granularity);
+        case '<':
+            return val1.isAfter(val2, granularity);
+        case '<=':
+            return val1.isSameOrAfter(val2, granularity);
+        default:
+            throw new Error(`${strOp} was not a recognized operator`);
+    }
+}
+export const compareDurationValue = (comp: DurationComparison, date: Dayjs) => {
+    const dateToCompare = dayjs().subtract(comp.duration.asSeconds(), 'seconds');
+    return dateComparisonTextOp(date, comp.operator, dateToCompare);
+}
+export const comparisonTextOp = (val1: number, strOp: string, val2: number): boolean => {
+    switch (strOp) {
+        case '>':
+            return val1 > val2;
+        case '>=':
+            return val1 >= val2;
+        case '<':
+            return val1 < val2;
+        case '<=':
+            return val1 <= val2;
+        default:
+            throw new Error(`${strOp} was not a recognized operator`);
     }
 }

@@ -17,8 +17,6 @@ import {
     buildCacheOptionsFromProvider,
     buildCachePrefix,
     cacheStats,
-    compareDurationValue,
-    comparisonTextOp,
     createCacheManager,
     escapeRegex,
     FAIL,
@@ -35,7 +33,6 @@ import {
     isUser,
     hashString,
     mergeArr,
-    parseDurationComparison,
     parseExternalUrl,
     parseRedditEntity,
     parseStringToRegex,
@@ -152,7 +149,12 @@ import {
 } from "../Common/Infrastructure/Reddit";
 import {AuthorCritPropHelper} from "../Common/Infrastructure/Filters/AuthorCritPropHelper";
 import {NoopLogger} from "../Utils/loggerFactory";
-import {parseGenericValueComparison, parseGenericValueOrPercentComparison} from "../Common/Infrastructure/Comparisons";
+import {
+    compareDurationValue, comparisonTextOp,
+    parseDurationComparison,
+    parseGenericValueComparison,
+    parseGenericValueOrPercentComparison
+} from "../Common/Infrastructure/Comparisons";
 import {asCreateModNoteData, CreateModNoteData, ModNote, ModNoteRaw} from "./ModNotes/ModNote";
 
 export const DEFAULT_FOOTER = '\r\n*****\r\nThis action was performed by [a bot.]({{botLink}}) Mention a moderator or [send a modmail]({{modmailLink}}) if you any ideas, questions, or concerns about this action.';

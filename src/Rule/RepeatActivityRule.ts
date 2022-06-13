@@ -3,7 +3,6 @@ import {Comment, RedditUser} from "snoowrap";
 import {
     activityWindowText,
     asSubmission,
-    comparisonTextOp,
     FAIL,
     getActivitySubredditName, isActivityWindowConfig,
     isExternalUrlSubmission,
@@ -29,7 +28,7 @@ import {
     ActivityWindowCriteria,
     HistoryFiltersOptions
 } from "../Common/Infrastructure/ActivityWindow";
-import {parseGenericValueComparison} from "../Common/Infrastructure/Comparisons";
+import {comparisonTextOp, parseGenericValueComparison} from "../Common/Infrastructure/Comparisons";
 
 const parseUsableLinkIdentifier = linkParser();
 

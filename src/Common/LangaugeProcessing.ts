@@ -5,12 +5,12 @@ import {SentimentIntensityAnalyzer} from 'vader-sentiment';
 import wink from 'wink-sentiment';
 import {SnoowrapActivity} from "./Infrastructure/Reddit";
 import {
-    asGenericComparison,
+    asGenericComparison, comparisonTextOp,
     GenericComparison,
     parseGenericValueComparison,
     RangedComparison
 } from "./Infrastructure/Comparisons";
-import {asSubmission, between, comparisonTextOp, formatNumber} from "../util";
+import {asSubmission, between, formatNumber} from "../util";
 import {CMError, MaybeSeriousErrorWithCause} from "../Utils/Errors";
 import InvalidRegexError from "../Utils/InvalidRegexError";
 import {StringOperator} from "./Infrastructure/Atomic";

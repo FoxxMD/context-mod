@@ -8,7 +8,6 @@ import Submission from "snoowrap/dist/objects/Submission";
 import dayjs from "dayjs";
 import {
     asSubmission,
-    comparisonTextOp,
     FAIL,
     formatNumber, getActivitySubredditName, historyFilterConfigToOptions, isSubmission,
     parseSubredditName,
@@ -20,7 +19,7 @@ import {SubredditCriteria} from "../Common/Infrastructure/Filters/FilterCriteria
 import {CompareValueOrPercent} from "../Common/Infrastructure/Atomic";
 import {ActivityWindowConfig, ActivityWindowCriteria} from "../Common/Infrastructure/ActivityWindow";
 import {ErrorWithCause} from "pony-cause";
-import {parseGenericValueOrPercentComparison} from "../Common/Infrastructure/Comparisons";
+import {comparisonTextOp, parseGenericValueOrPercentComparison} from "../Common/Infrastructure/Comparisons";
 
 export interface CommentThresholdCriteria extends ThresholdCriteria {
     /**

@@ -3,13 +3,13 @@ import {assert} from 'chai';
 import {
     COMMENT_URL_ID,
     parseDuration,
-    parseDurationComparison,
     parseLinkIdentifier,
     parseRedditEntity, removeUndefinedKeys, SUBMISSION_URL_ID
 } from "../src/util";
 import dayjs from "dayjs";
 import dduration, {DurationUnitType} from 'dayjs/plugin/duration.js';
 import {
+    parseDurationComparison,
     parseGenericValueComparison,
     parseGenericValueOrPercentComparison
 } from "../src/Common/Infrastructure/Comparisons";

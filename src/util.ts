@@ -1,5 +1,5 @@
 import winston, {Logger} from "winston";
-import dayjs, {Dayjs, OpUnitType} from 'dayjs';
+import dayjs, {Dayjs} from 'dayjs';
 import {Duration} from 'dayjs/plugin/duration.js';
 import Ajv from "ajv";
 import {InvalidOptionArgumentError} from "commander";
@@ -53,11 +53,15 @@ import {RulePremise} from "./Common/Entities/RulePremise";
 import {RuleResultEntity as RuleResultEntity} from "./Common/Entities/RuleResultEntity";
 import {nanoid} from "nanoid";
 import {
-    ActivityState, asModLogCriteria, asModNoteCriteria,
+    ActivityState,
+    asModLogCriteria,
+    asModNoteCriteria,
     AuthorCriteria,
     authorCriteriaProperties,
     CommentState,
-    defaultStrongSubredditCriteriaOptions, ModLogCriteria, ModNoteCriteria,
+    defaultStrongSubredditCriteriaOptions,
+    ModLogCriteria,
+    ModNoteCriteria,
     StrongSubredditCriteria,
     SubmissionState,
     SubredditCriteria,
@@ -69,15 +73,15 @@ import {
     ActivitySourceTypes,
     CacheProvider,
     ConfigFormat,
-    DurationVal, ModUserNoteLabel, modUserNoteLabels,
+    DurationVal,
+    ModUserNoteLabel,
+    modUserNoteLabels,
     RedditEntity,
     RedditEntityType,
     statFrequencies,
     StatisticFrequency,
-    StatisticFrequencyOption,
-    StringOperator
+    StatisticFrequencyOption
 } from "./Common/Infrastructure/Atomic";
-import {DurationComparison} from "./Common/Infrastructure/Comparisons";
 import {
     AuthorOptions,
     FilterCriteriaDefaults,
@@ -709,36 +713,6 @@ export const isActivityWindowConfig = (val: any): val is FullActivityWindowConfi
     return false;
 }
 
-export const comparisonTextOp = (val1: number, strOp: string, val2: number): boolean => {
-    switch (strOp) {
-        case '>':
-            return val1 > val2;
-        case '>=':
-            return val1 >= val2;
-        case '<':
-            return val1 < val2;
-        case '<=':
-            return val1 <= val2;
-        default:
-            throw new Error(`${strOp} was not a recognized operator`);
-    }
-}
-
-export const dateComparisonTextOp = (val1: Dayjs, strOp: StringOperator, val2: Dayjs, granularity?: OpUnitType): boolean => {
-    switch (strOp) {
-        case '>':
-            return val1.isBefore(val2, granularity);
-        case '>=':
-            return val1.isSameOrBefore(val2, granularity);
-        case '<':
-            return val1.isAfter(val2, granularity);
-        case '<=':
-            return val1.isSameOrAfter(val2, granularity);
-        default:
-            throw new Error(`${strOp} was not a recognized operator`);
-    }
-}
-
 const ISO8601_REGEX: RegExp = /^(-?)P(?=\d|T\d)(?:(\d+)Y)?(?:(\d+)M)?(?:(\d+)([DW]))?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?)?$/;
 const DURATION_REGEX: RegExp = /^\s*(?<time>\d+)\s*(?<unit>days?|weeks?|months?|years?|hours?|minutes?|seconds?|milliseconds?)\s*$/;
 export const parseDuration = (val: string): Duration => {
@@ -760,31 +734,6 @@ export const parseDuration = (val: string): Duration => {
         return dur;
     }
     throw new InvalidRegexError([DURATION_REGEX, ISO8601_REGEX], val)
-}
-
-/**
- * Named groups: operator, time, unit
- * */
-const DURATION_COMPARISON_REGEX: RegExp = /^\s*(?<opStr>>|>=|<|<=)\s*(?<time>\d+)\s*(?<unit>days?|weeks?|months?|years?|hours?|minutes?|seconds?|milliseconds?)\s*$/;
-const DURATION_COMPARISON_REGEX_URL = 'https://regexr.com/609n8';
-export const parseDurationComparison = (val: string): DurationComparison => {
-    const matches = val.match(DURATION_COMPARISON_REGEX);
-    if (matches === null) {
-        throw new InvalidRegexError(DURATION_COMPARISON_REGEX, val, DURATION_COMPARISON_REGEX_URL)
-    }
-    const groups = matches.groups as any;
-    const dur: Duration = dayjs.duration(groups.time, groups.unit);
-    if (!dayjs.isDuration(dur)) {
-        throw new SimpleError(`Parsed value '${val}' did not result in a valid Dayjs Duration`);
-    }
-    return {
-        operator: groups.opStr as StringOperator,
-        duration: dur
-    }
-}
-export const compareDurationValue = (comp: DurationComparison, date: Dayjs) => {
-    const dateToCompare = dayjs().subtract(comp.duration.asSeconds(), 'seconds');
-    return dateComparisonTextOp(date, comp.operator, dateToCompare);
 }
 
 const SUBREDDIT_NAME_REGEX: RegExp = /^\s*(?:\/r\/|r\/)*(\w+)*\s*$/;

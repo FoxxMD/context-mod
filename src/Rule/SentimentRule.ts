@@ -2,13 +2,14 @@ import {Rule, RuleJSONConfig, RuleOptions} from "./index";
 import {Comment} from "snoowrap";
 import Submission from "snoowrap/dist/objects/Submission";
 import {
-    comparisonTextOp, formatNumber,
+    formatNumber,
     triggeredIndicator, windowConfigToWindowCriteria
 } from "../util";
 
 import dayjs from 'dayjs';
 import {map as mapAsync} from 'async';
 import {
+    comparisonTextOp,
     GenericComparison,
     parseGenericValueOrPercentComparison,
     RangedComparison

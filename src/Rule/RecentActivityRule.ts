@@ -11,7 +11,7 @@ import {
     asSubmission, bitsToHexLength,
     // blockHashImage,
     compareImages,
-    comparisonTextOp, convertSubredditsRawToStrong,
+    convertSubredditsRawToStrong,
     FAIL,
     formatNumber,
     getActivitySubredditName, imageCompareMaxConcurrencyGuess,
@@ -41,7 +41,7 @@ import {
     SubredditCriteria
 } from "../Common/Infrastructure/Filters/FilterCriteria";
 import {ActivityWindow, ActivityWindowConfig} from "../Common/Infrastructure/ActivityWindow";
-import {parseGenericValueOrPercentComparison} from "../Common/Infrastructure/Comparisons";
+import {comparisonTextOp, parseGenericValueOrPercentComparison} from "../Common/Infrastructure/Comparisons";
 
 const parseLink = parseUsableLinkIdentifier();
 
