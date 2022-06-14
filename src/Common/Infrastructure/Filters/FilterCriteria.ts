@@ -141,19 +141,43 @@ export interface FullModNoteCriteria extends FullModActionCriteria, Omit<ModNote
     note?: RegExp[]
 }
 
+const arrayableModNoteProps = ['activityType','noteType','note'];
+
 export const asModNoteCriteria = (val: any): val is ModNoteCriteria => {
     return val !== null && typeof val === 'object' && ('noteType' in val || 'note' in val);
 }
 
 export const toFullModNoteCriteria = (val: ModNoteCriteria): FullModNoteCriteria => {
-    return {
-        type: ['NOTE'],
-        count: val.count === undefined ? undefined : parseGenericValueComparison(val.count),
-        search: val.search,
-        activityType: val.activityType === undefined ? undefined : (Array.isArray(val.activityType) ? val.activityType : [val.activityType]),
-        noteType: val.noteType === undefined ? undefined : (Array.isArray(val.noteType) ? val.noteType : [val.noteType]),
-        note: val.note === undefined ? undefined : (Array.isArray(val.note) ? val.note.map(x => parseStringToRegexOrLiteralSearch(x)) : [parseStringToRegexOrLiteralSearch(val.note)]),
-    }
+
+    const result = Object.entries(val).reduce((acc: FullModNoteCriteria, curr) => {
+        const [k,v] = curr;
+
+        if(v === undefined) {
+            return acc;
+        }
+
+        const rawVal = arrayableModNoteProps.includes(k) && !Array.isArray(v) ? [v] : v;
+
+        switch(k) {
+            case 'search':
+                acc.search = rawVal;
+                break;
+            case 'count':
+                acc.count = parseGenericValueComparison(rawVal);
+                break;
+            case 'activityType':
+            case 'noteType':
+                acc[k] = rawVal;
+                break;
+            case 'note':
+                acc[k] = rawVal.map((x: string) => parseStringToRegexOrLiteralSearch(x))
+        }
+
+        return acc;
+    }, {});
+
+    result.type = ['NOTE'];
+    return result;
 }
 
 
@@ -169,21 +193,42 @@ export interface FullModLogCriteria extends FullModActionCriteria, Omit<ModLogCr
     description?: RegExp[]
 }
 
+const arrayableModLogProps = ['type','activityType','action','description','details', 'type'];
+
 export const asModLogCriteria = (val: any): val is ModLogCriteria => {
-    return val !== null && typeof val === 'object' && ('action' in val || 'details' in val || 'description' in val || 'activityType' in val);
+    return val !== null && typeof val === 'object' && !asModNoteCriteria(val) && ('action' in val || 'details' in val || 'description' in val || 'activityType' in val || 'search' in val || 'count' in val || 'type' in val);
 }
 
-
 export const toFullModLogCriteria = (val: ModLogCriteria): FullModLogCriteria => {
-    return {
-        count: val.count === undefined ? undefined : parseGenericValueComparison(val.count),
-        search: val.search,
-        type: val.type === undefined ? undefined : (Array.isArray(val.type) ? val.type : [val.type]).map(x => x.toUpperCase()) as ModActionType[],
-        activityType: val.activityType === undefined ? undefined : (Array.isArray(val.activityType) ? val.activityType : [val.activityType]),
-        action: val.action === undefined ? undefined : (Array.isArray(val.action) ? val.action.map(x => parseStringToRegexOrLiteralSearch(x)) : [parseStringToRegexOrLiteralSearch(val.action)]),
-        description: val.description === undefined ? undefined : (Array.isArray(val.description) ? val.description.map(x => parseStringToRegexOrLiteralSearch(x)) : [parseStringToRegexOrLiteralSearch(val.description)]),
-        details: val.details === undefined ? undefined : (Array.isArray(val.details) ? val.details.map(x => parseStringToRegexOrLiteralSearch(x)) : [parseStringToRegexOrLiteralSearch(val.details)]),
-    }
+
+    return Object.entries(val).reduce((acc: FullModLogCriteria, curr) => {
+        const [k,v] = curr;
+
+        if(v === undefined) {
+            return acc;
+        }
+
+        const rawVal = arrayableModLogProps.includes(k) && !Array.isArray(v) ? [v] : v;
+
+        switch(k) {
+            case 'search':
+                acc.search = rawVal;
+                break;
+            case 'count':
+                acc.count = parseGenericValueComparison(rawVal);
+                break;
+            case 'activityType':
+            case 'type':
+                acc[k as keyof FullModLogCriteria] = rawVal;
+                break;
+            case 'action':
+            case 'description':
+            case 'details':
+                acc[k as keyof FullModLogCriteria] = rawVal.map((x: string) => parseStringToRegexOrLiteralSearch(x))
+        }
+
+        return acc;
+    }, {});
 }
 
 export const authorCriteriaProperties = ['name', 'flairCssClass', 'flairText', 'flairTemplate', 'isMod', 'userNotes', 'modActions', 'age', 'linkKarma', 'commentKarma', 'totalKarma', 'verified', 'shadowBanned', 'description', 'isContributor'];

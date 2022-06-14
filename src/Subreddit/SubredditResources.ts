@@ -2874,7 +2874,7 @@ export class SubredditResources {
 
                                     let actionsToUse: ModNote[] = [];
                                     if(asModNoteCriteria(actionCriteria)) {
-                                        actionsToUse.filter(x => x.type === 'NOTE');
+                                        actionsToUse = actionsToUse.filter(x => x.type === 'NOTE');
                                     } else {
                                         actionsToUse = modActions;
                                     }
@@ -2905,7 +2905,7 @@ export class SubredditResources {
                                                             return false
                                                         }
                                                         break;
-                                                    case 'activityType':
+                                                    case 'activitytype':
                                                         const anyMatch = v.some((a: ActivityType) => {
                                                             switch (a) {
                                                                 case 'submission':
@@ -2941,10 +2941,10 @@ export class SubredditResources {
 
                                             return true;
                                         }); // filter end
-                                    } else {
+                                    } else if(asModNoteCriteria(actionCriteria)) {
                                         const fullCrit = toFullModNoteCriteria(actionCriteria as ModNoteCriteria);
                                         const fullCritEntries = Object.entries(fullCrit);
-                                        validActions = modActions.filter(x => {
+                                        validActions = actionsToUse.filter(x => {
 
                                             // filter out any notes that occur before time range
                                             if(cutoffDate !== undefined && x.createdAt.isBefore(cutoffDate)) {
@@ -2957,7 +2957,7 @@ export class SubredditResources {
                                                     continue;
                                                 }
                                                 switch (key) {
-                                                    case 'noteType':
+                                                    case 'notetype':
                                                         if (!v.map((x: ModUserNoteLabel) => x.toUpperCase()).includes((x.note.label as ModUserNoteLabel))) {
                                                             return false
                                                         }
@@ -2972,7 +2972,7 @@ export class SubredditResources {
                                                             return false;
                                                         }
                                                         break;
-                                                    case 'activityType':
+                                                    case 'activitytype':
                                                         const anyMatch = v.some((a: ActivityType) => {
                                                             switch (a) {
                                                                 case 'submission':
@@ -2997,11 +2997,13 @@ export class SubredditResources {
 
                                             return true;
                                         }); // filter end
+                                    } else {
+                                        throw new SimpleError(`Could not determine if a modActions criteria was for Mod Log or Mod Note. Given: ${JSON.stringify(actionCriteria)}`);
                                     }
 
                                     switch (search) {
                                         case 'current':
-                                            if (modActions.length === 0) {
+                                            if (validActions.length === 0) {
                                                 actionResult.push('No Mod Actions present');
                                             } else {
                                                 actionResult.push('Current Action matches criteria');
@@ -3038,12 +3040,12 @@ export class SubredditResources {
                                             if (isPercent) {
                                                 // avoid divide by zero
                                                 const percent = notes.length === 0 ? 0 : validActions.length / actionsToUse.length;
-                                                foundNoteResult.push(`${formatNumber(percent)}% of ${actionsToUse.length} matched criteria`);
+                                                actionResult.push(`${formatNumber(percent)}% of ${actionsToUse.length} matched criteria`);
                                                 if (comparisonTextOp(percent, operator, value / 100)) {
                                                     return true;
                                                 }
                                             } else {
-                                                foundNoteResult.push(`${validActions.length} matched criteria`);
+                                                actionResult.push(`${validActions.length} matched criteria`);
                                                 if (comparisonTextOp(validActions.length, operator, value)) {
                                                     return true;
                                                 }
