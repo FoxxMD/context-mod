@@ -555,6 +555,8 @@ export const filterCriteriaPropertySummary = <T>(val: FilterCriteriaPropertyResu
         const expectedStrings = crit.map((x: any) => {
             if (asUserNoteCriteria(x)) {
                 return userNoteCriteriaSummary(x);
+            }  else if(asModNoteCriteria(x) || asModLogCriteria(x)) {
+                return modActionCriteriaSummary(x);
             }
             return x;
         }).join(' OR ');
