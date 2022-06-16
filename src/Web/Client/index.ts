@@ -904,7 +904,7 @@ const webClient = async (options: OperatorConfig) => {
 
     app.postAsync('/config', [ensureAuthenticatedApi, defaultSession, instanceWithPermissions, botWithPermissions(true)], async (req: express.Request, res: express.Response) => {
         const {subreddit} = req.query as any;
-        const {location, data, create = false} = req.body as any;
+        const {location, data, reason = 'Updated through CM Web', create = false} = req.body as any;
 
         const client = new ExtendedSnoowrap({
             userAgent,
@@ -918,7 +918,7 @@ const webClient = async (options: OperatorConfig) => {
             const wiki = await client.getSubreddit(subreddit).getWikiPage(location);
             await wiki.edit({
                 text: data,
-                reason: create ? 'Created Config through CM Web' : 'Updated through CM Web'
+                reason
             });
         } catch (err: any) {
             res.status(500);

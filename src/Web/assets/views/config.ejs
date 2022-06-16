@@ -57,7 +57,9 @@
                     </span>
                 </span>
                 | <input id="configUrl" class="text-black placeholder-gray-500 rounded mx-2" style="min-width:400px;" placeholder="URL of a config to load"/> <a href="#" id="loadConfig">Load</a>
-                <span id="saveTip">
+                <div id="editWrapper" class="my-2">
+                    <label style="display: none" for="reason">Edit Reason</label><input id="reason" class="text-black placeholder-gray-500 rounded mr-2" style="min-width:400px;" placeholder="Edit Reason: Updated through CM Web"/>
+                    <span id="saveTip">
                     <span style="margin-top:30px; z-index:100" class="tooltip rounded shadow-lg p-1 bg-gray-100 text-black -mt-2 space-y-3 p-2 text-left">
                         <div>In order to <strong id="configPageActionType">save</strong> a configuration to a subreddit's wiki page you must re-authorize ContextMod with Reddit to get the following permissions:</div>
                         <ul class="list-inside list-disc" id="reauthPermissions">
@@ -67,7 +69,7 @@
                         <div><b><a href="#" id="doAuthorize">Click Here to re-authorize</a></b></div>
                     </span>
                     <span>
-                        | <a id="doSave">Save</a>
+                        <a id="doSave">Save</a>
                         <svg id="saveQuestionIcon" xmlns="http://www.w3.org/2000/svg"
                              class="h-4 w-4 inline-block cursor-help"
                              fill="none"
@@ -76,6 +78,7 @@
                         </svg>
                     </span>
                 </span>
+                </div>
                 <div id="error" class="font-semibold"></div>
                 <select style="display:none;" id="schema-selection">
                     <option value="bot.yaml">Bot Configuration</option>
@@ -196,18 +199,24 @@
             return;
         }
 
+        const payload = {
+            location: window.wikiLocation,
+            create: window.creatingWikiPage,
+            data: window.ed.getModel().getValue(),
+        };
+
+        const reasonVal = document.querySelector('#reason').value;
+        if(reasonVal.trim() !== '') {
+            payload.reason = reasonVal;
+        }
+
         fetch(`${document.location.origin}/config${document.location.search}`, {
             method: 'POST',
             headers: {
                 'Accept': 'application/json',
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-                //...data,
-                location: window.wikiLocation,
-                create: window.creatingWikiPage,
-                data: window.ed.getModel().getValue()
-            })
+            body: JSON.stringify(payload)
         }).then((resp) => {
             if (!resp.ok) {
                 resp.text().then(data => {
@@ -217,6 +226,9 @@
                 if(window.creatingWikiPage) {
                     window.isCreatingWikiPage(false);
                 }
+
+                document.querySelector('#reason').value = '';
+
                 document.querySelector('#error').innerHTML = `Wiki saved!`;
                 window.dirty = false;
                 setTimeout(() => {
