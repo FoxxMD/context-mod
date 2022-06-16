@@ -141,12 +141,14 @@
             const saveLink = document.querySelector('#doSave');
             saveLink.classList.remove('isDisabled');
             saveLink.href = '#';
+            document.querySelector('#reason').style.display = 'initial';
         } else {
             document.querySelector('#saveTip').classList.add('has-tooltip');
             document.querySelector('#saveQuestionIcon').style.display = 'initial';
             const saveLink = document.querySelector('#doSave');
             saveLink.classList.add('isDisabled');
             saveLink.href = '';
+            document.querySelector('#reason').style.display = 'none';
         }
     }
 
