@@ -82,13 +82,26 @@ app.use((req, res, next) => {
     }
 });
 
+const staticHeaders = (res: express.Response, path: string, stat: object) => {
+    res.setHeader('X-Robots-Tag', 'noindex');
+}
+const staticOpts = {
+    setHeaders: staticHeaders
+}
+
 app.use(bodyParser.urlencoded({extended: false}));
 //app.use(cookieParser());
 app.set('views', `${__dirname}/../assets/views`);
 app.set('view engine', 'ejs');
-app.use('/public', express.static(`${__dirname}/../assets/public`));
-app.use('/monaco', express.static(`${__dirname}/../../../node_modules/monaco-editor/`));
-app.use('/schemas', express.static(`${__dirname}/../../Schema/`));
+app.use('/public', express.static(`${__dirname}/../assets/public`, staticOpts));
+app.use('/monaco', express.static(`${__dirname}/../../../node_modules/monaco-editor/`, staticOpts));
+app.use('/schemas', express.static(`${__dirname}/../../Schema/`, staticOpts));
+
+app.use((req, res, next) => {
+    // https://developers.google.com/search/docs/advanced/crawling/block-indexing#http-response-header
+    res.setHeader('X-Robots-Tag', 'noindex');
+    next();
+});
 
 const userAgent = `web:contextBot:web`;
 
@@ -891,7 +904,7 @@ const webClient = async (options: OperatorConfig) => {
 
     app.postAsync('/config', [ensureAuthenticatedApi, defaultSession, instanceWithPermissions, botWithPermissions(true)], async (req: express.Request, res: express.Response) => {
         const {subreddit} = req.query as any;
-        const {location, data, create = false} = req.body as any;
+        const {location, data, reason = 'Updated through CM Web', create = false} = req.body as any;
 
         const client = new ExtendedSnoowrap({
             userAgent,
@@ -905,7 +918,7 @@ const webClient = async (options: OperatorConfig) => {
             const wiki = await client.getSubreddit(subreddit).getWikiPage(location);
             await wiki.edit({
                 text: data,
-                reason: create ? 'Created Config through CM Web' : 'Updated through CM Web'
+                reason
             });
         } catch (err: any) {
             res.status(500);

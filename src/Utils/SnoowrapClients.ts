@@ -1,6 +1,9 @@
-import Snoowrap, {Listing} from "snoowrap";
-import {Subreddit} from "snoowrap/dist/objects";
+import Snoowrap, {Listing, RedditUser} from "snoowrap";
+import {Submission, Subreddit, Comment} from "snoowrap/dist/objects";
 import {parseSubredditName} from "../util";
+import {ModUserNoteLabel} from "../Common/Infrastructure/Atomic";
+import {CreateModNoteData, ModNote, ModNoteRaw, ModNoteSnoowrapPopulated} from "../Subreddit/ModNotes/ModNote";
+import {SimpleError} from "./Errors";
 
 // const proxyFactory = (endpoint: string) => {
 //     return class ProxiedSnoowrap extends Snoowrap {
@@ -13,6 +16,26 @@ import {parseSubredditName} from "../util";
 //         }
 //     }
 // }
+
+export interface ModNoteGetOptions {
+    before?: string,
+    filter?: ModUserNoteLabel,
+    limit?: number
+}
+
+export interface ModNotesRaw {
+    mod_notes: ModNoteSnoowrapPopulated[]
+    start_cursor: string
+    end_cursor: string
+    has_next_page: boolean
+}
+
+export interface ModNotesResponse {
+    notes: ModNote[]
+    startCursor: string
+    endCursor: string
+    isFinished: boolean
+}
 
 export class ExtendedSnoowrap extends Snoowrap {
 
@@ -52,6 +75,70 @@ export class ExtendedSnoowrap extends Snoowrap {
                 flair_template_id: options.flairTemplateId,
             }
         });
+    }
+
+    async getModNotes(subreddit: Subreddit | string, user: RedditUser | string, options: ModNoteGetOptions = {limit: 100}): Promise<ModNotesResponse> {
+
+        const authorName = typeof user === 'string' ? user : user.name;
+        if(authorName === '[deleted]') {
+            throw new SimpleError(`User is '[deleted]', cannot retrieve`, {isSerious: false});
+        }
+        const subredditName = typeof subreddit === 'string' ? subreddit : subreddit.display_name;
+
+        const data: any = {
+            subreddit: subredditName,
+            user: authorName,
+            ...options
+        };
+        const response = await this.oauthRequest({
+            uri: `/api/mod/notes`,
+            method: 'get',
+            qs: data
+        }) as ModNotesRaw;
+
+        // TODO get all mod notes (iterate pages if has_next_page)
+        return {
+
+            // "undo" the _populate function snoowrap uses to replace user/subreddit keys with Proxies
+            // because we want to store the "raw" response data when caching (where user/subreddit keys are strings) so we can construct ModNote from either api response or cache using same data
+            notes: response.mod_notes.map(x => {
+                return new ModNote({
+                    ...x,
+                    subreddit: x.subreddit.display_name,
+                    user: x.user.name,
+                }, this);
+
+            }),
+            startCursor: response.start_cursor,
+            endCursor: response.end_cursor,
+            isFinished: !response.has_next_page
+        }
+    }
+
+    /**
+     * Add a Mod Note
+     *
+     * @see https://www.reddit.com/dev/api#POST_api_mod_notes
+     * */
+    async addModNote(data: CreateModNoteData): Promise<ModNote> {
+        const {note, label} = data;
+
+        const requestData: any = {
+            note,
+            label,
+            subreddit: data.subreddit.display_name,
+            user: data.user.name,
+        }
+        if(data.activity !== undefined) {
+            requestData.reddit_id = data.activity.id;
+        }
+
+        const response =await this.oauthRequest({
+            uri: `/api/mod/notes`,
+            method: 'post',
+            form: requestData
+        }) as { created: ModNoteRaw };
+        return new ModNote(response.created, this);
     }
 }
 

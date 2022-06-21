@@ -185,7 +185,8 @@ export type ActionTypes =
     | 'userflair'
     | 'dispatch'
     | 'cancelDispatch'
-    | 'contributor';
+    | 'contributor'
+    | 'modnote';
 
 /**
  * Test the calculated VADER sentiment (compound) score for an Activity using this comparison. Can be either a numerical or natural language
@@ -229,3 +230,22 @@ export type ActionTypes =
  * @examples ["is negative", "> 0.2"]
  * */
 export type VaderSentimentComparison = string;
+
+export type ModUserNoteLabel =
+    'BOT_BAN'
+    | 'PERMA_BAN'
+    | 'BAN'
+    | 'ABUSE_WARNING'
+    | 'SPAM_WARNING'
+    | 'SPAM_WATCH'
+    | 'SOLID_CONTRIBUTOR'
+    | 'HELPFUL_USER';
+
+export const modUserNoteLabels = ['BOT_BAN', 'PERMA_BAN', 'BAN', 'ABUSE_WARNING', 'SPAM_WARNING', 'SPAM_WATCH', 'SOLID_CONTRIBUTOR', 'HELPFUL_USER'];
+
+export type ModActionType =
+    'INVITE' |
+    'NOTE' |
+    'REMOVAL' |
+    'SPAM' |
+    'APPROVAL';

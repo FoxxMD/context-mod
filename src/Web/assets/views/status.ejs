@@ -1139,7 +1139,7 @@
 
     function getLiveStats(bot, sub) {
         console.debug(`Getting live stats for ${bot} ${sub}`)
-        const fetchPromise = fetch(`/api/liveStats?instance=<%= instanceId %>&bot=${bot}&subreddit=${sub}`)
+        return fetch(`/api/liveStats?instance=<%= instanceId %>&bot=${bot}&subreddit=${sub}`)
             .then(response => response.json())
             .then(resp => updateLiveStats(resp));
     }
@@ -1197,10 +1197,17 @@
             }
 
             // always get live stats for tab we just started viewing
-            getLiveStats(bot, sub);
-            const liveStatsInt = setInterval(() => getLiveStats(bot, sub), 5000);
-            recentlySeen.set(identifier, {liveStatsInt});
-
+            getLiveStats(bot, sub).then(() => {
+                let liveStatsInt;
+                const liveStatFunc = () => {
+                    getLiveStats(bot, sub).catch(() => {
+                        // stop interval if live stat encounters an error
+                        clearInterval(liveStatsInt);
+                    })
+                };
+                liveStatsInt = setInterval(liveStatFunc, 5000);
+                recentlySeen.set(identifier, {liveStatsInt});
+            });
         });
     });
 

@@ -3,10 +3,8 @@ import {Listing, SearchOptions} from "snoowrap";
 import Submission from "snoowrap/dist/objects/Submission";
 import Comment from "snoowrap/dist/objects/Comment";
 import {
-    compareDurationValue,
-    comparisonTextOp,
     FAIL, formatNumber,
-    isRepostItemResult, parseDurationComparison, parseUsableLinkIdentifier,
+    isRepostItemResult, parseUsableLinkIdentifier,
     PASS, searchAndReplace, stringSameness, triggeredIndicator, windowConfigToWindowCriteria, wordCount
 } from "../util";
 import {
@@ -22,7 +20,11 @@ import dayjs from "dayjs";
 import {rest} from "lodash";
 import {CompareValue, DurationComparor, JoinOperands, SearchFacetType} from "../Common/Infrastructure/Atomic";
 import {ActivityWindow, ActivityWindowConfig} from "../Common/Infrastructure/ActivityWindow";
-import {parseGenericValueComparison} from "../Common/Infrastructure/Comparisons";
+import {
+    compareDurationValue, comparisonTextOp,
+    parseDurationComparison,
+    parseGenericValueComparison
+} from "../Common/Infrastructure/Comparisons";
 
 const parseYtIdentifier = parseUsableLinkIdentifier();
 

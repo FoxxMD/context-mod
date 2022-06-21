@@ -1,4 +1,14 @@
-import {CompareValue, CompareValueOrPercent, DurationComparor, ModeratorNameCriteria, ModeratorNames} from "../Atomic";
+import {
+    CompareValue,
+    CompareValueOrPercent,
+    DurationComparor,
+    ModeratorNameCriteria,
+    ModeratorNames, ModActionType,
+    ModUserNoteLabel
+} from "../Atomic";
+import {ActivityType} from "../Reddit";
+import {GenericComparison, parseGenericValueComparison} from "../Comparisons";
+import {parseStringToRegexOrLiteralSearch} from "../../../util";
 
 /**
  * Different attributes a `Subreddit` can be in. Only include a property if you want to check it.
@@ -55,42 +65,40 @@ export const defaultStrongSubredditCriteriaOptions = {
 
 export type FilterCriteriaDefaultBehavior = 'replace' | 'merge';
 
-export interface UserNoteCriteria {
-    /**
-     * User Note type key to search for
-     * @examples ["spamwarn"]
-     * */
-    type: string;
+export interface UserSubredditHistoryCriteria {
     /**
      * Number of occurrences of this type. Ignored if `search` is `current`
      *
      * A string containing a comparison operator and/or a value to compare number of occurrences against
      *
-     * The syntax is `(< OR > OR <= OR >=) <number>[percent sign] [ascending|descending]`
+     * The syntax is `(< OR > OR <= OR >=) <number>[percent sign] [in timeRange] [ascending|descending]`
+     *
+     * If `timeRange` is given then only notes/mod actions that occur between timeRange and NOW will be returned. `timeRange` is ignored if search is `current`
      *
      * @examples [">= 1"]
      * @default ">= 1"
-     * @pattern ^\s*(?<opStr>>|>=|<|<=)\s*(?<value>\d+)\s*(?<percent>%?)\s*(?<extra>asc.*|desc.*)*$
+     * @pattern ^\s*(?<opStr>>|>=|<|<=)\s*(?<value>\d+)\s*(?<percent>%?)\s*(?<duration>in\s+\d+\s*(days?|weeks?|months?|years?|hours?|minutes?|seconds?|milliseconds?))?\s*(?<extra>asc.*|desc.*)*$
      * */
     count?: string;
 
     /**
-     * How to test the notes for this Author:
+     * How to test the Toolbox Notes or Mod Actions for this Author:
      *
      * ### current
      *
-     * Only the most recent note is checked for `type`
+     * Only the most recent note is checked for criteria
      *
      * ### total
      *
-     * The `count` comparison of `type` must be found within all notes
+     * `count` comparison of mod actions/notes must be found within all history
      *
      * * EX `count: > 3`   => Must have more than 3 notes of `type`, total
      * * EX `count: <= 25%` => Must have 25% or less of notes of `type`, total
+     * * EX: `count: > 3 in 1 week` => Must have more than 3 notes within the last week
      *
      * ### consecutive
      *
-     * The `count` **number** of `type` notes must be found in a row.
+     * The `count` **number** of mod actions/notes must be found in a row.
      *
      * You may also specify the time-based order in which to search the notes by specifying `ascending (asc)` or `descending (desc)` in the `count` value. Default is `descending`
      *
@@ -104,7 +112,126 @@ export interface UserNoteCriteria {
     search?: 'current' | 'consecutive' | 'total'
 }
 
-export const authorCriteriaProperties = ['name', 'flairCssClass', 'flairText', 'flairTemplate', 'isMod', 'userNotes', 'age', 'linkKarma', 'commentKarma', 'totalKarma', 'verified', 'shadowBanned', 'description', 'isContributor'];
+export interface UserNoteCriteria extends UserSubredditHistoryCriteria {
+    /**
+     * User Note type key to search for
+     * @examples ["spamwarn"]
+     * */
+    type: string;
+}
+
+export interface ModActionCriteria extends UserSubredditHistoryCriteria {
+    type?: ModActionType | ModActionType[]
+    activityType?: ActivityType | ActivityType[]
+}
+
+export interface FullModActionCriteria extends Omit<ModActionCriteria, 'count'> {
+    type?: ModActionType[]
+    count?: GenericComparison
+    activityType?: ActivityType[]
+}
+
+export interface ModNoteCriteria extends ModActionCriteria {
+    noteType?: ModUserNoteLabel | ModUserNoteLabel[]
+    note?: string | string[]
+}
+
+export interface FullModNoteCriteria extends FullModActionCriteria, Omit<ModNoteCriteria, 'note' | 'count' | 'type' | 'activityType'> {
+    noteType?: ModUserNoteLabel[]
+    note?: RegExp[]
+}
+
+const arrayableModNoteProps = ['activityType','noteType','note'];
+
+export const asModNoteCriteria = (val: any): val is ModNoteCriteria => {
+    return val !== null && typeof val === 'object' && ('noteType' in val || 'note' in val);
+}
+
+export const toFullModNoteCriteria = (val: ModNoteCriteria): FullModNoteCriteria => {
+
+    const result = Object.entries(val).reduce((acc: FullModNoteCriteria, curr) => {
+        const [k,v] = curr;
+
+        if(v === undefined) {
+            return acc;
+        }
+
+        const rawVal = arrayableModNoteProps.includes(k) && !Array.isArray(v) ? [v] : v;
+
+        switch(k) {
+            case 'search':
+                acc.search = rawVal;
+                break;
+            case 'count':
+                acc.count = parseGenericValueComparison(rawVal);
+                break;
+            case 'activityType':
+            case 'noteType':
+                acc[k] = rawVal;
+                break;
+            case 'note':
+                acc[k] = rawVal.map((x: string) => parseStringToRegexOrLiteralSearch(x))
+        }
+
+        return acc;
+    }, {});
+
+    result.type = ['NOTE'];
+    return result;
+}
+
+
+export interface ModLogCriteria extends ModActionCriteria {
+    action?: string | string[]
+    details?: string | string[]
+    description?: string | string[]
+}
+
+export interface FullModLogCriteria extends FullModActionCriteria, Omit<ModLogCriteria, 'action' | 'details' | 'description' | 'count' | 'type' | 'activityType'> {
+    action?: RegExp[]
+    details?: RegExp[]
+    description?: RegExp[]
+}
+
+const arrayableModLogProps = ['type','activityType','action','description','details', 'type'];
+
+export const asModLogCriteria = (val: any): val is ModLogCriteria => {
+    return val !== null && typeof val === 'object' && !asModNoteCriteria(val) && ('action' in val || 'details' in val || 'description' in val || 'activityType' in val || 'search' in val || 'count' in val || 'type' in val);
+}
+
+export const toFullModLogCriteria = (val: ModLogCriteria): FullModLogCriteria => {
+
+    return Object.entries(val).reduce((acc: FullModLogCriteria, curr) => {
+        const [k,v] = curr;
+
+        if(v === undefined) {
+            return acc;
+        }
+
+        const rawVal = arrayableModLogProps.includes(k) && !Array.isArray(v) ? [v] : v;
+
+        switch(k) {
+            case 'search':
+                acc.search = rawVal;
+                break;
+            case 'count':
+                acc.count = parseGenericValueComparison(rawVal);
+                break;
+            case 'activityType':
+            case 'type':
+                acc[k as keyof FullModLogCriteria] = rawVal;
+                break;
+            case 'action':
+            case 'description':
+            case 'details':
+                acc[k as keyof FullModLogCriteria] = rawVal.map((x: string) => parseStringToRegexOrLiteralSearch(x))
+        }
+
+        return acc;
+    }, {});
+}
+
+export const authorCriteriaProperties = ['name', 'flairCssClass', 'flairText', 'flairTemplate', 'isMod', 'userNotes', 'modActions', 'age', 'linkKarma', 'commentKarma', 'totalKarma', 'verified', 'shadowBanned', 'description', 'isContributor'];
 
 /**
  * Criteria with which to test against the author of an Activity. The outcome of the test is based on:
@@ -158,6 +285,8 @@ export interface AuthorCriteria {
      * A list of UserNote properties to check against the User Notes attached to this Author in this Subreddit (must have Toolbox enabled and used User Notes at least once)
      * */
     userNotes?: UserNoteCriteria[]
+
+    modActions?: (ModNoteCriteria | ModLogCriteria)[]
 
     /**
      * Test the age of the Author's account (when it was created) against this comparison
@@ -228,7 +357,35 @@ export interface AuthorCriteria {
      * Is the author an approved user (contributor)?
      * */
     isContributor?: boolean
-} // properties calculated/derived by CM -- not provided as plain values by reddit
+}
+
+/**
+ * When testing AuthorCriteria test properties in order of likelihood to require an API call to complete
+ * */
+export const orderedAuthorCriteriaProps: (keyof AuthorCriteria)[] = [
+    'name', // never needs an api call, returned/cached with activity info
+    // none of these normally need api calls unless activity is a skeleton generated by CM (not normal)
+    // all are part of cached activity data
+    'flairCssClass',
+    'flairText',
+    'flairTemplate',
+    // usernotes are cached longer than author by default (5 min vs 60 seconds)
+    'userNotes',
+    // requires fetching/getting cached author.
+    // If fetching and user is shadowbanned none of the individual author data below will be retrievable either so always do this first
+    'shadowBanned',
+    // individual props require fetching/getting cached
+    'age',
+    'linkKarma',
+    'commentKarma',
+    'totalKarma',
+    'verified',
+    'description',
+    'isMod', // requires fetching mods for subreddit
+    'isContributor', // requires fetching contributors for subreddit
+    'modActions', // requires fetching mod notes/actions for author (shortest cache TTL)
+];
+
 export interface ActivityState {
     /**
      * * true/false => test whether Activity is removed or not

@@ -3,16 +3,18 @@ import {assert} from 'chai';
 import {
     COMMENT_URL_ID,
     parseDuration,
-    parseDurationComparison,
     parseLinkIdentifier,
     parseRedditEntity, removeUndefinedKeys, SUBMISSION_URL_ID
 } from "../src/util";
 import dayjs from "dayjs";
-import dduration, {DurationUnitType} from 'dayjs/plugin/duration.js';
+import dduration, {Duration, DurationUnitType} from 'dayjs/plugin/duration.js';
 import {
+    parseDurationComparison,
     parseGenericValueComparison,
     parseGenericValueOrPercentComparison
 } from "../src/Common/Infrastructure/Comparisons";
+
+dayjs.extend(dduration);
 
 
 describe('Non-temporal Comparison Operations', function () {
@@ -54,12 +56,23 @@ describe('Non-temporal Comparison Operations', function () {
         const withoutPercent = parseGenericValueOrPercentComparison('<= 3');
         assert.isFalse(withoutPercent.isPercent)
     })
+    it('should parse comparison with time component', function() {
+        const val = parseGenericValueComparison('> 3 in 2 months');
+        assert.equal(val.value, 3);
+        assert.isFalse(val.isPercent);
+        assert.exists(val.duration);
+        assert.equal(dayjs.duration(2, 'months').milliseconds(), (val.duration as Duration).milliseconds());
+    });
+    it('should parse percentage comparison with time component', function() {
+        const val = parseGenericValueOrPercentComparison('> 3% in 2 months');
+        assert.equal(val.value, 3);
+        assert.isTrue(val.isPercent);
+        assert.exists(val.duration);
+        assert.equal(dayjs.duration(2, 'months').milliseconds(), (val.duration as Duration).milliseconds());
+    });
 });
 
 describe('Parsing Temporal Values', function () {
-    before('Extend DayJS', function () {
-        dayjs.extend(dduration);
-    });
 
     describe('Temporal Comparison Operations', function () {
         it('should throw if no operator sign', function () {

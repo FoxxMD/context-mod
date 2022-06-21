@@ -17,8 +17,6 @@ import {
     buildCacheOptionsFromProvider,
     buildCachePrefix,
     cacheStats,
-    compareDurationValue,
-    comparisonTextOp,
     createCacheManager,
     escapeRegex,
     FAIL,
@@ -35,7 +33,6 @@ import {
     isUser,
     hashString,
     mergeArr,
-    parseDurationComparison,
     parseExternalUrl,
     parseRedditEntity,
     parseStringToRegex,
@@ -56,7 +53,12 @@ import {
     frequencyEqualOrLargerThanMin,
     parseDurationValToDuration,
     windowConfigToWindowCriteria,
-    asStrongSubredditState, convertSubredditsRawToStrong, filterByTimeRequirement
+    asStrongSubredditState,
+    convertSubredditsRawToStrong,
+    filterByTimeRequirement,
+    asSubreddit,
+    modActionCriteriaSummary,
+    parseRedditFullname
 } from "../util";
 import LoggedError from "../Utils/LoggedError";
 import {
@@ -109,16 +111,19 @@ import {RuleSetResultEntity} from "../Common/Entities/RuleSetResultEntity";
 import {RulePremise} from "../Common/Entities/RulePremise";
 import cloneDeep from "lodash/cloneDeep";
 import {
-    AuthorCriteria, CommentState, RequiredAuthorCrit,
+    asModLogCriteria,
+    asModNoteCriteria,
+    AuthorCriteria, CommentState, ModLogCriteria, ModNoteCriteria, orderedAuthorCriteriaProps, RequiredAuthorCrit,
     StrongSubredditCriteria, SubmissionState,
-    SubredditCriteria, TypedActivityState, TypedActivityStates,
+    SubredditCriteria, toFullModLogCriteria, toFullModNoteCriteria, TypedActivityState, TypedActivityStates,
     UserNoteCriteria
 } from "../Common/Infrastructure/Filters/FilterCriteria";
 import {
     ActivitySource, DurationVal,
     EventRetentionPolicyRange,
     JoinOperands,
-    ModeratorNameCriteria, statFrequencies, StatisticFrequency,
+    ModActionType,
+    ModeratorNameCriteria, ModUserNoteLabel, statFrequencies, StatisticFrequency,
     StatisticFrequencyOption
 } from "../Common/Infrastructure/Atomic";
 import {
@@ -137,13 +142,20 @@ import {
 import {Duration} from "dayjs/plugin/duration";
 import {
 
+    ActivityType,
     AuthorHistorySort,
     CachedFetchedActivitiesResult, FetchedActivitiesResult,
     SnoowrapActivity
 } from "../Common/Infrastructure/Reddit";
 import {AuthorCritPropHelper} from "../Common/Infrastructure/Filters/AuthorCritPropHelper";
 import {NoopLogger} from "../Utils/loggerFactory";
-import {parseGenericValueComparison, parseGenericValueOrPercentComparison} from "../Common/Infrastructure/Comparisons";
+import {
+    compareDurationValue, comparisonTextOp,
+    parseDurationComparison,
+    parseGenericValueComparison,
+    parseGenericValueOrPercentComparison
+} from "../Common/Infrastructure/Comparisons";
+import {asCreateModNoteData, CreateModNoteData, ModNote, ModNoteRaw} from "./ModNotes/ModNote";
 
 export const DEFAULT_FOOTER = '\r\n*****\r\nThis action was performed by [a bot.]({{botLink}}) Mention a moderator or [send a modmail]({{modmailLink}}) if you any ideas, questions, or concerns about this action.';
 
@@ -209,6 +221,7 @@ export class SubredditResources {
     protected submissionTTL: number | false = cacheTTLDefaults.submissionTTL;
     protected commentTTL: number | false = cacheTTLDefaults.commentTTL;
     protected filterCriteriaTTL: number | false = cacheTTLDefaults.filterCriteriaTTL;
+    protected modNotesTTL: number | false = cacheTTLDefaults.modNotesTTL;
     public selfTTL: number | false = cacheTTLDefaults.selfTTL;
     name: string;
     botName: string;
@@ -258,6 +271,7 @@ export class SubredditResources {
                 submissionTTL,
                 commentTTL,
                 subredditTTL,
+                modNotesTTL,
             },
             botName,
             database,
@@ -299,6 +313,7 @@ export class SubredditResources {
         this.subredditTTL = subredditTTL === true ? 0 : subredditTTL;
         this.wikiTTL = wikiTTL === true ? 0 : wikiTTL;
         this.filterCriteriaTTL = filterCriteriaTTL === true ? 0 : filterCriteriaTTL;
+        this.modNotesTTL = modNotesTTL === true ? 0 : modNotesTTL;
         this.selfTTL = selfTTL === true ? 0 : selfTTL;
         this.subreddit = subreddit;
         this.thirdPartyCredentials = thirdPartyCredentials;
@@ -1003,11 +1018,19 @@ export class SubredditResources {
     }
 
     // @ts-ignore
-    async getSubreddit(item: Submission | Comment, logger = this.logger) {
+    async getSubreddit(item: Submission | Comment | Subreddit | string, logger = this.logger) {
+        let subName = '';
+        if (typeof item === 'string') {
+            subName = item;
+        } else if (asSubreddit(item)) {
+            subName = item.display_name;
+        } else if (asSubmission(item) || asComment(item)) {
+            subName = getActivitySubredditName(item);
+        }
         try {
             let hash = '';
-            const subName = getActivitySubredditName(item);
             if (this.subredditTTL !== false) {
+
                 hash = `sub-${subName}`;
                 await this.stats.cache.subreddit.identifierRequestCount.set(hash, (await this.stats.cache.subreddit.identifierRequestCount.wrap(hash, () => 0) as number) + 1);
                 this.stats.cache.subreddit.requestTimestamps.push(Date.now());
@@ -1018,7 +1041,7 @@ export class SubredditResources {
                     return new Subreddit(cachedSubreddit, this.client, false);
                 }
                 // @ts-ignore
-                const subreddit = await this.client.getSubreddit(subName).fetch() as Subreddit;
+                const subreddit = await (item instanceof Subreddit ? item : this.client.getSubreddit(subName)).fetch() as Subreddit;
                 this.stats.cache.subreddit.miss++;
                 // @ts-ignore
                 await this.cache.set(hash, subreddit, {ttl: this.subredditTTL});
@@ -1026,7 +1049,7 @@ export class SubredditResources {
                 return subreddit as Subreddit;
             } else {
                 // @ts-ignore
-                let subreddit = await this.client.getSubreddit(subName);
+                let subreddit = await (item instanceof Subreddit ? item : this.client.getSubreddit(subName)).fetch();
 
                 return subreddit as Subreddit;
             }
@@ -1132,6 +1155,84 @@ export class SubredditResources {
         return false;
     }
 
+    async getAuthorModNotesByActivityAuthor(activity: Comment | Submission) {
+        const author = activity.author instanceof RedditUser ? activity.author : getActivityAuthorName(activity.author);
+        if (activity.subreddit.display_name !== this.subreddit.display_name) {
+            throw new SimpleError(`Can only get Modnotes for current moderator subreddit, Activity is from ${activity.subreddit.display_name}`, {isSerious: false});
+        }
+        return this.getAuthorModNotes(author);
+    }
+
+    async getAuthorModNotes(val: RedditUser | string) {
+
+        const authorName = typeof val === 'string' ? val : val.name;
+        if (authorName === '[deleted]') {
+            throw new SimpleError(`User is '[deleted]', cannot retrieve`, {isSerious: false});
+        }
+        const subredditName = this.subreddit.display_name
+
+        const hash = `authorModNotes-${subredditName}-${authorName}`;
+
+        if (this.modNotesTTL !== false) {
+            const cachedModNoteData = await this.cache.get(hash) as ModNoteRaw[] | null | undefined;
+            if (cachedModNoteData !== undefined && cachedModNoteData !== null) {
+                this.logger.debug(`Cache Hit: Author ModNotes ${authorName} in ${subredditName}`);
+
+                return cachedModNoteData.map(x => {
+                    const note = new ModNote(x, this.client);
+                    note.subreddit = this.subreddit;
+                    if (val instanceof RedditUser) {
+                        note.user = val;
+                    }
+                    return note;
+                });
+            }
+        }
+
+        const fetchedNotes = (await this.client.getModNotes(this.subreddit, val)).notes.map(x => {
+            x.subreddit = this.subreddit;
+            if (val instanceof RedditUser) {
+                x.user = val;
+            }
+            return x;
+        });
+
+        if (this.modNotesTTL !== false) {
+            // @ts-ignore
+            await this.cache.set(hash, fetchedNotes, {ttl: this.modNotesTTL});
+        }
+
+        return fetchedNotes;
+    }
+
+    async addModNote(note: CreateModNoteData | ModNote): Promise<ModNote> {
+        let data: CreateModNoteData;
+        if (asCreateModNoteData(note)) {
+            data = note;
+        } else {
+            data = {
+                user: note.user,
+                subreddit: this.subreddit,
+                activity: note.note.actedOn as Submission | Comment | RedditUser | undefined,
+                label: note.note.label,
+                note: note.note.note ?? '',
+            }
+        }
+
+        const newNote = await this.client.addModNote(data);
+
+        if (this.modNotesTTL !== false) {
+            const hash = `authorModNotes-${this.subreddit.display_name}-${data.user.name}`;
+            const cachedModNoteData = await this.cache.get(hash) as ModNoteRaw[] | null | undefined;
+            if (cachedModNoteData !== undefined && cachedModNoteData !== null) {
+                this.logger.debug(`Adding new Note ${newNote.id} to Author ${data.user.name} Note cache`);
+                await this.cache.set(hash, [newNote, ...cachedModNoteData], {ttl: this.modNotesTTL});
+            }
+        }
+
+        return newNote;
+    }
+
     // @ts-ignore
     async getAuthor(val: RedditUser | string) {
         const authorName = typeof val === 'string' ? val : val.name;
@@ -1174,7 +1275,7 @@ export class SubredditResources {
             return user;
         } catch (err) {
             if(isStatusError(err) && err.statusCode === 404) {
-                throw new SimpleError(`Reddit returned a 404 for User '${authorName}'. Likely this user is shadowbanned.`, {isSerious: false});
+                throw new SimpleError(`Reddit returned a 404 for User '${authorName}'. Likely this user is shadowbanned.`, {isSerious: false, code: 404});
             }
             throw new ErrorWithCause(`Could not retrieve User '${authorName}'`, {cause: err});
         }
@@ -2150,7 +2251,7 @@ export class SubredditResources {
                         propResultsMap.age!.found = created.format('MMMM D, YYYY h:mm A Z');
                         break;
                     case 'title':
-                        if((item instanceof Comment)) {
+                        if(asComment(item)) {
                             const titleWarn ='`title` is not allowed in `itemIs` criteria when the main Activity is a Comment';
                             log.debug(titleWarn);
                             propResultsMap.title!.passed = true;
@@ -2169,7 +2270,7 @@ export class SubredditResources {
                         }
                         break;
                     case 'isRedditMediaDomain':
-                        if((item instanceof Comment)) {
+                        if(asComment(item)) {
                             const mediaWarn = '`isRedditMediaDomain` is not allowed in `itemIs` criteria when the main Activity is a Comment';
                             log.debug(mediaWarn);
                             propResultsMap.isRedditMediaDomain!.passed = true;
@@ -2256,7 +2357,7 @@ export class SubredditResources {
                         propResultsMap[k]!.passed = criteriaPassWithIncludeBehavior(propResultsMap[k]!.found === itemOptVal, include);
                         break;
                     case 'op':
-                        if(isSubmission(item)) {
+                        if(asSubmission(item)) {
                             const opWarn = `On a Submission the 'op' property will always be true. Did you mean to use this on a comment instead?`;
                             log.debug(opWarn);
                             propResultsMap.op!.passed = true;
@@ -2267,7 +2368,7 @@ export class SubredditResources {
                         propResultsMap.op!.passed = criteriaPassWithIncludeBehavior(propResultsMap.op!.found === itemOptVal, include);
                         break;
                     case 'depth':
-                        if(isSubmission(item)) {
+                        if(asSubmission(item)) {
                             const depthWarn = `Cannot test for 'depth' on a Submission`;
                             log.debug(depthWarn);
                             propResultsMap.depth!.passed = true;
@@ -2378,6 +2479,8 @@ export class SubredditResources {
                 ex = v.map(x => {
                     if (asUserNoteCriteria(x)) {
                         return userNoteCriteriaSummary(x);
+                    } else if(asModNoteCriteria(x) || asModLogCriteria(x)) {
+                        return modActionCriteriaSummary(x);
                     }
                     return x;
                 });
@@ -2391,45 +2494,29 @@ export class SubredditResources {
             return acc;
         }, {});
 
-        const {shadowBanned} = authorOpts;
+        const keys = Object.keys(propResultsMap) as (keyof AuthorCriteria)[]
+        let orderedKeys: (keyof AuthorCriteria)[] = [];
 
-        if (shadowBanned !== undefined) {
-            try {
-                // @ts-ignore
-                await item.author.fetch();
-                // user is not shadowbanned
-                // if criteria specifies they SHOULD be shadowbanned then return false now
-                if (shadowBanned) {
-                    propResultsMap.shadowBanned!.found = false;
-                    propResultsMap.shadowBanned!.passed = false;
-                }
-            } catch (err: any) {
-                if (isStatusError(err) && err.statusCode === 404) {
-                    // user is shadowbanned
-                    // if criteria specifies they should not be shadowbanned then return false now
-                    if (!shadowBanned) {
-                        propResultsMap.shadowBanned!.found = true;
-                        propResultsMap.shadowBanned!.passed = false;
-                    }
-                } else {
-                    throw err;
-                }
+        // push existing keys that should be ordered to the front of the list
+        for(const oProp of orderedAuthorCriteriaProps) {
+            if(keys.includes(oProp)) {
+                orderedKeys.push(oProp);
             }
         }
 
+        // then add any keys not included as ordered but that exist onto the end of the list
+        // this way when we iterate all properties of the criteria we test all props that (probably) don't require API calls first
+        orderedKeys = orderedKeys.concat(keys.filter(x => !orderedKeys.includes(x)));
 
-
-        if (propResultsMap.shadowBanned === undefined || propResultsMap.shadowBanned.passed === undefined) {
             try {
                 const authorName = getActivityAuthorName(item.author);
 
-                const keys = Object.keys(propResultsMap) as (keyof AuthorCriteria)[]
-
                 let shouldContinue = true;
-                for (const k of keys) {
-                    if (k === 'shadowBanned') {
-                        // we have already taken care of this with shadowban check above
-                        continue;
+                for (const k of orderedKeys) {
+
+                    if(propResultsMap.shadowBanned !== undefined && propResultsMap.shadowBanned!.found === true) {
+                        // if we've determined the user is shadowbanned we can't get any info about them anyways so end criteria testing early
+                        break;
                     }
 
                     // none of the criteria below are returned if the user is suspended
@@ -2454,8 +2541,30 @@ export class SubredditResources {
 
                     const authorOptVal = definedAuthorOpts[k];
 
-                    //if (authorOpts[k] !== undefined) {
                     switch (k) {
+                        case 'shadowBanned':
+
+                            const isShadowBannedTest = async () => {
+                                try {
+                                    // @ts-ignore
+                                    await user();
+                                    return false;
+                                } catch (err: any) {
+                                    // see this.getAuthor() catch block
+                                    if('code' in err && err.code === 404) {
+                                        return true
+                                    }
+                                    throw err;
+                                }
+                            }
+
+                            propResultsMap.shadowBanned!.found = await isShadowBannedTest();
+                            const shadowPassed = (propResultsMap.shadowBanned!.found && authorOptVal === true) || (!propResultsMap.shadowBanned!.found && authorOptVal === false);
+                            propResultsMap.shadowBanned!.passed = criteriaPassWithIncludeBehavior(shadowPassed, include);
+                            if(propResultsMap.shadowBanned!.passed) {
+                                shouldContinue = false;
+                            }
+                            break;
                         case 'name':
                             const nameVal = authorOptVal as RequiredAuthorCrit['name'];
                             const authPass = () => {
@@ -2469,7 +2578,7 @@ export class SubredditResources {
                             }
                             const authResult = authPass();
                             propResultsMap.name!.found = authorName;
-                            propResultsMap.name!.passed = !((include && !authResult) || (!include && authResult));
+                            propResultsMap.name!.passed = criteriaPassWithIncludeBehavior(authResult, include);
                             if (!propResultsMap.name!.passed) {
                                 shouldContinue = false;
                             }
@@ -2494,7 +2603,7 @@ export class SubredditResources {
                                 cssResult = opts.some(x => x.trim().toLowerCase() === css.trim().toLowerCase())
                             }
 
-                            propResultsMap.flairCssClass!.passed = !((include && !cssResult) || (!include && cssResult));
+                            propResultsMap.flairCssClass!.passed = criteriaPassWithIncludeBehavior(cssResult, include);
                             if (!propResultsMap.flairCssClass!.passed) {
                                 shouldContinue = false;
                             }
@@ -2518,7 +2627,7 @@ export class SubredditResources {
                                 const opts = Array.isArray(authorOptVal) ? authorOptVal as string[] : [authorOptVal] as string[];
                                 textResult = opts.some(x => x.trim().toLowerCase() === text.trim().toLowerCase())
                             }
-                            propResultsMap.flairText!.passed = !((include && !textResult) || (!include && textResult));
+                            propResultsMap.flairText!.passed = criteriaPassWithIncludeBehavior(textResult, include);
                             if (!propResultsMap.flairText!.passed) {
                                 shouldContinue = false;
                             }
@@ -2542,7 +2651,7 @@ export class SubredditResources {
                                 templateResult = opts.some(x => x.trim() === templateId);
                             }
 
-                            propResultsMap.flairTemplate!.passed = !((include && !templateResult) || (!include && templateResult));
+                            propResultsMap.flairTemplate!.passed = criteriaPassWithIncludeBehavior(templateResult, include);
                             if (!propResultsMap.flairTemplate!.passed) {
                                 shouldContinue = false;
                             }
@@ -2552,7 +2661,7 @@ export class SubredditResources {
                             const isModerator = mods.some(x => x.name === authorName) || authorName.toLowerCase() === 'automoderator';
                             const modMatch = authorOptVal === isModerator;
                             propResultsMap.isMod!.found = isModerator;
-                            propResultsMap.isMod!.passed = !((include && !modMatch) || (!include && modMatch));
+                            propResultsMap.isMod!.passed = criteriaPassWithIncludeBehavior(modMatch, include);
                             if (!propResultsMap.isMod!.passed) {
                                 shouldContinue = false;
                             }
@@ -2562,7 +2671,7 @@ export class SubredditResources {
                             const isContributor= contributors.some(x => x.name === authorName);
                             const contributorMatch = authorOptVal === isContributor;
                             propResultsMap.isContributor!.found = isContributor;
-                            propResultsMap.isContributor!.passed = !((include && !contributorMatch) || (!include && contributorMatch));
+                            propResultsMap.isContributor!.passed = criteriaPassWithIncludeBehavior(contributorMatch, include);
                             if (!propResultsMap.isContributor!.passed) {
                                 shouldContinue = false;
                             }
@@ -2572,7 +2681,7 @@ export class SubredditResources {
                             const authorAge = dayjs.unix((await user()).created);
                             const ageTest = compareDurationValue(parseDurationComparison(await authorOpts.age as string), authorAge);
                             propResultsMap.age!.found = authorAge.fromNow(true);
-                            propResultsMap.age!.passed = !((include && !ageTest) || (!include && ageTest));
+                            propResultsMap.age!.passed = criteriaPassWithIncludeBehavior(ageTest, include);
                             if (!propResultsMap.age!.passed) {
                                 shouldContinue = false;
                             }
@@ -2589,7 +2698,7 @@ export class SubredditResources {
                                 lkMatch = comparisonTextOp(item.author.link_karma, lkCompare.operator, lkCompare.value);
                             }
                             propResultsMap.linkKarma!.found = tk;
-                            propResultsMap.linkKarma!.passed = !((include && !lkMatch) || (!include && lkMatch));
+                            propResultsMap.linkKarma!.passed = criteriaPassWithIncludeBehavior(lkMatch, include);
                             if (!propResultsMap.linkKarma!.passed) {
                                 shouldContinue = false;
                             }
@@ -2605,7 +2714,7 @@ export class SubredditResources {
                                 ckMatch = comparisonTextOp(item.author.comment_karma, ckCompare.operator, ckCompare.value);
                             }
                             propResultsMap.commentKarma!.found = ck;
-                            propResultsMap.commentKarma!.passed = !((include && !ckMatch) || (!include && ckMatch));
+                            propResultsMap.commentKarma!.passed = criteriaPassWithIncludeBehavior(ckMatch, include);
                             if (!propResultsMap.commentKarma!.passed) {
                                 shouldContinue = false;
                             }
@@ -2619,7 +2728,7 @@ export class SubredditResources {
                             }
                             const tkMatch = comparisonTextOp(totalKarma, tkCompare.operator, tkCompare.value);
                             propResultsMap.totalKarma!.found = totalKarma;
-                            propResultsMap.totalKarma!.passed = !((include && !tkMatch) || (!include && tkMatch));
+                            propResultsMap.totalKarma!.passed = criteriaPassWithIncludeBehavior(tkMatch, include);
                             if (!propResultsMap.totalKarma!.passed) {
                                 shouldContinue = false;
                             }
@@ -2629,7 +2738,7 @@ export class SubredditResources {
                             const verified = (await user()).has_verified_mail;
                             const vMatch = verified === authorOpts.verified as boolean;
                             propResultsMap.verified!.found = verified;
-                            propResultsMap.verified!.passed = !((include && !vMatch) || (!include && vMatch));
+                            propResultsMap.verified!.passed = criteriaPassWithIncludeBehavior(vMatch, include);
                             if (!propResultsMap.verified!.passed) {
                                 shouldContinue = false;
                             }
@@ -2655,7 +2764,7 @@ export class SubredditResources {
                                 }
                             }
                             propResultsMap.description!.found = typeof desc === 'string' ? truncateStringToLength(50)(desc) : desc;
-                            propResultsMap.description!.passed = !((include && !passed) || (!include && passed));
+                            propResultsMap.description!.passed = criteriaPassWithIncludeBehavior(passed, include);
                             if (!propResultsMap.description!.passed) {
                                 shouldContinue = false;
                             } else {
@@ -2672,8 +2781,10 @@ export class SubredditResources {
                                         value,
                                         operator,
                                         isPercent,
+                                        duration,
                                         extra = ''
                                     } = parseGenericValueOrPercentComparison(count);
+                                    const cutoffDate = duration === undefined ? undefined : dayjs().subtract(duration);
                                     const order = extra.includes('asc') ? 'ascending' : 'descending';
                                     switch (search) {
                                         case 'current':
@@ -2688,29 +2799,32 @@ export class SubredditResources {
                                             }
                                             break;
                                         case 'consecutive':
-                                            let orderedNotes = notes;
+                                            if (isPercent) {
+                                                throw new SimpleError(`When comparing UserNotes with 'consecutive' search 'count' cannot be a percentage. Given: ${count}`);
+                                            }
+
+                                            let orderedNotes = cutoffDate === undefined ? notes : notes.filter(x => x.time.isSameOrAfter(cutoffDate));
                                             if (order === 'descending') {
                                                 orderedNotes = [...notes];
                                                 orderedNotes.reverse();
                                             }
                                             let currCount = 0;
+                                            let maxCount = 0;
                                             for (const note of orderedNotes) {
                                                 if (note.noteType === type) {
                                                     currCount++;
+                                                    maxCount = Math.max(maxCount, currCount);
                                                 } else {
                                                     currCount = 0;
                                                 }
-                                                if (isPercent) {
-                                                    throw new SimpleError(`When comparing UserNotes with 'consecutive' search 'count' cannot be a percentage. Given: ${count}`);
-                                                }
-                                                foundNoteResult.push(`Found ${currCount} ${type} consecutively`);
-                                                if (comparisonTextOp(currCount, operator, value)) {
-                                                    return true;
-                                                }
+                                            }
+                                            foundNoteResult.push(`Found ${currCount} ${type} consecutively`);
+                                            if (comparisonTextOp(currCount, operator, value)) {
+                                                return true;
                                             }
                                             break;
                                         case 'total':
-                                            const filteredNotes = notes.filter(x => x.noteType === type);
+                                            const filteredNotes = notes.filter(x => x.noteType === type && cutoffDate === undefined || (x.time.isSameOrAfter(cutoffDate)));
                                             if (isPercent) {
                                                 // avoid divide by zero
                                                 const percent = notes.length === 0 ? 0 : filteredNotes.length / notes.length;
@@ -2731,8 +2845,219 @@ export class SubredditResources {
                             }
                             const noteResult = notePass();
                             propResultsMap.userNotes!.found = foundNoteResult.join(' | ');
-                            propResultsMap.userNotes!.passed = !((include && !noteResult) || (!include && noteResult));
+                            propResultsMap.userNotes!.passed = criteriaPassWithIncludeBehavior(noteResult, include);
                             if (!propResultsMap.userNotes!.passed) {
+                                shouldContinue = false;
+                            }
+                            break;
+                        case 'modActions':
+                            const modActions = await this.getAuthorModNotesByActivityAuthor(item);
+                            // TODO convert these prior to running filter so we don't have to do it every time
+                            const actionCriterias = authorOptVal as (ModNoteCriteria | ModLogCriteria)[];
+                            let actionResult: string[] = [];
+
+                            const actionsPass = () => {
+
+                                for (const actionCriteria of actionCriterias) {
+
+                                    const {search = 'current', count = '>= 1'} = actionCriteria;
+
+
+                                    const {
+                                        value,
+                                        operator,
+                                        isPercent,
+                                        duration,
+                                        extra = ''
+                                    } = parseGenericValueOrPercentComparison(count);
+                                    const cutoffDate = duration === undefined ? undefined : dayjs().subtract(duration);
+
+                                    let actionsToUse: ModNote[] = [];
+                                    if(asModNoteCriteria(actionCriteria)) {
+                                        actionsToUse = actionsToUse.filter(x => x.type === 'NOTE');
+                                    } else {
+                                        actionsToUse = modActions;
+                                    }
+
+                                    if(search === 'current' && actionsToUse.length > 0) {
+                                        actionsToUse = [actionsToUse[0]];
+                                    }
+
+                                    let validActions: ModNote[] = [];
+                                    if (asModLogCriteria(actionCriteria)) {
+                                        const fullCrit = toFullModLogCriteria(actionCriteria);
+                                        const fullCritEntries = Object.entries(fullCrit);
+                                        validActions = actionsToUse.filter(x => {
+
+                                            // filter out any notes that occur before time range
+                                            if(cutoffDate !== undefined && x.createdAt.isBefore(cutoffDate)) {
+                                                return false;
+                                            }
+
+                                            for (const [k, v] of fullCritEntries) {
+                                                const key = k.toLocaleLowerCase();
+                                                if (['count', 'search'].includes(key)) {
+                                                    continue;
+                                                }
+                                                switch (key) {
+                                                    case 'type':
+                                                        if (!v.includes((x.type as ModActionType))) {
+                                                            return false
+                                                        }
+                                                        break;
+                                                    case 'activitytype':
+                                                        const anyMatch = v.some((a: ActivityType) => {
+                                                            switch (a) {
+                                                                case 'submission':
+                                                                    if (x.action.actedOn instanceof Submission) {
+                                                                        return true;
+                                                                    }
+                                                                    break;
+                                                                case 'comment':
+                                                                    if (x.action.actedOn instanceof Comment) {
+                                                                        return true;
+                                                                    }
+                                                                    break;
+                                                            }
+                                                        });
+                                                        if (!anyMatch) {
+                                                            return false;
+                                                        }
+                                                        break;
+                                                    case 'description':
+                                                    case 'action':
+                                                    case 'details':
+                                                        const actionPropVal = x.action[key] as string;
+                                                        if (actionPropVal === undefined) {
+                                                            return false;
+                                                        }
+                                                        const anyPropMatch = v.some((y: RegExp) => y.test(actionPropVal));
+                                                        if (!anyPropMatch) {
+                                                            return false;
+                                                        }
+                                                } // case end
+
+                                            } // for each end
+
+                                            return true;
+                                        }); // filter end
+                                    } else if(asModNoteCriteria(actionCriteria)) {
+                                        const fullCrit = toFullModNoteCriteria(actionCriteria as ModNoteCriteria);
+                                        const fullCritEntries = Object.entries(fullCrit);
+                                        validActions = actionsToUse.filter(x => {
+
+                                            // filter out any notes that occur before time range
+                                            if(cutoffDate !== undefined && x.createdAt.isBefore(cutoffDate)) {
+                                                return false;
+                                            }
+
+                                            for (const [k, v] of fullCritEntries) {
+                                                const key = k.toLocaleLowerCase();
+                                                if (['count', 'search'].includes(key)) {
+                                                    continue;
+                                                }
+                                                switch (key) {
+                                                    case 'notetype':
+                                                        if (!v.map((x: ModUserNoteLabel) => x.toUpperCase()).includes((x.note.label as ModUserNoteLabel))) {
+                                                            return false
+                                                        }
+                                                        break;
+                                                    case 'note':
+                                                        const actionPropVal = x.note.note;
+                                                        if (actionPropVal === undefined) {
+                                                            return false;
+                                                        }
+                                                        const anyPropMatch = v.some((y: RegExp) => y.test(actionPropVal));
+                                                        if (!anyPropMatch) {
+                                                            return false;
+                                                        }
+                                                        break;
+                                                    case 'activitytype':
+                                                        const anyMatch = v.some((a: ActivityType) => {
+                                                            switch (a) {
+                                                                case 'submission':
+                                                                    if (x.action.actedOn instanceof Submission) {
+                                                                        return true;
+                                                                    }
+                                                                    break;
+                                                                case 'comment':
+                                                                    if (x.action.actedOn instanceof Comment) {
+                                                                        return true;
+                                                                    }
+                                                                    break;
+                                                            }
+                                                        });
+                                                        if (!anyMatch) {
+                                                            return false;
+                                                        }
+                                                        break;
+                                                } // case end
+
+                                            } // for each end
+
+                                            return true;
+                                        }); // filter end
+                                    } else {
+                                        throw new SimpleError(`Could not determine if a modActions criteria was for Mod Log or Mod Note. Given: ${JSON.stringify(actionCriteria)}`);
+                                    }
+
+                                    switch (search) {
+                                        case 'current':
+                                            if (validActions.length === 0) {
+                                                actionResult.push('No Mod Actions present');
+                                            } else {
+                                                actionResult.push('Current Action matches criteria');
+                                                return true;
+                                            }
+                                            break;
+                                        case 'consecutive':
+                                            if (isPercent) {
+                                                throw new SimpleError(`When comparing Mod Actions with 'search: consecutive' the 'count' value cannot be a percentage. Given: ${count}`);
+                                            }
+                                            const validActionIds = validActions.map(x => x.id);
+                                            const order = extra.includes('asc') ? 'ascending' : 'descending';
+                                            let orderedActions = actionsToUse;
+                                            if(order === 'descending') {
+                                                orderedActions = [...actionsToUse];
+                                                orderedActions.reverse();
+                                            }
+                                            let currCount = 0;
+                                            let maxCount = 0;
+                                            for(const action of orderedActions) {
+                                                if(validActionIds.includes(action.id)) {
+                                                    currCount++;
+                                                    maxCount = Math.max(maxCount, currCount);
+                                                } else {
+                                                    currCount = 0;
+                                                }
+                                            }
+                                            actionResult.push(`Found maximum of ${maxCount} consecutive Mod Actions that matched criteria`);
+                                            if (comparisonTextOp(currCount, operator, value)) {
+                                                return true;
+                                            }
+                                            break;
+                                        case 'total':
+                                            if (isPercent) {
+                                                // avoid divide by zero
+                                                const percent = notes.length === 0 ? 0 : validActions.length / actionsToUse.length;
+                                                actionResult.push(`${formatNumber(percent)}% of ${actionsToUse.length} matched criteria`);
+                                                if (comparisonTextOp(percent, operator, value / 100)) {
+                                                    return true;
+                                                }
+                                            } else {
+                                                actionResult.push(`${validActions.length} matched criteria`);
+                                                if (comparisonTextOp(validActions.length, operator, value)) {
+                                                    return true;
+                                                }
+                                            }
+                                    }
+                                } // criteria for loop ends
+                                return false;
+                            }
+                            const actionsResult = actionsPass();
+                            propResultsMap.modActions!.found = actionResult.join(' | ');
+                            propResultsMap.modActions!.passed = criteriaPassWithIncludeBehavior(actionsResult, include);
+                            if (!propResultsMap.modActions!.passed) {
                                 shouldContinue = false;
                             }
                             break;
@@ -2744,12 +3069,11 @@ export class SubredditResources {
                 }
             } catch (err: any) {
                 if (isStatusError(err) && err.statusCode === 404) {
-                    throw new SimpleError('Reddit returned a 404 while trying to retrieve User profile. It is likely this user is shadowbanned.', {isSerious: false});
+                    throw new SimpleError('Reddit returned a 404 while trying to retrieve User profile. It is likely this user is shadowbanned.', {isSerious: false, code: 404});
                 } else {
                     throw err;
                 }
             }
-        }
 
         // gather values and determine overall passed
         const propResults = Object.values(propResultsMap);
@@ -2909,6 +3233,7 @@ export class BotResourcesManager {
                 submissionTTL,
                 subredditTTL,
                 filterCriteriaTTL,
+                modNotesTTL,
                 selfTTL,
                 provider,
                 actionedEventsMax,
@@ -2931,7 +3256,7 @@ export class BotResourcesManager {
         this.defaultCacheConfig = caching;
         this.defaultThirdPartyCredentials = thirdParty;
         this.defaultDatabase = database;
-        this.ttlDefaults = {authorTTL, userNotesTTL, wikiTTL, commentTTL, submissionTTL, filterCriteriaTTL, subredditTTL, selfTTL};
+        this.ttlDefaults = {authorTTL, userNotesTTL, wikiTTL, commentTTL, submissionTTL, filterCriteriaTTL, subredditTTL, selfTTL, modNotesTTL};
         this.botName = name as string;
         this.logger = logger;
         this.invokeeRepo = this.defaultDatabase.getRepository(InvokeeType);

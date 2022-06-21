@@ -434,7 +434,7 @@ export abstract class Check extends RunnableBase implements Omit<ICheck, 'postTr
                 checkSum.postBehavior = this.postFail.behavior;
             }
 
-            behaviorT = checkSum.triggered ? 'Trigger' : 'Fail';
+            behaviorT = checkResult.triggered ? 'Trigger' : 'Fail';
 
             switch (checkSum.postBehavior.toLowerCase()) {
                 case 'next':

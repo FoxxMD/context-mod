@@ -651,6 +651,19 @@
                     "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
                     "type": "string"
                 },
+                "modActions": {
+                    "items": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/definitions/ModNoteCriteria"
+                            },
+                            {
+                                "$ref": "#/definitions/ModLogCriteria"
+                            }
+                        ]
+                    },
+                    "type": "array"
+                },
                 "name": {
                     "description": "A list of reddit usernames (case-insensitive) to match against. Do not include the \"u/\" prefix\n\n EX to match against /u/FoxxMD and /u/AnotherUser use [\"FoxxMD\",\"AnotherUser\"]",
                     "examples": [
@@ -959,6 +972,17 @@
                 "filterCriteriaTTL": {
                     "default": 60,
                     "description": "Amount of time, in seconds, to cache filter criteria results (`authorIs` and `itemIs` results)\n\nThis is especially useful if when polling high-volume comments and your checks rely on author/item filters\n\n* If `0` or `true` will cache indefinitely (not recommended)\n* If `false` will not cache",
+                    "examples": [
+                        60
+                    ],
+                    "type": [
+                        "number",
+                        "boolean"
+                    ]
+                },
+                "modNotesTTL": {
+                    "default": 60,
+                    "description": "Amount of time, in seconds, Mod Notes should be cached\n\n* If `0` or `true` will cache indefinitely (not recommended)\n* If `false` will not cache",
                     "examples": [
                         60
                     ],
@@ -1418,6 +1442,9 @@
                             },
                             {
                                 "$ref": "#/definitions/ContributorActionJson"
+                            },
+                            {
+                                "$ref": "#/definitions/ModNoteActionJson"
                             },
                             {
                                 "type": "string"
@@ -3481,6 +3508,366 @@
             ],
             "type": "object"
         },
+        "ModLogCriteria": {
+            "properties": {
+                "action": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "string"
+                        }
+                    ]
+                },
+                "activityType": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "enum": [
+                                    "comment",
+                                    "submission"
+                                ],
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "enum": [
+                                "comment",
+                                "submission"
+                            ],
+                            "type": "string"
+                        }
+                    ]
+                },
+                "count": {
+                    "default": ">= 1",
+                    "description": "Number of occurrences of this type. Ignored if `search` is `current`\n\nA string containing a comparison operator and/or a value to compare number of occurrences against\n\nThe syntax is `(< OR > OR <= OR >=) <number>[percent sign] [in timeRange] [ascending|descending]`\n\nIf `timeRange` is given then only notes/mod actions that occur between timeRange and NOW will be returned. `timeRange` is ignored if search is `current`",
+                    "examples": [
+                        ">= 1"
+                    ],
+                    "pattern": "^\\s*(?<opStr>>|>=|<|<=)\\s*(?<value>\\d+)\\s*(?<percent>%?)\\s*(?<duration>in\\s+\\d+\\s*(days?|weeks?|months?|years?|hours?|minutes?|seconds?|milliseconds?))?\\s*(?<extra>asc.*|desc.*)*$",
+                    "type": "string"
+                },
+                "description": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "string"
+                        }
+                    ]
+                },
+                "details": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "string"
+                        }
+                    ]
+                },
+                "search": {
+                    "default": "current",
+                    "description": "How to test the Toolbox Notes or Mod Actions for this Author:\n\n### current\n\nOnly the most recent note is checked for criteria\n\n### total\n\n`count` comparison of mod actions/notes must be found within all history\n\n* EX `count: > 3`   => Must have more than 3 notes of `type`, total\n* EX `count: <= 25%` => Must have 25% or less of notes of `type`, total\n* EX: `count: > 3 in 1 week` => Must have more than 3 notes within the last week\n\n### consecutive\n\nThe `count` **number** of mod actions/notes must be found in a row.\n\nYou may also specify the time-based order in which to search the notes by specifying `ascending (asc)` or `descending (desc)` in the `count` value. Default is `descending`\n\n* EX `count: >= 3` => Must have 3 or more notes of `type` consecutively, in descending order\n* EX `count: < 2`  => Must have less than 2 notes of `type` consecutively, in descending order\n* EX `count: > 4 asc` => Must have greater than 4 notes of `type` consecutively, in ascending order",
+                    "enum": [
+                        "consecutive",
+                        "current",
+                        "total"
+                    ],
+                    "examples": [
+                        "current"
+                    ],
+                    "type": "string"
+                },
+                "type": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "enum": [
+                                    "APPROVAL",
+                                    "INVITE",
+                                    "NOTE",
+                                    "REMOVAL",
+                                    "SPAM"
+                                ],
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "enum": [
+                                "APPROVAL",
+                                "INVITE",
+                                "NOTE",
+                                "REMOVAL",
+                                "SPAM"
+                            ],
+                            "type": "string"
+                        }
+                    ]
+                }
+            },
+            "type": "object"
+        },
+        "ModNoteActionJson": {
+            "description": "Add a Toolbox User Note to the Author of this Activity",
+            "properties": {
+                "allowDuplicate": {
+                    "default": false,
+                    "description": "Add Note even if a Note already exists for this Activity",
+                    "examples": [
+                        false
+                    ],
+                    "type": "boolean"
+                },
+                "authorIs": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "anyOf": [
+                                    {
+                                        "$ref": "#/definitions/AuthorCriteria"
+                                    },
+                                    {
+                                        "$ref": "#/definitions/NamedCriteria<AuthorCriteria>"
+                                    },
+                                    {
+                                        "type": "string"
+                                    }
+                                ]
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "$ref": "#/definitions/FilterOptionsJson<AuthorCriteria>"
+                        }
+                    ],
+                    "description": "If present then these Author criteria are checked before running the Check. If criteria fails then the Check will fail."
+                },
+                "content": {
+                    "description": "The Content to submit for this Action. Content is interpreted as reddit-flavored Markdown.\n\nIf value starts with `wiki:` then the proceeding value will be used to get a wiki page from the current subreddit\n\n * EX `wiki:botconfig/mybot` tries to get `https://reddit.com/r/currentSubreddit/wiki/botconfig/mybot`\n\nIf the value starts with `wiki:` and ends with `|someValue` then `someValue` will be used as the base subreddit for the wiki page\n\n* EX `wiki:replytemplates/test|ContextModBot` tries to get `https://reddit.com/r/ContextModBot/wiki/replytemplates/test`\n\nIf the value starts with `url:` then the value is fetched as an external url and expects raw text returned\n\n* EX `url:https://pastebin.com/raw/38qfL7mL` tries to get the text response of `https://pastebin.com/raw/38qfL7mL`\n\nIf none of the above is used the value is treated as the raw context\n\n * EX `this is **bold** markdown text` => \"this is **bold** markdown text\"\n\nAll Content is rendered using [mustache](https://github.com/janl/mustache.js/#templates) to enable [Action Templating](https://github.com/FoxxMD/context-mod#action-templating).\n\nThe following properties are always available in the template (view individual Rules to see rule-specific template data):\n```\nitem.kind      => The type of Activity that was checked (comment/submission)\nitem.author    => The name of the Author of the Activity EX FoxxMD\nitem.permalink => A permalink URL to the Activity EX https://reddit.com/r/yourSub/comments/o1h0i0/title_name/1v3b7x\nitem.url       => If the Activity is Link Sumbission then the external URL\nitem.title     => If the Activity is a Submission then the title of that Submission\nrules          => An object containing RuleResults of all the rules run for this check. See Action Templating for more details on naming\n```",
+                    "examples": [
+                        "This is the content of a comment/report/usernote",
+                        "this is **bold** markdown text",
+                        "wiki:botconfig/acomment"
+                    ],
+                    "type": "string"
+                },
+                "dryRun": {
+                    "default": false,
+                    "description": "If `true` the Action will not make the API request to Reddit to perform its action.",
+                    "examples": [
+                        false,
+                        true
+                    ],
+                    "type": "boolean"
+                },
+                "enable": {
+                    "default": true,
+                    "description": "If set to `false` the Action will not be run",
+                    "examples": [
+                        true
+                    ],
+                    "type": "boolean"
+                },
+                "itemIs": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "anyOf": [
+                                    {
+                                        "$ref": "#/definitions/SubmissionState"
+                                    },
+                                    {
+                                        "$ref": "#/definitions/CommentState"
+                                    },
+                                    {
+                                        "$ref": "#/definitions/NamedCriteria<TypedActivityState>"
+                                    },
+                                    {
+                                        "type": "string"
+                                    }
+                                ]
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "$ref": "#/definitions/FilterOptionsJson<TypedActivityState>"
+                        }
+                    ],
+                    "description": "A list of criteria to test the state of the `Activity` against before running the check.\n\nIf any set of criteria passes the Check will be run. If the criteria fails then the Check will fail.\n\n* @examples [[{\"over_18\": true, \"removed': false}]]"
+                },
+                "kind": {
+                    "description": "The type of action that will be performed",
+                    "enum": [
+                        "modnote"
+                    ],
+                    "type": "string"
+                },
+                "name": {
+                    "description": "An optional, but highly recommended, friendly name for this Action. If not present will default to `kind`.\n\nCan only contain letters, numbers, underscore, spaces, and dashes",
+                    "examples": [
+                        "myDescriptiveAction"
+                    ],
+                    "pattern": "^[a-zA-Z]([\\w -]*[\\w])?$",
+                    "type": "string"
+                },
+                "referenceActivity": {
+                    "type": "boolean"
+                },
+                "type": {
+                    "enum": [
+                        "ABUSE_WARNING",
+                        "BAN",
+                        "BOT_BAN",
+                        "HELPFUL_USER",
+                        "PERMA_BAN",
+                        "SOLID_CONTRIBUTOR",
+                        "SPAM_WARNING",
+                        "SPAM_WATCH"
+                    ],
+                    "type": "string"
+                }
+            },
+            "required": [
+                "kind"
+            ],
+            "type": "object"
+        },
+        "ModNoteCriteria": {
+            "properties": {
+                "activityType": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "enum": [
+                                    "comment",
+                                    "submission"
+                                ],
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "enum": [
+                                "comment",
+                                "submission"
+                            ],
+                            "type": "string"
+                        }
+                    ]
+                },
+                "count": {
+                    "default": ">= 1",
+                    "description": "Number of occurrences of this type. Ignored if `search` is `current`\n\nA string containing a comparison operator and/or a value to compare number of occurrences against\n\nThe syntax is `(< OR > OR <= OR >=) <number>[percent sign] [in timeRange] [ascending|descending]`\n\nIf `timeRange` is given then only notes/mod actions that occur between timeRange and NOW will be returned. `timeRange` is ignored if search is `current`",
+                    "examples": [
+                        ">= 1"
+                    ],
+                    "pattern": "^\\s*(?<opStr>>|>=|<|<=)\\s*(?<value>\\d+)\\s*(?<percent>%?)\\s*(?<duration>in\\s+\\d+\\s*(days?|weeks?|months?|years?|hours?|minutes?|seconds?|milliseconds?))?\\s*(?<extra>asc.*|desc.*)*$",
+                    "type": "string"
+                },
+                "note": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "string"
+                        }
+                    ]
+                },
+                "noteType": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "enum": [
+                                    "ABUSE_WARNING",
+                                    "BAN",
+                                    "BOT_BAN",
+                                    "HELPFUL_USER",
+                                    "PERMA_BAN",
+                                    "SOLID_CONTRIBUTOR",
+                                    "SPAM_WARNING",
+                                    "SPAM_WATCH"
+                                ],
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "enum": [
+                                "ABUSE_WARNING",
+                                "BAN",
+                                "BOT_BAN",
+                                "HELPFUL_USER",
+                                "PERMA_BAN",
+                                "SOLID_CONTRIBUTOR",
+                                "SPAM_WARNING",
+                                "SPAM_WATCH"
+                            ],
+                            "type": "string"
+                        }
+                    ]
+                },
+                "search": {
+                    "default": "current",
+                    "description": "How to test the Toolbox Notes or Mod Actions for this Author:\n\n### current\n\nOnly the most recent note is checked for criteria\n\n### total\n\n`count` comparison of mod actions/notes must be found within all history\n\n* EX `count: > 3`   => Must have more than 3 notes of `type`, total\n* EX `count: <= 25%` => Must have 25% or less of notes of `type`, total\n* EX: `count: > 3 in 1 week` => Must have more than 3 notes within the last week\n\n### consecutive\n\nThe `count` **number** of mod actions/notes must be found in a row.\n\nYou may also specify the time-based order in which to search the notes by specifying `ascending (asc)` or `descending (desc)` in the `count` value. Default is `descending`\n\n* EX `count: >= 3` => Must have 3 or more notes of `type` consecutively, in descending order\n* EX `count: < 2`  => Must have less than 2 notes of `type` consecutively, in descending order\n* EX `count: > 4 asc` => Must have greater than 4 notes of `type` consecutively, in ascending order",
+                    "enum": [
+                        "consecutive",
+                        "current",
+                        "total"
+                    ],
+                    "examples": [
+                        "current"
+                    ],
+                    "type": "string"
+                },
+                "type": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "enum": [
+                                    "APPROVAL",
+                                    "INVITE",
+                                    "NOTE",
+                                    "REMOVAL",
+                                    "SPAM"
+                                ],
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "enum": [
+                                "APPROVAL",
+                                "INVITE",
+                                "NOTE",
+                                "REMOVAL",
+                                "SPAM"
+                            ],
+                            "type": "string"
+                        }
+                    ]
+                }
+            },
+            "type": "object"
+        },
         "ModeratorNameCriteria": {
             "properties": {
                 "behavior": {
@@ -5368,6 +5755,9 @@
                                 "$ref": "#/definitions/ContributorActionJson"
                             },
                             {
+                                "$ref": "#/definitions/ModNoteActionJson"
+                            },
+                            {
                                 "type": "string"
                             }
                         ]
@@ -6035,16 +6425,16 @@
             "properties": {
                 "count": {
                     "default": ">= 1",
-                    "description": "Number of occurrences of this type. Ignored if `search` is `current`\n\nA string containing a comparison operator and/or a value to compare number of occurrences against\n\nThe syntax is `(< OR > OR <= OR >=) <number>[percent sign] [ascending|descending]`",
+                    "description": "Number of occurrences of this type. Ignored if `search` is `current`\n\nA string containing a comparison operator and/or a value to compare number of occurrences against\n\nThe syntax is `(< OR > OR <= OR >=) <number>[percent sign] [in timeRange] [ascending|descending]`\n\nIf `timeRange` is given then only notes/mod actions that occur between timeRange and NOW will be returned. `timeRange` is ignored if search is `current`",
                     "examples": [
                         ">= 1"
                     ],
-                    "pattern": "^\\s*(?<opStr>>|>=|<|<=)\\s*(?<value>\\d+)\\s*(?<percent>%?)\\s*(?<extra>asc.*|desc.*)*$",
+                    "pattern": "^\\s*(?<opStr>>|>=|<|<=)\\s*(?<value>\\d+)\\s*(?<percent>%?)\\s*(?<duration>in\\s+\\d+\\s*(days?|weeks?|months?|years?|hours?|minutes?|seconds?|milliseconds?))?\\s*(?<extra>asc.*|desc.*)*$",
                     "type": "string"
                 },
                 "search": {
                     "default": "current",
-                    "description": "How to test the notes for this Author:\n\n### current\n\nOnly the most recent note is checked for `type`\n\n### total\n\nThe `count` comparison of `type` must be found within all notes\n\n* EX `count: > 3`   => Must have more than 3 notes of `type`, total\n* EX `count: <= 25%` => Must have 25% or less of notes of `type`, total\n\n### consecutive\n\nThe `count` **number** of `type` notes must be found in a row.\n\nYou may also specify the time-based order in which to search the notes by specifying `ascending (asc)` or `descending (desc)` in the `count` value. Default is `descending`\n\n* EX `count: >= 3` => Must have 3 or more notes of `type` consecutively, in descending order\n* EX `count: < 2`  => Must have less than 2 notes of `type` consecutively, in descending order\n* EX `count: > 4 asc` => Must have greater than 4 notes of `type` consecutively, in ascending order",
+                    "description": "How to test the Toolbox Notes or Mod Actions for this Author:\n\n### current\n\nOnly the most recent note is checked for criteria\n\n### total\n\n`count` comparison of mod actions/notes must be found within all history\n\n* EX `count: > 3`   => Must have more than 3 notes of `type`, total\n* EX `count: <= 25%` => Must have 25% or less of notes of `type`, total\n* EX: `count: > 3 in 1 week` => Must have more than 3 notes within the last week\n\n### consecutive\n\nThe `count` **number** of mod actions/notes must be found in a row.\n\nYou may also specify the time-based order in which to search the notes by specifying `ascending (asc)` or `descending (desc)` in the `count` value. Default is `descending`\n\n* EX `count: >= 3` => Must have 3 or more notes of `type` consecutively, in descending order\n* EX `count: < 2`  => Must have less than 2 notes of `type` consecutively, in descending order\n* EX `count: > 4 asc` => Must have greater than 4 notes of `type` consecutively, in ascending order",
                     "enum": [
                         "consecutive",
                         "current",

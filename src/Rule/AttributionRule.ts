@@ -10,7 +10,7 @@ import {getAttributionIdentifier} from "../Utils/SnoowrapUtils";
 import dayjs from "dayjs";
 import {
     asSubmission, buildFilter, buildSubredditFilter,
-    comparisonTextOp, convertSubredditsRawToStrong,
+    convertSubredditsRawToStrong,
     FAIL,
     formatNumber, getActivitySubredditName, isActivityWindowConfig, isSubmission,
     parseSubredditName,
@@ -26,7 +26,7 @@ import {
     HistoryFiltersOptions
 } from "../Common/Infrastructure/ActivityWindow";
 import {FilterOptions} from "../Common/Infrastructure/Filters/FilterShapes";
-import {parseGenericValueOrPercentComparison} from "../Common/Infrastructure/Comparisons";
+import {comparisonTextOp, parseGenericValueOrPercentComparison} from "../Common/Infrastructure/Comparisons";
 
 
 export interface AttributionCriteria {

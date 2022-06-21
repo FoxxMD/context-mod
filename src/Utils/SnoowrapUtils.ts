@@ -17,7 +17,7 @@ import {
     convertSubredditsRawToStrong,
     getActivityAuthorName,
     getActivitySubredditName,
-    isStrongSubredditState,
+    isStrongSubredditState, isSubmission,
     mergeArr,
     normalizeName,
     parseDurationValToDuration,
@@ -344,7 +344,7 @@ export const getAttributionIdentifier = (sub: Submission, useParentMediaDomain =
 
 export const activityIsRemoved = (item: Submission | Comment): boolean => {
     if(item.can_mod_post) {
-        if (item instanceof Submission) {
+        if (asSubmission(item)) {
             // when automod filters a post it gets this category
             return item.banned_at_utc !== null && item.removed_by_category !== 'automod_filtered';
         }
@@ -352,7 +352,7 @@ export const activityIsRemoved = (item: Submission | Comment): boolean => {
         // so if we want to processing filtered comments we need to check for this
         return item.banned_at_utc !== null && item.removed;
     } else {
-        if (item instanceof Submission) {
+        if (asSubmission(item)) {
             return item.removed_by_category === 'moderator' || item.removed_by_category === 'deleted';
         }
         // in subreddits the bot does not mod it is not possible to tell the difference between a comment that was removed by the user and one that was removed by a mod
@@ -362,7 +362,7 @@ export const activityIsRemoved = (item: Submission | Comment): boolean => {
 
 export const activityIsFiltered = (item: Submission | Comment): boolean => {
     if(item.can_mod_post) {
-        if (item instanceof Submission) {
+        if (asSubmission(item)) {
             // when automod filters a post it gets this category
             return item.banned_at_utc !== null && item.removed_by_category === 'automod_filtered';
         }
@@ -375,7 +375,7 @@ export const activityIsFiltered = (item: Submission | Comment): boolean => {
 }
 
 export const activityIsDeleted = (item: Submission | Comment): boolean => {
-    if (item instanceof Submission) {
+    if (asSubmission(item)) {
         return item.removed_by_category === 'deleted';
     }
     return item.author.name === '[deleted]'

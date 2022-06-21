@@ -461,6 +461,17 @@ export interface TTLConfig {
      * @default 50
      * */
     selfTTL?: number | boolean
+
+    /**
+     * Amount of time, in seconds, Mod Notes should be cached
+     *
+     * * If `0` or `true` will cache indefinitely (not recommended)
+     * * If `false` will not cache
+     *
+     * @examples [60]
+     * @default 60
+     * */
+    modNotesTTL?: number | boolean;
 }
 
 export interface CacheConfig extends TTLConfig {
@@ -737,6 +748,7 @@ export type StrongCache = {
     commentTTL: number | boolean,
     subredditTTL: number | boolean,
     selfTTL: number | boolean,
+    modNotesTTL: number | boolean,
     filterCriteriaTTL: number | boolean,
     provider: CacheOptions
     actionedEventsMax?: number,

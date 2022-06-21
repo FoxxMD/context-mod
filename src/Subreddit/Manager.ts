@@ -1,4 +1,4 @@
-import Snoowrap, {Comment, Subreddit, WikiPage} from "snoowrap";
+import Snoowrap, {WikiPage} from "snoowrap";
 import {Logger} from "winston";
 import {SubmissionCheck} from "../Check/SubmissionCheck";
 import {CommentCheck} from "../Check/CommentCheck";
@@ -42,7 +42,7 @@ import {
     SYSTEM,
     USER, RuleResult, DatabaseStatisticsOperatorConfig
 } from "../Common/interfaces";
-import Submission from "snoowrap/dist/objects/Submission";
+import {Submission, Comment, Subreddit} from 'snoowrap/dist/objects';
 import {activityIsRemoved, ItemContent, itemContentPeek} from "../Utils/SnoowrapUtils";
 import LoggedError from "../Utils/LoggedError";
 import {

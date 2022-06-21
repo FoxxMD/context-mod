@@ -17,6 +17,7 @@ import {DispatchAction, DispatchActionJson} from "./DispatchAction";
 import {CancelDispatchAction, CancelDispatchActionJson} from "./CancelDispatchAction";
 import ContributorAction, {ContributorActionJson} from "./ContributorAction";
 import {StructuredFilter} from "../Common/Infrastructure/Filters/FilterShapes";
+import {ModNoteAction, ModNoteActionJson} from "./ModNoteAction";
 
 export function actionFactory
 (config: StructuredActionJson, logger: Logger, subredditName: string, resources: SubredditResources, client: ExtendedSnoowrap, emitter: EventEmitter): Action {
@@ -47,6 +48,8 @@ export function actionFactory
             return new CancelDispatchAction({...config as StructuredFilter<CancelDispatchActionJson>, logger, subredditName, resources, client, emitter})
         case 'contributor':
             return new ContributorAction({...config as StructuredFilter<ContributorActionJson>, logger, subredditName, resources, client, emitter})
+        case 'modnote':
+            return new ModNoteAction({...config as StructuredFilter<ModNoteActionJson>, logger, subredditName, resources, client, emitter})
         default:
             throw new Error('rule "kind" was not recognized.');
     }

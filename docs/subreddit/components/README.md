@@ -39,10 +39,13 @@ This list is not exhaustive. [For complete documentation on a subreddit's config
     * [Message](#message)
     * [Remove](#remove)
     * [Report](#report)
-    * [UserNote](#usernote)
+    * [Toolbox UserNote](#usernote)
+    * [Mod Note](#mod-note)
 * [Filters](#filters)
   * [Filter Types](#filter-types)
     * [Author Filter](#author-filter)
+      * [Mod Notes/Actions](#mod-actionsnotes-filter)
+      * [Toolbox UserNotes](#toolbox-usernotes-filter)
     * [Item Filter](#item-filter)
     * [Subreddit Filter](#subreddit-filter)
   * [Named Filters](#named-filters)
@@ -651,6 +654,28 @@ actions:
     allowDuplicate: boolean # if false then the usernote will not be added if the same note appears for this activity
 ```
 
+### Mod Note
+
+Add a [Mod Note](https://www.reddit.com/r/modnews/comments/t8vafc/announcing_mod_notes/) for the Author of the Activity.
+
+* `type` must be one of the [valid note labels](https://www.reddit.com/dev/api#POST_api_mod_notes): 
+  * BOT_BAN
+  * PERMA_BAN
+  * BAN
+  * ABUSE_WARNING
+  * SPAM_WARNING
+  * SPAM_WATCH
+  * SOLID_CONTRIBUTOR
+  * HELPFUL_USER
+
+```yaml
+actions:
+  - kind: modnote
+    type: SPAM_WATCH
+    content: 'a note only mods can see message' # optional
+    referenceActivity: boolean # if true the Note will be linked to the Activity being processed
+```
+
 # Filters
 
 **Filters** are an additional channel for determining if an Event should be processed by ContextMod. They differ from **Rules** in several key ways:
@@ -731,6 +756,14 @@ There are two types of Filter. Both types have the same "shape" in the configura
 ### Author Filter
 
 Test the Author of an Activity. See [Schema documentation](https://json-schema.app/view/%23%2Fdefinitions%2FAuthorCriteria?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Freddit-context-bot%2Fedge%2Fsrc%2FSchema%2FApp.json) for all possible Author Criteria
+
+#### Mod Actions/Notes Filter
+
+See [Mod Actions/Notes](/docs/subreddit/components/modActions/README.md#mod-action-filter) documentation.
+
+#### Toolbox UserNotes Filter
+
+See [UserNotes](/docs/subreddit/components/userNotes/README.md) documentation
 
 ### Item Filter
 

@@ -1,5 +1,5 @@
 import winston, {Logger} from "winston";
-import dayjs, {Dayjs, OpUnitType} from 'dayjs';
+import dayjs, {Dayjs} from 'dayjs';
 import {Duration} from 'dayjs/plugin/duration.js';
 import Ajv from "ajv";
 import {InvalidOptionArgumentError} from "commander";
@@ -38,7 +38,7 @@ import redisStore from "cache-manager-redis-store";
 import Autolinker from 'autolinker';
 import {create as createMemoryStore} from './Utils/memoryStore';
 import {LEVEL, MESSAGE} from "triple-beam";
-import {Comment, RedditUser, Submission} from "snoowrap/dist/objects";
+import {Comment, PrivateMessage, RedditUser, Submission, Subreddit} from "snoowrap/dist/objects";
 import reRegExp from '@stdlib/regexp-regexp';
 import fetch from "node-fetch";
 import ImageData from "./Common/ImageData";
@@ -54,10 +54,14 @@ import {RuleResultEntity as RuleResultEntity} from "./Common/Entities/RuleResult
 import {nanoid} from "nanoid";
 import {
     ActivityState,
+    asModLogCriteria,
+    asModNoteCriteria,
     AuthorCriteria,
     authorCriteriaProperties,
     CommentState,
     defaultStrongSubredditCriteriaOptions,
+    ModLogCriteria,
+    ModNoteCriteria,
     StrongSubredditCriteria,
     SubmissionState,
     SubredditCriteria,
@@ -70,14 +74,14 @@ import {
     CacheProvider,
     ConfigFormat,
     DurationVal,
+    ModUserNoteLabel,
+    modUserNoteLabels,
     RedditEntity,
     RedditEntityType,
     statFrequencies,
     StatisticFrequency,
-    StatisticFrequencyOption,
-    StringOperator
+    StatisticFrequencyOption
 } from "./Common/Infrastructure/Atomic";
-import {DurationComparison} from "./Common/Infrastructure/Comparisons";
 import {
     AuthorOptions,
     FilterCriteriaDefaults,
@@ -109,6 +113,7 @@ import {
     HistoryFiltersOptions
 } from "./Common/Infrastructure/ActivityWindow";
 import {RunnableBaseJson} from "./Common/Infrastructure/Runnable";
+import Snoowrap from "snoowrap";
 
 
 //import {ResembleSingleCallbackComparisonResult} from "resemblejs";
@@ -550,6 +555,8 @@ export const filterCriteriaPropertySummary = <T>(val: FilterCriteriaPropertyResu
         const expectedStrings = crit.map((x: any) => {
             if (asUserNoteCriteria(x)) {
                 return userNoteCriteriaSummary(x);
+            }  else if(asModNoteCriteria(x) || asModLogCriteria(x)) {
+                return modActionCriteriaSummary(x);
             }
             return x;
         }).join(' OR ');
@@ -708,40 +715,16 @@ export const isActivityWindowConfig = (val: any): val is FullActivityWindowConfi
     return false;
 }
 
-export const comparisonTextOp = (val1: number, strOp: string, val2: number): boolean => {
-    switch (strOp) {
-        case '>':
-            return val1 > val2;
-        case '>=':
-            return val1 >= val2;
-        case '<':
-            return val1 < val2;
-        case '<=':
-            return val1 <= val2;
-        default:
-            throw new Error(`${strOp} was not a recognized operator`);
-    }
-}
-
-export const dateComparisonTextOp = (val1: Dayjs, strOp: StringOperator, val2: Dayjs, granularity?: OpUnitType): boolean => {
-    switch (strOp) {
-        case '>':
-            return val1.isBefore(val2, granularity);
-        case '>=':
-            return val1.isSameOrBefore(val2, granularity);
-        case '<':
-            return val1.isAfter(val2, granularity);
-        case '<=':
-            return val1.isSameOrAfter(val2, granularity);
-        default:
-            throw new Error(`${strOp} was not a recognized operator`);
-    }
-}
-
+// string must only contain ISO8601 optionally wrapped by whitespace
 const ISO8601_REGEX: RegExp = /^(-?)P(?=\d|T\d)(?:(\d+)Y)?(?:(\d+)M)?(?:(\d+)([DW]))?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?)?$/;
+// finds ISO8601 in any part of a string
+const ISO8601_SUBSTRING_REGEX: RegExp = /(-?)P(?=\d|T\d)(?:(\d+)Y)?(?:(\d+)M)?(?:(\d+)([DW]))?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?)?/;
+// string must only duration optionally wrapped by whitespace
 const DURATION_REGEX: RegExp = /^\s*(?<time>\d+)\s*(?<unit>days?|weeks?|months?|years?|hours?|minutes?|seconds?|milliseconds?)\s*$/;
-export const parseDuration = (val: string): Duration => {
-    let matches = val.match(DURATION_REGEX);
+// finds duration in any part of the string
+const DURATION_SUBSTRING_REGEX: RegExp = /(?<time>\d+)\s*(?<unit>days?|weeks?|months?|years?|hours?|minutes?|seconds?|milliseconds?)/;
+export const parseDuration = (val: string, strict = true): Duration => {
+    let matches = val.match(strict ? DURATION_REGEX : DURATION_SUBSTRING_REGEX);
     if (matches !== null) {
         const groups = matches.groups as any;
         const dur: Duration = dayjs.duration(groups.time, groups.unit);
@@ -750,7 +733,7 @@ export const parseDuration = (val: string): Duration => {
         }
         return dur;
     }
-    matches = val.match(ISO8601_REGEX);
+    matches = val.match(strict ? ISO8601_REGEX : ISO8601_SUBSTRING_REGEX);
     if (matches !== null) {
         const dur: Duration = dayjs.duration(val);
         if (!dayjs.isDuration(dur)) {
@@ -758,32 +741,7 @@ export const parseDuration = (val: string): Duration => {
         }
         return dur;
     }
-    throw new InvalidRegexError([DURATION_REGEX, ISO8601_REGEX], val)
-}
-
-/**
- * Named groups: operator, time, unit
- * */
-const DURATION_COMPARISON_REGEX: RegExp = /^\s*(?<opStr>>|>=|<|<=)\s*(?<time>\d+)\s*(?<unit>days?|weeks?|months?|years?|hours?|minutes?|seconds?|milliseconds?)\s*$/;
-const DURATION_COMPARISON_REGEX_URL = 'https://regexr.com/609n8';
-export const parseDurationComparison = (val: string): DurationComparison => {
-    const matches = val.match(DURATION_COMPARISON_REGEX);
-    if (matches === null) {
-        throw new InvalidRegexError(DURATION_COMPARISON_REGEX, val, DURATION_COMPARISON_REGEX_URL)
-    }
-    const groups = matches.groups as any;
-    const dur: Duration = dayjs.duration(groups.time, groups.unit);
-    if (!dayjs.isDuration(dur)) {
-        throw new SimpleError(`Parsed value '${val}' did not result in a valid Dayjs Duration`);
-    }
-    return {
-        operator: groups.opStr as StringOperator,
-        duration: dur
-    }
-}
-export const compareDurationValue = (comp: DurationComparison, date: Dayjs) => {
-    const dateToCompare = dayjs().subtract(comp.duration.asSeconds(), 'seconds');
-    return dateComparisonTextOp(date, comp.operator, dateToCompare);
+    throw new InvalidRegexError([(strict ? DURATION_REGEX : DURATION_SUBSTRING_REGEX), (strict ? ISO8601_REGEX : ISO8601_SUBSTRING_REGEX)], val)
 }
 
 const SUBREDDIT_NAME_REGEX: RegExp = /^\s*(?:\/r\/|r\/)*(\w+)*\s*$/;
@@ -1412,6 +1370,18 @@ export const parseStringToRegex = (val: string, defaultFlags?: string): RegExp |
     return new RegExp(result[1], flags);
 }
 
+export const parseStringToRegexOrLiteralSearch = (val: string, defaultFlags: string = 'i'): RegExp => {
+    const maybeRegex = parseStringToRegex(val, defaultFlags);
+    if (maybeRegex !== undefined) {
+        return maybeRegex;
+    }
+    const literalSearchRegex = parseStringToRegex(`/${escapeRegex(val.trim())}/`, defaultFlags);
+    if (literalSearchRegex === undefined) {
+        throw new SimpleError(`Could not convert test value to a valid regex: ${val}`);
+    }
+    return literalSearchRegex;
+}
+
 export const parseRegex = (reg: RegExp, val: string): RegExResult => {
 
     if(reg.global) {
@@ -1729,12 +1699,25 @@ export const difference = (a: Array<any>, b: Array<any>) => {
     return Array.from(setMinus(a, b));
 }
 
+// can use 'in' operator to check if object has a property with name WITHOUT TRIGGERING a snoowrap proxy to fetch
+export const isSubreddit = (value: any) => {
+    try {
+        return value !== null && typeof value === 'object' && (value instanceof Subreddit || ('id' in value && value.id !== undefined && value.id.includes('t5_')) || 'display_name' in value);
+    } catch (e) {
+        return false;
+    }
+}
+
+export const asSubreddit = (value: any): value is Subreddit => {
+    return isSubreddit(value);
+}
+
 /**
  * Cached activities lose type information when deserialized so need to check properties as well to see if the object is the shape of a Submission
  * */
 export const isSubmission = (value: any) => {
     try {
-        return value !== null && typeof value === 'object' && (value instanceof Submission || (value.name !== undefined && value.name.includes('t3_')));
+        return value !== null && typeof value === 'object' && (value instanceof Submission || ('name' in value && value.name !== undefined && value.name.includes('t3_')));
     } catch (e) {
         return false;
     }
@@ -1746,7 +1729,7 @@ export const asSubmission = (value: any): value is Submission => {
 
 export const isComment = (value: any) => {
     try {
-        return value !== null && typeof value === 'object' && (value instanceof Comment || value.name.includes('t1_'));
+        return value !== null && typeof value === 'object' && (value instanceof Comment || ('name' in value && value.name !== undefined && value.name.includes('t1_')));
     } catch (e) {
         return false;
     }
@@ -1762,7 +1745,7 @@ export const asActivity = (value: any): value is (Submission | Comment) => {
 
 export const isUser = (value: any) => {
     try {
-        return value !== null && typeof value === 'object' && (value instanceof RedditUser || value.name.includes('t2_'));
+        return value !== null && typeof value === 'object' && (value instanceof RedditUser || ('name' in value && value.name !== undefined && value.name.includes('t2_')));
     } catch(e) {
         return false;
     }
@@ -1782,6 +1765,20 @@ export const asUserNoteCriteria = (value: any): value is UserNoteCriteria => {
 
 export const userNoteCriteriaSummary = (val: UserNoteCriteria): string => {
     return `${val.count === undefined ? '>= 1' : val.count} of ${val.search === undefined ? 'current' : val.search} notes is ${val.type}`;
+}
+
+export const modActionCriteriaSummary = (val: (ModNoteCriteria | ModLogCriteria)): string => {
+    const isNote = asModNoteCriteria(val);
+    const preamble = `${val.count === undefined ? '>= 1' : val.count} of ${val.search === undefined ? 'current' : val.search} ${isNote ? 'notes' : 'actions'} is`;
+    const filters = Object.entries(val).reduce((acc: string[], curr) => {
+        if(['count', 'search'].includes(curr[0])) {
+            return acc;
+        }
+        const vals = Array.isArray(curr[1]) ? curr[1] : [curr[1]];
+       acc.push(`${curr[0]}: ${vals.join(' ,')}`)
+        return acc;
+    }, []);
+    return `${preamble} ${filters.join(' || ')}`;
 }
 
 /**
@@ -2452,6 +2449,30 @@ export const normalizeCriteria = <T extends AuthorCriteria | TypedActivityState 
         if(criteria.description !== undefined) {
             criteria.description = Array.isArray(criteria.description) ? criteria.description : [criteria.description];
         }
+        if(criteria.modActions !== undefined) {
+            criteria.modActions.map((x, index) => {
+                const common = {
+                    ...x,
+                    type: x.type === undefined ? undefined : (Array.isArray(x.type) ? x.type : [x.type])
+                }
+                if(asModNoteCriteria(x)) {
+                    return {
+                        ...common,
+                        noteType: x.noteType === undefined ? undefined : (Array.isArray(x.noteType) ? x.noteType : [x.noteType]),
+                        note: x.note === undefined ? undefined : (Array.isArray(x.note) ? x.note : [x.note]),
+                    }
+                } else if(asModLogCriteria(x)) {
+                    return {
+                        ...common,
+                        action: x.action === undefined ? undefined : (Array.isArray(x.action) ? x.action : [x.action]),
+                        details: x.details === undefined ? undefined : (Array.isArray(x.details) ? x.details : [x.details]),
+                        description: x.description === undefined ? undefined : (Array.isArray(x.description) ? x.description : [x.description]),
+                        activityType: x.activityType === undefined ? undefined : (Array.isArray(x.activityType) ? x.activityType : [x.activityType]),
+                    }
+                }
+                return common;
+            })
+        }
     }
 
     return {
@@ -2615,6 +2636,22 @@ export const parseRedditFullname = (str: string): RedditThing | undefined => {
     }
 }
 
+export const generateSnoowrapEntityFromRedditThing = (data: RedditThing, client: Snoowrap) => {
+    switch(data.type) {
+        case 'comment':
+            return new Comment({id: data.val}, client, false);
+        case 'submission':
+            return new Submission({id: data.val}, client, false);
+        case 'user':
+            return new RedditUser({id: data.val}, client, false);
+        case 'subreddit':
+            return new Subreddit({id: data.val}, client, false);
+        case 'message':
+            return new PrivateMessage({id: data.val}, client, false)
+
+    }
+}
+
 export const activityDispatchConfigToDispatch = (config: ActivityDispatchConfig, activity: (Comment | Submission), type: ActivitySourceTypes, {action, dryRun}: {action?: string, dryRun?: boolean} = {}): ActivityDispatch => {
     let tolerantVal: boolean | Duration | undefined;
     if (config.tardyTolerant !== undefined) {
@@ -2772,4 +2809,17 @@ export const between = (val: number, a: number, b: number, inclusiveMin: boolean
 
     // inclusive max
     return val > min && val <= max;
+}
+
+export const toModNoteLabel = (val: string): ModUserNoteLabel => {
+    const cleanVal = val.trim().toUpperCase();
+    if (asModNoteLabel(cleanVal)) {
+        return cleanVal;
+    }
+    throw new Error(`${val} is not a valid mod note label. Must be one of: ${modUserNoteLabels.join(', ')}`);
+}
+
+
+export const asModNoteLabel = (val: string): val is ModUserNoteLabel => {
+    return modUserNoteLabels.includes(val);
 }
