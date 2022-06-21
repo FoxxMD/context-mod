@@ -21,6 +21,7 @@ This list is not exhaustive. [For complete documentation on a subreddit's config
     * [Author](#author)
     * [Regex](#regex)
     * [Repost](#repost)
+    * [Sentiment Analysis](#sentiment-analysis)
 * [Rule Sets](#rule-sets)
 * [Actions](#actions)
   * [Named Actions](#named-actions)
@@ -368,6 +369,12 @@ The **Repost** rule is used to find reposts for both **Submissions** and **Comme
 
 This rule is for searching **all of Reddit** for reposts, as opposed to just the history of the Author of the Activity being checked. If you only want to check for reposts by the Author of the Activity being checked you should use the [Repeat Activity](/docs/subreddit/components/repeatActivity) rule.
 
+### Sentiment Analysis
+
+[**Full Documentation**](/docs/subreddit/components/sentiment)
+
+The **Sentiment Rule** is used to determine the overall emotional intent (negative, neutral, positive) of a Submission or Comment by analyzing the actual text content of the Activity.
+
 # Rule Sets
 
 The `rules` list on a `Check` can contain both `Rule` objects and `RuleSet` objects.
@@ -655,6 +662,8 @@ actions:
 ```
 
 ### Mod Note
+
+[**Full Documentation**](/docs/subreddit/components/modActions/README.md#mod-note-action)
 
 Add a [Mod Note](https://www.reddit.com/r/modnews/comments/t8vafc/announcing_mod_notes/) for the Author of the Activity.
 
