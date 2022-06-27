@@ -7,12 +7,12 @@ import Submission from "snoowrap/dist/objects/Submission";
 import {ActionProcessResult, RuleResult} from "../Common/interfaces";
 import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
 import {runCheckOptions} from "../Subreddit/Manager";
-import {ActionTypes} from "../Common/Infrastructure/Atomic";
+import {ActionTypes, UserNoteType} from "../Common/Infrastructure/Atomic";
 
 
 export class UserNoteAction extends Action {
     content: string;
-    type: string;
+    type: UserNoteType;
     allowDuplicate: boolean;
 
     constructor(options: UserNoteActionOptions) {

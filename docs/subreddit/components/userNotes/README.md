@@ -6,6 +6,16 @@ Context Mod supports reading and writing [User Notes](https://www.reddit.com/r/t
 
 [Click here for the Toolbox Quickstart Guide](https://www.reddit.com/r/toolbox/wiki/docs/quick_start)
 
+Valid Note Types:
+
+* `gooduser`
+* `spamwatch`
+* `spamwarn`
+* `abusewarn`
+* `ban`
+* `permban`
+* `botban`
+
 ## Filter
 
 User Notes are an additional criteria on [AuthorCriteria](https://json-schema.app/view/%23%2Fdefinitions%2FAuthorCriteria?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Fcontext-mod%2Fmaster%2Fsrc%2FSchema%2FApp.json) that can be used alongside other Author properties for both [filtering rules and in the AuthorRule.](/docs/subreddit/components/author/)

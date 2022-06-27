@@ -249,3 +249,14 @@ export type ModActionType =
     'REMOVAL' |
     'SPAM' |
     'APPROVAL';
+
+export type UserNoteType =
+    'gooduser' |
+    'spamwatch' |
+    'spamwarn' |
+    'abusewarn' |
+    'ban' |
+    'permban' |
+    'botban';
+
+export const userNoteTypes = ['gooduser', 'spamwatch', 'spamwarn', 'abusewarn', 'ban', 'permban', 'botban'];
