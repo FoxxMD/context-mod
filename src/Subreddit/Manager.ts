@@ -1571,6 +1571,14 @@ export class Manager extends EventEmitter implements RunningStates {
         await this.syncRunningState('managerState');
     }
 
+    async destroy(causedBy: Invokee = 'system', options?: ManagerStateChangeOption) {
+        await this.stop(causedBy, options);
+        clearInterval(this.eventsSampleInterval);
+        clearInterval(this.delayedQueueInterval);
+        clearInterval(this.rulesUniqueSampleInterval)
+        await this.cacheManager.destroy(this.subreddit.display_name);
+    }
+
     setInitialRunningState(managerEntity: RunningStateEntities, type: RunningStateTypes): RunningState {
         if(managerEntity[type].runType.name === 'stopped' && managerEntity[type].invokee.name === 'user') {
             return {state: STOPPED, causedBy: 'user'};

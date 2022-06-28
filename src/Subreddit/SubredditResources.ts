@@ -345,7 +345,7 @@ export class SubredditResources {
                 // set default prune interval
                 this.pruneInterval = setInterval(() => {
                     // @ts-ignore
-                    this.defaultCache?.store.prune();
+                    this.cache?.store.prune();
                     this.logger.debug('Pruned cache');
                     // prune interval should be twice the smallest TTL
                 },min * 1000 * 2)
@@ -364,6 +364,16 @@ export class SubredditResources {
                 this.retention = undefined;
                 this.logger.error(new ErrorWithCause('Could not parse retention as a valid duration. Retention enforcement is disabled.', {cause: e}));
             }
+        }
+    }
+
+    async destroy() {
+        if(this.historicalSaveInterval !== undefined) {
+            clearInterval(this.historicalSaveInterval);
+        }
+        if(this.pruneInterval !== undefined && this.cacheType === 'memory' && this.cacheSettingsHash !== 'default') {
+            clearInterval(this.pruneInterval);
+            this.cache?.reset();
         }
     }
 
@@ -3378,6 +3388,14 @@ export class BotResourcesManager {
         await resource.initDatabaseDelayedActivities();
 
         return resource;
+    }
+
+    async destroy(subName: string) {
+        const res = this.get(subName);
+        if(res !== undefined) {
+            await res.destroy();
+            this.resources.delete(subName);
+        }
     }
 
     async getPendingSubredditInvites(): Promise<(string[])> {

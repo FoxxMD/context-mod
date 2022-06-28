@@ -2823,3 +2823,21 @@ export const toModNoteLabel = (val: string): ModUserNoteLabel => {
 export const asModNoteLabel = (val: string): val is ModUserNoteLabel => {
     return modUserNoteLabels.includes(val);
 }
+
+/**
+ * Split an array into two based on a truthy function
+ *
+ * Returns arrays -> [[...passed],[...failed]]
+ *
+ * https://stackoverflow.com/a/42299191/1469797
+ * */
+export function partition<T>(array: T[], callback: (element: T, index: number, array: T[]) => boolean) {
+    return array.reduce(function (result: [T[], T[]], element, i) {
+            callback(element, i, array)
+                ? result[0].push(element)
+                : result[1].push(element);
+
+            return result;
+        }, [[], []]
+    );
+}

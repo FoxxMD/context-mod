@@ -133,7 +133,7 @@ export class App {
         for (const b of this.bots) {
             if (b.error === undefined) {
                 try {
-                    await b.testClient();
+                    await b.init();
                     await b.buildManagers();
                     await sleep(2000);
                     b.runManagers(causedBy).catch((err) => {
