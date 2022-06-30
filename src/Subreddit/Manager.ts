@@ -58,7 +58,6 @@ import dayjs, {Dayjs as DayjsObj} from "dayjs";
 import Action from "../Action";
 import {queue, QueueObject} from 'async';
 import {SubredditConfigHydratedData, SubredditConfigData} from "../SubredditConfigData";
-import {Check, CheckStructuredJson} from "../Check";
 import NotificationManager from "../Notification/NotificationManager";
 import {createHistoricalDisplayDefaults} from "../Common/defaults";
 import {ExtendedSnoowrap} from "../Utils/SnoowrapClients";

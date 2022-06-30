@@ -1,13 +1,8 @@
 import {
-    ActivityCheckConfigData, ActivityCheckConfigHydratedData,
-    ActivityCheckConfigValue, ActivityCheckObject,
-    CheckJson,
-    CommentCheckConfigData,
-    SubmissionCheckConfigData
+    ActivityCheckConfigValue,
 } from "./Check";
 import {ManagerOptions} from "./Common/interfaces";
-import {RunConfigHydratedData, RunConfigValue, RunConfigData, RunConfigObject} from "./Run";
-import {IncludesType} from "./Common/Infrastructure/Includes";
+import {RunConfigHydratedData, RunConfigValue, RunConfigObject} from "./Run";
 
 export interface SubredditConfigData extends ManagerOptions {
     /**

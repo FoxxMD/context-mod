@@ -1,27 +1,30 @@
 import winston, {Logger} from "winston";
 import {
     asNamedCriteria,
-    buildCacheOptionsFromProvider, buildCachePrefix, buildFilter, castToBool,
+    buildCachePrefix, buildFilter, castToBool,
     createAjvFactory, fileOrDirectoryIsWriteable,
     mergeArr, mergeFilters,
     normalizeName,
     overwriteMerge,
     parseBool, parseExternalUrl, parseWikiContext, randomId,
-    readConfigFile, removeFromSourceIfKeysExistsInDestination,
+    readConfigFile,
     removeUndefinedKeys, resolvePathFromEnvWithRelative
 } from "./util";
-import {CommentCheck} from "./Check/CommentCheck";
-import {SubmissionCheck} from "./Check/SubmissionCheck";
 
 import Ajv, {Schema} from 'ajv';
 import * as appSchema from './Schema/App.json';
 import * as runSchema from './Schema/Run.json';
 import * as checkSchema from './Schema/Check.json';
 import * as operatorSchema from './Schema/OperatorConfig.json';
-import * as rulesetSchema from './Schema/RuleSet.json';
+//import * as rulesetSchema from './Schema/RuleSet.json';
 import {SubredditConfigHydratedData, SubredditConfigData} from "./SubredditConfigData";
 import LoggedError from "./Utils/LoggedError";
-import {ActivityCheckConfigData, CheckConfigHydratedData, CheckConfigObject, CheckStructuredJson} from "./Check";
+import {
+    ActivityCheckConfigData,
+    ActivityCheckConfigHydratedData,
+    CheckConfigHydratedData,
+    CheckConfigObject
+} from "./Check";
 import {
     DEFAULT_POLLING_INTERVAL,
     DEFAULT_POLLING_LIMIT,
@@ -42,13 +45,9 @@ import {
 } from "./Common/interfaces";
 import {isRuleSetJSON, RuleSetConfigData, RuleSetConfigHydratedData, RuleSetConfigObject} from "./Rule/RuleSet";
 import deepEqual from "fast-deep-equal";
-import {
-    ActionJson
-} from "./Common/types";
 import {isActionJson} from "./Action";
-import {getLogger, resolveLogDir} from "./Utils/loggerFactory";
+import {getLogger} from "./Utils/loggerFactory";
 import {GetEnvVars} from 'env-cmd';
-import {operatorConfig} from "./Utils/CommandConfig";
 import merge from 'deepmerge';
 import * as process from "process";
 import {
@@ -62,53 +61,41 @@ import objectHash from "object-hash";
 import {
     createAppDatabaseConnection,
     createDatabaseConfig,
-    createDatabaseConnection,
     createWebDatabaseConnection
 } from "./Utils/databaseUtils";
 import path from 'path';
 import {
     JsonOperatorConfigDocument,
-    OperatorConfigDocumentInterface,
     YamlOperatorConfigDocument
 } from "./Common/Config/Operator";
-import {
-    ConfigDocumentInterface
-} from "./Common/Config/AbstractConfigDocument";
 import {Document as YamlDocument} from "yaml";
 import {SimpleError} from "./Utils/Errors";
 import {ErrorWithCause} from "pony-cause";
-import {RunConfigHydratedData, RunConfigData, RunStructuredJson, RunConfigObject} from "./Run";
+import {RunConfigHydratedData, RunConfigData, RunConfigObject} from "./Run";
 import {AuthorRuleConfig} from "./Rule/AuthorRule";
 import {
     CacheProvider, ConfigFormat,
     PollOn
 } from "./Common/Infrastructure/Atomic";
 import {
-    AuthorOptions,
     FilterCriteriaDefaults,
     FilterCriteriaDefaultsJson,
-    FilterOptionsJson,
-    MaybeAnonymousCriteria,
     MaybeAnonymousOrStringCriteria, MinimalOrFullFilter, MinimalOrFullFilterJson, NamedCriteria
 } from "./Common/Infrastructure/Filters/FilterShapes";
-import {AuthorCriteria, TypedActivityState, TypedActivityStates} from "./Common/Infrastructure/Filters/FilterCriteria";
+import {AuthorCriteria, TypedActivityState} from "./Common/Infrastructure/Filters/FilterCriteria";
 import {StrongLoggingOptions} from "./Common/Infrastructure/Logging";
-import {DatabaseDriver, DatabaseDriverConfig, DatabaseDriverType} from "./Common/Infrastructure/Database";
+import {DatabaseDriver, DatabaseDriverType} from "./Common/Infrastructure/Database";
 import {parseFromJsonOrYamlToObject} from "./Common/Config/ConfigUtil";
-import {RunnableBaseJson, RunnableBaseOptions, StructuredRunnableBase} from "./Common/Infrastructure/Runnable";
+import {RunnableBaseJson, StructuredRunnableBase} from "./Common/Infrastructure/Runnable";
 import {
     RuleConfigData, RuleConfigHydratedData,
     RuleConfigObject,
-    StructuredRuleConfigObject,
-    StructuredRuleSetConfigObject
 } from "./Common/Infrastructure/RuleShapes";
 import {
-    ActionConfigData,
     ActionConfigHydratedData, ActionConfigObject,
-    StructuredActionObjectJson
 } from "./Common/Infrastructure/ActionShapes";
 import {SubredditResources} from "./Subreddit/SubredditResources";
-import {asIncludesData, IncludesData, IncludesString, IncludesType} from "./Common/Infrastructure/Includes";
+import {asIncludesData, IncludesData, IncludesString} from "./Common/Infrastructure/Includes";
 import ConfigParseError from "./Utils/ConfigParseError";
 
 export interface ConfigBuilderOptions {
@@ -180,7 +167,7 @@ export class ConfigBuilder {
         return validateJson<SubredditConfigData>(config, appSchema, this.logger);
     }
 
-    async hydrateIncludes(val: IncludesType | string | object, resource: SubredditResources): Promise<object | string> {
+    async hydrateIncludes(val: IncludesData | string | object, resource: SubredditResources): Promise<object | string> {
         let includes: IncludesData | undefined = undefined;
         if(typeof val === 'string' && (parseWikiContext(val) || parseExternalUrl(val))) {
             includes = {
@@ -248,7 +235,7 @@ export class ConfigBuilder {
                     throw new ConfigParseError(`Check #${checkIndex} in Run #${runIndex} was not in a recognized include format. Given: ${hydratedCheckData}`);
                 }
 
-                const preValidatedCheck = validateJson<ActivityCheckConfigData>(hydratedCheckData, checkSchema, this.logger);
+                const preValidatedCheck = validateJson<ActivityCheckConfigHydratedData>(hydratedCheckData, checkSchema, this.logger);
 
                 const {rules, actions, ...rest} = preValidatedCheck;
                 const hydratedCheckConfigData: CheckConfigHydratedData = rest;
@@ -294,35 +281,6 @@ export class ConfigBuilder {
             const hydratedRun: RunConfigHydratedData = {...rest, checks: hydratedChecks};
 
             hydratedRuns.push(hydratedRun);
-
-            // let includes: IncludesData | undefined = undefined;
-            // if(typeof r === 'string' && (parseWikiContext(r) || parseExternalUrl(r))) {
-            //     includes = {
-            //         path: r
-            //     };
-            // } else if (asIncludesData(r)) {
-            //     includes = r;
-            // }
-            //
-            // if(includes === undefined) {
-            //     hydratedRuns.push(r as RunConfigData);
-            // } else {
-            //     const includesStr = await resource.getContent(includes.path);
-            //
-            //     const [format, configObj, jsonErr, yamlErr] = parseFromJsonOrYamlToObject(includesStr);
-            //     if (configObj === undefined) {
-            //         this.logger.error(`Could not parse includes URL of '${includes.path}' contents as JSON or YAML.`);
-            //         this.logger.error(yamlErr);
-            //         this.logger.debug(jsonErr);
-            //         throw new ConfigParseError(`Could not parse includes URL of '${includes.path}' contents as JSON or YAML.`)
-            //     } else {
-            //         const hydratedObjs = Array.isArray(configObj) ? configObj : [configObj];
-            //         for(const obj of hydratedObjs) {
-            //             const validated = validateJson<RunConfigData>(obj, runSchema, this.logger);
-            //             hydratedRuns.push(validated)
-            //         }
-            //     }
-            // }
         }
 
         const hydratedConfig: SubredditConfigHydratedData = {...restConfig, runs: hydratedRuns};
@@ -330,46 +288,6 @@ export class ConfigBuilder {
         const validatedHydratedConfig = validateJson<SubredditConfigHydratedData>(hydratedConfig, appSchema, this.logger);
 
         return validatedHydratedConfig;
-
-        // const hydratedRunsWithHydratedChecks: RunConfigHydratedData[] = [];
-        // for(const r of hydratedRuns) {
-        //     const {checks = []} = r;
-        //     const hydratedChecks: ActivityCheckConfigObject[] = [];
-        //
-        //     for(const c of checks) {
-        //         let includes: IncludesData | undefined = undefined;
-        //         if(typeof c === 'string' && (parseWikiContext(c) || parseExternalUrl(c))) {
-        //             includes = {
-        //                 path: c
-        //             };
-        //         } else if (asIncludesData(c)) {
-        //             includes = c;
-        //         }
-        //
-        //         if(includes === undefined) {
-        //             hydratedChecks.push(c as ActivityCheckConfigObject);
-        //         } else {
-        //             const includesStr = await resource.getContent(includes.path);
-        //
-        //             const [format, configObj, jsonErr, yamlErr] = parseFromJsonOrYamlToObject(includesStr);
-        //             if (configObj === undefined) {
-        //                 this.logger.error(`Could not parse includes URL of '${includes.path}' contents as JSON or YAML.`);
-        //                 this.logger.error(yamlErr);
-        //                 this.logger.debug(jsonErr);
-        //                 throw new ConfigParseError(`Could not parse includes URL of '${includes.path}' contents as JSON or YAML.`)
-        //             } else {
-        //                 const hydratedObjs = Array.isArray(configObj) ? configObj : [configObj];
-        //                 for(const obj of hydratedObjs) {
-        //                     const validated = validateJson<ActivityCheckConfigObject>(obj, checkSchema, this.logger);
-        //                     hydratedChecks.push(validated)
-        //                 }
-        //             }
-        //         }
-        //     }
-        //
-        //     hydratedRunsWithHydratedChecks.push({...r, checks: hydratedChecks});
-        // }
-
     }
 
     async parseToStructured(config: SubredditConfigData, resource: SubredditResources, filterCriteriaDefaultsFromBot?: FilterCriteriaDefaults, postCheckBehaviorDefaultsFromBot: PostBehavior = {}): Promise<RunConfigObject[]> {
@@ -380,11 +298,6 @@ export class ConfigBuilder {
         const hydratedConfig = await this.hydrateConfig(config, resource);
 
         const {runs: realRuns = []} = hydratedConfig;
-
-        //const realRuns  = runs;
-        // if(checks.length > 0) {
-        //     realRuns.push({name: 'Run1', checks: checks});
-        // }
 
         for(const r of realRuns) {
             for (const c of r.checks) {

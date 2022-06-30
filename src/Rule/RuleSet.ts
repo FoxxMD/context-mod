@@ -1,15 +1,13 @@
-import {IRule, Triggerable, Rule, RuleJSONConfig, StructuredRuleJson} from "./index";
+import {IRule, Rule} from "./index";
 import Snoowrap, {Comment, Submission} from "snoowrap";
 import {ruleFactory} from "./RuleFactory";
 import {createAjvFactory, mergeArr} from "../util";
 import {Logger} from "winston";
-import {JoinCondition, RuleResult, RuleSetResult} from "../Common/interfaces";
+import {JoinCondition, RuleSetResult} from "../Common/interfaces";
 import * as RuleSchema from '../Schema/Rule.json';
-import Ajv from 'ajv';
 import {SubredditResources} from "../Subreddit/SubredditResources";
 import {runCheckOptions} from "../Subreddit/Manager";
 import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
-import {RuleSetResultEntity} from "../Common/Entities/RuleSetResultEntity";
 import {JoinOperands} from "../Common/Infrastructure/Atomic";
 import {
     RuleConfigData,

@@ -5,22 +5,13 @@
             "$ref": "#/definitions/IncludesData"
         },
         {
-            "items": {
-                "type": "string"
-            },
-            "type": "array"
-        },
-        {
-            "items": {
-                "type": "string"
-            },
-            "type": "array"
-        },
-        {
             "$ref": "#/definitions/SubmissionCheckConfigData"
         },
         {
             "$ref": "#/definitions/CommentCheckConfigData"
+        },
+        {
+            "type": "string"
         }
     ],
     "definitions": {
@@ -2806,20 +2797,7 @@
         "IncludesData": {
             "properties": {
                 "path": {
-                    "anyOf": [
-                        {
-                            "items": {
-                                "type": "string"
-                            },
-                            "type": "array"
-                        },
-                        {
-                            "items": {
-                                "type": "string"
-                            },
-                            "type": "array"
-                        }
-                    ]
+                    "type": "string"
                 },
                 "ttl": {
                     "type": [

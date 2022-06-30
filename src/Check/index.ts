@@ -29,7 +29,6 @@ import {
 import * as RuleSchema from '../Schema/Rule.json';
 import * as RuleSetSchema from '../Schema/RuleSet.json';
 import * as ActionSchema from '../Schema/Action.json';
-import {ActionJson as ActionTypeJson} from "../Common/types";
 import {SubredditResources} from "../Subreddit/SubredditResources";
 import {ExtendedSnoowrap} from '../Utils/SnoowrapClients';
 import {ActionProcessingError, CheckProcessingError} from "../Utils/Errors";
@@ -46,7 +45,6 @@ import {ActionResultEntity} from "../Common/Entities/ActionResultEntity";
 import {RuleSetResultEntity} from "../Common/Entities/RuleSetResultEntity";
 import {CheckToRuleResultEntity} from "../Common/Entities/RunnableAssociation/CheckToRuleResultEntity";
 import {JoinOperands, PostBehaviorType, RecordOutputType, recordOutputTypes} from "../Common/Infrastructure/Atomic";
-import {MinimalOrFullFilter, MinimalOrFullFilterJson} from "../Common/Infrastructure/Filters/FilterShapes";
 import {CommentState, SubmissionState,} from "../Common/Infrastructure/Filters/FilterCriteria";
 import {ActivityType} from "../Common/Infrastructure/Reddit";
 import {
@@ -67,7 +65,7 @@ import {
     ActionConfigObject,
     StructuredActionObjectJson
 } from "../Common/Infrastructure/ActionShapes";
-import {IncludesType} from "../Common/Infrastructure/Includes";
+import {IncludesData} from "../Common/Infrastructure/Includes";
 
 const checkLogName = truncateStringToLength(25);
 
@@ -642,7 +640,7 @@ export interface CheckConfigData extends ICheck, RunnableBaseJson {
      *
      * **If `rules` is an empty array or not present then `actions` are performed immediately.**
      * */
-    rules?: (RuleSetConfigData | RuleConfigData | IncludesType)[]
+    rules?: (RuleSetConfigData | RuleConfigData | string | IncludesData)[]
     /**
      * The `Actions` to run after the check is successfully triggered. ALL `Actions` will run in the order they are listed
      *
@@ -664,12 +662,10 @@ export interface CheckConfigData extends ICheck, RunnableBaseJson {
 
 export interface SubmissionCheckConfigData extends CheckConfigData, TypedRunnableBaseData<SubmissionState> {
     kind: 'submission'
-    //itemIs?: MinimalOrFullFilterJson<SubmissionState>
 }
 
 export interface CommentCheckConfigData extends CheckConfigData, TypedRunnableBaseData<CommentState> {
     kind: 'comment'
-    //itemIs?: MinimalOrFullFilterJson<CommentState>
 }
 
 
@@ -709,16 +705,6 @@ export interface CommentCheckConfigObject extends Omit<CheckConfigObject, 'itemI
     kind: 'comment'
 }
 
-export interface CheckJson extends CheckConfigData {
-    rules?: Array<RuleSetConfigObject | RuleConfigObject>
-    actions?: Array<ActionConfigData>
-}
-
-// export interface SubmissionCheckConfigObject extends CheckJson {
-//     kind: 'submission'
-//     itemIs?: MinimalOrFullFilterJson<SubmissionState>
-// }
-
 /**
  * Cache the result of this check based on the comment author and the submission id
  *
@@ -754,14 +740,6 @@ export const userResultCacheDefault: Required<UserResultCacheOptions> = {
     runActions: true,
 }
 
-
-
-// export interface CommentCheckConfigObject extends CheckJson {
-//     kind: 'comment'
-//     itemIs?: MinimalOrFullFilterJson<CommentState>
-// }
-
-
 export const asStructuredCommentCheckJson = (val: any): val is CommentCheckConfigObject => {
     return val.kind === 'comment';
 }
@@ -770,27 +748,9 @@ export const asStructuredSubmissionCheckJson = (val: any): val is SubmissionChec
     return val.kind === 'submission';
 }
 
-export type CheckStructuredJson = SubmissionCheckConfigObject | CommentCheckConfigObject;
-// export interface CheckStructuredJson extends CheckJson {
-//     rules: Array<RuleSetObjectJson | RuleObjectJson>
-//     actions: Array<ActionObjectJson>
-// }
+export type ActivityCheckConfigValue = string | IncludesData | SubmissionCheckConfigData | CommentCheckConfigData;
 
-export interface SubmissionCheckStructuredJson extends Omit<SubmissionCheckConfigObject, 'authorIs' | 'itemIs' | 'rules'>,  StructuredRunnableBase {
-    rules: Array<StructuredRuleSetConfigObject | StructuredRuleConfigObject>
-    actions: Array<ActionConfigObject>
-    itemIs?: MinimalOrFullFilter<SubmissionState>
-}
-
-export interface CommentCheckStructuredJson extends Omit<CommentCheckConfigObject, 'authorIs' | 'itemIs' | 'rules'>, StructuredRunnableBase {
-    rules: Array<StructuredRuleSetConfigObject | StructuredRuleConfigObject>
-    actions: Array<ActionConfigObject>
-    itemIs?: MinimalOrFullFilter<CommentState>
-}
-
-export type ActivityCheckConfigValue = IncludesType | SubmissionCheckConfigData | CommentCheckConfigData;
-
-export type ActivityCheckConfigData = Exclude<ActivityCheckConfigValue, IncludesType>;
+export type ActivityCheckConfigData = Exclude<ActivityCheckConfigValue, IncludesData>;
 
 export type ActivityCheckConfigHydratedData = SubmissionCheckConfigHydratedData | CommentCheckConfigHydratedData;
 

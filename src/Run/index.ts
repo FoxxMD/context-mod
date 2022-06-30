@@ -1,10 +1,9 @@
 import {
-    ActivityCheckConfigData, ActivityCheckConfigHydratedData,
+    ActivityCheckConfigHydratedData,
     ActivityCheckConfigValue, ActivityCheckObject,
     asStructuredCommentCheckJson,
     asStructuredSubmissionCheckJson,
     Check,
-    CheckStructuredJson
 } from "../Check";
 import {
     PostBehavior, PostBehaviorOption,
@@ -26,7 +25,7 @@ import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
 import {RunnableBase} from "../Common/RunnableBase";
 import {RunnableBaseJson, RunnableBaseOptions, StructuredRunnableBase} from "../Common/Infrastructure/Runnable";
 import {FilterCriteriaDefaults} from "../Common/Infrastructure/Filters/FilterShapes";
-import {IncludesType} from "../Common/Infrastructure/Includes";
+import {IncludesData} from "../Common/Infrastructure/Includes";
 
 export class Run extends RunnableBase {
     name: string;
@@ -319,7 +318,7 @@ export interface RunConfigData extends IRun {
     checks: ActivityCheckConfigValue[]
 }
 
-export type RunConfigValue = IncludesType | RunConfigData;
+export type RunConfigValue = string | IncludesData | RunConfigData;
 
 export interface RunConfigHydratedData extends IRun {
     checks: ActivityCheckConfigHydratedData[]
@@ -327,8 +326,4 @@ export interface RunConfigHydratedData extends IRun {
 
 export interface RunConfigObject extends Omit<RunConfigHydratedData, 'authorIs' | 'itemIs'>, StructuredRunnableBase {
     checks: ActivityCheckObject[]
-}
-
-export interface RunStructuredJson extends Omit<RunConfigData, 'authorIs' | 'itemIs' | 'checks'>, StructuredRunnableBase {
-    checks: CheckStructuredJson[]
 }

@@ -1,6 +1,6 @@
 import {RecentActivityRule, RecentActivityRuleJSONConfig} from "./RecentActivityRule";
 import RepeatActivityRule, {RepeatActivityJSONConfig} from "./RepeatActivityRule";
-import {Rule, RuleJSONConfig, StructuredRuleJson} from "./index";
+import {Rule} from "./index";
 import AuthorRule, {AuthorRuleJSONConfig} from "./AuthorRule";
 import {AttributionJSONConfig, AttributionRule} from "./AttributionRule";
 import {Logger} from "winston";
@@ -11,9 +11,10 @@ import Snoowrap from "snoowrap";
 import {RepostRule, RepostRuleJSONConfig} from "./RepostRule";
 import {StructuredFilter} from "../Common/Infrastructure/Filters/FilterShapes";
 import {SentimentRule, SentimentRuleJSONConfig} from "./SentimentRule";
+import {StructuredRuleConfigObject} from "../Common/Infrastructure/RuleShapes";
 
 export function ruleFactory
-(config: StructuredRuleJson, logger: Logger, subredditName: string, resources: SubredditResources, client: Snoowrap): Rule {
+(config: StructuredRuleConfigObject, logger: Logger, subredditName: string, resources: SubredditResources, client: Snoowrap): Rule {
     let cfg;
     switch (config.kind) {
         case 'recentActivity':
