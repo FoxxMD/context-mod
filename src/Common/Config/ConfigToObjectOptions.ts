@@ -6,4 +6,5 @@ export interface ConfigToObjectOptions {
     location?: string,
     jsonDocFunc?: (content: string, location?: string) => AbstractConfigDocument<OperatorJsonConfig>,
     yamlDocFunc?: (content: string, location?: string) => AbstractConfigDocument<YamlDocument>
+    allowArrays?: boolean
 }

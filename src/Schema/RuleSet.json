@@ -1626,6 +1626,43 @@
             },
             "type": "object"
         },
+        "IncludesData": {
+            "properties": {
+                "path": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        }
+                    ]
+                },
+                "ttl": {
+                    "type": [
+                        "number",
+                        "boolean"
+                    ]
+                },
+                "type": {
+                    "enum": [
+                        "json",
+                        "yaml"
+                    ],
+                    "type": "string"
+                }
+            },
+            "required": [
+                "path"
+            ],
+            "type": "object"
+        },
         "ModLogCriteria": {
             "properties": {
                 "action": {
@@ -3463,6 +3500,9 @@
                     },
                     {
                         "$ref": "#/definitions/SentimentRuleJSONConfig"
+                    },
+                    {
+                        "$ref": "#/definitions/IncludesData"
                     },
                     {
                         "type": "string"

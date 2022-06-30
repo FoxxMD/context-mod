@@ -19,6 +19,7 @@ export const parseFromJsonOrYamlToObject = (content: string, options?: ConfigToO
         location,
         jsonDocFunc = (content: string, location?: string) => new JsonConfigDocument(content, location),
         yamlDocFunc = (content: string, location?: string) => new YamlConfigDocument(content, location),
+        allowArrays = false,
     } = options || {};
 
     try {

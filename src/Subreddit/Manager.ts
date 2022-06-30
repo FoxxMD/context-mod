@@ -57,7 +57,7 @@ import ConfigParseError from "../Utils/ConfigParseError";
 import dayjs, {Dayjs as DayjsObj} from "dayjs";
 import Action from "../Action";
 import {queue, QueueObject} from 'async';
-import {JSONConfig} from "../JsonConfig";
+import {SubredditConfigHydratedData, SubredditConfigData} from "../SubredditConfigData";
 import {Check, CheckStructuredJson} from "../Check";
 import NotificationManager from "../Notification/NotificationManager";
 import {createHistoricalDisplayDefaults} from "../Common/defaults";
@@ -651,7 +651,7 @@ export class Manager extends EventEmitter implements RunningStates {
             this.logger.info('Subreddit-specific options updated');
             this.logger.info('Building Runs and Checks...');
 
-            const structuredRuns = configBuilder.parseToStructured(validJson, this.filterCriteriaDefaults, this.postCheckBehaviorDefaults);
+            const structuredRuns = await configBuilder.parseToStructured(validJson, this.resources, this.filterCriteriaDefaults, this.postCheckBehaviorDefaults);
 
             let runs: Run[] = [];
 

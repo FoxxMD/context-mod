@@ -6,7 +6,7 @@ import {
     mergeArr, mergeFilters,
     normalizeName,
     overwriteMerge,
-    parseBool, randomId,
+    parseBool, parseExternalUrl, parseWikiContext, randomId,
     readConfigFile, removeFromSourceIfKeysExistsInDestination,
     removeUndefinedKeys, resolvePathFromEnvWithRelative
 } from "./util";
@@ -15,10 +15,13 @@ import {SubmissionCheck} from "./Check/SubmissionCheck";
 
 import Ajv, {Schema} from 'ajv';
 import * as appSchema from './Schema/App.json';
+import * as runSchema from './Schema/Run.json';
+import * as checkSchema from './Schema/Check.json';
 import * as operatorSchema from './Schema/OperatorConfig.json';
-import {JSONConfig} from "./JsonConfig";
+import * as rulesetSchema from './Schema/RuleSet.json';
+import {SubredditConfigHydratedData, SubredditConfigData} from "./SubredditConfigData";
 import LoggedError from "./Utils/LoggedError";
-import {CheckStructuredJson} from "./Check";
+import {ActivityCheckConfigData, CheckConfigHydratedData, CheckConfigObject, CheckStructuredJson} from "./Check";
 import {
     DEFAULT_POLLING_INTERVAL,
     DEFAULT_POLLING_LIMIT,
@@ -37,7 +40,7 @@ import {
     OperatorFileConfig,
     PostBehavior
 } from "./Common/interfaces";
-import {isRuleSetJSON, RuleSetJson, RuleSetObjectJson} from "./Rule/RuleSet";
+import {isRuleSetJSON, RuleSetConfigData, RuleSetConfigHydratedData, RuleSetConfigObject} from "./Rule/RuleSet";
 import deepEqual from "fast-deep-equal";
 import {
     ActionJson
@@ -74,7 +77,7 @@ import {
 import {Document as YamlDocument} from "yaml";
 import {SimpleError} from "./Utils/Errors";
 import {ErrorWithCause} from "pony-cause";
-import {RunJson, RunStructuredJson} from "./Run";
+import {RunConfigHydratedData, RunConfigData, RunStructuredJson, RunConfigObject} from "./Run";
 import {AuthorRuleConfig} from "./Rule/AuthorRule";
 import {
     CacheProvider, ConfigFormat,
@@ -94,22 +97,29 @@ import {DatabaseDriver, DatabaseDriverConfig, DatabaseDriverType} from "./Common
 import {parseFromJsonOrYamlToObject} from "./Common/Config/ConfigUtil";
 import {RunnableBaseJson, RunnableBaseOptions, StructuredRunnableBase} from "./Common/Infrastructure/Runnable";
 import {
-    RuleJson,
-    RuleObjectJson,
-    StructuredRuleObjectJson,
-    StructuredRuleSetObjectJson
+    RuleConfigData, RuleConfigHydratedData,
+    RuleConfigObject,
+    StructuredRuleConfigObject,
+    StructuredRuleSetConfigObject
 } from "./Common/Infrastructure/RuleShapes";
-import {ActionObjectJson, StructuredActionObjectJson} from "./Common/Infrastructure/ActionShapes";
+import {
+    ActionConfigData,
+    ActionConfigHydratedData, ActionConfigObject,
+    StructuredActionObjectJson
+} from "./Common/Infrastructure/ActionShapes";
+import {SubredditResources} from "./Subreddit/SubredditResources";
+import {asIncludesData, IncludesData, IncludesString, IncludesType} from "./Common/Infrastructure/Includes";
+import ConfigParseError from "./Utils/ConfigParseError";
 
 export interface ConfigBuilderOptions {
     logger: Logger,
 }
 
-export const validateJson = (config: object, schema: Schema, logger: Logger): any => {
+export const validateJson = <T>(config: object, schema: Schema, logger: Logger): T => {
     const ajv = createAjvFactory(logger);
     const valid = ajv.validate(schema, config);
     if (valid) {
-        return config;
+        return config as unknown as T;
     } else {
         logger.error('Json config was not valid. Please use schema to check validity.', {leaf: 'Config'});
         if (Array.isArray(ajv.errors)) {
@@ -166,25 +176,215 @@ export class ConfigBuilder {
         this.logger = options.logger;
     }
 
-    validateJson(config: object): JSONConfig {
-        const validConfig = validateJson(config, appSchema, this.logger);
-        return validConfig as JSONConfig;
+    validateJson(config: object): SubredditConfigData {
+        return validateJson<SubredditConfigData>(config, appSchema, this.logger);
     }
 
-    parseToStructured(config: JSONConfig, filterCriteriaDefaultsFromBot?: FilterCriteriaDefaults, postCheckBehaviorDefaultsFromBot: PostBehavior = {}): RunStructuredJson[] {
-        let namedRules: Map<string, RuleObjectJson> = new Map();
-        let namedActions: Map<string, ActionObjectJson> = new Map();
-        const {checks = [], runs = [], filterCriteriaDefaults, postCheckBehaviorDefaults} = config;
+    async hydrateIncludes(val: IncludesType | string | object, resource: SubredditResources): Promise<object | string> {
+        let includes: IncludesData | undefined = undefined;
+        if(typeof val === 'string' && (parseWikiContext(val) || parseExternalUrl(val))) {
+            includes = {
+                path: val as IncludesString
+            };
+        } else if (asIncludesData(val)) {
+            includes = val;
+        }
+
+        if(includes === undefined) {
+            return val;
+        }
+
+        const includesStr = await resource.getContent(includes.path);
+
+        const [format, configObj, jsonErr, yamlErr] = parseFromJsonOrYamlToObject(includesStr);
+        if (configObj === undefined) {
+            this.logger.error(`Could not parse includes URL of '${includes.path}' contents as JSON or YAML.`);
+            this.logger.error(yamlErr);
+            this.logger.debug(jsonErr);
+            throw new ConfigParseError(`Could not parse includes URL of '${includes.path}' contents as JSON or YAML.`)
+        }
+        return configObj.toJS();
+    }
+
+    async hydrateConfig(config: SubredditConfigData, resource: SubredditResources): Promise<SubredditConfigHydratedData> {
+        const {
+            runs = [],
+            checks = [],
+            ...restConfig
+        } = config;
 
         if(checks.length > 0 && runs.length > 0) {
             // cannot have both checks and runs at top-level
             throw new Error(`Subreddit configuration cannot contain both 'checks' and 'runs' at top-level.`);
         }
 
+        // TODO consolidate this with parseToStructured
         const realRuns  = runs;
         if(checks.length > 0) {
             realRuns.push({name: 'Run1', checks: checks});
         }
+
+        const hydratedRuns: RunConfigHydratedData[] = [];
+
+        let runIndex = 1;
+        for(const r of realRuns) {
+
+            const hydratedRunVal = await this.hydrateIncludes(r, resource);
+
+            if(typeof hydratedRunVal === 'string') {
+                throw new ConfigParseError(`Run #${runIndex} was not in a recognized include format. Given: ${hydratedRunVal}`);
+            }
+
+            // validate run with unhydrated checks
+            const preValidatedRun = validateJson<RunConfigData>(hydratedRunVal, runSchema, this.logger);
+
+            const {checks, ...rest} = preValidatedRun;
+
+            const hydratedChecks: CheckConfigHydratedData[] = [];
+            let checkIndex = 1;
+            for(const c of preValidatedRun.checks) {
+                const hydratedCheckData = await this.hydrateIncludes(c, resource);
+                if(typeof hydratedCheckData === 'string') {
+                    throw new ConfigParseError(`Check #${checkIndex} in Run #${runIndex} was not in a recognized include format. Given: ${hydratedCheckData}`);
+                }
+
+                const preValidatedCheck = validateJson<ActivityCheckConfigData>(hydratedCheckData, checkSchema, this.logger);
+
+                const {rules, actions, ...rest} = preValidatedCheck;
+                const hydratedCheckConfigData: CheckConfigHydratedData = rest;
+
+                if(rules !== undefined) {
+                    const hydratedRulesOrSets: (RuleSetConfigHydratedData | RuleConfigHydratedData)[] = [];
+
+                    for(const r of rules) {
+                        const hydratedRuleOrSet = await this.hydrateIncludes(r, resource);
+                        if(typeof hydratedRuleOrSet === 'string') {
+                            hydratedRulesOrSets.push(hydratedRuleOrSet);
+                        } else if (isRuleSetJSON(hydratedRuleOrSet)) {
+                            const hydratedRulesetRules: (string | RuleConfigHydratedData)[] = [];
+                            for(const rsr of (hydratedRuleOrSet as RuleSetConfigData).rules) {
+                                const hydratedRuleSetRule = await this.hydrateIncludes(rsr, resource);
+                                // either a string or rule data at this point
+                                // we will validate the whole check again so this rule will be validated eventually
+                                hydratedRulesetRules.push(hydratedRuleSetRule as RuleConfigHydratedData)
+                            }
+                            hydratedRuleOrSet.rules = hydratedRulesetRules;
+                            hydratedRulesOrSets.push(hydratedRuleOrSet as RuleSetConfigHydratedData);
+                        } else {
+                            hydratedRulesOrSets.push(hydratedRuleOrSet as RuleConfigHydratedData);
+                        }
+                    }
+                    hydratedCheckConfigData.rules = hydratedRulesOrSets;
+                }
+
+                if(actions !== undefined) {
+                    const hydratedActions: ActionConfigHydratedData[] = [];
+
+                    for(const a of actions) {
+                        const hydratedAction = await this.hydrateIncludes(a, resource);
+                        hydratedActions.push(hydratedAction as (string | ActionConfigHydratedData));
+                    }
+                    hydratedCheckConfigData.actions = hydratedActions;
+                }
+
+                hydratedChecks.push(hydratedCheckConfigData);
+                checkIndex++;
+            }
+
+            const hydratedRun: RunConfigHydratedData = {...rest, checks: hydratedChecks};
+
+            hydratedRuns.push(hydratedRun);
+
+            // let includes: IncludesData | undefined = undefined;
+            // if(typeof r === 'string' && (parseWikiContext(r) || parseExternalUrl(r))) {
+            //     includes = {
+            //         path: r
+            //     };
+            // } else if (asIncludesData(r)) {
+            //     includes = r;
+            // }
+            //
+            // if(includes === undefined) {
+            //     hydratedRuns.push(r as RunConfigData);
+            // } else {
+            //     const includesStr = await resource.getContent(includes.path);
+            //
+            //     const [format, configObj, jsonErr, yamlErr] = parseFromJsonOrYamlToObject(includesStr);
+            //     if (configObj === undefined) {
+            //         this.logger.error(`Could not parse includes URL of '${includes.path}' contents as JSON or YAML.`);
+            //         this.logger.error(yamlErr);
+            //         this.logger.debug(jsonErr);
+            //         throw new ConfigParseError(`Could not parse includes URL of '${includes.path}' contents as JSON or YAML.`)
+            //     } else {
+            //         const hydratedObjs = Array.isArray(configObj) ? configObj : [configObj];
+            //         for(const obj of hydratedObjs) {
+            //             const validated = validateJson<RunConfigData>(obj, runSchema, this.logger);
+            //             hydratedRuns.push(validated)
+            //         }
+            //     }
+            // }
+        }
+
+        const hydratedConfig: SubredditConfigHydratedData = {...restConfig, runs: hydratedRuns};
+
+        const validatedHydratedConfig = validateJson<SubredditConfigHydratedData>(hydratedConfig, appSchema, this.logger);
+
+        return validatedHydratedConfig;
+
+        // const hydratedRunsWithHydratedChecks: RunConfigHydratedData[] = [];
+        // for(const r of hydratedRuns) {
+        //     const {checks = []} = r;
+        //     const hydratedChecks: ActivityCheckConfigObject[] = [];
+        //
+        //     for(const c of checks) {
+        //         let includes: IncludesData | undefined = undefined;
+        //         if(typeof c === 'string' && (parseWikiContext(c) || parseExternalUrl(c))) {
+        //             includes = {
+        //                 path: c
+        //             };
+        //         } else if (asIncludesData(c)) {
+        //             includes = c;
+        //         }
+        //
+        //         if(includes === undefined) {
+        //             hydratedChecks.push(c as ActivityCheckConfigObject);
+        //         } else {
+        //             const includesStr = await resource.getContent(includes.path);
+        //
+        //             const [format, configObj, jsonErr, yamlErr] = parseFromJsonOrYamlToObject(includesStr);
+        //             if (configObj === undefined) {
+        //                 this.logger.error(`Could not parse includes URL of '${includes.path}' contents as JSON or YAML.`);
+        //                 this.logger.error(yamlErr);
+        //                 this.logger.debug(jsonErr);
+        //                 throw new ConfigParseError(`Could not parse includes URL of '${includes.path}' contents as JSON or YAML.`)
+        //             } else {
+        //                 const hydratedObjs = Array.isArray(configObj) ? configObj : [configObj];
+        //                 for(const obj of hydratedObjs) {
+        //                     const validated = validateJson<ActivityCheckConfigObject>(obj, checkSchema, this.logger);
+        //                     hydratedChecks.push(validated)
+        //                 }
+        //             }
+        //         }
+        //     }
+        //
+        //     hydratedRunsWithHydratedChecks.push({...r, checks: hydratedChecks});
+        // }
+
+    }
+
+    async parseToStructured(config: SubredditConfigData, resource: SubredditResources, filterCriteriaDefaultsFromBot?: FilterCriteriaDefaults, postCheckBehaviorDefaultsFromBot: PostBehavior = {}): Promise<RunConfigObject[]> {
+        let namedRules: Map<string, RuleConfigObject> = new Map();
+        let namedActions: Map<string, ActionConfigObject> = new Map();
+        const {filterCriteriaDefaults, postCheckBehaviorDefaults} = config;
+
+        const hydratedConfig = await this.hydrateConfig(config, resource);
+
+        const {runs: realRuns = []} = hydratedConfig;
+
+        //const realRuns  = runs;
+        // if(checks.length > 0) {
+        //     realRuns.push({name: 'Run1', checks: checks});
+        // }
 
         for(const r of realRuns) {
             for (const c of r.checks) {
@@ -194,11 +394,11 @@ export class ConfigBuilder {
             }
         }
 
-        const [namedAuthorFilters, namedItemFilters] = extractNamedFilters({...config, runs: realRuns});
+        const [namedAuthorFilters, namedItemFilters] = extractNamedFilters({...hydratedConfig, runs: realRuns});
 
         const configFilterDefaults = filterCriteriaDefaults === undefined ? undefined : buildDefaultFilterCriteriaFromJson(filterCriteriaDefaults, namedAuthorFilters, namedItemFilters);
 
-        const structuredRuns: RunStructuredJson[] = [];
+        const structuredRuns: RunConfigObject[] = [];
 
         const namedFilters = insertNameFilters(namedAuthorFilters, namedItemFilters);
 
@@ -210,7 +410,7 @@ export class ConfigBuilder {
 
             const configFilterDefaultsFromRun = filterCriteriaDefaultsFromRun === undefined ? undefined : buildDefaultFilterCriteriaFromJson(filterCriteriaDefaultsFromRun, namedAuthorFilters, namedItemFilters);
 
-            const structuredChecks: CheckStructuredJson[] = [];
+            const structuredChecks: CheckConfigObject[] = [];
             for (const c of r.checks) {
                 const {rules = [], actions = [], authorIs = {}, itemIs = []} = c;
                 const strongRules = insertNamedRules(rules, namedRules, namedAuthorFilters, namedItemFilters);
@@ -227,7 +427,7 @@ export class ConfigBuilder {
                     rules: strongRules,
                     actions: strongActions,
                     ...postCheckBehaviors
-                } as CheckStructuredJson;
+                } as CheckConfigObject;
                 structuredChecks.push(strongCheck);
             }
             structuredRuns.push({
@@ -283,19 +483,19 @@ export const buildDefaultFilterCriteriaFromJson = (val: FilterCriteriaDefaultsJs
     return def;
 }
 
-export const extractNamedRules = (rules: Array<RuleSetJson | RuleJson>, namedRules: Map<string, RuleObjectJson> = new Map()): Map<string, RuleObjectJson> => {
+export const extractNamedRules = (rules: Array<RuleSetConfigData | RuleConfigData>, namedRules: Map<string, RuleConfigObject> = new Map()): Map<string, RuleConfigObject> => {
     //const namedRules = new Map();
     for (const r of rules) {
-        let rulesToAdd: RuleObjectJson[] = [];
+        let rulesToAdd: RuleConfigObject[] = [];
         if ((typeof r === 'object')) {
-            if ((r as RuleObjectJson).kind !== undefined) {
+            if ((r as RuleConfigObject).kind !== undefined) {
                 // itsa rule
-                const rule = r as RuleObjectJson;
+                const rule = r as RuleConfigObject;
                 if (rule.name !== undefined) {
                     rulesToAdd.push(rule);
                 }
             } else {
-                const ruleSet = r as RuleSetJson;
+                const ruleSet = r as RuleSetConfigData;
                 const nestedNamed = extractNamedRules(ruleSet.rules);
                 rulesToAdd = [...nestedNamed.values()];
             }
@@ -306,7 +506,7 @@ export const extractNamedRules = (rules: Array<RuleSetJson | RuleJson>, namedRul
                 const ruleNoName = {...rest};
 
                 if (namedRules.has(normalName)) {
-                    const {name: nn, ...ruleRest} = namedRules.get(normalName) as RuleObjectJson;
+                    const {name: nn, ...ruleRest} = namedRules.get(normalName) as RuleConfigObject;
                     if (!deepEqual(ruleRest, ruleNoName)) {
                         throw new Error(`Rule names must be unique (case-insensitive). Conflicting name: ${name}`);
                     }
@@ -352,7 +552,7 @@ const parseFilterJson = <T>(addToFilter: FilterJsonFuncArg<T>) => (val: MinimalO
     }
 }
 
-export const extractNamedFilters = (config: JSONConfig, namedAuthorFilters: Map<string, NamedCriteria<AuthorCriteria>> = new Map(), namedItemFilters: Map<string, NamedCriteria<TypedActivityState>> = new Map()): [Map<string, NamedCriteria<AuthorCriteria>>, Map<string, NamedCriteria<TypedActivityState>>] => {
+export const extractNamedFilters = (config: SubredditConfigHydratedData, namedAuthorFilters: Map<string, NamedCriteria<AuthorCriteria>> = new Map(), namedItemFilters: Map<string, NamedCriteria<TypedActivityState>> = new Map()): [Map<string, NamedCriteria<AuthorCriteria>>, Map<string, NamedCriteria<TypedActivityState>>] => {
     const addToAuthors = addToNamedFilter(namedAuthorFilters, 'authorIs');
     const addToItems = addToNamedFilter(namedItemFilters, 'itemIs');
 
@@ -407,7 +607,7 @@ export const extractNamedFilters = (config: JSONConfig, namedAuthorFilters: Map<
     parseAuthorIs(filterCriteriaDefaults?.authorIs);
     parseItemIs(filterCriteriaDefaults?.itemIs);
 
-    for (const r of runs as RunJson[]) {
+    for (const r of runs) {
 
         const {
             filterCriteriaDefaults: filterCriteriaDefaultsFromRun
@@ -508,13 +708,13 @@ export const insertNameFilters = (namedAuthorFilters: Map<string, NamedCriteria<
     return runnableOpts;
 }
 
-export const insertNamedRules = (rules: Array<RuleSetJson | RuleJson>, namedRules: Map<string, RuleObjectJson> = new Map(), namedAuthorFilters: Map<string, NamedCriteria<AuthorCriteria>> = new Map(), namedItemFilters: Map<string, NamedCriteria<TypedActivityState>> = new Map()): (StructuredRuleSetObjectJson | StructuredRuleObjectJson)[] => {
+export const insertNamedRules = (rules: Array<RuleSetConfigHydratedData | RuleConfigHydratedData>, namedRules: Map<string, RuleConfigObject> = new Map(), namedAuthorFilters: Map<string, NamedCriteria<AuthorCriteria>> = new Map(), namedItemFilters: Map<string, NamedCriteria<TypedActivityState>> = new Map()): (RuleSetConfigObject | RuleConfigObject)[] => {
 
     const namedFilters = insertNameFilters(namedAuthorFilters, namedItemFilters);
 
-    const strongRules: (StructuredRuleSetObjectJson | StructuredRuleObjectJson)[] = [];
+    const strongRules: (RuleSetConfigObject | RuleConfigObject)[] = [];
     for (const r of rules) {
-        let rule: StructuredRuleObjectJson | undefined;
+        let rule: RuleConfigObject | undefined;
         if (typeof r === 'string') {
             const foundRule = namedRules.get(r.toLowerCase());
             if (foundRule === undefined) {
@@ -523,20 +723,20 @@ export const insertNamedRules = (rules: Array<RuleSetJson | RuleJson>, namedRule
             rule = {
                 ...foundRule,
                 ...namedFilters(foundRule)
-            } as StructuredRuleObjectJson
+            } as RuleConfigObject
             //strongRules.push(foundRule);
         } else if (isRuleSetJSON(r)) {
             const {rules: sr, ...rest} = r;
             const setRules = insertNamedRules(sr, namedRules, namedAuthorFilters, namedItemFilters);
-            const strongSet = {rules: setRules, ...rest} as StructuredRuleSetObjectJson;
+            const strongSet = {rules: setRules, ...rest} as RuleSetConfigObject;
             strongRules.push(strongSet);
         } else {
-            rule = {...r, ...namedFilters(r)} as StructuredRuleObjectJson;
+            rule = {...r, ...namedFilters(r)} as RuleConfigObject;
         }
 
         if(rule !== undefined) {
             if(rule.kind === 'author') {
-                const authorRuleConfig = rule as (StructuredRuleObjectJson & AuthorRuleConfig);
+                const authorRuleConfig = rule as (RuleConfigObject & AuthorRuleConfig);
                 const filters = namedFilters({authorIs: {include: authorRuleConfig.include, exclude: authorRuleConfig.exclude}});
                 const builtFilter = buildFilter(filters.authorIs as MinimalOrFullFilter<AuthorCriteria>);
                 rule = {
@@ -546,14 +746,14 @@ export const insertNamedRules = (rules: Array<RuleSetJson | RuleJson>, namedRule
                     exclude: builtFilter.exclude
                 }
             }
-            strongRules.push(rule as StructuredRuleObjectJson);
+            strongRules.push(rule as RuleConfigObject);
         }
     }
 
     return strongRules;
 }
 
-export const extractNamedActions = (actions: Array<ActionJson>, namedActions: Map<string, ActionObjectJson> = new Map()): Map<string, ActionObjectJson> => {
+export const extractNamedActions = (actions: Array<ActionConfigHydratedData>, namedActions: Map<string, ActionConfigObject> = new Map()): Map<string, ActionConfigObject> => {
     for (const a of actions) {
         if (!(typeof a === 'string')) {
             if (isActionJson(a) && a.name !== undefined) {
@@ -562,7 +762,7 @@ export const extractNamedActions = (actions: Array<ActionJson>, namedActions: Ma
                 const actionNoName = {...rest};
                 if (namedActions.has(normalName)) {
                     // @ts-ignore
-                    const {name: nn, ...aRest} = namedActions.get(normalName) as ActionObjectJson;
+                    const {name: nn, ...aRest} = namedActions.get(normalName) as ActionConfigObject;
                     if (!deepEqual(aRest, actionNoName)) {
                         throw new Error(`Actions names must be unique (case-insensitive). Conflicting name: ${a.name}`);
                     }
@@ -575,20 +775,20 @@ export const extractNamedActions = (actions: Array<ActionJson>, namedActions: Ma
     return namedActions;
 }
 
-export const insertNamedActions = (actions: Array<ActionJson>, namedActions: Map<string, ActionObjectJson> = new Map(), namedAuthorFilters: Map<string, NamedCriteria<AuthorCriteria>> = new Map(), namedItemFilters: Map<string, NamedCriteria<TypedActivityState>> = new Map()): Array<StructuredActionObjectJson> => {
+export const insertNamedActions = (actions: Array<ActionConfigHydratedData>, namedActions: Map<string, ActionConfigObject> = new Map(), namedAuthorFilters: Map<string, NamedCriteria<AuthorCriteria>> = new Map(), namedItemFilters: Map<string, NamedCriteria<TypedActivityState>> = new Map()): Array<ActionConfigObject> => {
 
     const namedFilters = insertNameFilters(namedAuthorFilters, namedItemFilters);
 
-    const strongActions: Array<StructuredActionObjectJson> = [];
+    const strongActions: Array<ActionConfigObject> = [];
     for (const a of actions) {
         if (typeof a === 'string') {
             const foundAction = namedActions.get(a.toLowerCase());
             if (foundAction === undefined) {
                 throw new Error(`No named Action with the name ${a} was found`);
             }
-            strongActions.push({...foundAction, ...namedFilters(foundAction)} as StructuredActionObjectJson);
+            strongActions.push({...foundAction, ...namedFilters(foundAction)} as ActionConfigObject);
         } else {
-            strongActions.push({...a, ...namedFilters(a)} as StructuredActionObjectJson);
+            strongActions.push({...a, ...namedFilters(a)} as ActionConfigObject);
         }
     }
 

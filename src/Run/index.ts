@@ -1,6 +1,12 @@
-import {asStructuredCommentCheckJson, asStructuredSubmissionCheckJson, Check, CheckStructuredJson} from "../Check";
 import {
-    ActivityCheckJson,
+    ActivityCheckConfigData, ActivityCheckConfigHydratedData,
+    ActivityCheckConfigValue, ActivityCheckObject,
+    asStructuredCommentCheckJson,
+    asStructuredSubmissionCheckJson,
+    Check,
+    CheckStructuredJson
+} from "../Check";
+import {
     PostBehavior, PostBehaviorOption,
     RunResult
 } from "../Common/interfaces";
@@ -20,6 +26,7 @@ import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
 import {RunnableBase} from "../Common/RunnableBase";
 import {RunnableBaseJson, RunnableBaseOptions, StructuredRunnableBase} from "../Common/Infrastructure/Runnable";
 import {FilterCriteriaDefaults} from "../Common/Infrastructure/Filters/FilterShapes";
+import {IncludesType} from "../Common/Infrastructure/Includes";
 
 export class Run extends RunnableBase {
     name: string;
@@ -296,7 +303,7 @@ export interface IRun extends PostBehavior, RunnableBaseJson {
     enable?: boolean,
 }
 
-export interface RunOptions extends RunStructuredJson, RunnableBaseOptions {
+export interface RunOptions extends RunConfigObject, RunnableBaseOptions {
     // submissionChecks?: SubmissionCheck[]
     // commentChecks?: CommentCheck[]
     //checks: CheckStructuredJson[]
@@ -308,10 +315,20 @@ export interface RunOptions extends RunStructuredJson, RunnableBaseOptions {
     emitter: EventEmitter;
 }
 
-export interface RunJson extends IRun {
-    checks: ActivityCheckJson[]
+export interface RunConfigData extends IRun {
+    checks: ActivityCheckConfigValue[]
 }
 
-export interface RunStructuredJson extends Omit<RunJson, 'authorIs' | 'itemIs' | 'checks'>, StructuredRunnableBase {
+export type RunConfigValue = IncludesType | RunConfigData;
+
+export interface RunConfigHydratedData extends IRun {
+    checks: ActivityCheckConfigHydratedData[]
+}
+
+export interface RunConfigObject extends Omit<RunConfigHydratedData, 'authorIs' | 'itemIs'>, StructuredRunnableBase {
+    checks: ActivityCheckObject[]
+}
+
+export interface RunStructuredJson extends Omit<RunConfigData, 'authorIs' | 'itemIs' | 'checks'>, StructuredRunnableBase {
     checks: CheckStructuredJson[]
 }

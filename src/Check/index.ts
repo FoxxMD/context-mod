@@ -1,19 +1,18 @@
-import {RuleSet, IRuleSet, RuleSetJson, RuleSetObjectJson, isRuleSetJSON} from "../Rule/RuleSet";
-import {IRule, Rule, RuleJSONConfig} from "../Rule";
-import Action, {ActionConfig, ActionJson, StructuredActionJson} from "../Action";
+import {RuleSet, RuleSetConfigData, RuleSetConfigHydratedData, RuleSetConfigObject} from "../Rule/RuleSet";
+import {Rule} from "../Rule";
+import Action, {ActionConfig} from "../Action";
 import {Logger} from "winston";
-import Snoowrap, {Comment, Submission} from "snoowrap";
+import {Comment, Submission} from "snoowrap";
 import {actionFactory} from "../Action/ActionFactory";
 import {ruleFactory} from "../Rule/RuleFactory";
 import {
     asPostBehaviorOptionConfig,
-    boolToString,
-    createAjvFactory, determineNewResults,
-    FAIL, isRuleSetResult,
+    createAjvFactory,
+    FAIL,
+    isRuleSetResult,
     mergeArr,
     PASS,
     resultsSummary,
-    ruleNamesFromResults,
     truncateStringToLength
 } from "../util";
 import {
@@ -22,19 +21,18 @@ import {
     CheckSummary,
     JoinCondition,
     NotificationEventPayload,
-    PostBehavior, PostBehaviorOptionConfig, PostBehaviorOptionConfigStrong, PostBehaviorStrong,
-    RuleResult,
-    RuleSetResult, UserResultCache
+    PostBehavior,
+    PostBehaviorOptionConfigStrong,
+    PostBehaviorStrong,
+    RuleSetResult
 } from "../Common/interfaces";
 import * as RuleSchema from '../Schema/Rule.json';
 import * as RuleSetSchema from '../Schema/RuleSet.json';
 import * as ActionSchema from '../Schema/Action.json';
-import {
-    ActionJson as ActionTypeJson
-} from "../Common/types";
-import  {SubredditResources} from "../Subreddit/SubredditResources";
+import {ActionJson as ActionTypeJson} from "../Common/types";
+import {SubredditResources} from "../Subreddit/SubredditResources";
 import {ExtendedSnoowrap} from '../Utils/SnoowrapClients';
-import {ActionProcessingError, CheckProcessingError, isRateLimitError} from "../Utils/Errors";
+import {ActionProcessingError, CheckProcessingError} from "../Utils/Errors";
 import {ErrorWithCause, stackWithCauses} from "pony-cause";
 import {runCheckOptions} from "../Subreddit/Manager";
 import EventEmitter from "events";
@@ -47,24 +45,29 @@ import {RunnableBase} from "../Common/RunnableBase";
 import {ActionResultEntity} from "../Common/Entities/ActionResultEntity";
 import {RuleSetResultEntity} from "../Common/Entities/RuleSetResultEntity";
 import {CheckToRuleResultEntity} from "../Common/Entities/RunnableAssociation/CheckToRuleResultEntity";
-import {
-    JoinOperands,
-    PostBehaviorType,
-    RecordOutputType,
-    recordOutputTypes
-} from "../Common/Infrastructure/Atomic";
-import {
-    MinimalOrFullFilter,
-    MinimalOrFullFilterJson
-} from "../Common/Infrastructure/Filters/FilterShapes";
-import {
-    CommentState,
-    SubmissionState,
-} from "../Common/Infrastructure/Filters/FilterCriteria";
+import {JoinOperands, PostBehaviorType, RecordOutputType, recordOutputTypes} from "../Common/Infrastructure/Atomic";
+import {MinimalOrFullFilter, MinimalOrFullFilterJson} from "../Common/Infrastructure/Filters/FilterShapes";
+import {CommentState, SubmissionState,} from "../Common/Infrastructure/Filters/FilterCriteria";
 import {ActivityType} from "../Common/Infrastructure/Reddit";
-import {RunnableBaseJson, RunnableBaseOptions, StructuredRunnableBase} from "../Common/Infrastructure/Runnable";
-import {RuleJson, StructuredRuleObjectJson, StructuredRuleSetObjectJson} from "../Common/Infrastructure/RuleShapes";
-import {ActionObjectJson, StructuredActionObjectJson} from "../Common/Infrastructure/ActionShapes";
+import {
+    RunnableBaseJson,
+    RunnableBaseOptions,
+    StructuredRunnableBase,
+    TypedRunnableBaseData, TypedStructuredRunnableBase
+} from "../Common/Infrastructure/Runnable";
+import {
+    RuleConfigData, RuleConfigHydratedData,
+    RuleConfigObject,
+    StructuredRuleConfigObject,
+    StructuredRuleSetConfigObject
+} from "../Common/Infrastructure/RuleShapes";
+import {
+    ActionConfigData,
+    ActionConfigHydratedData,
+    ActionConfigObject,
+    StructuredActionObjectJson
+} from "../Common/Infrastructure/ActionShapes";
+import {IncludesType} from "../Common/Infrastructure/Includes";
 
 const checkLogName = truncateStringToLength(25);
 
@@ -192,12 +195,12 @@ export abstract class Check extends RunnableBase implements Omit<ICheck, 'postTr
                 let ruleErrors: any = [];
                 if (valid) {
                     const ruleConfig = r;
-                    this.rules.push(new RuleSet({...ruleConfig as StructuredRuleSetObjectJson, logger: this.logger, subredditName, resources: this.resources, client: this.client}));
+                    this.rules.push(new RuleSet({...ruleConfig as StructuredRuleSetConfigObject, logger: this.logger, subredditName, resources: this.resources, client: this.client}));
                 } else {
                     setErrors = ajv.errors;
                     valid = ajv.validate(RuleSchema, r);
                     if (valid) {
-                        this.rules.push(ruleFactory(r as StructuredRuleObjectJson, this.logger, subredditName, this.resources, this.client));
+                        this.rules.push(ruleFactory(r as StructuredRuleConfigObject, this.logger, subredditName, this.resources, this.client));
                     } else {
                         ruleErrors = ajv.errors;
                         const leastErrorType = setErrors.length < ruleErrors ? 'RuleSet' : 'Rule';
@@ -605,7 +608,7 @@ export interface ICheck extends JoinCondition, PostBehavior, RunnableBaseJson {
 }
 
 export interface CheckOptions extends Omit<ICheck, 'authorIs' | 'itemIs'>, RunnableBaseOptions {
-    rules: Array<StructuredRuleSetObjectJson | StructuredRuleObjectJson>;
+    rules: Array<RuleConfigObject | RuleSetConfigObject>;
     actions: ActionConfig[];
     logger: Logger;
     subredditName: string;
@@ -616,7 +619,15 @@ export interface CheckOptions extends Omit<ICheck, 'authorIs' | 'itemIs'>, Runna
     emitter: EventEmitter
 }
 
-export interface CheckJson extends ICheck {
+/*
+* Can contain actions/rules as:
+*  - full objects
+*  - string to hydrate IE "url:fsdfd"
+*  - named string IE "namedRule"
+*
+* Also can contain itemIs/authorIs as full object or named filter
+* */
+export interface CheckConfigData extends ICheck, RunnableBaseJson {
     /**
      * The type of event (new submission or new comment) this check should be run against
      * @examples ["submission", "comment"]
@@ -631,7 +642,7 @@ export interface CheckJson extends ICheck {
      *
      * **If `rules` is an empty array or not present then `actions` are performed immediately.**
      * */
-    rules?: Array<RuleSetJson | RuleJson>
+    rules?: (RuleSetConfigData | RuleConfigData | IncludesType)[]
     /**
      * The `Actions` to run after the check is successfully triggered. ALL `Actions` will run in the order they are listed
      *
@@ -639,7 +650,7 @@ export interface CheckJson extends ICheck {
      *
      * @examples [[{"kind": "comment", "content": "this is the content of the comment", "distinguish": true}, {"kind": "lock"}]]
      * */
-    actions?: Array<ActionTypeJson>
+    actions?: ActionConfigData[]
 
     /**
      * If notifications are configured and this is `true` then an `eventActioned` event will be sent when this check is triggered.
@@ -651,10 +662,62 @@ export interface CheckJson extends ICheck {
     cacheUserResult?: UserResultCacheOptions;
 }
 
-export interface SubmissionCheckJson extends CheckJson {
+export interface SubmissionCheckConfigData extends CheckConfigData, TypedRunnableBaseData<SubmissionState> {
     kind: 'submission'
-    itemIs?: MinimalOrFullFilterJson<SubmissionState>
+    //itemIs?: MinimalOrFullFilterJson<SubmissionState>
 }
+
+export interface CommentCheckConfigData extends CheckConfigData, TypedRunnableBaseData<CommentState> {
+    kind: 'comment'
+    //itemIs?: MinimalOrFullFilterJson<CommentState>
+}
+
+
+/*
+* Can contain actions/rules as:
+*  - full objects
+*  - named string IE "namedRule"
+*
+* Also can contain itemIs/authorIs as full object or named filter
+* */
+export interface CheckConfigHydratedData extends CheckConfigData {
+    rules?: (RuleSetConfigHydratedData | RuleConfigHydratedData)[]
+    actions?: ActionConfigHydratedData[]
+}
+
+export interface SubmissionCheckConfigHydratedData extends CheckConfigHydratedData, TypedRunnableBaseData<SubmissionState> {
+    kind: 'submission'
+}
+
+export interface CommentCheckConfigHydratedData extends CheckConfigHydratedData, TypedRunnableBaseData<CommentState> {
+    kind: 'comment'
+}
+
+/*
+* All actions/rules/filters should now be full objects
+* */
+export interface CheckConfigObject extends Omit<CheckConfigHydratedData, 'itemIs' | 'authorIs'>, StructuredRunnableBase {
+    rules: Array<RuleSetConfigObject | RuleConfigObject>
+    actions: Array<ActionConfigObject>
+}
+
+export interface SubmissionCheckConfigObject extends Omit<CheckConfigObject, 'itemIs' | 'author'>, TypedStructuredRunnableBase<SubmissionState> {
+    kind: 'submission'
+}
+
+export interface CommentCheckConfigObject extends Omit<CheckConfigObject, 'itemIs' | 'author'>, TypedStructuredRunnableBase<CommentState> {
+    kind: 'comment'
+}
+
+export interface CheckJson extends CheckConfigData {
+    rules?: Array<RuleSetConfigObject | RuleConfigObject>
+    actions?: Array<ActionConfigData>
+}
+
+// export interface SubmissionCheckConfigObject extends CheckJson {
+//     kind: 'submission'
+//     itemIs?: MinimalOrFullFilterJson<SubmissionState>
+// }
 
 /**
  * Cache the result of this check based on the comment author and the submission id
@@ -691,33 +754,44 @@ export const userResultCacheDefault: Required<UserResultCacheOptions> = {
     runActions: true,
 }
 
-export interface CommentCheckJson extends CheckJson {
-    kind: 'comment'
-    itemIs?: MinimalOrFullFilterJson<CommentState>
-}
 
-export const asStructuredCommentCheckJson = (val: any): val is CommentCheckStructuredJson => {
+
+// export interface CommentCheckConfigObject extends CheckJson {
+//     kind: 'comment'
+//     itemIs?: MinimalOrFullFilterJson<CommentState>
+// }
+
+
+export const asStructuredCommentCheckJson = (val: any): val is CommentCheckConfigObject => {
     return val.kind === 'comment';
 }
 
-export const asStructuredSubmissionCheckJson = (val: any): val is SubmissionCheckStructuredJson => {
+export const asStructuredSubmissionCheckJson = (val: any): val is SubmissionCheckConfigObject => {
     return val.kind === 'submission';
 }
 
-export type CheckStructuredJson = SubmissionCheckStructuredJson | CommentCheckStructuredJson;
+export type CheckStructuredJson = SubmissionCheckConfigObject | CommentCheckConfigObject;
 // export interface CheckStructuredJson extends CheckJson {
 //     rules: Array<RuleSetObjectJson | RuleObjectJson>
 //     actions: Array<ActionObjectJson>
 // }
 
-export interface SubmissionCheckStructuredJson extends Omit<SubmissionCheckJson, 'authorIs' | 'itemIs' | 'rules'>,  StructuredRunnableBase {
-    rules: Array<StructuredRuleSetObjectJson | StructuredRuleObjectJson>
-    actions: Array<ActionObjectJson>
+export interface SubmissionCheckStructuredJson extends Omit<SubmissionCheckConfigObject, 'authorIs' | 'itemIs' | 'rules'>,  StructuredRunnableBase {
+    rules: Array<StructuredRuleSetConfigObject | StructuredRuleConfigObject>
+    actions: Array<ActionConfigObject>
     itemIs?: MinimalOrFullFilter<SubmissionState>
 }
 
-export interface CommentCheckStructuredJson extends Omit<CommentCheckJson, 'authorIs' | 'itemIs' | 'rules'>, StructuredRunnableBase {
-    rules: Array<StructuredRuleSetObjectJson | StructuredRuleObjectJson>
-    actions: Array<ActionObjectJson>
+export interface CommentCheckStructuredJson extends Omit<CommentCheckConfigObject, 'authorIs' | 'itemIs' | 'rules'>, StructuredRunnableBase {
+    rules: Array<StructuredRuleSetConfigObject | StructuredRuleConfigObject>
+    actions: Array<ActionConfigObject>
     itemIs?: MinimalOrFullFilter<CommentState>
 }
+
+export type ActivityCheckConfigValue = IncludesType | SubmissionCheckConfigData | CommentCheckConfigData;
+
+export type ActivityCheckConfigData = Exclude<ActivityCheckConfigValue, IncludesType>;
+
+export type ActivityCheckConfigHydratedData = SubmissionCheckConfigHydratedData | CommentCheckConfigHydratedData;
+
+export type ActivityCheckObject = SubmissionCheckConfigObject | CommentCheckConfigObject;

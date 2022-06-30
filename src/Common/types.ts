@@ -20,7 +20,8 @@ import {CancelDispatchActionJson} from "../Action/CancelDispatchAction";
 import {ContributorActionJson} from "../Action/ContributorAction";
 import {SentimentRuleJSONConfig} from "../Rule/SentimentRule";
 import {ModNoteActionJson} from "../Action/ModNoteAction";
+import {IncludesType} from "./Infrastructure/Includes";
 
 export type RuleObjectJsonTypes = RecentActivityRuleJSONConfig | RepeatActivityJSONConfig | AuthorRuleJSONConfig | AttributionJSONConfig | HistoryJSONConfig | RegexRuleJSONConfig | RepostRuleJSONConfig | SentimentRuleJSONConfig
 
-export type ActionJson = CommentActionJson | FlairActionJson | ReportActionJson | LockActionJson | RemoveActionJson | ApproveActionJson | BanActionJson | UserNoteActionJson | MessageActionJson | UserFlairActionJson | DispatchActionJson | CancelDispatchActionJson | ContributorActionJson | ModNoteActionJson | string;
+export type ActionJson = CommentActionJson | FlairActionJson | ReportActionJson | LockActionJson | RemoveActionJson | ApproveActionJson | BanActionJson | UserNoteActionJson | MessageActionJson | UserFlairActionJson | DispatchActionJson | CancelDispatchActionJson | ContributorActionJson | ModNoteActionJson | string | IncludesType;

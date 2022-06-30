@@ -6,7 +6,6 @@ import Comment from "snoowrap/dist/objects/Comment";
 import RedditUser from "snoowrap/dist/objects/RedditUser";
 import {DataSource} from "typeorm";
 import {JsonOperatorConfigDocument, YamlOperatorConfigDocument} from "./Config/Operator";
-import {CommentCheckJson, SubmissionCheckJson} from "../Check";
 import {SafeDictionary} from "ts-essentials";
 import {RuleResultEntity} from "./Entities/RuleResultEntity";
 import {Dayjs} from "dayjs";
@@ -1900,8 +1899,6 @@ export interface TextMatchOptions {
      **/
     caseSensitive?: boolean
 }
-
-export type ActivityCheckJson = SubmissionCheckJson | CommentCheckJson;
 
 export interface PostBehaviorOptionConfig {
     recordTo?: RecordOutputOption
