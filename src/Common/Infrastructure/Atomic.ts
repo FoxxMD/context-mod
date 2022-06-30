@@ -260,3 +260,5 @@ export type UserNoteType =
     'botban';
 
 export const userNoteTypes = ['gooduser', 'spamwatch', 'spamwarn', 'abusewarn', 'ban', 'permban', 'botban'];
+
+export type ConfigFragmentValidationFunc = (data: object, fetched: boolean) => boolean;

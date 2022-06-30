@@ -9,7 +9,7 @@ import {
 import {map as mapAsync} from 'async';
 import winston, {Logger} from "winston";
 import as from 'async';
-import fetch from 'node-fetch';
+import fetch, {Response} from 'node-fetch';
 import {
     asActivity,
     asSubmission,
@@ -20,7 +20,7 @@ import {
     createCacheManager,
     escapeRegex,
     FAIL,
-    fetchExternalUrl,
+    fetchExternalResult,
     filterCriteriaSummary,
     formatNumber,
     generateItemFilterHelpers,
@@ -119,7 +119,7 @@ import {
     UserNoteCriteria
 } from "../Common/Infrastructure/Filters/FilterCriteria";
 import {
-    ActivitySource, DurationVal,
+    ActivitySource, ConfigFragmentValidationFunc, DurationVal,
     EventRetentionPolicyRange,
     JoinOperands,
     ModActionType,
@@ -156,6 +156,9 @@ import {
     parseGenericValueOrPercentComparison
 } from "../Common/Infrastructure/Comparisons";
 import {asCreateModNoteData, CreateModNoteData, ModNote, ModNoteRaw} from "./ModNotes/ModNote";
+import {IncludesData} from "../Common/Infrastructure/Includes";
+import {parseFromJsonOrYamlToObject} from "../Common/Config/ConfigUtil";
+import ConfigParseError from "../Utils/ConfigParseError";
 
 export const DEFAULT_FOOTER = '\r\n*****\r\nThis action was performed by [a bot.]({{botLink}}) Mention a moderator or [send a modmail]({{modmailLink}}) if you any ideas, questions, or concerns about this action.';
 
@@ -1641,8 +1644,7 @@ export class SubredditResources {
         return filteredListing;
     }
 
-
-    async getContent(val: string, subredditArg?: Subreddit): Promise<string> {
+    async getExternalResource(val: string, subredditArg?: Subreddit): Promise<{val: string, fromCache: boolean, response?: Response, hash?: string}> {
         const subreddit = subredditArg || this.subreddit;
         let cacheKey;
         const wikiContext = parseWikiContext(val);
@@ -1655,7 +1657,7 @@ export class SubredditResources {
         }
 
         if (cacheKey === undefined) {
-            return val;
+            return {val, fromCache: false, hash: cacheKey};
         }
 
         // try to get cached value first
@@ -1667,13 +1669,14 @@ export class SubredditResources {
             const cachedContent = await this.cache.get(hash);
             if (cachedContent !== undefined && cachedContent !== null) {
                 this.logger.debug(`Content Cache Hit: ${cacheKey}`);
-                return cachedContent as string;
+                return {val, fromCache: true, hash: cacheKey};
             } else {
                 this.stats.cache.content.miss++;
             }
         }
 
         let wikiContent: string;
+        let response: Response | undefined;
 
         // no cache hit, get from source
         if (wikiContext !== undefined) {
@@ -1701,7 +1704,9 @@ export class SubredditResources {
             }
         } else {
             try {
-                wikiContent = await fetchExternalUrl(extUrl as string, this.logger);
+                const [wikiContentVal, responseVal] = await fetchExternalResult(extUrl as string, this.logger);
+                wikiContent = wikiContentVal;
+                response = responseVal;
             } catch (err: any) {
                 const msg = `Error occurred while trying to fetch the url ${extUrl}`;
                 this.logger.error(msg, err);
@@ -1709,11 +1714,107 @@ export class SubredditResources {
             }
         }
 
-        if (this.wikiTTL !== false) {
+        return {val: wikiContent, fromCache: false, response, hash: cacheKey};
+    }
+
+    async getContent(val: string, subredditArg?: Subreddit): Promise<string> {
+        const {val: wikiContent, fromCache, hash} = await this.getExternalResource(val, subredditArg);
+
+        if (!fromCache && hash !== undefined && this.wikiTTL !== false) {
             this.cache.set(hash, wikiContent, {ttl: this.wikiTTL});
         }
 
         return wikiContent;
+    }
+
+    async getConfigFragment<T>(includesData: IncludesData, validateFunc?: ConfigFragmentValidationFunc): Promise<T> {
+
+        const {
+            path,
+            ttl = this.wikiTTL,
+        } = includesData;
+
+        const {val: configStr, fromCache, hash, response} = await this.getExternalResource(path);
+
+        const [format, configObj, jsonErr, yamlErr] = parseFromJsonOrYamlToObject(configStr);
+        if (configObj === undefined) {
+            //this.logger.error(`Could not parse includes URL of '${configStr}' contents as JSON or YAML.`);
+            this.logger.error(yamlErr);
+            this.logger.debug(jsonErr);
+            throw new ConfigParseError(`Could not parse includes URL of '${configStr}' contents as JSON or YAML.`)
+        }
+
+        // if its from cache then we know the data is valid
+        if(fromCache) {
+            return configObj.toJS() as unknown as T;
+        }
+
+        const rawData = configObj.toJS();
+        let validatedData: T;
+        // otherwise now we want to validate it if a function is present
+        if(validateFunc !== undefined) {
+            try {
+               validateFunc(configObj.toJS(), fromCache);
+               validatedData = rawData as unknown as T;
+            } catch (e) {
+                throw e;
+            }
+        } else {
+            validatedData = rawData as unknown as T;
+        }
+
+        let ttlVal: number | false = this.wikiTTL;
+        // never cache
+        if(ttl === false) {
+            return validatedData;
+        } else if(typeof ttl === 'number') {
+            ttlVal = ttl;
+        } else if(ttl === true) {
+            // cache forever
+            ttlVal = 0;
+        } else if(ttl === 'response') {
+            // try to get cache time from response headers, if they exist
+            // otherwise fallback to wiki ttl
+
+            if(response === undefined) {
+                ttlVal = this.wikiTTL;
+            } else {
+                const cc = response.headers.get('cache-control');
+                const ex = response.headers.get('expires');
+                if(cc !== null) {
+                    // response doesn't want to be stored :(
+                    if(null !== cc.match('/no-(cache|store)/i')) {
+                        return validatedData;
+                    }
+                    const matches = cc.match(/max-age=(\d+)/);
+                    if(null === matches) {
+                        // huh? why include max-age but no value?
+                        ttlVal = this.wikiTTL;
+                    } else {
+                        ttlVal = parseInt(matches[1], 10);
+                    }
+                } else if(ex !== null) {
+                    const expDate = dayjs(ex);
+                    if(dayjs.isDayjs(expDate) && expDate.isValid()) {
+                        const seconds = expDate.diff(dayjs(), 'second');
+                        if(seconds < 0) {
+                            // expiration is older than now?? don't cache
+                            return validatedData;
+                        }
+                        ttlVal = seconds;
+                    }
+                } else {
+                    // couldn't get a cache header, fallback
+                    ttlVal = this.wikiTTL;
+                }
+            }
+        }
+
+        if (ttlVal !== false) {
+            this.cache.set(hash as string, configStr, {ttl: ttlVal});
+        }
+
+        return validatedData;
     }
 
     async cacheSubreddits(subs: (Subreddit | string)[]) {

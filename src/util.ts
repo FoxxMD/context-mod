@@ -7,6 +7,7 @@ import {deflateSync, inflateSync} from "zlib";
 import pixelmatch from 'pixelmatch';
 import os from 'os';
 import pathUtil from 'path';
+import {Response} from 'node-fetch';
 import crypto, {createHash} from 'crypto';
 import {
     ActionResult,
@@ -815,7 +816,7 @@ const GIST_REGEX = new RegExp(/.*gist\.github\.com\/.+\/(.+)/i)
 const GH_BLOB_REGEX = new RegExp(/.*github\.com\/(.+)\/(.+)\/blob\/(.+)/i);
 const REGEXR_REGEX = new RegExp(/^.*((regexr\.com)\/[\w\d]+).*$/i);
 const REGEXR_PAGE_REGEX = new RegExp(/(.|[\n\r])+"expression":"(.+)","text"/g);
-export const fetchExternalUrl = async (url: string, logger: (any) = dummyLogger): Promise<string> => {
+export const fetchExternalResult = async (url: string, logger: (any) = dummyLogger): Promise<[string, Response]> => {
     let hadError = false;
     logger.debug(`Attempting to detect resolvable URL for ${url}`);
     let match = url.match(GIST_REGEX);
@@ -845,13 +846,13 @@ export const fetchExternalUrl = async (url: string, logger: (any) = dummyLogger)
                     }
                     const file = data.files[fileKeys[0]];
                     if (file.truncated === false) {
-                        return file.content;
+                        return [file.content, response];
                     }
                     const rawUrl = file.raw_url;
                     logger.debug(`File contents was truncated, retrieving full contents from ${rawUrl}`);
                     try {
                         const rawUrlResponse = await fetch(rawUrl);
-                        return await rawUrlResponse.text();
+                        return [await rawUrlResponse.text(), rawUrlResponse];
                     } catch (err: any) {
                         logger.error('Gist Raw URL Response returned an error, will return response from original URL instead');
                         logger.error(err);
@@ -877,7 +878,7 @@ export const fetchExternalUrl = async (url: string, logger: (any) = dummyLogger)
                 }
                 hadError = true;
             } else {
-                return await response.text();
+                return [await response.text(), response];
             }
         } catch (err: any) {
             logger.error('Response returned an error, will return response from original URL instead');
@@ -921,7 +922,7 @@ export const fetchExternalUrl = async (url: string, logger: (any) = dummyLogger)
         }
         throw new Error(`Response was not OK: ${response.statusText}`);
     }
-    return await response.text();
+    return [await response.text(), response];
 }
 
 export interface RetryOptions {

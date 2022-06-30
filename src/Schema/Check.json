@@ -1228,6 +1228,9 @@
                     "items": {
                         "anyOf": [
                             {
+                                "$ref": "#/definitions/IncludesData"
+                            },
+                            {
                                 "$ref": "#/definitions/FlairActionJson"
                             },
                             {
@@ -1268,9 +1271,6 @@
                             },
                             {
                                 "$ref": "#/definitions/ModNoteActionJson"
-                            },
-                            {
-                                "$ref": "#/definitions/IncludesData"
                             },
                             {
                                 "type": "string"
@@ -1417,6 +1417,9 @@
                     "items": {
                         "anyOf": [
                             {
+                                "$ref": "#/definitions/IncludesData"
+                            },
+                            {
                                 "$ref": "#/definitions/RecentActivityRuleJSONConfig"
                             },
                             {
@@ -1439,9 +1442,6 @@
                             },
                             {
                                 "$ref": "#/definitions/SentimentRuleJSONConfig"
-                            },
-                            {
-                                "$ref": "#/definitions/IncludesData"
                             },
                             {
                                 "$ref": "#/definitions/RuleSetConfigData"
@@ -2797,15 +2797,26 @@
         "IncludesData": {
             "properties": {
                 "path": {
+                    "description": "The special-form path to the config fragment to retrieve.\n\nIf value starts with `wiki:` then the proceeding value will be used to get a wiki page from the current subreddit\n\n * EX `wiki:botconfig/mybot` tries to get `https://reddit.com/r/currentSubreddit/wiki/botconfig/mybot`\n\nIf the value starts with `wiki:` and ends with `|someValue` then `someValue` will be used as the base subreddit for the wiki page\n\n* EX `wiki:replytemplates/test|ContextModBot` tries to get `https://reddit.com/r/ContextModBot/wiki/replytemplates/test`\n\nIf the value starts with `url:` then the value is fetched as an external url and expects raw text returned\n\n* EX `url:https://pastebin.com/raw/38qfL7mL` tries to get the text response of `https://pastebin.com/raw/38qfL7mL`",
                     "type": "string"
                 },
                 "ttl": {
-                    "type": [
-                        "number",
-                        "boolean"
-                    ]
+                    "anyOf": [
+                        {
+                            "enum": [
+                                false,
+                                "response",
+                                true
+                            ]
+                        },
+                        {
+                            "type": "number"
+                        }
+                    ],
+                    "description": "Control caching for the config fragment.\n\nIf not specified the value for `wikiTTL` will be used\n\n* If true then value is cached forever\n* If false then value is never cached\n* If a number then the number of seconds to cache value\n* If 'response' then CM will attempt to use Cache-Control or Expires headers from the response to determine how long to cache the value"
                 },
                 "type": {
+                    "description": "An unused hint about the content type. Not implemented yet",
                     "enum": [
                         "json",
                         "yaml"
@@ -4680,6 +4691,9 @@
                     "items": {
                         "anyOf": [
                             {
+                                "$ref": "#/definitions/IncludesData"
+                            },
+                            {
                                 "$ref": "#/definitions/RecentActivityRuleJSONConfig"
                             },
                             {
@@ -4702,9 +4716,6 @@
                             },
                             {
                                 "$ref": "#/definitions/SentimentRuleJSONConfig"
-                            },
-                            {
-                                "$ref": "#/definitions/IncludesData"
                             },
                             {
                                 "type": "string"
@@ -4987,6 +4998,9 @@
                     "items": {
                         "anyOf": [
                             {
+                                "$ref": "#/definitions/IncludesData"
+                            },
+                            {
                                 "$ref": "#/definitions/FlairActionJson"
                             },
                             {
@@ -5027,9 +5041,6 @@
                             },
                             {
                                 "$ref": "#/definitions/ModNoteActionJson"
-                            },
-                            {
-                                "$ref": "#/definitions/IncludesData"
                             },
                             {
                                 "type": "string"
@@ -5176,6 +5187,9 @@
                     "items": {
                         "anyOf": [
                             {
+                                "$ref": "#/definitions/IncludesData"
+                            },
+                            {
                                 "$ref": "#/definitions/RecentActivityRuleJSONConfig"
                             },
                             {
@@ -5198,9 +5212,6 @@
                             },
                             {
                                 "$ref": "#/definitions/SentimentRuleJSONConfig"
-                            },
-                            {
-                                "$ref": "#/definitions/IncludesData"
                             },
                             {
                                 "$ref": "#/definitions/RuleSetConfigData"

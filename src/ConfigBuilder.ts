@@ -74,7 +74,7 @@ import {ErrorWithCause} from "pony-cause";
 import {RunConfigHydratedData, RunConfigData, RunConfigObject} from "./Run";
 import {AuthorRuleConfig} from "./Rule/AuthorRule";
 import {
-    CacheProvider, ConfigFormat,
+    CacheProvider, ConfigFormat, ConfigFragmentValidationFunc,
     PollOn
 } from "./Common/Infrastructure/Atomic";
 import {
@@ -167,7 +167,7 @@ export class ConfigBuilder {
         return validateJson<SubredditConfigData>(config, appSchema, this.logger);
     }
 
-    async hydrateIncludes(val: IncludesData | string | object, resource: SubredditResources): Promise<object | string> {
+    async hydrateIncludes<T>(val: IncludesData | string | object, resource: SubredditResources, validateFunc?: ConfigFragmentValidationFunc): Promise<T | string> {
         let includes: IncludesData | undefined = undefined;
         if(typeof val === 'string' && (parseWikiContext(val) || parseExternalUrl(val))) {
             includes = {
@@ -178,19 +178,10 @@ export class ConfigBuilder {
         }
 
         if(includes === undefined) {
-            return val;
+            return val as unknown as T;
         }
 
-        const includesStr = await resource.getContent(includes.path);
-
-        const [format, configObj, jsonErr, yamlErr] = parseFromJsonOrYamlToObject(includesStr);
-        if (configObj === undefined) {
-            this.logger.error(`Could not parse includes URL of '${includes.path}' contents as JSON or YAML.`);
-            this.logger.error(yamlErr);
-            this.logger.debug(jsonErr);
-            throw new ConfigParseError(`Could not parse includes URL of '${includes.path}' contents as JSON or YAML.`)
-        }
-        return configObj.toJS();
+       return await resource.getConfigFragment(includes, validateFunc);
     }
 
     async hydrateConfig(config: SubredditConfigData, resource: SubredditResources): Promise<SubredditConfigHydratedData> {
@@ -216,26 +207,39 @@ export class ConfigBuilder {
         let runIndex = 1;
         for(const r of realRuns) {
 
-            const hydratedRunVal = await this.hydrateIncludes(r, resource);
+            const hydratedRunVal = await this.hydrateIncludes(r, resource, <RunConfigData>(data: object, fetched: boolean) => {
+                if(fetched) {
+                    validateJson<RunConfigData>(data, runSchema, this.logger);
+                    return true;
+                }
+                return true;
+            });
 
             if(typeof hydratedRunVal === 'string') {
                 throw new ConfigParseError(`Run #${runIndex} was not in a recognized include format. Given: ${hydratedRunVal}`);
             }
 
             // validate run with unhydrated checks
-            const preValidatedRun = validateJson<RunConfigData>(hydratedRunVal, runSchema, this.logger);
+            const preValidatedRun = hydratedRunVal as RunConfigData;
 
             const {checks, ...rest} = preValidatedRun;
 
             const hydratedChecks: CheckConfigHydratedData[] = [];
             let checkIndex = 1;
             for(const c of preValidatedRun.checks) {
-                const hydratedCheckData = await this.hydrateIncludes(c, resource);
+                const hydratedCheckData = await this.hydrateIncludes(c, resource, (data: object, fetched: boolean) => {
+                    if(fetched) {
+                        validateJson<ActivityCheckConfigHydratedData>(data, runSchema, this.logger);
+                        return true;
+                    }
+                    return true;
+                });
+
                 if(typeof hydratedCheckData === 'string') {
                     throw new ConfigParseError(`Check #${checkIndex} in Run #${runIndex} was not in a recognized include format. Given: ${hydratedCheckData}`);
                 }
 
-                const preValidatedCheck = validateJson<ActivityCheckConfigHydratedData>(hydratedCheckData, checkSchema, this.logger);
+                const preValidatedCheck = hydratedCheckData as ActivityCheckConfigHydratedData;
 
                 const {rules, actions, ...rest} = preValidatedCheck;
                 const hydratedCheckConfigData: CheckConfigHydratedData = rest;
@@ -244,7 +248,7 @@ export class ConfigBuilder {
                     const hydratedRulesOrSets: (RuleSetConfigHydratedData | RuleConfigHydratedData)[] = [];
 
                     for(const r of rules) {
-                        const hydratedRuleOrSet = await this.hydrateIncludes(r, resource);
+                        const hydratedRuleOrSet = await this.hydrateIncludes(r, resource) as RuleConfigHydratedData | RuleSetConfigHydratedData;
                         if(typeof hydratedRuleOrSet === 'string') {
                             hydratedRulesOrSets.push(hydratedRuleOrSet);
                         } else if (isRuleSetJSON(hydratedRuleOrSet)) {
