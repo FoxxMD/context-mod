@@ -1649,7 +1649,7 @@ export class SubredditResources {
         let cacheKey;
         const wikiContext = parseWikiContext(val);
         if (wikiContext !== undefined) {
-            cacheKey = `${wikiContext.wiki}${wikiContext.subreddit !== undefined ? `|${wikiContext.subreddit}` : ''}`;
+            cacheKey = `${subreddit.display_name}-content-${wikiContext.wiki}${wikiContext.subreddit !== undefined ? `|${wikiContext.subreddit}` : ''}`;
         }
         const extUrl = wikiContext === undefined ? parseExternalUrl(val) : undefined;
         if (extUrl !== undefined) {
@@ -1661,15 +1661,14 @@ export class SubredditResources {
         }
 
         // try to get cached value first
-        let hash = `${subreddit.display_name}-content-${cacheKey}`;
         if (this.wikiTTL !== false) {
             await this.stats.cache.content.identifierRequestCount.set(cacheKey, (await this.stats.cache.content.identifierRequestCount.wrap(cacheKey, () => 0) as number) + 1);
             this.stats.cache.content.requestTimestamps.push(Date.now());
             this.stats.cache.content.requests++;
-            const cachedContent = await this.cache.get(hash);
+            const cachedContent = await this.cache.get(cacheKey);
             if (cachedContent !== undefined && cachedContent !== null) {
                 this.logger.debug(`Content Cache Hit: ${cacheKey}`);
-                return {val, fromCache: true, hash: cacheKey};
+                return {val: cachedContent as string, fromCache: true, hash: cacheKey};
             } else {
                 this.stats.cache.content.miss++;
             }
@@ -1746,6 +1745,7 @@ export class SubredditResources {
 
         // if its from cache then we know the data is valid
         if(fromCache) {
+            this.logger.verbose(`Got Config Fragment ${path} from cache`);
             return configObj.toJS() as unknown as T;
         }
 
