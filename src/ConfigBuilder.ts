@@ -207,84 +207,110 @@ export class ConfigBuilder {
         let runIndex = 1;
         for(const r of realRuns) {
 
-            const hydratedRunVal = await this.hydrateIncludes(r, resource, <RunConfigData>(data: object, fetched: boolean) => {
+            const hydratedRunValResult = await this.hydrateIncludes(r, resource, <RunConfigData>(data: object, fetched: boolean) => {
                 if(fetched) {
-                    validateJson<RunConfigData>(data, runSchema, this.logger);
+                    if(Array.isArray(data)) {
+                        for(const runData of data) {
+                            validateJson<RunConfigData>(runData, runSchema, this.logger);
+                        }
+                    } else {
+                        validateJson<RunConfigData>(data, runSchema, this.logger);
+                    }
                     return true;
                 }
                 return true;
             });
 
-            if(typeof hydratedRunVal === 'string') {
-                throw new ConfigParseError(`Run #${runIndex} was not in a recognized include format. Given: ${hydratedRunVal}`);
-            }
+            const hydratedRunArr = Array.isArray(hydratedRunValResult) ? hydratedRunValResult : [hydratedRunValResult];
 
-            // validate run with unhydrated checks
-            const preValidatedRun = hydratedRunVal as RunConfigData;
-
-            const {checks, ...rest} = preValidatedRun;
-
-            const hydratedChecks: CheckConfigHydratedData[] = [];
-            let checkIndex = 1;
-            for(const c of preValidatedRun.checks) {
-                const hydratedCheckData = await this.hydrateIncludes(c, resource, (data: object, fetched: boolean) => {
-                    if(fetched) {
-                        validateJson<ActivityCheckConfigHydratedData>(data, runSchema, this.logger);
-                        return true;
-                    }
-                    return true;
-                });
-
-                if(typeof hydratedCheckData === 'string') {
-                    throw new ConfigParseError(`Check #${checkIndex} in Run #${runIndex} was not in a recognized include format. Given: ${hydratedCheckData}`);
+            for(const hydratedRunVal of hydratedRunArr) {
+                if (typeof hydratedRunVal === 'string') {
+                    throw new ConfigParseError(`Run #${runIndex} was not in a recognized include format. Given: ${hydratedRunVal}`);
                 }
 
-                const preValidatedCheck = hydratedCheckData as ActivityCheckConfigHydratedData;
+                // validate run with unhydrated checks
+                const preValidatedRun = hydratedRunVal as RunConfigData;
 
-                const {rules, actions, ...rest} = preValidatedCheck;
-                const hydratedCheckConfigData: CheckConfigHydratedData = rest;
+                const {checks, ...rest} = preValidatedRun;
 
-                if(rules !== undefined) {
-                    const hydratedRulesOrSets: (RuleSetConfigHydratedData | RuleConfigHydratedData)[] = [];
-
-                    for(const r of rules) {
-                        const hydratedRuleOrSet = await this.hydrateIncludes(r, resource) as RuleConfigHydratedData | RuleSetConfigHydratedData;
-                        if(typeof hydratedRuleOrSet === 'string') {
-                            hydratedRulesOrSets.push(hydratedRuleOrSet);
-                        } else if (isRuleSetJSON(hydratedRuleOrSet)) {
-                            const hydratedRulesetRules: (string | RuleConfigHydratedData)[] = [];
-                            for(const rsr of (hydratedRuleOrSet as RuleSetConfigData).rules) {
-                                const hydratedRuleSetRule = await this.hydrateIncludes(rsr, resource);
-                                // either a string or rule data at this point
-                                // we will validate the whole check again so this rule will be validated eventually
-                                hydratedRulesetRules.push(hydratedRuleSetRule as RuleConfigHydratedData)
+                const hydratedChecks: CheckConfigHydratedData[] = [];
+                let checkIndex = 1;
+                for (const c of preValidatedRun.checks) {
+                    const hydratedCheckDataResult = await this.hydrateIncludes(c, resource, (data: object, fetched: boolean) => {
+                        if (fetched) {
+                            if (Array.isArray(data)) {
+                                for (const checkObj of data) {
+                                    validateJson<ActivityCheckConfigHydratedData>(checkObj, checkSchema, this.logger);
+                                }
+                            } else {
+                                validateJson<ActivityCheckConfigHydratedData>(data, checkSchema, this.logger);
                             }
-                            hydratedRuleOrSet.rules = hydratedRulesetRules;
-                            hydratedRulesOrSets.push(hydratedRuleOrSet as RuleSetConfigHydratedData);
-                        } else {
-                            hydratedRulesOrSets.push(hydratedRuleOrSet as RuleConfigHydratedData);
+                            return true;
                         }
+                        return true;
+                    });
+
+                    const hydratedCheckDataArr = Array.isArray(hydratedCheckDataResult) ? hydratedCheckDataResult : [hydratedCheckDataResult];
+                    for (const hydratedCheckData of hydratedCheckDataArr) {
+                        if (typeof hydratedCheckData === 'string') {
+                            throw new ConfigParseError(`Check #${checkIndex} in Run #${runIndex} was not in a recognized include format. Given: ${hydratedCheckData}`);
+                        }
+
+                        const preValidatedCheck = hydratedCheckData as ActivityCheckConfigHydratedData;
+
+                        const {rules, actions, ...rest} = preValidatedCheck;
+                        const hydratedCheckConfigData: CheckConfigHydratedData = rest;
+
+                        if (rules !== undefined) {
+                            const hydratedRulesOrSets: (RuleSetConfigHydratedData | RuleConfigHydratedData)[] = [];
+
+                            for (const r of rules) {
+                                const hydratedRuleOrSetResult = await this.hydrateIncludes(r, resource) as RuleConfigHydratedData | RuleSetConfigHydratedData | (RuleConfigHydratedData | RuleSetConfigHydratedData)[];
+                                const hydratedRuleOrSetArr = Array.isArray(hydratedRuleOrSetResult) ? hydratedRuleOrSetResult : [hydratedRuleOrSetResult];
+                                for (const hydratedRuleOrSet of hydratedRuleOrSetArr) {
+                                    if (typeof hydratedRuleOrSet === 'string') {
+                                        hydratedRulesOrSets.push(hydratedRuleOrSet);
+                                    } else if (isRuleSetJSON(hydratedRuleOrSet)) {
+                                        const hydratedRulesetRules: (string | RuleConfigHydratedData)[] = [];
+                                        for (const rsr of (hydratedRuleOrSet as RuleSetConfigData).rules) {
+                                            const hydratedRuleSetRule = await this.hydrateIncludes(rsr, resource);
+                                            // either a string or rule data at this point
+                                            // we will validate the whole check again so this rule will be validated eventually
+                                            hydratedRulesetRules.push(hydratedRuleSetRule as RuleConfigHydratedData)
+                                        }
+                                        hydratedRuleOrSet.rules = hydratedRulesetRules;
+                                        hydratedRulesOrSets.push(hydratedRuleOrSet as RuleSetConfigHydratedData);
+                                    } else {
+                                        hydratedRulesOrSets.push(hydratedRuleOrSet as RuleConfigHydratedData);
+                                    }
+                                }
+                            }
+                            hydratedCheckConfigData.rules = hydratedRulesOrSets;
+                        }
+
+                        if (actions !== undefined) {
+                            const hydratedActions: ActionConfigHydratedData[] = [];
+
+                            for (const a of actions) {
+                                const hydratedActionResult = await this.hydrateIncludes(a, resource) as ActionConfigHydratedData | ActionConfigHydratedData[];
+                                const hydratedActionArr = Array.isArray(hydratedActionResult) ? hydratedActionResult : [hydratedActionResult];
+                                for (const hydratedAction of hydratedActionArr) {
+                                    hydratedActions.push(hydratedAction);
+                                }
+                            }
+                            hydratedCheckConfigData.actions = hydratedActions;
+                        }
+
+                        hydratedChecks.push(hydratedCheckConfigData);
+                        checkIndex++;
                     }
-                    hydratedCheckConfigData.rules = hydratedRulesOrSets;
                 }
 
-                if(actions !== undefined) {
-                    const hydratedActions: ActionConfigHydratedData[] = [];
+                const hydratedRun: RunConfigHydratedData = {...rest, checks: hydratedChecks};
 
-                    for(const a of actions) {
-                        const hydratedAction = await this.hydrateIncludes(a, resource);
-                        hydratedActions.push(hydratedAction as (string | ActionConfigHydratedData));
-                    }
-                    hydratedCheckConfigData.actions = hydratedActions;
-                }
-
-                hydratedChecks.push(hydratedCheckConfigData);
-                checkIndex++;
+                hydratedRuns.push(hydratedRun);
+                runIndex++;
             }
-
-            const hydratedRun: RunConfigHydratedData = {...rest, checks: hydratedChecks};
-
-            hydratedRuns.push(hydratedRun);
         }
 
         const hydratedConfig: SubredditConfigHydratedData = {...restConfig, runs: hydratedRuns};
