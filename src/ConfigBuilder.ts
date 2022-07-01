@@ -1,12 +1,12 @@
 import winston, {Logger} from "winston";
 import {
-    asNamedCriteria,
+    asNamedCriteria, asWikiContext,
     buildCachePrefix, buildFilter, castToBool,
     createAjvFactory, fileOrDirectoryIsWriteable,
     mergeArr, mergeFilters,
     normalizeName,
     overwriteMerge,
-    parseBool, parseExternalUrl, parseWikiContext, randomId,
+    parseBool, parseExternalUrl, parseUrlContext, parseWikiContext, randomId,
     readConfigFile,
     removeUndefinedKeys, resolvePathFromEnvWithRelative
 } from "./util";
@@ -69,7 +69,7 @@ import {
     YamlOperatorConfigDocument
 } from "./Common/Config/Operator";
 import {Document as YamlDocument} from "yaml";
-import {SimpleError} from "./Utils/Errors";
+import {CMError, SimpleError} from "./Utils/Errors";
 import {ErrorWithCause} from "pony-cause";
 import {RunConfigHydratedData, RunConfigData, RunConfigObject} from "./Run";
 import {AuthorRuleConfig} from "./Rule/AuthorRule";
@@ -159,7 +159,7 @@ export class ConfigBuilder {
 
     constructor(options: ConfigBuilderOptions) {
 
-        this.configLogger = options.logger.child({leaf: 'Config'}, mergeArr);
+        this.configLogger = options.logger.child({labels: ['Config']}, mergeArr);
         this.logger = options.logger;
     }
 
@@ -167,21 +167,39 @@ export class ConfigBuilder {
         return validateJson<SubredditConfigData>(config, appSchema, this.logger);
     }
 
-    async hydrateIncludes<T>(val: IncludesData | string | object, resource: SubredditResources, validateFunc?: ConfigFragmentValidationFunc): Promise<T | string> {
+    async hydrateConfigFragment<T>(val: IncludesData | string | object, resource: SubredditResources, validateFunc?: ConfigFragmentValidationFunc): Promise<T[]> {
         let includes: IncludesData | undefined = undefined;
-        if(typeof val === 'string' && (parseWikiContext(val) || parseExternalUrl(val))) {
-            includes = {
-                path: val as IncludesString
-            };
+        if(typeof val === 'string') {
+            const strContextResult = parseUrlContext(val);
+            if(strContextResult !== undefined) {
+                this.configLogger.debug(`Detected ${asWikiContext(strContextResult) !== undefined ? 'REDDIT WIKI' : 'URL'} type Config Fragment from string: ${val}`);
+                includes = {
+                    path: val as IncludesString
+                };
+            } else {
+                this.configLogger.debug(`Did not detect Config Fragment as a URL resource: ${val}`);
+            }
         } else if (asIncludesData(val)) {
             includes = val;
+            const strContextResult = parseUrlContext(val.path);
+            if(strContextResult === undefined) {
+                throw new ConfigParseError(`Could not detect Config Fragment path as a valid URL Resource. Resource must be prefixed with either 'url:' or 'wiki:' -- ${val.path}`);
+            }
         }
 
         if(includes === undefined) {
-            return val as unknown as T;
+            if(Array.isArray(val)) {
+                return val as unknown as T[];
+            } else {
+                return [val as unknown as T];
+            }
         }
 
-       return await resource.getConfigFragment(includes, validateFunc);
+       const resolvedFragment = await resource.getConfigFragment(includes, validateFunc);
+        if(Array.isArray(resolvedFragment)) {
+            return resolvedFragment
+        }
+        return [resolvedFragment as T];
     }
 
     async hydrateConfig(config: SubredditConfigData, resource: SubredditResources): Promise<SubredditConfigHydratedData> {
@@ -207,25 +225,29 @@ export class ConfigBuilder {
         let runIndex = 1;
         for(const r of realRuns) {
 
-            const hydratedRunValResult = await this.hydrateIncludes(r, resource, <RunConfigData>(data: object, fetched: boolean) => {
-                if(fetched) {
-                    if(Array.isArray(data)) {
-                        for(const runData of data) {
-                            validateJson<RunConfigData>(runData, runSchema, this.logger);
+            let hydratedRunArr: RunConfigData | RunConfigData[];
+
+            try {
+                hydratedRunArr = await this.hydrateConfigFragment<RunConfigData>(r, resource, <RunConfigData>(data: object, fetched: boolean) => {
+                    if (fetched) {
+                        if (Array.isArray(data)) {
+                            for (const runData of data) {
+                                validateJson<RunConfigData>(runData, runSchema, this.logger);
+                            }
+                        } else {
+                            validateJson<RunConfigData>(data, runSchema, this.logger);
                         }
-                    } else {
-                        validateJson<RunConfigData>(data, runSchema, this.logger);
+                        return true;
                     }
                     return true;
-                }
-                return true;
-            });
-
-            const hydratedRunArr = Array.isArray(hydratedRunValResult) ? hydratedRunValResult : [hydratedRunValResult];
+                });
+            } catch (e: any) {
+                throw new CMError(`Could not fetch or validate Run #${runIndex}`, {cause: e});
+            }
 
             for(const hydratedRunVal of hydratedRunArr) {
                 if (typeof hydratedRunVal === 'string') {
-                    throw new ConfigParseError(`Run #${runIndex} was not in a recognized include format. Given: ${hydratedRunVal}`);
+                    throw new ConfigParseError(`Run Config Fragment #${runIndex} was not in a recognized Config Fragment format. Given: ${hydratedRunVal}`);
                 }
 
                 // validate run with unhydrated checks
@@ -236,21 +258,26 @@ export class ConfigBuilder {
                 const hydratedChecks: CheckConfigHydratedData[] = [];
                 let checkIndex = 1;
                 for (const c of preValidatedRun.checks) {
-                    const hydratedCheckDataResult = await this.hydrateIncludes(c, resource, (data: object, fetched: boolean) => {
-                        if (fetched) {
-                            if (Array.isArray(data)) {
-                                for (const checkObj of data) {
-                                    validateJson<ActivityCheckConfigHydratedData>(checkObj, checkSchema, this.logger);
+                    let hydratedCheckDataArr: ActivityCheckConfigHydratedData[];
+
+                    try {
+                        hydratedCheckDataArr = await this.hydrateConfigFragment<ActivityCheckConfigHydratedData>(c, resource, (data: object, fetched: boolean) => {
+                            if (fetched) {
+                                if (Array.isArray(data)) {
+                                    for (const checkObj of data) {
+                                        validateJson<ActivityCheckConfigHydratedData>(checkObj, checkSchema, this.logger);
+                                    }
+                                } else {
+                                    validateJson<ActivityCheckConfigHydratedData>(data, checkSchema, this.logger);
                                 }
-                            } else {
-                                validateJson<ActivityCheckConfigHydratedData>(data, checkSchema, this.logger);
+                                return true;
                             }
                             return true;
-                        }
-                        return true;
-                    });
+                        });
+                    } catch (e: any) {
+                        throw new CMError(`Could not fetch or validate Check Config Fragment #${checkIndex} in Run #${runIndex}`, {cause: e});
+                    }
 
-                    const hydratedCheckDataArr = Array.isArray(hydratedCheckDataResult) ? hydratedCheckDataResult : [hydratedCheckDataResult];
                     for (const hydratedCheckData of hydratedCheckDataArr) {
                         if (typeof hydratedCheckData === 'string') {
                             throw new ConfigParseError(`Check #${checkIndex} in Run #${runIndex} was not in a recognized include format. Given: ${hydratedCheckData}`);
@@ -264,25 +291,33 @@ export class ConfigBuilder {
                         if (rules !== undefined) {
                             const hydratedRulesOrSets: (RuleSetConfigHydratedData | RuleConfigHydratedData)[] = [];
 
+                            let ruleIndex = 1;
                             for (const r of rules) {
-                                const hydratedRuleOrSetResult = await this.hydrateIncludes(r, resource) as RuleConfigHydratedData | RuleSetConfigHydratedData | (RuleConfigHydratedData | RuleSetConfigHydratedData)[];
-                                const hydratedRuleOrSetArr = Array.isArray(hydratedRuleOrSetResult) ? hydratedRuleOrSetResult : [hydratedRuleOrSetResult];
+                                let hydratedRuleOrSetArr: (RuleConfigHydratedData | RuleSetConfigHydratedData)[];
+                                try {
+                                    hydratedRuleOrSetArr = await this.hydrateConfigFragment<(RuleSetConfigHydratedData | RuleConfigHydratedData)>(r, resource);
+                                } catch (e: any) {
+                                    throw new CMError(`Rule Config Fragment #${ruleIndex} in Check #${checkIndex} could not be fetched`, {cause: e});
+                                }
                                 for (const hydratedRuleOrSet of hydratedRuleOrSetArr) {
                                     if (typeof hydratedRuleOrSet === 'string') {
                                         hydratedRulesOrSets.push(hydratedRuleOrSet);
                                     } else if (isRuleSetJSON(hydratedRuleOrSet)) {
-                                        const hydratedRulesetRules: (string | RuleConfigHydratedData)[] = [];
-                                        for (const rsr of (hydratedRuleOrSet as RuleSetConfigData).rules) {
-                                            const hydratedRuleSetRule = await this.hydrateIncludes(rsr, resource);
-                                            // either a string or rule data at this point
-                                            // we will validate the whole check again so this rule will be validated eventually
-                                            hydratedRulesetRules.push(hydratedRuleSetRule as RuleConfigHydratedData)
+                                        const hydratedRulesetRules: RuleConfigHydratedData[] = [];
+                                        for (const rsr of hydratedRuleOrSet.rules) {
+                                            const hydratedRuleSetRuleArr = await this.hydrateConfigFragment<RuleConfigHydratedData>(rsr, resource);
+                                            for(const rsrData of hydratedRuleSetRuleArr) {
+                                                // either a string or rule data at this point
+                                                // we will validate the whole check again so this rule will be validated eventually
+                                                hydratedRulesetRules.push(rsrData)
+                                            }
                                         }
                                         hydratedRuleOrSet.rules = hydratedRulesetRules;
-                                        hydratedRulesOrSets.push(hydratedRuleOrSet as RuleSetConfigHydratedData);
+                                        hydratedRulesOrSets.push(hydratedRuleOrSet);
                                     } else {
-                                        hydratedRulesOrSets.push(hydratedRuleOrSet as RuleConfigHydratedData);
+                                        hydratedRulesOrSets.push(hydratedRuleOrSet);
                                     }
+                                    ruleIndex++;
                                 }
                             }
                             hydratedCheckConfigData.rules = hydratedRulesOrSets;
@@ -291,11 +326,17 @@ export class ConfigBuilder {
                         if (actions !== undefined) {
                             const hydratedActions: ActionConfigHydratedData[] = [];
 
+                            let actionIndex = 1;
                             for (const a of actions) {
-                                const hydratedActionResult = await this.hydrateIncludes(a, resource) as ActionConfigHydratedData | ActionConfigHydratedData[];
-                                const hydratedActionArr = Array.isArray(hydratedActionResult) ? hydratedActionResult : [hydratedActionResult];
+                                let hydratedActionArr: ActionConfigHydratedData[];
+                                try {
+                                    hydratedActionArr = await this.hydrateConfigFragment<ActionConfigHydratedData>(a, resource);
+                                } catch (e: any) {
+                                    throw new CMError(`Action Config Fragment #${actionIndex} in Check #${checkIndex} could not be fetched`, {cause: e});
+                                }
                                 for (const hydratedAction of hydratedActionArr) {
                                     hydratedActions.push(hydratedAction);
+                                    actionIndex++;
                                 }
                             }
                             hydratedCheckConfigData.actions = hydratedActions;

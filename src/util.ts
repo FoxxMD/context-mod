@@ -74,14 +74,15 @@ import {
     ActivitySourceTypes,
     CacheProvider,
     ConfigFormat,
-    DurationVal,
+    DurationVal, ExternalUrlContext,
     ModUserNoteLabel,
     modUserNoteLabels,
     RedditEntity,
     RedditEntityType,
     statFrequencies,
     StatisticFrequency,
-    StatisticFrequencyOption
+    StatisticFrequencyOption, UrlContext,
+    WikiContext
 } from "./Common/Infrastructure/Atomic";
 import {
     AuthorOptions,
@@ -785,7 +786,7 @@ const WIKI_REGEX_URL = 'https://regexr.com/61bq1';
 const URL_REGEX: RegExp = /^\s*url:(?<url>[^\s]+)\s*$/;
 const URL_REGEX_URL = 'https://regexr.com/61bqd';
 
-export const parseWikiContext = (val: string) => {
+export const parseWikiContext = (val: string): WikiContext | undefined => {
     const matches = val.match(WIKI_REGEX);
     if (matches === null) {
         return undefined;
@@ -803,6 +804,34 @@ export const parseExternalUrl = (val: string) => {
         return undefined;
     }
     return (matches.groups as any).url as string;
+}
+
+export const parseUrlContext = (val: string): UrlContext | undefined => {
+    const wiki = parseWikiContext(val);
+    if(wiki !== undefined) {
+        return {
+            value: val,
+            context: wiki
+        }
+    }
+    const urlContext = parseExternalUrl(val);
+    if(urlContext !== undefined) {
+        return {
+            value: val,
+            context: {
+                url: urlContext
+            }
+        }
+    }
+    return undefined;
+}
+
+export const asWikiContext = (val: object): val is WikiContext => {
+    return val !== null && typeof val === 'object' && 'wiki' in val;
+}
+
+export const asExtUrlContext = (val: object): val is ExternalUrlContext => {
+    return val !== null && typeof val === 'object' && 'url' in val;
 }
 
 export const dummyLogger = {
@@ -827,9 +856,9 @@ export const fetchExternalResult = async (url: string, logger: (any) = dummyLogg
         try {
             const response = await fetch(gistApiUrl);
             if (!response.ok) {
-                logger.error(`Response was not OK from Gist API (${response.statusText}) -- will return response from original URL instead`);
+                logger.warn(`Response was not OK from Gist API (${response.statusText}) -- will return response from original URL instead`);
                 if (response.size > 0) {
-                    logger.error(await response.text())
+                    logger.warn(await response.text())
                 }
                 hadError = true;
             } else {
