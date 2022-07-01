@@ -6374,11 +6374,11 @@
                     "type": "string"
                 },
                 "type": {
-                    "$ref": "#/definitions/UserNoteType",
                     "description": "User Note type key",
                     "examples": [
                         "spamwarn"
-                    ]
+                    ],
+                    "type": "string"
                 }
             },
             "required": [
@@ -6423,18 +6423,6 @@
                 "type"
             ],
             "type": "object"
-        },
-        "UserNoteType": {
-            "enum": [
-                "abusewarn",
-                "ban",
-                "botban",
-                "gooduser",
-                "permban",
-                "spamwarn",
-                "spamwatch"
-            ],
-            "type": "string"
         },
         "UserResultCacheOptions": {
             "description": "Cache the result of this check based on the comment author and the submission id\n\nThis is useful in this type of scenario:\n\n1. This check is configured to run on comments for specific submissions with high volume activity\n2. The rules being run are not dependent on the content of the comment\n3. The rule results are not likely to change while cache is valid",

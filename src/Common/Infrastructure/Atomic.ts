@@ -257,7 +257,8 @@ export type UserNoteType =
     'abusewarn' |
     'ban' |
     'permban' |
-    'botban';
+    'botban' |
+    string;
 
 export const userNoteTypes = ['gooduser', 'spamwatch', 'spamwarn', 'abusewarn', 'ban', 'permban', 'botban'];
 

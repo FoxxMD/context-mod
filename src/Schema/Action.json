@@ -2681,11 +2681,11 @@
                     "type": "string"
                 },
                 "type": {
-                    "$ref": "#/definitions/UserNoteType",
                     "description": "User Note type key",
                     "examples": [
                         "spamwarn"
-                    ]
+                    ],
+                    "type": "string"
                 }
             },
             "required": [
@@ -2730,18 +2730,6 @@
                 "type"
             ],
             "type": "object"
-        },
-        "UserNoteType": {
-            "enum": [
-                "abusewarn",
-                "ban",
-                "botban",
-                "gooduser",
-                "permban",
-                "spamwarn",
-                "spamwatch"
-            ],
-            "type": "string"
         }
     }
 }
