@@ -179,8 +179,11 @@ class Bot {
 
         this.logger.stream().on('log', (log: LogInfo) => {
             if(log.bot !== undefined && log.bot === this.getBotName() && log.subreddit === undefined) {
-                const combinedLogs = [log, ...this.logs];
-                this.logs = combinedLogs.slice(0, 301);
+                this.logs.unshift(log);
+                if(this.logs.length > 300) {
+                    // remove all elements starting from the 300th index (301st item)
+                    this.logs.splice(300);
+                }
             }
         });
 

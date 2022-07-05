@@ -324,7 +324,11 @@ export class Manager extends EventEmitter implements RunningStates {
         }, mergeArr);
         this.logger.stream().on('log', (log: LogInfo) => {
             if(log.subreddit !== undefined && log.subreddit === this.getDisplay()) {
-                this.logs = [log, ...this.logs].slice(0, 301);
+                this.logs.unshift(log);
+                if(this.logs.length > 300) {
+                    // remove all elements starting from the 300th index (301st item)
+                    this.logs.splice(300);
+                }
             }
         });
         this.globalDryRun = dryRun;

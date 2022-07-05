@@ -85,7 +85,9 @@ const rcbServer = async function (options: OperatorConfigWithFileContext) {
 
         if(botName === undefined && subName === undefined) {
             sysLogs.unshift(log);
-            sysLogs = sysLogs.slice(0, 201);
+            if(sysLogs.length > 200) {
+                sysLogs.splice(200);
+            }
         }
     })
 
