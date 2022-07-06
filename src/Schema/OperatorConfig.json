@@ -258,6 +258,9 @@
                     },
                     "type": "object"
                 },
+                "influxConfig": {
+                    "$ref": "#/definitions/InfluxConfig"
+                },
                 "name": {
                     "type": "string"
                 },
@@ -864,6 +867,43 @@
                     "type": "array"
                 }
             },
+            "type": "object"
+        },
+        "InfluxConfig": {
+            "properties": {
+                "credentials": {
+                    "$ref": "#/definitions/InfluxCredentials"
+                },
+                "defaultTags": {
+                    "$ref": "#/definitions/Record<string,string>"
+                }
+            },
+            "required": [
+                "credentials"
+            ],
+            "type": "object"
+        },
+        "InfluxCredentials": {
+            "properties": {
+                "bucket": {
+                    "type": "string"
+                },
+                "org": {
+                    "type": "string"
+                },
+                "token": {
+                    "type": "string"
+                },
+                "url": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "bucket",
+                "org",
+                "token",
+                "url"
+            ],
             "type": "object"
         },
         "LoggingOptions": {
@@ -1669,6 +1709,9 @@
             },
             "type": "object"
         },
+        "Record<string,string>": {
+            "type": "object"
+        },
         "RedditCredentials": {
             "description": "Credentials required for the bot to interact with Reddit's API\n\nThese credentials will provided to both the API and Web interface unless otherwise specified with the `web.credentials` property\n\nRefer to the [required credentials table](https://github.com/FoxxMD/context-mod/blob/master/docs/operatorConfiguration.md#minimum-required-configuration) to see what is necessary to run the bot.",
             "examples": [
@@ -2192,6 +2235,9 @@
         "databaseStatisticsDefaults": {
             "$ref": "#/definitions/DatabaseStatisticsOperatorJsonConfig",
             "description": "Set defaults for the frequency time series stats are collected"
+        },
+        "influxConfig": {
+            "$ref": "#/definitions/InfluxConfig"
         },
         "logging": {
             "$ref": "#/definitions/LoggingOptions",

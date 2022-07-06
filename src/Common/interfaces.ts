@@ -42,8 +42,16 @@ import {
     ItemOptions
 } from "./Infrastructure/Filters/FilterShapes";
 import {LoggingOptions, LogLevel, StrongLoggingOptions} from "./Infrastructure/Logging";
-import {DatabaseConfig, DatabaseDriver, DatabaseDriverConfig, DatabaseDriverType} from "./Infrastructure/Database";
+import {
+    DatabaseConfig,
+    DatabaseDriver,
+    DatabaseDriverConfig,
+    DatabaseDriverType
+} from "./Infrastructure/Database";
 import {ActivityType} from "./Infrastructure/Reddit";
+import {InfluxDB, WriteApi} from "@influxdata/influxdb-client";
+import {InfluxConfig} from "./Influx/interfaces";
+import {InfluxClient} from "./Influx/InfluxClient";
 
 
 export interface ReferenceSubmission {
@@ -1118,6 +1126,8 @@ export interface BotInstanceJsonConfig {
         retention?: EventRetentionPolicyRange
     }
 
+    influxConfig?: InfluxConfig
+
     /**
      * Settings related to bot behavior for subreddits it is managing
      * */
@@ -1373,6 +1383,8 @@ export interface OperatorJsonConfig {
         retention?: EventRetentionPolicyRange
     }
 
+    influxConfig?: InfluxConfig
+
     /**
      * Set global snoowrap options as well as default snoowrap config for all bots that don't specify their own
      * */
@@ -1579,6 +1591,7 @@ export interface BotInstanceConfig extends BotInstanceJsonConfig {
     database: DataSource
     snoowrap: SnoowrapOptions
     databaseStatisticsDefaults: DatabaseStatisticsOperatorConfig
+    opInflux?: InfluxClient,
     subreddits: {
         names?: string[],
         exclude?: string[],
@@ -1619,6 +1632,7 @@ export interface OperatorConfig extends OperatorJsonConfig {
         retention?: EventRetentionPolicyRange
     }
     database: DataSource
+    influx?: InfluxClient,
     web: {
         database: DataSource,
         databaseConfig: {

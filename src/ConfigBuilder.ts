@@ -97,6 +97,7 @@ import {
 import {SubredditResources} from "./Subreddit/SubredditResources";
 import {asIncludesData, IncludesData, IncludesString} from "./Common/Infrastructure/Includes";
 import ConfigParseError from "./Utils/ConfigParseError";
+import {InfluxClient} from "./Common/Influx/InfluxClient";
 
 export interface ConfigBuilderOptions {
     logger: Logger,
@@ -1208,6 +1209,7 @@ export const buildOperatorConfigWithDefaults = async (data: OperatorJsonConfig):
             migrations = {},
             retention,
         } = {},
+        influxConfig,
         web: {
             port = 8085,
             maxLogs = 200,
@@ -1325,6 +1327,13 @@ export const buildOperatorConfigWithDefaults = async (data: OperatorJsonConfig):
     }
     const webDbConfig = createDatabaseConfig(realdbConnectionWeb);
 
+    let influx: InfluxClient | undefined = undefined;
+    if(influxConfig !== undefined) {
+        const tags = friendly !== undefined ? {server: friendly} : undefined;
+        influx = new InfluxClient(influxConfig, appLogger, tags);
+        await influx.isReady();
+    }
+
     const config: OperatorConfig = {
         mode,
         operator: {
@@ -1344,6 +1353,7 @@ export const buildOperatorConfigWithDefaults = async (data: OperatorJsonConfig):
             migrations,
             retention,
         },
+        influx,
         userAgent,
         web: {
             database: await createWebDatabaseConnection(webDbConfig, appLogger),
@@ -1398,6 +1408,7 @@ export const buildBotConfig = (data: BotInstanceJsonConfig, opConfig: OperatorCo
         databaseConfig: {
             retention: retentionFromOp,
         } = {},
+        influx: opInflux
     } = opConfig;
     const {
         name: botName,
@@ -1423,6 +1434,7 @@ export const buildBotConfig = (data: BotInstanceJsonConfig, opConfig: OperatorCo
         databaseConfig: {
             retention,
         } = {},
+        influxConfig,
         flowControlDefaults,
         credentials = {},
         subreddits: {
@@ -1554,6 +1566,7 @@ export const buildBotConfig = (data: BotInstanceJsonConfig, opConfig: OperatorCo
         databaseConfig: {
           retention: retention ?? retentionFromOp
         },
+        opInflux,
         subreddits: {
             names,
             exclude,

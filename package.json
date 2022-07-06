@@ -32,6 +32,8 @@
   "dependencies": {
     "@awaitjs/express": "^0.8.0",
     "@googleapis/youtube": "^2.0.0",
+    "@influxdata/influxdb-client": "^1.27.0",
+    "@influxdata/influxdb-client-apis": "^1.27.0",
     "@nlpjs/core": "^4.23.4",
     "@nlpjs/lang-de": "^4.23.4",
     "@nlpjs/lang-en": "^4.23.4",

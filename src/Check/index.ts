@@ -156,7 +156,7 @@ export abstract class Check extends RunnableBase implements Omit<ICheck, 'postTr
         if(asPostBehaviorOptionConfig(postFail)) {
             const {
                 behavior = 'next',
-                recordTo = false
+                recordTo = ['influx']
             } = postFail;
             let recordStrong: RecordOutputType[] = [];
             if(typeof recordTo === 'boolean') {
@@ -175,7 +175,7 @@ export abstract class Check extends RunnableBase implements Omit<ICheck, 'postTr
         } else {
             this.postFail = {
                 behavior: postFail,
-                recordTo: []
+                recordTo: ['influx']
             }
         }
 

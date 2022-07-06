@@ -41,6 +41,7 @@ import {ManagerRunState} from "../Common/Entities/EntityRunState/ManagerRunState
 import {Invokee, PollOn} from "../Common/Infrastructure/Atomic";
 import {FilterCriteriaDefaults} from "../Common/Infrastructure/Filters/FilterShapes";
 import {snooLogWrapper} from "../Utils/loggerFactory";
+import {InfluxClient} from "../Common/Influx/InfluxClient";
 
 class Bot {
 
@@ -91,6 +92,8 @@ class Bot {
     cacheManager: BotResourcesManager;
 
     config: BotInstanceConfig;
+
+    influxClients: InfluxClient[] = [];
 
     database: DataSource
     invokeeRepo: Repository<InvokeeType>;
@@ -356,6 +359,15 @@ class Bot {
             this.botEntity = await botRepo.save(b);
         } else {
             this.botEntity = b;
+        }
+
+        if(this.config.opInflux !== undefined) {
+            this.influxClients.push(this.config.opInflux.childClient(this.logger, {bot: user.name}));
+            if(this.config.influxConfig !== undefined) {
+                const iClient = new InfluxClient(this.config.influxConfig, this.logger, {bot: user.name});
+                await iClient.isReady();
+                this.influxClients.push(iClient);
+            }
         }
 
         this.inited = true;
@@ -698,6 +710,7 @@ class Bot {
             managerEntity: managerEntity as ManagerEntity,
             statDefaults: (statDefaultsFromOverride ?? databaseStatisticsDefaults) as DatabaseStatisticsOperatorConfig,
             retention,
+            influxClients: this.influxClients,
         });
         // all errors from managers will count towards bot-level retry count
         manager.on('error', async (err) => await this.panicOnRetries(err));

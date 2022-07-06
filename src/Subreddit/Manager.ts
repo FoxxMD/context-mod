@@ -97,6 +97,8 @@ import {
 } from "../Common/Infrastructure/Atomic";
 import {parseFromJsonOrYamlToObject} from "../Common/Config/ConfigUtil";
 import {FilterCriteriaDefaults} from "../Common/Infrastructure/Filters/FilterShapes";
+import {InfluxClient} from "../Common/Influx/InfluxClient";
+import { Point } from "@influxdata/influxdb-client";
 
 export interface RunningState {
     state: RunState,
@@ -138,6 +140,7 @@ export interface RuntimeManagerOptions extends Omit<ManagerOptions, 'filterCrite
     managerEntity: ManagerEntity
     filterCriteriaDefaults?: FilterCriteriaDefaults
     statDefaults: DatabaseStatisticsOperatorConfig
+    influxClients: InfluxClient[]
 }
 
 interface QueuedIdentifier {
@@ -236,6 +239,8 @@ export class Manager extends EventEmitter implements RunningStates {
     authorRepo!: Repository<AuthorEntity>
     eventRepo!: Repository<CMEvent>;
 
+    influxClients: InfluxClient[] = [];
+
     getStats = async (): Promise<ManagerStats> => {
         const data: any = {
             eventsAvg: formatNumber(this.eventsRollingAvg),
@@ -307,7 +312,8 @@ export class Manager extends EventEmitter implements RunningStates {
             botEntity,
             managerEntity,
             statDefaults,
-            retention
+            retention,
+            influxClients,
         } = opts || {};
         this.displayLabel = opts.nickname || `${sub.display_name_prefixed}`;
         const getLabels = this.getCurrentLabels;
@@ -341,6 +347,9 @@ export class Manager extends EventEmitter implements RunningStates {
         this.pollingRetryHandler = createRetryHandler({maxRequestRetry: 3, maxOtherRetry: 2}, this.logger);
         this.subreddit = sub;
         this.botEntity = botEntity;
+        for(const client of influxClients) {
+            this.influxClients.push(client.childClient(this.logger, {manager: this.displayLabel, subreddit: sub.display_name_prefixed}));
+        }
 
         this.managerEntity = managerEntity;
         // always init in stopped state but use last invokee to determine if we should start the manager automatically afterwards
@@ -1087,6 +1096,10 @@ export class Manager extends EventEmitter implements RunningStates {
                 event.runResults = runResults;
                 //actionedEvent.runResults = runResults;
 
+                const checksRun = actionedEvent.runResults.map(x => x.checkResults).flat().length;
+                let actionsRun = actionedEvent.runResults.map(x => x.checkResults?.map(y => y.actionResults)).flat().length;
+                let totalRulesRun = actionedEvent.runResults.map(x => x.checkResults?.map(y => y.ruleResults)).flat(5).length;
+
                 // determine if event should be recorded
                 const allOutputs = [...new Set(runResults.map(x => x.checkResults.map(y => y.recordOutputs ?? [])).flat(2).filter(x => recordOutputTypes.includes(x)))];
                 if(allOutputs.length > 0) {
@@ -1118,11 +1131,108 @@ export class Manager extends EventEmitter implements RunningStates {
                         }
                         await this.eventRepo.save(event);
                     }
-                }
+                    if (allOutputs.includes('influx') && this.influxClients.length > 0) {
+                        try {
+                            const time = dayjs().valueOf()
 
-                const checksRun = actionedEvent.runResults.map(x => x.checkResults).flat().length;
-                let actionsRun = actionedEvent.runResults.map(x => x.checkResults?.map(y => y.actionResults)).flat().length;
-                let totalRulesRun = actionedEvent.runResults.map(x => x.checkResults?.map(y => y.ruleResults)).flat().length;
+                            const measurements: Point[] = [];
+
+                            measurements.push(new Point('event')
+                                .timestamp(time)
+                                .tag('triggered', event.triggered ? '1' : '0')
+                                .tag('activityType', isSubmission(item) ? 'submission' : 'comment')
+                                .tag('sourceIdentifier', event.source.identifier ?? 'unknown')
+                                .tag('sourceType', event.source.type)
+                                .stringField('eventId', event.id)
+                                .stringField('activityId', event.activity.id)
+                                .stringField('author', actionedEvent.activity.author)
+                                .intField('processingTime', event.processedAt.valueOf())
+                                .intField('queuedTime', event.queuedAt.valueOf())
+                                .intField('runsProcessed', actionedEvent.runResults.length)
+                                .intField('runsTriggered', actionedEvent.runResults.filter(x => x.triggered).length)
+                                .intField('checksProcessed', checksRun)
+                                .intField('checksTriggered', actionedEvent.runResults.map(x => x.checkResults).flat().filter(x => x.triggered).length)
+                                .intField('totalRulesProcessed', totalRulesRun)
+                                .intField('rulesTriggered', actionedEvent.runResults.map(x => x.checkResults?.map(y => y.ruleResults)).flat(5).filter((x: RuleResultEntity) => x.triggered === true).length)
+                                .intField('uniqueRulesProcessed', allRuleResults.length)
+                                .intField('cachedRulesProcessed', totalRulesRun - allRuleResults.length)
+                                .intField('actionsProcessed', actionsRun)
+                                .intField('apiUsage', startingApiLimit - this.client.ratelimitRemaining));
+
+                            const defaultPoint = () => new Point('triggeredEntity')
+                                .timestamp(time)
+                                .tag('activityType', isSubmission(item) ? 'submission' : 'comment')
+                                .tag('sourceIdentifier', event.source.identifier ?? 'unknown')
+                                .tag('sourceType', event.source.type)
+                                .stringField('activityId', event.activity.id)
+                                .stringField('author', actionedEvent.activity.author)
+                                .stringField('eventId', event.id);
+
+                            for (const r of event.runResults) {
+                                if (r.triggered) {
+                                    measurements.push(defaultPoint()
+                                        .tag('entityType', 'run')
+                                        .tag('name', r.run.name));
+                                    for (const c of r.checkResults) {
+                                        if (c.triggered) {
+                                            measurements.push(defaultPoint()
+                                                .tag('entityType', 'check')
+                                                .stringField('name', c.check.name)
+                                                .tag('fromCache', c.fromCache ? '1' : '0'));
+
+                                            if (c.ruleResults !== undefined) {
+                                                for (const ru of c.ruleResults) {
+                                                    if (ru.result.triggered) {
+                                                        measurements.push(defaultPoint()
+                                                            .tag('entityType', 'rule')
+                                                            .stringField('name', ru.result.premise.name)
+                                                            .tag('fromCache', ru.result.fromCache ? '1' : '0'))
+                                                    }
+                                                }
+                                            }
+                                            if (c.ruleSetResults !== undefined) {
+                                                for (const rs of c.ruleSetResults) {
+                                                    if (rs.result.triggered) {
+                                                        measurements.push(defaultPoint()
+                                                            .tag('entityType', 'ruleSet'));
+                                                        for (const ru of rs.result.results) {
+                                                            if (ru.triggered) {
+                                                                measurements.push(defaultPoint()
+                                                                    .tag('entityType', 'rule')
+                                                                    .stringField('name', ru.premise.name))
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                            if (c.actionResults !== undefined) {
+                                                for (const a of c.actionResults) {
+                                                    if (a.run) {
+                                                        measurements.push(defaultPoint()
+                                                            .tag('entityType', 'action')
+                                                            .stringField('name', a.premise.name)
+                                                            .tag('dryRun', a.dryRun ? '1' : '0')
+                                                            .tag('succes', a.success ? '1' : '0')
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            for (const client of this.influxClients) {
+                                await client.writePoint(measurements);
+                            }
+                        } catch (e: any) {
+                            this.logger.error(new CMError('Error occurred while building or sending Influx data', {
+                                cause: e,
+                                isSerious: false
+                            }));
+                        }
+                    }
+                }
 
                 this.logger.verbose(`Run Stats:        Checks ${checksRun} | Rules => Total: ${totalRulesRun} Unique: ${allRuleResults.length} Cached: ${totalRulesRun - allRuleResults.length} Rolling Avg: ~${formatNumber(this.rulesUniqueRollingAvg)}/s | Actions ${actionsRun}`);
                 this.logger.verbose(`Reddit API Stats: Initial ${startingApiLimit} | Current ${this.client.ratelimitRemaining} | Used ~${startingApiLimit - this.client.ratelimitRemaining} | Events ~${formatNumber(this.eventsRollingAvg)}/s`);
