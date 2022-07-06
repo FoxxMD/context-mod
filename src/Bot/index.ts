@@ -42,6 +42,7 @@ import {Invokee, PollOn} from "../Common/Infrastructure/Atomic";
 import {FilterCriteriaDefaults} from "../Common/Infrastructure/Filters/FilterShapes";
 import {snooLogWrapper} from "../Utils/loggerFactory";
 import {InfluxClient} from "../Common/Influx/InfluxClient";
+import {Point} from "@influxdata/influxdb-client";
 
 class Bot {
 
@@ -936,6 +937,16 @@ class Bot {
                 }
                 this.nextExpiration = dayjs(this.client.ratelimitExpiration);
             }
+
+            if(this.influxClients.length > 0) {
+                const apiMeasure = new Point('apiHealth')
+                    .intField('remaining', this.client.ratelimitRemaining)
+                    .stringField('nannyMod', this.nannyMode ?? 'none');
+                for(const iclient of this.influxClients) {
+                    await iclient.writePoint(apiMeasure);
+                }
+            }
+
             const rollingSample = this.apiSample.slice(0, 7)
             rollingSample.unshift(this.client.ratelimitRemaining);
             this.apiSample = rollingSample;
