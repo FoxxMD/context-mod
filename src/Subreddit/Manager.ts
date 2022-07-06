@@ -899,6 +899,8 @@ export class Manager extends EventEmitter implements RunningStates {
             force = false,
         } = options;
 
+        const event = new CMEvent();
+
         if(refresh) {
             this.logger.verbose(`Refreshed data`);
             // @ts-ignore
@@ -925,7 +927,6 @@ export class Manager extends EventEmitter implements RunningStates {
             activityEntity = existingEntity;
         }
 
-        const event = new CMEvent();
         event.triggered = false;
         event.manager = this.managerEntity;
         event.activity = activityEntity;
