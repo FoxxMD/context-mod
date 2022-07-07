@@ -17,12 +17,14 @@ export class InfluxClient {
     write: WriteApi;
     health: HealthAPI;
 
+    tags: Record<string, string>;
+
     logger: Logger;
 
     ready: boolean;
     lastReadyAttempt: Dayjs | undefined;
 
-    constructor(config: InfluxClientConfig, logger: Logger, tags?: Record<string, string>) {
+    constructor(config: InfluxClientConfig, logger: Logger, tags: Record<string, string> = {}) {
 
         const {client, ready = false, ...rest} = config;
 
@@ -39,10 +41,8 @@ export class InfluxClient {
            setLogger(this.logger);
         }
         this.write = this.client.getWriteApi(config.credentials.org, config.credentials.bucket, 'ms');
-        if (tags !== undefined) {
-            const initialTags = this.write.defaultTags ?? {};
-            this.write.useDefaultTags({...initialTags, ...tags});
-        }
+        this.tags = tags;
+        this.write.useDefaultTags(tags);
         this.health = new HealthAPI(this.client);
     }
 
@@ -105,11 +105,11 @@ export class InfluxClient {
         });
     }
 
-    childClient(logger: Logger, tags?: Record<string, string>) {
+    childClient(logger: Logger, tags: Record<string, string> = {}) {
         return new InfluxClient({
             ...this.config,
             client: this.client,
             ready: this.ready
-        }, logger, tags);
+        }, logger, {...this.tags, ...tags});
     }
 }

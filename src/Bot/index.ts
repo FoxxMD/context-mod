@@ -809,6 +809,7 @@ class Bot {
     async healthLoop() {
         while (this.running) {
             await sleep(5000);
+            await this.apiHealthCheck();
             if (!this.running) {
                 break;
             }
@@ -846,6 +847,56 @@ class Bot {
         this.emitter.emit('healthStopped');
     }
 
+    getApiUsageSummary() {
+        const depletion = this.apiEstDepletion === undefined ? 'Not Calculated' : this.apiEstDepletion.humanize();
+        return`API Usage Rolling Avg: ${formatNumber(this.apiRollingAvg)}/s | Est Depletion: ${depletion} (${formatNumber(this.depletedInSecs, {toFixed: 0})} seconds)`;
+    }
+
+    async apiHealthCheck() {
+
+        const rollingSample = this.apiSample.slice(0, 7)
+        rollingSample.unshift(this.client.ratelimitRemaining);
+        this.apiSample = rollingSample;
+        const diff = this.apiSample.reduceRight((acc: number[], curr, index) => {
+            if (this.apiSample[index + 1] !== undefined) {
+                const d = Math.abs(curr - this.apiSample[index + 1]);
+                if (d === 0) {
+                    return [...acc, 0];
+                }
+                return [...acc, d / 10];
+            }
+            return acc;
+        }, []);
+        const diffTotal = diff.reduce((acc, curr) => acc + curr, 0);
+        if(diffTotal === 0 || diff.length === 0) {
+            this.apiRollingAvg = 0;
+        } else {
+            this.apiRollingAvg = diffTotal / diff.length; // api requests per second
+        }
+        this.depletedInSecs = this.apiRollingAvg === 0 ? Number.POSITIVE_INFINITY :  this.client.ratelimitRemaining / this.apiRollingAvg; // number of seconds until current remaining limit is 0
+        // if depletion/api usage is 0 we need a sane value to use here for both displaying in logs as well as for api nanny. 10 years seems reasonable
+        this.apiEstDepletion = dayjs.duration((this.depletedInSecs === Number.POSITIVE_INFINITY ? {years: 10} : {seconds: this.depletedInSecs}));
+
+        if(this.influxClients.length > 0) {
+            const apiMeasure = new Point('apiHealth')
+                .intField('remaining', this.client.ratelimitRemaining)
+                .stringField('nannyMod', this.nannyMode ?? 'none');
+
+            if(this.apiSample.length > 1) {
+                const curr = this.apiSample[0];
+                const last = this.apiSample[1];
+                if(curr <= last) {
+                    apiMeasure.intField('used', last - curr);
+                }
+            }
+
+            for(const iclient of this.influxClients) {
+                await iclient.writePoint(apiMeasure);
+            }
+        }
+
+    }
+
     async retentionCleanup() {
         const now = dayjs();
         if(now.isSameOrAfter(this.nextRetentionCheck)) {
@@ -859,8 +910,7 @@ class Bot {
     }
 
     async heartbeat() {
-        const heartbeat = `HEARTBEAT -- API Remaining: ${this.client.ratelimitRemaining} | Usage Rolling Avg: ~${formatNumber(this.apiRollingAvg)}/s | Est Depletion: ${this.apiEstDepletion === undefined ? 'N/A' : this.apiEstDepletion.humanize()} (${formatNumber(this.depletedInSecs, {toFixed: 0})} seconds)`
-        this.logger.info(heartbeat);
+        this.logger.info(`HEARTBEAT -- ${this.getApiUsageSummary()}`);
 
         let startedAny = false;
 
@@ -914,6 +964,7 @@ class Bot {
 
     async runApiNanny() {
         try {
+            this.logger.debug(this.getApiUsageSummary());
             this.nextExpiration = dayjs(this.client.ratelimitExpiration);
             const nowish = dayjs().add(10, 'second');
             if (nowish.isAfter(this.nextExpiration)) {
@@ -938,39 +989,11 @@ class Bot {
                 this.nextExpiration = dayjs(this.client.ratelimitExpiration);
             }
 
-            if(this.influxClients.length > 0) {
-                const apiMeasure = new Point('apiHealth')
-                    .intField('remaining', this.client.ratelimitRemaining)
-                    .stringField('nannyMod', this.nannyMode ?? 'none');
-                for(const iclient of this.influxClients) {
-                    await iclient.writePoint(apiMeasure);
-                }
-            }
-
-            const rollingSample = this.apiSample.slice(0, 7)
-            rollingSample.unshift(this.client.ratelimitRemaining);
-            this.apiSample = rollingSample;
-            const diff = this.apiSample.reduceRight((acc: number[], curr, index) => {
-                if (this.apiSample[index + 1] !== undefined) {
-                    const d = Math.abs(curr - this.apiSample[index + 1]);
-                    if (d === 0) {
-                        return [...acc, 0];
-                    }
-                    return [...acc, d / 10];
-                }
-                return acc;
-            }, []);
-            this.apiRollingAvg = diff.reduce((acc, curr) => acc + curr, 0) / diff.length; // api requests per second
-            this.depletedInSecs = this.client.ratelimitRemaining / this.apiRollingAvg; // number of seconds until current remaining limit is 0
-            this.apiEstDepletion = dayjs.duration({seconds: this.depletedInSecs});
-            this.logger.debug(`API Usage Rolling Avg: ${formatNumber(this.apiRollingAvg)}/s | Est Depletion: ${this.apiEstDepletion.humanize()} (${formatNumber(this.depletedInSecs, {toFixed: 0})} seconds)`);
-
-
             let hardLimitHit = false;
-            if (typeof this.hardLimit === 'string') {
+            if (typeof this.hardLimit === 'string' && this.apiEstDepletion !== undefined) {
                 const hardDur = parseDuration(this.hardLimit);
                 hardLimitHit = hardDur.asSeconds() > this.apiEstDepletion.asSeconds();
-            } else {
+            } else if(typeof this.hardLimit === 'number') {
                 hardLimitHit = this.hardLimit > this.client.ratelimitRemaining;
             }
 
@@ -979,7 +1002,6 @@ class Bot {
                     return;
                 }
                 this.logger.info(`Detected HARD LIMIT of ${this.hardLimit} remaining`, {leaf: 'Api Nanny'});
-                this.logger.info(`API Remaining: ${this.client.ratelimitRemaining} | Usage Rolling Avg: ${this.apiRollingAvg}/s | Est Depletion: ${this.apiEstDepletion.humanize()} (${formatNumber(this.depletedInSecs, {toFixed: 0})} seconds)`, {leaf: 'Api Nanny'});
                 this.logger.info(`All subreddit event polling has been paused`, {leaf: 'Api Nanny'});
 
                 for (const m of this.subManagers) {
@@ -996,10 +1018,10 @@ class Bot {
             }
 
             let softLimitHit = false;
-            if (typeof this.softLimit === 'string') {
+            if (typeof this.softLimit === 'string' && this.apiEstDepletion !== undefined) {
                 const softDur = parseDuration(this.softLimit);
                 softLimitHit = softDur.asSeconds() > this.apiEstDepletion.asSeconds();
-            } else {
+            } else if(typeof this.softLimit === 'number') {
                 softLimitHit = this.softLimit > this.client.ratelimitRemaining;
             }
 
@@ -1008,7 +1030,6 @@ class Bot {
                     return;
                 }
                 this.logger.info(`Detected SOFT LIMIT of ${this.softLimit} remaining`, {leaf: 'Api Nanny'});
-                this.logger.info(`API Remaining: ${this.client.ratelimitRemaining} | Usage Rolling Avg: ${formatNumber(this.apiRollingAvg)}/s | Est Depletion: ${this.apiEstDepletion.humanize()} (${formatNumber(this.depletedInSecs, {toFixed: 0})} seconds)`, {leaf: 'Api Nanny'});
                 this.logger.info('Trying to detect heavy usage subreddits...', {leaf: 'Api Nanny'});
                 let threshold = 0.5;
                 let offenders = this.subManagers.filter(x => {

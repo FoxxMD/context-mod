@@ -607,6 +607,9 @@ export const formatNumber = (val: number | string, options?: numberFormatOptions
     if (Number.isNaN(parsedVal)) {
         return defaultVal;
     }
+    if(!Number.isFinite(val)) {
+        return 'Infinite';
+    }
     let prefixStr = prefix;
     const {enable = false, indicate = true, type = 'round'} = round || {};
     if (enable && !Number.isInteger(parsedVal)) {
