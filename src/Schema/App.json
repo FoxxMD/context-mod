@@ -919,7 +919,7 @@
                     "type": "string"
                 },
                 "note": {
-                    "description": "A mod note for this ban",
+                    "description": "A mod note for this ban. Can use Templating.\n\nIf the length expands to more than 100 characters it will truncated with \"...\"",
                     "examples": [
                         "Sock puppet for u/AnotherUser"
                     ],
@@ -927,7 +927,7 @@
                     "type": "string"
                 },
                 "reason": {
-                    "description": "Reason for ban.",
+                    "description": "Reason for ban. Can use Templating.\n\nIf the length expands to more than 100 characters it will truncated with \"...\"",
                     "examples": [
                         "repeat spam"
                     ],
