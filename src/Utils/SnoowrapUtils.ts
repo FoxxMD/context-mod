@@ -117,46 +117,28 @@ export const isSubreddit = async (subreddit: Subreddit, stateCriteria: Subreddit
 }
 
 export const renderContent = async (template: string, data: (Submission | Comment), ruleResults: RuleResultEntity[] = [], usernotes: UserNotes) => {
+    const conditional: any = {};
+    if(data.can_mod_post) {
+        conditional.reports = data.num_reports;
+        conditional.modReports = data.mod_reports.length;
+        conditional.userReports = data.user_reports.length;
+    }
+    if(asSubmission(data)) {
+        conditional.nsfw = data.over_18;
+        conditional.spoiler = data.spoiler;
+        conditional.op = true;
+        conditional.upvoteRatio = `${data.upvote_ratio * 100}%`;
+    } else {
+        conditional.op = data.is_submitter;
+    }
     const templateData: any = {
         kind: data instanceof Submission ? 'submission' : 'comment',
         author: await data.author.name,
-        // make this a getter so that if we don't load notes (and api call) if we don't need to
-        // didn't work either for some reason
-        // tried to get too fancy :(
-        // get notes() {
-        //     return usernotes.getUserNotes(data.author).then((notesData) => {
-        //         // return usable notes data with some stats
-        //         const current = notesData.length > 0 ? notesData[notesData.length -1] : undefined;
-        //         // group by type
-        //         const grouped = notesData.reduce((acc: any, x) => {
-        //             const {[x.noteType]: nt = []} = acc;
-        //             return Object.assign(acc, {[x.noteType]: nt.concat(x)});
-        //         }, {});
-        //         return {
-        //             data: notesData,
-        //             current,
-        //             ...grouped,
-        //         };
-        //     });
-        // },
-        // when i was trying to use mustache-async (didn't work)
-        // notes: async () => {
-        //     const notesData = await usernotes.getUserNotes(data.author);
-        //     // return usable notes data with some stats
-        //     const current = notesData.length > 0 ? notesData[notesData.length -1] : undefined;
-        //     // group by type
-        //     const grouped = notesData.reduce((acc: any, x) => {
-        //         const {[x.noteType]: nt = []} = acc;
-        //         return Object.assign(acc, {[x.noteType]: nt.concat(x)});
-        //     }, {});
-        //     return {
-        //         data: notesData,
-        //         current,
-        //         ...grouped,
-        //     };
-        // },
+        votes: data.score,
+        age: dayjs.duration(dayjs().diff(dayjs.unix(data.created))).humanize(),
         permalink: `https://reddit.com${data.permalink}`,
         botLink: BOT_LINK,
+        ...conditional
     }
     if (template.includes('{{item.notes')) {
         // we need to get notes
