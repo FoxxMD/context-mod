@@ -67,6 +67,7 @@ This list is not exhaustive. [For complete documentation on a subreddit's config
     * [Check Order](#check-order)
     * [Rule Order](#rule-order)
   * [Configuration Re-use and Caching](#configuration-re-use-and-caching)
+  * [Partial Configurations](#partial-configurations)
 * [Subreddit-ready examples](#subreddit-ready-examples)
 
 # Runs
@@ -1073,7 +1074,7 @@ If the Check is using `AND` condition for its rules (default) then if either Rul
 
 **It is therefore advantageous to list your lightweight Rules first in each Check.**
 
-### Configuration Re-use and Caching
+## Configuration Re-use and Caching
 
 ContextMod implements caching functionality for:
 
@@ -1096,6 +1097,116 @@ Re-use will result in less API calls and faster Check times.
 PROTIP: You can monitor the re-use of cache in the `Cache` section of your subreddit on the web interface. See the tooltips in that section for a better breakdown of cache statistics.
 
 [Learn more about how Caching works](/docs/operator/caching.md)
+
+## Partial Configurations
+
+ContextMod supports fetching parts of a configuration (a **Fragment**) from an external source. Fragments are an advanced feature and should only be used by users who are familiar with CM's configuration syntax and understand the risks/downsides associates with fragmenting a configuration.
+
+**Fragments** are supported for:
+
+* [Runs](#runs)
+* [Checks](#checks)
+* [Rules](#rules)
+* [Actions](#actions)
+
+### Should You Use Partial Configurations?
+
+* **PROS**
+  * Consolidate shared configuration for many subreddits into one location
+  * Shared configuration can be updated independently of subreddits
+  * Allows sharing access to configuration outside of moderators of a specific subreddit or even reddit
+* **CONS**
+  * Editor does not currently support viewing, editing, or updating Fragments. Only the Fragment URL is visible in a Subreddit's configuration
+    * No editor support for viewing obscures "complete view" of configuration and makes editor less useful for validation
+  * Currently, editor cannot validate individual Fragments. They must be copy-pasted "in place" within a normal configuration.
+  * Using external (non-wiki) sources means **you** are responsible for the security/access to the fragment
+
+In general, Fragments should only be used to offload small, well-tested pieces of a configuration that can be shared between many subreddits. Examples:
+
+* A regex Rule for spam links
+* A Recent Activity Rule for reporting users from freekarma subreddits
+
+### Usage
+
+A Fragment may be either a special string or a Fragment object. The fetched Fragment can be either an object or an array of objects of the type of Fragment being replaced.
+
+**String**
+
+If value starts with `wiki:` then the proceeding value will be used to get a wiki page from the current subreddit
+
+* EX `wiki:botconfig/myFragment` tries to get `https://reddit.com/r/currentSubreddit/wiki/botconfig/myFragment`
+
+If the value starts with `wiki:` and ends with `|someValue` then `someValue` will be used as the base subreddit for the wiki page
+
+* EX `wiki:myFragment/test|ContextModBot` tries to get `https://reddit.com/r/ContextModBot/wiki/myFragment/test`
+
+If the value starts with `url:` then the value is fetched as an external url and expects raw text returned
+
+* EX `url:https://pastebin.com/raw/38qfL7mL` tries to get the text response of `https://pastebin.com/raw/38qfL7mL`
+
+**Object**
+
+The object contains:
+
+* `path` -- REQUIRED string following rules above
+* `ttl` -- OPTIONAL, number of seconds to cache the URL result. Defaults to `WikiTTL`
+
+#### Examples
+
+**Replacing A Rule with a URL Fragment**
+
+```yaml
+runs:
+- checks:
+  - name: Free Karma Alert
+    description: Check if author has posted in 'freekarma' subreddits
+    kind: submission
+    rules:
+      - 'url:https://gist.githubusercontent.com/FoxxMD/0e1ee1ab950ff4d1f0cd26172bae7f8f/raw/0ebfaca903e4a651827effac5775c8718fb6e1f2/fragmentRule.yaml'
+      - name: badSub
+        kind: recentActivity
+        useSubmissionAsReference: false
+        thresholds:
+          # if the number of activities (sub/comment) found CUMULATIVELY in the subreddits listed is
+          # equal to or greater than 1 then the rule is triggered
+          - threshold: '>= 1'
+            subreddits:
+              - MyBadSubreddit
+        window: 7 days
+      actions:
+      - kind: report
+        content: 'uses freekarma subreddits and bad subreddits'
+```
+
+**Replacing A Rule with a URL Fragment (Multiple)**
+
+```yaml
+runs:
+- checks:
+  - name: Free Karma Alert
+    description: Check if author has posted in 'freekarma' subreddits
+    kind: submission
+    rules:
+      - 'url:https://gist.githubusercontent.com/FoxxMD/0e1ee1ab950ff4d1f0cd26172bae7f8f/raw/0ebfaca903e4a651827effac5775c8718fb6e1f2/fragmentRuleArray.yaml'
+    actions:
+      - kind: report
+        content: 'uses freekarma subreddits and bad subreddits'
+```
+
+**Replacing A Rule with a Wiki Fragment**
+
+```yaml
+runs:
+- checks:
+  - name: Free Karma Alert
+    description: Check if author has posted in 'freekarma' subreddits
+    kind: submission
+    rules:
+      - 'wiki:freeKarmaFrag'
+    actions:
+      - kind: report
+        content: 'uses freekarma subreddits'
+```
 
 # Subreddit-Ready Examples
 

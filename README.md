@@ -30,6 +30,7 @@ Feature Highlights for **Moderators:**
 * Event notification via Discord
 * [**Web interface**](#web-ui-and-screenshots) for monitoring, administration, and oauth bot authentication
 * [**Placeholders**](/docs/subreddit/actionTemplating.md) (like automoderator) can be configured via a wiki page or raw text and supports [mustache](https://mustache.github.io) templating
+* [**Partial Configurations**](/docs/subreddit/components/README.md#partial-configurations) -- offload parts of your configuration to shared locations to consolidate logic between multiple subreddits
 
 Feature highlights for **Developers and Hosting (Operators):**
 
