@@ -44,6 +44,7 @@ Feature highlights for **Developers and Hosting (Operators):**
   * Historical statistics
 * [Docker container support](/docs/operator/installation.md#docker-recommended)
 * Easy, UI-based [OAuth authentication](/docs/operator/addingBot.md) for adding Bots and moderator dashboard
+* Integration with [InfluxDB](https://www.influxdata.com) for detailed [time-series metrics](/docs/operator/database.md#influx) and a pre-built [Grafana](https://grafana.com) [dashboard](/docs/operator/database.md#grafana)
 
 # Table of Contents
 
@@ -145,6 +146,13 @@ A built-in editor using [monaco-editor](https://microsoft.github.io/monaco-edito
 * Switch schemas to edit either subreddit or operator configurations
 
 ![Configuration View](docs/images/editor.jpg)
+
+### [Grafana Dashboard](/docs/operator/database.md#grafana)
+
+* Overall stats (active bots/subreddits, api calls, per second/hour/minute activity ingest)
+* Over time graphs for events, per subreddit, and for individual rules/check/actions
+
+![Grafana Dashboard](/docs/images/grafana.jpg)
 
 ## License
 
