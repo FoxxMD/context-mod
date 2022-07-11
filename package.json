@@ -81,7 +81,7 @@
     "object-hash": "^2.2.0",
     "p-event": "^4.2.0",
     "p-map": "^4.0.0",
-    "passport": "^0.6.0",
+    "passport": "^0.4.1",
     "passport-custom": "^1.1.1",
     "passport-jwt": "^4.0.0",
     "patch-package": "^6.4.7",
