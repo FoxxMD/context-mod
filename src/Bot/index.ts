@@ -647,9 +647,14 @@ class Bot {
             } = {}
         } = this.config;
 
+        let sub = subVal;
         // make sure the subreddit is fully fetched
         // @ts-ignore
-        const sub = await subVal.fetch();
+        if(subVal._hasFetched === false) {
+            // @ts-ignore
+            sub = await subVal.fetch();
+        }
+
 
         const override = overrides.find(x => {
             const configName = parseRedditEntity(x.name).name;
