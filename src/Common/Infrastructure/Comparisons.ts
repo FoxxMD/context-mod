@@ -2,8 +2,9 @@ import {StringOperator} from "./Atomic";
 import {Duration} from "dayjs/plugin/duration";
 import InvalidRegexError from "../../Utils/InvalidRegexError";
 import dayjs, {Dayjs, OpUnitType} from "dayjs";
-import {SimpleError} from "../../Utils/Errors";
-import { parseDuration } from "../../util";
+import {CMError, SimpleError} from "../../Utils/Errors";
+import {escapeRegex, parseDuration, parseStringToRegex} from "../../util";
+import {ReportType} from "./Reddit";
 
 export interface DurationComparison {
     operator: StringOperator,
@@ -15,6 +16,7 @@ export interface GenericComparison extends HasDisplayText {
     value: number,
     isPercent: boolean,
     extra?: string,
+    groups?: Record<string, string>
     displayText: string,
     duration?: Duration
 }
@@ -73,11 +75,30 @@ export const parseGenericValueComparison = (val: string, options?: {
         displayParts.push('%');
     }
 
+    const {
+        opStr,
+        value,
+        percent,
+        extra,
+        ...rest
+    } = matches.groups || {};
+
+    const extraGroups: Record<string,string> = {};
+    let hasExtraGroups = false;
+
+    for(const [k,v] of Object.entries(rest)) {
+        if(typeof v === 'string' && v.trim() !== '') {
+            extraGroups[k] = v;
+            hasExtraGroups = true;
+        }
+    }
+
     return {
         operator: groups.opStr as StringOperator,
         value: Number.parseFloat(groups.value),
         isPercent: hasPercent,
         extra: groups.extra,
+        groups: hasExtraGroups ? extraGroups : undefined,
         displayText: displayParts.join(''),
         duration
     }
@@ -138,4 +159,52 @@ export const comparisonTextOp = (val1: number, strOp: string, val2: number): boo
         default:
             throw new Error(`${strOp} was not a recognized operator`);
     }
+}
+
+export interface ReportComparison extends Omit<GenericComparison, 'groups'> {
+    reportType?: ReportType
+    reasonRegex?: RegExp
+    reasonMatch?: string
+}
+
+const REPORT_COMPARISON = /^\s*(?<opStr>>|>=|<|<=)\s*(?<value>\d+)(?<percent>\s*%)?(?:\s+(?<reportType>mods?|users?))?(?:\s+(?<reasonMatch>["'].*["']|\/.*\/))?\s*$/i
+const REPORT_REASON_LITERAL = /["'](.*)["']/i
+export const parseReportComparison = (str: string): ReportComparison => {
+    const generic = parseGenericValueComparison(str, {reg: REPORT_COMPARISON});
+
+
+    const {
+        groups: {
+            reportType,
+            reasonMatch
+        } = {},
+        ...rest
+    } = generic;
+
+    const result: ReportComparison = {...rest, reasonMatch};
+
+    if(reportType !== undefined) {
+        if(reportType.toLocaleLowerCase().includes('mod')) {
+            result.reportType = 'mod' as ReportType;
+        } else if (reportType.toLocaleLowerCase().includes('user')) {
+            result.reportType = 'user' as ReportType;
+        }
+    }
+    if(reasonMatch !== undefined) {
+        const literalMatch = reasonMatch.match(REPORT_REASON_LITERAL);
+        if(literalMatch !== null) {
+            const cleanLiteralMatch = `/.*${escapeRegex(literalMatch[1].trim())}.*/`;
+            result.reasonRegex = parseStringToRegex(cleanLiteralMatch, 'i');
+            if(result.reasonRegex === undefined) {
+                throw new CMError(`Could not convert reason match value to Regex: ${cleanLiteralMatch}`, {isSerious: false})
+            }
+        } else {
+            result.reasonRegex = parseStringToRegex(reasonMatch, 'i');
+            if(result.reasonRegex === undefined) {
+                throw new CMError(`Could not convert reason match value to Regex: ${reasonMatch}`, {isSerious: false})
+            }
+        }
+    }
+
+    return result;
 }

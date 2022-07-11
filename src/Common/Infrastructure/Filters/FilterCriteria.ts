@@ -405,20 +405,35 @@ export interface ActivityState {
     approved?: boolean | ModeratorNames | ModeratorNames[] | ModeratorNameCriteria
     score?: CompareValue
     /**
-     * A string containing a comparison operator and a value to compare against
+     * A string containing a comparison operator, a value to compare against, an (optional) report type filter, and an (optional) qualifier for report reason
      *
-     * The syntax is `(< OR > OR <= OR >=) <number>`
+     * The syntax is `(< OR > OR <= OR >=) number[%] [type] [qualifier]`
+     *
+     * If only comparison and number is given then defaults to TOTAL reports on an Activity.
      *
      * * EX `> 2`  => greater than 2 total reports
      *
-     * Defaults to TOTAL reports on an Activity. Suffix the value with the report type to check that type:
+     * Type (optional) determines which type of reports to look at:
      *
-     * * EX `> 3 mod` => greater than 3 mod reports
-     * * EX `>= 1 user` => greater than 1 user report
+     * * `mod` -- mod reports
+     *   * EX `> 3 mod` => greater than 3 mod reports
+     * * `user` -- user reports
+     *   * EX `> 3 user` => greater than 3 user reports
      *
-     * @pattern ^\s*(>|>=|<|<=)\s*(\d+)\s*(%?)(.*)$
+     * Report reason qualifiers can be:
+     *
+     * * enclosed double or single quotes -- report reason contains
+     *   * EX `> 1 "misinformation" => greater than 1 report with reason containing "misinformation"
+     * * enclosed in backslashes -- match regex
+     *   * EX `> 1 \harassment towards .*\` => greater than 1 report with reason matching regex \harassment towards .*\
+     *
+     * Type and reason qualifiers can be used together:
+     *
+     * EX `> 2 user "misinformation" => greater than 2 user reports with reasons containing "misinformation"
+     *
+     * @pattern ^\s*(>|>=|<|<=)\s*(\d+)(\s*%)?(\s+(?:mods?|users?))?(\s+(?:["'].*["']|\/.*\/))?\s*$
      * */
-    reports?: CompareValue
+    reports?: string
     age?: DurationComparor
     /**
      * Test whether the activity is present in dispatched/delayed activities

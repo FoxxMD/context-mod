@@ -141,6 +141,7 @@ import {
 } from "../Common/Infrastructure/ActivityWindow";
 import {Duration} from "dayjs/plugin/duration";
 import {
+    activityReports,
 
     ActivityType,
     AuthorHistorySort,
@@ -153,7 +154,7 @@ import {
     compareDurationValue, comparisonTextOp,
     parseDurationComparison,
     parseGenericValueComparison,
-    parseGenericValueOrPercentComparison
+    parseGenericValueOrPercentComparison, parseReportComparison
 } from "../Common/Infrastructure/Comparisons";
 import {asCreateModNoteData, CreateModNoteData, ModNote, ModNoteRaw} from "./ModNotes/ModNote";
 import {IncludesData} from "../Common/Infrastructure/Includes";
@@ -2259,27 +2260,30 @@ export class SubredditResources {
                             propResultsMap.reports!.reason = reportsMsg;
                             break;
                         }
-                        const reportCompare = parseGenericValueComparison(itemOptVal as string);
-                        let reportType = 'total';
-                        if(reportCompare.extra !== undefined && reportCompare.extra.trim() !== '') {
-                            const requestedType = reportCompare.extra.toLocaleLowerCase().trim();
-                            if(requestedType.includes('mod')) {
-                                reportType = 'mod';
-                            } else if(requestedType.includes('user')) {
-                                reportType = 'user';
-                            } else {
-                                const reportTypeWarn = `Did not recognize the report type "${requestedType}" -- can only use "mod" or "user". Will default to TOTAL reports`;
-                                log.debug(reportTypeWarn);
-                                propResultsMap.reports!.reason = reportTypeWarn;
-                            }
+
+                        const reports = activityReports(item);
+
+                        const reportCompare = parseReportComparison(itemOptVal as string);
+
+                        let reportType = reportCompare.reportType ?? 'total';
+
+                        let validReports = reports;
+
+                        if(reportCompare.reportType === 'user') {
+                            validReports = validReports.filter(x => x.type === 'user');
+                        } else if(reportCompare.reportType === 'mod') {
+                            validReports = validReports.filter(x => x.type === 'mod');
                         }
-                        let reportNum = item.num_reports;
-                        if(reportType === 'user') {
-                            reportNum = item.user_reports.length;
-                        } else if(reportType === 'mod') {
-                            reportNum = item.mod_reports.length;
+
+                        let reasonMatchStr = '';
+                        if(reportCompare.reasonRegex !== undefined) {
+                            reasonMatchStr = ` containing reason matching ${reportCompare.reasonMatch}`;
+                            validReports = validReports.filter(x => reportCompare.reasonRegex?.test(x.reason));
                         }
-                        propResultsMap.reports!.found = `${reportNum} ${reportType}`;
+
+                        let reportNum = validReports.length;
+
+                        propResultsMap.reports!.found = `${reportNum} ${reportType} reports${reasonMatchStr}`;
                         propResultsMap.reports!.passed = criteriaPassWithIncludeBehavior(comparisonTextOp(reportNum, reportCompare.operator, reportCompare.value), include);
                         break;
                     case 'removed':
