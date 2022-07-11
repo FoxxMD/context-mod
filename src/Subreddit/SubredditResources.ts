@@ -2276,7 +2276,7 @@ export class SubredditResources {
                         let reportNum = item.num_reports;
                         if(reportType === 'user') {
                             reportNum = item.user_reports.length;
-                        } else {
+                        } else if(reportType === 'mod') {
                             reportNum = item.mod_reports.length;
                         }
                         propResultsMap.reports!.found = `${reportNum} ${reportType}`;
