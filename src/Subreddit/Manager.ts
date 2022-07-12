@@ -229,7 +229,10 @@ export class Manager extends EventEmitter implements RunningStates {
     rulesUniqueSample: number[] = [];
     rulesUniqueSampleInterval: any;
     rulesUniqueRollingAvg: number = 0;
-    actionedEvents: ActionedEvent[] = [];
+
+    //seenWithNoReports: Set<string> = new Set();
+    isMonitoringModqueue: boolean = false;
+    modqueueInterval: number = 0;
 
     delayedQueueInterval: any;
 
@@ -907,6 +910,89 @@ export class Manager extends EventEmitter implements RunningStates {
             item = await activity.refresh();
         }
 
+        let activityEntity: Activity;
+        const existingEntity = await this.activityRepo.findOneBy({_id: item.name});
+
+
+        /**
+         * Report Tracking
+         *
+         * Store ids for activities that do not have any reports so that if that changes we can be sure activity had no reports at last modqueue poll interval
+         *
+         * Only do this if modqueue is being monitored otherwise its useless since we'll never see the event again
+         * */
+
+        // #1 if never seen before and only one report AND source is modqueue
+        // --> we know it was last interval for sure
+        // --> and store last seen so if we see again we know last interval
+
+        // #2 if never seen before and more than one report
+        // --> don't know which was "new", need to store all rough
+        // --> and store last seen so if we see again we know last interval
+
+        // #3 if never seen before and no reports
+        // --> then store last seen so if we see again we know last interval BUT don't need to store b/c...
+        // --> if next seen in modqueue then #1
+        // --> if not in modqueue we have last seen
+
+        // #4 if seen before and one report and not modqueue
+        // --> have last seen so we have at least a more narrow window than activity created at
+
+        // #6 if seen before and more than one report and not already exists and not modqueue
+        // --> outside of modqueue interval and don't have prior history so have to store everything rough
+
+        // #7 if seen before and more than one report and modqueue
+        // --> we know modqueue was started prior to seeing this first time so we can use last interval
+
+        // #2
+        // #4
+        // #6
+        let lastKnownStateTimestamp = await this.resources.getActivityLastSeenDate(item.name);
+        if(lastKnownStateTimestamp !== undefined && lastKnownStateTimestamp.isBefore(this.startedAt)) {
+            // if we last saw this activity BEFORE we started event polling (modqueue) then it's not useful to us
+            lastKnownStateTimestamp = undefined;
+        }
+        // #2
+        // #3
+        // #6
+        await this.resources.setActivityLastSeenDate(item.name);
+
+        // if modqueue is running then we know we are checking for new reports every X seconds
+        if(options.activitySource.identifier === 'modqueue') {
+            // #1 if the activity is from modqueue and only has one report then we know that report was just created
+            if(item.num_reports === 1
+                // #7 otherwise if it has more than one report AND we have seen it -- its only seen if it has already been stored (in below block) --
+                // then we are reasonably sure that any reports created were in the last X seconds
+                || (item.num_reports > 1 && lastKnownStateTimestamp !== undefined)) {
+
+                lastKnownStateTimestamp = dayjs().subtract(this.modqueueInterval, 'seconds');
+            }
+        }
+        // if activity is not from modqueue then known good timestamps for "time between last known report and now" is reliant on these things:
+        // 1) (most accurate) lastKnownStateTimestamp -- only available if activity either had 0 reports OR 1+ and existing reports have been stored (see below code)
+        // 2) last stored report time from Activity
+        // 3) create date of activity
+
+        let shouldPersistReports = false;
+
+        if (existingEntity === null) {
+            activityEntity = Activity.fromSnoowrapActivity(this.managerEntity.subreddit, activity, lastKnownStateTimestamp);
+            // always store if any reports exist and modqueue is being monitored (no reason to store if not monitoring, things would be too inaccurate)
+            if (item.num_reports > 0 /*&& this.isMonitoringModqueue*/) {
+                shouldPersistReports = true;
+            }
+        } else {
+            activityEntity = existingEntity;
+            // will always persist if reports need to be updated and modqueue is being monitored (no reason to store if not monitoring, things would be too inaccurate)
+            if (activityEntity.syncReports(item, lastKnownStateTimestamp) /*&& this.isMonitoringModqueue*/) {
+                shouldPersistReports = true;
+            }
+        }
+
+        if (shouldPersistReports) {
+            activityEntity = await this.activityRepo.save(activityEntity);
+        }
+
         const itemId = await item.id;
 
         if(await this.resources.hasRecentSelf(item)) {
@@ -917,14 +1003,6 @@ export class Manager extends EventEmitter implements RunningStates {
                 this.logger.debug(`${recentMsg} so will skip running.`);
                 return;
             }
-        }
-
-        let activityEntity: Activity;
-        const existingEntity = await this.activityRepo.findOneBy({_id: item.name});
-        if(existingEntity === null) {
-            activityEntity = Activity.fromSnoowrapActivity(this.managerEntity.subreddit, activity);
-        } else {
-            activityEntity = existingEntity;
         }
 
         event.triggered = false;
@@ -1588,6 +1666,12 @@ export class Manager extends EventEmitter implements RunningStates {
                 s.startInterval();
             }
             this.startedAt = dayjs();
+
+            const modQueuePollOpts = this.pollOptions.find(x => x.pollOn === 'modqueue');
+            if(modQueuePollOpts !== undefined) {
+                this.isMonitoringModqueue = true;
+                this.modqueueInterval = modQueuePollOpts.interval;
+            }
         }
 
         this.logger.info('Event polling STARTED');
@@ -1623,6 +1707,7 @@ export class Manager extends EventEmitter implements RunningStates {
             }
             await this.syncRunningState('eventsState');
         }
+        this.isMonitoringModqueue = false;
     }
 
     async stopEvents(causedBy: Invokee = 'system', options?: ManagerStateChangeOption) {
@@ -1651,6 +1736,8 @@ export class Manager extends EventEmitter implements RunningStates {
         } else {
             this.logger.info('Events already STOPPED');
         }
+
+        this.isMonitoringModqueue = false;
     }
 
     async start(causedBy: Invokee = 'system', options?: ManagerStateChangeOption) {

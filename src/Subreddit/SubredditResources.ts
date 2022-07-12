@@ -915,6 +915,29 @@ export class SubredditResources {
     //     return events;
     // }
 
+    async getActivityLastSeenDate(value: SnoowrapActivity | string): Promise<Dayjs | undefined> {
+        if(this.selfTTL !== false) {
+            const id = typeof(value) === 'string' ? value : value.name;
+            const hash = `activityLastSeen-${id}`;
+            const lastSeenUnix = await this.cache.get(hash) as string | undefined | null;
+            if(lastSeenUnix !== undefined && lastSeenUnix !== null) {
+                return dayjs.unix(Number.parseInt(lastSeenUnix, 10));
+            }
+            return undefined;
+        }
+        return undefined;
+    }
+
+    async setActivityLastSeenDate(value: SnoowrapActivity | string, timestamp?: number): Promise<void> {
+        if(this.selfTTL !== false) {
+            const id = typeof(value) === 'string' ? value : value.name;
+            const hash = `activityLastSeen-${id}`;
+            this.cache.set(hash, timestamp ?? dayjs().unix(), {
+                ttl: 86400 // store for 24 hours (seconds)
+            });
+        }
+    }
+
     async getActivity(item: Submission | Comment) {
         try {
             let hash = '';
