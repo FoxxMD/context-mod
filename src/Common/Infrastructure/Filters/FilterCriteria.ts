@@ -405,9 +405,9 @@ export interface ActivityState {
     approved?: boolean | ModeratorNames | ModeratorNames[] | ModeratorNameCriteria
     score?: CompareValue
     /**
-     * A string containing a comparison operator, a value to compare against, an (optional) report type filter, and an (optional) qualifier for report reason
+     * A string containing a comparison operator, a value to compare against, an (optional) report type filter, an (optional) qualifier for report reason, and an (optional) time constraint
      *
-     * The syntax is `(< OR > OR <= OR >=) number[%] [type] [qualifier]`
+     * The syntax is `(< OR > OR <= OR >=) number[%] [type] [reasonQualifier] [timeValue] [timeUnit]`
      *
      * If only comparison and number is given then defaults to TOTAL reports on an Activity.
      *
@@ -431,7 +431,12 @@ export interface ActivityState {
      *
      * EX `> 2 user "misinformation" => greater than 2 user reports with reasons containing "misinformation"
      *
-     * @pattern ^\s*(>|>=|<|<=)\s*(\d+)(\s*%)?(\s+(?:mods?|users?))?(\s+(?:["'].*["']|\/.*\/))?\s*$
+     * The time constraint filter reports created between NOW and [timeConstraint] in the past:
+     *
+     * * `> 3 in 30 minutes` => more than 3 reports created between NOW and 30 minutes ago
+     * * `> 2 user "misinformation" in 2 hours` => more than 2 user reports containing "misinformation" created between NOW and 2 hours ago
+     *
+     * @pattern ^\s*(>|>=|<|<=)\s*(\d+)(\s*%)?(\s+(?:mods?|users?))?(\s+(?:["'].*["']|\/.*\/))?.*(\d+)?\s*(days?|weeks?|months?|years?|hours?|minutes?|seconds?|milliseconds?)?\s*$
      * */
     reports?: string
     age?: DurationComparor

@@ -17,7 +17,7 @@ import {
     CheckSummary,
     ImageComparisonResult,
     ItemCritPropHelper,
-    LogInfo,
+    LogInfo, NamedGroup,
     PollingOptionsStrong,
     PostBehaviorOptionConfig,
     RegExResult,
@@ -721,32 +721,47 @@ export const isActivityWindowConfig = (val: any): val is FullActivityWindowConfi
 }
 
 // string must only contain ISO8601 optionally wrapped by whitespace
-const ISO8601_REGEX: RegExp = /^(-?)P(?=\d|T\d)(?:(\d+)Y)?(?:(\d+)M)?(?:(\d+)([DW]))?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?)?$/;
+const ISO8601_REGEX: RegExp = /^\s*((-?)P(?=\d|T\d)(?:(\d+)Y)?(?:(\d+)M)?(?:(\d+)([DW]))?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?)?)\s*$/;
 // finds ISO8601 in any part of a string
-const ISO8601_SUBSTRING_REGEX: RegExp = /(-?)P(?=\d|T\d)(?:(\d+)Y)?(?:(\d+)M)?(?:(\d+)([DW]))?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?)?/;
+const ISO8601_SUBSTRING_REGEX: RegExp = /((-?)P(?=\d|T\d)(?:(\d+)Y)?(?:(\d+)M)?(?:(\d+)([DW]))?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?)?)/g;
 // string must only duration optionally wrapped by whitespace
 const DURATION_REGEX: RegExp = /^\s*(?<time>\d+)\s*(?<unit>days?|weeks?|months?|years?|hours?|minutes?|seconds?|milliseconds?)\s*$/;
 // finds duration in any part of the string
-const DURATION_SUBSTRING_REGEX: RegExp = /(?<time>\d+)\s*(?<unit>days?|weeks?|months?|years?|hours?|minutes?|seconds?|milliseconds?)/;
-export const parseDuration = (val: string, strict = true): Duration => {
-    let matches = val.match(strict ? DURATION_REGEX : DURATION_SUBSTRING_REGEX);
-    if (matches !== null) {
-        const groups = matches.groups as any;
-        const dur: Duration = dayjs.duration(groups.time, groups.unit);
-        if (!dayjs.isDuration(dur)) {
-            throw new SimpleError(`Parsed value '${val}' did not result in a valid Dayjs Duration`);
-        }
-        return dur;
+const DURATION_SUBSTRING_REGEX: RegExp = /(?<time>\d+)\s*(?<unit>days?|weeks?|months?|years?|hours?|minutes?|seconds?|milliseconds?)/g;
+
+export const parseDurationFromString = (val: string, strict = true): {duration: Duration, original: string}[] => {
+    let matches = parseRegex(strict ? DURATION_REGEX : DURATION_SUBSTRING_REGEX, val);
+    if (matches !== undefined) {
+        return matches.map(x => {
+            const groups = x.named as NamedGroup;
+            const dur: Duration = dayjs.duration(groups.time, groups.unit);
+            if (!dayjs.isDuration(dur)) {
+                throw new SimpleError(`Parsed value '${x.match}' did not result in a valid Dayjs Duration`);
+            }
+            return {duration: dur, original: `${groups.time} ${groups.unit}`};
+        });
     }
-    matches = val.match(strict ? ISO8601_REGEX : ISO8601_SUBSTRING_REGEX);
-    if (matches !== null) {
-        const dur: Duration = dayjs.duration(val);
-        if (!dayjs.isDuration(dur)) {
-            throw new SimpleError(`Parsed value '${val}' did not result in a valid Dayjs Duration`);
-        }
-        return dur;
+
+    matches = parseRegex(strict ? ISO8601_REGEX : ISO8601_SUBSTRING_REGEX, val);
+    if (matches !== undefined) {
+        return matches.map(x => {
+            const dur: Duration = dayjs.duration(x.groups[0]);
+            if (!dayjs.isDuration(dur)) {
+                throw new SimpleError(`Parsed value '${x.groups[0]}' did not result in a valid Dayjs Duration`);
+            }
+            return {duration: dur, original: x.groups[0]};
+        });
     }
+
     throw new InvalidRegexError([(strict ? DURATION_REGEX : DURATION_SUBSTRING_REGEX), (strict ? ISO8601_REGEX : ISO8601_SUBSTRING_REGEX)], val)
+}
+
+export const parseDuration = (val: string, strict = true): Duration => {
+    const res = parseDurationFromString(val, strict);
+    if(res.length > 1) {
+        throw new SimpleError(`Must only have one Duration value, found ${res.length} in: ${val}`);
+    }
+    return res[0].duration;
 }
 
 const SUBREDDIT_NAME_REGEX: RegExp = /^\s*(?:\/r\/|r\/)*(\w+)*\s*$/;
@@ -1415,30 +1430,33 @@ export const parseStringToRegexOrLiteralSearch = (val: string, defaultFlags: str
     return literalSearchRegex;
 }
 
-export const parseRegex = (reg: RegExp, val: string): RegExResult => {
+export const parseRegex = (reg: RegExp, val: string): RegExResult[] | undefined => {
 
     if(reg.global) {
         const g = Array.from(val.matchAll(reg));
-        const global = g.map(x => {
+        if(g.length === 0) {
+            return undefined;
+        }
+        return g.map(x => {
             return {
                 match: x[0],
+                index: x.index,
                 groups: x.slice(1),
                 named: x.groups,
-            }
+            } as RegExResult;
         });
-        return {
-            matched: g.length > 0,
-            matches: g.length > 0 ? g.map(x => x[0]) : [],
-            global: g.length > 0 ? global : [],
-        };
     }
 
     const m = val.match(reg)
-    return {
-        matched: m !== null,
-        matches: m !== null ? m.slice(0).filter(x => x !== undefined) : [],
-        global: [],
+    if(m === null) {
+        return undefined;
     }
+    return [{
+        match: m[0],
+        index: m.index as number,
+        groups: m.slice(1),
+        named: m.groups
+    }];
 }
 
 export const testMaybeStringRegex = (test: string, subject: string, defaultFlags: string = 'i'): [boolean, string] => {

@@ -732,19 +732,14 @@ export interface SearchAndReplaceRegExp {
 }
 
 export interface NamedGroup {
-    [name: string]: string
-}
-
-export interface GlobalRegExResult {
-    match: string,
-    groups: string[],
-    named: NamedGroup | undefined
+    [name: string]: any
 }
 
 export interface RegExResult {
-    matched: boolean,
-    matches: string[],
-    global: GlobalRegExResult[]
+    match: string,
+    groups: string[],
+    index: number
+    named: NamedGroup | undefined
 }
 
 export type StrongCache = {

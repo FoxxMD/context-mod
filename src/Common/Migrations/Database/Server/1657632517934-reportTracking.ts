@@ -45,8 +45,8 @@ export class reportTracking1657632517934 implements MigrationInterface {
                 ],
                 indices: [
                     idIndex('ActivityReport', true),
-                    index('ActivityReport', ['activityId']),
-                    index('ActivityReportReason', ['reason']),
+                    index('ActivityReport', ['activityId'], false),
+                    index('ActivityReportReason', ['reason'], false),
                     createdAtIndex('report'),
                 ]
             }),

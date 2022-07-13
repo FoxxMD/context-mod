@@ -160,6 +160,7 @@ import {asCreateModNoteData, CreateModNoteData, ModNote, ModNoteRaw} from "./Mod
 import {IncludesData} from "../Common/Infrastructure/Includes";
 import {parseFromJsonOrYamlToObject} from "../Common/Config/ConfigUtil";
 import ConfigParseError from "../Utils/ConfigParseError";
+import {ActivityReport} from "../Common/Entities/ActivityReport";
 
 export const DEFAULT_FOOTER = '\r\n*****\r\nThis action was performed by [a bot.]({{botLink}}) Mention a moderator or [send a modmail]({{modmailLink}}) if you any ideas, questions, or concerns about this action.';
 
@@ -2284,7 +2285,16 @@ export class SubredditResources {
                             break;
                         }
 
-                        const reports = activityReports(item);
+                        const reportSummaryParts: string[] = [];
+
+                        let reports: ActivityReport[] = [];
+
+                        if(item.num_reports > 0) {
+                            reports = await this.database.getRepository(ActivityReport).createQueryBuilder('report')
+                                .select('report')
+                                .where({activityId: item.name})
+                                .getMany();
+                        }
 
                         const reportCompare = parseReportComparison(itemOptVal as string);
 
@@ -2298,15 +2308,21 @@ export class SubredditResources {
                             validReports = validReports.filter(x => x.type === 'mod');
                         }
 
-                        let reasonMatchStr = '';
                         if(reportCompare.reasonRegex !== undefined) {
-                            reasonMatchStr = ` containing reason matching ${reportCompare.reasonMatch}`;
+                            reportSummaryParts.push(`containing reason matching ${reportCompare.reasonMatch}`);
                             validReports = validReports.filter(x => reportCompare.reasonRegex?.test(x.reason));
+                        }
+                        if(reportCompare.durationText !== undefined) {
+                            reportSummaryParts.push(`within ${reportCompare.durationText}`);
+                            const earliestDate = dayjs().subtract(reportCompare.duration as Duration);
+                            validReports = validReports.filter(x => x.createdAt.isSameOrAfter(earliestDate));
                         }
 
                         let reportNum = validReports.length;
 
-                        propResultsMap.reports!.found = `${reportNum} ${reportType} reports${reasonMatchStr}`;
+                        reportSummaryParts.unshift(`${reportNum} ${reportType} reports`);
+
+                        propResultsMap.reports!.found = reportSummaryParts.join(' ');
                         propResultsMap.reports!.passed = criteriaPassWithIncludeBehavior(comparisonTextOp(reportNum, reportCompare.operator, reportCompare.value), include);
                         break;
                     case 'removed':

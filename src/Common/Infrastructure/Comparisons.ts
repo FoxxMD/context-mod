@@ -3,7 +3,7 @@ import {Duration} from "dayjs/plugin/duration";
 import InvalidRegexError from "../../Utils/InvalidRegexError";
 import dayjs, {Dayjs, OpUnitType} from "dayjs";
 import {CMError, SimpleError} from "../../Utils/Errors";
-import {escapeRegex, parseDuration, parseStringToRegex} from "../../util";
+import {escapeRegex, parseDuration, parseDurationFromString, parseStringToRegex} from "../../util";
 import {ReportType} from "./Reddit";
 
 export interface DurationComparison {
@@ -19,6 +19,7 @@ export interface GenericComparison extends HasDisplayText {
     groups?: Record<string, string>
     displayText: string,
     duration?: Duration
+    durationText?: string
 }
 
 export interface HasDisplayText {
@@ -55,18 +56,20 @@ export const parseGenericValueComparison = (val: string, options?: {
     const groups = matches.groups as any;
 
     let duration: Duration | undefined;
+    let durationText: string | undefined;
 
-    if(typeof groups.extra === 'string' && groups.extra.trim() !== '') {
-        try {
-            duration = parseDuration(groups.extra, false);
-        } catch (e) {
-            // if it returns an invalid regex just means they didn't
-            if (requireDuration || !(e instanceof InvalidRegexError)) {
-                throw e;
-            }
+    try {
+        const durationResult = parseDurationFromString(val, false);
+        if(durationResult.length > 1) {
+            throw new SimpleError(`Must only have one Duration value, found ${durationResult.length} in: ${val}`);
         }
-    } else if(requireDuration) {
-        throw new SimpleError(`Comparison must contain a duration value but none was found. Given: ${val}`);
+        duration = durationResult[0].duration;
+        durationText = durationResult[0].original;
+    } catch (e) {
+        // if it returns an invalid regex just means they didn't
+        if (requireDuration || !(e instanceof InvalidRegexError)) {
+            throw e;
+        }
     }
 
     const displayParts = [`${groups.opStr} ${groups.value}`];
@@ -100,7 +103,8 @@ export const parseGenericValueComparison = (val: string, options?: {
         extra: groups.extra,
         groups: hasExtraGroups ? extraGroups : undefined,
         displayText: displayParts.join(''),
-        duration
+        duration,
+        durationText,
     }
 }
 const GENERIC_VALUE_PERCENT_COMPARISON = /^\s*(?<opStr>>|>=|<|<=)\s*(?<value>\d+)\s*(?<percent>%)?(?<extra>.*)$/
@@ -114,18 +118,16 @@ export const parseGenericValueOrPercentComparison = (val: string, options?: {req
 const DURATION_COMPARISON_REGEX: RegExp = /^\s*(?<opStr>>|>=|<|<=)\s*(?<time>\d+)\s*(?<unit>days?|weeks?|months?|years?|hours?|minutes?|seconds?|milliseconds?)\s*$/;
 const DURATION_COMPARISON_REGEX_URL = 'https://regexr.com/609n8';
 export const parseDurationComparison = (val: string): DurationComparison => {
-    const matches = val.match(DURATION_COMPARISON_REGEX);
-    if (matches === null) {
-        throw new InvalidRegexError(DURATION_COMPARISON_REGEX, val, DURATION_COMPARISON_REGEX_URL)
+    const result = parseGenericValueComparison(val, {requireDuration: true});
+    if(result.isPercent) {
+        throw new InvalidRegexError(DURATION_COMPARISON_REGEX, val, DURATION_COMPARISON_REGEX_URL, 'Duration comparison value cannot be a percentage');
     }
-    const groups = matches.groups as any;
-    const dur: Duration = dayjs.duration(groups.time, groups.unit);
-    if (!dayjs.isDuration(dur)) {
-        throw new SimpleError(`Parsed value '${val}' did not result in a valid Dayjs Duration`);
+    if(result.value < 0) {
+        throw new InvalidRegexError(DURATION_COMPARISON_REGEX, val, DURATION_COMPARISON_REGEX_URL,'Duration value cannot be negative');
     }
     return {
-        operator: groups.opStr as StringOperator,
-        duration: dur
+        operator: result.operator as StringOperator,
+        duration: result.duration as Duration
     }
 }
 export const dateComparisonTextOp = (val1: Dayjs, strOp: StringOperator, val2: Dayjs, granularity?: OpUnitType): boolean => {
@@ -167,7 +169,7 @@ export interface ReportComparison extends Omit<GenericComparison, 'groups'> {
     reasonMatch?: string
 }
 
-const REPORT_COMPARISON = /^\s*(?<opStr>>|>=|<|<=)\s*(?<value>\d+)(?<percent>\s*%)?(?:\s+(?<reportType>mods?|users?))?(?:\s+(?<reasonMatch>["'].*["']|\/.*\/))?\s*$/i
+const REPORT_COMPARISON = /^\s*(?<opStr>>|>=|<|<=)\s*(?<value>\d+)(?<percent>\s*%)?(?:\s+(?<reportType>mods?|users?))?(?:\s+(?<reasonMatch>["'].*["']|\/.*\/))?.*(?<time>\d+)?\s*(?<unit>days?|weeks?|months?|years?|hours?|minutes?|seconds?|milliseconds?)?\s*$/i
 const REPORT_REASON_LITERAL = /["'](.*)["']/i
 export const parseReportComparison = (str: string): ReportComparison => {
     const generic = parseGenericValueComparison(str, {reg: REPORT_COMPARISON});

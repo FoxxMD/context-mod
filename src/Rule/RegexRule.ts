@@ -380,8 +380,10 @@ export class RegexRule extends Rule {
 
         for (const c of contents) {
             const results = parseRegex(reg, c);
-            if (results.matched) {
-                m = m.concat(results.matches);
+            if(results !== undefined) {
+                for(const r of results) {
+                    m.push(r.match);
+                }
             }
         }
         return m;

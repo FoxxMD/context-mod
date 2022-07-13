@@ -70,7 +70,7 @@ export class Activity {
     @OneToMany(type => Activity, obj => obj.submission, {nullable: true})
     comments!: Activity[];
 
-    @OneToMany(type => ActivityReport, act => act.activity, {cascade: ['insert']})
+    @OneToMany(type => ActivityReport, act => act.activity, {cascade: ['insert'], eager: true})
     reports: ActivityReport[] | undefined
 
     constructor(data?: ActivityEntityOptions) {
