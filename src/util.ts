@@ -859,62 +859,81 @@ export const dummyLogger = {
     info: (v: any) => null
 }
 
-const GIST_REGEX = new RegExp(/.*gist\.github\.com\/.+\/(.+)/i)
-const GH_BLOB_REGEX = new RegExp(/.*github\.com\/(.+)\/(.+)\/blob\/(.+)/i);
-const REGEXR_REGEX = new RegExp(/^.*((regexr\.com)\/[\w\d]+).*$/i);
-const REGEXR_PAGE_REGEX = new RegExp(/(.|[\n\r])+"expression":"(.+)","text"/g);
+export const normalizeGistFileKey = (val: string) => val.replaceAll(/[^\w\d]/g, '').toLowerCase().trim();
+export const GIST_REGEX = new RegExp(/.*gist\.github\.com\/(?<user>.+)\/(?<gistId>[^#\/]+)(?:#file-(?<fileName>.+))?/i)
+export const GIST_RAW_REGEX = new RegExp(/.*gist\.github\.com\/(?<user>.+)\/(?<gistId>[^#\/]+)\/raw\/.+/i)
+export const GH_BLOB_REGEX = new RegExp(/.*github\.com\/(?<user>.+)\/(?<repo>.+)\/blob\/(?<path>.+)(?:#.+)?/i);
+export const REGEXR_REGEX = new RegExp(/^.*((regexr\.com)\/[\w\d]+).*$/i);
+export const REGEXR_PAGE_REGEX = new RegExp(/(.|[\n\r])+"expression":"(.+)","text"/g);
 export const fetchExternalResult = async (url: string, logger: (any) = dummyLogger): Promise<[string, Response]> => {
     let hadError = false;
     logger.debug(`Attempting to detect resolvable URL for ${url}`);
-    let match = url.match(GIST_REGEX);
-    if (match !== null) {
-        const gistApiUrl = `https://api.github.com/gists/${match[1]}`;
-        logger.debug(`Looks like a non-raw gist URL! Trying to resolve ${gistApiUrl}`);
+    let match = parseRegexSingleOrFail(GIST_RAW_REGEX, url); // check for raw gist url first and if found treat as normal URL
+    if(match === undefined) {
+        // if not raw then if its still a gist then we need to parse and use API
+        match = parseRegexSingleOrFail(GIST_REGEX, url);
 
-        try {
-            const response = await fetch(gistApiUrl);
-            if (!response.ok) {
-                logger.warn(`Response was not OK from Gist API (${response.statusText}) -- will return response from original URL instead`);
-                if (response.size > 0) {
-                    logger.warn(await response.text())
-                }
-                hadError = true;
-            } else {
-                const data = await response.json();
-                // get first found file
-                const fileKeys = Object.keys(data.files);
-                if (fileKeys.length === 0) {
-                    logger.error(`No files found in gist!`);
+        if (match !== undefined) {
+            const gistApiUrl = `https://api.github.com/gists/${match.named.gistId}`;
+            logger.debug(`Looks like a non-raw gist URL! Trying to resolve ${gistApiUrl} ${match.named.fileName !== undefined ? ` and find file ${match.named.fileName}` : ''}`);
+
+            try {
+                const response = await fetch(gistApiUrl);
+                if (!response.ok) {
+                    logger.warn(`Response was not OK from Gist API (${response.statusText}) -- will return response from original URL instead`);
+                    if (response.size > 0) {
+                        logger.warn(await response.text())
+                    }
+                    hadError = true;
                 } else {
-                    if (fileKeys.length > 1) {
-                        logger.warn(`More than one file found in gist! Using first found: ${fileKeys[0]}`);
+                    const data = await response.json();
+                    // get first found file
+                    const fileKeys = Object.keys(data.files);
+                    if (fileKeys.length === 0) {
+                        logger.error(`No files found in gist!`);
                     } else {
-                        logger.debug(`Using file ${fileKeys[0]}`);
-                    }
-                    const file = data.files[fileKeys[0]];
-                    if (file.truncated === false) {
-                        return [file.content, response];
-                    }
-                    const rawUrl = file.raw_url;
-                    logger.debug(`File contents was truncated, retrieving full contents from ${rawUrl}`);
-                    try {
-                        const rawUrlResponse = await fetch(rawUrl);
-                        return [await rawUrlResponse.text(), rawUrlResponse];
-                    } catch (err: any) {
-                        logger.error('Gist Raw URL Response returned an error, will return response from original URL instead');
-                        logger.error(err);
+                        let fileKey = fileKeys[0];
+                        if (fileKeys.length > 1) {
+                            if(match.named.fileName !== undefined) {
+                                //const normalizedFileName = normalizeGistFileKey(match.named.fileName.replace('/^file-/', ''));
+                                const normalizedFileName = normalizeGistFileKey(match.named.fileName);
+                                const matchingKey = fileKeys.find(x => normalizeGistFileKey(x) === normalizedFileName);
+                                if(matchingKey === undefined) {
+                                    throw new SimpleError(`Found Gist ${match.named.gistId} but it did not contain a file named ${match.named.fileName}`);
+                                }
+                                fileKey = matchingKey;
+                            } else {
+                                logger.warn(`More than one file found in gist but URL did not specify a filename! Using first found: ${fileKey}`);
+                            }
+                        } else {
+                            logger.debug(`Using file ${fileKey}`);
+                        }
+                        const file = data.files[fileKey];
+                        if (file.truncated === false) {
+                            return [file.content, response];
+                        }
+                        const rawUrl = file.raw_url;
+                        logger.debug(`File contents was truncated, retrieving full contents from ${rawUrl}`);
+                        try {
+                            const rawUrlResponse = await fetch(rawUrl);
+                            return [await rawUrlResponse.text(), rawUrlResponse];
+                        } catch (err: any) {
+                            logger.error('Gist Raw URL Response returned an error, will return response from original URL instead');
+                            logger.error(err);
+                        }
                     }
                 }
+            } catch (err: any) {
+                logger.error('Response returned an error, will return response from original URL instead');
+                logger.error(err);
             }
-        } catch (err: any) {
-            logger.error('Response returned an error, will return response from original URL instead');
-            logger.error(err);
         }
     }
-    match = url.match(GH_BLOB_REGEX);
 
-    if (match !== null) {
-        const rawUrl = `https://raw.githubusercontent.com/${match[1]}/${match[2]}/${match[3]}`
+    match = parseRegexSingleOrFail(GH_BLOB_REGEX, url)
+
+    if (match !== undefined) {
+        const rawUrl = `https://raw.githubusercontent.com/${match.named.user}/${match.named.repo}/${match.named.path}`
         logger.debug(`Looks like a single file github URL! Resolving to ${rawUrl}`);
         try {
             const response = await fetch(rawUrl);
@@ -933,8 +952,8 @@ export const fetchExternalResult = async (url: string, logger: (any) = dummyLogg
         }
     }
 
-    match = url.match(REGEXR_REGEX);
-    if(match !== null) {
+    match = parseRegexSingleOrFail(REGEXR_REGEX, url);
+    if(match !== undefined) {
         logger.debug(`Looks like a Regexr URL! Trying to get expression from page HTML`);
         try {
             const response = await fetch(url);
@@ -1442,7 +1461,7 @@ export const parseRegex = (reg: RegExp, val: string): RegExResult[] | undefined 
                 match: x[0],
                 index: x.index,
                 groups: x.slice(1),
-                named: x.groups,
+                named: x.groups || {},
             } as RegExResult;
         });
     }
@@ -1455,8 +1474,19 @@ export const parseRegex = (reg: RegExp, val: string): RegExResult[] | undefined 
         match: m[0],
         index: m.index as number,
         groups: m.slice(1),
-        named: m.groups
+        named: m.groups || {}
     }];
+}
+
+export const parseRegexSingleOrFail = (reg: RegExp, val: string): RegExResult | undefined => {
+    const results = parseRegex(reg, val);
+    if(results !== undefined) {
+        if(results.length > 1) {
+                throw new SimpleError(`Expected Regex to match once but got ${results.length} results. Either Regex must NOT be global (using 'g' flag) or parsed value must only match regex once. Given: ${val} || Regex: ${reg.toString()}`);
+        }
+        return results[0];
+    }
+    return undefined;
 }
 
 export const testMaybeStringRegex = (test: string, subject: string, defaultFlags: string = 'i'): [boolean, string] => {

@@ -739,7 +739,7 @@ export interface RegExResult {
     match: string,
     groups: string[],
     index: number
-    named: NamedGroup | undefined
+    named: NamedGroup
 }
 
 export type StrongCache = {

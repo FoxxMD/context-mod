@@ -1,10 +1,11 @@
 import {describe, it} from 'mocha';
 import {assert} from 'chai';
 import {
-    COMMENT_URL_ID,
+    COMMENT_URL_ID, GH_BLOB_REGEX, GIST_RAW_REGEX,
+    GIST_REGEX,
     parseDurationFromString,
     parseLinkIdentifier,
-    parseRedditEntity, removeUndefinedKeys, SUBMISSION_URL_ID
+    parseRedditEntity, parseRegexSingleOrFail, REGEXR_REGEX, removeUndefinedKeys, SUBMISSION_URL_ID
 } from "../src/util";
 import dayjs from "dayjs";
 import dduration, {Duration, DurationUnitType} from 'dayjs/plugin/duration.js';
@@ -13,6 +14,7 @@ import {
     parseGenericValueComparison,
     parseGenericValueOrPercentComparison, parseReportComparison
 } from "../src/Common/Infrastructure/Comparisons";
+import {RegExResult} from "../src/Common/interfaces";
 
 dayjs.extend(dduration);
 
@@ -301,5 +303,57 @@ describe('Link Recognition', function () {
 
         // it('should recognize submission id from reddit shortlink')
         // https://redd.it/92dd8
+    });
+
+    describe('External URL Parsing', function() {
+
+        it('should recognize and parse raw gist URLs', function() {
+            const res = parseRegexSingleOrFail(GIST_RAW_REGEX, 'https://gist.github.com/FoxxMD/2b035429fbf326a00d9a6ca2a38011d9/raw/97076d52114eb17a8754384d95087e8a0a74cf88/file-with-symbols.test.yaml');
+            assert.exists(res);
+            const rese = res as RegExResult;
+            assert.equal(rese.named.user, 'FoxxMD');
+            assert.equal(rese.named.gistId, '2b035429fbf326a00d9a6ca2a38011d9');
+        });
+
+        it('should not parse non-raw gist URLs with raw regex', function() {
+            for(const url of [
+                'https://gist.github.com/FoxxMD/2b035429fbf326a00d9a6ca2a38011d9',
+                'https://gist.github.com/FoxxMD/2b035429fbf326a00d9a6ca2a38011d9#file-file-with-symbols-test-yaml'
+            ]) {
+                const res = parseRegexSingleOrFail(GIST_RAW_REGEX, url);
+                assert.notExists(res, `Should not have parsed ${url} as RAW gist`);
+            }
+        });
+
+        it('should recognize and parse gist URLs', function() {
+            const res = parseRegexSingleOrFail(GIST_REGEX, 'https://gist.github.com/FoxxMD/2b035429fbf326a00d9a6ca2a38011d9');
+            assert.exists(res);
+            const rese = res as RegExResult;
+            assert.equal(rese.named.user, 'FoxxMD');
+            assert.equal(rese.named.gistId, '2b035429fbf326a00d9a6ca2a38011d9');
+        });
+
+        it('should recognize and parse gist URLs with filename hashes', function() {
+            const res = parseRegexSingleOrFail(GIST_REGEX, 'https://gist.github.com/FoxxMD/2b035429fbf326a00d9a6ca2a38011d9#file-file-with-symbols-test-yaml');
+            assert.exists(res);
+            const rese = res as RegExResult;
+            assert.equal(rese.named.user, 'FoxxMD');
+            assert.equal(rese.named.gistId, '2b035429fbf326a00d9a6ca2a38011d9');
+            assert.equal(rese.named.fileName, 'file-with-symbols-test-yaml');
+        });
+
+        it('should recognize and parse github blob URLs', function() {
+            const res = parseRegexSingleOrFail(GH_BLOB_REGEX, 'https://github.com/FoxxMD/context-mod/blob/master/src/util.ts');
+            assert.exists(res);
+            const rese = res as RegExResult;
+            assert.equal(rese.named.user, 'FoxxMD');
+            assert.equal(rese.named.repo, 'context-mod');
+            assert.equal(rese.named.path, 'master/src/util.ts');
+        });
+
+        it('should recognize regexr URLs', function() {
+            const res = parseRegexSingleOrFail(REGEXR_REGEX, 'https://regexr.com/6pomb');
+            assert.exists(res);
+        });
     })
 })
