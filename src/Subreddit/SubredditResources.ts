@@ -2535,6 +2535,23 @@ export class SubredditResources {
                         propResultsMap.depth!.found = depth;
                         propResultsMap.depth!.passed = criteriaPassWithIncludeBehavior(comparisonTextOp(depth, depthCompare.operator, depthCompare.value), include);
                         break;
+                    case 'upvoteRatio':
+                        if(asSubmission(item)) {
+
+                            let compareStr = typeof itemOptVal === 'number' ? `>= ${itemOptVal}` : itemOptVal as string;
+                            const ratioCompare = parseGenericValueComparison(compareStr);
+
+                            const ratio = item.upvote_ratio * 100;
+                            propResultsMap.upvoteRatio!.found = ratio;
+                            propResultsMap.upvoteRatio!.passed = criteriaPassWithIncludeBehavior(comparisonTextOp(ratio, ratioCompare.operator, ratioCompare.value), include);;
+                            break;
+                        } else {
+                            const ratioCommWarn = `Cannot test for 'upvoteRatio' on a Comment`;
+                            log.debug(ratioCommWarn);
+                            propResultsMap.depth!.passed = true;
+                            propResultsMap.depth!.reason = ratioCommWarn;
+                            break;
+                        }
                     case 'flairTemplate':
                     case 'link_flair_text':
                     case 'link_flair_css_class':

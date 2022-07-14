@@ -507,6 +507,18 @@ export interface SubmissionState extends ActivityState {
      * Is the submission a reddit-hosted image or video?
      * */
     isRedditMediaDomain?: boolean
+
+    /**
+     * Compare the upvote ratio for this Submission, expressed as a whole number
+     *
+     * Can be either a comparison string or a number. If a number then CM assumes upvote ratio must be greater than or equal to this.
+     *
+     * Example:
+     *
+     * * `< 90` => less than 90% upvoted
+     * * 45 => greater than or equal to 45% upvoted
+     * */
+    upvoteRatio?: number | CompareValue
 }
 
 export const cmActivityProperties = ['submissionState', 'score', 'reports', 'removed', 'deleted', 'filtered', 'age', 'title'];

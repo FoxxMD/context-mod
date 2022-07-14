@@ -5660,6 +5660,13 @@
                 "title": {
                     "description": "A valid regular expression to match against the title of the submission",
                     "type": "string"
+                },
+                "upvoteRatio": {
+                    "description": "Compare the upvote ratio for this Submission, expressed as a whole number\n\nCan be either a comparison string or a number. If a number then CM assumes upvote ratio must be greater than or equal to this.\n\nExample:\n\n* `< 90` => less than 90% upvoted\n* 45 => greater than or equal to 45% upvoted",
+                    "type": [
+                        "string",
+                        "number"
+                    ]
                 }
             },
             "type": "object"
