@@ -57,8 +57,7 @@ import ConfigParseError from "../Utils/ConfigParseError";
 import dayjs, {Dayjs as DayjsObj} from "dayjs";
 import Action from "../Action";
 import {queue, QueueObject} from 'async';
-import {JSONConfig} from "../JsonConfig";
-import {Check, CheckStructuredJson} from "../Check";
+import {SubredditConfigHydratedData, SubredditConfigData} from "../SubredditConfigData";
 import NotificationManager from "../Notification/NotificationManager";
 import {createHistoricalDisplayDefaults} from "../Common/defaults";
 import {ExtendedSnoowrap} from "../Utils/SnoowrapClients";
@@ -98,6 +97,8 @@ import {
 } from "../Common/Infrastructure/Atomic";
 import {parseFromJsonOrYamlToObject} from "../Common/Config/ConfigUtil";
 import {FilterCriteriaDefaults} from "../Common/Infrastructure/Filters/FilterShapes";
+import {InfluxClient} from "../Common/Influx/InfluxClient";
+import { Point } from "@influxdata/influxdb-client";
 
 export interface RunningState {
     state: RunState,
@@ -139,6 +140,7 @@ export interface RuntimeManagerOptions extends Omit<ManagerOptions, 'filterCrite
     managerEntity: ManagerEntity
     filterCriteriaDefaults?: FilterCriteriaDefaults
     statDefaults: DatabaseStatisticsOperatorConfig
+    influxClients: InfluxClient[]
 }
 
 interface QueuedIdentifier {
@@ -227,7 +229,8 @@ export class Manager extends EventEmitter implements RunningStates {
     rulesUniqueSample: number[] = [];
     rulesUniqueSampleInterval: any;
     rulesUniqueRollingAvg: number = 0;
-    actionedEvents: ActionedEvent[] = [];
+
+    modqueueInterval: number = 0;
 
     delayedQueueInterval: any;
 
@@ -236,6 +239,8 @@ export class Manager extends EventEmitter implements RunningStates {
     activityRepo!: Repository<Activity>;
     authorRepo!: Repository<AuthorEntity>
     eventRepo!: Repository<CMEvent>;
+
+    influxClients: InfluxClient[] = [];
 
     getStats = async (): Promise<ManagerStats> => {
         const data: any = {
@@ -308,7 +313,8 @@ export class Manager extends EventEmitter implements RunningStates {
             botEntity,
             managerEntity,
             statDefaults,
-            retention
+            retention,
+            influxClients,
         } = opts || {};
         this.displayLabel = opts.nickname || `${sub.display_name_prefixed}`;
         const getLabels = this.getCurrentLabels;
@@ -325,7 +331,11 @@ export class Manager extends EventEmitter implements RunningStates {
         }, mergeArr);
         this.logger.stream().on('log', (log: LogInfo) => {
             if(log.subreddit !== undefined && log.subreddit === this.getDisplay()) {
-                this.logs = [log, ...this.logs].slice(0, 301);
+                this.logs.unshift(log);
+                if(this.logs.length > 300) {
+                    // remove all elements starting from the 300th index (301st item)
+                    this.logs.splice(300);
+                }
             }
         });
         this.globalDryRun = dryRun;
@@ -338,6 +348,9 @@ export class Manager extends EventEmitter implements RunningStates {
         this.pollingRetryHandler = createRetryHandler({maxRequestRetry: 3, maxOtherRetry: 2}, this.logger);
         this.subreddit = sub;
         this.botEntity = botEntity;
+        for(const client of influxClients) {
+            this.influxClients.push(client.childClient(this.logger, {manager: this.displayLabel, subreddit: sub.display_name_prefixed}));
+        }
 
         this.managerEntity = managerEntity;
         // always init in stopped state but use last invokee to determine if we should start the manager automatically afterwards
@@ -651,7 +664,7 @@ export class Manager extends EventEmitter implements RunningStates {
             this.logger.info('Subreddit-specific options updated');
             this.logger.info('Building Runs and Checks...');
 
-            const structuredRuns = configBuilder.parseToStructured(validJson, this.filterCriteriaDefaults, this.postCheckBehaviorDefaults);
+            const structuredRuns = await configBuilder.parseToStructured(validJson, this.resources, this.filterCriteriaDefaults, this.postCheckBehaviorDefaults);
 
             let runs: Run[] = [];
 
@@ -887,10 +900,65 @@ export class Manager extends EventEmitter implements RunningStates {
             force = false,
         } = options;
 
+        const event = new CMEvent();
+
         if(refresh) {
             this.logger.verbose(`Refreshed data`);
             // @ts-ignore
             item = await activity.refresh();
+        }
+
+        let activityEntity: Activity;
+        const existingEntity = await this.activityRepo.findOneBy({_id: item.name});
+
+
+        /**
+         * Report Tracking
+         *
+         * Store ids for activities we process. Enables us to be sure of whether modqueue has been monitored since we've last seen the activity
+         *
+         * */
+        let lastKnownStateTimestamp = await this.resources.getActivityLastSeenDate(item.name);
+        if(lastKnownStateTimestamp !== undefined && lastKnownStateTimestamp.isBefore(this.startedAt)) {
+            // if we last saw this activity BEFORE we started event polling (modqueue) then it's not useful to us
+            lastKnownStateTimestamp = undefined;
+        }
+        await this.resources.setActivityLastSeenDate(item.name);
+
+        // if modqueue is running then we know we are checking for new reports every X seconds
+        if(options.activitySource.identifier === 'modqueue') {
+            // if the activity is from modqueue and only has one report then we know that report was just created
+            if(item.num_reports === 1
+                // otherwise if it has more than one report AND we have seen it (its only seen if it has already been stored (in below block))
+                // then we are reasonably sure that any reports created were in the last X seconds
+                || (item.num_reports > 1 && lastKnownStateTimestamp !== undefined)) {
+
+                lastKnownStateTimestamp = dayjs().subtract(this.modqueueInterval, 'seconds');
+            }
+        }
+        // if activity is not from modqueue then known good timestamps for "time between last known report and now" is dependent on these things:
+        // 1) (most accurate) lastKnownStateTimestamp -- only available if activity either had 0 reports OR 1+ and existing reports have been stored (see below code)
+        // 2) last stored report time from Activity
+        // 3) create date of activity
+
+        let shouldPersistReports = false;
+
+        if (existingEntity === null) {
+            activityEntity = Activity.fromSnoowrapActivity(this.managerEntity.subreddit, activity, lastKnownStateTimestamp);
+            // always persist if activity is not already persisted and any reports exist
+            if (item.num_reports > 0) {
+                shouldPersistReports = true;
+            }
+        } else {
+            activityEntity = existingEntity;
+            // always persist if reports need to be updated
+            if (activityEntity.syncReports(item, lastKnownStateTimestamp)) {
+                shouldPersistReports = true;
+            }
+        }
+
+        if (shouldPersistReports) {
+            activityEntity = await this.activityRepo.save(activityEntity);
         }
 
         const itemId = await item.id;
@@ -905,15 +973,6 @@ export class Manager extends EventEmitter implements RunningStates {
             }
         }
 
-        let activityEntity: Activity;
-        const existingEntity = await this.activityRepo.findOneBy({_id: item.name});
-        if(existingEntity === null) {
-            activityEntity = Activity.fromSnoowrapActivity(this.managerEntity.subreddit, activity);
-        } else {
-            activityEntity = existingEntity;
-        }
-
-        const event = new CMEvent();
         event.triggered = false;
         event.manager = this.managerEntity;
         event.activity = activityEntity;
@@ -928,7 +987,6 @@ export class Manager extends EventEmitter implements RunningStates {
         itemIdentifiers.push(`${checkType === 'Submission' ? 'SUB' : 'COM'} ${itemId}`);
         this.currentLabels = itemIdentifiers;
         let ePeek = '';
-        let peekParts: ItemContent;
         try {
             const [peek, { content: peekContent }] = await itemContentPeek(item);
             ePeek = peekContent;
@@ -1084,6 +1142,10 @@ export class Manager extends EventEmitter implements RunningStates {
                 event.runResults = runResults;
                 //actionedEvent.runResults = runResults;
 
+                const checksRun = actionedEvent.runResults.map(x => x.checkResults).flat().length;
+                let actionsRun = actionedEvent.runResults.map(x => x.checkResults?.map(y => y.actionResults)).flat().length;
+                let totalRulesRun = actionedEvent.runResults.map(x => x.checkResults?.map(y => y.ruleResults)).flat(5).length;
+
                 // determine if event should be recorded
                 const allOutputs = [...new Set(runResults.map(x => x.checkResults.map(y => y.recordOutputs ?? [])).flat(2).filter(x => recordOutputTypes.includes(x)))];
                 if(allOutputs.length > 0) {
@@ -1115,11 +1177,108 @@ export class Manager extends EventEmitter implements RunningStates {
                         }
                         await this.eventRepo.save(event);
                     }
-                }
+                    if (allOutputs.includes('influx') && this.influxClients.length > 0) {
+                        try {
+                            const time = dayjs().valueOf()
 
-                const checksRun = actionedEvent.runResults.map(x => x.checkResults).flat().length;
-                let actionsRun = actionedEvent.runResults.map(x => x.checkResults?.map(y => y.actionResults)).flat().length;
-                let totalRulesRun = actionedEvent.runResults.map(x => x.checkResults?.map(y => y.ruleResults)).flat().length;
+                            const measurements: Point[] = [];
+
+                            measurements.push(new Point('event')
+                                .timestamp(time)
+                                .tag('triggered', event.triggered ? '1' : '0')
+                                .tag('activityType', isSubmission(item) ? 'submission' : 'comment')
+                                .tag('sourceIdentifier', event.source.identifier ?? 'unknown')
+                                .tag('sourceType', event.source.type)
+                                .stringField('eventId', event.id)
+                                .stringField('activityId', event.activity.id)
+                                .stringField('author', actionedEvent.activity.author)
+                                .intField('processingTime', time - event.processedAt.valueOf())
+                                .intField('queuedTime', event.processedAt.valueOf() - event.queuedAt.valueOf())
+                                .intField('runsProcessed', actionedEvent.runResults.length)
+                                .intField('runsTriggered', actionedEvent.runResults.filter(x => x.triggered).length)
+                                .intField('checksProcessed', checksRun)
+                                .intField('checksTriggered', actionedEvent.runResults.map(x => x.checkResults).flat().filter(x => x.triggered).length)
+                                .intField('totalRulesProcessed', totalRulesRun)
+                                .intField('rulesTriggered', actionedEvent.runResults.map(x => x.checkResults?.map(y => y.ruleResults)).flat(5).filter((x: RuleResultEntity) => x.triggered === true).length)
+                                .intField('uniqueRulesProcessed', allRuleResults.length)
+                                .intField('cachedRulesProcessed', totalRulesRun - allRuleResults.length)
+                                .intField('actionsProcessed', actionsRun)
+                                .intField('apiUsage', startingApiLimit - this.client.ratelimitRemaining));
+
+                            const defaultPoint = () => new Point('triggeredEntity')
+                                .timestamp(time)
+                                .tag('activityType', isSubmission(item) ? 'submission' : 'comment')
+                                .tag('sourceIdentifier', event.source.identifier ?? 'unknown')
+                                .tag('sourceType', event.source.type)
+                                .stringField('activityId', event.activity.id)
+                                .stringField('author', actionedEvent.activity.author)
+                                .stringField('eventId', event.id);
+
+                            for (const r of event.runResults) {
+                                if (r.triggered) {
+                                    measurements.push(defaultPoint()
+                                        .tag('entityType', 'run')
+                                        .tag('name', r.run.name));
+                                    for (const c of r.checkResults) {
+                                        if (c.triggered) {
+                                            measurements.push(defaultPoint()
+                                                .tag('entityType', 'check')
+                                                .stringField('name', c.check.name)
+                                                .tag('fromCache', c.fromCache ? '1' : '0'));
+
+                                            if (c.ruleResults !== undefined) {
+                                                for (const ru of c.ruleResults) {
+                                                    if (ru.result.triggered) {
+                                                        measurements.push(defaultPoint()
+                                                            .tag('entityType', 'rule')
+                                                            .stringField('name', ru.result.premise.name)
+                                                            .tag('fromCache', ru.result.fromCache ? '1' : '0'))
+                                                    }
+                                                }
+                                            }
+                                            if (c.ruleSetResults !== undefined) {
+                                                for (const rs of c.ruleSetResults) {
+                                                    if (rs.result.triggered) {
+                                                        measurements.push(defaultPoint()
+                                                            .tag('entityType', 'ruleSet'));
+                                                        for (const ru of rs.result.results) {
+                                                            if (ru.triggered) {
+                                                                measurements.push(defaultPoint()
+                                                                    .tag('entityType', 'rule')
+                                                                    .stringField('name', ru.premise.name))
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                            if (c.actionResults !== undefined) {
+                                                for (const a of c.actionResults) {
+                                                    if (a.run) {
+                                                        measurements.push(defaultPoint()
+                                                            .tag('entityType', 'action')
+                                                            .stringField('name', a.premise.name)
+                                                            .tag('dryRun', a.dryRun ? '1' : '0')
+                                                            .tag('succes', a.success ? '1' : '0')
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            for (const client of this.influxClients) {
+                                await client.writePoint(measurements);
+                            }
+                        } catch (e: any) {
+                            this.logger.error(new CMError('Error occurred while building or sending Influx data', {
+                                cause: e,
+                                isSerious: false
+                            }));
+                        }
+                    }
+                }
 
                 this.logger.verbose(`Run Stats:        Checks ${checksRun} | Rules => Total: ${totalRulesRun} Unique: ${allRuleResults.length} Cached: ${totalRulesRun - allRuleResults.length} Rolling Avg: ~${formatNumber(this.rulesUniqueRollingAvg)}/s | Actions ${actionsRun}`);
                 this.logger.verbose(`Reddit API Stats: Initial ${startingApiLimit} | Current ${this.client.ratelimitRemaining} | Used ~${startingApiLimit - this.client.ratelimitRemaining} | Events ~${formatNumber(this.eventsRollingAvg)}/s`);
@@ -1474,6 +1633,11 @@ export class Manager extends EventEmitter implements RunningStates {
                 s.startInterval();
             }
             this.startedAt = dayjs();
+
+            const modQueuePollOpts = this.pollOptions.find(x => x.pollOn === 'modqueue');
+            if(modQueuePollOpts !== undefined) {
+                this.modqueueInterval = modQueuePollOpts.interval;
+            }
         }
 
         this.logger.info('Event polling STARTED');
@@ -1569,6 +1733,14 @@ export class Manager extends EventEmitter implements RunningStates {
             this.notificationManager.handle('runStateChanged', 'Bot Stopped', reason, causedBy)
         }
         await this.syncRunningState('managerState');
+    }
+
+    async destroy(causedBy: Invokee = 'system', options?: ManagerStateChangeOption) {
+        await this.stop(causedBy, options);
+        clearInterval(this.eventsSampleInterval);
+        clearInterval(this.delayedQueueInterval);
+        clearInterval(this.rulesUniqueSampleInterval)
+        await this.cacheManager.destroy(this.subreddit.display_name);
     }
 
     setInitialRunningState(managerEntity: RunningStateEntities, type: RunningStateTypes): RunningState {

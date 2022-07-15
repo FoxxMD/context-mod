@@ -249,3 +249,31 @@ export type ModActionType =
     'REMOVAL' |
     'SPAM' |
     'APPROVAL';
+
+export type UserNoteType =
+    'gooduser' |
+    'spamwatch' |
+    'spamwarn' |
+    'abusewarn' |
+    'ban' |
+    'permban' |
+    'botban' |
+    string;
+
+export const userNoteTypes = ['gooduser', 'spamwatch', 'spamwarn', 'abusewarn', 'ban', 'permban', 'botban'];
+
+export type ConfigFragmentValidationFunc = (data: object, fetched: boolean) => boolean;
+
+export interface WikiContext {
+    wiki: string
+    subreddit?: string
+}
+
+export interface ExternalUrlContext {
+    url: string
+}
+
+export interface UrlContext {
+    value: string
+    context: WikiContext | ExternalUrlContext
+}

@@ -1,12 +1,5 @@
-import {MigrationInterface, QueryRunner, Table, TableIndex} from "typeorm"
-
-const index = (prefix: string, columns: string[], unique = true) => new TableIndex({
-    name: `IDX_${unique ? 'UN_' : ''}${prefix}_${columns.join('-')}_MIG`,
-    columnNames: columns,
-    isUnique: unique,
-});
-
-const idIndex = (prefix: string, unique: boolean) => index(prefix, ['id'], unique);
+import {MigrationInterface, QueryRunner, Table} from "typeorm"
+import {idIndex, index} from "../MigrationUtil";
 
 export class indexes1653586738904 implements MigrationInterface {
 

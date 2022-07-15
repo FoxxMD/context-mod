@@ -130,7 +130,7 @@ export class ExtendedSnoowrap extends Snoowrap {
             user: data.user.name,
         }
         if(data.activity !== undefined) {
-            requestData.reddit_id = data.activity.id;
+            requestData.reddit_id = data.activity.name;
         }
 
         const response =await this.oauthRequest({

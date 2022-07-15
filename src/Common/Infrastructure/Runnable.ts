@@ -10,8 +10,13 @@ export interface RunnableBaseOptions extends Omit<RunnableBaseJson, 'itemIs' | '
     authorIs?: MinimalOrFullFilter<AuthorCriteria>
 }
 
-export interface StructuredRunnableBase {
+export interface StructuredRunnableBase extends RunnableBaseJson {
     itemIs?: MinimalOrFullFilter<TypedActivityState>
+    authorIs?: MinimalOrFullFilter<AuthorCriteria>
+}
+
+export interface TypedStructuredRunnableBase<T> extends TypedRunnableBaseData<T> {
+    itemIs?: MinimalOrFullFilter<T>
     authorIs?: MinimalOrFullFilter<AuthorCriteria>
 }
 
@@ -26,6 +31,13 @@ export interface RunnableBaseJson {
      * */
     itemIs?: MinimalOrFullFilterJson<TypedActivityState>
 
+    /**
+     * If present then these Author criteria are checked before running the Check. If criteria fails then the Check will fail.
+     * */
+    authorIs?: MinimalOrFullFilterJson<AuthorCriteria>
+}
+
+export interface TypedRunnableBaseData<T extends TypedActivityState> extends RunnableBaseJson {
     /**
      * If present then these Author criteria are checked before running the Check. If criteria fails then the Check will fail.
      * */

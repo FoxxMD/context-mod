@@ -258,6 +258,9 @@
                     },
                     "type": "object"
                 },
+                "influxConfig": {
+                    "$ref": "#/definitions/InfluxConfig"
+                },
                 "name": {
                     "type": "string"
                 },
@@ -578,8 +581,8 @@
                     "description": "* true/false => test whether Activity is removed or not\n* string or list of strings => test which moderator removed this Activity"
                 },
                 "reports": {
-                    "description": "A string containing a comparison operator and a value to compare against\n\nThe syntax is `(< OR > OR <= OR >=) <number>`\n\n* EX `> 2`  => greater than 2 total reports\n\nDefaults to TOTAL reports on an Activity. Suffix the value with the report type to check that type:\n\n* EX `> 3 mod` => greater than 3 mod reports\n* EX `>= 1 user` => greater than 1 user report",
-                    "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
+                    "description": "A string containing a comparison operator, a value to compare against, an (optional) report type filter, an (optional) qualifier for report reason, and an (optional) time constraint\n\nThe syntax is `(< OR > OR <= OR >=) number[%] [type] [reasonQualifier] [timeValue] [timeUnit]`\n\nIf only comparison and number is given then defaults to TOTAL reports on an Activity.\n\n* EX `> 2`  => greater than 2 total reports\n\nType (optional) determines which type of reports to look at:\n\n* `mod` -- mod reports\n  * EX `> 3 mod` => greater than 3 mod reports\n* `user` -- user reports\n  * EX `> 3 user` => greater than 3 user reports\n\nReport reason qualifiers can be:\n\n* enclosed double or single quotes -- report reason contains\n  * EX `> 1 \"misinformation\" => greater than 1 report with reason containing \"misinformation\"\n* enclosed in backslashes -- match regex\n  * EX `> 1 \\harassment towards .*\\` => greater than 1 report with reason matching regex \\harassment towards .*\\\n\nType and reason qualifiers can be used together:\n\nEX `> 2 user \"misinformation\" => greater than 2 user reports with reasons containing \"misinformation\"\n\nThe time constraint filter reports created between NOW and [timeConstraint] in the past:\n\n* `> 3 in 30 minutes` => more than 3 reports created between NOW and 30 minutes ago\n* `> 2 user \"misinformation\" in 2 hours` => more than 2 user reports containing \"misinformation\" created between NOW and 2 hours ago",
+                    "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)(\\s*%)?(\\s+(?:mods?|users?))?(\\s+(?:[\"'].*[\"']|\\/.*\\/))?.*(\\d+)?\\s*(days?|weeks?|months?|years?|hours?|minutes?|seconds?|milliseconds?)?\\s*$",
                     "type": "string"
                 },
                 "score": {
@@ -864,6 +867,43 @@
                     "type": "array"
                 }
             },
+            "type": "object"
+        },
+        "InfluxConfig": {
+            "properties": {
+                "credentials": {
+                    "$ref": "#/definitions/InfluxCredentials"
+                },
+                "defaultTags": {
+                    "$ref": "#/definitions/Record<string,string>"
+                }
+            },
+            "required": [
+                "credentials"
+            ],
+            "type": "object"
+        },
+        "InfluxCredentials": {
+            "properties": {
+                "bucket": {
+                    "type": "string"
+                },
+                "org": {
+                    "type": "string"
+                },
+                "token": {
+                    "type": "string"
+                },
+                "url": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "bucket",
+                "org",
+                "token",
+                "url"
+            ],
             "type": "object"
         },
         "LoggingOptions": {
@@ -1669,6 +1709,9 @@
             },
             "type": "object"
         },
+        "Record<string,string>": {
+            "type": "object"
+        },
         "RedditCredentials": {
             "description": "Credentials required for the bot to interact with Reddit's API\n\nThese credentials will provided to both the API and Web interface unless otherwise specified with the `web.credentials` property\n\nRefer to the [required credentials table](https://github.com/FoxxMD/context-mod/blob/master/docs/operatorConfiguration.md#minimum-required-configuration) to see what is necessary to run the bot.",
             "examples": [
@@ -1906,8 +1949,8 @@
                     "description": "* true/false => test whether Activity is removed or not\n* string or list of strings => test which moderator removed this Activity"
                 },
                 "reports": {
-                    "description": "A string containing a comparison operator and a value to compare against\n\nThe syntax is `(< OR > OR <= OR >=) <number>`\n\n* EX `> 2`  => greater than 2 total reports\n\nDefaults to TOTAL reports on an Activity. Suffix the value with the report type to check that type:\n\n* EX `> 3 mod` => greater than 3 mod reports\n* EX `>= 1 user` => greater than 1 user report",
-                    "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
+                    "description": "A string containing a comparison operator, a value to compare against, an (optional) report type filter, an (optional) qualifier for report reason, and an (optional) time constraint\n\nThe syntax is `(< OR > OR <= OR >=) number[%] [type] [reasonQualifier] [timeValue] [timeUnit]`\n\nIf only comparison and number is given then defaults to TOTAL reports on an Activity.\n\n* EX `> 2`  => greater than 2 total reports\n\nType (optional) determines which type of reports to look at:\n\n* `mod` -- mod reports\n  * EX `> 3 mod` => greater than 3 mod reports\n* `user` -- user reports\n  * EX `> 3 user` => greater than 3 user reports\n\nReport reason qualifiers can be:\n\n* enclosed double or single quotes -- report reason contains\n  * EX `> 1 \"misinformation\" => greater than 1 report with reason containing \"misinformation\"\n* enclosed in backslashes -- match regex\n  * EX `> 1 \\harassment towards .*\\` => greater than 1 report with reason matching regex \\harassment towards .*\\\n\nType and reason qualifiers can be used together:\n\nEX `> 2 user \"misinformation\" => greater than 2 user reports with reasons containing \"misinformation\"\n\nThe time constraint filter reports created between NOW and [timeConstraint] in the past:\n\n* `> 3 in 30 minutes` => more than 3 reports created between NOW and 30 minutes ago\n* `> 2 user \"misinformation\" in 2 hours` => more than 2 user reports containing \"misinformation\" created between NOW and 2 hours ago",
+                    "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)(\\s*%)?(\\s+(?:mods?|users?))?(\\s+(?:[\"'].*[\"']|\\/.*\\/))?.*(\\d+)?\\s*(days?|weeks?|months?|years?|hours?|minutes?|seconds?|milliseconds?)?\\s*$",
                     "type": "string"
                 },
                 "score": {
@@ -1941,6 +1984,13 @@
                 "title": {
                     "description": "A valid regular expression to match against the title of the submission",
                     "type": "string"
+                },
+                "upvoteRatio": {
+                    "description": "Compare the upvote ratio for this Submission, expressed as a whole number\n\nCan be either a comparison string or a number. If a number then CM assumes upvote ratio must be greater than or equal to this.\n\nExample:\n\n* `< 90` => less than 90% upvoted\n* 45 => greater than or equal to 45% upvoted",
+                    "type": [
+                        "string",
+                        "number"
+                    ]
                 }
             },
             "type": "object"
@@ -2192,6 +2242,9 @@
         "databaseStatisticsDefaults": {
             "$ref": "#/definitions/DatabaseStatisticsOperatorJsonConfig",
             "description": "Set defaults for the frequency time series stats are collected"
+        },
+        "influxConfig": {
+            "$ref": "#/definitions/InfluxConfig"
         },
         "logging": {
             "$ref": "#/definitions/LoggingOptions",

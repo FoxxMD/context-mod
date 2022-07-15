@@ -6,6 +6,10 @@ import {ActionProcessResult, Footer, RuleResult} from "../Common/interfaces";
 import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
 import {runCheckOptions} from "../Subreddit/Manager";
 import {ActionTypes} from "../Common/Infrastructure/Atomic";
+import {truncateStringToLength} from "../util";
+
+const truncate = truncateStringToLength(100);
+const truncateLongMessage = truncateStringToLength(200);
 
 export class BanAction extends Action {
 
@@ -41,11 +45,14 @@ export class BanAction extends Action {
         const renderedBody = content === undefined ? undefined : await renderContent(content, item, ruleResults, this.resources.userNotes);
         const renderedContent = renderedBody === undefined ? undefined : `${renderedBody}${await this.resources.generateFooter(item, this.footer)}`;
 
+        const renderedReason = this.reason === undefined ? undefined : truncate(await renderContent(this.reason, item, ruleResults, this.resources.userNotes));
+        const renderedNote = this.note === undefined ? undefined : truncate(await renderContent(this.note, item, ruleResults, this.resources.userNotes));
+
         const touchedEntities = [];
         let banPieces = [];
-        banPieces.push(`Message: ${renderedContent === undefined ? 'None' : `${renderedContent.length > 100 ? `\r\n${renderedContent}` : renderedContent}`}`);
-        banPieces.push(`Reason:  ${this.reason || 'None'}`);
-        banPieces.push(`Note:    ${this.note || 'None'}`);
+        banPieces.push(`Message: ${renderedContent === undefined ? 'None' : `${renderedContent.length > 100 ? `\r\n${truncateLongMessage(renderedContent)}` : renderedContent}`}`);
+        banPieces.push(`Reason:  ${renderedReason || 'None'}`);
+        banPieces.push(`Note:    ${renderedNote || 'None'}`);
         const durText = this.duration === undefined ? 'permanently' : `for ${this.duration} days`;
         this.logger.info(`Banning ${item.author.name} ${durText}${this.reason !== undefined ? ` (${this.reason})` : ''}`);
         this.logger.verbose(`\r\n${banPieces.join('\r\n')}`);
@@ -56,8 +63,8 @@ export class BanAction extends Action {
             const bannedUser = await fetchedSub.banUser({
                 name: fetchedName,
                 banMessage: renderedContent === undefined ? undefined : renderedContent,
-                banReason: this.reason,
-                banNote: this.note,
+                banReason: renderedReason,
+                banNote: renderedNote,
                 duration: this.duration
             });
             touchedEntities.push(bannedUser);
@@ -65,7 +72,7 @@ export class BanAction extends Action {
         return {
             dryRun,
             success: true,
-            result: `Banned ${item.author.name} ${durText}${this.reason !== undefined ? ` (${this.reason})` : ''}`,
+            result: `Banned ${item.author.name} ${durText}${renderedReason !== undefined ? ` (${renderedReason})` : ''}`,
             touchedEntities
         };
     }
@@ -97,7 +104,10 @@ export interface BanActionConfig extends ActionConfig, Footer {
      * */
     message?: string
     /**
-     * Reason for ban.
+     * Reason for ban. Can use Templating.
+     *
+     * If the length expands to more than 100 characters it will truncated with "..."
+     *
      * @maxLength 100
      * @examples ["repeat spam"]
      * */
@@ -110,7 +120,10 @@ export interface BanActionConfig extends ActionConfig, Footer {
      * */
     duration?: number
     /**
-     * A mod note for this ban
+     * A mod note for this ban. Can use Templating.
+     *
+     * If the length expands to more than 100 characters it will truncated with "..."
+     *
      * @maxLength 100
      * @examples ["Sock puppet for u/AnotherUser"]
      * */

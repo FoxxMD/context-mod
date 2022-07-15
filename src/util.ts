@@ -7,6 +7,7 @@ import {deflateSync, inflateSync} from "zlib";
 import pixelmatch from 'pixelmatch';
 import os from 'os';
 import pathUtil from 'path';
+import {Response} from 'node-fetch';
 import crypto, {createHash} from 'crypto';
 import {
     ActionResult,
@@ -16,7 +17,7 @@ import {
     CheckSummary,
     ImageComparisonResult,
     ItemCritPropHelper,
-    LogInfo,
+    LogInfo, NamedGroup,
     PollingOptionsStrong,
     PostBehaviorOptionConfig,
     RegExResult,
@@ -73,14 +74,15 @@ import {
     ActivitySourceTypes,
     CacheProvider,
     ConfigFormat,
-    DurationVal,
+    DurationVal, ExternalUrlContext,
     ModUserNoteLabel,
     modUserNoteLabels,
     RedditEntity,
     RedditEntityType,
     statFrequencies,
     StatisticFrequency,
-    StatisticFrequencyOption
+    StatisticFrequencyOption, UrlContext,
+    WikiContext
 } from "./Common/Infrastructure/Atomic";
 import {
     AuthorOptions,
@@ -605,6 +607,9 @@ export const formatNumber = (val: number | string, options?: numberFormatOptions
     if (Number.isNaN(parsedVal)) {
         return defaultVal;
     }
+    if(!Number.isFinite(val)) {
+        return 'Infinite';
+    }
     let prefixStr = prefix;
     const {enable = false, indicate = true, type = 'round'} = round || {};
     if (enable && !Number.isInteger(parsedVal)) {
@@ -716,32 +721,47 @@ export const isActivityWindowConfig = (val: any): val is FullActivityWindowConfi
 }
 
 // string must only contain ISO8601 optionally wrapped by whitespace
-const ISO8601_REGEX: RegExp = /^(-?)P(?=\d|T\d)(?:(\d+)Y)?(?:(\d+)M)?(?:(\d+)([DW]))?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?)?$/;
+const ISO8601_REGEX: RegExp = /^\s*((-?)P(?=\d|T\d)(?:(\d+)Y)?(?:(\d+)M)?(?:(\d+)([DW]))?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?)?)\s*$/;
 // finds ISO8601 in any part of a string
-const ISO8601_SUBSTRING_REGEX: RegExp = /(-?)P(?=\d|T\d)(?:(\d+)Y)?(?:(\d+)M)?(?:(\d+)([DW]))?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?)?/;
+const ISO8601_SUBSTRING_REGEX: RegExp = /((-?)P(?=\d|T\d)(?:(\d+)Y)?(?:(\d+)M)?(?:(\d+)([DW]))?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?)?)/g;
 // string must only duration optionally wrapped by whitespace
 const DURATION_REGEX: RegExp = /^\s*(?<time>\d+)\s*(?<unit>days?|weeks?|months?|years?|hours?|minutes?|seconds?|milliseconds?)\s*$/;
 // finds duration in any part of the string
-const DURATION_SUBSTRING_REGEX: RegExp = /(?<time>\d+)\s*(?<unit>days?|weeks?|months?|years?|hours?|minutes?|seconds?|milliseconds?)/;
-export const parseDuration = (val: string, strict = true): Duration => {
-    let matches = val.match(strict ? DURATION_REGEX : DURATION_SUBSTRING_REGEX);
-    if (matches !== null) {
-        const groups = matches.groups as any;
-        const dur: Duration = dayjs.duration(groups.time, groups.unit);
-        if (!dayjs.isDuration(dur)) {
-            throw new SimpleError(`Parsed value '${val}' did not result in a valid Dayjs Duration`);
-        }
-        return dur;
+const DURATION_SUBSTRING_REGEX: RegExp = /(?<time>\d+)\s*(?<unit>days?|weeks?|months?|years?|hours?|minutes?|seconds?|milliseconds?)/g;
+
+export const parseDurationFromString = (val: string, strict = true): {duration: Duration, original: string}[] => {
+    let matches = parseRegex(strict ? DURATION_REGEX : DURATION_SUBSTRING_REGEX, val);
+    if (matches !== undefined) {
+        return matches.map(x => {
+            const groups = x.named as NamedGroup;
+            const dur: Duration = dayjs.duration(groups.time, groups.unit);
+            if (!dayjs.isDuration(dur)) {
+                throw new SimpleError(`Parsed value '${x.match}' did not result in a valid Dayjs Duration`);
+            }
+            return {duration: dur, original: `${groups.time} ${groups.unit}`};
+        });
     }
-    matches = val.match(strict ? ISO8601_REGEX : ISO8601_SUBSTRING_REGEX);
-    if (matches !== null) {
-        const dur: Duration = dayjs.duration(val);
-        if (!dayjs.isDuration(dur)) {
-            throw new SimpleError(`Parsed value '${val}' did not result in a valid Dayjs Duration`);
-        }
-        return dur;
+
+    matches = parseRegex(strict ? ISO8601_REGEX : ISO8601_SUBSTRING_REGEX, val);
+    if (matches !== undefined) {
+        return matches.map(x => {
+            const dur: Duration = dayjs.duration(x.groups[0]);
+            if (!dayjs.isDuration(dur)) {
+                throw new SimpleError(`Parsed value '${x.groups[0]}' did not result in a valid Dayjs Duration`);
+            }
+            return {duration: dur, original: x.groups[0]};
+        });
     }
+
     throw new InvalidRegexError([(strict ? DURATION_REGEX : DURATION_SUBSTRING_REGEX), (strict ? ISO8601_REGEX : ISO8601_SUBSTRING_REGEX)], val)
+}
+
+export const parseDuration = (val: string, strict = true): Duration => {
+    const res = parseDurationFromString(val, strict);
+    if(res.length > 1) {
+        throw new SimpleError(`Must only have one Duration value, found ${res.length} in: ${val}`);
+    }
+    return res[0].duration;
 }
 
 const SUBREDDIT_NAME_REGEX: RegExp = /^\s*(?:\/r\/|r\/)*(\w+)*\s*$/;
@@ -784,7 +804,7 @@ const WIKI_REGEX_URL = 'https://regexr.com/61bq1';
 const URL_REGEX: RegExp = /^\s*url:(?<url>[^\s]+)\s*$/;
 const URL_REGEX_URL = 'https://regexr.com/61bqd';
 
-export const parseWikiContext = (val: string) => {
+export const parseWikiContext = (val: string): WikiContext | undefined => {
     const matches = val.match(WIKI_REGEX);
     if (matches === null) {
         return undefined;
@@ -804,6 +824,34 @@ export const parseExternalUrl = (val: string) => {
     return (matches.groups as any).url as string;
 }
 
+export const parseUrlContext = (val: string): UrlContext | undefined => {
+    const wiki = parseWikiContext(val);
+    if(wiki !== undefined) {
+        return {
+            value: val,
+            context: wiki
+        }
+    }
+    const urlContext = parseExternalUrl(val);
+    if(urlContext !== undefined) {
+        return {
+            value: val,
+            context: {
+                url: urlContext
+            }
+        }
+    }
+    return undefined;
+}
+
+export const asWikiContext = (val: object): val is WikiContext => {
+    return val !== null && typeof val === 'object' && 'wiki' in val;
+}
+
+export const asExtUrlContext = (val: object): val is ExternalUrlContext => {
+    return val !== null && typeof val === 'object' && 'url' in val;
+}
+
 export const dummyLogger = {
     debug: (v: any) => null,
     error: (v: any) => null,
@@ -811,62 +859,81 @@ export const dummyLogger = {
     info: (v: any) => null
 }
 
-const GIST_REGEX = new RegExp(/.*gist\.github\.com\/.+\/(.+)/i)
-const GH_BLOB_REGEX = new RegExp(/.*github\.com\/(.+)\/(.+)\/blob\/(.+)/i);
-const REGEXR_REGEX = new RegExp(/^.*((regexr\.com)\/[\w\d]+).*$/i);
-const REGEXR_PAGE_REGEX = new RegExp(/(.|[\n\r])+"expression":"(.+)","text"/g);
-export const fetchExternalUrl = async (url: string, logger: (any) = dummyLogger): Promise<string> => {
+export const normalizeGistFileKey = (val: string) => val.replaceAll(/[^\w\d]/g, '').toLowerCase().trim();
+export const GIST_REGEX = new RegExp(/.*gist\.github\.com\/(?<user>.+)\/(?<gistId>[^#\/]+)(?:#file-(?<fileName>.+))?/i)
+export const GIST_RAW_REGEX = new RegExp(/.*gist\.github\.com\/(?<user>.+)\/(?<gistId>[^#\/]+)\/raw\/.+/i)
+export const GH_BLOB_REGEX = new RegExp(/.*github\.com\/(?<user>.+)\/(?<repo>.+)\/blob\/(?<path>.+)(?:#.+)?/i);
+export const REGEXR_REGEX = new RegExp(/^.*((regexr\.com)\/[\w\d]+).*$/i);
+export const REGEXR_PAGE_REGEX = new RegExp(/(.|[\n\r])+"expression":"(.+)","text"/g);
+export const fetchExternalResult = async (url: string, logger: (any) = dummyLogger): Promise<[string, Response]> => {
     let hadError = false;
     logger.debug(`Attempting to detect resolvable URL for ${url}`);
-    let match = url.match(GIST_REGEX);
-    if (match !== null) {
-        const gistApiUrl = `https://api.github.com/gists/${match[1]}`;
-        logger.debug(`Looks like a non-raw gist URL! Trying to resolve ${gistApiUrl}`);
+    let match = parseRegexSingleOrFail(GIST_RAW_REGEX, url); // check for raw gist url first and if found treat as normal URL
+    if(match === undefined) {
+        // if not raw then if its still a gist then we need to parse and use API
+        match = parseRegexSingleOrFail(GIST_REGEX, url);
 
-        try {
-            const response = await fetch(gistApiUrl);
-            if (!response.ok) {
-                logger.error(`Response was not OK from Gist API (${response.statusText}) -- will return response from original URL instead`);
-                if (response.size > 0) {
-                    logger.error(await response.text())
-                }
-                hadError = true;
-            } else {
-                const data = await response.json();
-                // get first found file
-                const fileKeys = Object.keys(data.files);
-                if (fileKeys.length === 0) {
-                    logger.error(`No files found in gist!`);
+        if (match !== undefined) {
+            const gistApiUrl = `https://api.github.com/gists/${match.named.gistId}`;
+            logger.debug(`Looks like a non-raw gist URL! Trying to resolve ${gistApiUrl} ${match.named.fileName !== undefined ? ` and find file ${match.named.fileName}` : ''}`);
+
+            try {
+                const response = await fetch(gistApiUrl);
+                if (!response.ok) {
+                    logger.warn(`Response was not OK from Gist API (${response.statusText}) -- will return response from original URL instead`);
+                    if (response.size > 0) {
+                        logger.warn(await response.text())
+                    }
+                    hadError = true;
                 } else {
-                    if (fileKeys.length > 1) {
-                        logger.warn(`More than one file found in gist! Using first found: ${fileKeys[0]}`);
+                    const data = await response.json();
+                    // get first found file
+                    const fileKeys = Object.keys(data.files);
+                    if (fileKeys.length === 0) {
+                        logger.error(`No files found in gist!`);
                     } else {
-                        logger.debug(`Using file ${fileKeys[0]}`);
-                    }
-                    const file = data.files[fileKeys[0]];
-                    if (file.truncated === false) {
-                        return file.content;
-                    }
-                    const rawUrl = file.raw_url;
-                    logger.debug(`File contents was truncated, retrieving full contents from ${rawUrl}`);
-                    try {
-                        const rawUrlResponse = await fetch(rawUrl);
-                        return await rawUrlResponse.text();
-                    } catch (err: any) {
-                        logger.error('Gist Raw URL Response returned an error, will return response from original URL instead');
-                        logger.error(err);
+                        let fileKey = fileKeys[0];
+                        if (fileKeys.length > 1) {
+                            if(match.named.fileName !== undefined) {
+                                //const normalizedFileName = normalizeGistFileKey(match.named.fileName.replace('/^file-/', ''));
+                                const normalizedFileName = normalizeGistFileKey(match.named.fileName);
+                                const matchingKey = fileKeys.find(x => normalizeGistFileKey(x) === normalizedFileName);
+                                if(matchingKey === undefined) {
+                                    throw new SimpleError(`Found Gist ${match.named.gistId} but it did not contain a file named ${match.named.fileName}`);
+                                }
+                                fileKey = matchingKey;
+                            } else {
+                                logger.warn(`More than one file found in gist but URL did not specify a filename! Using first found: ${fileKey}`);
+                            }
+                        } else {
+                            logger.debug(`Using file ${fileKey}`);
+                        }
+                        const file = data.files[fileKey];
+                        if (file.truncated === false) {
+                            return [file.content, response];
+                        }
+                        const rawUrl = file.raw_url;
+                        logger.debug(`File contents was truncated, retrieving full contents from ${rawUrl}`);
+                        try {
+                            const rawUrlResponse = await fetch(rawUrl);
+                            return [await rawUrlResponse.text(), rawUrlResponse];
+                        } catch (err: any) {
+                            logger.error('Gist Raw URL Response returned an error, will return response from original URL instead');
+                            logger.error(err);
+                        }
                     }
                 }
+            } catch (err: any) {
+                logger.error('Response returned an error, will return response from original URL instead');
+                logger.error(err);
             }
-        } catch (err: any) {
-            logger.error('Response returned an error, will return response from original URL instead');
-            logger.error(err);
         }
     }
-    match = url.match(GH_BLOB_REGEX);
 
-    if (match !== null) {
-        const rawUrl = `https://raw.githubusercontent.com/${match[1]}/${match[2]}/${match[3]}`
+    match = parseRegexSingleOrFail(GH_BLOB_REGEX, url)
+
+    if (match !== undefined) {
+        const rawUrl = `https://raw.githubusercontent.com/${match.named.user}/${match.named.repo}/${match.named.path}`
         logger.debug(`Looks like a single file github URL! Resolving to ${rawUrl}`);
         try {
             const response = await fetch(rawUrl);
@@ -877,7 +944,7 @@ export const fetchExternalUrl = async (url: string, logger: (any) = dummyLogger)
                 }
                 hadError = true;
             } else {
-                return await response.text();
+                return [await response.text(), response];
             }
         } catch (err: any) {
             logger.error('Response returned an error, will return response from original URL instead');
@@ -885,8 +952,8 @@ export const fetchExternalUrl = async (url: string, logger: (any) = dummyLogger)
         }
     }
 
-    match = url.match(REGEXR_REGEX);
-    if(match !== null) {
+    match = parseRegexSingleOrFail(REGEXR_REGEX, url);
+    if(match !== undefined) {
         logger.debug(`Looks like a Regexr URL! Trying to get expression from page HTML`);
         try {
             const response = await fetch(url);
@@ -921,7 +988,7 @@ export const fetchExternalUrl = async (url: string, logger: (any) = dummyLogger)
         }
         throw new Error(`Response was not OK: ${response.statusText}`);
     }
-    return await response.text();
+    return [await response.text(), response];
 }
 
 export interface RetryOptions {
@@ -1382,30 +1449,44 @@ export const parseStringToRegexOrLiteralSearch = (val: string, defaultFlags: str
     return literalSearchRegex;
 }
 
-export const parseRegex = (reg: RegExp, val: string): RegExResult => {
+export const parseRegex = (reg: RegExp, val: string): RegExResult[] | undefined => {
 
     if(reg.global) {
         const g = Array.from(val.matchAll(reg));
-        const global = g.map(x => {
+        if(g.length === 0) {
+            return undefined;
+        }
+        return g.map(x => {
             return {
                 match: x[0],
+                index: x.index,
                 groups: x.slice(1),
-                named: x.groups,
-            }
+                named: x.groups || {},
+            } as RegExResult;
         });
-        return {
-            matched: g.length > 0,
-            matches: g.length > 0 ? g.map(x => x[0]) : [],
-            global: g.length > 0 ? global : [],
-        };
     }
 
     const m = val.match(reg)
-    return {
-        matched: m !== null,
-        matches: m !== null ? m.slice(0).filter(x => x !== undefined) : [],
-        global: [],
+    if(m === null) {
+        return undefined;
     }
+    return [{
+        match: m[0],
+        index: m.index as number,
+        groups: m.slice(1),
+        named: m.groups || {}
+    }];
+}
+
+export const parseRegexSingleOrFail = (reg: RegExp, val: string): RegExResult | undefined => {
+    const results = parseRegex(reg, val);
+    if(results !== undefined) {
+        if(results.length > 1) {
+                throw new SimpleError(`Expected Regex to match once but got ${results.length} results. Either Regex must NOT be global (using 'g' flag) or parsed value must only match regex once. Given: ${val} || Regex: ${reg.toString()}`);
+        }
+        return results[0];
+    }
+    return undefined;
 }
 
 export const testMaybeStringRegex = (test: string, subject: string, defaultFlags: string = 'i'): [boolean, string] => {
@@ -2822,4 +2903,22 @@ export const toModNoteLabel = (val: string): ModUserNoteLabel => {
 
 export const asModNoteLabel = (val: string): val is ModUserNoteLabel => {
     return modUserNoteLabels.includes(val);
+}
+
+/**
+ * Split an array into two based on a truthy function
+ *
+ * Returns arrays -> [[...passed],[...failed]]
+ *
+ * https://stackoverflow.com/a/42299191/1469797
+ * */
+export function partition<T>(array: T[], callback: (element: T, index: number, array: T[]) => boolean) {
+    return array.reduce(function (result: [T[], T[]], element, i) {
+            callback(element, i, array)
+                ? result[0].push(element)
+                : result[1].push(element);
+
+            return result;
+        }, [[], []]
+    );
 }

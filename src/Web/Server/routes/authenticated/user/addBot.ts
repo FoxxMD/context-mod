@@ -54,7 +54,7 @@ const addBot = () => {
                 result.error = newBot.error;
                 return res.status(500).json(result);
             }
-            await newBot.testClient();
+            await newBot.init();
             // return response early so client doesn't have to wait for all managers to be built
             res.json(result);
         } catch (err: any) {

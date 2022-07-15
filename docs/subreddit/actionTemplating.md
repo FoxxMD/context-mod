@@ -2,44 +2,92 @@ Actions that can submit text (Report, Comment, UserNote) will have their `conten
 
 See here for a [cheatsheet](https://gist.github.com/FoxxMD/d365707cf99fdb526a504b8b833a5b78) and [here](https://www.tsmean.com/articles/mustache/the-ultimate-mustache-tutorial/) for a more thorough tutorial.
 
+# Template Data
+
+## Activity Data
+
+Activity data can be accessed using the `item` variable. Example
+
+```
+This activity is a {{item.kind}} with {{item.votes}} votes, created {{item.age}} ago.
+```
+Produces:
+
+> This activity is a submission with 10 votes created 5 minutes ago.
+
+### Common
+
 All Actions with `content` have access to this data:
 
-```json5
+| Name        | Description                                                                                         | Example                                                                              |
+|-------------|-----------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------|
+| `kind`      | The Activity type (submission or comment)                                                           | submission                                                                           |
+| `author`    | Name of the Author of the Activity being processed                                                  | FoxxMD                                                                               |
+| `permalink` | URL to the Activity                                                                                 | https://reddit.com/r/mySuibreddit/comments/ab23f/my_post                             |
+| `votes`     | Number of upvotes                                                                                   | 69                                                                                   |
+| `age`       | The age of the Activity in a [human friendly format](https://day.js.org/docs/en/durations/humanize) | 5 minutes                                                                            |
+| `botLink`   | A URL to CM's introduction thread                                                                   | https://www.reddit.com/r/ContextModBot/comments/otz396/introduction_to_contextmodbot |
 
-{
-    item: {
-        kind: 'string', // the type of item (comment/submission)
-        author: 'string', // name of the item author (reddit user)
-        permalink: 'string', // a url to the item
-        url: 'string', // if the item is a Submission then its URL (external for link type submission, reddit link for self-posts)
-        title: 'string', // if the item is a Submission, then the title of the Submission,
-        botLink: 'string' // a link to the bot's FAQ
-    },
-    rules: {
-        // contains all rules that were run and are accessible using the name, lowercased, with all spaces/dashes/underscores removed
-    }
-}
+### Submissions
+
+If the **Activity** is a Submission these additional properties are accessible:
+
+| Name          | Description                                                     | Example                 |
+|---------------|-----------------------------------------------------------------|-------------------------|
+| `upvoteRatio` | The upvote ratio                                                | 100%                    |
+| `nsfw`        | If the submission is marked as NSFW                             | true                    |
+| `spoiler`     | If the submission is marked as a spoiler                        | true                    |
+| `url`         | If the submission was a link then this is the URL for that link | http://example.com      |
+| `title`       | The title of the submission                                     | Test post please ignore |
+
+### Comments
+
+If the **Activity** is a Comment these additional properties are accessible:
+
+| Name | Description                                                  | Example |
+|------|--------------------------------------------------------------|---------|
+| `op` | If the Author is the OP of the Submission this comment is in | true    |
+
+### Moderator
+
+If the **Activity** occurred in a Subreddit the Bot moderates these properties are accessible:
+
+| Name          | Description                         | Example |
+|---------------|-------------------------------------|---------|
+| `reports`     | The number of reports recieved      | 1       |
+| `modReports`  | The number of reports by moderators | 1       |
+| `userReports` | The number of reports by users      | 1       |
+
+## Rule Data
+
+### Summary
+
+A summary of what rules were processed and which were triggered, with results, is available using the `ruleSummary` variable. Example:
 
 ```
+A summary of rules processed for this activity:
 
-The properties of `rules` are accessible using the name, lower-cased, with all spaces/dashes/underscores. If no name is given `kind` is used as `name` Example:
-
+{{ruleSummary}}
 ```
 
-"rules": [
-  {
-    "name": "My Custom-Recent Activity Rule", // mycustomrecentactivityrule
-    "kind": "recentActivity"
-  },
-  {
-    // name = repeatsubmission
-    "kind": "repeatActivity",
-  }
-]
+Would produce:
+> A summary of rules processed for this activity:
+> 
+> * namedRegexRule - ✘
+> * nameAttributionRule - ✓ - 1 Attribution(s) met the threshold of < 20%, with 1 (3%) of 32 Total -- window: 6 months
+> * noXPost ✓ - ✓ 1 of 1 unique items repeated <= 3 times, largest repeat: 1
+
+
+### Individual
+
+Individual **Rules** can be accessed using the name of the rule, **lower-cased, with all spaces/dashes/underscores.** Example:
 
 ```
+Submission was repeated {{rules.noxpost.largestRepeat}} times
+```
+Produces
 
-**To see what data is available for individual Rules [consult the schema](#configuration) for each Rule.**
+> Submission was repeated 7 times
 
 #### Quick Templating Tutorial
 

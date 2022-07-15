@@ -130,3 +130,59 @@ retention: 2000
 runs:
   ...
 ```
+
+# Influx
+
+ContextMod supports writing detailed time-series data to [InfluxDB](https://www.influxdata.com/). 
+
+This data can be used to monitor the overall health, performance, and metrics for a ContextMod server. Currently, this data can **only be used by an Operator** as it requires access to the operator configuration and CM instance.
+
+CM supports InfluxDB OSS > 2.3 or InfluxDB Cloud.
+
+**Note:** This is an **advanced feature** and assumes you have enough technical knowledge to follow the documentation provided by each application to deploy and configure them. No support is guaranteed for installation, configuration, or use of Influx and Grafana.
+
+## Supported Metrics
+
+TBA
+
+## Setup
+
+### InfluxDB OSS
+
+* Install [InfluxDB](https://docs.influxdata.com/influxdb/v2.3/install/)
+* [Configure InfluxDB using the UI](https://docs.influxdata.com/influxdb/v2.3/install/#set-up-influxdb-through-the-ui)
+  * You will need **Username**, **Password**, **Organization Name**, and **Bucket Name** later for Grafana setup so make sure to record them somewhere
+* [Create a Token](https://docs.influxdata.com/influxdb/v2.3/security/tokens/create-token/) with enough permissions to write/read to the bucket you configured
+  * After the token is created **view/copy the token** to clipboard by clicking the token name. You will need this for Grafana setup.
+
+### ContextMod
+
+Add the following block to the top-level of your operator configuration:
+
+```yaml
+influxConfig:
+  credentials:
+    url: 'http://localhost:8086' # URL to your influx DB instance
+    token: '9RtZ5YZ6bfEXAMPLENJsTSKg==' # token created in the previous step
+    org: MyOrg # organization created in the previous step
+    bucket: contextmod # name of the bucket created in the previous step
+```
+
+## Grafana
+
+A pre-built dashboard for [Grafana](https://grafana.com) can be imported to display overall metrics/stats using InfluxDB data.
+
+![Grafana Dashboard](/docs/images/grafana.jpg)
+
+* Create a new Data Source using **InfluxDB** type
+  * Choose **Flux** for the **Query Language**
+  * Fill in the details for **URL**, **Basic Auth Details** and **InfluxDB Details** using the data you created in the [Influx Setup step](#influxdb-oss)
+  * Set **Min time interval** to `60s`
+  * Click **Save and test**
+* Import Dashboard
+  * **Browse** the Dashboard pane
+  * Click **Import** and **upload** the [grafana dashboard json file](/docs/operator/grafana.json)
+    * Chose the data source you created from the **InfluxDB CM** dropdown
+    * Click **Import**
+
+The dashboard can be filtered by **Bots** and **Subreddits** dropdowns at the top of the page to get more specific details.

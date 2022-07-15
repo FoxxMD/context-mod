@@ -78,8 +78,8 @@
                     "description": "* true/false => test whether Activity is removed or not\n* string or list of strings => test which moderator removed this Activity"
                 },
                 "reports": {
-                    "description": "A string containing a comparison operator and a value to compare against\n\nThe syntax is `(< OR > OR <= OR >=) <number>`\n\n* EX `> 2`  => greater than 2 total reports\n\nDefaults to TOTAL reports on an Activity. Suffix the value with the report type to check that type:\n\n* EX `> 3 mod` => greater than 3 mod reports\n* EX `>= 1 user` => greater than 1 user report",
-                    "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
+                    "description": "A string containing a comparison operator, a value to compare against, an (optional) report type filter, an (optional) qualifier for report reason, and an (optional) time constraint\n\nThe syntax is `(< OR > OR <= OR >=) number[%] [type] [reasonQualifier] [timeValue] [timeUnit]`\n\nIf only comparison and number is given then defaults to TOTAL reports on an Activity.\n\n* EX `> 2`  => greater than 2 total reports\n\nType (optional) determines which type of reports to look at:\n\n* `mod` -- mod reports\n  * EX `> 3 mod` => greater than 3 mod reports\n* `user` -- user reports\n  * EX `> 3 user` => greater than 3 user reports\n\nReport reason qualifiers can be:\n\n* enclosed double or single quotes -- report reason contains\n  * EX `> 1 \"misinformation\" => greater than 1 report with reason containing \"misinformation\"\n* enclosed in backslashes -- match regex\n  * EX `> 1 \\harassment towards .*\\` => greater than 1 report with reason matching regex \\harassment towards .*\\\n\nType and reason qualifiers can be used together:\n\nEX `> 2 user \"misinformation\" => greater than 2 user reports with reasons containing \"misinformation\"\n\nThe time constraint filter reports created between NOW and [timeConstraint] in the past:\n\n* `> 3 in 30 minutes` => more than 3 reports created between NOW and 30 minutes ago\n* `> 2 user \"misinformation\" in 2 hours` => more than 2 user reports containing \"misinformation\" created between NOW and 2 hours ago",
+                    "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)(\\s*%)?(\\s+(?:mods?|users?))?(\\s+(?:[\"'].*[\"']|\\/.*\\/))?.*(\\d+)?\\s*(days?|weeks?|months?|years?|hours?|minutes?|seconds?|milliseconds?)?\\s*$",
                     "type": "string"
                 },
                 "score": {
@@ -919,7 +919,7 @@
                     "type": "string"
                 },
                 "note": {
-                    "description": "A mod note for this ban",
+                    "description": "A mod note for this ban. Can use Templating.\n\nIf the length expands to more than 100 characters it will truncated with \"...\"",
                     "examples": [
                         "Sock puppet for u/AnotherUser"
                     ],
@@ -927,7 +927,7 @@
                     "type": "string"
                 },
                 "reason": {
-                    "description": "Reason for ban.",
+                    "description": "Reason for ban. Can use Templating.\n\nIf the length expands to more than 100 characters it will truncated with \"...\"",
                     "examples": [
                         "repeat spam"
                     ],
@@ -1386,7 +1386,7 @@
             ],
             "type": "object"
         },
-        "CommentCheckJson": {
+        "CommentCheckConfigData": {
             "properties": {
                 "actions": {
                     "description": "The `Actions` to run after the check is successfully triggered. ALL `Actions` will run in the order they are listed\n\n Can be `Action` or the `name` of any **named** `Action` in your subreddit's configuration",
@@ -1404,6 +1404,9 @@
                     ],
                     "items": {
                         "anyOf": [
+                            {
+                                "$ref": "#/definitions/IncludesData"
+                            },
                             {
                                 "$ref": "#/definitions/FlairActionJson"
                             },
@@ -1518,16 +1521,16 @@
                 "itemIs": {
                     "anyOf": [
                         {
-                            "$ref": "#/definitions/FilterOptionsJson<CommentState>"
-                        },
-                        {
                             "items": {
                                 "anyOf": [
+                                    {
+                                        "$ref": "#/definitions/SubmissionState"
+                                    },
                                     {
                                         "$ref": "#/definitions/CommentState"
                                     },
                                     {
-                                        "$ref": "#/definitions/NamedCriteria<CommentState>"
+                                        "$ref": "#/definitions/NamedCriteria<TypedActivityState>"
                                     },
                                     {
                                         "type": "string"
@@ -1535,6 +1538,9 @@
                                 ]
                             },
                             "type": "array"
+                        },
+                        {
+                            "$ref": "#/definitions/FilterOptionsJson<TypedActivityState>"
                         }
                     ],
                     "description": "A list of criteria to test the state of the `Activity` against before running the check.\n\nIf any set of criteria passes the Check will be run. If the criteria fails then the Check will fail.\n\n* @examples [[{\"over_18\": true, \"removed': false}]]"
@@ -1588,6 +1594,9 @@
                     "items": {
                         "anyOf": [
                             {
+                                "$ref": "#/definitions/IncludesData"
+                            },
+                            {
                                 "$ref": "#/definitions/RecentActivityRuleJSONConfig"
                             },
                             {
@@ -1612,7 +1621,7 @@
                                 "$ref": "#/definitions/SentimentRuleJSONConfig"
                             },
                             {
-                                "$ref": "#/definitions/RuleSetJson"
+                                "$ref": "#/definitions/RuleSetConfigData"
                             },
                             {
                                 "type": "string"
@@ -1721,8 +1730,8 @@
                     "description": "* true/false => test whether Activity is removed or not\n* string or list of strings => test which moderator removed this Activity"
                 },
                 "reports": {
-                    "description": "A string containing a comparison operator and a value to compare against\n\nThe syntax is `(< OR > OR <= OR >=) <number>`\n\n* EX `> 2`  => greater than 2 total reports\n\nDefaults to TOTAL reports on an Activity. Suffix the value with the report type to check that type:\n\n* EX `> 3 mod` => greater than 3 mod reports\n* EX `>= 1 user` => greater than 1 user report",
-                    "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
+                    "description": "A string containing a comparison operator, a value to compare against, an (optional) report type filter, an (optional) qualifier for report reason, and an (optional) time constraint\n\nThe syntax is `(< OR > OR <= OR >=) number[%] [type] [reasonQualifier] [timeValue] [timeUnit]`\n\nIf only comparison and number is given then defaults to TOTAL reports on an Activity.\n\n* EX `> 2`  => greater than 2 total reports\n\nType (optional) determines which type of reports to look at:\n\n* `mod` -- mod reports\n  * EX `> 3 mod` => greater than 3 mod reports\n* `user` -- user reports\n  * EX `> 3 user` => greater than 3 user reports\n\nReport reason qualifiers can be:\n\n* enclosed double or single quotes -- report reason contains\n  * EX `> 1 \"misinformation\" => greater than 1 report with reason containing \"misinformation\"\n* enclosed in backslashes -- match regex\n  * EX `> 1 \\harassment towards .*\\` => greater than 1 report with reason matching regex \\harassment towards .*\\\n\nType and reason qualifiers can be used together:\n\nEX `> 2 user \"misinformation\" => greater than 2 user reports with reasons containing \"misinformation\"\n\nThe time constraint filter reports created between NOW and [timeConstraint] in the past:\n\n* `> 3 in 30 minutes` => more than 3 reports created between NOW and 30 minutes ago\n* `> 2 user \"misinformation\" in 2 hours` => more than 2 user reports containing \"misinformation\" created between NOW and 2 hours ago",
+                    "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)(\\s*%)?(\\s+(?:mods?|users?))?(\\s+(?:[\"'].*[\"']|\\/.*\\/))?.*(\\d+)?\\s*(days?|weeks?|months?|years?|hours?|minutes?|seconds?|milliseconds?)?\\s*$",
                     "type": "string"
                 },
                 "score": {
@@ -2519,102 +2528,6 @@
             },
             "type": "object"
         },
-        "FilterOptionsJson<CommentState>": {
-            "properties": {
-                "exclude": {
-                    "description": "Only runs if `include` is not present. Each Criteria is comprised of conditions that the filter (Author/Item) being checked must \"not\" pass. See excludeCondition for set behavior\n\nEX: `isMod: true, name: Automoderator` => Will pass if the Author IS NOT a mod and IS NOT named Automoderator",
-                    "items": {
-                        "anyOf": [
-                            {
-                                "$ref": "#/definitions/CommentState"
-                            },
-                            {
-                                "$ref": "#/definitions/NamedCriteria<CommentState>"
-                            },
-                            {
-                                "type": "string"
-                            }
-                        ]
-                    },
-                    "type": "array"
-                },
-                "excludeCondition": {
-                    "default": "OR",
-                    "description": "* OR => if ANY exclude condition \"does not\" pass then the exclude test passes\n* AND => if ALL exclude conditions \"do not\" pass then the exclude test passes\n\nDefaults to OR",
-                    "enum": [
-                        "AND",
-                        "OR"
-                    ],
-                    "type": "string"
-                },
-                "include": {
-                    "description": "Will \"pass\" if any set of Criteria passes",
-                    "items": {
-                        "anyOf": [
-                            {
-                                "$ref": "#/definitions/CommentState"
-                            },
-                            {
-                                "$ref": "#/definitions/NamedCriteria<CommentState>"
-                            },
-                            {
-                                "type": "string"
-                            }
-                        ]
-                    },
-                    "type": "array"
-                }
-            },
-            "type": "object"
-        },
-        "FilterOptionsJson<SubmissionState>": {
-            "properties": {
-                "exclude": {
-                    "description": "Only runs if `include` is not present. Each Criteria is comprised of conditions that the filter (Author/Item) being checked must \"not\" pass. See excludeCondition for set behavior\n\nEX: `isMod: true, name: Automoderator` => Will pass if the Author IS NOT a mod and IS NOT named Automoderator",
-                    "items": {
-                        "anyOf": [
-                            {
-                                "$ref": "#/definitions/SubmissionState"
-                            },
-                            {
-                                "$ref": "#/definitions/NamedCriteria<SubmissionState>"
-                            },
-                            {
-                                "type": "string"
-                            }
-                        ]
-                    },
-                    "type": "array"
-                },
-                "excludeCondition": {
-                    "default": "OR",
-                    "description": "* OR => if ANY exclude condition \"does not\" pass then the exclude test passes\n* AND => if ALL exclude conditions \"do not\" pass then the exclude test passes\n\nDefaults to OR",
-                    "enum": [
-                        "AND",
-                        "OR"
-                    ],
-                    "type": "string"
-                },
-                "include": {
-                    "description": "Will \"pass\" if any set of Criteria passes",
-                    "items": {
-                        "anyOf": [
-                            {
-                                "$ref": "#/definitions/SubmissionState"
-                            },
-                            {
-                                "$ref": "#/definitions/NamedCriteria<SubmissionState>"
-                            },
-                            {
-                                "type": "string"
-                            }
-                        ]
-                    },
-                    "type": "array"
-                }
-            },
-            "type": "object"
-        },
         "FilterOptionsJson<SubredditCriteria>": {
             "properties": {
                 "exclude": {
@@ -3284,6 +3197,41 @@
                     "type": "number"
                 }
             },
+            "type": "object"
+        },
+        "IncludesData": {
+            "properties": {
+                "path": {
+                    "description": "The special-form path to the config fragment to retrieve.\n\nIf value starts with `wiki:` then the proceeding value will be used to get a wiki page from the current subreddit\n\n * EX `wiki:botconfig/mybot` tries to get `https://reddit.com/r/currentSubreddit/wiki/botconfig/mybot`\n\nIf the value starts with `wiki:` and ends with `|someValue` then `someValue` will be used as the base subreddit for the wiki page\n\n* EX `wiki:replytemplates/test|ContextModBot` tries to get `https://reddit.com/r/ContextModBot/wiki/replytemplates/test`\n\nIf the value starts with `url:` then the value is fetched as an external url and expects raw text returned\n\n* EX `url:https://pastebin.com/raw/38qfL7mL` tries to get the text response of `https://pastebin.com/raw/38qfL7mL`",
+                    "type": "string"
+                },
+                "ttl": {
+                    "anyOf": [
+                        {
+                            "enum": [
+                                false,
+                                "response",
+                                true
+                            ]
+                        },
+                        {
+                            "type": "number"
+                        }
+                    ],
+                    "description": "Control caching for the config fragment.\n\nIf not specified the value for `wikiTTL` will be used\n\n* If true then value is cached forever\n* If false then value is never cached\n* If a number then the number of seconds to cache value\n* If 'response' then CM will attempt to use Cache-Control or Expires headers from the response to determine how long to cache the value"
+                },
+                "type": {
+                    "description": "An unused hint about the content type. Not implemented yet",
+                    "enum": [
+                        "json",
+                        "yaml"
+                    ],
+                    "type": "string"
+                }
+            },
+            "required": [
+                "path"
+            ],
             "type": "object"
         },
         "LockActionJson": {
@@ -5268,7 +5216,7 @@
             ],
             "type": "object"
         },
-        "RuleSetJson": {
+        "RuleSetConfigData": {
             "description": "A RuleSet is a \"nested\" set of `Rule` objects that can be used to create more complex AND/OR behavior. Think of the outcome of a `RuleSet` as the result of all of its run `Rule` objects (based on `condition`)",
             "properties": {
                 "condition": {
@@ -5287,6 +5235,9 @@
                     "description": "Can be `Rule` or the `name` of any **named** `Rule` in your subreddit's configuration",
                     "items": {
                         "anyOf": [
+                            {
+                                "$ref": "#/definitions/IncludesData"
+                            },
                             {
                                 "$ref": "#/definitions/RecentActivityRuleJSONConfig"
                             },
@@ -5325,7 +5276,7 @@
             ],
             "type": "object"
         },
-        "RunJson": {
+        "RunConfigData": {
             "properties": {
                 "authorIs": {
                     "anyOf": [
@@ -5355,10 +5306,16 @@
                     "items": {
                         "anyOf": [
                             {
-                                "$ref": "#/definitions/SubmissionCheckJson"
+                                "$ref": "#/definitions/IncludesData"
                             },
                             {
-                                "$ref": "#/definitions/CommentCheckJson"
+                                "$ref": "#/definitions/SubmissionCheckConfigData"
+                            },
+                            {
+                                "$ref": "#/definitions/CommentCheckConfigData"
+                            },
+                            {
+                                "type": "string"
                             }
                         ]
                     },
@@ -5697,7 +5654,7 @@
             ],
             "type": "object"
         },
-        "SubmissionCheckJson": {
+        "SubmissionCheckConfigData": {
             "properties": {
                 "actions": {
                     "description": "The `Actions` to run after the check is successfully triggered. ALL `Actions` will run in the order they are listed\n\n Can be `Action` or the `name` of any **named** `Action` in your subreddit's configuration",
@@ -5715,6 +5672,9 @@
                     ],
                     "items": {
                         "anyOf": [
+                            {
+                                "$ref": "#/definitions/IncludesData"
+                            },
                             {
                                 "$ref": "#/definitions/FlairActionJson"
                             },
@@ -5835,7 +5795,10 @@
                                         "$ref": "#/definitions/SubmissionState"
                                     },
                                     {
-                                        "$ref": "#/definitions/NamedCriteria<SubmissionState>"
+                                        "$ref": "#/definitions/CommentState"
+                                    },
+                                    {
+                                        "$ref": "#/definitions/NamedCriteria<TypedActivityState>"
                                     },
                                     {
                                         "type": "string"
@@ -5845,7 +5808,7 @@
                             "type": "array"
                         },
                         {
-                            "$ref": "#/definitions/FilterOptionsJson<SubmissionState>"
+                            "$ref": "#/definitions/FilterOptionsJson<TypedActivityState>"
                         }
                     ],
                     "description": "A list of criteria to test the state of the `Activity` against before running the check.\n\nIf any set of criteria passes the Check will be run. If the criteria fails then the Check will fail.\n\n* @examples [[{\"over_18\": true, \"removed': false}]]"
@@ -5899,6 +5862,9 @@
                     "items": {
                         "anyOf": [
                             {
+                                "$ref": "#/definitions/IncludesData"
+                            },
+                            {
                                 "$ref": "#/definitions/RecentActivityRuleJSONConfig"
                             },
                             {
@@ -5923,7 +5889,7 @@
                                 "$ref": "#/definitions/SentimentRuleJSONConfig"
                             },
                             {
-                                "$ref": "#/definitions/RuleSetJson"
+                                "$ref": "#/definitions/RuleSetConfigData"
                             },
                             {
                                 "type": "string"
@@ -6088,8 +6054,8 @@
                     "description": "* true/false => test whether Activity is removed or not\n* string or list of strings => test which moderator removed this Activity"
                 },
                 "reports": {
-                    "description": "A string containing a comparison operator and a value to compare against\n\nThe syntax is `(< OR > OR <= OR >=) <number>`\n\n* EX `> 2`  => greater than 2 total reports\n\nDefaults to TOTAL reports on an Activity. Suffix the value with the report type to check that type:\n\n* EX `> 3 mod` => greater than 3 mod reports\n* EX `>= 1 user` => greater than 1 user report",
-                    "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
+                    "description": "A string containing a comparison operator, a value to compare against, an (optional) report type filter, an (optional) qualifier for report reason, and an (optional) time constraint\n\nThe syntax is `(< OR > OR <= OR >=) number[%] [type] [reasonQualifier] [timeValue] [timeUnit]`\n\nIf only comparison and number is given then defaults to TOTAL reports on an Activity.\n\n* EX `> 2`  => greater than 2 total reports\n\nType (optional) determines which type of reports to look at:\n\n* `mod` -- mod reports\n  * EX `> 3 mod` => greater than 3 mod reports\n* `user` -- user reports\n  * EX `> 3 user` => greater than 3 user reports\n\nReport reason qualifiers can be:\n\n* enclosed double or single quotes -- report reason contains\n  * EX `> 1 \"misinformation\" => greater than 1 report with reason containing \"misinformation\"\n* enclosed in backslashes -- match regex\n  * EX `> 1 \\harassment towards .*\\` => greater than 1 report with reason matching regex \\harassment towards .*\\\n\nType and reason qualifiers can be used together:\n\nEX `> 2 user \"misinformation\" => greater than 2 user reports with reasons containing \"misinformation\"\n\nThe time constraint filter reports created between NOW and [timeConstraint] in the past:\n\n* `> 3 in 30 minutes` => more than 3 reports created between NOW and 30 minutes ago\n* `> 2 user \"misinformation\" in 2 hours` => more than 2 user reports containing \"misinformation\" created between NOW and 2 hours ago",
+                    "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)(\\s*%)?(\\s+(?:mods?|users?))?(\\s+(?:[\"'].*[\"']|\\/.*\\/))?.*(\\d+)?\\s*(days?|weeks?|months?|years?|hours?|minutes?|seconds?|milliseconds?)?\\s*$",
                     "type": "string"
                 },
                 "score": {
@@ -6123,6 +6089,13 @@
                 "title": {
                     "description": "A valid regular expression to match against the title of the submission",
                     "type": "string"
+                },
+                "upvoteRatio": {
+                    "description": "Compare the upvote ratio for this Submission, expressed as a whole number\n\nCan be either a comparison string or a number. If a number then CM assumes upvote ratio must be greater than or equal to this.\n\nExample:\n\n* `< 90` => less than 90% upvoted\n* 45 => greater than or equal to 45% upvoted",
+                    "type": [
+                        "string",
+                        "number"
+                    ]
                 }
             },
             "type": "object"
@@ -6492,10 +6465,16 @@
             "items": {
                 "anyOf": [
                     {
-                        "$ref": "#/definitions/SubmissionCheckJson"
+                        "$ref": "#/definitions/IncludesData"
                     },
                     {
-                        "$ref": "#/definitions/CommentCheckJson"
+                        "$ref": "#/definitions/SubmissionCheckConfigData"
+                    },
+                    {
+                        "$ref": "#/definitions/CommentCheckConfigData"
+                    },
+                    {
+                        "type": "string"
                     }
                 ]
             },
@@ -6596,7 +6575,17 @@
         "runs": {
             "description": "A list of sets of Checks to run",
             "items": {
-                "$ref": "#/definitions/RunJson"
+                "anyOf": [
+                    {
+                        "$ref": "#/definitions/IncludesData"
+                    },
+                    {
+                        "$ref": "#/definitions/RunConfigData"
+                    },
+                    {
+                        "type": "string"
+                    }
+                ]
             },
             "minItems": 1,
             "type": "array"

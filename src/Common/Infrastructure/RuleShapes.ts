@@ -1,10 +1,12 @@
 import {StructuredRunnableBase} from "./Runnable";
-import {RuleSetObjectJson} from "../../Rule/RuleSet";
+import {RuleSetConfigObject} from "../../Rule/RuleSet";
 import {RuleObjectJsonTypes} from "../types";
+import {IncludesData} from "./Includes";
 
-export type RuleJson = RuleObjectJsonTypes | string;
-export type RuleObjectJson = Exclude<RuleJson, string>
-export type StructuredRuleObjectJson = Omit<RuleObjectJson, 'authorIs' | 'itemIs'> & StructuredRunnableBase
-export type StructuredRuleSetObjectJson = Omit<RuleSetObjectJson, 'rules'> & {
-    rules: StructuredRuleObjectJson[]
+export type RuleConfigData = RuleObjectJsonTypes | string | IncludesData;
+export type RuleConfigHydratedData = Exclude<RuleConfigData, IncludesData>
+export type RuleConfigObject = Exclude<RuleConfigHydratedData, string>
+export type StructuredRuleConfigObject = Omit<RuleConfigObject, 'authorIs' | 'itemIs'> & StructuredRunnableBase
+export type StructuredRuleSetConfigObject = Omit<RuleSetConfigObject, 'rules'> & {
+    rules: StructuredRuleConfigObject[]
 }

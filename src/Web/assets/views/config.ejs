@@ -242,39 +242,64 @@
 </script>
 <script defer="defer" src="/public/yaml/entry.js"></script>
 <script>
-    const gistReg = new RegExp(/.*gist.github.com\/.+\/(.+)/i)
+    const GIST_RAW_REGEX = new RegExp(/.*gist\.github\.com\/(.+)\/(.+)\/raw\/.+/i)
+    // match[1] = username
+    // match[2] = gistId
+    // match[3] = filename (optional)
+    const gistReg = new RegExp(/.*gist\.github\.com\/(.+)\/([^#\/]+)(?:#file-(.+))?/i)
     const blobReg = new RegExp(/.*github.com\/(.+)\/(.+)\/blob\/(.+)/i);
+
+    const normalizeGistFileKey = (val) => val.replaceAll(/[^\w\d]/g, '').toLowerCase().trim();
 
     function getPayloadUrl(url) {
         console.debug(`Attempting to detect resolvable URL for ${url}`);
-        let match = url.match(gistReg);
-        if (match !== null) {
-            const gistApiUrl = `https://api.github.com/gists/${match[1]}`;
-            console.debug(`Looks like a non-raw gist URL! Trying to resolve ${gistApiUrl}`);
-
+        let match = url.match(GIST_RAW_REGEX);
+        if(match !== null) {
             return new Promise((resolve, reject) => {
-                fetch(gistApiUrl).then((resp) => {
-                    if (!resp.ok) {
-                        console.error('Response was not OK from Gist API');
-                        resolve(url);
-                    } else {
-                        resp.json().then((data) => {
-                            // get first found file
-                            const fileKeys = Object.keys(data.files);
-                            if (fileKeys.length === 0) {
-                                console.error(`No files found in gist!`);
-                            } else {
-                                if (fileKeys.length > 1) {
-                                    console.warn(`More than one file found in gist! Using first found: ${fileKeys[0]}`);
+                // need to use CDN url or else we get a CORS policy error
+                resolve(url.replace('gist.github.com', 'gist.githubusercontent.com'));
+            })
+        } else {
+            match = url.match(gistReg);
+            if (match !== null) {
+                const gistApiUrl = `https://api.github.com/gists/${match[2]}`;
+                console.debug(`Looks like a non-raw gist URL! Trying to resolve ${gistApiUrl}`);
+
+                return new Promise((resolve, reject) => {
+                    fetch(gistApiUrl).then((resp) => {
+                        if (!resp.ok) {
+                            console.error('Response was not OK from Gist API');
+                            resolve(url);
+                        } else {
+                            resp.json().then((data) => {
+                                // get first found file
+                                const fileKeys = Object.keys(data.files);
+                                if (fileKeys.length === 0) {
+                                    console.error(`No files found in gist!`);
+                                } else {
+                                    let fileKey = fileKeys[0];
+                                    if (fileKeys.length > 1) {
+                                        if(match[3] !== undefined) {
+                                            //const normalizedFileName = normalizeGistFileKey(match.named.fileName.replace('/^file-/', ''));
+                                            const normalizedFileName = normalizeGistFileKey(match[3]);
+                                            const matchingKey = fileKeys.find(x => normalizeGistFileKey(x) === normalizedFileName);
+                                            if(matchingKey === undefined) {
+                                                console.error(`Found Gist ${match[2]} but it did not contain a file named ${match[3]}`);
+                                            }
+                                            fileKey = matchingKey;
+                                        } else {
+                                            console.warn(`More than one file found in gist but URL did not specify a filename! Using first found: ${fileKey}`);
+                                        }
+                                    }
+                                    const rawUrl = data.files[fileKey].raw_url;
+                                    console.debug(`Resolving raw gist url for file found (${fileKey}) to ${rawUrl}`);
+                                    resolve(rawUrl);
                                 }
-                                const rawUrl = data.files[fileKeys[0]].raw_url;
-                                console.debug(`Resolving raw gist url for first file found (${fileKeys[0]}) to ${rawUrl}`);
-                                resolve(rawUrl);
-                            }
-                        });
-                    }
-                })
-            });
+                            });
+                        }
+                    })
+                });
+            }
         }
 
         match = url.match(blobReg);

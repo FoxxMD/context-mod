@@ -18,7 +18,7 @@ import {
     mergeArr,
     parseBool,
     parseDuration, parseMatchMessage, parseRedditEntity,
-    parseSubredditName, RetryOptions,
+    parseSubredditName, partition, RetryOptions,
     sleep
 } from "../util";
 import {Manager} from "../Subreddit/Manager";
@@ -41,6 +41,8 @@ import {ManagerRunState} from "../Common/Entities/EntityRunState/ManagerRunState
 import {Invokee, PollOn} from "../Common/Infrastructure/Atomic";
 import {FilterCriteriaDefaults} from "../Common/Infrastructure/Filters/FilterShapes";
 import {snooLogWrapper} from "../Utils/loggerFactory";
+import {InfluxClient} from "../Common/Influx/InfluxClient";
+import {Point} from "@influxdata/influxdb-client";
 
 class Bot {
 
@@ -49,6 +51,7 @@ class Bot {
     logs: LogInfo[] = [];
     wikiLocation: string;
     dryRun?: true | undefined;
+    inited: boolean = false;
     running: boolean = false;
     subreddits: string[];
     excludeSubreddits: string[];
@@ -71,6 +74,7 @@ class Bot {
     botName?: string;
     botLink?: string;
     botAccount?: string;
+    botUser?: RedditUser;
     maxWorkers: number;
     startedAt: Dayjs = dayjs();
     sharedStreams: PollOn[] = [];
@@ -89,6 +93,8 @@ class Bot {
     cacheManager: BotResourcesManager;
 
     config: BotInstanceConfig;
+
+    influxClients: InfluxClient[] = [];
 
     database: DataSource
     invokeeRepo: Repository<InvokeeType>;
@@ -177,8 +183,11 @@ class Bot {
 
         this.logger.stream().on('log', (log: LogInfo) => {
             if(log.bot !== undefined && log.bot === this.getBotName() && log.subreddit === undefined) {
-                const combinedLogs = [log, ...this.logs];
-                this.logs = combinedLogs.slice(0, 301);
+                this.logs.unshift(log);
+                if(this.logs.length > 300) {
+                    // remove all elements starting from the 300th index (301st item)
+                    this.logs.splice(300);
+                }
             }
         });
 
@@ -311,33 +320,22 @@ class Bot {
         }
     }
 
-    async testClient(initial = true) {
-        try {
-            // @ts-ignore
-            await this.client.getMe();
-            this.logger.info('Test API call successful');
-        } catch (err: any) {
-            if (initial) {
-                this.logger.error('An error occurred while trying to initialize the Reddit API Client which would prevent the entire application from running.');
-            }
-            const hint = getExceptionMessage(err, {
-                401: 'Likely a credential is missing or incorrect. Check clientId, clientSecret, refreshToken, and accessToken',
-                400: 'Credentials may have been invalidated manually or by reddit due to behavior',
-            });
-            let msg = `Error occurred while testing Reddit API client${hint !== undefined ? `: ${hint}` : ''}`;
-            this.error = msg;
-            const clientError = new CMError(msg, {cause: err});
-            clientError.logged = true;
-            this.logger.error(clientError);
-            throw clientError;
-        }
-    }
+    async init() {
 
-    async buildManagers(subreddits: string[] = []) {
-        let availSubs = [];
-        // @ts-ignore
-        const user = await this.client.getMe().fetch();
+        if(this.inited) {
+            return;
+        }
+
+        let user: RedditUser;
+        try {
+            user = await this.testClient();
+        } catch(err: any) {
+            this.logger.error('An error occurred while trying to initialize the Reddit API Client which would prevent the Bot from running.');
+            throw err;
+        }
+
         this.cacheManager.botName = user.name;
+        this.botUser = user;
         this.botLink = `https://reddit.com/user/${user.name}`;
         this.botAccount = `u/${user.name}`;
         this.logger.info(`Reddit API Limit Remaining: ${this.client.ratelimitRemaining}`);
@@ -364,35 +362,78 @@ class Bot {
             this.botEntity = b;
         }
 
+        if(this.config.opInflux !== undefined) {
+            this.influxClients.push(this.config.opInflux.childClient(this.logger, {bot: user.name}));
+            if(this.config.influxConfig !== undefined) {
+                const iClient = new InfluxClient(this.config.influxConfig, this.logger, {bot: user.name});
+                await iClient.isReady();
+                this.influxClients.push(iClient);
+            }
+        }
+
+        this.inited = true;
+    }
+
+    // @ts-ignore
+    async testClient(initial = true) {
+        try {
+            // @ts-ignore
+            const user = this.client.getMe().fetch();
+            this.logger.info('Test API call successful');
+            return user;
+        } catch (err: any) {
+            if (initial) {
+                this.logger.error('An error occurred while trying to initialize the Reddit API Client which would prevent the entire application from running.');
+            }
+            const hint = getExceptionMessage(err, {
+                401: 'Likely a credential is missing or incorrect. Check clientId, clientSecret, refreshToken, and accessToken',
+                400: 'Credentials may have been invalidated manually or by reddit due to behavior',
+            });
+            let msg = `Error occurred while testing Reddit API client${hint !== undefined ? `: ${hint}` : ''}`;
+            this.error = msg;
+            const clientError = new CMError(msg, {cause: err});
+            clientError.logged = true;
+            this.logger.error(clientError);
+            throw clientError;
+        }
+    }
+
+    async buildManagers(subreddits: string[] = []) {
+        await this.init();
+
+        this.logger.verbose('Syncing subreddits to moderate with managers...');
+
+        let availSubs: Subreddit[] = [];
+
         let subListing = await this.client.getModeratedSubreddits({count: 100});
         while(!subListing.isFinished) {
             subListing = await subListing.fetchMore({amount: 100});
         }
-        availSubs = subListing.filter(x => x.display_name !== `u_${user.name}`);
+        availSubs = subListing.filter(x => x.display_name !== `u_${this.botUser?.name}`);
 
-        this.logger.info(`u/${user.name} is a moderator of these subreddits: ${availSubs.map(x => x.display_name_prefixed).join(', ')}`);
+        this.logger.verbose(`${this.botAccount} is a moderator of these subreddits: ${availSubs.map(x => x.display_name_prefixed).join(', ')}`);
 
         let subsToRun: Subreddit[] = [];
         const subsToUse = subreddits.length > 0 ? subreddits.map(parseSubredditName) : this.subreddits;
         if (subsToUse.length > 0) {
-            this.logger.info(`Operator-defined subreddit constraints detected (CLI argument or environmental variable), will try to run on: ${subsToUse.join(', ')}`);
-            for (const sub of subsToUse) {
+            this.logger.info(`Operator-specified subreddit constraints detected, will only use these: ${subsToUse.join(', ')}`);
+            const availSubsCI = availSubs.map(x => x.display_name.toLowerCase());
+            const [foundSubs, notFoundSubs] = partition(subsToUse, (aSub) => availSubsCI.includes(aSub.toLowerCase()));
+            if(notFoundSubs.length > 0) {
+                this.logger.warn(`Will not run some operator-specified subreddits because they are not modded by, or do not have appropriate mod permissions for, this bot: ${notFoundSubs.join(', ')}`);
+            }
+
+            for (const sub of foundSubs) {
                 const asub = availSubs.find(x => x.display_name.toLowerCase() === sub.toLowerCase())
-                if (asub === undefined) {
-                    this.logger.warn(`Will not run on ${sub} because is not modded by, or does not have appropriate permissions to mod with, for this client.`);
-                } else {
-                    // @ts-ignore
-                    const fetchedSub = await asub.fetch();
-                    subsToRun.push(fetchedSub);
-                }
+                subsToRun.push(asub as Subreddit);
             }
         } else {
             if(this.excludeSubreddits.length > 0) {
-                this.logger.info(`Will run on all moderated subreddits but own profile and user-defined excluded: ${this.excludeSubreddits.join(', ')}`);
+                this.logger.info(`Will run on all moderated subreddits EXCEPT own profile and operator-defined excluded: ${this.excludeSubreddits.join(', ')}`);
                 const normalExcludes = this.excludeSubreddits.map(x => x.toLowerCase());
                 subsToRun = availSubs.filter(x => !normalExcludes.includes(x.display_name.toLowerCase()));
             } else {
-                this.logger.info(`No user-defined subreddit constraints detected, will run on all moderated subreddits EXCEPT own profile (${this.botAccount})`);
+                this.logger.info(`No operator-defined subreddit constraints detected, will run on all moderated subreddits EXCEPT own profile (${this.botAccount})`);
                 subsToRun = availSubs;
             }
         }
@@ -421,24 +462,60 @@ class Bot {
             }
         }
 
+        let subManagersChanged = false;
 
-        // get configs for subs we want to run on and build/validate them
+        const subsToRunNames = subsToRun.map(x => x.display_name.toLowerCase());
+
+        // first stop and remove any managers with subreddits not in subsToRun
+        // -- this covers scenario where bot is running and mods of a subreddit de-mod the bot
+        // -- or where the include/exclude subs list changed from operator (not yet implemented)
+        if(this.subManagers.length > 0) {
+            let index = 0;
+            for(const manager of this.subManagers) {
+                if(!subsToRunNames.includes(manager.subreddit.display_name.toLowerCase())) {
+                    subManagersChanged = true;
+                    // determine if bot was de-modded
+                    const deModded = !availSubs.some(x => x.display_name.toLowerCase() === manager.subreddit.display_name.toLowerCase());
+                    this.logger.warn(`Stopping and removing manager for ${manager.subreddit.display_name.toLowerCase()} because it is ${deModded ? 'no longer moderated by this bot' : 'not in the list of subreddits to moderate'}`);
+                    await manager.destroy('system', {reason: deModded ? 'No longer moderated by this bot' : 'Subreddit is not in moderated list'});
+                    this.subManagers.splice(index, 1);
+                }
+                index++;
+            }
+        }
+
+        // then create any managers that don't already exist
+        // -- covers init scenario
+        // -- and in-situ adding subreddits IE bot is modded to a new subreddit while CM is running
+        const subsToInit: string[] = [];
         for (const sub of subsToRun) {
+            if(!this.subManagers.some(x => x.subreddit.display_name === sub.display_name)) {
+                subManagersChanged = true;
+                this.logger.info(`Manager for ${sub.display_name_prefixed} not found in existing managers. Creating now...`);
+                subsToInit.push(sub.display_name);
+                try {
+                    this.subManagers.push(await this.createManager(sub));
+                } catch (err: any) {
+
+                }
+            }
+        }
+        for(const subName of subsToInit) {
             try {
-                this.subManagers.push(await this.createManager(sub));
+                const m = this.subManagers.find(x => x.subreddit.display_name === subName);
+                await this.initManager(m as Manager);
             } catch (err: any) {
 
             }
         }
-        for(const m of this.subManagers) {
-            try {
-                await this.initManager(m);
-            } catch (err: any) {
 
-            }
+        if(!subManagersChanged) {
+            this.logger.verbose('All managers were already synced!');
+        } else {
+            this.parseSharedStreams();
         }
 
-        this.parseSharedStreams();
+        return subManagersChanged;
     }
 
     parseSharedStreams() {
@@ -559,7 +636,7 @@ class Bot {
         }
     }
 
-    async createManager(sub: Subreddit): Promise<Manager> {
+    async createManager(subVal: Subreddit): Promise<Manager> {
         const {
             flowControlDefaults: {
                 maxGotoDepth: botMaxDefault
@@ -569,6 +646,15 @@ class Bot {
                 overrides = [],
             } = {}
         } = this.config;
+
+        let sub = subVal;
+        // make sure the subreddit is fully fetched
+        // @ts-ignore
+        if(subVal._hasFetched === false) {
+            // @ts-ignore
+            sub = await subVal.fetch();
+        }
+
 
         const override = overrides.find(x => {
             const configName = parseRedditEntity(x.name).name;
@@ -630,6 +716,7 @@ class Bot {
             managerEntity: managerEntity as ManagerEntity,
             statDefaults: (statDefaultsFromOverride ?? databaseStatisticsDefaults) as DatabaseStatisticsOperatorConfig,
             retention,
+            influxClients: this.influxClients,
         });
         // all errors from managers will count towards bot-level retry count
         manager.on('error', async (err) => await this.panicOnRetries(err));
@@ -669,21 +756,6 @@ class Bot {
                 await this.client.getSubreddit(name).acceptModeratorInvite();
                 this.logger.info(`Accepted moderator invite for r/${name}!`);
                 await this.cacheManager.deletePendingSubredditInvite(name);
-                // @ts-ignore
-                const sub = await this.client.getSubreddit(name);
-                this.logger.info(`Attempting to add manager for r/${name}`);
-                try {
-                    const manager =  await this.createManager(sub);
-                    this.logger.info(`Starting manager for r/${name}`);
-                    this.subManagers.push(manager);
-                    await this.initManager(manager);
-                    await manager.start('system', {reason: 'Caused by creation due to moderator invite'});
-                    await this.runSharedStreams();
-                } catch (err: any) {
-                    if (!(err instanceof LoggedError)) {
-                        this.logger.error(err);
-                    }
-                }
             } catch (err: any) {
                 if (err.message.includes('NO_INVITE_FOUND')) {
                     this.logger.warn(`No pending moderation invite for r/${name} was found`);
@@ -742,6 +814,7 @@ class Bot {
     async healthLoop() {
         while (this.running) {
             await sleep(5000);
+            await this.apiHealthCheck();
             if (!this.running) {
                 break;
             }
@@ -757,8 +830,17 @@ class Bot {
             }
             if(now.isSameOrAfter(this.nextHeartbeat)) {
                 try {
-                    await this.heartbeat();
+
+                    // run sanity check to see if there is a service issue
+                    try {
+                        await this.testClient(false);
+                    } catch (err: any) {
+                        throw new SimpleError(`Something isn't right! This could be a Reddit API issue (service is down? buggy??) or an issue with the Bot account. Will not run heartbeat operations and will wait until next heartbeat (${dayjs.duration(this.nextHeartbeat.diff(dayjs())).humanize()}) to try again`);
+                    }
+
                     await this.checkModInvites();
+                    await this.buildManagers();
+                    await this.heartbeat();
                 } catch (err: any) {
                     this.logger.error(`Error occurred during heartbeat check: ${err.message}`);
                 }
@@ -768,6 +850,56 @@ class Bot {
             this.retentionCleanup();
         }
         this.emitter.emit('healthStopped');
+    }
+
+    getApiUsageSummary() {
+        const depletion = this.apiEstDepletion === undefined ? 'Not Calculated' : this.apiEstDepletion.humanize();
+        return`API Usage Rolling Avg: ${formatNumber(this.apiRollingAvg)}/s | Est Depletion: ${depletion} (${formatNumber(this.depletedInSecs, {toFixed: 0})} seconds)`;
+    }
+
+    async apiHealthCheck() {
+
+        const rollingSample = this.apiSample.slice(0, 7)
+        rollingSample.unshift(this.client.ratelimitRemaining);
+        this.apiSample = rollingSample;
+        const diff = this.apiSample.reduceRight((acc: number[], curr, index) => {
+            if (this.apiSample[index + 1] !== undefined) {
+                const d = Math.abs(curr - this.apiSample[index + 1]);
+                if (d === 0) {
+                    return [...acc, 0];
+                }
+                return [...acc, d / 10];
+            }
+            return acc;
+        }, []);
+        const diffTotal = diff.reduce((acc, curr) => acc + curr, 0);
+        if(diffTotal === 0 || diff.length === 0) {
+            this.apiRollingAvg = 0;
+        } else {
+            this.apiRollingAvg = diffTotal / diff.length; // api requests per second
+        }
+        this.depletedInSecs = this.apiRollingAvg === 0 ? Number.POSITIVE_INFINITY :  this.client.ratelimitRemaining / this.apiRollingAvg; // number of seconds until current remaining limit is 0
+        // if depletion/api usage is 0 we need a sane value to use here for both displaying in logs as well as for api nanny. 10 years seems reasonable
+        this.apiEstDepletion = dayjs.duration((this.depletedInSecs === Number.POSITIVE_INFINITY ? {years: 10} : {seconds: this.depletedInSecs}));
+
+        if(this.influxClients.length > 0) {
+            const apiMeasure = new Point('apiHealth')
+                .intField('remaining', this.client.ratelimitRemaining)
+                .stringField('nannyMod', this.nannyMode ?? 'none');
+
+            if(this.apiSample.length > 1) {
+                const curr = this.apiSample[0];
+                const last = this.apiSample[1];
+                if(curr <= last) {
+                    apiMeasure.intField('used', last - curr);
+                }
+            }
+
+            for(const iclient of this.influxClients) {
+                await iclient.writePoint(apiMeasure);
+            }
+        }
+
     }
 
     async retentionCleanup() {
@@ -783,15 +915,8 @@ class Bot {
     }
 
     async heartbeat() {
-        const heartbeat = `HEARTBEAT -- API Remaining: ${this.client.ratelimitRemaining} | Usage Rolling Avg: ~${formatNumber(this.apiRollingAvg)}/s | Est Depletion: ${this.apiEstDepletion === undefined ? 'N/A' : this.apiEstDepletion.humanize()} (${formatNumber(this.depletedInSecs, {toFixed: 0})} seconds)`
-        this.logger.info(heartbeat);
+        this.logger.info(`HEARTBEAT -- ${this.getApiUsageSummary()}`);
 
-        // run sanity check to see if there is a service issue
-        try {
-            await this.testClient(false);
-        } catch (err: any) {
-            throw new SimpleError(`Something isn't right! This could be a Reddit API issue (service is down? buggy??) or an issue with the Bot account. Will not run heartbeat operations and will wait until next heartbeat (${dayjs.duration(this.nextHeartbeat.diff(dayjs())).humanize()}) to try again`);
-        }
         let startedAny = false;
 
         for (const s of this.subManagers) {
@@ -844,6 +969,7 @@ class Bot {
 
     async runApiNanny() {
         try {
+            this.logger.debug(this.getApiUsageSummary());
             this.nextExpiration = dayjs(this.client.ratelimitExpiration);
             const nowish = dayjs().add(10, 'second');
             if (nowish.isAfter(this.nextExpiration)) {
@@ -867,30 +993,12 @@ class Bot {
                 }
                 this.nextExpiration = dayjs(this.client.ratelimitExpiration);
             }
-            const rollingSample = this.apiSample.slice(0, 7)
-            rollingSample.unshift(this.client.ratelimitRemaining);
-            this.apiSample = rollingSample;
-            const diff = this.apiSample.reduceRight((acc: number[], curr, index) => {
-                if (this.apiSample[index + 1] !== undefined) {
-                    const d = Math.abs(curr - this.apiSample[index + 1]);
-                    if (d === 0) {
-                        return [...acc, 0];
-                    }
-                    return [...acc, d / 10];
-                }
-                return acc;
-            }, []);
-            this.apiRollingAvg = diff.reduce((acc, curr) => acc + curr, 0) / diff.length; // api requests per second
-            this.depletedInSecs = this.client.ratelimitRemaining / this.apiRollingAvg; // number of seconds until current remaining limit is 0
-            this.apiEstDepletion = dayjs.duration({seconds: this.depletedInSecs});
-            this.logger.debug(`API Usage Rolling Avg: ${formatNumber(this.apiRollingAvg)}/s | Est Depletion: ${this.apiEstDepletion.humanize()} (${formatNumber(this.depletedInSecs, {toFixed: 0})} seconds)`);
-
 
             let hardLimitHit = false;
-            if (typeof this.hardLimit === 'string') {
+            if (typeof this.hardLimit === 'string' && this.apiEstDepletion !== undefined) {
                 const hardDur = parseDuration(this.hardLimit);
                 hardLimitHit = hardDur.asSeconds() > this.apiEstDepletion.asSeconds();
-            } else {
+            } else if(typeof this.hardLimit === 'number') {
                 hardLimitHit = this.hardLimit > this.client.ratelimitRemaining;
             }
 
@@ -899,7 +1007,6 @@ class Bot {
                     return;
                 }
                 this.logger.info(`Detected HARD LIMIT of ${this.hardLimit} remaining`, {leaf: 'Api Nanny'});
-                this.logger.info(`API Remaining: ${this.client.ratelimitRemaining} | Usage Rolling Avg: ${this.apiRollingAvg}/s | Est Depletion: ${this.apiEstDepletion.humanize()} (${formatNumber(this.depletedInSecs, {toFixed: 0})} seconds)`, {leaf: 'Api Nanny'});
                 this.logger.info(`All subreddit event polling has been paused`, {leaf: 'Api Nanny'});
 
                 for (const m of this.subManagers) {
@@ -916,10 +1023,10 @@ class Bot {
             }
 
             let softLimitHit = false;
-            if (typeof this.softLimit === 'string') {
+            if (typeof this.softLimit === 'string' && this.apiEstDepletion !== undefined) {
                 const softDur = parseDuration(this.softLimit);
                 softLimitHit = softDur.asSeconds() > this.apiEstDepletion.asSeconds();
-            } else {
+            } else if(typeof this.softLimit === 'number') {
                 softLimitHit = this.softLimit > this.client.ratelimitRemaining;
             }
 
@@ -928,7 +1035,6 @@ class Bot {
                     return;
                 }
                 this.logger.info(`Detected SOFT LIMIT of ${this.softLimit} remaining`, {leaf: 'Api Nanny'});
-                this.logger.info(`API Remaining: ${this.client.ratelimitRemaining} | Usage Rolling Avg: ${formatNumber(this.apiRollingAvg)}/s | Est Depletion: ${this.apiEstDepletion.humanize()} (${formatNumber(this.depletedInSecs, {toFixed: 0})} seconds)`, {leaf: 'Api Nanny'});
                 this.logger.info('Trying to detect heavy usage subreddits...', {leaf: 'Api Nanny'});
                 let threshold = 0.5;
                 let offenders = this.subManagers.filter(x => {

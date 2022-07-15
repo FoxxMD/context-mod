@@ -9,7 +9,7 @@ import {
 import {map as mapAsync} from 'async';
 import winston, {Logger} from "winston";
 import as from 'async';
-import fetch from 'node-fetch';
+import fetch, {Response} from 'node-fetch';
 import {
     asActivity,
     asSubmission,
@@ -20,7 +20,7 @@ import {
     createCacheManager,
     escapeRegex,
     FAIL,
-    fetchExternalUrl,
+    fetchExternalResult,
     filterCriteriaSummary,
     formatNumber,
     generateItemFilterHelpers,
@@ -119,7 +119,7 @@ import {
     UserNoteCriteria
 } from "../Common/Infrastructure/Filters/FilterCriteria";
 import {
-    ActivitySource, DurationVal,
+    ActivitySource, ConfigFragmentValidationFunc, DurationVal,
     EventRetentionPolicyRange,
     JoinOperands,
     ModActionType,
@@ -141,6 +141,7 @@ import {
 } from "../Common/Infrastructure/ActivityWindow";
 import {Duration} from "dayjs/plugin/duration";
 import {
+    activityReports,
 
     ActivityType,
     AuthorHistorySort,
@@ -153,9 +154,13 @@ import {
     compareDurationValue, comparisonTextOp,
     parseDurationComparison,
     parseGenericValueComparison,
-    parseGenericValueOrPercentComparison
+    parseGenericValueOrPercentComparison, parseReportComparison
 } from "../Common/Infrastructure/Comparisons";
 import {asCreateModNoteData, CreateModNoteData, ModNote, ModNoteRaw} from "./ModNotes/ModNote";
+import {IncludesData} from "../Common/Infrastructure/Includes";
+import {parseFromJsonOrYamlToObject} from "../Common/Config/ConfigUtil";
+import ConfigParseError from "../Utils/ConfigParseError";
+import {ActivityReport} from "../Common/Entities/ActivityReport";
 
 export const DEFAULT_FOOTER = '\r\n*****\r\nThis action was performed by [a bot.]({{botLink}}) Mention a moderator or [send a modmail]({{modmailLink}}) if you any ideas, questions, or concerns about this action.';
 
@@ -345,7 +350,7 @@ export class SubredditResources {
                 // set default prune interval
                 this.pruneInterval = setInterval(() => {
                     // @ts-ignore
-                    this.defaultCache?.store.prune();
+                    this.cache?.store.prune();
                     this.logger.debug('Pruned cache');
                     // prune interval should be twice the smallest TTL
                 },min * 1000 * 2)
@@ -364,6 +369,16 @@ export class SubredditResources {
                 this.retention = undefined;
                 this.logger.error(new ErrorWithCause('Could not parse retention as a valid duration. Retention enforcement is disabled.', {cause: e}));
             }
+        }
+    }
+
+    async destroy() {
+        if(this.historicalSaveInterval !== undefined) {
+            clearInterval(this.historicalSaveInterval);
+        }
+        if(this.pruneInterval !== undefined && this.cacheType === 'memory' && this.cacheSettingsHash !== 'default') {
+            clearInterval(this.pruneInterval);
+            this.cache?.reset();
         }
     }
 
@@ -900,6 +915,29 @@ export class SubredditResources {
     //     })
     //     return events;
     // }
+
+    async getActivityLastSeenDate(value: SnoowrapActivity | string): Promise<Dayjs | undefined> {
+        if(this.selfTTL !== false) {
+            const id = typeof(value) === 'string' ? value : value.name;
+            const hash = `activityLastSeen-${id}`;
+            const lastSeenUnix = await this.cache.get(hash) as string | undefined | null;
+            if(lastSeenUnix !== undefined && lastSeenUnix !== null) {
+                return dayjs.unix(Number.parseInt(lastSeenUnix, 10));
+            }
+            return undefined;
+        }
+        return undefined;
+    }
+
+    async setActivityLastSeenDate(value: SnoowrapActivity | string, timestamp?: number): Promise<void> {
+        if(this.selfTTL !== false) {
+            const id = typeof(value) === 'string' ? value : value.name;
+            const hash = `activityLastSeen-${id}`;
+            this.cache.set(hash, timestamp ?? dayjs().unix(), {
+                ttl: 86400 // store for 24 hours (seconds)
+            });
+        }
+    }
 
     async getActivity(item: Submission | Comment) {
         try {
@@ -1631,13 +1669,12 @@ export class SubredditResources {
         return filteredListing;
     }
 
-
-    async getContent(val: string, subredditArg?: Subreddit): Promise<string> {
+    async getExternalResource(val: string, subredditArg?: Subreddit): Promise<{val: string, fromCache: boolean, response?: Response, hash?: string}> {
         const subreddit = subredditArg || this.subreddit;
         let cacheKey;
         const wikiContext = parseWikiContext(val);
         if (wikiContext !== undefined) {
-            cacheKey = `${wikiContext.wiki}${wikiContext.subreddit !== undefined ? `|${wikiContext.subreddit}` : ''}`;
+            cacheKey = `${subreddit.display_name}-content-${wikiContext.wiki}${wikiContext.subreddit !== undefined ? `|${wikiContext.subreddit}` : ''}`;
         }
         const extUrl = wikiContext === undefined ? parseExternalUrl(val) : undefined;
         if (extUrl !== undefined) {
@@ -1645,25 +1682,25 @@ export class SubredditResources {
         }
 
         if (cacheKey === undefined) {
-            return val;
+            return {val, fromCache: false, hash: cacheKey};
         }
 
         // try to get cached value first
-        let hash = `${subreddit.display_name}-content-${cacheKey}`;
         if (this.wikiTTL !== false) {
             await this.stats.cache.content.identifierRequestCount.set(cacheKey, (await this.stats.cache.content.identifierRequestCount.wrap(cacheKey, () => 0) as number) + 1);
             this.stats.cache.content.requestTimestamps.push(Date.now());
             this.stats.cache.content.requests++;
-            const cachedContent = await this.cache.get(hash);
+            const cachedContent = await this.cache.get(cacheKey);
             if (cachedContent !== undefined && cachedContent !== null) {
                 this.logger.debug(`Content Cache Hit: ${cacheKey}`);
-                return cachedContent as string;
+                return {val: cachedContent as string, fromCache: true, hash: cacheKey};
             } else {
                 this.stats.cache.content.miss++;
             }
         }
 
         let wikiContent: string;
+        let response: Response | undefined;
 
         // no cache hit, get from source
         if (wikiContext !== undefined) {
@@ -1691,7 +1728,9 @@ export class SubredditResources {
             }
         } else {
             try {
-                wikiContent = await fetchExternalUrl(extUrl as string, this.logger);
+                const [wikiContentVal, responseVal] = await fetchExternalResult(extUrl as string, this.logger);
+                wikiContent = wikiContentVal;
+                response = responseVal;
             } catch (err: any) {
                 const msg = `Error occurred while trying to fetch the url ${extUrl}`;
                 this.logger.error(msg, err);
@@ -1699,11 +1738,108 @@ export class SubredditResources {
             }
         }
 
-        if (this.wikiTTL !== false) {
+        return {val: wikiContent, fromCache: false, response, hash: cacheKey};
+    }
+
+    async getContent(val: string, subredditArg?: Subreddit): Promise<string> {
+        const {val: wikiContent, fromCache, hash} = await this.getExternalResource(val, subredditArg);
+
+        if (!fromCache && hash !== undefined && this.wikiTTL !== false) {
             this.cache.set(hash, wikiContent, {ttl: this.wikiTTL});
         }
 
         return wikiContent;
+    }
+
+    async getConfigFragment<T>(includesData: IncludesData, validateFunc?: ConfigFragmentValidationFunc): Promise<T> {
+
+        const {
+            path,
+            ttl = this.wikiTTL,
+        } = includesData;
+
+        const {val: configStr, fromCache, hash, response} = await this.getExternalResource(path);
+
+        const [format, configObj, jsonErr, yamlErr] = parseFromJsonOrYamlToObject(configStr);
+        if (configObj === undefined) {
+            //this.logger.error(`Could not parse includes URL of '${configStr}' contents as JSON or YAML.`);
+            this.logger.error(yamlErr);
+            this.logger.debug(jsonErr);
+            throw new ConfigParseError(`Could not parse includes URL of '${configStr}' contents as JSON or YAML.`)
+        }
+
+        // if its from cache then we know the data is valid
+        if(fromCache) {
+            this.logger.verbose(`Got Config Fragment ${path} from cache`);
+            return configObj.toJS() as unknown as T;
+        }
+
+        const rawData = configObj.toJS();
+        let validatedData: T;
+        // otherwise now we want to validate it if a function is present
+        if(validateFunc !== undefined) {
+            try {
+               validateFunc(configObj.toJS(), fromCache);
+               validatedData = rawData as unknown as T;
+            } catch (e) {
+                throw e;
+            }
+        } else {
+            validatedData = rawData as unknown as T;
+        }
+
+        let ttlVal: number | false = this.wikiTTL;
+        // never cache
+        if(ttl === false) {
+            return validatedData;
+        } else if(typeof ttl === 'number') {
+            ttlVal = ttl;
+        } else if(ttl === true) {
+            // cache forever
+            ttlVal = 0;
+        } else if(ttl === 'response') {
+            // try to get cache time from response headers, if they exist
+            // otherwise fallback to wiki ttl
+
+            if(response === undefined) {
+                ttlVal = this.wikiTTL;
+            } else {
+                const cc = response.headers.get('cache-control');
+                const ex = response.headers.get('expires');
+                if(cc !== null) {
+                    // response doesn't want to be stored :(
+                    if(null !== cc.match('/no-(cache|store)/i')) {
+                        return validatedData;
+                    }
+                    const matches = cc.match(/max-age=(\d+)/);
+                    if(null === matches) {
+                        // huh? why include max-age but no value?
+                        ttlVal = this.wikiTTL;
+                    } else {
+                        ttlVal = parseInt(matches[1], 10);
+                    }
+                } else if(ex !== null) {
+                    const expDate = dayjs(ex);
+                    if(dayjs.isDayjs(expDate) && expDate.isValid()) {
+                        const seconds = expDate.diff(dayjs(), 'second');
+                        if(seconds < 0) {
+                            // expiration is older than now?? don't cache
+                            return validatedData;
+                        }
+                        ttlVal = seconds;
+                    }
+                } else {
+                    // couldn't get a cache header, fallback
+                    ttlVal = this.wikiTTL;
+                }
+            }
+        }
+
+        if (ttlVal !== false) {
+            this.cache.set(hash as string, configStr, {ttl: ttlVal});
+        }
+
+        return validatedData;
     }
 
     async cacheSubreddits(subs: (Subreddit | string)[]) {
@@ -2148,27 +2284,45 @@ export class SubredditResources {
                             propResultsMap.reports!.reason = reportsMsg;
                             break;
                         }
-                        const reportCompare = parseGenericValueComparison(itemOptVal as string);
-                        let reportType = 'total';
-                        if(reportCompare.extra !== undefined && reportCompare.extra.trim() !== '') {
-                            const requestedType = reportCompare.extra.toLocaleLowerCase().trim();
-                            if(requestedType.includes('mod')) {
-                                reportType = 'mod';
-                            } else if(requestedType.includes('user')) {
-                                reportType = 'user';
-                            } else {
-                                const reportTypeWarn = `Did not recognize the report type "${requestedType}" -- can only use "mod" or "user". Will default to TOTAL reports`;
-                                log.debug(reportTypeWarn);
-                                propResultsMap.reports!.reason = reportTypeWarn;
-                            }
+
+                        const reportSummaryParts: string[] = [];
+
+                        let reports: ActivityReport[] = [];
+
+                        if(item.num_reports > 0) {
+                            reports = await this.database.getRepository(ActivityReport).createQueryBuilder('report')
+                                .select('report')
+                                .where({activityId: item.name})
+                                .getMany();
                         }
-                        let reportNum = item.num_reports;
-                        if(reportType === 'user') {
-                            reportNum = item.user_reports.length;
-                        } else {
-                            reportNum = item.mod_reports.length;
+
+                        const reportCompare = parseReportComparison(itemOptVal as string);
+
+                        let reportType = reportCompare.reportType ?? 'total';
+
+                        let validReports = reports;
+
+                        if(reportCompare.reportType === 'user') {
+                            validReports = validReports.filter(x => x.type === 'user');
+                        } else if(reportCompare.reportType === 'mod') {
+                            validReports = validReports.filter(x => x.type === 'mod');
                         }
-                        propResultsMap.reports!.found = `${reportNum} ${reportType}`;
+
+                        if(reportCompare.reasonRegex !== undefined) {
+                            reportSummaryParts.push(`containing reason matching ${reportCompare.reasonMatch}`);
+                            validReports = validReports.filter(x => reportCompare.reasonRegex?.test(x.reason));
+                        }
+                        if(reportCompare.durationText !== undefined) {
+                            reportSummaryParts.push(`within ${reportCompare.durationText}`);
+                            const earliestDate = dayjs().subtract(reportCompare.duration as Duration);
+                            validReports = validReports.filter(x => x.createdAt.isSameOrAfter(earliestDate));
+                        }
+
+                        let reportNum = validReports.length;
+
+                        reportSummaryParts.unshift(`${reportNum} ${reportType} reports`);
+
+                        propResultsMap.reports!.found = reportSummaryParts.join(' ');
                         propResultsMap.reports!.passed = criteriaPassWithIncludeBehavior(comparisonTextOp(reportNum, reportCompare.operator, reportCompare.value), include);
                         break;
                     case 'removed':
@@ -2381,6 +2535,23 @@ export class SubredditResources {
                         propResultsMap.depth!.found = depth;
                         propResultsMap.depth!.passed = criteriaPassWithIncludeBehavior(comparisonTextOp(depth, depthCompare.operator, depthCompare.value), include);
                         break;
+                    case 'upvoteRatio':
+                        if(asSubmission(item)) {
+
+                            let compareStr = typeof itemOptVal === 'number' ? `>= ${itemOptVal}` : itemOptVal as string;
+                            const ratioCompare = parseGenericValueComparison(compareStr);
+
+                            const ratio = item.upvote_ratio * 100;
+                            propResultsMap.upvoteRatio!.found = ratio;
+                            propResultsMap.upvoteRatio!.passed = criteriaPassWithIncludeBehavior(comparisonTextOp(ratio, ratioCompare.operator, ratioCompare.value), include);;
+                            break;
+                        } else {
+                            const ratioCommWarn = `Cannot test for 'upvoteRatio' on a Comment`;
+                            log.debug(ratioCommWarn);
+                            propResultsMap.depth!.passed = true;
+                            propResultsMap.depth!.reason = ratioCommWarn;
+                            break;
+                        }
                     case 'flairTemplate':
                     case 'link_flair_text':
                     case 'link_flair_css_class':
@@ -3378,6 +3549,14 @@ export class BotResourcesManager {
         await resource.initDatabaseDelayedActivities();
 
         return resource;
+    }
+
+    async destroy(subName: string) {
+        const res = this.get(subName);
+        if(res !== undefined) {
+            await res.destroy();
+            this.resources.delete(subName);
+        }
     }
 
     async getPendingSubredditInvites(): Promise<(string[])> {

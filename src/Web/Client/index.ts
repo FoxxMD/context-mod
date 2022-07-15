@@ -205,7 +205,9 @@ const webClient = async (options: OperatorConfig) => {
     logger.stream().on('log', (log: LogInfo) => {
         emitter.emit('log', log);
         webLogs.unshift(log);
-        webLogs = webLogs.slice(0, 201);
+        if(webLogs.length > 200) {
+            webLogs.splice(200);
+        }
     });
 
     const migrationService = new MigrationService({

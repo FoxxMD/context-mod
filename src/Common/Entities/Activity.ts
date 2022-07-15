@@ -1,11 +1,11 @@
-import {Entity, Column, PrimaryGeneratedColumn, ManyToOne, PrimaryColumn, OneToMany, OneToOne, Index} from "typeorm";
+import {Entity, Column, ManyToOne, PrimaryColumn, OneToMany, Index} from "typeorm";
 import {AuthorEntity} from "./AuthorEntity";
 import {Subreddit} from "./Subreddit";
 import {CMEvent} from "./CMEvent";
-import Submission from "snoowrap/dist/objects/Submission";
-import {Comment} from "snoowrap";
 import {asComment, getActivityAuthorName, parseRedditFullname, redditThingTypeToPrefix} from "../../util";
-import {ActivityType} from "../Infrastructure/Reddit";
+import {activityReports, ActivityType, Report, SnoowrapActivity} from "../Infrastructure/Reddit";
+import {ActivityReport} from "./ActivityReport";
+import dayjs, {Dayjs} from "dayjs";
 
 export interface ActivityEntityOptions {
     id: string
@@ -15,6 +15,7 @@ export interface ActivityEntityOptions {
     permalink: string
     author: AuthorEntity
     submission?: Activity
+    reports?: ActivityReport[]
 }
 
 @Entity()
@@ -69,6 +70,9 @@ export class Activity {
     @OneToMany(type => Activity, obj => obj.submission, {nullable: true})
     comments!: Activity[];
 
+    @OneToMany(type => ActivityReport, act => act.activity, {cascade: ['insert'], eager: true})
+    reports: ActivityReport[] | undefined
+
     constructor(data?: ActivityEntityOptions) {
         if(data !== undefined) {
             this.type = data.type;
@@ -78,10 +82,76 @@ export class Activity {
             this.permalink = data.permalink;
             this.author = data.author;
             this.submission = data.submission;
+            this.reports = data.reports !== undefined ? data.reports : undefined;
         }
     }
 
-    static fromSnoowrapActivity(subreddit: Subreddit, activity: (Submission | Comment)) {
+    /**
+     * @param {SnoowrapActivity} activity
+     * @param {Dayjs|undefined} lastKnownStateTimestamp Override the last good state (useful when tracked through polling)
+     * */
+    syncReports(activity: SnoowrapActivity, lastKnownStateTimestamp?: Dayjs) {
+        if(activity.num_reports > 0 && (this.reports === undefined || activity.num_reports !== this.reports.length)) {
+            if(this.reports === undefined) {
+                this.reports = [];
+            }
+            const reports = activityReports(activity);
+            // match up existing reports
+            const usedReportEntities: string[] = [];
+            const unsyncedReports: Report[] = [];
+            for(const r of reports) {
+                const matchedEntity = this.reports.find(x => !usedReportEntities.includes(x.id) && x.matchReport(r));
+                if(matchedEntity !== undefined) {
+                    usedReportEntities.push(matchedEntity.id);
+                } else {
+                    // found an unsynced report
+                    unsyncedReports.push(r);
+                }
+            }
+
+            // ideally we only have one report but it's possible (probable) there are more
+            //
+            // to simplify tracking over time we will spread out the "create time" for each report to be between NOW
+            // and the last recorded report, or if no reports then the create time of the activity
+
+            // -- the assumptions about tracking should be good enough for most users because:
+            // * default poll interval is 30 seconds so even if there are more than one reports in that time the resolution is high enough for accurate usage (most mods will use "> 1 report in 1 minute" or larger timescales)
+            // * for populating existing reports (CM has not been tracking since activity creation) we don't want to bunch up all reports at the timestamp which could create false positives,
+            //   it's more likely that reports would be spread out than all occurring at the same time.
+
+            // TODO additionally, will allow users to specify minimum required granularity to use when filtering by reports over time
+
+            let lastRecordedTime = lastKnownStateTimestamp;
+            if(lastKnownStateTimestamp === undefined) {
+                lastRecordedTime = this.reports.length > 0 ?
+                    // get the latest create date for existing reports
+                    this.reports.reduce((acc, curr) => curr.createdAt.isAfter(acc) ? curr.createdAt : acc, dayjs('2000-1-1'))
+                    // if no reports then use activity create date
+                    : dayjs(activity.created_utc * 1000);
+            }
+
+            // find the amount of time between now and last good timestamp
+            const missingTimespan = dayjs.duration(dayjs().diff(lastRecordedTime));
+            const granularity = Math.floor(missingTimespan.asSeconds());
+
+            // each report will have its create date spaced out (mostly) equally between now and the last good timestamp
+            //
+            // if only one report stick it in exact middle
+            // if more than one than decrease span by 1/4 so that we don't end up having reports dead-on the last timestamp
+            const increment = Math.floor(unsyncedReports.length === 1 ? (granularity / 2) : ((granularity / 1.25) / unsyncedReports.length));
+
+            for(let i = 0; i < unsyncedReports.length; i++) {
+               const r = new ActivityReport({...unsyncedReports[i], activity: this, granularity});
+               r.createdAt = dayjs().subtract(increment * (i + 1), 'seconds');
+               this.reports.push(r);
+            }
+
+            return true;
+        }
+        return false;
+    }
+
+    static fromSnoowrapActivity(subreddit: Subreddit, activity: SnoowrapActivity, lastKnownStateTimestamp?: dayjs.Dayjs | undefined) {
         let submission: Activity | undefined;
         let type: ActivityType = 'submission';
         let content: string;
@@ -99,7 +169,7 @@ export class Activity {
         const author = new AuthorEntity();
         author.name = getActivityAuthorName(activity.author);
 
-        return new Activity({
+        const entity = new Activity({
             id: activity.name,
             subreddit,
             type,
@@ -107,6 +177,10 @@ export class Activity {
             permalink: activity.permalink,
             author,
             submission
-        })
+        });
+
+        entity.syncReports(activity, lastKnownStateTimestamp);
+
+        return entity;
     }
 }

@@ -405,20 +405,40 @@ export interface ActivityState {
     approved?: boolean | ModeratorNames | ModeratorNames[] | ModeratorNameCriteria
     score?: CompareValue
     /**
-     * A string containing a comparison operator and a value to compare against
+     * A string containing a comparison operator, a value to compare against, an (optional) report type filter, an (optional) qualifier for report reason, and an (optional) time constraint
      *
-     * The syntax is `(< OR > OR <= OR >=) <number>`
+     * The syntax is `(< OR > OR <= OR >=) number[%] [type] [reasonQualifier] [timeValue] [timeUnit]`
+     *
+     * If only comparison and number is given then defaults to TOTAL reports on an Activity.
      *
      * * EX `> 2`  => greater than 2 total reports
      *
-     * Defaults to TOTAL reports on an Activity. Suffix the value with the report type to check that type:
+     * Type (optional) determines which type of reports to look at:
      *
-     * * EX `> 3 mod` => greater than 3 mod reports
-     * * EX `>= 1 user` => greater than 1 user report
+     * * `mod` -- mod reports
+     *   * EX `> 3 mod` => greater than 3 mod reports
+     * * `user` -- user reports
+     *   * EX `> 3 user` => greater than 3 user reports
      *
-     * @pattern ^\s*(>|>=|<|<=)\s*(\d+)\s*(%?)(.*)$
+     * Report reason qualifiers can be:
+     *
+     * * enclosed double or single quotes -- report reason contains
+     *   * EX `> 1 "misinformation" => greater than 1 report with reason containing "misinformation"
+     * * enclosed in backslashes -- match regex
+     *   * EX `> 1 \harassment towards .*\` => greater than 1 report with reason matching regex \harassment towards .*\
+     *
+     * Type and reason qualifiers can be used together:
+     *
+     * EX `> 2 user "misinformation" => greater than 2 user reports with reasons containing "misinformation"
+     *
+     * The time constraint filter reports created between NOW and [timeConstraint] in the past:
+     *
+     * * `> 3 in 30 minutes` => more than 3 reports created between NOW and 30 minutes ago
+     * * `> 2 user "misinformation" in 2 hours` => more than 2 user reports containing "misinformation" created between NOW and 2 hours ago
+     *
+     * @pattern ^\s*(>|>=|<|<=)\s*(\d+)(\s*%)?(\s+(?:mods?|users?))?(\s+(?:["'].*["']|\/.*\/))?.*(\d+)?\s*(days?|weeks?|months?|years?|hours?|minutes?|seconds?|milliseconds?)?\s*$
      * */
-    reports?: CompareValue
+    reports?: string
     age?: DurationComparor
     /**
      * Test whether the activity is present in dispatched/delayed activities
@@ -487,6 +507,18 @@ export interface SubmissionState extends ActivityState {
      * Is the submission a reddit-hosted image or video?
      * */
     isRedditMediaDomain?: boolean
+
+    /**
+     * Compare the upvote ratio for this Submission, expressed as a whole number
+     *
+     * Can be either a comparison string or a number. If a number then CM assumes upvote ratio must be greater than or equal to this.
+     *
+     * Example:
+     *
+     * * `< 90` => less than 90% upvoted
+     * * 45 => greater than or equal to 45% upvoted
+     * */
+    upvoteRatio?: number | CompareValue
 }
 
 export const cmActivityProperties = ['submissionState', 'score', 'reports', 'removed', 'deleted', 'filtered', 'age', 'title'];

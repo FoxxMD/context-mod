@@ -6,7 +6,6 @@ import Comment from "snoowrap/dist/objects/Comment";
 import RedditUser from "snoowrap/dist/objects/RedditUser";
 import {DataSource} from "typeorm";
 import {JsonOperatorConfigDocument, YamlOperatorConfigDocument} from "./Config/Operator";
-import {CommentCheckJson, SubmissionCheckJson} from "../Check";
 import {SafeDictionary} from "ts-essentials";
 import {RuleResultEntity} from "./Entities/RuleResultEntity";
 import {Dayjs} from "dayjs";
@@ -43,8 +42,16 @@ import {
     ItemOptions
 } from "./Infrastructure/Filters/FilterShapes";
 import {LoggingOptions, LogLevel, StrongLoggingOptions} from "./Infrastructure/Logging";
-import {DatabaseConfig, DatabaseDriver, DatabaseDriverConfig, DatabaseDriverType} from "./Infrastructure/Database";
+import {
+    DatabaseConfig,
+    DatabaseDriver,
+    DatabaseDriverConfig,
+    DatabaseDriverType
+} from "./Infrastructure/Database";
 import {ActivityType} from "./Infrastructure/Reddit";
+import {InfluxDB, WriteApi} from "@influxdata/influxdb-client";
+import {InfluxConfig} from "./Influx/interfaces";
+import {InfluxClient} from "./Influx/InfluxClient";
 
 
 export interface ReferenceSubmission {
@@ -725,19 +732,14 @@ export interface SearchAndReplaceRegExp {
 }
 
 export interface NamedGroup {
-    [name: string]: string
-}
-
-export interface GlobalRegExResult {
-    match: string,
-    groups: string[],
-    named: NamedGroup | undefined
+    [name: string]: any
 }
 
 export interface RegExResult {
-    matched: boolean,
-    matches: string[],
-    global: GlobalRegExResult[]
+    match: string,
+    groups: string[],
+    index: number
+    named: NamedGroup
 }
 
 export type StrongCache = {
@@ -1119,6 +1121,8 @@ export interface BotInstanceJsonConfig {
         retention?: EventRetentionPolicyRange
     }
 
+    influxConfig?: InfluxConfig
+
     /**
      * Settings related to bot behavior for subreddits it is managing
      * */
@@ -1374,6 +1378,8 @@ export interface OperatorJsonConfig {
         retention?: EventRetentionPolicyRange
     }
 
+    influxConfig?: InfluxConfig
+
     /**
      * Set global snoowrap options as well as default snoowrap config for all bots that don't specify their own
      * */
@@ -1580,6 +1586,7 @@ export interface BotInstanceConfig extends BotInstanceJsonConfig {
     database: DataSource
     snoowrap: SnoowrapOptions
     databaseStatisticsDefaults: DatabaseStatisticsOperatorConfig
+    opInflux?: InfluxClient,
     subreddits: {
         names?: string[],
         exclude?: string[],
@@ -1620,6 +1627,7 @@ export interface OperatorConfig extends OperatorJsonConfig {
         retention?: EventRetentionPolicyRange
     }
     database: DataSource
+    influx?: InfluxClient,
     web: {
         database: DataSource,
         databaseConfig: {
@@ -1900,8 +1908,6 @@ export interface TextMatchOptions {
      **/
     caseSensitive?: boolean
 }
-
-export type ActivityCheckJson = SubmissionCheckJson | CommentCheckJson;
 
 export interface PostBehaviorOptionConfig {
     recordTo?: RecordOutputOption

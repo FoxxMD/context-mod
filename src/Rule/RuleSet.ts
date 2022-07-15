@@ -1,17 +1,20 @@
-import {IRule, Triggerable, Rule, RuleJSONConfig, StructuredRuleJson} from "./index";
+import {IRule, Rule} from "./index";
 import Snoowrap, {Comment, Submission} from "snoowrap";
 import {ruleFactory} from "./RuleFactory";
 import {createAjvFactory, mergeArr} from "../util";
 import {Logger} from "winston";
-import {JoinCondition, RuleResult, RuleSetResult} from "../Common/interfaces";
+import {JoinCondition, RuleSetResult} from "../Common/interfaces";
 import * as RuleSchema from '../Schema/Rule.json';
-import Ajv from 'ajv';
 import {SubredditResources} from "../Subreddit/SubredditResources";
 import {runCheckOptions} from "../Subreddit/Manager";
 import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
-import {RuleSetResultEntity} from "../Common/Entities/RuleSetResultEntity";
 import {JoinOperands} from "../Common/Infrastructure/Atomic";
-import {RuleJson, RuleObjectJson, StructuredRuleObjectJson} from "../Common/Infrastructure/RuleShapes";
+import {
+    RuleConfigData,
+    RuleConfigHydratedData,
+    RuleConfigObject,
+    StructuredRuleConfigObject
+} from "../Common/Infrastructure/RuleShapes";
 
 export class RuleSet implements IRuleSet {
     rules: Rule[] = [];
@@ -99,7 +102,7 @@ export interface IRuleSet extends JoinCondition {
 }
 
 export interface RuleSetOptions extends IRuleSet {
-    rules: Array<StructuredRuleObjectJson>,
+    rules: Array<StructuredRuleConfigObject>,
     logger: Logger
     subredditName: string
     resources: SubredditResources
@@ -109,20 +112,24 @@ export interface RuleSetOptions extends IRuleSet {
 /**
  * A RuleSet is a "nested" set of `Rule` objects that can be used to create more complex AND/OR behavior. Think of the outcome of a `RuleSet` as the result of all of its run `Rule` objects (based on `condition`)
  * */
-export interface RuleSetJson extends JoinCondition {
+export interface RuleSetConfigData extends JoinCondition {
     /**
      * Can be `Rule` or the `name` of any **named** `Rule` in your subreddit's configuration
      * @minItems 1
      * */
-    rules: Array<RuleJson>
+    rules: RuleConfigData[]
 }
 
-export interface RuleSetObjectJson extends RuleSetJson {
-    rules: Array<RuleObjectJson>
+export interface RuleSetConfigHydratedData extends RuleSetConfigData {
+    rules: RuleConfigHydratedData[]
 }
 
-export const isRuleSetJSON = (obj: object): obj is RuleSetJson => {
-    return (obj as RuleSetJson).rules !== undefined;
+export interface RuleSetConfigObject extends RuleSetConfigHydratedData {
+    rules: RuleConfigObject[]
+}
+
+export const isRuleSetJSON = (obj: object): obj is RuleSetConfigData => {
+    return (obj as RuleSetConfigData).rules !== undefined;
 }
 
 export const isRuleSet = (obj: object): obj is RuleSet => {

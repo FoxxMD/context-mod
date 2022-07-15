@@ -15,6 +15,7 @@ import {RichContent} from "../Common/interfaces";
 import {Cache} from 'cache-manager';
 import {isScopeError} from "../Utils/Errors";
 import {ErrorWithCause} from "pony-cause";
+import {UserNoteType} from "../Common/Infrastructure/Atomic";
 
 interface RawUserNotesPayload {
     ver: number,
@@ -125,7 +126,7 @@ export class UserNotes {
         return this.mod as RedditUser;
     }
 
-    async addUserNote(item: (Submission|Comment), type: string | number, text: string = '', wikiEditReasonPrefix?: string): Promise<UserNote>
+    async addUserNote(item: (Submission|Comment), type: UserNoteType | number, text: string = '', wikiEditReasonPrefix?: string): Promise<UserNote>
     {
         const payload = await this.retrieveData();
         const userName = getActivityAuthorName(item.author);
@@ -235,7 +236,7 @@ export interface UserNoteJson extends RichContent {
      * User Note type key
      * @examples ["spamwarn"]
      * */
-    type: string,
+    type: UserNoteType,
 }
 
 export class UserNote {
@@ -246,7 +247,7 @@ export class UserNote {
     // noteType: string | null;
     // link: string;
 
-    constructor(public time: Dayjs, public text: string, public modIndex: number, public noteType: string | number, public link: (string | null) = null, public moderator?: RedditUser) {
+    constructor(public time: Dayjs, public text: string, public modIndex: number, public noteType: UserNoteType | number, public link: (string | null) = null, public moderator?: RedditUser) {
 
     }
 

@@ -1,18 +1,20 @@
 import {describe, it} from 'mocha';
 import {assert} from 'chai';
 import {
-    COMMENT_URL_ID,
-    parseDuration,
+    COMMENT_URL_ID, GH_BLOB_REGEX, GIST_RAW_REGEX,
+    GIST_REGEX,
+    parseDurationFromString,
     parseLinkIdentifier,
-    parseRedditEntity, removeUndefinedKeys, SUBMISSION_URL_ID
+    parseRedditEntity, parseRegexSingleOrFail, REGEXR_REGEX, removeUndefinedKeys, SUBMISSION_URL_ID
 } from "../src/util";
 import dayjs from "dayjs";
 import dduration, {Duration, DurationUnitType} from 'dayjs/plugin/duration.js';
 import {
     parseDurationComparison,
     parseGenericValueComparison,
-    parseGenericValueOrPercentComparison
+    parseGenericValueOrPercentComparison, parseReportComparison
 } from "../src/Common/Infrastructure/Comparisons";
+import {RegExResult} from "../src/Common/interfaces";
 
 dayjs.extend(dduration);
 
@@ -70,26 +72,91 @@ describe('Non-temporal Comparison Operations', function () {
         assert.exists(val.duration);
         assert.equal(dayjs.duration(2, 'months').milliseconds(), (val.duration as Duration).milliseconds());
     });
+    it('should throw if more than one time component found', function () {
+        assert.throws(() => parseDurationComparison('> 3 in 2 days and 4 months'));
+    });
 });
 
 describe('Parsing Temporal Values', function () {
 
-    describe('Temporal Comparison Operations', function () {
-        it('should throw if no operator sign', function () {
-            assert.throws(() => parseDurationComparison('just 3'))
+    describe('Parsing Text', function () {
+        for (const unit of ['millisecond', 'milliseconds', 'second', 'seconds', 'minute', 'minutes', 'hour', 'hours', 'day', 'days', 'week', 'weeks', 'month', 'months', 'year', 'years']) {
+            it(`should accept ${unit} unit for duration`, function () {
+                const result = parseDurationFromString(`1 ${unit}`)[0];
+                assert.equal(result.original, `1 ${unit}`);
+                assert.equal(result.duration.asMilliseconds(), dayjs.duration(1, unit as DurationUnitType).asMilliseconds());
+            });
+        }
+        it('should accept ISO8601 durations', function () {
+
+            const shortResult = parseDurationFromString('P23DT23H')[0];
+            assert.equal(shortResult.original, 'P23DT23H');
+            assert.equal(shortResult.duration.asSeconds(), dayjs.duration({
+                days: 23,
+                hours: 23
+            }).asSeconds());
+
+            const longResult = parseDurationFromString('P3Y6M4DT12H30M5S')[0];
+
+            assert.equal(longResult.original, 'P3Y6M4DT12H30M5S');
+            assert.equal(longResult.duration.asSeconds(), dayjs.duration({
+                years: 3,
+                months: 6,
+                days: 4,
+                hours: 12,
+                minutes: 30,
+                seconds: 5
+            }).asSeconds());
         });
+
+        it('should parse durations from anywhere in a string', function() {
+           const example1 = `> 2 user "misinfo" in 2 hours`;
+           const ex1Result = parseDurationFromString(example1, false)[0];
+           assert.equal(ex1Result.original, '2 hours');
+           assert.equal(ex1Result.duration.asMilliseconds(), dayjs.duration(2, 'hours').asMilliseconds());
+
+           const example2 = `Test example 4 minutes ago`;
+            const ex2Result = parseDurationFromString(example2, false)[0];
+            assert.equal(ex2Result.original, '4 minutes');
+            assert.equal(ex2Result.duration.asMilliseconds(), dayjs.duration(4, 'minutes').asMilliseconds());
+
+           const example3 = `Test 3 hours will be`;
+            const ex3Result = parseDurationFromString(example3, false)[0];
+            assert.equal(ex3Result.original, '3 hours');
+            assert.equal(ex3Result.duration.asMilliseconds(), dayjs.duration(3, 'hours').asMilliseconds());
+
+           const example4 = `> 2 user "misinfo" in P23DT23H with extra`;
+            const ex4Result = parseDurationFromString(example4, false)[0];
+            assert.equal(ex4Result.original, 'P23DT23H');
+            assert.equal(ex4Result.duration.asMilliseconds(), dayjs.duration({
+                days: 23,
+                hours: 23
+            }).asMilliseconds());
+        });
+    })
+
+    describe('Temporal Comparison Operations', function () {
+
         it('should throw if no units', function () {
             assert.throws(() => parseDurationComparison('> 3'))
         });
 
-        for (const unit of ['millisecond', 'milliseconds', 'second', 'seconds', 'minute', 'minutes', 'hour', 'hours', 'day', 'days', 'week', 'weeks', 'month', 'months', 'year', 'years']) {
-            it(`should accept ${unit} unit`, function () {
-                assert.doesNotThrow(() => parseDurationComparison(`> 3 ${unit}`))
-            });
-        }
         it('should only accept units compatible with dayjs', function () {
             assert.throws(() => parseDurationComparison('> 3 gigawatts'))
         });
+
+        it('should throw if value is a percentage', function () {
+            assert.throws(() => parseDurationComparison('> 3% months'))
+        });
+
+        it('should throw if value is negative', function () {
+            assert.throws(() => parseDurationComparison('> -3 months'))
+        });
+
+        it('should throw if more than one duration value found', function () {
+            assert.throws(() => parseDurationComparison('> 3 months in 2 days'))
+        });
+
         it('should parse greater-than with a duration', function () {
             const res = parseDurationComparison('> 3 days');
             assert.equal(res.operator, '>')
@@ -112,30 +179,56 @@ describe('Parsing Temporal Values', function () {
         })
     })
 
-    describe('Parsing Text', function () {
-        for (const unit of ['millisecond', 'milliseconds', 'second', 'seconds', 'minute', 'minutes', 'hour', 'hours', 'day', 'days', 'week', 'weeks', 'month', 'months', 'year', 'years']) {
-            it(`should accept ${unit} unit for duration`, function () {
-                assert.equal(parseDuration(`1 ${unit}`).asMilliseconds(), dayjs.duration(1, unit as DurationUnitType).asMilliseconds());
-            });
+});
+
+describe('Report Comparison Operations', function () {
+
+    it(`should accept report type as optional`, function () {
+        const result = parseReportComparison(`> 0`)
+        assert.isUndefined(result.reportType);
+    });
+
+    it(`should accept 'user' report type`, function () {
+        for(const type of ['user','users']) {
+            const result = parseReportComparison(`> 0 ${type}`)
+            assert.equal(result.reportType, 'user');
         }
-        it('should accept ISO8601 durations', function () {
+    });
 
-            assert.equal(parseDuration('P23DT23H').asSeconds(), dayjs.duration({
-                days: 23,
-                hours: 23
-            }).asSeconds());
+    it(`should accept 'mod' report type`, function () {
+        for(const type of ['mod','mods']) {
+            const result = parseReportComparison(`> 0 ${type}`)
+            assert.equal(result.reportType, 'mod');
+        }
+    });
 
-            assert.equal(parseDuration('P3Y6M4DT12H30M5S').asSeconds(), dayjs.duration({
-                years: 3,
-                months: 6,
-                days: 4,
-                hours: 12,
-                minutes: 30,
-                seconds: 5
-            }).asSeconds());
-        });
-    })
+    it(`should accept report reason literals in single or double quotes`, function () {
+        for(const reasonStr of [`'misinfo'`, `"misinfo"`]) {
+            const result = parseReportComparison(`> 0 ${reasonStr}`)
+            assert.equal(result.reasonMatch, reasonStr);
+            assert.equal((result.reasonRegex as RegExp).toString(), new RegExp(/.*misinfo.*/, 'i').toString());
+        }
+    });
 
+    it(`should accept report reason as regex`, function () {
+        const result = parseReportComparison(`> 0 /misinfo/`)
+        assert.equal(result.reasonMatch, '/misinfo/');
+        assert.equal((result.reasonRegex as RegExp).toString(), new RegExp(/misinfo/, 'i').toString());
+    });
+
+    it(`should accept a time constraint`, function () {
+        const result = parseReportComparison(`> 1 in 2 hours`)
+        assert.equal(result.durationText, '2 hours');
+        assert.equal((result.duration as Duration).asMilliseconds(), dayjs.duration(2, 'hours').asMilliseconds())
+    });
+
+    it(`should accept all components`, function () {
+        const result = parseReportComparison(`> 1 user 'misinfo' in 2 hours`)
+        assert.equal(result.reasonMatch, `'misinfo'`);
+        assert.equal((result.reasonRegex as RegExp).toString(), new RegExp(/.*misinfo.*/, 'i').toString());
+        assert.equal(result.durationText, '2 hours');
+        assert.equal((result.duration as Duration).asMilliseconds(), dayjs.duration(2, 'hours').asMilliseconds())
+    });
 });
 
 describe('Parsing Reddit Entity strings', function () {
@@ -210,5 +303,57 @@ describe('Link Recognition', function () {
 
         // it('should recognize submission id from reddit shortlink')
         // https://redd.it/92dd8
+    });
+
+    describe('External URL Parsing', function() {
+
+        it('should recognize and parse raw gist URLs', function() {
+            const res = parseRegexSingleOrFail(GIST_RAW_REGEX, 'https://gist.github.com/FoxxMD/2b035429fbf326a00d9a6ca2a38011d9/raw/97076d52114eb17a8754384d95087e8a0a74cf88/file-with-symbols.test.yaml');
+            assert.exists(res);
+            const rese = res as RegExResult;
+            assert.equal(rese.named.user, 'FoxxMD');
+            assert.equal(rese.named.gistId, '2b035429fbf326a00d9a6ca2a38011d9');
+        });
+
+        it('should not parse non-raw gist URLs with raw regex', function() {
+            for(const url of [
+                'https://gist.github.com/FoxxMD/2b035429fbf326a00d9a6ca2a38011d9',
+                'https://gist.github.com/FoxxMD/2b035429fbf326a00d9a6ca2a38011d9#file-file-with-symbols-test-yaml'
+            ]) {
+                const res = parseRegexSingleOrFail(GIST_RAW_REGEX, url);
+                assert.notExists(res, `Should not have parsed ${url} as RAW gist`);
+            }
+        });
+
+        it('should recognize and parse gist URLs', function() {
+            const res = parseRegexSingleOrFail(GIST_REGEX, 'https://gist.github.com/FoxxMD/2b035429fbf326a00d9a6ca2a38011d9');
+            assert.exists(res);
+            const rese = res as RegExResult;
+            assert.equal(rese.named.user, 'FoxxMD');
+            assert.equal(rese.named.gistId, '2b035429fbf326a00d9a6ca2a38011d9');
+        });
+
+        it('should recognize and parse gist URLs with filename hashes', function() {
+            const res = parseRegexSingleOrFail(GIST_REGEX, 'https://gist.github.com/FoxxMD/2b035429fbf326a00d9a6ca2a38011d9#file-file-with-symbols-test-yaml');
+            assert.exists(res);
+            const rese = res as RegExResult;
+            assert.equal(rese.named.user, 'FoxxMD');
+            assert.equal(rese.named.gistId, '2b035429fbf326a00d9a6ca2a38011d9');
+            assert.equal(rese.named.fileName, 'file-with-symbols-test-yaml');
+        });
+
+        it('should recognize and parse github blob URLs', function() {
+            const res = parseRegexSingleOrFail(GH_BLOB_REGEX, 'https://github.com/FoxxMD/context-mod/blob/master/src/util.ts');
+            assert.exists(res);
+            const rese = res as RegExResult;
+            assert.equal(rese.named.user, 'FoxxMD');
+            assert.equal(rese.named.repo, 'context-mod');
+            assert.equal(rese.named.path, 'master/src/util.ts');
+        });
+
+        it('should recognize regexr URLs', function() {
+            const res = parseRegexSingleOrFail(REGEXR_REGEX, 'https://regexr.com/6pomb');
+            assert.exists(res);
+        });
     })
 })

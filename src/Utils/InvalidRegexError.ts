@@ -1,9 +1,9 @@
 import ExtendableError from "es6-error";
 
 class InvalidRegexError extends ExtendableError {
-    constructor(regex: RegExp | RegExp[], val?: string, url?: string) {
+    constructor(regex: RegExp | RegExp[], val?: string, url?: string, message?: string) {
         const msgParts = [
-            'Regex(es) did not match the value given.',
+            message ?? 'Regex(es) did not match the value given.',
         ];
         let regArr = Array.isArray(regex) ? regex : [regex];
         for(const r of regArr) {

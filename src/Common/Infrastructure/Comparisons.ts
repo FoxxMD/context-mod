@@ -2,8 +2,9 @@ import {StringOperator} from "./Atomic";
 import {Duration} from "dayjs/plugin/duration";
 import InvalidRegexError from "../../Utils/InvalidRegexError";
 import dayjs, {Dayjs, OpUnitType} from "dayjs";
-import {SimpleError} from "../../Utils/Errors";
-import { parseDuration } from "../../util";
+import {CMError, SimpleError} from "../../Utils/Errors";
+import {escapeRegex, parseDuration, parseDurationFromString, parseStringToRegex} from "../../util";
+import {ReportType} from "./Reddit";
 
 export interface DurationComparison {
     operator: StringOperator,
@@ -15,8 +16,10 @@ export interface GenericComparison extends HasDisplayText {
     value: number,
     isPercent: boolean,
     extra?: string,
+    groups?: Record<string, string>
     displayText: string,
     duration?: Duration
+    durationText?: string
 }
 
 export interface HasDisplayText {
@@ -53,18 +56,20 @@ export const parseGenericValueComparison = (val: string, options?: {
     const groups = matches.groups as any;
 
     let duration: Duration | undefined;
+    let durationText: string | undefined;
 
-    if(typeof groups.extra === 'string' && groups.extra.trim() !== '') {
-        try {
-            duration = parseDuration(groups.extra, false);
-        } catch (e) {
-            // if it returns an invalid regex just means they didn't
-            if (requireDuration || !(e instanceof InvalidRegexError)) {
-                throw e;
-            }
+    try {
+        const durationResult = parseDurationFromString(val, false);
+        if(durationResult.length > 1) {
+            throw new SimpleError(`Must only have one Duration value, found ${durationResult.length} in: ${val}`);
         }
-    } else if(requireDuration) {
-        throw new SimpleError(`Comparison must contain a duration value but none was found. Given: ${val}`);
+        duration = durationResult[0].duration;
+        durationText = durationResult[0].original;
+    } catch (e) {
+        // if it returns an invalid regex just means they didn't
+        if (requireDuration || !(e instanceof InvalidRegexError)) {
+            throw e;
+        }
     }
 
     const displayParts = [`${groups.opStr} ${groups.value}`];
@@ -73,13 +78,33 @@ export const parseGenericValueComparison = (val: string, options?: {
         displayParts.push('%');
     }
 
+    const {
+        opStr,
+        value,
+        percent,
+        extra,
+        ...rest
+    } = matches.groups || {};
+
+    const extraGroups: Record<string,string> = {};
+    let hasExtraGroups = false;
+
+    for(const [k,v] of Object.entries(rest)) {
+        if(typeof v === 'string' && v.trim() !== '') {
+            extraGroups[k] = v;
+            hasExtraGroups = true;
+        }
+    }
+
     return {
         operator: groups.opStr as StringOperator,
         value: Number.parseFloat(groups.value),
         isPercent: hasPercent,
         extra: groups.extra,
+        groups: hasExtraGroups ? extraGroups : undefined,
         displayText: displayParts.join(''),
-        duration
+        duration,
+        durationText,
     }
 }
 const GENERIC_VALUE_PERCENT_COMPARISON = /^\s*(?<opStr>>|>=|<|<=)\s*(?<value>\d+)\s*(?<percent>%)?(?<extra>.*)$/
@@ -93,18 +118,16 @@ export const parseGenericValueOrPercentComparison = (val: string, options?: {req
 const DURATION_COMPARISON_REGEX: RegExp = /^\s*(?<opStr>>|>=|<|<=)\s*(?<time>\d+)\s*(?<unit>days?|weeks?|months?|years?|hours?|minutes?|seconds?|milliseconds?)\s*$/;
 const DURATION_COMPARISON_REGEX_URL = 'https://regexr.com/609n8';
 export const parseDurationComparison = (val: string): DurationComparison => {
-    const matches = val.match(DURATION_COMPARISON_REGEX);
-    if (matches === null) {
-        throw new InvalidRegexError(DURATION_COMPARISON_REGEX, val, DURATION_COMPARISON_REGEX_URL)
+    const result = parseGenericValueComparison(val, {requireDuration: true});
+    if(result.isPercent) {
+        throw new InvalidRegexError(DURATION_COMPARISON_REGEX, val, DURATION_COMPARISON_REGEX_URL, 'Duration comparison value cannot be a percentage');
     }
-    const groups = matches.groups as any;
-    const dur: Duration = dayjs.duration(groups.time, groups.unit);
-    if (!dayjs.isDuration(dur)) {
-        throw new SimpleError(`Parsed value '${val}' did not result in a valid Dayjs Duration`);
+    if(result.value < 0) {
+        throw new InvalidRegexError(DURATION_COMPARISON_REGEX, val, DURATION_COMPARISON_REGEX_URL,'Duration value cannot be negative');
     }
     return {
-        operator: groups.opStr as StringOperator,
-        duration: dur
+        operator: result.operator as StringOperator,
+        duration: result.duration as Duration
     }
 }
 export const dateComparisonTextOp = (val1: Dayjs, strOp: StringOperator, val2: Dayjs, granularity?: OpUnitType): boolean => {
@@ -138,4 +161,52 @@ export const comparisonTextOp = (val1: number, strOp: string, val2: number): boo
         default:
             throw new Error(`${strOp} was not a recognized operator`);
     }
+}
+
+export interface ReportComparison extends Omit<GenericComparison, 'groups'> {
+    reportType?: ReportType
+    reasonRegex?: RegExp
+    reasonMatch?: string
+}
+
+const REPORT_COMPARISON = /^\s*(?<opStr>>|>=|<|<=)\s*(?<value>\d+)(?<percent>\s*%)?(?:\s+(?<reportType>mods?|users?))?(?:\s+(?<reasonMatch>["'].*["']|\/.*\/))?.*(?<time>\d+)?\s*(?<unit>days?|weeks?|months?|years?|hours?|minutes?|seconds?|milliseconds?)?\s*$/i
+const REPORT_REASON_LITERAL = /["'](.*)["']/i
+export const parseReportComparison = (str: string): ReportComparison => {
+    const generic = parseGenericValueComparison(str, {reg: REPORT_COMPARISON});
+
+
+    const {
+        groups: {
+            reportType,
+            reasonMatch
+        } = {},
+        ...rest
+    } = generic;
+
+    const result: ReportComparison = {...rest, reasonMatch};
+
+    if(reportType !== undefined) {
+        if(reportType.toLocaleLowerCase().includes('mod')) {
+            result.reportType = 'mod' as ReportType;
+        } else if (reportType.toLocaleLowerCase().includes('user')) {
+            result.reportType = 'user' as ReportType;
+        }
+    }
+    if(reasonMatch !== undefined) {
+        const literalMatch = reasonMatch.match(REPORT_REASON_LITERAL);
+        if(literalMatch !== null) {
+            const cleanLiteralMatch = `/.*${escapeRegex(literalMatch[1].trim())}.*/`;
+            result.reasonRegex = parseStringToRegex(cleanLiteralMatch, 'i');
+            if(result.reasonRegex === undefined) {
+                throw new CMError(`Could not convert reason match value to Regex: ${cleanLiteralMatch}`, {isSerious: false})
+            }
+        } else {
+            result.reasonRegex = parseStringToRegex(reasonMatch, 'i');
+            if(result.reasonRegex === undefined) {
+                throw new CMError(`Could not convert reason match value to Regex: ${reasonMatch}`, {isSerious: false})
+            }
+        }
+    }
+
+    return result;
 }

@@ -187,8 +187,3 @@ export interface RuleJSONConfig extends IRule {
      */
     kind: 'recentActivity' | 'repeatActivity' | 'author' | 'attribution' | 'history' | 'regex' | 'repost' | 'sentiment'
 }
-
-
-export interface StructuredRuleJson extends Omit<RuleJSONConfig, 'authorIs' | 'itemIs'>, StructuredRunnableBase {
-
-}
