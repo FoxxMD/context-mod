@@ -2268,7 +2268,7 @@ export class SubredditResources {
                             const requestedSourcesVal: string[] = !Array.isArray(itemOptVal) ? [itemOptVal] as string[] : itemOptVal as string[];
                             const requestedSources = requestedSourcesVal.map(x => strToActivitySource(x).toLowerCase());
 
-                            propResultsMap.source!.passed = criteriaPassWithIncludeBehavior(requestedSources.some(x => source.toLowerCase().includes(x)), include);
+                            propResultsMap.source!.passed = criteriaPassWithIncludeBehavior(requestedSources.some(x => source.toLowerCase().trim() === x.toLowerCase().trim()), include);
                             break;
                         }
                     case 'score':
