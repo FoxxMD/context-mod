@@ -29,13 +29,14 @@ import {authUserCheck, botRoute} from "./middleware";
 import Bot from "../../Bot";
 import addBot from "./routes/authenticated/user/addBot";
 import ServerUser from "../Common/User/ServerUser";
-import {SimpleError} from "../../Utils/Errors";
+import {CMError, SimpleError} from "../../Utils/Errors";
 import {ErrorWithCause} from "pony-cause";
 import {Manager} from "../../Subreddit/Manager";
 import {MESSAGE} from "triple-beam";
 import dayjs from "dayjs";
 import { sleep } from '../../util';
 import {Invokee} from "../../Common/Infrastructure/Atomic";
+import {Point} from "@influxdata/influxdb-client";
 
 const server = addAsync(express());
 server.use(bodyParser.json());
@@ -232,6 +233,60 @@ const rcbServer = async function (options: OperatorConfigWithFileContext) {
         });
     }
 
+    // would like to use node-memwatch for more stats but doesn't work with docker (alpine gclib?) and requires more gyp bindings, yuck
+    // https://github.com/airbnb/node-memwatch
+/*    if(options.influx !== undefined) {
+        const memwatchImp = await import('@airbnb/node-memwatch');
+        if (memwatchImp === undefined) {
+            logger.debug('memwatch not installed! Skipping memory monitoring');
+        } else {
+            const memwatch = memwatchImp.default;
+            const influx = options.influx;
+            let lastMemoryReport = dayjs();
+            let gcEvents = 0;
+            memwatch.on('stats', (stats) => {
+                gcEvents++;
+                if(dayjs().diff(lastMemoryReport, 'seconds') >= 15) {
+                    const memUsage = process.memoryUsage();
+                    influx.writePoint(new Point('serverMemory')
+                        .intField('heapSize', stats.total_heap_size)
+                        .intField('heapSizeExec', stats.total_heap_size_executable)
+                        .intField('heapUsed', stats.used_heap_size)
+                        .intField('mallocedMemory', stats.malloced_memory)
+                        .intField('physicalSize', stats.total_physical_size)
+                        .intField('external', memUsage.external)
+                        .intField('rss', memUsage.rss)
+                        .intField('arrayBuffers', memUsage.arrayBuffers)
+                        .intField('gcEvents', gcEvents)
+                    );
+                    lastMemoryReport = dayjs();
+                    gcEvents = 0;
+                }
+            });
+        }
+    }*/
+
+    const writeMemoryMetrics = async () => {
+        if(options.influx !== undefined) {
+            const influx = options.influx;
+            while(true) {
+                await sleep(15000);
+                try {
+                    const memUsage = process.memoryUsage();
+                    await influx.writePoint(new Point('serverMemory')
+                        .intField('external', memUsage.external)
+                        .intField('rss', memUsage.rss)
+                        .intField('arrayBuffers', memUsage.arrayBuffers)
+                        .intField('heapTotal', memUsage.heapTotal)
+                        .intField('heapUsed', memUsage.heapUsed)
+                    );
+                } catch(e: any) {
+                    logger.warn(new CMError('Error occurred while trying to collect memory metrics', {cause: e}));
+                }
+            }
+        }
+    }
+
     server.postAsync('/init', authUserCheck(), async (req, res) => {
         logger.info(`${(req.user as Express.User).name} requested the app to be re-built. Starting rebuild now...`, {subreddit: (req.user as Express.User).name});
         await initBot('user');
@@ -285,6 +340,7 @@ const rcbServer = async function (options: OperatorConfigWithFileContext) {
 
     logger.info('Initializing database...');
     try {
+        writeMemoryMetrics();
         const dbReady = await app.initDatabase();
         if(dbReady) {
             logger.info('Initializing application...');
