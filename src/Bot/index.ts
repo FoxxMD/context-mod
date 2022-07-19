@@ -814,9 +814,13 @@ class Bot {
     async healthLoop() {
         while (this.running) {
             await sleep(5000);
-            await this.apiHealthCheck();
+            const time = dayjs().valueOf()
+            await this.apiHealthCheck(time);
             if (!this.running) {
                 break;
+            }
+            for(const m of this.subManagers) {
+                await m.writeHealthMetrics(time);
             }
             const now = dayjs();
             if (now.isSameOrAfter(this.nextNannyCheck)) {
@@ -857,7 +861,7 @@ class Bot {
         return`API Usage Rolling Avg: ${formatNumber(this.apiRollingAvg)}/s | Est Depletion: ${depletion} (${formatNumber(this.depletedInSecs, {toFixed: 0})} seconds)`;
     }
 
-    async apiHealthCheck() {
+    async apiHealthCheck(time?: number) {
 
         const rollingSample = this.apiSample.slice(0, 7)
         rollingSample.unshift(this.client.ratelimitRemaining);
@@ -886,6 +890,10 @@ class Bot {
             const apiMeasure = new Point('apiHealth')
                 .intField('remaining', this.client.ratelimitRemaining)
                 .stringField('nannyMod', this.nannyMode ?? 'none');
+
+            if(time !== undefined) {
+                apiMeasure.timestamp(time);
+            }
 
             if(this.apiSample.length > 1) {
                 const curr = this.apiSample[0];

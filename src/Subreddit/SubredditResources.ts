@@ -773,11 +773,15 @@ export class SubredditResources {
         }
     }
 
-    async getStats() {
-        const totals = Object.values(this.stats.cache).reduce((acc, curr) => ({
+    getCacheTotals() {
+        return Object.values(this.stats.cache).reduce((acc, curr) => ({
             miss: acc.miss + curr.miss,
             req: acc.req + curr.requests,
         }), {miss: 0, req: 0});
+    }
+
+    async getStats() {
+        const totals = this.getCacheTotals();
         const cacheKeys = Object.keys(this.stats.cache);
         const res = {
             cache: {
