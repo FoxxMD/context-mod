@@ -1239,6 +1239,10 @@ export const buildOperatorConfigWithDefaults = async (data: OperatorJsonConfig):
         } = {},
         credentials = {},
         bots = [],
+        dev: {
+            monitorMemory = false,
+            monitorMemoryInterval = 15
+        } = {},
     } = data;
 
     let cache: StrongCache;
@@ -1387,6 +1391,10 @@ export const buildOperatorConfigWithDefaults = async (data: OperatorJsonConfig):
         },
         bots: [],
         credentials,
+        dev: {
+            monitorMemory,
+            monitorMemoryInterval
+        }
     };
 
     config.bots = bots.map(x => buildBotConfig(x, config));

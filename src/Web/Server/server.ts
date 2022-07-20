@@ -235,54 +235,27 @@ const rcbServer = async function (options: OperatorConfigWithFileContext) {
 
     // would like to use node-memwatch for more stats but doesn't work with docker (alpine gclib?) and requires more gyp bindings, yuck
     // https://github.com/airbnb/node-memwatch
-/*    if(options.influx !== undefined) {
-        const memwatchImp = await import('@airbnb/node-memwatch');
-        if (memwatchImp === undefined) {
-            logger.debug('memwatch not installed! Skipping memory monitoring');
-        } else {
-            const memwatch = memwatchImp.default;
-            const influx = options.influx;
-            let lastMemoryReport = dayjs();
-            let gcEvents = 0;
-            memwatch.on('stats', (stats) => {
-                gcEvents++;
-                if(dayjs().diff(lastMemoryReport, 'seconds') >= 15) {
-                    const memUsage = process.memoryUsage();
-                    influx.writePoint(new Point('serverMemory')
-                        .intField('heapSize', stats.total_heap_size)
-                        .intField('heapSizeExec', stats.total_heap_size_executable)
-                        .intField('heapUsed', stats.used_heap_size)
-                        .intField('mallocedMemory', stats.malloced_memory)
-                        .intField('physicalSize', stats.total_physical_size)
-                        .intField('external', memUsage.external)
-                        .intField('rss', memUsage.rss)
-                        .intField('arrayBuffers', memUsage.arrayBuffers)
-                        .intField('gcEvents', gcEvents)
-                    );
-                    lastMemoryReport = dayjs();
-                    gcEvents = 0;
-                }
-            });
-        }
-    }*/
-
     const writeMemoryMetrics = async () => {
-        if(options.influx !== undefined) {
-            const influx = options.influx;
-            while(true) {
-                await sleep(15000);
-                try {
-                    const memUsage = process.memoryUsage();
-                    await influx.writePoint(new Point('serverMemory')
-                        .intField('external', memUsage.external)
-                        .intField('rss', memUsage.rss)
-                        .intField('arrayBuffers', memUsage.arrayBuffers)
-                        .intField('heapTotal', memUsage.heapTotal)
-                        .intField('heapUsed', memUsage.heapUsed)
-                    );
-                } catch(e: any) {
-                    logger.warn(new CMError('Error occurred while trying to collect memory metrics', {cause: e}));
+        if (options.dev.monitorMemory) {
+            if (options.influx !== undefined) {
+                const influx = options.influx;
+                while (true) {
+                    await sleep(options.dev.monitorMemoryInterval);
+                    try {
+                        const memUsage = process.memoryUsage();
+                        await influx.writePoint(new Point('serverMemory')
+                            .intField('external', memUsage.external)
+                            .intField('rss', memUsage.rss)
+                            .intField('arrayBuffers', memUsage.arrayBuffers)
+                            .intField('heapTotal', memUsage.heapTotal)
+                            .intField('heapUsed', memUsage.heapUsed)
+                        );
+                    } catch (e: any) {
+                        logger.warn(new CMError('Error occurred while trying to collect memory metrics', {cause: e}));
+                    }
                 }
+            } else {
+                logger.warn('Cannot monitor memory because influx config was not set');
             }
         }
     }
