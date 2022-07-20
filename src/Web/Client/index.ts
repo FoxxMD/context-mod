@@ -714,7 +714,7 @@ const webClient = async (options: OperatorConfig) => {
     // botUserRouter.use([ensureAuthenticated, defaultSession, botWithPermissions, createUserToken]);
     // app.use(botUserRouter);
 
-    app.useAsync('/api/', [ensureAuthenticated, defaultSession, instanceWithPermissions, botWithPermissions(false), createUserToken], (req: express.Request, res: express.Response) => {
+    app.useAsync('/api/', [ensureAuthenticatedApi, defaultSession, instanceWithPermissions, botWithPermissions(false), createUserToken], (req: express.Request, res: express.Response) => {
         req.headers.Authorization = `Bearer ${req.token}`
 
         const instance = req.instance as CMInstanceInterface;
