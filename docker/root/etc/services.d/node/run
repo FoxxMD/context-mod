@@ -4,4 +4,4 @@
 
 exec \
 	s6-setuidgid abc \
-	/usr/local/bin/node /app/src/index.js run
+	/usr/local/bin/node $NODE_FLAGS /app/src/index.js run
