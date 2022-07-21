@@ -194,19 +194,24 @@ const cancelDelayed = async (req: Request, res: Response) => {
     const {id} = req.query as any;
     const {name: userName} = req.user as Express.User;
 
-    if(req.manager?.resources === undefined) {
+    if (req.manager?.resources === undefined) {
         req.manager?.logger.error('Subreddit does not have delayed items!', {user: userName});
         return res.status(400).send();
     }
 
-    const delayedItem = req.manager.resources.delayedItems.find(x => x.id === id);
-    if(delayedItem === undefined) {
-        req.manager?.logger.error(`No delayed items exists with the id ${id}`, {user: userName});
-        return res.status(400).send();
+    if (id === undefined) {
+        await req.manager.resources.removeDelayedActivity();
+    } else {
+        const delayedItem = req.manager.resources.delayedItems.find(x => x.id === id);
+        if (delayedItem === undefined) {
+            req.manager?.logger.error(`No delayed items exists with the id ${id}`, {user: userName});
+            return res.status(400).send();
+        }
+
+        await req.manager.resources.removeDelayedActivity(delayedItem.id);
+        req.manager?.logger.info(`Remove Delayed Item '${delayedItem.id}'`, {user: userName});
     }
 
-    req.manager.resources.delayedItems = req.manager.resources.delayedItems.filter(x => x.id !== id);
-    req.manager?.logger.info(`Remove Delayed Item '${delayedItem.id}'`, {user: userName});
     return res.send('OK');
 };
 

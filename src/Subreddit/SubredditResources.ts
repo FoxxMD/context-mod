@@ -510,9 +510,15 @@ export class SubredditResources {
         this.delayedItems.push(data);
     }
 
-    async removeDelayedActivity(id: string) {
-        await this.dispatchedActivityRepo.delete(id);
-        this.delayedItems = this.delayedItems.filter(x => x.id !== id);
+    async removeDelayedActivity(val?: string | string[]) {
+        if(val === undefined) {
+            await this.dispatchedActivityRepo.delete({manager: {id: this.managerEntity.id}});
+            this.delayedItems = [];
+        } else {
+            const ids = typeof val === 'string' ? [val] : val;
+            await this.dispatchedActivityRepo.delete(ids);
+            this.delayedItems = this.delayedItems.filter(x => !ids.includes(x.id));
+        }
     }
 
     async initStats() {

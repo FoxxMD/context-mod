@@ -1047,12 +1047,12 @@
         recentlySeen.set(`${bot}.${sub}`, {...existing, fetch: fetchPromise, controller});
     }
 
-    function updateLiveStats(resp) {
+    function updateLiveStats(resp, bot) {
         let el;
         let isAll = resp.name.toLowerCase() === 'all';
         if(isAll) {
             // got all
-            el = document.querySelector(`[data-subreddit="All"][data-bot="${resp.bot}"].sub`);
+            el = document.querySelector(`[data-subreddit="All"][data-bot="${bot}"].sub`);
         } else {
             // got subreddit
             el = document.querySelector(`[data-subreddit="${resp.name}"].sub`);
@@ -1082,15 +1082,25 @@
                 const durationDayjs = dayjs.duration(x.duration, 'seconds');
                 const durationDisplay = durationDayjs.humanize();
                 const cancelLink = `<a href="#" data-id="${x.id}" data-subreddit="${x.subreddit}" class="delayCancel">CANCEL</a>`;
-                return `<div>A <a href="https://reddit.com${x.permalink}">${x.submissionId !== undefined ? 'Comment' : 'Submssion'}</a>${isAll ? ` in <a href="https://reddit.com${x.subreddit}">${x.subreddit}</a> ` : ''} by <a href="https://reddit.com/u/${x.author}">${x.author}</a> queued by ${x.source} at ${queuedAtDisplay} for ${durationDisplay} (dispatches ${durationUntilNow.humanize(true)}) -- ${cancelLink}</div>`;
+                return `<div>A <a href="https://reddit.com${x.permalink}">${x.submissionId !== undefined ? 'Comment' : 'Submission'}</a>${isAll ? ` in <a href="https://reddit.com${x.subreddit}">${x.subreddit}</a> ` : ''} by <a href="https://reddit.com/u/${x.author}">${x.author}</a> queued by ${x.source} at ${queuedAtDisplay} for ${durationDisplay} (dispatches ${durationUntilNow.humanize(true)}) -- ${cancelLink}</div>`;
             });
+            let sub = resp.name;
+            if(sub === 'All') {
+                sub = sorted.reduce((acc, curr) => {
+                    if(!acc.includes(curr.subreddit)) {
+                        return acc.concat(curr.subreddit);
+                    }
+                    return acc;
+                },[]).join(',');
+            }
+            delayedItemDivs.unshift(`<div><a href="#"data-subreddit="${sub}" class="delayCancelAll">Cancel ALL</a></div>`)
             el.querySelector('.delayedItemsList').insertAdjacentHTML('afterbegin', delayedItemDivs.join(''));
             el.querySelectorAll('.delayedItemsList .delayCancel').forEach(elm => {
                 elm.addEventListener('click', e => {
                     e.preventDefault();
                     const id = e.target.dataset.id;
                     const subreddit = e.target.dataset.subreddit;
-                    fetch(`/api/delayed?instance=<%= instanceId %>&bot=${resp.bot}&subreddit=${subreddit}&id=${id}`, {
+                    fetch(`/api/delayed?instance=<%= instanceId %>&bot=${bot}&subreddit=${subreddit}&id=${id}`, {
                         method: 'DELETE'
                     }).then((resp) => {
                         if (!resp.ok) {
@@ -1099,6 +1109,23 @@
                             console.log('Removed ok');
                         }
                     });
+                });
+            });
+            el.querySelectorAll('.delayedItemsList .delayCancelAll').forEach(elm => {
+                elm.addEventListener('click', e => {
+                    e.preventDefault();
+                    const subreddit = e.target.dataset.subreddit;
+                    deleteDelayedActivities(bot, subreddit);
+
+                    /*fetch(`/api/delayed?instance=<%= instanceId %>&bot=${bot}&subreddit=${subreddit}`, {
+                        method: 'DELETE'
+                    }).then((resp) => {
+                        if (!resp.ok) {
+                            console.error('Response was not OK from delay cancel ALL');
+                        } else {
+                            console.log('Removed ALL ok');
+                        }
+                    });*/
                 });
             });
         }
@@ -1137,11 +1164,35 @@
         }
     }
 
+    function deleteDelayedActivities(bot, subredditStr, id) {
+        const subs = subredditStr.split(',');
+        fetch(`/api/delayed?instance=<%= instanceId %>&bot=${bot}&subreddit=${subs[0]}${id !== undefined ? `&id=${id}` : ''}`, {
+            method: 'DELETE'
+        }).then((resp) => {
+            if (!resp.ok) {
+                if(id === undefined) {
+                    console.error(`Response was not OK from ${subs[0]} delay ALL cancel`);
+                } else {
+                    console.error(`Response was not OK from ${subs[0]} delay cancel ${id}`);
+                }
+            } else {
+                if(id === undefined) {
+                    console.log(`Removed ALL for ${subs[0]} ok`);
+                } else {
+                    console.log(`Removed ${id} for ${subs[0]} ok`);
+                }
+                if(subs.length > 1) {
+                    deleteDelayedActivities(bot, subs.slice(1).join(','));
+                }
+            }
+        });
+    }
+
     function getLiveStats(bot, sub) {
         console.debug(`Getting live stats for ${bot} ${sub}`)
         return fetch(`/api/liveStats?instance=<%= instanceId %>&bot=${bot}&subreddit=${sub}`)
             .then(response => response.json())
-            .then(resp => updateLiveStats(resp));
+            .then(resp => updateLiveStats(resp, bot));
     }
 
     document.querySelectorAll('.sub').forEach(el => {
