@@ -8,6 +8,30 @@ import {Manager} from "../../../../../Subreddit/Manager";
 import winston from "winston";
 import {opStats} from "../../../../Common/util";
 import {BotStatusResponse} from "../../../../Common/interfaces";
+import deepEqual from "fast-deep-equal";
+
+const lastFullResponse: Map<string, Record<string, any>> = new Map();
+
+const generateDeltaResponse = (data: Record<string, any>, hash: string, responseType: 'full' | 'delta') => {
+    if(responseType === 'full') {
+        lastFullResponse.set(hash, data);
+        return data;
+    }
+    const reference = lastFullResponse.get(hash);
+    if(reference === undefined) {
+        // shouldn't happen...
+        return data;
+    }
+    const delta: Record<string, any> = {};
+    for(const [k,v] of Object.entries(data)) {
+        if(!deepEqual(v, reference[k])) {
+            delta[k] = v;
+        }
+    }
+    // update reference frame with changed data
+    lastFullResponse.set(hash, {...lastFullResponse.get(hash), ...delta});
+    return delta;
+}
 
 const liveStats = () => {
     const middleware = [
@@ -20,6 +44,8 @@ const liveStats = () => {
     {
         const bot = req.serverBot as Bot;
         const manager = req.manager;
+        const responseType = req.query.type === 'delta' ? 'delta' : 'full';
+        const hash = `${bot.botName}${manager !== undefined ? `-${manager.getDisplay()}` : ''}`;
         
         if(manager === undefined) {
             // getting all
@@ -213,7 +239,11 @@ const liveStats = () => {
                 },
                 ...allManagerData,
             };
-            return res.json(data);
+            const respData = generateDeltaResponse(data, hash, responseType);
+            if(Object.keys(respData).length === 0) {
+                return res.status(304).end();
+            }
+            return res.json(respData);
         } else {
             // getting specific subreddit stats
             const sd = {
@@ -282,7 +312,11 @@ const liveStats = () => {
                 }
             }
 
-            return res.json(sd);
+            const respData = generateDeltaResponse(sd, hash, responseType);
+            if(Object.keys(respData).length === 0) {
+                return res.status(304).end();
+            }
+            return res.json(respData);
         }
     }
     return [...middleware, response];

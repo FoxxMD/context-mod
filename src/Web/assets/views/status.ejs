@@ -1047,77 +1047,108 @@
         recentlySeen.set(`${bot}.${sub}`, {...existing, fetch: fetchPromise, controller});
     }
 
-    function updateLiveStats(resp, bot) {
+    function updateLiveStats(resp, sub, bot) {
         let el;
-        let isAll = resp.name.toLowerCase() === 'all';
+        let isAll = sub.toLowerCase() === 'all';
         if(isAll) {
             // got all
             el = document.querySelector(`[data-subreddit="All"][data-bot="${bot}"].sub`);
         } else {
             // got subreddit
-            el = document.querySelector(`[data-subreddit="${resp.name}"].sub`);
+            el = document.querySelector(`[data-subreddit="${sub}"].sub`);
         }
 
-        if(resp.system.running && el.classList.contains('offline')) {
-            el.classList.remove('offline');
-        } else if(!resp.system.running && !el.classList.contains('offline')) {
-            el.classList.add('offline');
-        }
+        const {
+            system: {
+                running
+            } = {},
+            delayedItems,
+            runningActivities,
+            queuedActivities,
+            permissions,
+            stats: {
+                historical: {
+                    eventsCheckedTotal,
+                    checksTriggeredTotal,
+                    rulesTriggeredTotal,
+                    actionsRunTotal,
+                } = {},
+            } = {},
+            checks: {
+              comments,
+              submissions
+            } = {},
+            pollingInfo,
+        } = resp;
 
-        el.querySelector('.runningActivities').innerHTML = resp.runningActivities;
-        el.querySelector('.queuedActivities').innerHTML = resp.queuedActivities;
-        el.querySelector('.delayedItemsCount').innerHTML = resp.delayedItems.length;
-        el.querySelector('.delayedItemsList').innerHTML = 'No delayed Items!';
-        if(resp.delayedItems.length > 0) {
-            el.querySelector('.delayedItemsList').innerHTML = '';
-            const now = dayjs();
-            const sorted = resp.delayedItems.map(x => ({...x, queuedAtUnix: x.queuedAt, queuedAt: dayjs.unix(x.queuedAt), dispatchAt: dayjs.unix(x.queuedAt + x.duration)}));
-            sorted.sort((a, b) => {
-                return a.dispatchAt.isSameOrAfter(b.dispatchAt) ? 1 : -1
-            });
-            const delayedItemDivs = sorted.map(x => {
-                const diffUntilNow = x.dispatchAt.diff(now);
-                const durationUntilNow = dayjs.duration(diffUntilNow, 'ms');
-                const queuedAtDisplay = x.queuedAt.format('HH:mm:ss z');
-                const durationDayjs = dayjs.duration(x.duration, 'seconds');
-                const durationDisplay = durationDayjs.humanize();
-                const cancelLink = `<a href="#" data-id="${x.id}" data-subreddit="${x.subreddit}" class="delayCancel">CANCEL</a>`;
-                return `<div>A <a href="https://reddit.com${x.permalink}">${x.submissionId !== undefined ? 'Comment' : 'Submission'}</a>${isAll ? ` in <a href="https://reddit.com${x.subreddit}">${x.subreddit}</a> ` : ''} by <a href="https://reddit.com/u/${x.author}">${x.author}</a> queued by ${x.source} at ${queuedAtDisplay} for ${durationDisplay} (dispatches ${durationUntilNow.humanize(true)}) -- ${cancelLink}</div>`;
-            });
-            let sub = resp.name;
-            if(sub === 'All') {
-                sub = sorted.reduce((acc, curr) => {
-                    if(!acc.includes(curr.subreddit)) {
-                        return acc.concat(curr.subreddit);
-                    }
-                    return acc;
-                },[]).join(',');
+        if(running !== undefined) {
+            if(resp.system.running && el.classList.contains('offline')) {
+                el.classList.remove('offline');
+            } else if(!resp.system.running && !el.classList.contains('offline')) {
+                el.classList.add('offline');
             }
-            delayedItemDivs.unshift(`<div><a href="#"data-subreddit="${sub}" class="delayCancelAll">Cancel ALL</a></div>`)
-            el.querySelector('.delayedItemsList').insertAdjacentHTML('afterbegin', delayedItemDivs.join(''));
-            el.querySelectorAll('.delayedItemsList .delayCancel').forEach(elm => {
-                elm.addEventListener('click', e => {
-                    e.preventDefault();
-                    const id = e.target.dataset.id;
-                    const subreddit = e.target.dataset.subreddit;
-                    fetch(`/api/delayed?instance=<%= instanceId %>&bot=${bot}&subreddit=${subreddit}&id=${id}`, {
-                        method: 'DELETE'
-                    }).then((resp) => {
-                        if (!resp.ok) {
-                            console.error('Response was not OK from delay cancel');
-                        } else {
-                            console.log('Removed ok');
+        }
+
+        if(runningActivities !== undefined) {
+            el.querySelector('.runningActivities').innerHTML = resp.runningActivities;
+        }
+        if(queuedActivities !== undefined) {
+            el.querySelector('.queuedActivities').innerHTML = resp.queuedActivities;
+        }
+
+        if(delayedItems !== undefined) {
+            el.querySelector('.delayedItemsCount').innerHTML = resp.delayedItems.length;
+            el.querySelector('.delayedItemsList').innerHTML = 'No delayed Items!';
+            if(delayedItems.length > 0) {
+                el.querySelector('.delayedItemsList').innerHTML = '';
+                const now = dayjs();
+                const sorted = resp.delayedItems.map(x => ({...x, queuedAtUnix: x.queuedAt, queuedAt: dayjs.unix(x.queuedAt), dispatchAt: dayjs.unix(x.queuedAt + x.duration)}));
+                sorted.sort((a, b) => {
+                    return a.dispatchAt.isSameOrAfter(b.dispatchAt) ? 1 : -1
+                });
+                const delayedItemDivs = sorted.map(x => {
+                    const diffUntilNow = x.dispatchAt.diff(now);
+                    const durationUntilNow = dayjs.duration(diffUntilNow, 'ms');
+                    const queuedAtDisplay = x.queuedAt.format('HH:mm:ss z');
+                    const durationDayjs = dayjs.duration(x.duration, 'seconds');
+                    const durationDisplay = durationDayjs.humanize();
+                    const cancelLink = `<a href="#" data-id="${x.id}" data-subreddit="${x.subreddit}" class="delayCancel">CANCEL</a>`;
+                    return `<div>A <a href="https://reddit.com${x.permalink}">${x.submissionId !== undefined ? 'Comment' : 'Submission'}</a>${isAll ? ` in <a href="https://reddit.com${x.subreddit}">${x.subreddit}</a> ` : ''} by <a href="https://reddit.com/u/${x.author}">${x.author}</a> queued by ${x.source} at ${queuedAtDisplay} for ${durationDisplay} (dispatches ${durationUntilNow.humanize(true)}) -- ${cancelLink}</div>`;
+                });
+                //let sub = resp.name;
+                if(sub === 'All') {
+                    sub = sorted.reduce((acc, curr) => {
+                        if(!acc.includes(curr.subreddit)) {
+                            return acc.concat(curr.subreddit);
                         }
+                        return acc;
+                    },[]).join(',');
+                }
+                delayedItemDivs.unshift(`<div><a href="#"data-subreddit="${sub}" class="delayCancelAll">Cancel ALL</a></div>`)
+                el.querySelector('.delayedItemsList').insertAdjacentHTML('afterbegin', delayedItemDivs.join(''));
+                el.querySelectorAll('.delayedItemsList .delayCancel').forEach(elm => {
+                    elm.addEventListener('click', e => {
+                        e.preventDefault();
+                        const id = e.target.dataset.id;
+                        const subreddit = e.target.dataset.subreddit;
+                        fetch(`/api/delayed?instance=<%= instanceId %>&bot=${bot}&subreddit=${subreddit}&id=${id}`, {
+                            method: 'DELETE'
+                        }).then((resp) => {
+                            if (!resp.ok) {
+                                console.error('Response was not OK from delay cancel');
+                            } else {
+                                console.log('Removed ok');
+                            }
+                        });
                     });
                 });
-            });
-            el.querySelectorAll('.delayedItemsList .delayCancelAll').forEach(elm => {
-                elm.addEventListener('click', e => {
-                    e.preventDefault();
-                    const subreddit = e.target.dataset.subreddit;
-                    deleteDelayedActivities(bot, subreddit);
+                el.querySelectorAll('.delayedItemsList .delayCancelAll').forEach(elm => {
+                    elm.addEventListener('click', e => {
+                        e.preventDefault();
+                        const subreddit = e.target.dataset.subreddit;
+                        deleteDelayedActivities(bot, subreddit);
 
-                    /*fetch(`/api/delayed?instance=<%= instanceId %>&bot=${bot}&subreddit=${subreddit}`, {
+                        /*fetch(`/api/delayed?instance=<%= instanceId %>&bot=${bot}&subreddit=${subreddit}`, {
                         method: 'DELETE'
                     }).then((resp) => {
                         if (!resp.ok) {
@@ -1126,40 +1157,66 @@
                             console.log('Removed ALL ok');
                         }
                     });*/
+                    });
                 });
-            });
+            }
         }
 
-        el.querySelector('.allStats .eventsCount').innerHTML = resp.stats.historical.eventsCheckedTotal;
-        el.querySelector('.allStats .checksCount').innerHTML = resp.stats.historical.checksTriggeredTotal;
-        el.querySelector('.allStats .rulesCount').innerHTML = resp.stats.historical.rulesTriggeredTotal;
-        el.querySelector('.allStats .actionsCount').innerHTML = resp.stats.historical.actionsRunTotal;
+        if(eventsCheckedTotal !== undefined) {
+            el.querySelector('.allStats .eventsCount').innerHTML = resp.stats.historical.eventsCheckedTotal;
+        }
+        if(checksTriggeredTotal !== undefined) {
+            el.querySelector('.allStats .checksCount').innerHTML = resp.stats.historical.checksTriggeredTotal;
+        }
+        if(rulesTriggeredTotal !== undefined) {
+            el.querySelector('.allStats .rulesCount').innerHTML = resp.stats.historical.rulesTriggeredTotal;
+        }
+        if(actionsRunTotal !== undefined) {
+            el.querySelector('.allStats .actionsCount').innerHTML = resp.stats.historical.actionsRunTotal;
+        }
 
         if(isAll) {
             for(const elm of ['apiAvg','apiLimit','apiDepletion','nextHeartbeat', 'nextHeartbeatHuman', 'limitReset', 'limitResetHuman', 'nannyMode', 'startedAtHuman']) {
-                el.querySelector(`#${elm}`).innerHTML = resp[elm];
+                if(resp[elm] !== undefined) {
+                    el.querySelector(`#${elm}`).innerHTML = resp[elm];
+                }
             }
-            el.querySelector(`.botStatus`).innerHTML = resp.system.running ? 'ONLINE' : 'OFFLINE';
+
+            if(running !== undefined) {
+                el.querySelector(`.botStatus`).innerHTML = resp.system.running ? 'ONLINE' : 'OFFLINE';
+            }
         } else {
-            if(el.querySelector('.modPermissionsCount').innerHTML != resp.permissions.length) {
-                el.querySelector('.modPermissionsCount').innerHTML = resp.permissions.length;
-                el.querySelector('.modPermissionsList').innerHTML = '';
-                el.querySelector('.modPermissionsList').insertAdjacentHTML('afterbegin', resp.permissions.map(x => `<li class="font-mono">${x}</li>`).join(''));
+            if(permissions !== undefined) {
+                if(el.querySelector('.modPermissionsCount').innerHTML != resp.permissions.length) {
+                    el.querySelector('.modPermissionsCount').innerHTML = resp.permissions.length;
+                    el.querySelector('.modPermissionsList').innerHTML = '';
+                    el.querySelector('.modPermissionsList').insertAdjacentHTML('afterbegin', resp.permissions.map(x => `<li class="font-mono">${x}</li>`).join(''));
+                }
             }
 
             for(const elm of ['botState', 'queueState', 'eventsState']) {
-                const state = resp[elm];
-                el.querySelector(`.${elm}`).innerHTML = `${state.state}${state.causedBy === 'system' ? '' : ' (user)'}`;
+                if(resp[elm] !== undefined) {
+                    const state = resp[elm];
+                    el.querySelector(`.${elm}`).innerHTML = `${state.state}${state.causedBy === 'system' ? '' : ' (user)'}`;
+                }
             }
             for(const elm of ['startedAt', 'startedAtHuman', 'wikiLastCheck', 'wikiLastCheckHuman', 'wikiRevision', 'wikiRevisionHuman', 'validConfig', 'delayBy']) {
-                el.querySelector(`.${elm}`).innerHTML = resp[elm];
+                if(resp[elm] !== undefined) {
+                    el.querySelector(`.${elm}`).innerHTML = resp[elm];
+                }
             }
-            el.querySelector(`.commentCheckCount`).innerHTML = resp.checks.comments;
-            el.querySelector(`.submissionCheckCount`).innerHTML = resp.checks.submissions;
+            if(comments !== undefined) {
+                el.querySelector(`.commentCheckCount`).innerHTML = resp.checks.comments;
+            }
+            if(submissions !== undefined) {
+                el.querySelector(`.submissionCheckCount`).innerHTML = resp.checks.submissions;
+            }
 
-            const newInner = resp.pollingInfo.map(x => `<li>${x}</li>`).join('');
-            if(el.querySelector(`.pollingInfo`).innerHTML !== newInner) {
-                el.querySelector(`.pollingInfo`).innerHTML = newInner;
+            if(pollingInfo !== undefined) {
+                const newInner = resp.pollingInfo.map(x => `<li>${x}</li>`).join('');
+                if(el.querySelector(`.pollingInfo`).innerHTML !== newInner) {
+                    el.querySelector(`.pollingInfo`).innerHTML = newInner;
+                }
             }
         }
     }
@@ -1188,11 +1245,21 @@
         });
     }
 
-    function getLiveStats(bot, sub) {
+    function getLiveStats(bot, sub, responseType = 'full') {
         console.debug(`Getting live stats for ${bot} ${sub}`)
-        return fetch(`/api/liveStats?instance=<%= instanceId %>&bot=${bot}&subreddit=${sub}`)
-            .then(response => response.json())
-            .then(resp => updateLiveStats(resp, bot));
+        return fetch(`/api/liveStats?instance=<%= instanceId %>&bot=${bot}&subreddit=${sub}&type=${responseType}`)
+            .then(response => {
+                if(response.status === 304) {
+                    return Promise.resolve(false);
+                }
+                return response.json();
+            })
+            .then(resp => {
+                if(resp === false) {
+                    return;
+                }
+                updateLiveStats(resp, sub, bot);
+            });
     }
 
     document.querySelectorAll('.sub').forEach(el => {
@@ -1251,7 +1318,8 @@
             getLiveStats(bot, sub).then(() => {
                 let liveStatsInt;
                 const liveStatFunc = () => {
-                    getLiveStats(bot, sub).catch(() => {
+                    getLiveStats(bot, sub, 'delta').catch((err) => {
+                        console.error(err);
                         // stop interval if live stat encounters an error
                         clearInterval(liveStatsInt);
                     })
