@@ -13,7 +13,7 @@ import {
     USER
 } from "../Common/interfaces";
 import {
-    createRetryHandler, difference,
+    createRetryHandler, symmetricalDifference,
     formatNumber, getExceptionMessage, getUserAgent,
     mergeArr,
     parseBool,
@@ -456,7 +456,7 @@ class Bot {
                     return acc;
                 }
             }, []);
-            const notMatched = difference(normalizedOverrideNames, subsToRunNames);
+            const notMatched = symmetricalDifference(normalizedOverrideNames, subsToRunNames);
             if(notMatched.length > 0) {
                 this.logger.warn(`There are overrides defined for subreddits the bot is not running. Check your spelling! Overrides not matched: ${notMatched.join(', ')}`);
             }

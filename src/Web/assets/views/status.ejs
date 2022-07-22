@@ -999,6 +999,10 @@
             });
 
         fetchPromise.then(async res => {
+            // can potentially happen if request is aborted (by immediate log cancel) before logs begin to be read
+            if(res === undefined) {
+                return;
+            }
             const reader = res.getReader();
             let keepReading = true;
             while(keepReading) {
@@ -1039,15 +1043,20 @@
                             read();*/
         }).catch((e) => {
             if(e.name !== 'AbortError') {
+                console.debug(`Non-abort error occurred while streaming logs for ${bot} ${sub}`);
                 console.error(e);
+            } else {
+                console.debug(`Log streaming for ${bot} ${sub} aborted`);
             }
         });
 
         const existing = recentlySeen.get(`${bot}.${sub}`) || {};
-        recentlySeen.set(`${bot}.${sub}`, {...existing, fetch: fetchPromise, controller});
+        recentlySeen.set(`${bot}.${sub}`, {...existing, fetch: fetchPromise, controller, streamStart: Date.now()});
     }
 
-    function updateLiveStats(resp, sub, bot) {
+    const delayedItemsMap = new Map();
+
+    function updateLiveStats(resp, sub, bot, responseType) {
         let el;
         let isAll = sub.toLowerCase() === 'all';
         if(isAll) {
@@ -1097,12 +1106,28 @@
         }
 
         if(delayedItems !== undefined) {
-            el.querySelector('.delayedItemsCount').innerHTML = resp.delayedItems.length;
+            let items = [];
+            if(responseType === 'full') {
+                delayedItemsMap.clear();
+                for(const i of delayedItems) {
+                    delayedItemsMap.set(i.id, i);
+                }
+                items = delayedItems;
+            } else {
+                for(const n of delayedItems.new) {
+                    delayedItemsMap.set(n.id, n);
+                }
+                for(const n of delayedItems.removed) {
+                    delayedItemsMap.delete(n);
+                }
+                items = Array.from(delayedItemsMap.values());
+            }
+            el.querySelector('.delayedItemsCount').innerHTML = items.length;
             el.querySelector('.delayedItemsList').innerHTML = 'No delayed Items!';
-            if(delayedItems.length > 0) {
+            if(items.length > 0) {
                 el.querySelector('.delayedItemsList').innerHTML = '';
                 const now = dayjs();
-                const sorted = resp.delayedItems.map(x => ({...x, queuedAtUnix: x.queuedAt, queuedAt: dayjs.unix(x.queuedAt), dispatchAt: dayjs.unix(x.queuedAt + x.duration)}));
+                const sorted = items.map(x => ({...x, queuedAtUnix: x.queuedAt, queuedAt: dayjs.unix(x.queuedAt), dispatchAt: dayjs.unix(x.queuedAt + x.duration)}));
                 sorted.sort((a, b) => {
                     return a.dispatchAt.isSameOrAfter(b.dispatchAt) ? 1 : -1
                 });
@@ -1258,24 +1283,34 @@
                 if(resp === false) {
                     return;
                 }
-                updateLiveStats(resp, sub, bot);
+                updateLiveStats(resp, sub, bot, responseType);
             });
     }
 
     document.querySelectorAll('.sub').forEach(el => {
         const sub = el.dataset.subreddit;
         const bot = el.dataset.bot;
-        //console.log(`Focused on ${bot} ${sub}`);
         onVisible(el, () => {
-            console.debug(`Focused on ${bot} ${sub}`);
+            const identifier = `${bot}.${sub}`
 
-            const identifier = `${bot}.${sub}`;
+            console.debug(`Focused on ${identifier}`);
+
+            let immediateCancel = [];
+            const notNew = Array.from(recentlySeen.entries()).filter(([k,v]) => k !== identifier);
+            // browsers have a default limit for number of concurrent connections
+            // which INCLUDES streaming responses (logs)
+            // so we need to keep number of idle streaming logs low to prevent browser from hanging on new requests
+            if(notNew.length > 2) {
+                notNew.sort((a, b) =>  a[1].streamStart - b[1].streamStart);
+                immediateCancel = notNew.slice(2).map(x => x[0]);
+                console.debug(`More than 2 other views are still streaming logs! Will immediately stop the oldest (skipping two earliest): ${immediateCancel.join(' , ')}`);
+            }
 
             recentlySeen.forEach((value, key) => {
                 const {timeout, liveStatsInt, ...rest} = value;
                 if(key === identifier && timeout !== undefined) {
 
-                    console.debug('Clearing timeout on own already set');
+                    console.debug(`${key} Clearing unfocused timeout on own already set`);
                     clearTimeout(timeout);
                     recentlySeen.set(key, rest);
 
@@ -1284,6 +1319,14 @@
                     // stop live stats for tabs we are not viewing
                     clearInterval(liveStatsInt);
 
+                    if(immediateCancel.includes(key)) {
+                        const {controller} = value;
+                        if(controller !== undefined) {
+                            console.debug(`${key} Stopping logs IMMEDIATELY`);
+                            controller.abort();
+                            recentlySeen.delete(key);
+                        }
+                    } else
                     // set timeout for logs we are not viewing
                     if(timeout === undefined) {
                         const t = setTimeout(() => {
@@ -1291,15 +1334,11 @@
                             const val = recentlySeen.get(k);
                             if(val !== undefined) {
                                 const {controller} = val;
-                                console.debug(`timeout expired, stopping live data for ${k}`);
+                                console.debug(`${k} 15 second unfocused timeout expired, stopping log streaming`);
                                 if(controller !== undefined) {
                                     console.debug('Stopping logs');
                                     controller.abort();
                                 }
-                                // if(liveStatInt !== undefined) {
-                                //     console.log('Stopping live stats');
-                                //     clearInterval(liveStatInt);
-                                // }
                                 recentlySeen.delete(k);
                             }
                         },15000);
@@ -1314,10 +1353,12 @@
                 });
             }
 
+            delayedItemsMap.clear();
             // always get live stats for tab we just started viewing
             getLiveStats(bot, sub).then(() => {
                 let liveStatsInt;
                 const liveStatFunc = () => {
+                    // after initial live stats "full frame" only request deltas to reduce data usage
                     getLiveStats(bot, sub, 'delta').catch((err) => {
                         console.error(err);
                         // stop interval if live stat encounters an error
@@ -1325,7 +1366,8 @@
                     })
                 };
                 liveStatsInt = setInterval(liveStatFunc, 5000);
-                recentlySeen.set(identifier, {liveStatsInt});
+                const existing = recentlySeen.get(identifier) ?? {};
+                recentlySeen.set(identifier, {...existing, liveStatsInt});
             });
         });
     });

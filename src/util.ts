@@ -1776,8 +1776,24 @@ function *setMinus(A: Array<any>, B: Array<any>) {
 }
 
 
-export const difference = (a: Array<any>, b: Array<any>) => {
+/**
+ * Returns elements that both arrays do not have in common
+ */
+export const symmetricalDifference = (a: Array<any>, b: Array<any>) => {
     return Array.from(setMinus(a, b));
+}
+
+/**
+ * Returns a Set of elements from valA not in valB
+ * */
+export function difference(valA: Set<any> | Array<any>, valB: Set<any> | Array<any>) {
+    const setA = valA instanceof Set ? valA : new Set(valA);
+    const setB = valB instanceof Set ? valB : new Set(valB);
+    const _difference = new Set(setA);
+    for (const elem of setB) {
+        _difference.delete(elem);
+    }
+    return _difference;
 }
 
 // can use 'in' operator to check if object has a property with name WITHOUT TRIGGERING a snoowrap proxy to fetch

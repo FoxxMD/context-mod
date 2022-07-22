@@ -1,7 +1,7 @@
 import {authUserCheck, botRoute, subredditRoute} from "../../../middleware";
 import {Request, Response} from "express";
 import Bot from "../../../../../Bot";
-import {boolToString, cacheStats, filterLogs, formatNumber, logSortFunc, pollingInfo} from "../../../../../util";
+import {boolToString, cacheStats, difference, filterLogs, formatNumber, logSortFunc, pollingInfo} from "../../../../../util";
 import dayjs from "dayjs";
 import {LogInfo, ResourceStats, RUNNING, STOPPED, SYSTEM} from "../../../../../Common/interfaces";
 import {Manager} from "../../../../../Subreddit/Manager";
@@ -9,28 +9,60 @@ import winston from "winston";
 import {opStats} from "../../../../Common/util";
 import {BotStatusResponse} from "../../../../Common/interfaces";
 import deepEqual from "fast-deep-equal";
+import {DispatchedEntity} from "../../../../../Common/Entities/DispatchedEntity";
 
 const lastFullResponse: Map<string, Record<string, any>> = new Map();
 
-const generateDeltaResponse = (data: Record<string, any>, hash: string, responseType: 'full' | 'delta') => {
-    if(responseType === 'full') {
-        lastFullResponse.set(hash, data);
-        return data;
-    }
-    const reference = lastFullResponse.get(hash);
-    if(reference === undefined) {
-        // shouldn't happen...
-        return data;
-    }
-    const delta: Record<string, any> = {};
-    for(const [k,v] of Object.entries(data)) {
-        if(!deepEqual(v, reference[k])) {
+const mergeDeepEqual = (a: Record<any, any>, b: Record<any, any>): Record<any, any> => {
+    const delta: Record<any, any> = {};
+    for(const [k,v] of Object.entries(a)) {
+        if(typeof v === 'object' && v !== null && typeof b[k] === 'object' && b[k] !== null) {
+            const objDelta = mergeDeepEqual(v, b[k]);
+            if(Object.keys(objDelta).length > 0) {
+                delta[k] = objDelta;
+            }
+        } else if(!deepEqual(v, b[k])) {
             delta[k] = v;
         }
     }
-    // update reference frame with changed data
-    lastFullResponse.set(hash, {...lastFullResponse.get(hash), ...delta});
     return delta;
+}
+
+const generateDeltaResponse = (data: Record<string, any>, hash: string, responseType: 'full' | 'delta') => {
+    let resp = data;
+    if(responseType === 'delta') {
+        const reference = lastFullResponse.get(hash);
+        if(reference === undefined) {
+            // shouldn't happen...
+            return data;
+        }
+        const delta: Record<string, any> = {};
+        for(const [k,v] of Object.entries(data)) {
+            if(!deepEqual(v, reference[k])) {
+                // on delayed items delta we will send a different data structure back with just remove/new(add)
+                if(k === 'delayedItems') {
+                    const refIds = reference[k].map((x: DispatchedEntity) => x.id);
+                    const latestIds = v.map((x: DispatchedEntity) => x.id);
+
+                    const newIds = Array.from(difference(latestIds, refIds));
+                    const newItems = v.filter((x: DispatchedEntity) => newIds.includes(x.id));
+
+                    // just need ids that should be removed on frontend
+                    const removedItems = Array.from(difference(refIds, latestIds));
+                    delta[k] = {new: newItems, removed: removedItems};
+
+                } else if(v !== null && typeof v === 'object' && reference[k] !== null && typeof reference[k] === 'object') {
+                    // for things like cache/stats we only want to delta changed properties, not the entire object
+                    delta[k] = mergeDeepEqual(v, reference[k]);
+                } else {
+                    delta[k] = v;
+                }
+            }
+        }
+        resp = delta;
+    }
+    lastFullResponse.set(hash, data);
+    return resp;
 }
 
 const liveStats = () => {
@@ -46,7 +78,7 @@ const liveStats = () => {
         const manager = req.manager;
         const responseType = req.query.type === 'delta' ? 'delta' : 'full';
         const hash = `${bot.botName}${manager !== undefined ? `-${manager.getDisplay()}` : ''}`;
-        
+
         if(manager === undefined) {
             // getting all
             const subManagerData: any[] = [];
@@ -241,7 +273,7 @@ const liveStats = () => {
             };
             const respData = generateDeltaResponse(data, hash, responseType);
             if(Object.keys(respData).length === 0) {
-                return res.status(304).end();
+                return res.status(304).send();
             }
             return res.json(respData);
         } else {
@@ -314,7 +346,7 @@ const liveStats = () => {
 
             const respData = generateDeltaResponse(sd, hash, responseType);
             if(Object.keys(respData).length === 0) {
-                return res.status(304).end();
+                return res.status(304).send();
             }
             return res.json(respData);
         }
