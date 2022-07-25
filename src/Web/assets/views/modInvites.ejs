@@ -37,7 +37,10 @@
             } else {
                 resp.json().then(data => {
                     if (data.length > 0) {
-                        document.querySelector('#noSubs').style = 'display: none;';
+                        const ns = document.querySelector('#noSubs');
+                        if(ns !== null) {
+                            document.querySelector('#noSubs').style = 'display: none;';
+                        }
                         sl.removeChild(sl.childNodes[1]);
                     }
                     for (const sub of data) {
@@ -69,7 +72,10 @@
                         document.querySelector("#error").innerHTML = t;
                     });
                 } else {
-                    document.querySelector('#noSubs').style = 'display: none;';
+                    const ns = document.querySelector('#noSubs');
+                    if(ns !== null) {
+                        document.querySelector('#noSubs').style = 'display: none;';
+                    }
                     addSubredditElement(subName);
                     subNameElm.value = '';
                 }
