@@ -148,6 +148,7 @@ const rcbServer = async function (options: OperatorConfigWithFileContext) {
     server.use(passport.authenticate('jwt', {session: false}));
     server.use((req, res, next) => {
         req.botApp = app;
+        req.logger = logger;
         next();
     });
 
