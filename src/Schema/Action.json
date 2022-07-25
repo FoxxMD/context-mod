@@ -442,7 +442,6 @@
                     "examples": [
                         "Sock puppet for u/AnotherUser"
                     ],
-                    "maxLength": 100,
                     "type": "string"
                 },
                 "reason": {
@@ -450,7 +449,6 @@
                     "examples": [
                         "repeat spam"
                     ],
-                    "maxLength": 100,
                     "type": "string"
                 }
             },
