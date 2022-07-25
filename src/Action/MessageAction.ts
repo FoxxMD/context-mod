@@ -50,8 +50,9 @@ export class MessageAction extends Action {
 
     async process(item: Comment | Submission, ruleResults: RuleResultEntity[], options: runCheckOptions): Promise<ActionProcessResult> {
         const dryRun = this.getRuntimeAwareDryrun(options);
-        const content = await this.resources.getContent(this.content);
-        const body = await renderContent(content, item, ruleResults, this.resources.userNotes);
+
+        const body = await this.resources.renderContent(this.content, item, ruleResults);
+        const subject = this.title === undefined ? `Concerning your ${isSubmission(item) ? 'Submission' : 'Comment'}` : await this.resources.renderContent(this.title, item, ruleResults);
 
         const footer = await this.resources.generateFooter(item, this.footer);
 
@@ -80,7 +81,7 @@ export class MessageAction extends Action {
             text: renderedContent,
             // @ts-ignore
             fromSubreddit: this.asSubreddit ? await item.subreddit.fetch() : undefined,
-            subject: this.title || `Concerning your ${isSubmission(item) ? 'Submission' : 'Comment'}`,
+            subject: subject,
         };
 
         const msgPreview = `\r\n

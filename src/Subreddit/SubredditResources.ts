@@ -4,7 +4,7 @@ import {
     activityIsDeleted, activityIsFiltered,
     activityIsRemoved,
     AuthorTypedActivitiesOptions, BOT_LINK,
-    getAuthorHistoryAPIOptions
+    getAuthorHistoryAPIOptions, renderContent
 } from "../Utils/SnoowrapUtils";
 import {map as mapAsync} from 'async';
 import winston, {Logger} from "winston";
@@ -1759,6 +1759,14 @@ export class SubredditResources {
         }
 
         return wikiContent;
+    }
+
+    /**
+     * Convenience method for using getContent and SnoowrapUtils@renderContent in one method
+     * */
+    async renderContent(contentStr: string, data: SnoowrapActivity, ruleResults: RuleResultEntity[] = [], usernotes?: UserNotes) {
+        const content = await this.getContent(contentStr);
+        return await renderContent(content, data, ruleResults, usernotes ?? this.userNotes);
     }
 
     async getConfigFragment<T>(includesData: IncludesData, validateFunc?: ConfigFragmentValidationFunc): Promise<T> {

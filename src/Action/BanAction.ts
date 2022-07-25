@@ -41,12 +41,11 @@ export class BanAction extends Action {
 
     async process(item: Comment | Submission, ruleResults: RuleResultEntity[], options: runCheckOptions): Promise<ActionProcessResult> {
         const dryRun = this.getRuntimeAwareDryrun(options);
-        const content = this.message === undefined ? undefined : await this.resources.getContent(this.message, item.subreddit);
-        const renderedBody = content === undefined ? undefined : await renderContent(content, item, ruleResults, this.resources.userNotes);
+        const renderedBody = this.message === undefined ? undefined : await this.resources.renderContent(this.message, item, ruleResults);
         const renderedContent = renderedBody === undefined ? undefined : `${renderedBody}${await this.resources.generateFooter(item, this.footer)}`;
 
-        const renderedReason = this.reason === undefined ? undefined : truncate(await renderContent(this.reason, item, ruleResults, this.resources.userNotes));
-        const renderedNote = this.note === undefined ? undefined : truncate(await renderContent(this.note, item, ruleResults, this.resources.userNotes));
+        const renderedReason = this.reason === undefined ? undefined : truncate(await this.resources.renderContent(this.reason, item, ruleResults));
+        const renderedNote = this.note === undefined ? undefined : truncate(await this.resources.renderContent(this.note, item, ruleResults));
 
         const touchedEntities = [];
         let banPieces = [];
@@ -108,7 +107,6 @@ export interface BanActionConfig extends ActionConfig, Footer {
      *
      * If the length expands to more than 100 characters it will truncated with "..."
      *
-     * @maxLength 100
      * @examples ["repeat spam"]
      * */
     reason?: string
@@ -124,7 +122,6 @@ export interface BanActionConfig extends ActionConfig, Footer {
      *
      * If the length expands to more than 100 characters it will truncated with "..."
      *
-     * @maxLength 100
      * @examples ["Sock puppet for u/AnotherUser"]
      * */
     note?: string
