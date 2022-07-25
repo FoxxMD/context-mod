@@ -1055,6 +1055,7 @@
     }
 
     const delayedItemsMap = new Map();
+    let lastSeenIdentifier = null;
 
     function updateLiveStats(resp, sub, bot, responseType) {
         let el;
@@ -1287,91 +1288,129 @@
             });
     }
 
+    function onSubVisible (bot, sub) {
+        const identifier = `${bot}.${sub}`
+        lastSeenIdentifier = identifier;
+
+        console.debug(`Focused on ${identifier}`);
+
+        let immediateCancel = [];
+        const notNew = Array.from(recentlySeen.entries()).filter(([k,v]) => k !== identifier);
+        // browsers have a default limit for number of concurrent connections
+        // which INCLUDES streaming responses (logs)
+        // so we need to keep number of idle streaming logs low to prevent browser from hanging on new requests
+        if(notNew.length > 2) {
+            notNew.sort((a, b) =>  a[1].streamStart - b[1].streamStart);
+            immediateCancel = notNew.slice(2).map(x => x[0]);
+            console.debug(`More than 2 other views are still streaming logs! Will immediately stop the oldest (skipping two earliest): ${immediateCancel.join(' , ')}`);
+        }
+
+        recentlySeen.forEach((value, key) => {
+            const {timeout, liveStatsInt, ...rest} = value;
+            if(key === identifier && timeout !== undefined) {
+
+                console.debug(`${key} Clearing unfocused timeout on own already set`);
+                clearTimeout(timeout);
+                recentlySeen.set(key, rest);
+
+            } else if(key !== identifier) {
+
+                // stop live stats for tabs we are not viewing
+                clearInterval(liveStatsInt);
+
+                if(immediateCancel.includes(key)) {
+                    const {controller} = value;
+                    if(controller !== undefined) {
+                        console.debug(`${key} Stopping logs IMMEDIATELY`);
+                        controller.abort();
+                        recentlySeen.delete(key);
+                    }
+                } else
+                    // set timeout for logs we are not viewing
+                if(timeout === undefined) {
+                    const t = setTimeout(() => {
+                        const k = key;
+                        const val = recentlySeen.get(k);
+                        if(val !== undefined) {
+                            const {controller} = val;
+                            console.debug(`${k} 15 second unfocused timeout expired, stopping log streaming`);
+                            if(controller !== undefined) {
+                                console.debug('Stopping logs');
+                                controller.abort();
+                            }
+                            recentlySeen.delete(k);
+                        }
+                    },15000);
+                    recentlySeen.set(key, {timeout: t, liveStatsInt, ...rest});
+                }
+            }
+        });
+
+        if(!recentlySeen.has(identifier)) {
+            getLogBlock(bot, sub).then(() => {
+                getStreamingLogs(sub, bot);
+            });
+        }
+
+        delayedItemsMap.clear();
+        // always get live stats for tab we just started viewing
+        getLiveStats(bot, sub).then(() => {
+            let liveStatsInt;
+            const liveStatFunc = () => {
+                // after initial live stats "full frame" only request deltas to reduce data usage
+                getLiveStats(bot, sub, 'delta').catch((err) => {
+                    console.error(err);
+                    // stop interval if live stat encounters an error
+                    clearInterval(liveStatsInt);
+                })
+            };
+            liveStatsInt = setInterval(liveStatFunc, 5000);
+            const existing = recentlySeen.get(identifier) ?? {};
+            recentlySeen.set(identifier, {...existing, bot, sub, liveStatsInt});
+        });
+    }
+
     document.querySelectorAll('.sub').forEach(el => {
         const sub = el.dataset.subreddit;
         const bot = el.dataset.bot;
-        onVisible(el, () => {
-            const identifier = `${bot}.${sub}`
-
-            console.debug(`Focused on ${identifier}`);
-
-            let immediateCancel = [];
-            const notNew = Array.from(recentlySeen.entries()).filter(([k,v]) => k !== identifier);
-            // browsers have a default limit for number of concurrent connections
-            // which INCLUDES streaming responses (logs)
-            // so we need to keep number of idle streaming logs low to prevent browser from hanging on new requests
-            if(notNew.length > 2) {
-                notNew.sort((a, b) =>  a[1].streamStart - b[1].streamStart);
-                immediateCancel = notNew.slice(2).map(x => x[0]);
-                console.debug(`More than 2 other views are still streaming logs! Will immediately stop the oldest (skipping two earliest): ${immediateCancel.join(' , ')}`);
-            }
-
-            recentlySeen.forEach((value, key) => {
-                const {timeout, liveStatsInt, ...rest} = value;
-                if(key === identifier && timeout !== undefined) {
-
-                    console.debug(`${key} Clearing unfocused timeout on own already set`);
-                    clearTimeout(timeout);
-                    recentlySeen.set(key, rest);
-
-                } else if(key !== identifier) {
-
-                    // stop live stats for tabs we are not viewing
-                    clearInterval(liveStatsInt);
-
-                    if(immediateCancel.includes(key)) {
-                        const {controller} = value;
-                        if(controller !== undefined) {
-                            console.debug(`${key} Stopping logs IMMEDIATELY`);
-                            controller.abort();
-                            recentlySeen.delete(key);
-                        }
-                    } else
-                    // set timeout for logs we are not viewing
-                    if(timeout === undefined) {
-                        const t = setTimeout(() => {
-                            const k = key;
-                            const val = recentlySeen.get(k);
-                            if(val !== undefined) {
-                                const {controller} = val;
-                                console.debug(`${k} 15 second unfocused timeout expired, stopping log streaming`);
-                                if(controller !== undefined) {
-                                    console.debug('Stopping logs');
-                                    controller.abort();
-                                }
-                                recentlySeen.delete(k);
-                            }
-                        },15000);
-                        recentlySeen.set(key, {timeout: t, liveStatsInt, ...rest});
-                    }
-                }
-            });
-
-            if(!recentlySeen.has(identifier)) {
-                getLogBlock(bot, sub).then(() => {
-                    getStreamingLogs(sub, bot);
-                });
-            }
-
-            delayedItemsMap.clear();
-            // always get live stats for tab we just started viewing
-            getLiveStats(bot, sub).then(() => {
-                let liveStatsInt;
-                const liveStatFunc = () => {
-                    // after initial live stats "full frame" only request deltas to reduce data usage
-                    getLiveStats(bot, sub, 'delta').catch((err) => {
-                        console.error(err);
-                        // stop interval if live stat encounters an error
-                        clearInterval(liveStatsInt);
-                    })
-                };
-                liveStatsInt = setInterval(liveStatFunc, 5000);
-                const existing = recentlySeen.get(identifier) ?? {};
-                recentlySeen.set(identifier, {...existing, liveStatsInt});
-            });
-        });
+        onVisible(el, () => onSubVisible(bot, sub));
     });
 
+    let backgroundTimeout = null;
+
+    document.addEventListener("visibilitychange", (e) => {
+        if (document.visibilityState === "hidden") {
+            console.debug(`Set 15 seconds timeout for ${lastSeenIdentifier} live data due to page not being visible`);
+            backgroundTimeout = setTimeout(() => {
+                console.debug(`Stopping live data for ${lastSeenIdentifier} due to page not being visible`);
+
+                const {liveStatsInt, controller} = recentlySeen.get(lastSeenIdentifier) ?? {};
+                if(liveStatsInt !== undefined && liveStatsInt !== null) {
+                    clearInterval(liveStatsInt);
+                }
+                if(controller !== undefined && controller !== null) {
+                    controller.abort();
+                }
+                backgroundTimeout = null;
+            }, 15000);
+        } else {
+            // cancel real-time data timeout because page is visible again
+            if(backgroundTimeout !== null) {
+                console.debug(`Cancelled live-data timeout for ${lastSeenIdentifier}`);
+                clearTimeout(backgroundTimeout);
+                backgroundTimeout = null;
+            } else if(lastSeenIdentifier !== null) {
+                // if timeout is null then it was hit
+                // and since we have a last seen this is what is visible to the user so restart live data for it
+                const {bot, sub} = recentlySeen.get(lastSeenIdentifier) ?? {};
+                if(bot !== undefined && sub !== undefined) {
+                    console.debug(`Restarting live-data for ${lastSeenIdentifier} due to page being visible`);
+                    recentlySeen.delete(lastSeenIdentifier);
+                    onSubVisible(bot, sub);
+                }
+            }
+        }
+    });
 
     var searchParams = new URLSearchParams(window.location.search);
     const shownSub = searchParams.get('sub') || 'All'
