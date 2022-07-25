@@ -96,7 +96,7 @@ import {CMEvent as ActionedEventEntity, CMEvent } from "../Common/Entities/CMEve
 import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
 import globrex from 'globrex';
 import {runMigrations} from "../Common/Migrations/CacheMigrationUtils";
-import {isStatusError, MaybeSeriousErrorWithCause, SimpleError} from "../Utils/Errors";
+import {CMError, isStatusError, MaybeSeriousErrorWithCause, SimpleError} from "../Utils/Errors";
 import {ErrorWithCause} from "pony-cause";
 import {ManagerEntity} from "../Common/Entities/ManagerEntity";
 import {Bot} from "../Common/Entities/Bot";
@@ -3578,11 +3578,19 @@ export class BotResourcesManager {
     }
 
     async addPendingSubredditInvite(subreddit: string): Promise<void> {
+        if(subreddit === null || subreddit === undefined || subreddit == '') {
+            throw new CMError('Subreddit name cannot be empty');
+        }
         let subredditNames = await this.defaultCache.get(`modInvites`) as (string[] | undefined | null);
         if (subredditNames === undefined || subredditNames === null) {
             subredditNames = [];
         }
-        subredditNames.push(subreddit);
+        const cleanName = subreddit.trim();
+
+        if(subredditNames.some(x => x.trim().toLowerCase() === cleanName.toLowerCase())) {
+            throw new CMError(`An invite for the Subreddit '${subreddit}' already exists`);
+        }
+        subredditNames.push(cleanName);
         await this.defaultCache.set(`modInvites`, subredditNames, {ttl: 0});
         return;
     }
@@ -3592,7 +3600,7 @@ export class BotResourcesManager {
         if (subredditNames === undefined || subredditNames === null) {
             subredditNames = [];
         }
-        subredditNames = subredditNames.filter(x => x !== subreddit);
+        subredditNames = subredditNames.filter(x => x.toLowerCase() !== subreddit.trim().toLowerCase());
         await this.defaultCache.set(`modInvites`, subredditNames, {ttl: 0});
         return;
     }

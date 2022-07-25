@@ -20,6 +20,7 @@ import {filterResultsBuilder} from "../../../../../Utils/typeormUtils";
 import {Brackets} from "typeorm";
 import {Activity} from "../../../../../Common/Entities/Activity";
 import {RedditThing} from "../../../../../Common/Infrastructure/Reddit";
+import {CMError} from "../../../../../Utils/Errors";
 
 const commentReg = parseLinkIdentifier([COMMENT_URL_ID]);
 const submissionReg = parseLinkIdentifier([SUBMISSION_URL_ID]);
@@ -54,7 +55,17 @@ const addInvite = async (req: Request, res: Response) => {
     if (subreddit === undefined || subreddit === null || subreddit === '') {
         return res.status(400).send('subreddit must be defined');
     }
-    await req.serverBot.cacheManager.addPendingSubredditInvite(subreddit);
+    try {
+        await req.serverBot.cacheManager.addPendingSubredditInvite(subreddit);
+    } catch (e: any) {
+        if(e instanceof CMError) {
+            req.logger.warn(e);
+            return res.status(400).send(e.message);
+        } else {
+            req.logger.error(e);
+            return res.status(500).send(e.message);
+        }
+    }
     return res.status(200).send();
 };
 
