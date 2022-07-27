@@ -261,6 +261,31 @@
                                                     <span class="cursor-help underline" style="text-decoration-style: dotted"><%= data.scopes.length %></span>
                                                 </span>
                                             <% } else %>
+                                            <label>Guest Mods</label>
+                                            <span>
+                                                <% if(data.guests.length === 0) { %>
+                                                 <span>None</span>
+                                                <% } %>
+                                                <% if (data.name === 'All') { %>
+                                                        <% data.guests.forEach(function (i){ %>
+                                                    <span>
+                                                        <%= i.name %> (<%= i.subreddits.length %> Subs)
+                                                        <a href="" class="removeGuestAll" data-name="<%= i.name %>">
+                                                            <span class="cancellable iconify-inline" data-icon="icons8:cancel"></span>
+                                                            </a>
+                                                    </span>
+                                                        <% }) %>
+                                                <% } else { %>
+                                                        <% data.guests.forEach(function (i){ %>
+                                                        <span>
+                                                        <%= i.name %>
+                                                        <a href="" class="removeGuest" data-id="<%= i.id %>">
+                                                            <span class="cancellable iconify-inline" data-icon="icons8:cancel"></span>
+                                                            </a>
+                                                    </span>
+                                                    <% }) %>
+                                                <% } %>
+                                            </span>
                                         </div>
                                         <% if (data.name !== 'All') { %>
                                             <ul class="list-disc list-inside mt-4 pollingInfo">

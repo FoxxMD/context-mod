@@ -49,6 +49,7 @@ const sub: SubredditDataResponse = {
     heartbeatHuman: "-",
     indicator: "-",
     logs: [],
+    guests: [],
     maxWorkers: 0,
     name: "-",
     pollingInfo: [],

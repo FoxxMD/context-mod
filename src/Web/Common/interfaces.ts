@@ -1,6 +1,7 @@
 import {RunningState} from "../../Subreddit/Manager";
 import {LogInfo, ManagerStats} from "../../Common/interfaces";
 import {BotInstance} from "../interfaces";
+import {Guest, GuestAll} from "../../Common/Entities/Guest/GuestInterfaces";
 
 export interface BotStats {
     startedAtHuman: string,
@@ -50,6 +51,7 @@ export interface SubredditDataResponse {
     heartbeatHuman?: string
     heartbeat: number
     retention: string
+    guests: (Guest | GuestAll)[]
 }
 
 export interface BotStatusResponse {

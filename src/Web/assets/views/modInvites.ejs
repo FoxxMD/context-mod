@@ -87,7 +87,7 @@
             node.id = `subInvite-${sub}`;
             var textNode = document.createTextNode(sub);
             node.appendChild(textNode);
-            node.insertAdjacentHTML('beforeend', `<a href="" class="removeSub" id="removeSub-${sub}" data-subreddit="${sub}"><span style="display:inline; margin-left: 10px" class="iconify-inline" data-icon="icons8:cancel"></span><a/>`);
+            node.insertAdjacentHTML('beforeend', `<a href="" class="removeSub" id="removeSub-${sub}" data-subreddit="${sub}"><span style="display:inline; margin-left: 10px" class="iconify-inline" data-icon="icons8:cancel"></span></a>`);
             sl.appendChild(node);
             document.querySelector(`#removeSub-${sub}`).addEventListener('click', e => {
                 e.preventDefault();

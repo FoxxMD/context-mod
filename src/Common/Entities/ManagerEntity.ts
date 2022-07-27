@@ -15,12 +15,14 @@ import {RunEntity} from "./RunEntity";
 import {Bot} from "./Bot";
 import {RandomIdBaseEntity} from "./Base/RandomIdBaseEntity";
 import {ManagerRunState} from "./EntityRunState/ManagerRunState";
-import { QueueRunState } from "./EntityRunState/QueueRunState";
+import {QueueRunState} from "./EntityRunState/QueueRunState";
 import {EventsRunState} from "./EntityRunState/EventsRunState";
 import {RulePremise} from "./RulePremise";
 import {ActionPremise} from "./ActionPremise";
-import { RunningStateTypes } from "../../Subreddit/Manager";
+import {RunningStateTypes} from "../../Subreddit/Manager";
 import {EntityRunState} from "./EntityRunState/EntityRunState";
+import {GuestEntity, ManagerGuestEntity} from "./Guest/GuestEntity";
+import {Guest, GuestEntityData, HasGuests} from "./Guest/GuestInterfaces";
 
 export interface ManagerEntityOptions {
     name: string
@@ -36,7 +38,7 @@ export type RunningStateEntities = {
 };
 
 @Entity({name: 'Manager'})
-export class ManagerEntity extends RandomIdBaseEntity implements RunningStateEntities {
+export class ManagerEntity extends RandomIdBaseEntity implements RunningStateEntities, HasGuests {
 
     @Column("varchar", {length: 200})
     name!: string;
@@ -56,11 +58,14 @@ export class ManagerEntity extends RandomIdBaseEntity implements RunningStateEnt
     @OneToMany(type => ActionPremise, obj => obj.manager)
     actions!: Promise<ActionPremise[]>
 
-    @OneToMany(type => CheckEntity, obj => obj.manager) // note: we will create author property in the Photo class below
+    @OneToMany(type => CheckEntity, obj => obj.manager)
     checks!: Promise<CheckEntity[]>
 
-    @OneToMany(type => RunEntity, obj => obj.manager) // note: we will create author property in the Photo class below
+    @OneToMany(type => RunEntity, obj => obj.manager)
     runs!: Promise<RunEntity[]>
+
+    @OneToMany(type => ManagerGuestEntity, obj => obj.guestOf, {cascade: ['insert', 'remove', 'update']})
+    guests!: Promise<ManagerGuestEntity[]>
 
     @OneToOne(() => EventsRunState, {cascade: ['insert', 'update'], eager: true})
     @JoinColumn()
@@ -84,5 +89,47 @@ export class ManagerEntity extends RandomIdBaseEntity implements RunningStateEnt
             this.queueState = data.queueState;
             this.managerState = data.managerState;
         }
+    }
+
+    async getGuests(): Promise<ManagerGuestEntity[]> {
+        const g = await this.guests;
+        if (g === undefined) {
+            return [];
+        }
+        //return g.map(x => ({id: x.id, name: x.author.name, expiresAt: x.expiresAt})) as Guest[];
+        return g;
+    }
+
+    async addGuest(val: GuestEntityData | GuestEntityData[]) {
+        const reqGuests = Array.isArray(val) ? val : [val];
+        const guests = await this.guests;
+        for (const g of reqGuests) {
+            const existing = guests.find(x => x.author.name.toLowerCase() === g.author.name.toLowerCase());
+            if (existing !== undefined) {
+                // update existing guest expiresAt
+                existing.expiresAt = g.expiresAt;
+            } else {
+                guests.push(new ManagerGuestEntity({...g, guestOf: this}));
+            }
+        }
+        this.guests = Promise.resolve(guests);
+    }
+
+    async removeGuestById(val: string | string[]) {
+        const reqGuests = Array.isArray(val) ? val : [val];
+        const guests = await this.guests;
+        const filteredGuests = guests.filter(x => reqGuests.includes(x.id));
+        this.guests = Promise.resolve(filteredGuests);
+    }
+
+    async removeGuestByUser(val: string | string[]) {
+        const reqGuests = (Array.isArray(val) ? val : [val]).map(x => x.trim().toLowerCase());
+        const guests = await this.guests;
+        const filteredGuests = guests.filter(x => reqGuests.includes(x.author.name.toLowerCase()));
+        this.guests = Promise.resolve(filteredGuests);
+    }
+
+    async removeGuests() {
+        this.guests = Promise.resolve([]);
     }
 }

@@ -176,3 +176,8 @@ a {
 li > ul {
     padding: revert;
 }
+
+.cancellable {
+    display:inline;
+/*    margin-left: 10px*/
+}
