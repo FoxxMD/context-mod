@@ -62,6 +62,7 @@ export class ManagerGuestEntity extends GuestEntity<ManagerEntity> {
         super();
         if(data !== undefined) {
             this.guestOf = data.guestOf;
+            this.author = data.author;
         }
     }
 }
@@ -79,6 +80,7 @@ export class BotGuestEntity extends GuestEntity<Bot> {
         super();
         if(data !== undefined) {
             this.guestOf = data.guestOf;
+            this.author = data.author;
         }
     }
 }

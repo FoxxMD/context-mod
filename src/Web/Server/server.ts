@@ -16,7 +16,7 @@ import status from './routes/authenticated/user/status';
 import liveStats from './routes/authenticated/user/liveStats';
 import {
     actionedEventsRoute,
-    actionRoute,
+    actionRoute, addGuestModRoute,
     addInviteRoute,
     cancelDelayedRoute,
     configLocationRoute,
@@ -221,6 +221,8 @@ const rcbServer = async function (options: OperatorConfigWithFileContext) {
     server.deleteAsync('/delayed', ...cancelDelayedRoute);
 
     server.deleteAsync('/guests', ...removeGuestModRoute);
+
+    server.postAsync('/guests', ...addGuestModRoute);
 
     app = new App(options);
 

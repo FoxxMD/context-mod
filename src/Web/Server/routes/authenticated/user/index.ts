@@ -28,6 +28,7 @@ import {
     ManagerGuestEntity
 } from "../../../../../Common/Entities/Guest/GuestEntity";
 import {ManagerEntity} from "../../../../../Common/Entities/ManagerEntity";
+import {AuthorEntity} from "../../../../../Common/Entities/AuthorEntity";
 
 const commentReg = parseLinkIdentifier([COMMENT_URL_ID]);
 const submissionReg = parseLinkIdentifier([SUBMISSION_URL_ID]);
@@ -260,3 +261,43 @@ const removeGuestMod = async (req: Request, res: Response) => {
 };
 
 export const removeGuestModRoute = [authUserCheck(), botRoute(), subredditRoute(true), removeGuestMod];
+
+const addGuestMod = async (req: Request, res: Response) => {
+
+    const {name, time} = req.query as any;
+    const {name: userName} = req.user as Express.User;
+
+    const isAll = req.manager === undefined;
+
+    const managers = (isAll ? req.user?.accessibleSubreddits(req.bot) : [req.manager as Manager]) as Manager[];
+
+    const managerRepo = req.serverBot.database.getRepository(ManagerEntity);
+    const authorRepo = req.serverBot.database.getRepository(AuthorEntity);
+
+    let user = await authorRepo.findOne({
+        where: {
+            name: name as string,
+        }
+    });
+
+    if(user === null) {
+        user = await authorRepo.save(new AuthorEntity({name}))
+    }
+
+    // TODO this is not using the right time?
+    const expiresAt = dayjs(Number.parseInt(time));
+
+    let newGuests: GuestEntityData[] = [];
+    for(const m of managers) {
+        const filteredGuests = m.managerEntity.addGuest({author: user, expiresAt});
+        newGuests = newGuests.concat(filteredGuests);
+        m.logger.info(`Added ${name} from Guest Mods`, {user: userName});
+    }
+    await managerRepo.save(managers.map(x => x.managerEntity));
+
+    const guests = isAll ? guestEntitiesToAll(newGuests as ManagerGuestEntity[]) : newGuests.map(x => guestEntityToApiGuest(x as ManagerGuestEntity));
+
+    return res.status(200).json(guests);
+};
+
+export const addGuestModRoute = [authUserCheck(), botRoute(), subredditRoute(true), addGuestMod];

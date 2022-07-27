@@ -12,4 +12,10 @@ export class AuthorEntity {
 
     @OneToMany(type => Activity, act => act.author)
     activities!: Activity[]
+
+    constructor(data?: any) {
+        if(data !== undefined) {
+            this.name = data.name;
+        }
+    }
 }

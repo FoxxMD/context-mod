@@ -282,6 +282,18 @@
                                                 <ul class="list-disc list-inside guestList">
                                                     <li class="smallLi">None</li>
                                                 </ul>
+                                                <ul class="list-disc list-inside guestAdd">
+                                                    <li class="smallLi"><input
+                                                                               style="width:200px;"
+                                                                               class="guestAddName border-gray-50 placeholder-gray-500 rounded mr-1 p-1 text-black"
+                                                        placeholder="userName"/>
+                                                        <input type="datetime-local"
+                                                                                         class="guestAddTime border-gray-50 placeholder-gray-500 mt-2 mr-2 rounded text-black"
+                                                                                         value="2022-07-27T00:00"
+                                                                                         min="2022-07-27T00:00"/>
+                                                        <a href="" class="addGuest">Add</a>
+                                                    </li>
+                                                </ul>
                                             </span>
                                         </div>
                                         <% if (data.name !== 'All') { %>
@@ -1319,8 +1331,12 @@
             if (!resp.ok) {
                 console.error(`Response was not OK from ${subs[0]} add guest ${name}`);
             } else {
-
+                return resp.json();
             }
+        }).then((data) => {
+            renderGuestMods(bot, subs[0], data);
+            document.querySelector(`[data-bot="${bot}"][data-subreddit="${subs[0]}"] .guestAddName`).value = '';
+            document.querySelector(`[data-bot="${bot}"][data-subreddit="${subs[0]}"] .guestAddTime`).value = dayjs().format('YYYY-MM-DDTHH:mm');
         });
     }
 
@@ -1357,6 +1373,27 @@
             el.appendChild(node);
         }
     }
+
+    document.querySelectorAll('.addGuest').forEach(elm => {
+        elm.addEventListener('click', (e) => {
+            e.preventDefault();
+            const el = e.target;
+            const parent = el.closest('.sub');
+            const sub = parent.dataset.subreddit;
+            const bot = parent.dataset.bot;
+
+            const userEl = el.parentElement.querySelector('input.guestAddName');
+            const timeEl = el.parentElement.querySelector('input.guestAddTime');
+
+            const d = dayjs(timeEl.value);
+            const time = d.valueOf();
+            const user = userEl.value;
+
+            console.log(`Adding ${user} expiring at ${time} to ${bot}.${sub}`);
+
+            addGuestMod(bot, sub, user, time)
+        });
+    });
 
     function getLiveStats(bot, sub, responseType = 'full') {
         console.debug(`Getting live stats for ${bot} ${sub}`)
