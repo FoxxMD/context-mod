@@ -38,6 +38,7 @@ export class Bot extends RandomIdBaseEntity implements HasGuests {
             }
         }
         this.guests = Promise.resolve(guests);
+        return guests;
     }
 
     async removeGuestById(val: string | string[]) {
@@ -45,6 +46,7 @@ export class Bot extends RandomIdBaseEntity implements HasGuests {
         const guests = await this.guests;
         const filteredGuests = guests.filter(x => reqGuests.includes(x.id));
         this.guests = Promise.resolve(filteredGuests);
+        return filteredGuests;
     }
 
     async removeGuestByUser(val: string | string[]) {
@@ -52,9 +54,11 @@ export class Bot extends RandomIdBaseEntity implements HasGuests {
         const guests = await this.guests;
         const filteredGuests = guests.filter(x => reqGuests.includes(x.author.name.toLowerCase()));
         this.guests = Promise.resolve(filteredGuests);
+        return filteredGuests;
     }
 
     async removeGuests() {
         this.guests = Promise.resolve([]);
+        return [];
     }
 }

@@ -22,7 +22,7 @@ import {
     configLocationRoute,
     configRoute,
     deleteInviteRoute,
-    getInvitesRoute
+    getInvitesRoute, removeGuestModRoute
 } from "./routes/authenticated/user";
 import action from "./routes/authenticated/user/action";
 import {authUserCheck, botRoute} from "./middleware";
@@ -219,6 +219,8 @@ const rcbServer = async function (options: OperatorConfigWithFileContext) {
     server.deleteAsync('/bot/invite', ...deleteInviteRoute);
 
     server.deleteAsync('/delayed', ...cancelDelayedRoute);
+
+    server.deleteAsync('/guests', ...removeGuestModRoute);
 
     app = new App(options);
 

@@ -70,7 +70,6 @@ const status = () => {
         const allReq = req.query.subreddit !== undefined && (req.query.subreddit as string).toLowerCase() === 'all';
 
         const subManagerData = [];
-        let managerGuests: ManagerGuestEntity[] = [];
         for (const m of req.user?.accessibleSubreddits(bot) as Manager[]) {
             // const logs = req.manager === undefined || allReq || req.manager.getDisplay() === m.getDisplay() ? filterLogs(m.logs, {
             //         level: (level as string),
@@ -79,9 +78,6 @@ const status = () => {
             //         limit: limit as string,
             //         returnType: 'object'
             //     }) as LogInfo[]: [];
-
-            const guests = await m.managerEntity.getGuests();
-            managerGuests = managerGuests.concat(guests);
 
             let retention = 'Unknown';
             if (m.resources !== undefined) {
@@ -128,8 +124,7 @@ const status = () => {
                 startedAt: 'Not Started',
                 startedAtHuman: 'Not Started',
                 delayBy: m.delayBy === undefined ? 'No' : `Delayed by ${m.delayBy} sec`,
-                retention,
-                guests: guests.map(x => guestEntityToApiGuest(x)),
+                retention
             };
             // TODO replace indicator data with js on client page
             let indicator;
@@ -266,7 +261,6 @@ const status = () => {
             runningActivities,
             queuedActivities,
             delayedItems,
-            guests: guestEntitiesToAll(managerGuests),
             botState: {
                 state: RUNNING,
                 causedBy: SYSTEM

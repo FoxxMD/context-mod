@@ -64,7 +64,7 @@ export class ManagerEntity extends RandomIdBaseEntity implements RunningStateEnt
     @OneToMany(type => RunEntity, obj => obj.manager)
     runs!: Promise<RunEntity[]>
 
-    @OneToMany(type => ManagerGuestEntity, obj => obj.guestOf, {cascade: ['insert', 'remove', 'update']})
+    @OneToMany(type => ManagerGuestEntity, obj => obj.guestOf, {cascade: true, onDelete: 'CASCADE', orphanedRowAction: 'delete'})
     guests!: Promise<ManagerGuestEntity[]>
 
     @OneToOne(() => EventsRunState, {cascade: ['insert', 'update'], eager: true})
@@ -113,23 +113,28 @@ export class ManagerEntity extends RandomIdBaseEntity implements RunningStateEnt
             }
         }
         this.guests = Promise.resolve(guests);
+        return guests;
     }
 
     async removeGuestById(val: string | string[]) {
         const reqGuests = Array.isArray(val) ? val : [val];
         const guests = await this.guests;
-        const filteredGuests = guests.filter(x => reqGuests.includes(x.id));
+        const filteredGuests = guests.filter(x => !reqGuests.includes(x.id));
         this.guests = Promise.resolve(filteredGuests);
+        return filteredGuests;
     }
 
     async removeGuestByUser(val: string | string[]) {
         const reqGuests = (Array.isArray(val) ? val : [val]).map(x => x.trim().toLowerCase());
         const guests = await this.guests;
-        const filteredGuests = guests.filter(x => reqGuests.includes(x.author.name.toLowerCase()));
-        this.guests = Promise.resolve(filteredGuests);
+        const filteredGuests = guests.filter(x => !reqGuests.includes(x.author.name.toLowerCase()));
+        // @ts-ignore
+        this.guests = filteredGuests; //Promise.resolve(filteredGuests);
+        return filteredGuests;
     }
 
     async removeGuests() {
         this.guests = Promise.resolve([]);
+        return [];
     }
 }

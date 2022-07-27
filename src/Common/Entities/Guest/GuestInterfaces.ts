@@ -21,8 +21,8 @@ export interface GuestEntityData {
 
 export interface HasGuests {
     getGuests: () => Promise<GuestEntityData[]>
-    addGuest: (val: GuestEntityData | GuestEntityData[]) => Promise<void>
-    removeGuestById: (val: string | string[]) => Promise<void>
-    removeGuestByUser: (val: string | string[]) => Promise<void>
-    removeGuests: () => Promise<void>
+    addGuest: (val: GuestEntityData | GuestEntityData[]) => Promise<GuestEntityData[]>
+    removeGuestById: (val: string | string[]) => Promise<GuestEntityData[]>
+    removeGuestByUser: (val: string | string[]) => Promise<GuestEntityData[]>
+    removeGuests: () => Promise<GuestEntityData[]>
 }

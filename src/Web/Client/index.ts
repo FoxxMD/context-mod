@@ -57,6 +57,7 @@ import {MigrationService} from "../../Common/MigrationService";
 import {RuleResultEntity} from "../../Common/Entities/RuleResultEntity";
 import {RuleSetResultEntity} from "../../Common/Entities/RuleSetResultEntity";
 import { PaginationAwareObject } from "../Common/util";
+import {BotStatusResponse} from "../Common/interfaces";
 
 const emitter = new EventEmitter();
 
@@ -879,6 +880,25 @@ const webClient = async (options: OperatorConfig) => {
         // },[]);
 
         const isOp = req.user?.isInstanceOperator(instance);
+
+        // const bots = resp.bots.map((x: BotStatusResponse) => {
+        //     return {
+        //         ...x,
+        //         subreddits: x.subreddits.map(y => {
+        //            return {
+        //                ...y,
+        //                guests: y.guests.map(z => {
+        //                    const d = z.expiresAt === undefined ? undefined : dayjs(z.expiresAt);
+        //                    return {
+        //                        ...z,
+        //                        relative: d === undefined ? 'Never' : dayjs.duration(d.diff(dayjs())).humanize(),
+        //                        date: d === undefined ? 'Never' : d.format('YYYY-MM-DD HH:mm:ssZ')
+        //                    }
+        //                })
+        //            }
+        //         })
+        //     }
+        // });
 
         res.render('status', {
             instances: shownInstances,

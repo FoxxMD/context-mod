@@ -181,3 +181,8 @@ li > ul {
     display:inline;
 /*    margin-left: 10px*/
 }
+
+.smallLi:before {
+    margin-left: -10px;
+    content: ""
+}

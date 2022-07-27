@@ -21,6 +21,13 @@ import {Brackets} from "typeorm";
 import {Activity} from "../../../../../Common/Entities/Activity";
 import {RedditThing} from "../../../../../Common/Infrastructure/Reddit";
 import {CMError} from "../../../../../Utils/Errors";
+import {GuestEntityData} from "../../../../../Common/Entities/Guest/GuestInterfaces";
+import {
+    guestEntitiesToAll,
+    guestEntityToApiGuest,
+    ManagerGuestEntity
+} from "../../../../../Common/Entities/Guest/GuestEntity";
+import {ManagerEntity} from "../../../../../Common/Entities/ManagerEntity";
 
 const commentReg = parseLinkIdentifier([COMMENT_URL_ID]);
 const submissionReg = parseLinkIdentifier([SUBMISSION_URL_ID]);
@@ -227,3 +234,29 @@ const cancelDelayed = async (req: Request, res: Response) => {
 };
 
 export const cancelDelayedRoute = [authUserCheck(), botRoute(), subredditRoute(true), cancelDelayed];
+
+const removeGuestMod = async (req: Request, res: Response) => {
+
+    const {name} = req.query as any;
+    const {name: userName} = req.user as Express.User;
+
+    const isAll = req.manager === undefined;
+
+    const managers = (isAll ? req.user?.accessibleSubreddits(req.bot) : [req.manager as Manager]) as Manager[];
+
+    const managerRepo = req.serverBot.database.getRepository(ManagerEntity);
+
+    let newGuests: GuestEntityData[] = [];
+    for(const m of managers) {
+        const filteredGuests = await m.managerEntity.removeGuestByUser(name);
+        newGuests = newGuests.concat(filteredGuests);
+        m.logger.info(`Removed ${name} from Guest Mods`, {user: userName});
+    }
+    await managerRepo.save(managers.map(x => x.managerEntity));
+
+    const guests = isAll ? guestEntitiesToAll(newGuests as ManagerGuestEntity[]) : newGuests.map(x => guestEntityToApiGuest(x as ManagerGuestEntity));
+
+    return res.json(guests);
+};
+
+export const removeGuestModRoute = [authUserCheck(), botRoute(), subredditRoute(true), removeGuestMod];
