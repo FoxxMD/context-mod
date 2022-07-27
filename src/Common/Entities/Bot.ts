@@ -13,11 +13,11 @@ export class Bot extends RandomIdBaseEntity implements HasGuests {
     @OneToMany(type => ManagerEntity, obj => obj.bot)
     managers!: Promise<ManagerEntity[]>
 
-    @OneToMany(type => BotGuestEntity, obj => obj.guestOf, {cascade: ['insert', 'remove', 'update']})
-    guests!: Promise<BotGuestEntity[]>
+    @OneToMany(type => BotGuestEntity, obj => obj.guestOf, {eager: true, cascade: ['insert', 'remove', 'update']})
+    guests!: BotGuestEntity[]
 
-    async getGuests() {
-        const g = await this.guests;
+    getGuests() {
+        const g = this.guests;
         if (g === undefined) {
             return [];
         }
@@ -25,9 +25,9 @@ export class Bot extends RandomIdBaseEntity implements HasGuests {
         return g;
     }
 
-    async addGuest(val: GuestEntityData | GuestEntityData[]) {
+    addGuest(val: GuestEntityData | GuestEntityData[]) {
         const reqGuests = Array.isArray(val) ? val : [val];
-        const guests = await this.guests;
+        const guests = this.guests;
         for (const g of reqGuests) {
             const existing = guests.find(x => x.author.name.toLowerCase() === g.author.name.toLowerCase());
             if (existing !== undefined) {
@@ -37,28 +37,28 @@ export class Bot extends RandomIdBaseEntity implements HasGuests {
                 guests.push(new BotGuestEntity({...g, guestOf: this}));
             }
         }
-        this.guests = Promise.resolve(guests);
+        this.guests = guests
         return guests;
     }
 
-    async removeGuestById(val: string | string[]) {
+    removeGuestById(val: string | string[]) {
         const reqGuests = Array.isArray(val) ? val : [val];
-        const guests = await this.guests;
+        const guests = this.guests;
         const filteredGuests = guests.filter(x => reqGuests.includes(x.id));
-        this.guests = Promise.resolve(filteredGuests);
+        this.guests = filteredGuests;
         return filteredGuests;
     }
 
-    async removeGuestByUser(val: string | string[]) {
+    removeGuestByUser(val: string | string[]) {
         const reqGuests = (Array.isArray(val) ? val : [val]).map(x => x.trim().toLowerCase());
-        const guests = await this.guests;
+        const guests = this.guests;
         const filteredGuests = guests.filter(x => reqGuests.includes(x.author.name.toLowerCase()));
-        this.guests = Promise.resolve(filteredGuests);
+        this.guests =filteredGuests;
         return filteredGuests;
     }
 
-    async removeGuests() {
-        this.guests = Promise.resolve([]);
+    removeGuests() {
+        this.guests = []
         return [];
     }
 }

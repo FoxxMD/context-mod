@@ -64,8 +64,8 @@ export class ManagerEntity extends RandomIdBaseEntity implements RunningStateEnt
     @OneToMany(type => RunEntity, obj => obj.manager)
     runs!: Promise<RunEntity[]>
 
-    @OneToMany(type => ManagerGuestEntity, obj => obj.guestOf, {cascade: true, onDelete: 'CASCADE', orphanedRowAction: 'delete'})
-    guests!: Promise<ManagerGuestEntity[]>
+    @OneToMany(type => ManagerGuestEntity, obj => obj.guestOf, {eager: true, cascade: ['insert', 'remove', 'update']})
+    guests!: ManagerGuestEntity[]
 
     @OneToOne(() => EventsRunState, {cascade: ['insert', 'update'], eager: true})
     @JoinColumn()
@@ -91,8 +91,8 @@ export class ManagerEntity extends RandomIdBaseEntity implements RunningStateEnt
         }
     }
 
-    async getGuests(): Promise<ManagerGuestEntity[]> {
-        const g = await this.guests;
+    getGuests(): ManagerGuestEntity[] {
+        const g = this.guests;
         if (g === undefined) {
             return [];
         }
@@ -100,9 +100,9 @@ export class ManagerEntity extends RandomIdBaseEntity implements RunningStateEnt
         return g;
     }
 
-    async addGuest(val: GuestEntityData | GuestEntityData[]) {
+   addGuest(val: GuestEntityData | GuestEntityData[]) {
         const reqGuests = Array.isArray(val) ? val : [val];
-        const guests = await this.guests;
+        const guests = this.guests;
         for (const g of reqGuests) {
             const existing = guests.find(x => x.author.name.toLowerCase() === g.author.name.toLowerCase());
             if (existing !== undefined) {
@@ -112,29 +112,28 @@ export class ManagerEntity extends RandomIdBaseEntity implements RunningStateEnt
                 guests.push(new ManagerGuestEntity({...g, guestOf: this}));
             }
         }
-        this.guests = Promise.resolve(guests);
+        this.guests = guests;
         return guests;
     }
 
-    async removeGuestById(val: string | string[]) {
+    removeGuestById(val: string | string[]) {
         const reqGuests = Array.isArray(val) ? val : [val];
-        const guests = await this.guests;
+        const guests = this.guests;
         const filteredGuests = guests.filter(x => !reqGuests.includes(x.id));
-        this.guests = Promise.resolve(filteredGuests);
+        this.guests = filteredGuests
         return filteredGuests;
     }
 
-    async removeGuestByUser(val: string | string[]) {
+    removeGuestByUser(val: string | string[]) {
         const reqGuests = (Array.isArray(val) ? val : [val]).map(x => x.trim().toLowerCase());
-        const guests = await this.guests;
+        const guests = this.guests;
         const filteredGuests = guests.filter(x => !reqGuests.includes(x.author.name.toLowerCase()));
-        // @ts-ignore
-        this.guests = filteredGuests; //Promise.resolve(filteredGuests);
+        this.guests = filteredGuests;
         return filteredGuests;
     }
 
-    async removeGuests() {
-        this.guests = Promise.resolve([]);
+    removeGuests() {
+        this.guests = [];
         return [];
     }
 }

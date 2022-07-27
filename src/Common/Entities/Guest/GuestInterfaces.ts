@@ -20,9 +20,9 @@ export interface GuestEntityData {
 }
 
 export interface HasGuests {
-    getGuests: () => Promise<GuestEntityData[]>
-    addGuest: (val: GuestEntityData | GuestEntityData[]) => Promise<GuestEntityData[]>
-    removeGuestById: (val: string | string[]) => Promise<GuestEntityData[]>
-    removeGuestByUser: (val: string | string[]) => Promise<GuestEntityData[]>
-    removeGuests: () => Promise<GuestEntityData[]>
+    getGuests: () => GuestEntityData[]
+    addGuest: (val: GuestEntityData | GuestEntityData[]) => GuestEntityData[]
+    removeGuestById: (val: string | string[]) => GuestEntityData[]
+    removeGuestByUser: (val: string | string[]) => GuestEntityData[]
+    removeGuests: () => GuestEntityData[]
 }

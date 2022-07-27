@@ -49,13 +49,13 @@ export abstract class GuestEntity<T extends ManagerEntity | Bot> extends TimeAwa
     }
 }
 
-@ChildEntity()
+@ChildEntity('manager')
 export class ManagerGuestEntity extends GuestEntity<ManagerEntity> {
 
     type: string = 'manager';
 
-    @ManyToOne(type => ManagerEntity, act => act.guests, {eager: true})
-    @JoinColumn({name: 'guestOfId'})
+    @ManyToOne(type => ManagerEntity, act => act.guests, {nullable: false, orphanedRowAction: 'delete'})
+    @JoinColumn({name: 'guestOfId', referencedColumnName: 'id'})
     guestOf!: ManagerEntity
 
     constructor(data?: GuestOptions<ManagerEntity>) {
@@ -66,13 +66,13 @@ export class ManagerGuestEntity extends GuestEntity<ManagerEntity> {
     }
 }
 
-@ChildEntity()
+@ChildEntity('bot')
 export class BotGuestEntity extends GuestEntity<Bot> {
 
     type: string = 'bot';
 
-    @ManyToOne(type => Bot, act => act.guests, {eager: true})
-    @JoinColumn({name: 'guestOfId'})
+    @ManyToOne(type => Bot, act => act.guests, {nullable: false, orphanedRowAction: 'delete'})
+    @JoinColumn({name: 'guestOfId', referencedColumnName: 'id'})
     guestOf!: Bot
 
     constructor(data?: GuestOptions<Bot>) {

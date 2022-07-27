@@ -689,6 +689,9 @@ class Bot {
                     id: subreddit.id
                 }
             },
+            relations: {
+                guests: true
+            }
         });
         if(managerEntity === undefined || managerEntity === null) {
             const invokee = await this.invokeeRepo.findOneBy({name: SYSTEM}) as InvokeeType;

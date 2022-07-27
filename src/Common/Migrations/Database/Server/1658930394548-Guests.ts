@@ -27,7 +27,7 @@ export class Guests1658930394548 implements MigrationInterface {
                         name: 'guestOfId',
                         type: 'varchar',
                         length: '20',
-                        isNullable: false
+                        isNullable: true
                     },
                     timeAtColumn('expiresAt', dbType, true),
                     createdAtColumn(dbType),
