@@ -20,6 +20,7 @@ import {filterResultsBuilder} from "../../../../../Utils/typeormUtils";
 import {Brackets} from "typeorm";
 import {Activity} from "../../../../../Common/Entities/Activity";
 import {RedditThing} from "../../../../../Common/Infrastructure/Reddit";
+import {CMError} from "../../../../../Utils/Errors";
 
 const commentReg = parseLinkIdentifier([COMMENT_URL_ID]);
 const submissionReg = parseLinkIdentifier([SUBMISSION_URL_ID]);
@@ -54,7 +55,17 @@ const addInvite = async (req: Request, res: Response) => {
     if (subreddit === undefined || subreddit === null || subreddit === '') {
         return res.status(400).send('subreddit must be defined');
     }
-    await req.serverBot.cacheManager.addPendingSubredditInvite(subreddit);
+    try {
+        await req.serverBot.cacheManager.addPendingSubredditInvite(subreddit);
+    } catch (e: any) {
+        if(e instanceof CMError) {
+            req.logger.warn(e);
+            return res.status(400).send(e.message);
+        } else {
+            req.logger.error(e);
+            return res.status(500).send(e.message);
+        }
+    }
     return res.status(200).send();
 };
 
@@ -194,19 +205,24 @@ const cancelDelayed = async (req: Request, res: Response) => {
     const {id} = req.query as any;
     const {name: userName} = req.user as Express.User;
 
-    if(req.manager?.resources === undefined) {
+    if (req.manager?.resources === undefined) {
         req.manager?.logger.error('Subreddit does not have delayed items!', {user: userName});
         return res.status(400).send();
     }
 
-    const delayedItem = req.manager.resources.delayedItems.find(x => x.id === id);
-    if(delayedItem === undefined) {
-        req.manager?.logger.error(`No delayed items exists with the id ${id}`, {user: userName});
-        return res.status(400).send();
+    if (id === undefined) {
+        await req.manager.resources.removeDelayedActivity();
+    } else {
+        const delayedItem = req.manager.resources.delayedItems.find(x => x.id === id);
+        if (delayedItem === undefined) {
+            req.manager?.logger.error(`No delayed items exists with the id ${id}`, {user: userName});
+            return res.status(400).send();
+        }
+
+        await req.manager.resources.removeDelayedActivity(delayedItem.id);
+        req.manager?.logger.info(`Remove Delayed Item '${delayedItem.id}'`, {user: userName});
     }
 
-    req.manager.resources.delayedItems = req.manager.resources.delayedItems.filter(x => x.id !== id);
-    req.manager?.logger.info(`Remove Delayed Item '${delayedItem.id}'`, {user: userName});
     return res.send('OK');
 };
 

@@ -8,6 +8,7 @@ declare global {
     declare namespace Express {
         interface Request {
             botApp: App;
+            logger: Logger;
             token?: string,
             instance?: CMInstanceInterface,
             bot?: BotInstance,

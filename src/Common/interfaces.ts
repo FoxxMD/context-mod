@@ -1553,6 +1553,23 @@ export interface OperatorJsonConfig {
     }
 
     credentials?: ThirdPartyCredentialsJsonConfig
+
+    dev?: {
+        /**
+         * Invoke `process.memoryUsage()` on an interval and send metrics to Influx
+         *
+         * Only works if Influx config is provided
+         * */
+        monitorMemory?: boolean
+        /**
+        * Interval, in seconds, to invoke `process.memoryUsage()` at
+        *
+        * Defaults to 15 seconds
+        *
+        * @default 15
+        * */
+        monitorMemoryInterval?: number
+    };
 }
 
 export interface RequiredOperatorRedditCredentials extends RedditCredentials {
@@ -1659,6 +1676,10 @@ export interface OperatorConfig extends OperatorJsonConfig {
     databaseStatisticsDefaults: DatabaseStatisticsOperatorConfig
     bots: BotInstanceConfig[]
     credentials: ThirdPartyCredentialsJsonConfig
+    dev: {
+        monitorMemory: boolean
+        monitorMemoryInterval: number
+    }
 }
 
 export interface OperatorFileConfig {

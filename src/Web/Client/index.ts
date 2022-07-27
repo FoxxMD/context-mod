@@ -714,7 +714,14 @@ const webClient = async (options: OperatorConfig) => {
     // botUserRouter.use([ensureAuthenticated, defaultSession, botWithPermissions, createUserToken]);
     // app.use(botUserRouter);
 
-    app.useAsync('/api/', [ensureAuthenticated, defaultSession, instanceWithPermissions, botWithPermissions(false), createUserToken], (req: express.Request, res: express.Response) => {
+    // proxy.on('proxyReq', (req) => {
+    //    logger.debug(`Got proxy request: ${req.path}`);
+    // });
+    // proxy.on('proxyRes', (proxyRes, req, res) => {
+    //     logger.debug(`Got proxy response: ${res.statusCode} for ${req.url}`);
+    // });
+
+    app.useAsync('/api/', [ensureAuthenticatedApi, defaultSession, instanceWithPermissions, botWithPermissions(false), createUserToken], (req: express.Request, res: express.Response) => {
         req.headers.Authorization = `Bearer ${req.token}`
 
         const instance = req.instance as CMInstanceInterface;
@@ -725,6 +732,10 @@ const webClient = async (options: OperatorConfig) => {
                 port: instance.url.port,
             },
             prependPath: false,
+            proxyTimeout: 11000,
+        }, (e: any) => {
+            logger.error(e);
+            res.status(500).send();
         });
     });
 

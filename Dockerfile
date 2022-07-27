@@ -120,6 +120,10 @@ ENV NPM_CONFIG_LOGLEVEL debug
 # can set database to use more performant better-sqlite3 since we control everything
 ENV DB_DRIVER=better-sqlite3
 
+# NODE_ARGS are expanded after `node` command in the entrypoint IE "node {NODE_ARGS} src/index.js run"
+# by default enforce better memory mangement by limiting max long-lived GC space to 512MB
+ENV NODE_ARGS="--max_old_space_size=512"
+
 ARG webPort=8085
 ENV PORT=$webPort
 EXPOSE $PORT

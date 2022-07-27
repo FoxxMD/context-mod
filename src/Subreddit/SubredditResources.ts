@@ -4,7 +4,7 @@ import {
     activityIsDeleted, activityIsFiltered,
     activityIsRemoved,
     AuthorTypedActivitiesOptions, BOT_LINK,
-    getAuthorHistoryAPIOptions
+    getAuthorHistoryAPIOptions, renderContent
 } from "../Utils/SnoowrapUtils";
 import {map as mapAsync} from 'async';
 import winston, {Logger} from "winston";
@@ -96,7 +96,7 @@ import {CMEvent as ActionedEventEntity, CMEvent } from "../Common/Entities/CMEve
 import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
 import globrex from 'globrex';
 import {runMigrations} from "../Common/Migrations/CacheMigrationUtils";
-import {isStatusError, MaybeSeriousErrorWithCause, SimpleError} from "../Utils/Errors";
+import {CMError, isStatusError, MaybeSeriousErrorWithCause, SimpleError} from "../Utils/Errors";
 import {ErrorWithCause} from "pony-cause";
 import {ManagerEntity} from "../Common/Entities/ManagerEntity";
 import {Bot} from "../Common/Entities/Bot";
@@ -510,9 +510,15 @@ export class SubredditResources {
         this.delayedItems.push(data);
     }
 
-    async removeDelayedActivity(id: string) {
-        await this.dispatchedActivityRepo.delete(id);
-        this.delayedItems = this.delayedItems.filter(x => x.id !== id);
+    async removeDelayedActivity(val?: string | string[]) {
+        if(val === undefined) {
+            await this.dispatchedActivityRepo.delete({manager: {id: this.managerEntity.id}});
+            this.delayedItems = [];
+        } else {
+            const ids = typeof val === 'string' ? [val] : val;
+            await this.dispatchedActivityRepo.delete(ids);
+            this.delayedItems = this.delayedItems.filter(x => !ids.includes(x.id));
+        }
     }
 
     async initStats() {
@@ -773,11 +779,15 @@ export class SubredditResources {
         }
     }
 
-    async getStats() {
-        const totals = Object.values(this.stats.cache).reduce((acc, curr) => ({
+    getCacheTotals() {
+        return Object.values(this.stats.cache).reduce((acc, curr) => ({
             miss: acc.miss + curr.miss,
             req: acc.req + curr.requests,
         }), {miss: 0, req: 0});
+    }
+
+    async getStats() {
+        const totals = this.getCacheTotals();
         const cacheKeys = Object.keys(this.stats.cache);
         const res = {
             cache: {
@@ -1751,6 +1761,14 @@ export class SubredditResources {
         return wikiContent;
     }
 
+    /**
+     * Convenience method for using getContent and SnoowrapUtils@renderContent in one method
+     * */
+    async renderContent(contentStr: string, data: SnoowrapActivity, ruleResults: RuleResultEntity[] = [], usernotes?: UserNotes) {
+        const content = await this.getContent(contentStr);
+        return await renderContent(content, data, ruleResults, usernotes ?? this.userNotes);
+    }
+
     async getConfigFragment<T>(includesData: IncludesData, validateFunc?: ConfigFragmentValidationFunc): Promise<T> {
 
         const {
@@ -2268,7 +2286,7 @@ export class SubredditResources {
                             const requestedSourcesVal: string[] = !Array.isArray(itemOptVal) ? [itemOptVal] as string[] : itemOptVal as string[];
                             const requestedSources = requestedSourcesVal.map(x => strToActivitySource(x).toLowerCase());
 
-                            propResultsMap.source!.passed = criteriaPassWithIncludeBehavior(requestedSources.some(x => source.toLowerCase().includes(x)), include);
+                            propResultsMap.source!.passed = criteriaPassWithIncludeBehavior(requestedSources.some(x => source.toLowerCase().trim() === x.toLowerCase().trim()), include);
                             break;
                         }
                     case 'score':
@@ -3568,11 +3586,19 @@ export class BotResourcesManager {
     }
 
     async addPendingSubredditInvite(subreddit: string): Promise<void> {
+        if(subreddit === null || subreddit === undefined || subreddit == '') {
+            throw new CMError('Subreddit name cannot be empty');
+        }
         let subredditNames = await this.defaultCache.get(`modInvites`) as (string[] | undefined | null);
         if (subredditNames === undefined || subredditNames === null) {
             subredditNames = [];
         }
-        subredditNames.push(subreddit);
+        const cleanName = subreddit.trim();
+
+        if(subredditNames.some(x => x.trim().toLowerCase() === cleanName.toLowerCase())) {
+            throw new CMError(`An invite for the Subreddit '${subreddit}' already exists`);
+        }
+        subredditNames.push(cleanName);
         await this.defaultCache.set(`modInvites`, subredditNames, {ttl: 0});
         return;
     }
@@ -3582,7 +3608,7 @@ export class BotResourcesManager {
         if (subredditNames === undefined || subredditNames === null) {
             subredditNames = [];
         }
-        subredditNames = subredditNames.filter(x => x !== subreddit);
+        subredditNames = subredditNames.filter(x => x.toLowerCase() !== subreddit.trim().toLowerCase());
         await this.defaultCache.set(`modInvites`, subredditNames, {ttl: 0});
         return;
     }

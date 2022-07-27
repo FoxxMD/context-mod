@@ -116,6 +116,9 @@ export const isSubreddit = async (subreddit: Subreddit, stateCriteria: Subreddit
     })() as boolean;
 }
 
+const renderContentCommentTruncate = truncateStringToLength(50);
+const shortTitleTruncate = truncateStringToLength(15);
+
 export const renderContent = async (template: string, data: (Submission | Comment), ruleResults: RuleResultEntity[] = [], usernotes: UserNotes) => {
     const conditional: any = {};
     if(data.can_mod_post) {
@@ -133,11 +136,13 @@ export const renderContent = async (template: string, data: (Submission | Commen
     }
     const templateData: any = {
         kind: data instanceof Submission ? 'submission' : 'comment',
-        author: await data.author.name,
+        // @ts-ignore
+        author: getActivityAuthorName(await data.author),
         votes: data.score,
         age: dayjs.duration(dayjs().diff(dayjs.unix(data.created))).humanize(),
         permalink: `https://reddit.com${data.permalink}`,
         botLink: BOT_LINK,
+        id: data.name,
         ...conditional
     }
     if (template.includes('{{item.notes')) {
@@ -159,6 +164,10 @@ export const renderContent = async (template: string, data: (Submission | Commen
     if (data instanceof Submission) {
         templateData.url = data.url;
         templateData.title = data.title;
+        templateData.shortTitle = shortTitleTruncate(data.title);
+    } else {
+        templateData.title = renderContentCommentTruncate(data.body);
+        templateData.shortTitle = shortTitleTruncate(data.body);
     }
     // normalize rule names and map context data
     // NOTE: we are relying on users to use unique names for rules. If they don't only the last rule run of kind X will have its results here

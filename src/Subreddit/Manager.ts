@@ -1763,4 +1763,32 @@ export class Manager extends EventEmitter implements RunningStates {
 
         await this.cacheManager.defaultDatabase.getRepository(ManagerEntity).save(this.managerEntity);
     }
+
+    async writeHealthMetrics(time?: number) {
+        if (this.influxClients.length > 0) {
+            const metric = new Point('managerHealth')
+                .intField('delayedActivities', this.resources !== undefined ? this.resources.delayedItems.length : 0)
+                .intField('processing', this.queue.running())
+                .intField('queued', this.queue.length())
+                .booleanField('eventsRunning', this.eventsState.state === RUNNING)
+                .booleanField('queueRunning', this.queueState.state === RUNNING)
+                .booleanField('running', this.managerState.state === RUNNING)
+                .intField('uptime', this.startedAt !== undefined ? dayjs().diff(this.startedAt, 'seconds') : 0)
+                .intField('configAge', this.lastWikiRevision === undefined ? 0 : dayjs().diff(this.lastWikiRevision, 'seconds'));
+
+            if (this.resources !== undefined) {
+                const {req, miss} = this.resources.getCacheTotals();
+                metric.intField('cacheRequests', req)
+                    .intField('cacheMisses', miss);
+            }
+
+            if (time !== undefined) {
+                metric.timestamp(time);
+            }
+
+            for (const client of this.influxClients) {
+                await client.writePoint(metric);
+            }
+        }
+    }
 }

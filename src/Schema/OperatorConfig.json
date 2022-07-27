@@ -2243,6 +2243,20 @@
             "$ref": "#/definitions/DatabaseStatisticsOperatorJsonConfig",
             "description": "Set defaults for the frequency time series stats are collected"
         },
+        "dev": {
+            "properties": {
+                "monitorMemory": {
+                    "description": "Invoke `process.memoryUsage()` on an interval and send metrics to Influx\n\nOnly works if Influx config is provided",
+                    "type": "boolean"
+                },
+                "monitorMemoryInterval": {
+                    "default": 15,
+                    "description": "Interval, in seconds, to invoke `process.memoryUsage()` at\n\nDefaults to 15 seconds",
+                    "type": "number"
+                }
+            },
+            "type": "object"
+        },
         "influxConfig": {
             "$ref": "#/definitions/InfluxConfig"
         },
