@@ -38,7 +38,6 @@ import sharedSession from "express-socket.io-session";
 import dayjs from "dayjs";
 import httpProxy from 'http-proxy';
 import {arrayMiddle, booleanMiddle} from "../Common/middleware";
-import {BotInstance, CMInstanceInterface} from "../interfaces";
 import { URL } from "url";
 import {MESSAGE} from "triple-beam";
 import Autolinker from "autolinker";
@@ -57,7 +56,7 @@ import {MigrationService} from "../../Common/MigrationService";
 import {RuleResultEntity} from "../../Common/Entities/RuleResultEntity";
 import {RuleSetResultEntity} from "../../Common/Entities/RuleSetResultEntity";
 import { PaginationAwareObject } from "../Common/util";
-import {BotStatusResponse} from "../Common/interfaces";
+import {BotInstance, BotStatusResponse, CMInstanceInterface} from "../Common/interfaces";
 
 const emitter = new EventEmitter();
 
@@ -766,13 +765,13 @@ const webClient = async (options: OperatorConfig) => {
         next();
     }
 
-    const defaultSubreddit = async (req: express.Request, res: express.Response, next: Function) => {
+/*    const defaultSubreddit = async (req: express.Request, res: express.Response, next: Function) => {
         if(req.bot !== undefined && req.query.subreddit === undefined) {
-            const firstAccessibleSub = req.bot.subreddits.find(x => req.user?.isInstanceOperator(req.instance) || req.user?.subreddits.includes(x));
+            const firstAccessibleSub = req.bot.managers.find(x => req.user?.isInstanceOperator(req.instance) || req.user?.subreddits.includes(x));
             req.query.subreddit = firstAccessibleSub;
         }
         next();
-    }
+    }*/
 
     const initHeartbeat = async (req: express.Request, res: express.Response, next: Function) => {
         if(!init) {

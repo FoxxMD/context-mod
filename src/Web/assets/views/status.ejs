@@ -261,7 +261,7 @@
                                                     <span class="cursor-help underline" style="text-decoration-style: dotted"><%= data.scopes.length %></span>
                                                 </span>
                                             <% } else %>
-                                            <label>
+                                            <label class="guestsLabel <%= (!isOperator && !data.isMod ? 'hidden' : '')%>">
                                                 <span class="has-tooltip">
                                                        <span style="margin-top:55px" class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black space-y-3 p-2 text-left'>
                                                             <p>Reddit users who are allowed to access your bot even though they are not moderators.</p>
@@ -278,12 +278,13 @@
                                                         </span>
                                                     </span>
                                             </label>
-                                            <span class="guests" style="margin-left: 5px;">
+                                            <span class="guests <%= (!isOperator && !data.isMod ? 'hidden' : '')%>" style="margin-left: 5px;">
                                                 <ul class="list-disc list-inside guestList">
                                                     <li class="smallLi">None</li>
                                                 </ul>
-                                                <ul class="list-disc list-inside guestAdd">
-                                                    <li class="smallLi"><input
+                                                <div class="guestAdd <%= (!data.isMod ? 'hidden' : '')%> inline-flex items-center mt-1">
+                                                    <div>
+                                                        <input
                                                                                style="width:200px;"
                                                                                class="guestAddName border-gray-50 placeholder-gray-500 rounded mr-1 p-1 text-black"
                                                         placeholder="userName"/>
@@ -291,9 +292,10 @@
                                                                                          class="guestAddTime border-gray-50 placeholder-gray-500 mt-2 mr-2 rounded text-black"
                                                                                          value="2022-07-27T00:00"
                                                                                          min="2022-07-27T00:00"/>
-                                                        <a href="" class="addGuest">Add</a>
-                                                    </li>
-                                                </ul>
+
+                                                    </div>
+                                                    <a href="" class="addGuest">Add</a>
+                                                </div>
                                             </span>
                                         </div>
                                         <% if (data.name !== 'All') { %>
@@ -713,6 +715,8 @@
 <script>
     window.sort = 'desc';
 
+    const isOperator = <%= isOperator %>;
+
     document.querySelectorAll('.action').forEach(el => {
         el.addEventListener('click', e => {
             e.preventDefault();
@@ -1040,10 +1044,10 @@
             const reader = res.getReader();
             let keepReading = true;
             while(keepReading) {
-                const {done, value} = await reader.read();
+                const {done, value, ...rest} = await reader.read();
                 if(done) {
                     keepReading = false;
-                    console.debug('done');
+                    console.debug(`${bot}.${sub} log stream reader signalled it is done`);
                 }
                 if(value) {
                     //console.log(`((Logged For ${bot} ${sub})) ${value.message}`);
@@ -1316,10 +1320,12 @@
             method: 'DELETE'
         }).then((resp) => {
             if (!resp.ok) {
-                console.error(`Response was not OK from ${subs[0]} remove guest ${id}${name}`);
+                throw new Error(`Response was not OK from ${subs[0]} remove guest ${id}${name}`)
             } else {
-
+                return resp.json();
             }
+        }).then((data) => {
+            renderGuestMods(bot, subs[0], data);
         });
     }
 
@@ -1329,7 +1335,7 @@
             method: 'POST'
         }).then((resp) => {
             if (!resp.ok) {
-                console.error(`Response was not OK from ${subs[0]} add guest ${name}`);
+                throw new Error(`Response was not OK from ${subs[0]} add guest ${name}`);
             } else {
                 return resp.json();
             }
@@ -1354,23 +1360,30 @@
         const now = dayjs();
 
         el.innerHTML = '';
-        for(const g of data) {
-            var node = document.createElement("LI");
+        if(data.length === 0) {
+            const node = document.createElement("LI");
             node.classList.add('smallLi');
-            let relTime = g.expiresAt === undefined ? 'Never' : dayjs.duration(dayjs(g.expiresAt).diff(now)).humanize();
-            let guestText = g.name;
-            if(isAll) {
-                guestText += ` (${g.subreddits.length} Subs, at least ${relTime})`;
-            } else {
-                guestText += ` (${relTime})`;
-            }
-            node.appendChild(document.createTextNode(guestText));
-            node.insertAdjacentHTML('beforeend', `<a href="" class="remove" data-name="${g.name}"><span class="cancellable iconify-inline" data-icon="icons8:cancel"></span></a>`);
-            node.addEventListener('click', e => {
-                e.preventDefault();
-                removeGuestMod(bot, sub, g.name);
-            });
+            node.appendChild(document.createTextNode('None'));
             el.appendChild(node);
+        } else {
+            for(const g of data) {
+                const node = document.createElement("LI");
+                node.classList.add('smallLi');
+                let relTime = g.expiresAt === undefined ? 'Never' : dayjs.duration(dayjs(g.expiresAt).diff(now)).humanize();
+                let guestText = g.name;
+                if(isAll) {
+                    guestText += ` (${g.subreddits.length} Subs, at least ${relTime})`;
+                } else {
+                    guestText += ` (${relTime})`;
+                }
+                node.appendChild(document.createTextNode(guestText));
+                node.insertAdjacentHTML('beforeend', `<a href="" class="remove ml-1" data-name="${g.name}"><span class="cancellable iconify-inline" data-icon="icons8:cancel"></span></a>`);
+                node.addEventListener('click', e => {
+                    e.preventDefault();
+                    removeGuestMod(bot, sub, g.name);
+                });
+                el.appendChild(node);
+            }
         }
     }
 
@@ -1430,7 +1443,7 @@
         }
 
         recentlySeen.forEach((value, key) => {
-            const {timeout, liveStatsInt, ...rest} = value;
+            const {timeout, liveStatsInt,...rest} = value;
             if(key === identifier && timeout !== undefined) {
 
                 console.debug(`${key} Clearing unfocused timeout on own already set`);
@@ -1459,7 +1472,7 @@
                             const {controller} = val;
                             console.debug(`${k} 15 second unfocused timeout expired, stopping log streaming`);
                             if(controller !== undefined) {
-                                console.debug('Stopping logs');
+                                console.debug(`${k} Stopping logs`);
                                 controller.abort();
                             }
                             recentlySeen.delete(k);

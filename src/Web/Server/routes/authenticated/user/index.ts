@@ -243,7 +243,7 @@ const removeGuestMod = async (req: Request, res: Response) => {
 
     const isAll = req.manager === undefined;
 
-    const managers = (isAll ? req.user?.accessibleSubreddits(req.serverBot) : [req.manager as Manager]) as Manager[];
+    const managers = (isAll ? req.user?.getModeratedSubreddits(req.serverBot) : [req.manager as Manager]) as Manager[];
 
     const managerRepo = req.serverBot.database.getRepository(ManagerEntity);
 
@@ -260,7 +260,7 @@ const removeGuestMod = async (req: Request, res: Response) => {
     return res.json(guests);
 };
 
-export const removeGuestModRoute = [authUserCheck(), botRoute(), subredditRoute(true), removeGuestMod];
+export const removeGuestModRoute = [authUserCheck(), botRoute(), subredditRoute(true, true), removeGuestMod];
 
 const addGuestMod = async (req: Request, res: Response) => {
 
@@ -269,7 +269,7 @@ const addGuestMod = async (req: Request, res: Response) => {
 
     const isAll = req.manager === undefined;
 
-    const managers = (isAll ? req.user?.accessibleSubreddits(req.serverBot) : [req.manager as Manager]) as Manager[];
+    const managers = (isAll ? req.user?.getModeratedSubreddits(req.serverBot) : [req.manager as Manager]) as Manager[];
 
     const managerRepo = req.serverBot.database.getRepository(ManagerEntity);
     const authorRepo = req.serverBot.database.getRepository(AuthorEntity);
@@ -300,4 +300,4 @@ const addGuestMod = async (req: Request, res: Response) => {
     return res.status(200).json(guests);
 };
 
-export const addGuestModRoute = [authUserCheck(), botRoute(), subredditRoute(true), addGuestMod];
+export const addGuestModRoute = [authUserCheck(), botRoute(), subredditRoute(true, true), addGuestMod];

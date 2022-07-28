@@ -5,7 +5,7 @@ import {
     filterLogBySubreddit, filterLogs,
     formatNumber,
     intersect,
-    LogEntry, logSortFunc, parseDurationValToDuration,
+    LogEntry, logSortFunc, parseDurationValToDuration, parseRedditEntity,
     pollingInfo
 } from "../../../../../util";
 import {Manager} from "../../../../../Subreddit/Manager";
@@ -68,6 +68,7 @@ const status = () => {
         } = req.query;
 
         const allReq = req.query.subreddit !== undefined && (req.query.subreddit as string).toLowerCase() === 'all';
+        const userModerated: string[] = (req.user as Express.User).subreddits.map(x => parseRedditEntity(x).name);
 
         const subManagerData = [];
         for (const m of req.user?.accessibleSubreddits(bot) as Manager[]) {
@@ -124,7 +125,9 @@ const status = () => {
                 startedAt: 'Not Started',
                 startedAtHuman: 'Not Started',
                 delayBy: m.delayBy === undefined ? 'No' : `Delayed by ${m.delayBy} sec`,
-                retention
+                retention,
+                isGuest: m.managerEntity.getGuests().some(y => y.author.name === req.user?.name),
+                isMod: userModerated.some(x => parseRedditEntity(m.subreddit.display_name).name === x)
             };
             // TODO replace indicator data with js on client page
             let indicator;
@@ -260,6 +263,7 @@ const status = () => {
             subMaxWorkers,
             runningActivities,
             queuedActivities,
+            isMod: subManagerData.some(x => x.isMod),
             delayedItems,
             botState: {
                 state: RUNNING,

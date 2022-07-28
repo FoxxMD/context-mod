@@ -1,13 +1,18 @@
 import {URL} from "url";
 import {Logger} from "winston";
-import {BotInstance, CMInstanceInterface, CMInstanceInterface as CMInterface} from "../interfaces";
 import dayjs from 'dayjs';
 import {BotConnection, LogInfo} from "../../Common/interfaces";
 import normalizeUrl from "normalize-url";
-import {HeartbeatResponse} from "../Common/interfaces";
+import {
+    BotInstance,
+    CMInstanceInterface as CMInterface,
+    CMInstanceInterface,
+    HeartbeatResponse
+} from "../Common/interfaces";
 import jwt from "jsonwebtoken";
 import got from "got";
 import {ErrorWithCause} from "pony-cause";
+import ClientBotInstance from "./ClientBotInstance";
 
 export class CMInstance implements CMInterface {
     friendly?: string;
@@ -101,9 +106,9 @@ export class CMInstance implements CMInterface {
             }
         }
 
-        this.subreddits = resp.subreddits;
-        //@ts-ignore
-        this.bots = resp.bots.map(x => ({...x, instance: this}));
+        this.bots = resp.bots.map(x => new ClientBotInstance(x, this));
+        this.subreddits = this.bots.map(x => x.getSubreddits()).flat(3);
+
     }
 
     checkHeartbeat = async (force = false, otherFriendlies: string[] = []) => {
