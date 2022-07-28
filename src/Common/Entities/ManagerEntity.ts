@@ -102,7 +102,7 @@ export class ManagerEntity extends RandomIdBaseEntity implements RunningStateEnt
 
    addGuest(val: GuestEntityData | GuestEntityData[]) {
         const reqGuests = Array.isArray(val) ? val : [val];
-        const guests = this.guests;
+        const guests = this.getGuests();
         for (const g of reqGuests) {
             const existing = guests.find(x => x.author.name.toLowerCase() === g.author.name.toLowerCase());
             if (existing !== undefined) {
@@ -118,7 +118,7 @@ export class ManagerEntity extends RandomIdBaseEntity implements RunningStateEnt
 
     removeGuestById(val: string | string[]) {
         const reqGuests = Array.isArray(val) ? val : [val];
-        const guests = this.guests;
+        const guests = this.getGuests();
         const filteredGuests = guests.filter(x => !reqGuests.includes(x.id));
         this.guests = filteredGuests
         return filteredGuests;
@@ -126,7 +126,7 @@ export class ManagerEntity extends RandomIdBaseEntity implements RunningStateEnt
 
     removeGuestByUser(val: string | string[]) {
         const reqGuests = (Array.isArray(val) ? val : [val]).map(x => x.trim().toLowerCase());
-        const guests = this.guests;
+        const guests = this.getGuests();
         const filteredGuests = guests.filter(x => !reqGuests.includes(x.author.name.toLowerCase()));
         this.guests = filteredGuests;
         return filteredGuests;

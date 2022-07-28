@@ -290,8 +290,8 @@
                                                         placeholder="userName"/>
                                                         <input type="datetime-local"
                                                                                          class="guestAddTime border-gray-50 placeholder-gray-500 mt-2 mr-2 rounded text-black"
-                                                                                         value="2022-07-27T00:00"
-                                                                                         min="2022-07-27T00:00"/>
+                                                                                         value="<%= now %>"
+                                                                                         min="<%= now %>"/>
 
                                                     </div>
                                                     <a href="" class="addGuest">Add</a>
@@ -1342,7 +1342,7 @@
         }).then((data) => {
             renderGuestMods(bot, subs[0], data);
             document.querySelector(`[data-bot="${bot}"][data-subreddit="${subs[0]}"] .guestAddName`).value = '';
-            document.querySelector(`[data-bot="${bot}"][data-subreddit="${subs[0]}"] .guestAddTime`).value = dayjs().format('YYYY-MM-DDTHH:mm');
+            //document.querySelector(`[data-bot="${bot}"][data-subreddit="${subs[0]}"] .guestAddTime`).value = dayjs().add(1, 'minutes').format('YYYY-MM-DDTHH:mm');
         });
     }
 
@@ -1399,7 +1399,8 @@
             const timeEl = el.parentElement.querySelector('input.guestAddTime');
 
             const d = dayjs(timeEl.value);
-            const time = d.valueOf();
+            // don't allow users to set a time before now
+            const time = d.isBefore(dayjs()) ? dayjs().add(1, 'minute').valueOf() : d.valueOf();
             const user = userEl.value;
 
             console.log(`Adding ${user} expiring at ${time} to ${bot}.${sub}`);

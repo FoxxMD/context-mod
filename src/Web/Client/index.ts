@@ -902,6 +902,7 @@ const webClient = async (options: OperatorConfig) => {
         res.render('status', {
             instances: shownInstances,
             bots: resp.bots,
+            now: dayjs().add(1, 'minute').format('YYYY-MM-DDTHH:mm'),
             botId: (req.instance as CMInstance).getName(),
             instanceId: (req.instance as CMInstance).getName(),
             isOperator: isOp,

@@ -923,7 +923,7 @@ class Bot implements BotInstanceFunctions {
             const expiredGuests = m.managerEntity.getGuests().filter(x => x.expiresAt.isBefore(now));
             if(expiredGuests.length > 0) {
                 m.managerEntity.removeGuestById(expiredGuests.map(x => x.id));
-                m.logger.info(`Removed expires Guest Mods: ${expiredGuests.map(x => x.author.name).join(', ')}`);
+                m.logger.info(`Removed expired Guest Mods: ${expiredGuests.map(x => x.author.name).join(', ')}`);
                 await this.managerRepo.save(m.managerEntity);
             }
         }
