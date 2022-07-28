@@ -934,6 +934,11 @@ const webClient = async (options: OperatorConfig) => {
         });
     });
 
+    app.getAsync('/guest', [ensureAuthenticatedApi, defaultSession, instanceWithPermissions, botWithPermissions(true)], async (req: express.Request, res: express.Response) => {
+        const {subreddit} = req.query as any;
+        return res.status(req.user?.isSubredditGuest(req.bot, subreddit) ? 200 : 403).send();
+    });
+
     app.postAsync('/config', [ensureAuthenticatedApi, defaultSession, instanceWithPermissions, botWithPermissions(true)], async (req: express.Request, res: express.Response) => {
         const {subreddit} = req.query as any;
         const {location, data, reason = 'Updated through CM Web', create = false} = req.body as any;

@@ -301,3 +301,38 @@ const addGuestMod = async (req: Request, res: Response) => {
 };
 
 export const addGuestModRoute = [authUserCheck(), botRoute(), subredditRoute(true, true), addGuestMod];
+
+const saveGuestWikiEdit = async (req: Request, res: Response) => {
+    const {location, data, reason = 'Updated through CM Web', create = false} = req.body as any;
+
+    try {
+        // @ts-ignore
+        const wiki = await req.manager?.subreddit.getWikiPage(location) as WikiPage;
+        await wiki.edit({
+            text: data,
+            reason: `${reason} by Guest Mod ${req.user?.name}`,
+        });
+    } catch (err: any) {
+        res.status(500);
+        return res.send(err.message);
+    }
+
+    if(create) {
+        try {
+            // @ts-ignore
+            await req.manager.subreddit.getWikiPage(location).editSettings({
+                permissionLevel: 2,
+                // don't list this page on r/[subreddit]/wiki/pages
+                listed: false,
+            });
+        } catch (err: any) {
+            res.status(500);
+            return res.send(`Successfully created wiki page for configuration but encountered error while setting visibility. You should manually set the wiki page visibility on reddit. \r\n Error: ${err.message}`);
+        }
+    }
+
+    res.status(200);
+    return res.send();
+}
+
+export const saveGuestWikiEditRoute = [authUserCheck(), botRoute(), subredditRoute(true, false, true), saveGuestWikiEdit];

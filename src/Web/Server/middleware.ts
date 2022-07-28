@@ -38,7 +38,7 @@ export const botRoute = (required = true) => async (req: Request, res: Response,
     return next();
 }
 
-export const subredditRoute = (required = true, modRequired = false) => async (req: Request, res: Response, next: Function) => {
+export const subredditRoute = (required = true, modRequired = false, guestRequired = false) => async (req: Request, res: Response, next: Function) => {
 
     const bot = req.serverBot;
 
@@ -57,7 +57,7 @@ export const subredditRoute = (required = true, modRequired = false) => async (r
                 return res.status(400).send('Cannot access route for subreddit you do not manage or is not run by the bot')
             }
 
-            if (!req.user?.canAccessSubreddit(bot, subreddit) || (modRequired && !req.user?.isSubredditMod(bot, subreddit))) {
+            if (!req.user?.canAccessSubreddit(bot, subreddit) || (modRequired && !req.user?.isSubredditMod(bot, subreddit)) || (guestRequired && !req.user?.isSubredditGuest(bot, subreddit))) {
                 return res.status(400).send('Cannot access route for subreddit you do not manage or is not run by the bot')
             }
 

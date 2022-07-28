@@ -45,7 +45,7 @@ class ServerUser extends CMUser<App, Bot, Manager> {
         const normalName = parseRedditEntity(name).name;
         const manager = val.subManagers.find(x => parseRedditEntity(x.subreddit.display_name).name === normalName);
         if(manager !== undefined) {
-            return manager.toNormalizedManager().guests.some(x => x.name === name);
+            return manager.toNormalizedManager().guests.some(x => x.name === this.name);
         }
         return false;
     }
