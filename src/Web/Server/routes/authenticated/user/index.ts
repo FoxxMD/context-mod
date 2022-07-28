@@ -21,7 +21,7 @@ import {Brackets} from "typeorm";
 import {Activity} from "../../../../../Common/Entities/Activity";
 import {RedditThing} from "../../../../../Common/Infrastructure/Reddit";
 import {CMError} from "../../../../../Utils/Errors";
-import {GuestEntityData} from "../../../../../Common/Entities/Guest/GuestInterfaces";
+import {Guest, GuestEntityData} from "../../../../../Common/Entities/Guest/GuestInterfaces";
 import {
     guestEntitiesToAll,
     guestEntityToApiGuest,
@@ -243,19 +243,19 @@ const removeGuestMod = async (req: Request, res: Response) => {
 
     const isAll = req.manager === undefined;
 
-    const managers = (isAll ? req.user?.accessibleSubreddits(req.bot) : [req.manager as Manager]) as Manager[];
+    const managers = (isAll ? req.user?.accessibleSubreddits(req.serverBot) : [req.manager as Manager]) as Manager[];
 
     const managerRepo = req.serverBot.database.getRepository(ManagerEntity);
 
-    let newGuests: GuestEntityData[] = [];
+    let newGuests = new Map<string, Guest[]>();
     for(const m of managers) {
-        const filteredGuests = await m.managerEntity.removeGuestByUser(name);
-        newGuests = newGuests.concat(filteredGuests);
+        const filteredGuests = m.managerEntity.removeGuestByUser(name);
+        newGuests.set(m.displayLabel, filteredGuests.map(x => guestEntityToApiGuest(x)));
         m.logger.info(`Removed ${name} from Guest Mods`, {user: userName});
     }
     await managerRepo.save(managers.map(x => x.managerEntity));
 
-    const guests = isAll ? guestEntitiesToAll(newGuests as ManagerGuestEntity[]) : newGuests.map(x => guestEntityToApiGuest(x as ManagerGuestEntity));
+    const guests = isAll ? guestEntitiesToAll(newGuests) : Array.from(newGuests.values()).flat(3);
 
     return res.json(guests);
 };
@@ -269,7 +269,7 @@ const addGuestMod = async (req: Request, res: Response) => {
 
     const isAll = req.manager === undefined;
 
-    const managers = (isAll ? req.user?.accessibleSubreddits(req.bot) : [req.manager as Manager]) as Manager[];
+    const managers = (isAll ? req.user?.accessibleSubreddits(req.serverBot) : [req.manager as Manager]) as Manager[];
 
     const managerRepo = req.serverBot.database.getRepository(ManagerEntity);
     const authorRepo = req.serverBot.database.getRepository(AuthorEntity);
@@ -287,15 +287,15 @@ const addGuestMod = async (req: Request, res: Response) => {
     // TODO this is not using the right time?
     const expiresAt = dayjs(Number.parseInt(time));
 
-    let newGuests: GuestEntityData[] = [];
+    let newGuests = new Map<string, Guest[]>();
     for(const m of managers) {
         const filteredGuests = m.managerEntity.addGuest({author: user, expiresAt});
-        newGuests = newGuests.concat(filteredGuests);
+        newGuests.set(m.displayLabel, filteredGuests.map(x => guestEntityToApiGuest(x)));
         m.logger.info(`Added ${name} from Guest Mods`, {user: userName});
     }
     await managerRepo.save(managers.map(x => x.managerEntity));
 
-    const guests = isAll ? guestEntitiesToAll(newGuests as ManagerGuestEntity[]) : newGuests.map(x => guestEntityToApiGuest(x as ManagerGuestEntity));
+    const guests = isAll ? guestEntitiesToAll(newGuests) : Array.from(newGuests.values()).flat(3);
 
     return res.status(200).json(guests);
 };

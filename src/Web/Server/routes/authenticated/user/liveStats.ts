@@ -121,13 +121,15 @@ const liveStats = () => {
         if(manager === undefined) {
             // getting all
             const subManagerData: any[] = [];
-            let managerGuests: ManagerGuestEntity[] = [];
+            //let managerGuests: ManagerGuestEntity[] = [];
             for (const m of req.user?.accessibleSubreddits(bot) as Manager[]) {
 
-                const guests = await m.managerEntity.getGuests();
-                managerGuests = managerGuests.concat(guests);
+                //const guests = await m.managerEntity.getGuests();
+                //managerGuests = managerGuests.concat(guests);
 
                 const sd = {
+                    name: m.displayLabel,
+                    guests: m.managerEntity.getGuests().map(x => guestEntityToApiGuest(x)),
                     queuedActivities: m.queue.length(),
                     runningActivities: m.queue.running(),
                     delayedItems: m.getDelayedSummary(),
@@ -257,7 +259,10 @@ const liveStats = () => {
                 scopes: scopes === null || !Array.isArray(scopes) ? [] : scopes,
                 subMaxWorkers,
                 runningActivities,
-                guests: guestEntitiesToAll(managerGuests),
+                guests: guestEntitiesToAll(subManagerData.reduce((acc, curr) => {
+                    acc.set(curr.name, curr.guests);
+                    return acc;
+                }, new Map<string, Guest[]>())),
                 queuedActivities,
                 delayedItems,
                 botState: {

@@ -59,10 +59,9 @@ export class ManagerGuestEntity extends GuestEntity<ManagerEntity> {
     guestOf!: ManagerEntity
 
     constructor(data?: GuestOptions<ManagerEntity>) {
-        super();
+        super(data);
         if(data !== undefined) {
             this.guestOf = data.guestOf;
-            this.author = data.author;
         }
     }
 }
@@ -77,7 +76,7 @@ export class BotGuestEntity extends GuestEntity<Bot> {
     guestOf!: Bot
 
     constructor(data?: GuestOptions<Bot>) {
-        super();
+        super(data);
         if(data !== undefined) {
             this.guestOf = data.guestOf;
             this.author = data.author;
@@ -89,24 +88,30 @@ export const guestEntityToApiGuest = (val: GuestEntity<any>): Guest => {
     return {
         id: val.id,
         name: val.author.name,
-        expiresAt: val.expiresAtTimestamp()
+        expiresAt: val.expiresAtTimestamp(),
     }
 }
 
-export const guestEntitiesToAll = (val: ManagerGuestEntity[]): GuestAll[] => {
-    const userMap = val.reduce((acc, curr) => {
-        let u: GuestAll | undefined = acc.get(curr.author.name);
+interface ContextualGuest extends Guest {
+    subreddit: string
+}
+
+export const guestEntitiesToAll = (val: Map<string, Guest[]>): GuestAll[] => {
+    const contextualGuests: ContextualGuest[] = Array.from(val.entries()).map(([sub, guests]) => guests.map(y => ({...y, subreddit: sub} as ContextualGuest))).flat(3);
+
+    const userMap = contextualGuests.reduce((acc, curr) => {
+        let u: GuestAll | undefined = acc.get(curr.name);
         if (u === undefined) {
-            u = {name: curr.author.name, expiresAt: curr.expiresAtTimestamp(), subreddits: [curr.guestOf.name]};
+            u = {name: curr.name, expiresAt: curr.expiresAt, subreddits: [curr.subreddit]};
         } else {
-            if (!u.subreddits.includes(curr.guestOf.name)) {
-                u.subreddits.push(curr.guestOf.name);
+            if (!u.subreddits.includes(curr.subreddit)) {
+                u.subreddits.push(curr.subreddit);
             }
-            if ((u.expiresAt === undefined && curr.expiresAt !== undefined) || (u.expiresAt !== undefined && curr.expiresAt !== undefined && curr.expiresAt.isBefore(u.expiresAt))) {
-                u.expiresAt = curr.expiresAtTimestamp();
+            if ((u.expiresAt === undefined && curr.expiresAt !== undefined) || (u.expiresAt !== undefined && curr.expiresAt !== undefined && curr.expiresAt < u.expiresAt)) {
+                u.expiresAt = curr.expiresAt;
             }
         }
-        acc.set(curr.author.name, u);
+        acc.set(curr.name, u);
         return acc;
     }, new Map<string, GuestAll>());
 
