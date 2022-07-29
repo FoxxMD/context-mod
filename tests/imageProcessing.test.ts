@@ -116,9 +116,6 @@ describe('Hash Comparisons', function () {
         });
         await compareImg.hash(32);
 
-        await original.sharpImg.toFile(resolvePath('./tests/rick-orig-grey.jpg', './'))
-        await compareImg.sharpImg.toFile(resolvePath('./tests/rick-satur-grey.jpg', './'))
-
         const distanceNormal = leven(original.hashResult, compareImg.hashResult);
         const diffNormal = (distanceNormal/original.hashResult.length)*100;
 
