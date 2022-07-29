@@ -277,3 +277,8 @@ export interface UrlContext {
     value: string
     context: WikiContext | ExternalUrlContext
 }
+
+export interface ImageHashCacheData {
+    original: string
+    flipped?: string
+}

@@ -6,6 +6,7 @@ import {Sharp} from "sharp";
 import {blockhashAndFlipped} from "./blockhash/blockhash";
 import {CMError, SimpleError} from "../Utils/Errors";
 import {FileHandle, open} from "fs/promises";
+import {ImageHashCacheData} from "./Infrastructure/Atomic";
 
 export interface ImageDataOptions {
     width?: number,
@@ -260,6 +261,13 @@ class ImageData {
 
         const {width, height} = await ImageData.dimensionsFromMetadata(refSharp);
         return [refSharp, compareSharp, width, height];
+    }
+
+    toHashCache(): ImageHashCacheData {
+        return {
+            original: this.hashResult,
+            flipped: this.hashResultFlipped
+        }
     }
 
     static fromSubmission(sub: Submission, aggressive = false): ImageData {

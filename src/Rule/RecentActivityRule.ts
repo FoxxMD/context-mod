@@ -42,6 +42,7 @@ import {
 } from "../Common/Infrastructure/Filters/FilterCriteria";
 import {ActivityWindow, ActivityWindowConfig} from "../Common/Infrastructure/ActivityWindow";
 import {comparisonTextOp, parseGenericValueOrPercentComparison} from "../Common/Infrastructure/Comparisons";
+import {ImageHashCacheData} from "../Common/Infrastructure/Atomic";
 
 const parseLink = parseUsableLinkIdentifier();
 
@@ -195,24 +196,25 @@ export class RecentActivityRule extends Rule {
                 let filteredActivity: (Submission|Comment)[] = [];
                 let analysisTimes: number[] = [];
                 let referenceImage: ImageData | undefined;
+                let refHash: ImageHashCacheData | undefined;
                 if (this.imageDetection.enable) {
                     try {
                         referenceImage = ImageData.fromSubmission(item);
                         referenceImage.setPreferredResolutionByWidth(800);
                         if(this.imageDetection.hash.enable) {
-                            let refHash: string | undefined;
                             if(this.imageDetection.hash.ttl !== undefined) {
                                 refHash = await this.resources.getImageHash(referenceImage);
                                 if(refHash === undefined) {
-                                    refHash = await referenceImage.hash(this.imageDetection.hash.bits);
-                                    await this.resources.setImageHash(referenceImage, refHash, this.imageDetection.hash.ttl);
-                                } else if(refHash.length !== bitsToHexLength(this.imageDetection.hash.bits)) {
+                                    await referenceImage.hash(this.imageDetection.hash.bits);
+                                    await this.resources.setImageHash(referenceImage, this.imageDetection.hash.ttl);
+                                } else if(referenceImage.hashResult.length !== bitsToHexLength(this.imageDetection.hash.bits)) {
                                     this.logger.warn('Reference image hash length did not correspond to bits specified in config. Recomputing...');
-                                    refHash = await referenceImage.hash(this.imageDetection.hash.bits);
-                                    await this.resources.setImageHash(referenceImage, refHash, this.imageDetection.hash.ttl);
+                                    await referenceImage.hash(this.imageDetection.hash.bits);
+                                    await this.resources.setImageHash(referenceImage, this.imageDetection.hash.ttl);
                                 }
                             } else {
-                                refHash = await referenceImage.hash(this.imageDetection.hash.bits);
+                                await referenceImage.hash(this.imageDetection.hash.bits);
+                                refHash = referenceImage.toHashCache();
                             }
                         }
                         //await referenceImage.sharp();
@@ -244,29 +246,39 @@ export class RecentActivityRule extends Rule {
                     }
                     // only do image detection if regular URL comparison and other conditions fail first
                     // to reduce CPU/bandwidth usage
-                    if (referenceImage !== undefined) {
+                    if (referenceImage !== undefined && refHash !== undefined) {
                         try {
                             let imgData =  ImageData.fromSubmission(x);
                             imgData.setPreferredResolutionByWidth(800);
                             if(this.imageDetection.hash.enable) {
-                                let compareHash: string | undefined;
+                                let compareHash: ImageHashCacheData | undefined;
                                 if(this.imageDetection.hash.ttl !== undefined) {
                                     compareHash = await this.resources.getImageHash(imgData);
                                 }
-                                if(compareHash === undefined)
+                                if(compareHash === undefined || compareHash.original.length !== refHash.original.length)
                                 {
-                                    compareHash = await imgData.hash(this.imageDetection.hash.bits);
+                                    if(compareHash !== undefined) {
+                                        this.logger.debug(`Hash lengths were not the same! Will need to recompute compare hash to match reference.\n\nReference: ${referenceImage.basePath} has is ${refHash.original.length} char long | Comparing: ${imgData.basePath} has is ${compareHash} ${compareHash.original.length} long`);
+                                    }
+                                    await imgData.hash(this.imageDetection.hash.bits);
+                                    compareHash = imgData.toHashCache();
                                     if(this.imageDetection.hash.ttl !== undefined) {
-                                        await this.resources.setImageHash(imgData, compareHash, this.imageDetection.hash.ttl);
+                                        await this.resources.setImageHash(imgData, this.imageDetection.hash.ttl);
                                     }
                                 }
-                                const refHash = await referenceImage.hash(this.imageDetection.hash.bits);
-                                if(refHash.length !== compareHash.length) {
-                                    this.logger.debug(`Hash lengths were not the same! Will need to recompute compare hash to match reference.\n\nReference: ${referenceImage.basePath} has is ${refHash.length} char long | Comparing: ${imgData.basePath} has is ${compareHash} ${compareHash.length} long`);
-                                    compareHash = await imgData.hash(this.imageDetection.hash.bits)
+                                let diff: number;
+                                const odistance = leven(refHash.original, compareHash.original);
+                                diff = (odistance/refHash.original.length)*100;
+
+                                // compare flipped hash if it exists
+                                // if it has less difference than normal comparison then the image is probably flipped (or so different it doesn't matter)
+                                if(compareHash.flipped !== undefined) {
+                                    const fdistance = leven(refHash.original, compareHash.flipped);
+                                    const fdiff = (fdistance/refHash.original.length)*100;
+                                    if(fdiff < diff) {
+                                        diff = fdiff;
+                                    }
                                 }
-                                const distance = leven(refHash, compareHash);
-                                const diff = (distance/refHash.length)*100;
 
 
                                 // return image if hard is defined and diff is less
