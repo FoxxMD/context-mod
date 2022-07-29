@@ -262,7 +262,7 @@ export class RecentActivityRule extends Rule {
                                 }
                                 const refHash = await referenceImage.hash(this.imageDetection.hash.bits);
                                 if(refHash.length !== compareHash.length) {
-                                    this.logger.debug(`Hash lengths were not the same! Will need to recompute compare hash to match reference.\n\nReference: ${referenceImage.baseUrl} has is ${refHash.length} char long | Comparing: ${imgData.baseUrl} has is ${compareHash} ${compareHash.length} long`);
+                                    this.logger.debug(`Hash lengths were not the same! Will need to recompute compare hash to match reference.\n\nReference: ${referenceImage.basePath} has is ${refHash.length} char long | Comparing: ${imgData.basePath} has is ${compareHash} ${compareHash.length} long`);
                                     compareHash = await imgData.hash(this.imageDetection.hash.bits)
                                 }
                                 const distance = leven(refHash, compareHash);

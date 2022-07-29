@@ -3354,7 +3354,7 @@ export class SubredditResources {
     }
 
     async getImageHash(img: ImageData): Promise<string|undefined> {
-        const hash = `imgHash-${img.baseUrl}`;
+        const hash = `imgHash-${img.basePath}`;
         const result = await this.cache.get(hash) as string | undefined | null;
         this.stats.cache.imageHash.requests++
         this.stats.cache.imageHash.requestTimestamps.push(Date.now());
@@ -3372,7 +3372,7 @@ export class SubredditResources {
     }
 
     async setImageHash(img: ImageData, hash: string, ttl: number): Promise<void> {
-        await this.cache.set(`imgHash-${img.baseUrl}`, hash, {ttl});
+        await this.cache.set(`imgHash-${img.basePath}`, hash, {ttl});
         // const hash = await this.cache.wrap(img.baseUrl, async () => await img.hash(true), { ttl }) as string;
         // if(img.hashResult === undefined) {
         //     img.hashResult = hash;
