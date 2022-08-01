@@ -1,7 +1,16 @@
 import {authUserCheck, botRoute, subredditRoute} from "../../../middleware";
 import {Request, Response} from "express";
 import Bot from "../../../../../Bot";
-import {boolToString, cacheStats, difference, filterLogs, formatNumber, logSortFunc, pollingInfo} from "../../../../../util";
+import {
+    boolToString,
+    cacheStats,
+    difference,
+    filterLogs,
+    formatNumber,
+    logSortFunc, parseRedditEntity,
+    pollingInfo,
+    symmetricalDifference
+} from "../../../../../util";
 import dayjs from "dayjs";
 import {LogInfo, ResourceStats, RUNNING, STOPPED, SYSTEM} from "../../../../../Common/interfaces";
 import {Manager} from "../../../../../Subreddit/Manager";
@@ -10,6 +19,12 @@ import {opStats} from "../../../../Common/util";
 import {BotStatusResponse} from "../../../../Common/interfaces";
 import deepEqual from "fast-deep-equal";
 import {DispatchedEntity} from "../../../../../Common/Entities/DispatchedEntity";
+import {
+    guestEntitiesToAll,
+    guestEntityToApiGuest,
+    ManagerGuestEntity
+} from "../../../../../Common/Entities/Guest/GuestEntity";
+import {Guest} from "../../../../../Common/Entities/Guest/GuestInterfaces";
 
 const lastFullResponse: Map<string, Record<string, any>> = new Map();
 
@@ -38,11 +53,15 @@ const generateDeltaResponse = (data: Record<string, any>, hash: string, response
         }
         const delta: Record<string, any> = {};
         for(const [k,v] of Object.entries(data)) {
-            if(!deepEqual(v, reference[k])) {
-                // on delayed items delta we will send a different data structure back with just remove/new(add)
-                if(k === 'delayedItems') {
+            switch(k) {
+                case 'delayedItems':
+                    // on delayed items delta we will send a different data structure back with just remove/new(add)
                     const refIds = reference[k].map((x: DispatchedEntity) => x.id);
                     const latestIds = v.map((x: DispatchedEntity) => x.id);
+
+                    if(symmetricalDifference(refIds, latestIds).length === 0) {
+                        continue;
+                    }
 
                     const newIds = Array.from(difference(latestIds, refIds));
                     const newItems = v.filter((x: DispatchedEntity) => newIds.includes(x.id));
@@ -50,13 +69,33 @@ const generateDeltaResponse = (data: Record<string, any>, hash: string, response
                     // just need ids that should be removed on frontend
                     const removedItems = Array.from(difference(refIds, latestIds));
                     delta[k] = {new: newItems, removed: removedItems};
+                    break;
+                case 'guests':
+                    const refNames = reference[k].map((x: Guest) => `${x.name}-${x.expiresAt}`);
+                    const latestNames = v.map((x: Guest) => `${x.name}-${x.expiresAt}`);
 
-                } else if(v !== null && typeof v === 'object' && reference[k] !== null && typeof reference[k] === 'object') {
-                    // for things like cache/stats we only want to delta changed properties, not the entire object
-                    delta[k] = mergeDeepEqual(v, reference[k]);
-                } else {
+                    if(symmetricalDifference(refNames, latestNames).length === 0) {
+                        continue;
+                    }
+
+                    // const newNames = Array.from(difference(latestNames, refNames));
+                    // const newGuestItems = v.filter((x: Guest) => newNames.includes(x.name));
+                    //
+                    // // just need ids that should be removed on frontend
+                    // const removedGuestItems = Array.from(difference(refNames, latestNames));
+                    // delta[k] = {new: newGuestItems, removed: removedGuestItems};
                     delta[k] = v;
-                }
+                    break;
+                default:
+                    if(!deepEqual(v, reference[k])) {
+                        if(v !== null && typeof v === 'object' && reference[k] !== null && typeof reference[k] === 'object') {
+                            // for things like cache/stats we only want to delta changed properties, not the entire object
+                            delta[k] = mergeDeepEqual(v, reference[k]);
+                        } else {
+                            delta[k] = v;
+                        }
+                    }
+                    break;
             }
         }
         resp = delta;
@@ -78,18 +117,33 @@ const liveStats = () => {
         const manager = req.manager;
         const responseType = req.query.type === 'delta' ? 'delta' : 'full';
         const hash = `${bot.botName}${manager !== undefined ? `-${manager.getDisplay()}` : ''}`;
+        const isOperator = req.user?.isInstanceOperator(bot);
+
+        const userModerated: string[] = (req.user as Express.User).subreddits.map(x => parseRedditEntity(x).name);
 
         if(manager === undefined) {
             // getting all
             const subManagerData: any[] = [];
+            //let managerGuests: ManagerGuestEntity[] = [];
             for (const m of req.user?.accessibleSubreddits(bot) as Manager[]) {
+
+                const isMod = userModerated.some(x => parseRedditEntity(m.subreddit.display_name).name === x);
+                const isGuest = m.managerEntity.getGuests().some(y => y.author.name === req.user?.name);
+
+                //const guests = await m.managerEntity.getGuests();
+                //managerGuests = managerGuests.concat(guests);
+
                 const sd = {
+                    name: m.displayLabel,
+                    guests: isOperator || isMod ? m.managerEntity.getGuests().map(x => guestEntityToApiGuest(x)) : [],
                     queuedActivities: m.queue.length(),
                     runningActivities: m.queue.running(),
                     delayedItems: m.getDelayedSummary(),
                     maxWorkers: m.queue.concurrency,
                     subMaxWorkers: m.subMaxWorkers || bot.maxWorkers,
                     globalMaxWorkers: bot.maxWorkers,
+                    isMod,
+                    isGuest,
                     checks: {
                         submissions: m.submissionChecks === undefined ? 0 : m.submissionChecks.length,
                         comments: m.commentChecks === undefined ? 0 : m.commentChecks.length,
@@ -213,6 +267,11 @@ const liveStats = () => {
                 scopes: scopes === null || !Array.isArray(scopes) ? [] : scopes,
                 subMaxWorkers,
                 runningActivities,
+                guests: guestEntitiesToAll(subManagerData.reduce((acc, curr) => {
+                    acc.set(curr.name, curr.guests);
+                    return acc;
+                }, new Map<string, Guest[]>())),
+                isMod: subManagerData.some(x => x.isMod),
                 queuedActivities,
                 delayedItems,
                 botState: {
@@ -277,12 +336,15 @@ const liveStats = () => {
             }
             return res.json(respData);
         } else {
+            const isGuest = manager.managerEntity.getGuests().some(y => y.author.name === req.user?.name);
+            const isMod = userModerated.some(x => parseRedditEntity(manager.subreddit.display_name).name === x);
             // getting specific subreddit stats
             const sd = {
                 name: manager.displayLabel,
                 botState: manager.managerState,
                 eventsState: manager.eventsState,
                 queueState: manager.queueState,
+                guests: isOperator || isMod ? manager.managerEntity.getGuests().map(x => guestEntityToApiGuest(x)) : [],
                 indicator: 'gray',
                 permissions: await manager.getModPermissions(),
                 queuedActivities: manager.queue.length(),
@@ -293,6 +355,8 @@ const liveStats = () => {
                 globalMaxWorkers: bot.maxWorkers,
                 validConfig: boolToString(manager.validConfigLoaded),
                 configFormat: manager.wikiFormat,
+                isGuest,
+                isMod,
                 dryRun: boolToString(manager.dryRun === true),
                 pollingInfo: manager.pollOptions.length === 0 ? ['nothing :('] : manager.pollOptions.map(pollingInfo),
                 checks: {

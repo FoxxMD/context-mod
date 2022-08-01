@@ -45,7 +45,6 @@ const logs = () => {
 
         const userName = req.user?.name as string;
         const isOperator = req.user?.isInstanceOperator(req.botApp);
-        const realManagers = req.botApp.bots.map(x => req.user?.accessibleSubreddits(x).map(x => x.displayLabel)).flat() as string[];
         const {level = 'verbose', stream, limit = 200, sort = 'descending', streamObjects = false, formatted: formattedVal = true, transports: transportsVal = false} = req.query;
 
         const formatted = formattedVal as boolean;
@@ -67,8 +66,6 @@ const logs = () => {
                 managers = managers.concat(req.user?.accessibleSubreddits(b) as Manager[]);
             }
         }
-
-        //const allReq = req.query.subreddit !== undefined && (req.query.subreddit as string).toLowerCase() === 'all';
 
         if (stream) {
 

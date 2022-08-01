@@ -1,9 +1,9 @@
-import {BotInstance, CMInstanceInterface} from "../../interfaces";
 import CMUser from "./CMUser";
 import {intersect, parseRedditEntity} from "../../../util";
 import {App} from "../../../App";
 import Bot from "../../../Bot";
 import {Manager} from "../../../Subreddit/Manager";
+import {BotInstance, CMInstanceInterface} from "../interfaces";
 
 class ServerUser extends CMUser<App, Bot, Manager> {
 
@@ -16,23 +16,49 @@ class ServerUser extends CMUser<App, Bot, Manager> {
     }
 
     canAccessInstance(val: App): boolean {
-        return this.isOperator || val.bots.filter(x => intersect(this.subreddits, x.subManagers.map(y => y.subreddit.display_name))).length > 0;
+        return this.isOperator || val.bots.filter(x => x.canUserAccessBot(this.name, this.subreddits)).length > 0;
     }
 
     canAccessBot(val: Bot): boolean {
-        return this.isOperator || intersect(this.subreddits, val.subManagers.map(y => y.subreddit.display_name)).length > 0;
+        return this.isOperator || val.canUserAccessBot(this.name, this.subreddits);
     }
 
     accessibleBots(bots: Bot[]): Bot[] {
-        return this.isOperator ? bots : bots.filter(x => intersect(this.subreddits, x.subManagers.map(y => y.subreddit.display_name)).length > 0);
+        return this.isOperator ? bots : bots.filter(x => x.canUserAccessBot(this.name, this.subreddits));
     }
 
     canAccessSubreddit(val: Bot, name: string): boolean {
-        return this.isOperator || this.subreddits.includes(parseRedditEntity(name).name) && val.subManagers.some(y => y.subreddit.display_name.toLowerCase() === parseRedditEntity(name).name.toLowerCase());
+        const normalName = parseRedditEntity(name).name;
+        return this.isOperator || this.accessibleSubreddits(val).some(x => x.toNormalizedManager().subredditNormal === normalName);
     }
 
     accessibleSubreddits(bot: Bot): Manager[] {
-        return this.isOperator ? bot.subManagers : bot.subManagers.filter(x => intersect(this.subreddits, [x.subreddit.display_name]).length > 0);
+        if(this.isOperator) {
+            return bot.subManagers;
+        }
+
+        const subs = bot.getAccessibleSubreddits(this.name, this.subreddits);
+        return bot.subManagers.filter(x => subs.includes(x.toNormalizedManager().subredditNormal));
+    }
+
+    isSubredditGuest(val: Bot, name: string): boolean {
+        const normalName = parseRedditEntity(name).name;
+        const manager = val.subManagers.find(x => parseRedditEntity(x.subreddit.display_name).name === normalName);
+        if(manager !== undefined) {
+            return manager.toNormalizedManager().guests.some(x => x.name === this.name);
+        }
+        return false;
+    }
+
+    isSubredditMod(val: Bot, name: string): boolean {
+        const normalName = parseRedditEntity(name).name;
+        return val.subManagers.some(x => parseRedditEntity(x.subreddit.display_name).name === normalName) && this.subreddits.map(x => parseRedditEntity(x).name).some(x => x === normalName);
+    }
+
+    getModeratedSubreddits(val: Bot): Manager[] {
+        const normalSubs = this.subreddits.map(x => parseRedditEntity(x).name);
+
+        return val.subManagers.filter(x => normalSubs.includes(x.subreddit.display_name));
     }
 }
 

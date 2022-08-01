@@ -261,6 +261,42 @@
                                                     <span class="cursor-help underline" style="text-decoration-style: dotted"><%= data.scopes.length %></span>
                                                 </span>
                                             <% } else %>
+                                            <label class="guestsLabel <%= (!isOperator && !data.isMod ? 'hidden' : '')%>">
+                                                <span class="has-tooltip">
+                                                       <span style="margin-top:55px" class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black space-y-3 p-2 text-left'>
+                                                            <p>Reddit users who are allowed to access your bot even though they are not moderators.</p>
+                                                            <p>Guest mods can do everything a regular mod can except view/add/remove Guest Mods.</p>
+                                                            <p>Additionally, they can <b>edit the subreddit's config using the bot.</b> If a Guest Mod edits your config their username will be mentioned in the wiki page edit reason.</p>
+                                                        </span>
+                                                        <span>
+                                                            Guest Mods<svg xmlns="http://www.w3.org/2000/svg"
+                                                                          class="h-4 w-4 inline-block cursor-help"
+                                                                          fill="none"
+                                                                          viewBox="0 0 24 24" stroke="currentColor">
+                                                                <use xlink:href="public/questionsymbol.svg#q" />
+                                                            </svg>
+                                                        </span>
+                                                    </span>
+                                            </label>
+                                            <span class="guests <%= (!isOperator && !data.isMod ? 'hidden' : '')%>" style="margin-left: 5px;">
+                                                <ul class="list-disc list-inside guestList">
+                                                    <li class="smallLi">None</li>
+                                                </ul>
+                                                <div class="guestAdd <%= (!data.isMod ? 'hidden' : '')%> inline-flex items-center mt-1">
+                                                    <div>
+                                                        <input
+                                                                               style="width:200px;"
+                                                                               class="guestAddName border-gray-50 placeholder-gray-500 rounded mr-1 p-1 text-black"
+                                                        placeholder="userName"/>
+                                                        <input type="datetime-local"
+                                                                                         class="guestAddTime border-gray-50 placeholder-gray-500 mt-2 mr-2 rounded text-black"
+                                                                                         value="<%= now %>"
+                                                                                         min="<%= now %>"/>
+
+                                                    </div>
+                                                    <a href="" class="addGuest">Add</a>
+                                                </div>
+                                            </span>
                                         </div>
                                         <% if (data.name !== 'All') { %>
                                             <ul class="list-disc list-inside mt-4 pollingInfo">
@@ -679,6 +715,8 @@
 <script>
     window.sort = 'desc';
 
+    const isOperator = <%= isOperator %>;
+
     document.querySelectorAll('.action').forEach(el => {
         el.addEventListener('click', e => {
             e.preventDefault();
@@ -1006,10 +1044,10 @@
             const reader = res.getReader();
             let keepReading = true;
             while(keepReading) {
-                const {done, value} = await reader.read();
+                const {done, value, ...rest} = await reader.read();
                 if(done) {
                     keepReading = false;
-                    console.debug('done');
+                    console.debug(`${bot}.${sub} log stream reader signalled it is done`);
                 }
                 if(value) {
                     //console.log(`((Logged For ${bot} ${sub})) ${value.message}`);
@@ -1073,6 +1111,7 @@
                 running
             } = {},
             delayedItems,
+            guests,
             runningActivities,
             queuedActivities,
             permissions,
@@ -1188,6 +1227,10 @@
             }
         }
 
+        if(guests !== undefined) {
+            renderGuestMods(bot, sub, guests);
+        }
+
         if(eventsCheckedTotal !== undefined) {
             el.querySelector('.allStats .eventsCount').innerHTML = resp.stats.historical.eventsCheckedTotal;
         }
@@ -1271,6 +1314,101 @@
         });
     }
 
+    function removeGuestMod(bot, subredditStr, name) {
+        const subs = subredditStr.split(',');
+        fetch(`/api/guests?instance=<%= instanceId %>&bot=${bot}&subreddit=${subs[0]}&name=${name}`, {
+            method: 'DELETE'
+        }).then((resp) => {
+            if (!resp.ok) {
+                throw new Error(`Response was not OK from ${subs[0]} remove guest ${id}${name}`)
+            } else {
+                return resp.json();
+            }
+        }).then((data) => {
+            renderGuestMods(bot, subs[0], data);
+        });
+    }
+
+    function addGuestMod(bot, subredditStr, name, time) {
+        const subs = subredditStr.split(',');
+        fetch(`/api/guests?instance=<%= instanceId %>&bot=${bot}&subreddit=${subs[0]}&time=${time}&name=${name}`, {
+            method: 'POST'
+        }).then((resp) => {
+            if (!resp.ok) {
+                throw new Error(`Response was not OK from ${subs[0]} add guest ${name}`);
+            } else {
+                return resp.json();
+            }
+        }).then((data) => {
+            renderGuestMods(bot, subs[0], data);
+            document.querySelector(`[data-bot="${bot}"][data-subreddit="${subs[0]}"] .guestAddName`).value = '';
+            //document.querySelector(`[data-bot="${bot}"][data-subreddit="${subs[0]}"] .guestAddTime`).value = dayjs().add(1, 'minutes').format('YYYY-MM-DDTHH:mm');
+        });
+    }
+
+    function renderGuestMods(bot, sub, data) {
+        let el;
+        let isAll = sub.toLowerCase() === 'all';
+        if(isAll) {
+            // got all
+            el = document.querySelector(`[data-subreddit="All"][data-bot="${bot}"] .guestList`);
+        } else {
+            // got subreddit
+            el = document.querySelector(`[data-bot="${bot}"][data-subreddit="${sub}"] .guestList`);
+        }
+
+        const now = dayjs();
+
+        el.innerHTML = '';
+        if(data.length === 0) {
+            const node = document.createElement("LI");
+            node.classList.add('smallLi');
+            node.appendChild(document.createTextNode('None'));
+            el.appendChild(node);
+        } else {
+            for(const g of data) {
+                const node = document.createElement("LI");
+                node.classList.add('smallLi');
+                let relTime = g.expiresAt === undefined ? 'Never' : dayjs.duration(dayjs(g.expiresAt).diff(now)).humanize();
+                let guestText = g.name;
+                if(isAll) {
+                    guestText += ` (${g.subreddits.length} Subs, at least ${relTime})`;
+                } else {
+                    guestText += ` (${relTime})`;
+                }
+                node.appendChild(document.createTextNode(guestText));
+                node.insertAdjacentHTML('beforeend', `<a href="" class="remove ml-1" data-name="${g.name}"><span class="cancellable iconify-inline" data-icon="icons8:cancel"></span></a>`);
+                node.addEventListener('click', e => {
+                    e.preventDefault();
+                    removeGuestMod(bot, sub, g.name);
+                });
+                el.appendChild(node);
+            }
+        }
+    }
+
+    document.querySelectorAll('.addGuest').forEach(elm => {
+        elm.addEventListener('click', (e) => {
+            e.preventDefault();
+            const el = e.target;
+            const parent = el.closest('.sub');
+            const sub = parent.dataset.subreddit;
+            const bot = parent.dataset.bot;
+
+            const userEl = el.parentElement.querySelector('input.guestAddName');
+            const timeEl = el.parentElement.querySelector('input.guestAddTime');
+
+            const d = dayjs(timeEl.value);
+            // don't allow users to set a time before now
+            const time = d.isBefore(dayjs()) ? dayjs().add(1, 'minute').valueOf() : d.valueOf();
+            const user = userEl.value;
+
+            console.log(`Adding ${user} expiring at ${time} to ${bot}.${sub}`);
+
+            addGuestMod(bot, sub, user, time)
+        });
+    });
+
     function getLiveStats(bot, sub, responseType = 'full') {
         console.debug(`Getting live stats for ${bot} ${sub}`)
         return fetch(`/api/liveStats?instance=<%= instanceId %>&bot=${bot}&subreddit=${sub}&type=${responseType}`)
@@ -1306,7 +1444,7 @@
         }
 
         recentlySeen.forEach((value, key) => {
-            const {timeout, liveStatsInt, ...rest} = value;
+            const {timeout, liveStatsInt,...rest} = value;
             if(key === identifier && timeout !== undefined) {
 
                 console.debug(`${key} Clearing unfocused timeout on own already set`);
@@ -1335,7 +1473,7 @@
                             const {controller} = val;
                             console.debug(`${k} 15 second unfocused timeout expired, stopping log streaming`);
                             if(controller !== undefined) {
-                                console.debug('Stopping logs');
+                                console.debug(`${k} Stopping logs`);
                                 controller.abort();
                             }
                             recentlySeen.delete(k);

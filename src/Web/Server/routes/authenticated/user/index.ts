@@ -21,6 +21,14 @@ import {Brackets} from "typeorm";
 import {Activity} from "../../../../../Common/Entities/Activity";
 import {RedditThing} from "../../../../../Common/Infrastructure/Reddit";
 import {CMError} from "../../../../../Utils/Errors";
+import {Guest, GuestEntityData} from "../../../../../Common/Entities/Guest/GuestInterfaces";
+import {
+    guestEntitiesToAll,
+    guestEntityToApiGuest,
+    ManagerGuestEntity
+} from "../../../../../Common/Entities/Guest/GuestEntity";
+import {ManagerEntity} from "../../../../../Common/Entities/ManagerEntity";
+import {AuthorEntity} from "../../../../../Common/Entities/AuthorEntity";
 
 const commentReg = parseLinkIdentifier([COMMENT_URL_ID]);
 const submissionReg = parseLinkIdentifier([SUBMISSION_URL_ID]);
@@ -227,3 +235,104 @@ const cancelDelayed = async (req: Request, res: Response) => {
 };
 
 export const cancelDelayedRoute = [authUserCheck(), botRoute(), subredditRoute(true), cancelDelayed];
+
+const removeGuestMod = async (req: Request, res: Response) => {
+
+    const {name} = req.query as any;
+    const {name: userName} = req.user as Express.User;
+
+    const isAll = req.manager === undefined;
+
+    const managers = (isAll ? req.user?.getModeratedSubreddits(req.serverBot) : [req.manager as Manager]) as Manager[];
+
+    const managerRepo = req.serverBot.database.getRepository(ManagerEntity);
+
+    let newGuests = new Map<string, Guest[]>();
+    for(const m of managers) {
+        const filteredGuests = m.managerEntity.removeGuestByUser(name);
+        newGuests.set(m.displayLabel, filteredGuests.map(x => guestEntityToApiGuest(x)));
+        m.logger.info(`Removed ${name} from Guest Mods`, {user: userName});
+    }
+    await managerRepo.save(managers.map(x => x.managerEntity));
+
+    const guests = isAll ? guestEntitiesToAll(newGuests) : Array.from(newGuests.values()).flat(3);
+
+    return res.json(guests);
+};
+
+export const removeGuestModRoute = [authUserCheck(), botRoute(), subredditRoute(true, true), removeGuestMod];
+
+const addGuestMod = async (req: Request, res: Response) => {
+
+    const {name, time} = req.query as any;
+    const {name: userName} = req.user as Express.User;
+
+    const isAll = req.manager === undefined;
+
+    const managers = (isAll ? req.user?.getModeratedSubreddits(req.serverBot) : [req.manager as Manager]) as Manager[];
+
+    const managerRepo = req.serverBot.database.getRepository(ManagerEntity);
+    const authorRepo = req.serverBot.database.getRepository(AuthorEntity);
+
+    let user = await authorRepo.findOne({
+        where: {
+            name: name as string,
+        }
+    });
+
+    if(user === null) {
+        user = await authorRepo.save(new AuthorEntity({name}))
+    }
+
+    // TODO this is not using the right time?
+    const expiresAt = dayjs(Number.parseInt(time));
+
+    let newGuests = new Map<string, Guest[]>();
+    for(const m of managers) {
+        const filteredGuests = m.managerEntity.addGuest({author: user, expiresAt});
+        newGuests.set(m.displayLabel, filteredGuests.map(x => guestEntityToApiGuest(x)));
+        m.logger.info(`Added ${name} from Guest Mods`, {user: userName});
+    }
+    await managerRepo.save(managers.map(x => x.managerEntity));
+
+    const guests = isAll ? guestEntitiesToAll(newGuests) : Array.from(newGuests.values()).flat(3);
+
+    return res.status(200).json(guests);
+};
+
+export const addGuestModRoute = [authUserCheck(), botRoute(), subredditRoute(true, true), addGuestMod];
+
+const saveGuestWikiEdit = async (req: Request, res: Response) => {
+    const {location, data, reason = 'Updated through CM Web', create = false} = req.body as any;
+
+    try {
+        // @ts-ignore
+        const wiki = await req.manager?.subreddit.getWikiPage(location) as WikiPage;
+        await wiki.edit({
+            text: data,
+            reason: `${reason} by Guest Mod ${req.user?.name}`,
+        });
+    } catch (err: any) {
+        res.status(500);
+        return res.send(err.message);
+    }
+
+    if(create) {
+        try {
+            // @ts-ignore
+            await req.manager.subreddit.getWikiPage(location).editSettings({
+                permissionLevel: 2,
+                // don't list this page on r/[subreddit]/wiki/pages
+                listed: false,
+            });
+        } catch (err: any) {
+            res.status(500);
+            return res.send(`Successfully created wiki page for configuration but encountered error while setting visibility. You should manually set the wiki page visibility on reddit. \r\n Error: ${err.message}`);
+        }
+    }
+
+    res.status(200);
+    return res.send();
+}
+
+export const saveGuestWikiEditRoute = [authUserCheck(), botRoute(), subredditRoute(true, false, true), saveGuestWikiEdit];

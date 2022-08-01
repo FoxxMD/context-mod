@@ -127,6 +127,7 @@
     }
 
     window.canSave = <%= canSave %>;
+    window.isGuest = false;
 
     if (searchParams.get('subreddit') === null) {
         document.querySelector('#saveTip').style.display = 'none';
@@ -141,6 +142,9 @@
             const saveLink = document.querySelector('#doSave');
             saveLink.classList.remove('isDisabled');
             saveLink.href = '#';
+            if(window.isGuest && !saveLink.innerHTML.includes('guest')) {
+                saveLink.innerHTML = `${saveLink.innerHTML} as Guest Mod`;
+            }
             document.querySelector('#reason').style.display = 'initial';
         } else {
             document.querySelector('#saveTip').classList.add('has-tooltip');
@@ -212,7 +216,7 @@
             payload.reason = reasonVal;
         }
 
-        fetch(`${document.location.origin}/config${document.location.search}`, {
+        fetch(window.isGuest ? `${document.location.origin}/api/config${document.location.search}` : `${document.location.origin}/config${document.location.search}`, {
             method: 'POST',
             headers: {
                 'Accept': 'application/json',
@@ -381,7 +385,17 @@
                     } else {
                         resp.text().then(data => {
                             window.wikiLocation = data;
+                        });
+                        fetch(`${document.location.origin}/guest${document.location.search}`).then((resp) => {
+                            if(resp.ok) {
+                                window.canSave = true;
+                                window.isGuest = true;
+                                window.setSaveStatus();
+                            }
+                        }).catch((e) => {
+                            // do nothing, not a guest
                         })
+
                     }
                 });
             }

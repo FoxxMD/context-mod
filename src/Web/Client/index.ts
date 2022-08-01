@@ -38,7 +38,6 @@ import sharedSession from "express-socket.io-session";
 import dayjs from "dayjs";
 import httpProxy from 'http-proxy';
 import {arrayMiddle, booleanMiddle} from "../Common/middleware";
-import {BotInstance, CMInstanceInterface} from "../interfaces";
 import { URL } from "url";
 import {MESSAGE} from "triple-beam";
 import Autolinker from "autolinker";
@@ -57,6 +56,7 @@ import {MigrationService} from "../../Common/MigrationService";
 import {RuleResultEntity} from "../../Common/Entities/RuleResultEntity";
 import {RuleSetResultEntity} from "../../Common/Entities/RuleSetResultEntity";
 import { PaginationAwareObject } from "../Common/util";
+import {BotInstance, BotStatusResponse, CMInstanceInterface} from "../Common/interfaces";
 
 const emitter = new EventEmitter();
 
@@ -765,13 +765,13 @@ const webClient = async (options: OperatorConfig) => {
         next();
     }
 
-    const defaultSubreddit = async (req: express.Request, res: express.Response, next: Function) => {
+/*    const defaultSubreddit = async (req: express.Request, res: express.Response, next: Function) => {
         if(req.bot !== undefined && req.query.subreddit === undefined) {
-            const firstAccessibleSub = req.bot.subreddits.find(x => req.user?.isInstanceOperator(req.instance) || req.user?.subreddits.includes(x));
+            const firstAccessibleSub = req.bot.managers.find(x => req.user?.isInstanceOperator(req.instance) || req.user?.subreddits.includes(x));
             req.query.subreddit = firstAccessibleSub;
         }
         next();
-    }
+    }*/
 
     const initHeartbeat = async (req: express.Request, res: express.Response, next: Function) => {
         if(!init) {
@@ -880,9 +880,29 @@ const webClient = async (options: OperatorConfig) => {
 
         const isOp = req.user?.isInstanceOperator(instance);
 
+        // const bots = resp.bots.map((x: BotStatusResponse) => {
+        //     return {
+        //         ...x,
+        //         subreddits: x.subreddits.map(y => {
+        //            return {
+        //                ...y,
+        //                guests: y.guests.map(z => {
+        //                    const d = z.expiresAt === undefined ? undefined : dayjs(z.expiresAt);
+        //                    return {
+        //                        ...z,
+        //                        relative: d === undefined ? 'Never' : dayjs.duration(d.diff(dayjs())).humanize(),
+        //                        date: d === undefined ? 'Never' : d.format('YYYY-MM-DD HH:mm:ssZ')
+        //                    }
+        //                })
+        //            }
+        //         })
+        //     }
+        // });
+
         res.render('status', {
             instances: shownInstances,
             bots: resp.bots,
+            now: dayjs().add(1, 'minute').format('YYYY-MM-DDTHH:mm'),
             botId: (req.instance as CMInstance).getName(),
             instanceId: (req.instance as CMInstance).getName(),
             isOperator: isOp,
@@ -913,6 +933,11 @@ const webClient = async (options: OperatorConfig) => {
             format,
             canSave: req.user?.clientData?.scope?.includes('wikiedit') && req.user?.clientData?.tokenExpiresAt !== undefined && dayjs.unix(req.user?.clientData.tokenExpiresAt).isAfter(dayjs())
         });
+    });
+
+    app.getAsync('/guest', [ensureAuthenticatedApi, defaultSession, instanceWithPermissions, botWithPermissions(true)], async (req: express.Request, res: express.Response) => {
+        const {subreddit} = req.query as any;
+        return res.status(req.user?.isSubredditGuest(req.bot, subreddit) ? 200 : 403).send();
     });
 
     app.postAsync('/config', [ensureAuthenticatedApi, defaultSession, instanceWithPermissions, botWithPermissions(true)], async (req: express.Request, res: express.Response) => {
