@@ -623,10 +623,17 @@ actions:
 
 Remove the Activity being processed. [Schema Documentation](https://json-schema.app/view/%23/%23%2Fdefinitions%2FSubmissionCheckJson/%23%2Fdefinitions%2FRemoveActionJson?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Freddit-context-bot%2Fedge%2Fsrc%2FSchema%2FApp.json)
 
+* **note** can be [templated](#templating)
+* **reasonId** IDs can be found in the [editor](/docs/webInterface.md) using the **Removal Reasons** popup
+
+If neither note nor reasonId are included then no removal reason is added.
+
 ```yaml
 actions:
   - kind: remove
-    spam: boolean # optional, mark as spam on removal
+    spam: false # optional, mark as spam on removal
+    note: 'a moderator-readable note' # optional, a note only visible to moderators (new reddit only)
+    reasonId: '2n0f4674-365e-46d2-8fc7-a337d85d5340' # optional, the ID of a removal reason to add to the removal action (new reddit only)
 ```
 
 #### What About Removal Reason?

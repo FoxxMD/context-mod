@@ -146,7 +146,7 @@ import {
     ActivityType,
     AuthorHistorySort,
     CachedFetchedActivitiesResult, FetchedActivitiesResult,
-    SnoowrapActivity
+    SnoowrapActivity, SubredditRemovalReason
 } from "../Common/Infrastructure/Reddit";
 import {AuthorCritPropHelper} from "../Common/Infrastructure/Filters/AuthorCritPropHelper";
 import {NoopLogger} from "../Utils/loggerFactory";
@@ -3390,6 +3390,21 @@ export class SubredditResources {
             return this.thirdPartyCredentials[name];
         }
         return undefined;
+    }
+
+    async getSubredditRemovalReasons(): Promise<SubredditRemovalReason[]> {
+        if(this.wikiTTL !== false) {
+            return await this.cache.wrap(`removalReasons`, async () => {
+                const res = await this.client.getSubredditRemovalReasons(this.subreddit.display_name);
+                return Object.values(res.data);
+            }, { ttl: this.wikiTTL }) as SubredditRemovalReason[];
+        }
+        const res = await this.client.getSubredditRemovalReasons(this.subreddit.display_name);
+        return Object.values(res.data);
+    }
+
+    async getSubredditRemovalReasonById(id: string): Promise<SubredditRemovalReason | undefined> {
+        return (await this.getSubredditRemovalReasons()).find(x => x.id === id);
     }
 }
 

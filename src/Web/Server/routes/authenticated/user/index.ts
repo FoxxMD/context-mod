@@ -50,6 +50,14 @@ const configLocation = async (req: Request, res: Response) => {
 
 export const configLocationRoute = [authUserCheck(), botRoute(), subredditRoute(), configLocation];
 
+const removalReasons = async (req: Request, res: Response) => {
+    const manager = req.manager as Manager;
+    const reasons = await manager.resources.getSubredditRemovalReasons()
+    return res.json(reasons);
+};
+
+export const removalReasonsRoute = [authUserCheck(), botRoute(), subredditRoute(), removalReasons];
+
 const getInvites = async (req: Request, res: Response) => {
 
     return res.json(await req.serverBot.cacheManager.getPendingSubredditInvites());

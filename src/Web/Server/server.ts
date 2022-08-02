@@ -22,7 +22,7 @@ import {
     configLocationRoute,
     configRoute,
     deleteInviteRoute,
-    getInvitesRoute, removeGuestModRoute, saveGuestWikiEditRoute
+    getInvitesRoute, removalReasonsRoute, removeGuestModRoute, saveGuestWikiEditRoute
 } from "./routes/authenticated/user";
 import action from "./routes/authenticated/user/action";
 import {authUserCheck, botRoute} from "./middleware";
@@ -205,6 +205,8 @@ const rcbServer = async function (options: OperatorConfigWithFileContext) {
     server.getAsync('/config/location', ...configLocationRoute);
 
     server.postAsync('/config', ...saveGuestWikiEditRoute);
+
+    server.getAsync('/reasons', ...removalReasonsRoute);
 
     server.getAsync('/events', ...actionedEventsRoute);
 

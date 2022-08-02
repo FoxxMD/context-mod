@@ -56,6 +56,31 @@
                         </span>
                     </span>
                 </span>
+                <span id="reasonsWrapper" style="display: none;">
+                    |
+                    <span class="has-tooltip">
+                    <span style="z-index:999; margin-top: 30px;" class='tooltip rounded shadow-lg p-3 bg-gray-100 text-black space-y-2'>
+                       <strong>Subreddit Removal Reasons Helper</strong>
+                        <div>Copy the <b>ID</b> for use in <span class="font-mono">remove</span> action's <span class="font-mono">removalId</span> field</div>
+                        <ul style="user-select: text;" class="list-inside list-disc">
+                        </ul>
+                    </span>
+                    <span class="cursor-help">
+                            Removal Reasons
+                        <span>
+                            <svg xmlns="http://www.w3.org/2000/svg"
+                                 class="h-4 w-4 inline-block cursor-help"
+                                 fill="none"
+                                 viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round"
+                                      stroke-linejoin="round"
+                                      stroke-width="2"
+                                      d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                        </span>
+                    </span>
+                </span>
+                </span>
                 | <input id="configUrl" class="text-black placeholder-gray-500 rounded mx-2" style="min-width:400px;" placeholder="URL of a config to load"/> <a href="#" id="loadConfig">Load</a>
                 <div id="editWrapper" class="my-2">
                     <label style="display: none" for="reason">Edit Reason</label><input id="reason" class="text-black placeholder-gray-500 rounded mr-2" style="min-width:400px;" placeholder="Edit Reason: Updated through CM Web"/>
@@ -394,8 +419,42 @@
                             }
                         }).catch((e) => {
                             // do nothing, not a guest
-                        })
+                        });
 
+                        // Since we are getting config for a subreddit and (assuming) user is authorized to see config then get subreddit removal reasons and populate helper
+                        fetch(`${document.location.origin}/api/reasons${document.location.search}`).then((resp) => {
+                            if(resp.ok) {
+                                resp.json().then((data) => {
+                                    document.querySelector('#reasonsWrapper').style.display = 'initial';
+
+                                    const reasonsList = document.querySelector('#reasonsWrapper ul');
+                                    if(data.length === 0) {
+                                        const node = document.createElement("LI");
+                                        node.appendChild(document.createTextNode('None'));
+                                        reasonsList.appendChild(node);
+                                    } else {
+                                        for(const reason of data) {
+                                            const node = document.createElement("LI");
+                                            node.appendChild(document.createTextNode(reason.title));
+
+                                            const copy = document.createElement('span');
+                                            copy.classList.add('cursor-pointer', 'float-right');
+                                            copy.insertAdjacentHTML('beforeend', `<a class="hover:bg-gray-400 no-underline rounded-md py-1 px-3 border" href="">Copy ID <span style="display:inline" class="iconify" data-icon="clarity:copy-to-clipboard-line"></span></a>`);
+                                            copy.addEventListener('click', e => {
+                                                e.preventDefault();
+                                                navigator.clipboard.writeText(reason.id);
+                                            });
+                                            node.appendChild(copy);
+                                            reasonsList.appendChild(node);
+                                        }
+                                    }
+                                })
+                            }
+                        }).catch((e) => {
+                            // just log it
+                            console.error('Error occurred while trying to fetch subreddit removal reasons');
+                            console.error(e);
+                        })
                     }
                 });
             }

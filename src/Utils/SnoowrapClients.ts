@@ -3,7 +3,7 @@ import {Submission, Subreddit, Comment} from "snoowrap/dist/objects";
 import {parseSubredditName} from "../util";
 import {ModUserNoteLabel} from "../Common/Infrastructure/Atomic";
 import {CreateModNoteData, ModNote, ModNoteRaw, ModNoteSnoowrapPopulated} from "../Subreddit/ModNotes/ModNote";
-import {SimpleError} from "./Errors";
+import {CMError, SimpleError} from "./Errors";
 import {RawSubredditRemovalReasonData, SnoowrapActivity} from "../Common/Infrastructure/Reddit";
 
 // const proxyFactory = (endpoint: string) => {
@@ -150,18 +150,20 @@ export class ExtendedSnoowrap extends Snoowrap {
      * @see https://github.com/praw-dev/praw/blob/b22e1f514d68d36545daf62e8a8d6c6c8caf782b/praw/endpoints.py#L149 for endpoint
      * @see https://github.com/praw-dev/praw/blob/b22e1f514d68d36545daf62e8a8d6c6c8caf782b/praw/models/reddit/mixins/__init__.py#L28 for usage
      * */
-    async addRemovalReason(item: SnoowrapActivity, note: string, reason?: string) {
+    async addRemovalReason(item: SnoowrapActivity, note?: string, reason?: string) {
         try {
-            const response = await this.oauthRequest({
+            if(note === undefined && reason === undefined) {
+                throw new CMError(`Must provide either a note or reason in order to add removal reason on Activity ${item.name}`, {isSerious: false});
+            }
+            await this.oauthRequest({
                 uri: 'api/v1/modactions/removal_reasons',
                 method: 'post',
                 body: {
                     item_ids: [item.name],
-                    mod_note: note,
+                    mod_note: note ?? null,
                     reason_id: reason ?? null,
                 },
             });
-            return response;
         } catch(e: any) {
             throw e;
         }
