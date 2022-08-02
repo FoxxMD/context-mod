@@ -35,7 +35,7 @@ export class ClientBotInstance implements BotInstance {
     }
 
     getAccessibleSubreddits(user: string, subreddits: string[] = []): string[] {
-        const normalSubs = subreddits.map(x => parseRedditEntity(x).name.toLowerCase());
+        const normalSubs = subreddits.map(x => parseRedditEntity(x).name);
         return Array.from(new Set([...this.getGuestSubreddits(user), ...intersect(normalSubs, this.getSubreddits())]));
     }
 
