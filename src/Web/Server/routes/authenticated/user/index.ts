@@ -2,7 +2,13 @@ import {Request, Response} from 'express';
 import {authUserCheck, botRoute, subredditRoute} from "../../../middleware";
 import Submission from "snoowrap/dist/objects/Submission";
 import winston from 'winston';
-import {COMMENT_URL_ID, parseLinkIdentifier, parseRedditThingsFromLink, SUBMISSION_URL_ID} from "../../../../../util";
+import {
+    COMMENT_URL_ID,
+    parseLinkIdentifier,
+    parseRedditEntity,
+    parseRedditThingsFromLink,
+    SUBMISSION_URL_ID
+} from "../../../../../util";
 import {booleanMiddle} from "../../../../Common/middleware";
 import {Manager} from "../../../../../Subreddit/Manager";
 import {ActionedEvent} from "../../../../../Common/interfaces";
@@ -282,14 +288,16 @@ const addGuestMod = async (req: Request, res: Response) => {
     const managerRepo = req.serverBot.database.getRepository(ManagerEntity);
     const authorRepo = req.serverBot.database.getRepository(AuthorEntity);
 
+    const cleanName = parseRedditEntity(name, 'user').name as string;
+
     let user = await authorRepo.findOne({
         where: {
-            name: name as string,
+            name: cleanName,
         }
     });
 
     if(user === null) {
-        user = await authorRepo.save(new AuthorEntity({name}))
+        user = await authorRepo.save(new AuthorEntity({cleanName}))
     }
 
     // TODO this is not using the right time?
@@ -299,7 +307,7 @@ const addGuestMod = async (req: Request, res: Response) => {
     for(const m of managers) {
         const filteredGuests = m.managerEntity.addGuest({author: user, expiresAt});
         newGuests.set(m.displayLabel, filteredGuests.map(x => guestEntityToApiGuest(x)));
-        m.logger.info(`Added ${name} from Guest Mods`, {user: userName});
+        m.logger.info(`Added ${cleanName} from Guest Mods`, {user: userName});
     }
     await managerRepo.save(managers.map(x => x.managerEntity));
 
