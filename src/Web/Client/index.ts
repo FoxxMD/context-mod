@@ -750,7 +750,7 @@ const webClient = async (options: OperatorConfig) => {
                 if(x.operators.includes(user.name)) {
                     return true;
                 }
-                return intersect(user.subreddits, x.subreddits).length > 0;
+                return x.bots.some(y => y.canUserAccessBot(user.name, user.subreddits));
             });
 
             if(accessibleInstance === undefined) {
