@@ -636,10 +636,6 @@ actions:
     reasonId: '2n0f4674-365e-46d2-8fc7-a337d85d5340' # optional, the ID of a removal reason to add to the removal action (new reddit only)
 ```
 
-#### What About Removal Reason?
-
-Reddit does not support setting a removal reason through the API. Please complain in [r/modsupport](https://www.reddit.com/r/modsupport) or [r/redditdev](https://www.reddit.com/r/redditdev) to help get this added :)
-
 ### Report
 
 Report the Activity being processed. [Schema Documentation](https://json-schema.app/view/%23/%23%2Fdefinitions%2FSubmissionCheckJson/%23%2Fdefinitions%2FReportActionJson?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Freddit-context-bot%2Fedge%2Fsrc%2FSchema%2FApp.json)
