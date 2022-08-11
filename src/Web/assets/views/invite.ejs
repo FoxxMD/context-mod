@@ -8,7 +8,14 @@
             <div class="bg-gray-600">
                 <div class="p-6 md:px-10 md:py-6">
                     <div class="text-xl mb-4">Hi! Looks like you're accepting an invite to authorize an account to run on this ContextMod instance:</div>
-                    <div class="text-lg text-semibold my-3">1. Review permissions</div>
+                    <div class="text-lg text-semibold my-3">1. Visit this page while <strong>logged in to the Reddit account that will be the bot</strong>
+                    </div>
+                    <div class="ml-5">
+                        <div class="space-y-3">
+                            <div>Protip: Login to Reddit in an Incognito session, then open this URL in a new tab.</div>
+                        </div>
+                    </div>
+                    <div class="text-lg text-semibold my-3">2. Review permissions</div>
                     <div class="my-2 ml-5">
                         <div class="space-y-3">
                             <div>These are permissions to allow the bot account to perform these actions, <b>in
@@ -140,14 +147,21 @@
                             </div>
                         </div>
                     </div>
-                    <div class="text-lg text-semibold my-3">2. Login to Reddit with the account that will be the bot
-                    </div>
-                    <div class="ml-5">
+                    <div class="text-lg text-semibold my-3">3. Choose initial Guest Access</div>
+                    <div class="my-2 ml-5">
                         <div class="space-y-3">
-                            <div>Protip: Login to Reddit in an Incognito session, then open this URL in a new tab.</div>
+                            <div><b>Guests</b> are Reddit users who are NOT moderators of your Subreddits but can still access the Bot's dashboard and modify its configuration. They <strong>only</strong> have access to ContextMod -- not your subreddit in general.</div>
+                            <div>Guest are useful when a reddit user who is not a moderator of your subreddits is helping setup configurations for your bot. Usually this is the Operator of this CM server.</div>
+                            <div>Users specified below will be added to all Subreddits for <strong>24 hours</strong> after which they will be automatically removed. You can manually remove Guest from any/all subreddits at any time from the dashboard.</div>
+                            <input id="guestMods" disabled style="max-width:800px; display: block;"
+                                   class="text-black placeholder-gray-500 rounded mt-2 mb-3 p-2 w-full"
+                                   placeholder="RedditUser1,RedditUser2" value="<%- guests %>">
+                            <% if(guests.length > 0) { %>
+                                <div><strong>Note:</strong> The user(s) above have been pre-filled by the Operator of this server.</div>
+                            <% } %>
                         </div>
                     </div>
-                    <div class="text-lg text-semibold my-3">3. <a id="doAuth" href="">Authorize the account</a>
+                    <div class="text-lg text-semibold my-3">4. <a id="doAuth" href="">Authorize the account</a>
                     </div>
                 </div>
             </div>

@@ -153,6 +153,7 @@ export interface InviteData {
     overwrite?: boolean
     initialConfig?: string
     expiresAt?: number | Dayjs
+    guests?: string[]
 }
 
 export interface SubredditInviteData {

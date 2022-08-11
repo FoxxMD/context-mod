@@ -6,6 +6,7 @@ import LoggedError from "../../../../../Utils/LoggedError";
 import {open} from 'fs/promises';
 import {buildBotConfig} from "../../../../../ConfigBuilder";
 import {BotInvite} from "../../../../../Common/Entities/BotInvite";
+import dayjs from 'dayjs';
 
 const addBot = () => {
 
@@ -89,6 +90,9 @@ const addBot = () => {
                     req.botApp.logger.error(err);
                 }
             });
+            if(invite !== undefined && invite.guests !== undefined && invite.guests.length > 0) {
+                await newBot.addGuest(invite.guests, dayjs().add(1, 'day'));
+            }
         } catch (err: any) {
             req.botApp.logger.error(`Bot ${newBot.botName} cannot recover from this error and must be re-built`);
             if (!err.logged || !(err instanceof LoggedError)) {

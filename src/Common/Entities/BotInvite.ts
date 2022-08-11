@@ -28,6 +28,9 @@ export class BotInvite extends TimeAwareRandomBaseEntity implements InviteData {
     @Column()
     overwrite?: boolean;
 
+    @Column("simple-json")
+    guests?: string[]
+
     @Column("text")
     initialConfig?: string
 
@@ -64,6 +67,7 @@ export class BotInvite extends TimeAwareRandomBaseEntity implements InviteData {
             this.creator = data.creator;
             this.overwrite = data.overwrite;
             this.initialConfig = data.initialConfig;
+            this.guests = data.guests;
 
             if (data.expiresAt !== undefined && data.expiresAt !== 0) {
                 this.expiresAt = dayjs(data.expiresAt);

@@ -168,7 +168,7 @@
             saveLink.classList.remove('isDisabled');
             saveLink.href = '#';
             if(window.isGuest && !saveLink.innerHTML.includes('guest')) {
-                saveLink.innerHTML = `${saveLink.innerHTML} as Guest Mod`;
+                saveLink.innerHTML = `${saveLink.innerHTML} as Guest`;
             }
             document.querySelector('#reason').style.display = 'initial';
         } else {

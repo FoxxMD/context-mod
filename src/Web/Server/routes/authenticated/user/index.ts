@@ -202,21 +202,11 @@ export const cancelDelayedRoute = [authUserCheck(), botRoute(), subredditRoute(t
 const removeGuestMod = async (req: Request, res: Response) => {
 
     const {name} = req.query as any;
-    const {name: userName} = req.user as Express.User;
 
     const isAll = req.manager === undefined;
-
     const managers = (isAll ? req.user?.getModeratedSubreddits(req.serverBot) : [req.manager as Manager]) as Manager[];
 
-    const managerRepo = req.serverBot.database.getRepository(ManagerEntity);
-
-    let newGuests = new Map<string, Guest[]>();
-    for(const m of managers) {
-        const filteredGuests = m.managerEntity.removeGuestByUser(name);
-        newGuests.set(m.displayLabel, filteredGuests.map(x => guestEntityToApiGuest(x)));
-        m.logger.info(`Removed ${name} from Guest Mods`, {user: userName});
-    }
-    await managerRepo.save(managers.map(x => x.managerEntity));
+    const newGuests = await req.serverBot.removeGuest(name, managers.map(x => x.subreddit.display_name));
 
     const guests = isAll ? guestEntitiesToAll(newGuests) : Array.from(newGuests.values()).flat(3);
 
@@ -228,13 +218,13 @@ export const removeGuestModRoute = [authUserCheck(), botRoute(), subredditRoute(
 const addGuestMod = async (req: Request, res: Response) => {
 
     const {name, time} = req.query as any;
-    const {name: userName} = req.user as Express.User;
 
     const isAll = req.manager === undefined;
-
     const managers = (isAll ? req.user?.getModeratedSubreddits(req.serverBot) : [req.manager as Manager]) as Manager[];
 
-    const newGuests = await req.serverBot.addGuest(managers, name, Number.parseInt(time), userName);
+    const expiresAt = dayjs(Number.parseInt(time));
+
+    const newGuests = await req.serverBot.addGuest(name, expiresAt, managers.map(x => x.subreddit.display_name));
 
     const guests = isAll ? guestEntitiesToAll(newGuests) : Array.from(newGuests.values()).flat(3);
 

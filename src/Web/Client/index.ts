@@ -531,6 +531,7 @@ const webClient = async (options: OperatorConfig) => {
             }).json() as InviteData;
 
             return res.render('invite', {
+                guests: invite.guests !== undefined && invite.guests.length > 0 ? invite.guests.join(',') : '',
                 permissions: JSON.stringify(invite.permissions || []),
                 invite: inviteId,
             });
@@ -548,6 +549,7 @@ const webClient = async (options: OperatorConfig) => {
             redirect: redir,
             instance,
             subreddits,
+            guests,
         } = req.body as any;
 
         const cid = ci || clientId;
@@ -572,6 +574,7 @@ const webClient = async (options: OperatorConfig) => {
             instance,
             subreddits: subreddits.trim() === '' ? [] : subreddits.split(',').map((x: string) => parseRedditEntity(x).name),
             creator: (req.user as Express.User).name,
+            guests
         };
         const cmInstance = cmInstances.find(x => x.friendly === instance);
         if(cmInstance === undefined) {
