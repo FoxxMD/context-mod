@@ -120,7 +120,7 @@ import {
 } from "../Common/Infrastructure/Filters/FilterCriteria";
 import {
     ActivitySource, ConfigFragmentValidationFunc, DurationVal,
-    EventRetentionPolicyRange,
+    EventRetentionPolicyRange, ImageHashCacheData,
     JoinOperands,
     ModActionType,
     ModeratorNameCriteria, ModUserNoteLabel, statFrequencies, StatisticFrequency,
@@ -146,7 +146,7 @@ import {
     ActivityType,
     AuthorHistorySort,
     CachedFetchedActivitiesResult, FetchedActivitiesResult,
-    SnoowrapActivity
+    SnoowrapActivity, SubredditRemovalReason
 } from "../Common/Infrastructure/Reddit";
 import {AuthorCritPropHelper} from "../Common/Infrastructure/Filters/AuthorCritPropHelper";
 import {NoopLogger} from "../Utils/loggerFactory";
@@ -3353,14 +3353,19 @@ export class SubredditResources {
         return he.decode(Mustache.render(footerRawContent, {subName, permaLink, modmailLink, botLink: BOT_LINK}));
     }
 
-    async getImageHash(img: ImageData): Promise<string|undefined> {
-        const hash = `imgHash-${img.baseUrl}`;
+    async getImageHash(img: ImageData): Promise<ImageHashCacheData|undefined> {
+        const hash = `imgHash-${img.basePath}`;
         const result = await this.cache.get(hash) as string | undefined | null;
         this.stats.cache.imageHash.requests++
         this.stats.cache.imageHash.requestTimestamps.push(Date.now());
         await this.stats.cache.imageHash.identifierRequestCount.set(hash, (await this.stats.cache.imageHash.identifierRequestCount.wrap(hash, () => 0) as number) + 1);
         if(result !== undefined && result !== null) {
-            return result;
+            try {
+                return JSON.parse(result) as ImageHashCacheData
+            } catch (e) {
+                // may have old values, fallback to only original
+                return {original: result};
+            }
         }
         this.stats.cache.commentCheck.miss++;
         return undefined;
@@ -3371,8 +3376,8 @@ export class SubredditResources {
         // return hash;
     }
 
-    async setImageHash(img: ImageData, hash: string, ttl: number): Promise<void> {
-        await this.cache.set(`imgHash-${img.baseUrl}`, hash, {ttl});
+    async setImageHash(img: ImageData, ttl: number): Promise<void> {
+        await this.cache.set(`imgHash-${img.basePath}`, img.toHashCache(), {ttl});
         // const hash = await this.cache.wrap(img.baseUrl, async () => await img.hash(true), { ttl }) as string;
         // if(img.hashResult === undefined) {
         //     img.hashResult = hash;
@@ -3385,6 +3390,21 @@ export class SubredditResources {
             return this.thirdPartyCredentials[name];
         }
         return undefined;
+    }
+
+    async getSubredditRemovalReasons(): Promise<SubredditRemovalReason[]> {
+        if(this.wikiTTL !== false) {
+            return await this.cache.wrap(`removalReasons`, async () => {
+                const res = await this.client.getSubredditRemovalReasons(this.subreddit.display_name);
+                return Object.values(res.data);
+            }, { ttl: this.wikiTTL }) as SubredditRemovalReason[];
+        }
+        const res = await this.client.getSubredditRemovalReasons(this.subreddit.display_name);
+        return Object.values(res.data);
+    }
+
+    async getSubredditRemovalReasonById(id: string): Promise<SubredditRemovalReason | undefined> {
+        return (await this.getSubredditRemovalReasons()).find(x => x.id === id);
     }
 }
 

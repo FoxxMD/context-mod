@@ -676,14 +676,12 @@ const webClient = async (options: OperatorConfig) => {
             return res.status(404).render('error', {error: msg});
         }
 
-        if (req.params.subreddit !== undefined && !req.user?.isInstanceOperator(instance) && !req.user?.subreddits.includes(req.params.subreddit)) {
+        if (req.params.subreddit !== undefined && !req.user?.canAccessSubreddit(instance,req.params.subreddit)) {
             return res.status(404).render('error', {error: msg});
         }
         req.instance = instance;
         req.session.botId = instance.getName();
-        if(req.user?.canAccessInstance(instance)) {
-            req.session.authBotId = instance.getName();
-        }
+        req.session.authBotId = instance.getName();
         return next();
     }
 
@@ -722,7 +720,7 @@ const webClient = async (options: OperatorConfig) => {
                 return res.status(404).render('error', {error: msg});
             }
 
-            if (req.params.subreddit !== undefined && !req.user?.isInstanceOperator(instance) && !req.user?.subreddits.includes(req.params.subreddit)) {
+            if (req.params.subreddit !== undefined && !req.user?.canAccessSubreddit(instance,req.params.subreddit)) {
                 return res.status(404).render('error', {error: msg});
             }
             req.bot = botInstance;
@@ -787,7 +785,7 @@ const webClient = async (options: OperatorConfig) => {
                 if(x.operators.includes(user.name)) {
                     return true;
                 }
-                return intersect(user.subreddits, x.subreddits).length > 0;
+                return x.bots.some(y => y.canUserAccessBot(user.name, user.subreddits));
             });
 
             if(accessibleInstance === undefined) {

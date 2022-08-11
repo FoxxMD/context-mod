@@ -4678,7 +4678,16 @@
                     "pattern": "^[a-zA-Z]([\\w -]*[\\w])?$",
                     "type": "string"
                 },
+                "note": {
+                    "description": "(Optional) A mod-readable note added to the removal reason for this Activity. Can use Templating.\n\nThis note (and removal reasons) are only visible on New Reddit",
+                    "type": "string"
+                },
+                "reasonId": {
+                    "description": "(Optional) The ID of the Removal Reason to use\n\nRemoval reasons are only visible on New Reddit\n\nTo find IDs for removal reasons check the \"Removal Reasons\" popup located in the CM dashboard config editor for your subreddit\n\nMore info on Removal Reasons: https://mods.reddithelp.com/hc/en-us/articles/360010094892-Removal-Reasons",
+                    "type": "string"
+                },
                 "spam": {
+                    "description": "(Optional) Mark Activity as spam",
                     "type": "boolean"
                 }
             },

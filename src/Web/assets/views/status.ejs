@@ -26,7 +26,7 @@
                         <% bot.subreddits.forEach(function (data){ %>
                         <div class="sub <%= bot.system.running ? '' : 'offline' %>" data-subreddit="<%= data.name %>" data-bot="<%= bot.system.name %>">
                             <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-3 gap-5">
-                                <div class="bg-white shadow-md rounded my-3 bg-gray-600 ">
+                                <div class="bg-white shadow-md rounded my-3 bg-gray-600 overviewContainer">
                                     <div class="space-x-4 px-4 p-2 leading-2 font-semibold bg-gray-300 bg-gray-700 ">
                                         <div class="flex items-center justify-between">
                                             <h4>Overview</h4>
@@ -308,7 +308,7 @@
                                     </div>
                                 </div>
                                 <% if (data.name === 'All') { %>
-                                    <div class="bg-white shadow-md rounded my-3 bg-gray-600 ">
+                                    <div class="bg-white shadow-md rounded my-3 bg-gray-600 configContainer">
                                         <div class="space-x-4 px-4 p-2 leading-2 font-semibold bg-gray-300 bg-gray-700 ">
                                             <h4>API</h4>
                                         </div>
@@ -368,7 +368,7 @@
                                     </div>
                                 <% } %>
                                 <% if (data.name !== 'All') { %>
-                                    <div class="bg-white shadow-md rounded my-3 bg-gray-600 ">
+                                    <div class="bg-white shadow-md rounded my-3 bg-gray-600 configContainer">
                                         <div class="space-x-4 px-4 p-2 leading-2 font-semibold bg-gray-700 ">
                                             <h4>Config
                                                     <span class="has-tooltip">
@@ -385,7 +385,7 @@
                                                 <span class="font-semibold validConfig"><%= data.validConfig %></span>
                                                 <label>Checks</label>
                                                 <span><span class="submissionCheckCount"><%= data.checks.submissions %></span> Submission | <span class="commentCheckCount"><%= data.checks.comments %></span> Comment </span>
-                                                <label>Dry Run</label>
+                                                <label class="dryRunLabel">Dry Run</label>
                                                 <span><%= data.dryRun %></span>
                                                 <label>Updated</label>
                                                 <span class="has-tooltip">
@@ -411,14 +411,14 @@
                                                 <label>Location</label>
                                                 <span>
                                                     <a style="display: inline"
-                                                       href="<%= data.wikiHref %>"><%= data.wikiLocation %></a> | <a style="display: inline" target="_blank"
+                                                       href="<%= data.wikiHref %>"><%= data.wikiLocation %></a> | <a class="openConfig" style="display: inline" target="_blank"
                                                                                                                      href="/config?format=<%= data.configFormat %>&instance=<%= instanceId %>&bot=<%= bot.system.name %>&subreddit=<%= data.name %>">View</a>
                                                 </span>
                                             </div>
                                         </div>
                                     </div>
                                 <% } %>
-                                <div class="bg-white shadow-md rounded my-3 bg-gray-600 ">
+                                <div class="bg-white shadow-md rounded my-3 bg-gray-600 usageContainer">
                                     <div class="space-x-4 px-4 p-2 leading-2 font-semibold bg-gray-700 ">
                                         <h4>Usage</h4>
                                     </div>
@@ -453,9 +453,9 @@
                                                     </span>
                                                 </div>
                                                 <% if (data.name !== 'All') { %>
-                                                    <a target="_blank" href="/events?instance=<%= instanceId %>&bot=<%= bot.system.name %>&subreddit=<%= data.name %>" style="text-decoration-style: dotted">Actioned Events</a>
+                                                    <a class="openActioned" target="_blank" href="/events?instance=<%= instanceId %>&bot=<%= bot.system.name %>&subreddit=<%= data.name %>" style="text-decoration-style: dotted">Actioned Events</a>
                                                 <% } else { %>
-                                                    <a target="_blank" href="/events?instance=<%= instanceId %>&bot=<%= bot.system.name %>">Actioned Events</a>
+                                                    <a class="openActioned" target="_blank" href="/events?instance=<%= instanceId %>&bot=<%= bot.system.name %>">Actioned Events</a>
                                                 <% } %>
                                             </div>
                                             <div>
@@ -656,7 +656,7 @@
                             </div>
                             <br/>
                             <div class="flex items-center justify-between flex-wrap">
-                                <div class="inline-flex items-center">
+                                <div class="inline-flex items-center runBotOnThing">
                                     <div class="relative" style="width:550px; display: inline-block;">
                                     <input data-subreddit="<%= data.name %>"
                                            style="width: 100%;"
@@ -716,6 +716,7 @@
     window.sort = 'desc';
 
     const isOperator = <%= isOperator %>;
+    window.isOperator = <%= isOperator %>;
 
     document.querySelectorAll('.action').forEach(el => {
         el.addEventListener('click', e => {
@@ -1661,5 +1662,7 @@
         document.body.classList.remove('connected');
     });
 </script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/intro.js/6.0.0/intro.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="/public/statusTour.js"></script>
 </body>
 </html>

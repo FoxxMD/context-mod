@@ -2831,6 +2831,11 @@ export const resolvePath = (pathVal: string, relativeRoot: string) => {
     return pathUtil.resolve(relativeRoot, pathVal);
 }
 
+export const getExtension = (pathVal: string) => {
+    const pathInfo = pathUtil.parse(pathVal);
+    return pathInfo.ext;
+}
+
 export const resolvePathFromEnvWithRelative = (pathVal: any, relativeRoot: string, defaultVal?: string) => {
     if (pathVal === undefined || pathVal === null) {
         return defaultVal;

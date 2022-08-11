@@ -1,15 +1,17 @@
 import fetch from "node-fetch";
 import {Submission} from "snoowrap/dist/objects";
 import {URL} from "url";
-import {absPercentDifference, getSharpAsync, isValidImageURL} from "../util";
+import {absPercentDifference, getExtension, getSharpAsync, isValidImageURL} from "../util";
 import {Sharp} from "sharp";
-import {blockhash} from "./blockhash/blockhash";
-import {SimpleError} from "../Utils/Errors";
+import {blockhashAndFlipped} from "./blockhash/blockhash";
+import {CMError, SimpleError} from "../Utils/Errors";
+import {FileHandle, open} from "fs/promises";
+import {ImageHashCacheData} from "./Infrastructure/Atomic";
 
 export interface ImageDataOptions {
     width?: number,
     height?: number,
-    url: string,
+    path: URL,
     variants?: ImageData[]
 }
 
@@ -17,19 +19,20 @@ class ImageData {
 
     width?: number
     height?: number
-    url: URL
+    path: URL
     variants: ImageData[] = []
     preferredResolution?: [number, number]
     sharpImg!: Sharp
     hashResult!: string
+    hashResultFlipped!: string
     actualResolution?: [number, number]
 
     constructor(data: ImageDataOptions, aggressive = false) {
         this.width = data.width;
         this.height = data.height;
-        this.url = new URL(data.url);
-        if (!aggressive && !isValidImageURL(`${this.url.origin}${this.url.pathname}`)) {
-            throw new Error('URL did not end with a valid image extension');
+        this.path = data.path;
+        if (!aggressive && !isValidImageURL(`${this.path.origin}${this.path.pathname}`)) {
+            throw new Error('Path did not end with a valid image extension');
         }
         this.variants = data.variants || [];
     }
@@ -40,54 +43,89 @@ class ImageData {
     }
 
     async hash(bits: number, useVariantIfPossible = true): Promise<string> {
-        if(this.hashResult === undefined) {
+        if (this.hashResult === undefined) {
             let ref: ImageData | undefined;
-            if(useVariantIfPossible && this.preferredResolution !== undefined) {
+            if (useVariantIfPossible && this.preferredResolution !== undefined) {
                 ref = this.getSimilarResolutionVariant(this.preferredResolution[0], this.preferredResolution[1]);
             }
-            if(ref === undefined) {
+            if (ref === undefined) {
                 ref = this;
             }
-            this.hashResult = await blockhash((await ref.sharp()).clone(), bits);
+            const [hash, hashFlipped] = await blockhashAndFlipped((await ref.sharp()).clone(), bits);
+            this.hashResult = hash;
+            this.hashResultFlipped = hashFlipped;
         }
         return this.hashResult;
     }
 
     async sharp(): Promise<Sharp> {
         if (this.sharpImg === undefined) {
+            let animated = false;
+            let getBuffer: () => Promise<Buffer>;
+            let fileHandle: FileHandle | undefined;
             try {
-                const response = await fetch(this.url.toString())
-                if (response.ok) {
-                    const ct = response.headers.get('Content-Type');
-                    if (ct !== null && ct.includes('image')) {
-                        const sFunc = await getSharpAsync();
-                        // if image is animated then we want to extract the first frame and convert it to a regular image
-                        // so we can compare two static images later (also because sharp can't use resize() on animated images)
-                        if(['gif','webp'].some(x => ct.includes(x))) {
-                            this.sharpImg = await sFunc(await (await sFunc(await response.buffer(), {pages: 1, animated: false})).png().toBuffer());
-                        } else {
-                            this.sharpImg = await sFunc(await response.buffer());
-                        }
-                        const meta = await this.sharpImg.metadata();
-                        if (this.width === undefined || this.height === undefined) {
-                            this.width = meta.width;
-                            this.height = meta.height;
-                        }
-                        this.actualResolution = [meta.width as number, meta.height as number];
-                    } else {
-                        throw new SimpleError(`Content-Type for fetched URL ${this.url} did not contain "image"`);
+                if (this.path.protocol === 'file:') {
+                    try {
+                        animated = ['gif', 'webp'].includes(getExtension(this.path.pathname));
+                        fileHandle = await open(this.path, 'r');
+                        getBuffer = async () => await (fileHandle as FileHandle).readFile();
+                    } catch (err: any) {
+                        throw new CMError(`Unable to retrieve local file ${this.path.toString()}`, {cause: err});
                     }
                 } else {
-                    throw new SimpleError(`URL response was not OK: (${response.status})${response.statusText}`);
+                    try {
+                        const response = await fetch(this.path.toString())
+                        if (response.ok) {
+                            const ct = response.headers.get('Content-Type');
+                            if (ct !== null && ct.includes('image')) {
+                                animated = ['gif', 'webp'].some(x => ct.includes(x));
+                                getBuffer = async () => await response.buffer();
+                            } else {
+                                throw new SimpleError(`Content-Type for fetched URL ${this.path.toString()} did not contain "image"`);
+                            }
+                        } else {
+                            throw new SimpleError(`Fetching ${this.path.toString()} => URL response was not OK: (${response.status})${response.statusText}`);
+                        }
+
+                    } catch (err: any) {
+                        if (!(err instanceof SimpleError)) {
+                            throw new CMError(`Error occurred while fetching response from URL ${this.path.toString()}`, {cause: err});
+                        } else {
+                            throw err;
+                        }
+                    }
+                }
+            } catch (err: any) {
+                throw new CMError('Unable to fetch image resource', {cause: err, isSerious: false});
+            }
+
+            try {
+
+                const sFunc = await getSharpAsync();
+                // if image is animated then we want to extract the first frame and convert it to a regular image
+                // so we can compare two static images later (also because sharp can't use resize() on animated images)
+                if (animated) {
+                    this.sharpImg = await sFunc(await (await sFunc(await getBuffer(), {
+                        pages: 1,
+                        animated: false
+                    }).trim().greyscale()).png().withMetadata().toBuffer());
+                } else {
+                    this.sharpImg = await sFunc(await sFunc(await getBuffer()).trim().greyscale().withMetadata().toBuffer());
                 }
 
+                if(fileHandle !== undefined) {
+                    await fileHandle.close();
+                }
+
+                const meta = await this.sharpImg.metadata();
+                if (this.width === undefined || this.height === undefined) {
+                    this.width = meta.width;
+                    this.height = meta.height;
+                }
+                this.actualResolution = [meta.width as number, meta.height as number];
 
             } catch (err: any) {
-                if(!(err instanceof SimpleError)) {
-                    throw new Error(`Error occurred while fetching response from URL: ${err.message}`);
-                } else {
-                    throw err;
-                }
+                throw new CMError('Error occurred while converting image buffer to Sharp object', {cause: err});
             }
         }
         return this.sharpImg;
@@ -107,8 +145,8 @@ class ImageData {
         return this.width !== undefined && this.height !== undefined;
     }
 
-    get baseUrl() {
-        return `${this.url.origin}${this.url.pathname}`;
+    get basePath() {
+        return `${this.path.origin}${this.path.pathname}`;
     }
 
     setPreferredResolutionByWidth(prefWidth: number) {
@@ -225,6 +263,13 @@ class ImageData {
         return [refSharp, compareSharp, width, height];
     }
 
+    toHashCache(): ImageHashCacheData {
+        return {
+            original: this.hashResult,
+            flipped: this.hashResultFlipped
+        }
+    }
+
     static fromSubmission(sub: Submission, aggressive = false): ImageData {
         const url = new URL(sub.url);
         const data: any = {
@@ -237,7 +282,7 @@ class ImageData {
             data.width = ref.width;
             data.height = ref.height;
 
-            variants = firstImg.resolutions.map(x => new ImageData(x));
+            variants = firstImg.resolutions.map(x => new ImageData({...x, path: new URL(x.url)}));
             data.variants = variants;
         }
         return new ImageData(data, aggressive);

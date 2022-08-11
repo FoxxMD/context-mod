@@ -186,3 +186,7 @@ li > ul {
     margin-left: -10px;
     content: ""
 }
+
+.introjs-tooltip-title,.introjs-tooltiptext {
+    color: black;
+}

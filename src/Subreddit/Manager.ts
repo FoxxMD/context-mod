@@ -1495,6 +1495,11 @@ export class Manager extends EventEmitter implements RunningStates {
 
     async startQueue(causedBy: Invokee = 'system', options?: ManagerStateChangeOption) {
 
+        if(!this.validConfigLoaded) {
+            this.logger.warn('Cannot start queue while manager has an invalid configuration');
+            return;
+        }
+
         if(this.activityRepo === undefined) {
             this.activityRepo = this.resources.database.getRepository(Activity);
         }

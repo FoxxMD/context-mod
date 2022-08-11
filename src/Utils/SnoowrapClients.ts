@@ -3,7 +3,8 @@ import {Submission, Subreddit, Comment} from "snoowrap/dist/objects";
 import {parseSubredditName} from "../util";
 import {ModUserNoteLabel} from "../Common/Infrastructure/Atomic";
 import {CreateModNoteData, ModNote, ModNoteRaw, ModNoteSnoowrapPopulated} from "../Subreddit/ModNotes/ModNote";
-import {SimpleError} from "./Errors";
+import {CMError, SimpleError} from "./Errors";
+import {RawSubredditRemovalReasonData, SnoowrapActivity} from "../Common/Infrastructure/Reddit";
 
 // const proxyFactory = (endpoint: string) => {
 //     return class ProxiedSnoowrap extends Snoowrap {
@@ -139,6 +140,47 @@ export class ExtendedSnoowrap extends Snoowrap {
             form: requestData
         }) as { created: ModNoteRaw };
         return new ModNote(response.created, this);
+    }
+
+    /**
+     * Add a removal reason and/or mod note to a REMOVED Activity
+     *
+     * The activity must already be removed for this call to succeed. This is an UNDOCUMENTED endpoint.
+     *
+     * @see https://github.com/praw-dev/praw/blob/b22e1f514d68d36545daf62e8a8d6c6c8caf782b/praw/endpoints.py#L149 for endpoint
+     * @see https://github.com/praw-dev/praw/blob/b22e1f514d68d36545daf62e8a8d6c6c8caf782b/praw/models/reddit/mixins/__init__.py#L28 for usage
+     * */
+    async addRemovalReason(item: SnoowrapActivity, note?: string, reason?: string) {
+        try {
+            if(note === undefined && reason === undefined) {
+                throw new CMError(`Must provide either a note or reason in order to add removal reason on Activity ${item.name}`, {isSerious: false});
+            }
+            await this.oauthRequest({
+                uri: 'api/v1/modactions/removal_reasons',
+                method: 'post',
+                body: {
+                    item_ids: [item.name],
+                    mod_note: note ?? null,
+                    reason_id: reason ?? null,
+                },
+            });
+        } catch(e: any) {
+            throw e;
+        }
+    }
+
+    /**
+     * Get a list of New Reddit removal reasons for a Subreddit
+     *
+     * This is an UNDOCUMENTED endpoint.
+     *
+     * @see https://github.com/praw-dev/praw/blob/b22e1f514d68d36545daf62e8a8d6c6c8caf782b/praw/endpoints.py#L151 for endpoint
+     * */
+    async getSubredditRemovalReasons(sub: Subreddit | string): Promise<RawSubredditRemovalReasonData> {
+        return await this.oauthRequest({
+            uri: `api/v1/${typeof sub === 'string' ? sub : sub.display_name}/removal_reasons`,
+            method: 'get'
+        }) as RawSubredditRemovalReasonData;
     }
 }
 

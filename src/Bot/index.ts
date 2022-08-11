@@ -1140,7 +1140,7 @@ class Bot implements BotInstanceFunctions {
     }
 
     getAccessibleSubreddits(user: string, subreddits: string[] = []): string[] {
-        const normalSubs = subreddits.map(x => parseRedditEntity(x).name.toLowerCase());
+        const normalSubs = subreddits.map(x => parseRedditEntity(x).name);
         const moderatedSubs = intersect(normalSubs, this.getSubreddits());
         const guestSubs = this.getGuestSubreddits(user);
         return Array.from(new Set([...guestSubs, ...moderatedSubs]));

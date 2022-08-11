@@ -1,7 +1,13 @@
 import {Request, Response} from 'express';
 import {authUserCheck, botRoute, subredditRoute} from "../../../middleware";
 import winston from 'winston';
-import {COMMENT_URL_ID, parseLinkIdentifier, parseRedditThingsFromLink, SUBMISSION_URL_ID} from "../../../../../util";
+import {
+    COMMENT_URL_ID,
+    parseLinkIdentifier,
+    parseRedditEntity,
+    parseRedditThingsFromLink,
+    SUBMISSION_URL_ID
+} from "../../../../../util";
 import {booleanMiddle} from "../../../../Common/middleware";
 import {Manager} from "../../../../../Subreddit/Manager";
 import {CMEvent} from "../../../../../Common/Entities/CMEvent";
@@ -39,6 +45,14 @@ const configLocation = async (req: Request, res: Response) => {
 };
 
 export const configLocationRoute = [authUserCheck(), botRoute(), subredditRoute(), configLocation];
+
+const removalReasons = async (req: Request, res: Response) => {
+    const manager = req.manager as Manager;
+    const reasons = await manager.resources.getSubredditRemovalReasons()
+    return res.json(reasons);
+};
+
+export const removalReasonsRoute = [authUserCheck(), botRoute(), subredditRoute(), removalReasons];
 
 const actionedEvents = async (req: Request, res: Response) => {
 
