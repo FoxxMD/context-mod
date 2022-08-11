@@ -2,7 +2,7 @@
 <%- include('partials/head', {title: 'CM'}) %>
 <body class="bg-gray-900 text-white font-sans">
 <div class="min-w-screen min-h-screen">
-    <%- include('partials/title', {title: 'Migrations Required'}) %>
+    <%- include('partials/header') %>
     <div class="container mx-auto">
         <div class="grid">
             <div class="bg-gray-600">
@@ -42,6 +42,22 @@
     </div>
     <%- include('partials/footer') %>
 </div>
+<script>
+    const instanceSearchParams = new URLSearchParams(window.location.search);
+
+    const instance = instanceSearchParams.get('instance');
+
+    document.querySelectorAll(`[data-instance].instanceSelectWrapper`).forEach((el) => {
+        if(el.dataset.instance === instance) {
+            el.classList.add('border-2');
+            el.querySelector('a.instanceSelect').classList.add('pointer-events-none','no-underline','font-bold');
+        } else {
+            el.classList.add('border');
+            el.querySelector('a.instanceSelect').classList.add('font-normal','pointer');
+        }
+
+    });
+</script>
 </body>
 <script>
     document.querySelector('#run').addEventListener('click', e => {

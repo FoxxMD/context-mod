@@ -6,6 +6,7 @@ import {assign} from 'comment-json';
 
 export interface OperatorConfigDocumentInterface {
     addBot(botData: BotInstanceJsonConfig): void;
+    setFriendlyName(name: string): void;
     toJS(): OperatorJsonConfig;
 }
 
@@ -27,6 +28,14 @@ export class YamlOperatorConfigDocument extends YamlConfigDocument implements Op
         } else {
             this.parsed.addIn(['bots'], botData);
         }
+    }
+
+    setFriendlyName(name: string) {
+        const api = this.parsed.get('api') as YAMLMap;
+        if(api === undefined) {
+            this.parsed.add({key: 'api', value: {}});
+        }
+        this.parsed.setIn(['api', 'friendly'], name);
     }
 
     toJS(): OperatorJsonConfig  {
@@ -66,6 +75,11 @@ export class JsonOperatorConfigDocument extends JsonConfigDocument implements Op
         } else {
             this.parsed.bots.push(botData);
         }
+    }
+
+    setFriendlyName(name: string) {
+        const api = this.parsed.api || {};
+        this.parsed.api = {...api, friendly: name};
     }
 
     toJS(): OperatorJsonConfig {

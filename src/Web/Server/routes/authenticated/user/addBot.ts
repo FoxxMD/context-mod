@@ -5,24 +5,28 @@ import Bot from "../../../../../Bot";
 import LoggedError from "../../../../../Utils/LoggedError";
 import {open} from 'fs/promises';
 import {buildBotConfig} from "../../../../../ConfigBuilder";
+import {BotInvite} from "../../../../../Common/Entities/BotInvite";
 
 const addBot = () => {
 
     const middleware = [
-        authUserCheck(),
+        authUserCheck(['machine','operator']),
     ];
 
     const response = async (req: Request, res: Response) => {
-
-        if (!req.user?.isInstanceOperator(req.app)) {
-            return res.status(401).send("Must be an Operator to use this route");
-        }
 
         if (!req.botApp.fileConfig.isWriteable) {
             return res.status(409).send('Operator config is not writeable');
         }
 
-        const {overwrite = false, ...botData} = req.body;
+        const {overwrite = false, invite: inviteId, ...botData} = req.body;
+
+        // see if we are adding from invite
+        let invite: BotInvite | undefined;
+
+        if(inviteId !== undefined) {
+            invite = await req.botApp.getInviteById(inviteId);
+        }
 
         // check if bot is new or overwriting
         let existingBot = req.botApp.bots.find(x => x.botAccount === botData.name);
@@ -40,11 +44,19 @@ const addBot = () => {
             req.botApp.bots.splice(existingBotIndex, 1);
         }
 
+        if(invite !== undefined && invite.subreddits !== undefined) {
+            botData.subreddits = {names: invite.subreddits};
+        }
+
         req.botApp.fileConfig.document.addBot(botData);
 
         const handle = await open(req.botApp.fileConfig.document.location as string, 'w');
         await handle.writeFile(req.botApp.fileConfig.document.toString());
         await handle.close();
+
+        if(invite !== undefined) {
+            await req.botApp.deleteInvite(inviteId);
+        }
 
         const newBot = new Bot(buildBotConfig(botData, req.botApp.config), req.botApp.logger);
         req.botApp.bots.push(newBot);

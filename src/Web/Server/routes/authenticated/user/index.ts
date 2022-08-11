@@ -1,12 +1,10 @@
 import {Request, Response} from 'express';
 import {authUserCheck, botRoute, subredditRoute} from "../../../middleware";
-import Submission from "snoowrap/dist/objects/Submission";
 import winston from 'winston';
 import {COMMENT_URL_ID, parseLinkIdentifier, parseRedditThingsFromLink, SUBMISSION_URL_ID} from "../../../../../util";
 import {booleanMiddle} from "../../../../Common/middleware";
 import {Manager} from "../../../../../Subreddit/Manager";
-import {ActionedEvent} from "../../../../../Common/interfaces";
-import {CMEvent, CMEvent as ActionedEventEntity} from "../../../../../Common/Entities/CMEvent";
+import {CMEvent} from "../../../../../Common/Entities/CMEvent";
 import {nanoid} from "nanoid";
 import dayjs from "dayjs";
 import {
@@ -16,17 +14,9 @@ import {
     getFullEventsById,
     paginateRequest
 } from "../../../../Common/util";
-import {filterResultsBuilder} from "../../../../../Utils/typeormUtils";
-import {Brackets} from "typeorm";
 import {Activity} from "../../../../../Common/Entities/Activity";
-import {RedditThing} from "../../../../../Common/Infrastructure/Reddit";
-import {CMError} from "../../../../../Utils/Errors";
-import {Guest, GuestEntityData} from "../../../../../Common/Entities/Guest/GuestInterfaces";
-import {
-    guestEntitiesToAll,
-    guestEntityToApiGuest,
-    ManagerGuestEntity
-} from "../../../../../Common/Entities/Guest/GuestEntity";
+import {Guest} from "../../../../../Common/Entities/Guest/GuestInterfaces";
+import {guestEntitiesToAll, guestEntityToApiGuest} from "../../../../../Common/Entities/Guest/GuestEntity";
 import {ManagerEntity} from "../../../../../Common/Entities/ManagerEntity";
 import {AuthorEntity} from "../../../../../Common/Entities/AuthorEntity";
 
@@ -49,47 +39,6 @@ const configLocation = async (req: Request, res: Response) => {
 };
 
 export const configLocationRoute = [authUserCheck(), botRoute(), subredditRoute(), configLocation];
-
-const getInvites = async (req: Request, res: Response) => {
-
-    return res.json(await req.serverBot.cacheManager.getPendingSubredditInvites());
-};
-
-export const getInvitesRoute = [authUserCheck(), botRoute(), getInvites];
-
-const addInvite = async (req: Request, res: Response) => {
-
-    const {subreddit} = req.body as any;
-    if (subreddit === undefined || subreddit === null || subreddit === '') {
-        return res.status(400).send('subreddit must be defined');
-    }
-    try {
-        await req.serverBot.cacheManager.addPendingSubredditInvite(subreddit);
-    } catch (e: any) {
-        if(e instanceof CMError) {
-            req.logger.warn(e);
-            return res.status(400).send(e.message);
-        } else {
-            req.logger.error(e);
-            return res.status(500).send(e.message);
-        }
-    }
-    return res.status(200).send();
-};
-
-export const addInviteRoute = [authUserCheck(), botRoute(), addInvite];
-
-const deleteInvite = async (req: Request, res: Response) => {
-
-    const {subreddit} = req.query as any;
-    if (subreddit === undefined || subreddit === null || subreddit === '') {
-        return res.status(400).send('subreddit must be defined');
-    }
-    await req.serverBot.cacheManager.deletePendingSubredditInvite(subreddit);
-    return res.status(200).send();
-};
-
-export const deleteInviteRoute = [authUserCheck(), botRoute(), deleteInvite];
 
 const actionedEvents = async (req: Request, res: Response) => {
 
@@ -271,29 +220,7 @@ const addGuestMod = async (req: Request, res: Response) => {
 
     const managers = (isAll ? req.user?.getModeratedSubreddits(req.serverBot) : [req.manager as Manager]) as Manager[];
 
-    const managerRepo = req.serverBot.database.getRepository(ManagerEntity);
-    const authorRepo = req.serverBot.database.getRepository(AuthorEntity);
-
-    let user = await authorRepo.findOne({
-        where: {
-            name: name as string,
-        }
-    });
-
-    if(user === null) {
-        user = await authorRepo.save(new AuthorEntity({name}))
-    }
-
-    // TODO this is not using the right time?
-    const expiresAt = dayjs(Number.parseInt(time));
-
-    let newGuests = new Map<string, Guest[]>();
-    for(const m of managers) {
-        const filteredGuests = m.managerEntity.addGuest({author: user, expiresAt});
-        newGuests.set(m.displayLabel, filteredGuests.map(x => guestEntityToApiGuest(x)));
-        m.logger.info(`Added ${name} from Guest Mods`, {user: userName});
-    }
-    await managerRepo.save(managers.map(x => x.managerEntity));
+    const newGuests = await req.serverBot.addGuest(managers, name, Number.parseInt(time), userName);
 
     const guests = isAll ? guestEntitiesToAll(newGuests) : Array.from(newGuests.values()).flat(3);
 

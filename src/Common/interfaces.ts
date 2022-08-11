@@ -1480,20 +1480,6 @@ export interface OperatorJsonConfig {
         }
 
         /**
-         * Settings related to oauth flow invites
-         * */
-        invites?: {
-            /**
-            * Number of seconds an invite should be valid for
-             *
-             * If `0` or not specified (default) invites do not expire
-            *
-            * @default 0
-            * @examples [0]
-            * */
-            maxAge?: number
-        }
-        /**
          * The default log level to filter to in the web interface
          *
          * If not specified or `null` will be same as global `logLevel`
@@ -1548,6 +1534,8 @@ export interface OperatorJsonConfig {
         secret?: string,
         /**
          * A friendly name for this server. This will override `friendly` in `BotConnection` if specified.
+         *
+         * If none is set one is randomly generated.
          * */
         friendly?: string,
     }
@@ -1658,9 +1646,6 @@ export interface OperatorConfig extends OperatorJsonConfig {
             maxAge: number,
             secret?: string,
             storage?: 'database' | 'cache'
-        },
-        invites: {
-          maxAge: number
         },
         logLevel?: LogLevel,
         maxLogs: number,

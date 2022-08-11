@@ -2132,7 +2132,7 @@
             "description": "Configuration for the **Server** application. See [Architecture Documentation](https://github.com/FoxxMD/context-mod/blob/master/docs/serverClientArchitecture.md) for more info",
             "properties": {
                 "friendly": {
-                    "description": "A friendly name for this server. This will override `friendly` in `BotConnection` if specified.",
+                    "description": "A friendly name for this server. This will override `friendly` in `BotConnection` if specified.\n\nIf none is set one is randomly generated.",
                     "type": "string"
                 },
                 "port": {
@@ -2421,20 +2421,6 @@
                         },
                         "migrations": {
                             "$ref": "#/definitions/DatabaseMigrationOptions"
-                        }
-                    },
-                    "type": "object"
-                },
-                "invites": {
-                    "description": "Settings related to oauth flow invites",
-                    "properties": {
-                        "maxAge": {
-                            "default": 0,
-                            "description": "Number of seconds an invite should be valid for\n\n If `0` or not specified (default) invites do not expire",
-                            "examples": [
-                                0
-                            ],
-                            "type": "number"
                         }
                     },
                     "type": "object"

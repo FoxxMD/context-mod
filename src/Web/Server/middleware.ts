@@ -2,12 +2,26 @@ import {Request, Response, NextFunction} from "express";
 import Bot from "../../Bot";
 import ServerUser from "../Common/User/ServerUser";
 
-export const authUserCheck = (userRequired: boolean = true) => async (req: Request, res: Response, next: Function) => {
+export type AuthEntityType = 'user' | 'operator' | 'machine';
+
+export const authUserCheck = (allowedEntityTypes: AuthEntityType | AuthEntityType[] = ['user']) => async (req: Request, res: Response, next: Function) => {
+    const types = Array.isArray(allowedEntityTypes) ? allowedEntityTypes : [allowedEntityTypes];
+
     if (req.isAuthenticated()) {
-        if (userRequired && (req.user as ServerUser).machine) {
-            return res.status(403).send('Must be authenticated as a user to access this route');
+        if(types.length === 0) {
+            return next();
         }
-        return next();
+        if(types.includes('machine') && (req.user as ServerUser).machine) {
+            return next();
+        }
+        if(types.includes('operator') && req.user.isInstanceOperator(req.botApp)) {
+            return next();
+        }
+        if(types.includes('user') && !(req.user as ServerUser).machine) {
+            return next();
+        }
+        req.logger.error(`User is authenticated but does not sufficient permissions. Required: ${types.join(', ')} | User: ${req.user.name}`);
+        return res.status(403).send('Must be authenticated to access this route');
     } else {
         return res.status(401).send('Must be authenticated to access this route');
     }

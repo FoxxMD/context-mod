@@ -116,6 +116,7 @@ import {
 } from "./Common/Infrastructure/ActivityWindow";
 import {RunnableBaseJson} from "./Common/Infrastructure/Runnable";
 import Snoowrap from "snoowrap";
+import { uniqueNamesGenerator, adjectives, colors, animals } from 'unique-names-generator';
 
 
 //import {ResembleSingleCallbackComparisonResult} from "resemblejs";
@@ -2937,4 +2938,12 @@ export function partition<T>(array: T[], callback: (element: T, index: number, a
             return result;
         }, [[], []]
     );
+}
+
+export const generateRandomName = () => {
+    return uniqueNamesGenerator({
+        dictionaries: [colors, adjectives, animals],
+        style: 'capital',
+        separator: ''
+    });
 }

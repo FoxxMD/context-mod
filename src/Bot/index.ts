@@ -44,6 +44,9 @@ import {snooLogWrapper} from "../Utils/loggerFactory";
 import {InfluxClient} from "../Common/Influx/InfluxClient";
 import {Point} from "@influxdata/influxdb-client";
 import {BotInstanceFunctions, NormalizedManagerResponse} from "../Web/Common/interfaces";
+import {AuthorEntity} from "../Common/Entities/AuthorEntity";
+import {Guest} from "../Common/Entities/Guest/GuestInterfaces";
+import {guestEntitiesToAll, guestEntityToApiGuest} from "../Common/Entities/Guest/GuestEntity";
 
 class Bot implements BotInstanceFunctions {
 
@@ -1149,6 +1152,34 @@ class Bot implements BotInstanceFunctions {
 
     canUserAccessSubreddit(subreddit: string, user: string, subreddits: string[] = []): boolean {
         return this.getAccessibleSubreddits(user, subreddits).includes(parseRedditEntity(subreddit).name);
+    }
+
+    async addGuest(managersVal: Manager | Manager[], name: string | AuthorEntity, expiresAtVal: number | Dayjs, addedBy?: string) {
+
+        const authorRepo = this.database.getRepository(AuthorEntity);
+        const managerRepo = this.database.getRepository(ManagerEntity);
+
+        const managers = Array.isArray(managersVal) ? managersVal : [managersVal];
+        const expiresAt = expiresAtVal instanceof Dayjs ? expiresAtVal : dayjs(expiresAtVal);
+
+        let user = await authorRepo.findOne({
+            where: {
+                name: name as string,
+            }
+        });
+        if(user === null) {
+            user = await authorRepo.save(new AuthorEntity({name}))
+        }
+
+        let newGuests = new Map<string, Guest[]>();
+        for(const m of managers) {
+            const filteredGuests = m.managerEntity.addGuest({author: user, expiresAt});
+            newGuests.set(m.displayLabel, filteredGuests.map(x => guestEntityToApiGuest(x)));
+            m.logger.info(`Added ${name} from Guest Mods`, addedBy !== undefined ? {user: addedBy} : undefined);
+        }
+        await managerRepo.save(managers.map(x => x.managerEntity));
+
+       return newGuests;
     }
 }
 

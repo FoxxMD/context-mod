@@ -162,7 +162,7 @@
     }
     document.querySelector('#doAuth').addEventListener('click', e => {
         e.preventDefault()
-        const url = `${document.location.origin}/auth/init?invite=<%= invite %>`;
+        const url = `${document.location.origin}/auth/init/<%= invite %>`;
         window.location.href = url;
     })
 </script>

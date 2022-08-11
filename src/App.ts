@@ -4,24 +4,27 @@ import {getLogger} from "./Utils/loggerFactory";
 import {DatabaseMigrationOptions, OperatorConfig, OperatorConfigWithFileContext, OperatorFileConfig} from "./Common/interfaces";
 import Bot from "./Bot";
 import LoggedError from "./Utils/LoggedError";
-import {mergeArr, sleep} from "./util";
-import {copyFile} from "fs/promises";
+import {generateRandomName, mergeArr, sleep} from "./util";
+import {copyFile, open} from "fs/promises";
 import {constants} from "fs";
-import {Connection} from "typeorm";
+import {Connection, DataSource, Repository} from "typeorm";
 import {ErrorWithCause} from "pony-cause";
 import {MigrationService} from "./Common/MigrationService";
 import {Invokee} from "./Common/Infrastructure/Atomic";
 import {DatabaseConfig} from "./Common/Infrastructure/Database";
+import {InviteData} from "./Web/Common/interfaces";
+import {BotInvite} from "./Common/Entities/BotInvite";
 
 export class App {
 
     bots: Bot[] = [];
     logger: Logger;
     dbLogger: Logger;
-    database: Connection
+    database: DataSource
     startedAt: Dayjs = dayjs();
     ranMigrations: boolean = false;
     migrationBlocker?: string;
+    friendly?: string;
 
     config: OperatorConfig;
 
@@ -30,6 +33,7 @@ export class App {
     fileConfig: OperatorFileConfig;
 
     migrationService: MigrationService;
+    inviteRepo: Repository<BotInvite>;
 
     constructor(config: OperatorConfigWithFileContext) {
         const {
@@ -49,6 +53,8 @@ export class App {
         this.logger = getLogger(config.logging);
         this.dbLogger = this.logger.child({labels: ['Database']}, mergeArr);
         this.database = database;
+        this.inviteRepo = this.database.getRepository(BotInvite);
+        this.friendly = this.config.api.friendly;
 
         this.logger.info(`Operators: ${name.length === 0 ? 'None Specified' : name.join(', ')}`)
 
@@ -114,6 +120,8 @@ export class App {
             return;
         }
 
+        await this.checkFriendlyName();
+
         if(this.bots.length > 0) {
             this.logger.info('Bots already exist, will stop and destroy these before building new ones.');
             await this.destroy(causedBy);
@@ -160,5 +168,55 @@ export class App {
         for(const b of this.bots) {
             await b.destroy(causedBy);
         }
+    }
+
+    async checkFriendlyName() {
+        if(this.friendly === undefined) {
+            let randFriendly: string = generateRandomName();
+            this.logger.verbose(`No friendly name set for Server. Generated: ${randFriendly}`);
+
+            const exists = async (name: string) => {
+                const existing = await this.inviteRepo.findBy({instance: name});
+                return existing.length > 0;
+            }
+            while (await exists(randFriendly)) {
+                let oldFriendly = randFriendly;
+                randFriendly = generateRandomName();
+                this.logger.verbose(`${oldFriendly} already exists! Generated: ${randFriendly}`);
+            }
+
+            this.friendly = randFriendly;
+            this.fileConfig.document.setFriendlyName(this.friendly);
+
+            const handle = await open(this.fileConfig.document.location as string, 'w');
+            await handle.writeFile(this.fileConfig.document.toString());
+            await handle.close();
+            this.logger.verbose(`Wrote ${randFriendly} as friendly server name to config.`);
+        }
+    }
+
+    async getInviteById(id: string): Promise<BotInvite | undefined> {
+        const invite = await this.inviteRepo.findOne({where: {id, instance: this.friendly}});
+        if(invite === null) {
+            return undefined;
+        }
+        return invite;
+    }
+
+    async getInviteIds(): Promise<string[]> {
+        if(!this.ranMigrations) {
+            // not ready!
+            return [];
+        }
+        const invites = await this.inviteRepo.findBy({instance: this.friendly});
+        return invites.map(x => x.id);
+    }
+
+    async addInvite(data: InviteData): Promise<InviteData> {
+        return await this.inviteRepo.save(new BotInvite(data));
+    }
+
+    async deleteInvite(id: string): Promise<void> {
+        await this.inviteRepo.delete({ id });
     }
 }

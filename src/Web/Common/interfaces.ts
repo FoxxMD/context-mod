@@ -2,6 +2,7 @@ import {RunningState} from "../../Subreddit/Manager";
 import {BotConnection, LogInfo, ManagerStats} from "../../Common/interfaces";
 import {Guest, GuestAll} from "../../Common/Entities/Guest/GuestInterfaces";
 import {URL} from "url";
+import {Dayjs} from "dayjs";
 
 export interface BotStats {
     startedAtHuman: string,
@@ -127,6 +128,7 @@ export interface CMInstanceInterface extends BotConnection {
     error?: string
     ranMigrations: boolean
     migrationBlocker?: string
+    invites: string[]
 }
 
 export interface HeartbeatResponse {
@@ -136,6 +138,7 @@ export interface HeartbeatResponse {
     operatorDisplay?: string
     friendly?: string
     bots: BotInstanceResponse[]
+    invites: string[]
 }
 
 
@@ -148,4 +151,13 @@ export interface InviteData {
     redirectUri: string
     creator: string
     overwrite?: boolean
+    initialConfig?: string
+    expiresAt?: number | Dayjs
+}
+
+export interface SubredditInviteData {
+    subreddit: string
+    guests?: string[]
+    initialConfig?: string
+    expiresAt?: number | Dayjs
 }

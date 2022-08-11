@@ -3,6 +3,7 @@ import {ManagerEntity} from "./ManagerEntity";
 import {RandomIdBaseEntity} from "./Base/RandomIdBaseEntity";
 import {BotGuestEntity, ManagerGuestEntity} from "./Guest/GuestEntity";
 import {Guest, GuestEntityData, HasGuests} from "./Guest/GuestInterfaces";
+import {SubredditInvite} from "./SubredditInvite";
 
 @Entity()
 export class Bot extends RandomIdBaseEntity implements HasGuests {
@@ -15,6 +16,9 @@ export class Bot extends RandomIdBaseEntity implements HasGuests {
 
     @OneToMany(type => BotGuestEntity, obj => obj.guestOf, {eager: true, cascade: ['insert', 'remove', 'update']})
     guests!: BotGuestEntity[]
+
+    @OneToMany(type => SubredditInvite, obj => obj.bot, {eager: true, cascade: ['insert', 'remove', 'update']})
+    subredditInvites!: SubredditInvite[]
 
     getGuests() {
         const g = this.guests;
