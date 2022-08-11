@@ -1162,14 +1162,28 @@ class Bot implements BotInstanceFunctions {
         const managers = Array.isArray(managersVal) ? managersVal : [managersVal];
         const expiresAt = expiresAtVal instanceof Dayjs ? expiresAtVal : dayjs(expiresAtVal);
 
-        let user = await authorRepo.findOne({
-            where: {
-                name: name as string,
+
+
+        let user: AuthorEntity;
+
+        if(name instanceof AuthorEntity) {
+            user = name;
+        } else {
+            const cleanName = parseRedditEntity(name, 'user').name as string;
+
+            let maybeUser = await authorRepo.findOne({
+                where: {
+                    name: cleanName,
+                }
+            });
+            if(maybeUser === null) {
+                user = await authorRepo.save(new AuthorEntity({cleanName})) as AuthorEntity;
+            } else {
+                user = maybeUser;
             }
-        });
-        if(user === null) {
-            user = await authorRepo.save(new AuthorEntity({name}))
         }
+
+
 
         let newGuests = new Map<string, Guest[]>();
         for(const m of managers) {
