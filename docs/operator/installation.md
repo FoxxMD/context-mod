@@ -10,7 +10,7 @@ PROTIP: Using a container management tool like [Portainer.io CE](https://www.por
 
 ### [Dockerhub](https://hub.docker.com/r/foxxmd/context-mod)
 
-An example of starting the container using the [minimum configuration](/docs/operator/operatorConfiguration.md#minimum-config) with a [configuration file](/docs/operator/operatorConfiguration.md#defining-configuration-via-file):
+An example of starting the container using the [minimum configuration](/docs/operator/configuration.md#minimum-config):
 
 * Bind the directory where your config file, logs, and database are located on your host machine into the container's default `DATA_DIR` by using `-v /host/path/folder:/config`
 * Expose the web interface using the container port `8085`
