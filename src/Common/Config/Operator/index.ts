@@ -31,11 +31,7 @@ export class YamlOperatorConfigDocument extends YamlConfigDocument implements Op
     }
 
     setFriendlyName(name: string) {
-        const api = this.parsed.get('api') as YAMLMap;
-        if(api === undefined) {
-            this.parsed.add({key: 'api', value: {}});
-        }
-        this.parsed.setIn(['api', 'friendly'], name);
+        this.parsed.addIn(['api', 'friendly'], name);
     }
 
     toJS(): OperatorJsonConfig  {
