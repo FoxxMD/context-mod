@@ -76,7 +76,7 @@ const program = new Command();
             } = config;
             try {
                 if(mode === 'all' || mode === 'client') {
-                    await clientServer(config);
+                    await clientServer({...config, fileConfig});
                 }
                 if(mode === 'all' || mode === 'server') {
                     await apiServer({...config, fileConfig});

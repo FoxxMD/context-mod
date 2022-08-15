@@ -13,7 +13,7 @@ import {
     CheckSummary,
     RunResult,
     ActionedEvent,
-    ActionResult, RuleResult, EventActivity
+    ActionResult, RuleResult, EventActivity, OperatorConfigWithFileContext
 } from "../../Common/interfaces";
 import {
     buildCachePrefix,
@@ -57,6 +57,7 @@ import {RuleResultEntity} from "../../Common/Entities/RuleResultEntity";
 import {RuleSetResultEntity} from "../../Common/Entities/RuleSetResultEntity";
 import { PaginationAwareObject } from "../Common/util";
 import {BotInstance, BotStatusResponse, CMInstanceInterface, InviteData} from "../Common/interfaces";
+import {open} from "fs/promises";
 
 const emitter = new EventEmitter();
 
@@ -151,10 +152,10 @@ const availableLevels = ['error', 'warn', 'info', 'verbose', 'debug'];
 
 let webLogs: LogInfo[] = [];
 
-const webClient = async (options: OperatorConfig) => {
+const webClient = async (options: OperatorConfigWithFileContext) => {
     const {
         operator: {
-            name,
+            name: operatorName,
             display,
         },
         userAgent: uaFragment,
@@ -176,15 +177,13 @@ const webClient = async (options: OperatorConfig) => {
             },
             maxLogs,
             clients,
-            credentials: {
-                clientId,
-                clientSecret,
-                redirectUri
-            },
+            credentials,
             operators = [],
         },
         //database
     } = options;
+
+    let clientCredentials = credentials;
 
     let sessionSecretSynced = false;
 
@@ -294,9 +293,9 @@ const webClient = async (options: OperatorConfig) => {
             }
             const client = await ExtendedSnoowrap.fromAuthCode({
                 userAgent,
-                clientId,
-                clientSecret,
-                redirectUri: redirectUri as string,
+                clientId: clientCredentials.clientId,
+                clientSecret: clientCredentials.clientSecret,
+                redirectUri: clientCredentials.redirectUri as string,
                 code: code as string,
             });
             const user = await client.getMe().name as string;
@@ -346,10 +345,50 @@ const webClient = async (options: OperatorConfig) => {
         }
     }
 
+    app.postAsync('/init', async (req, res, next) => {
+        if (clientCredentials.clientId === undefined || clientCredentials.clientSecret === undefined) {
+            const {
+                redirect = '',
+                clientId = '',
+                clientSecret = '',
+                operator = '',
+            } = req.body as any;
+            if (redirect === null || redirect.trim() === '') {
+                return res.status(400).send('redirect cannot be empty');
+            }
+            if (clientId === null || clientId.trim() === '') {
+                return res.status(400).send('clientId cannot be empty');
+            }
+            if (clientSecret === null || clientSecret.trim() === '') {
+                return res.status(400).send('clientSecret cannot be empty');
+            }
+            if(operatorName === undefined) {
+                return res.status(400).send('operator cannot be empty');
+            }
+            options.fileConfig.document.setWebCredentials({redirectUri: redirect.trim(), clientId: clientId.trim(), clientSecret: clientSecret.trim()});
+            if(operators.length === 0 && operator !== '') {
+                options.fileConfig.document.setOperator(parseRedditEntity(operator, 'user').name);
+            }
+            const handle = await open(options.fileConfig.document.location as string, 'w');
+            await handle.writeFile(options.fileConfig.document.toString());
+            await handle.close();
+
+            clientCredentials = {
+                clientId,
+                clientSecret,
+                redirectUri: redirect
+            }
+
+            return res.status(200).send();
+        } else {
+            return res.status(400).send('Can only do init setup when client credentials do not already exist.');
+        }
+    });
+
     const scopeMiddle = arrayMiddle(['scope']);
     const successMiddle = booleanMiddle([{name: 'closeOnSuccess', defaultVal: undefined, required: false}]);
     app.getAsync('/login', scopeMiddle, successMiddle, async (req, res, next) => {
-        if (redirectUri === undefined) {
+        if (clientCredentials.redirectUri === undefined) {
             return res.render('error', {error: `No <b>redirectUri</b> was specified through environmental variables or program argument. This must be provided in order to use the web interface.`});
         }
         const {query: { scope: reqScopes = [], closeOnSuccess } } = req;
@@ -361,10 +400,13 @@ const webClient = async (options: OperatorConfig) => {
             // @ts-ignore
             req.session.closeOnSuccess = closeOnSuccess;
         }
+        if(clientCredentials.clientId === undefined) {
+            return res.render('init', { operators: operators.join(',') });
+        }
         const authUrl = Snoowrap.getAuthUrl({
-            clientId,
+            clientId: clientCredentials.clientId,
             scope: scope,
-            redirectUri: redirectUri as string,
+            redirectUri: clientCredentials.redirectUri as string,
             permanent: false,
             state: req.session.state,
         });
@@ -553,9 +595,9 @@ const webClient = async (options: OperatorConfig) => {
 
     app.getAsync('/auth/helper', helperAuthed, instanceWithPermissions, instancesViewData, (req, res) => {
         return res.render('helper', {
-            redirectUri,
-            clientId,
-            clientSecret,
+            redirectUri: clientCredentials.redirectUri,
+            clientId: clientCredentials.clientId,
+            clientSecret: clientCredentials.clientSecret,
             token: req.isAuthenticated() && req.user?.clientData?.webOperator ? token : undefined,
             // @ts-ignore
             ...req.instancesViewData,
@@ -603,12 +645,12 @@ const webClient = async (options: OperatorConfig) => {
             guests: guestsVal,
         } = req.body as any;
 
-        const cid = ci || clientId;
+        const cid = ci || clientCredentials.clientId;
         if(cid === undefined || cid.trim() === '') {
             return res.status(400).send('clientId is required');
         }
 
-        const ced = ce || clientSecret;
+        const ced = ce || clientCredentials.clientSecret;
         if(ced === undefined || ced.trim() === '') {
             return res.status(400).send('clientSecret is required');
         }
@@ -627,8 +669,8 @@ const webClient = async (options: OperatorConfig) => {
 
         const inviteData = {
             permissions,
-            clientId: (ci || clientId).trim(),
-            clientSecret: (ce || clientSecret).trim(),
+            clientId: (ci || clientCredentials.clientId).trim(),
+            clientSecret: (ce || clientCredentials.clientSecret).trim(),
             redirectUri: redir.trim(),
             instance,
             subreddits: subreddits.trim() === '' ? [] : subreddits.split(',').map((x: string) => parseRedditEntity(x).name),
@@ -1029,8 +1071,8 @@ const webClient = async (options: OperatorConfig) => {
 
         const client = new ExtendedSnoowrap({
             userAgent,
-            clientId,
-            clientSecret,
+            clientId: clientCredentials.clientId,
+            clientSecret: clientCredentials.clientSecret,
             accessToken: req.user?.clientData?.token
         });
 
