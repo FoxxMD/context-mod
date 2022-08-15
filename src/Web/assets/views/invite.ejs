@@ -154,8 +154,7 @@
                             <div>Guest are useful when a reddit user who is not a moderator of your subreddits is helping setup configurations for your bot. Usually this is the Operator of this CM server.</div>
                             <div>Users specified below will be added to all Subreddits for <strong>24 hours</strong> after which they will be automatically removed. You can manually remove Guest from any/all subreddits at any time from the dashboard.</div>
                             <input id="guestMods" disabled style="max-width:800px; display: block;"
-                                   class="text-black placeholder-gray-500 rounded mt-2 mb-3 p-2 w-full"
-                                   placeholder="RedditUser1,RedditUser2" value="<%- guests %>">
+                                   class="text-black placeholder-gray-500 rounded mt-2 mb-3 p-2 w-full" value="<%- guests %>">
                             <% if(guests.length > 0) { %>
                                 <div><strong>Note:</strong> The user(s) above have been pre-filled by the Operator of this server.</div>
                             <% } %>

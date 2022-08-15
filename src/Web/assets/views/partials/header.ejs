@@ -33,11 +33,13 @@
                 </ul>
                 <% } %>
             </div>
+            <% if(locals.showHelp === true) { %>
             <div id="help" class="flex items-center mr-8 text-sm">
                 <a id="helpStart" href="" >
                     Help
                 </a>
             </div>
+            <% } %>
             <div class="flex items-center mr-8 text-sm">
                 <a href="https://redditstatus.com" target="_blank">
                     <span>Reddit Status: <span id="redditStatus" class="ml-2"><span class="iconify-inline" data-icon="ep:question-filled"></span></span></span>

@@ -3,6 +3,7 @@ import {TimeAwareBaseEntity} from "./Base/TimeAwareBaseEntity";
 import {InviteData} from "../../Web/Common/interfaces";
 import dayjs, {Dayjs} from "dayjs";
 import {TimeAwareRandomBaseEntity} from "./Base/TimeAwareRandomBaseEntity";
+import {parseRedditEntity} from "../../util";
 
 @Entity({name: 'BotInvite'})
 export class BotInvite extends TimeAwareRandomBaseEntity implements InviteData {
@@ -67,7 +68,12 @@ export class BotInvite extends TimeAwareRandomBaseEntity implements InviteData {
             this.creator = data.creator;
             this.overwrite = data.overwrite;
             this.initialConfig = data.initialConfig;
-            this.guests = data.guests;
+            if(data.guests !== undefined && data.guests !== null && data.guests.length > 0) {
+                const cleanGuests = data.guests.filter(x => x !== '').map(x => parseRedditEntity(x, 'user').name);
+                if(cleanGuests.length > 0) {
+                    this.guests = cleanGuests;
+                }
+            }
 
             if (data.expiresAt !== undefined && data.expiresAt !== 0) {
                 this.expiresAt = dayjs(data.expiresAt);

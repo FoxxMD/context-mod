@@ -501,13 +501,64 @@ const webClient = async (options: OperatorConfig) => {
         next();
     }
 
-    app.getAsync('/auth/helper', helperAuthed, (req, res) => {
+    const instanceWithPermissions = async (req: express.Request, res: express.Response, next: Function) => {
+        delete req.session.botId;
+        delete req.session.authBotId;
+
+        const msg = 'Bot does not exist or you do not have permission to access it';
+        const instance = cmInstances.find(x => x.getName() === req.query.instance);
+        if (instance === undefined) {
+            return res.status(404).render('error', {error: msg});
+        }
+
+        if (!req.user?.clientData?.webOperator && !req.user?.canAccessInstance(instance)) {
+            return res.status(404).render('error', {error: msg});
+        }
+
+        if (req.params.subreddit !== undefined && !req.user?.canAccessSubreddit(instance,req.params.subreddit)) {
+            return res.status(404).render('error', {error: msg});
+        }
+        req.instance = instance;
+        req.session.botId = instance.getName();
+        req.session.authBotId = instance.getName();
+        return next();
+    }
+
+    const instancesViewData = async (req: express.Request, res: express.Response, next: Function) => {
+
+        const user = req.user as Express.User;
+        const instance = req.instance as CMInstance;
+
+        const shownInstances = cmInstances.reduce((acc: CMInstance[], curr) => {
+            const isBotOperator = user?.isInstanceOperator(curr);
+            if(user?.clientData?.webOperator) {
+                // @ts-ignore
+                return acc.concat({...curr.getData(), canAccessLocation: true, isOperator: isBotOperator});
+            }
+            if(!isBotOperator && !req.user?.canAccessInstance(curr)) {
+                return acc;
+            }
+            // @ts-ignore
+            return acc.concat({...curr.getData(), canAccessLocation: isBotOperator, isOperator: isBotOperator, botId: curr.getName()});
+        },[]);
+
+        // @ts-ignore
+        req.instancesViewData = {
+            instances: shownInstances,
+            instanceId: instance.getName()
+        };
+
+        next();
+    }
+
+    app.getAsync('/auth/helper', helperAuthed, instanceWithPermissions, instancesViewData, (req, res) => {
         return res.render('helper', {
             redirectUri,
             clientId,
             clientSecret,
             token: req.isAuthenticated() && req.user?.clientData?.webOperator ? token : undefined,
-            instances: cmInstances.filter(x => req.user?.isInstanceOperator(x)).map(x => x.getName()),
+            // @ts-ignore
+            ...req.instancesViewData,
         });
     });
 
@@ -531,7 +582,7 @@ const webClient = async (options: OperatorConfig) => {
             }).json() as InviteData;
 
             return res.render('invite', {
-                guests: invite.guests !== undefined && invite.guests.length > 0 ? invite.guests.join(',') : '',
+                guests: invite.guests !== undefined && invite.guests !== null && invite.guests.length > 0 ? invite.guests.join(',') : '',
                 permissions: JSON.stringify(invite.permissions || []),
                 invite: inviteId,
             });
@@ -549,7 +600,7 @@ const webClient = async (options: OperatorConfig) => {
             redirect: redir,
             instance,
             subreddits,
-            guests,
+            guests: guestsVal,
         } = req.body as any;
 
         const cid = ci || clientId;
@@ -566,6 +617,14 @@ const webClient = async (options: OperatorConfig) => {
             return res.status(400).send('redirectUrl is required');
         }
 
+        let guestArr = [];
+        if(typeof guestsVal === 'string') {
+            guestArr = guestsVal.split(',');
+        } else if(Array.isArray(guestsVal)) {
+            guestArr = guestsVal;
+        }
+        guestArr = guestArr.filter(x => x.trim() !== '').map(x => parseRedditEntity(x, 'user').name);
+
         const inviteData = {
             permissions,
             clientId: (ci || clientId).trim(),
@@ -574,7 +633,7 @@ const webClient = async (options: OperatorConfig) => {
             instance,
             subreddits: subreddits.trim() === '' ? [] : subreddits.split(',').map((x: string) => parseRedditEntity(x).name),
             creator: (req.user as Express.User).name,
-            guests
+            guests: guestArr.length > 0 ? guestArr : undefined
         };
         const cmInstance = cmInstances.find(x => x.friendly === instance);
         if(cmInstance === undefined) {
@@ -664,29 +723,6 @@ const webClient = async (options: OperatorConfig) => {
         throw new ErrorWithCause('[Web] Error occurred while initializing web or socket.io server', {cause: err});
     }
     logger.info(`Web UI started: http://localhost:${port}`, {label: ['Web']});
-
-    const instanceWithPermissions = async (req: express.Request, res: express.Response, next: Function) => {
-        delete req.session.botId;
-        delete req.session.authBotId;
-
-        const msg = 'Bot does not exist or you do not have permission to access it';
-        const instance = cmInstances.find(x => x.getName() === req.query.instance);
-        if (instance === undefined) {
-            return res.status(404).render('error', {error: msg});
-        }
-
-        if (!req.user?.clientData?.webOperator && !req.user?.canAccessInstance(instance)) {
-            return res.status(404).render('error', {error: msg});
-        }
-
-        if (req.params.subreddit !== undefined && !req.user?.canAccessSubreddit(instance,req.params.subreddit)) {
-            return res.status(404).render('error', {error: msg});
-        }
-        req.instance = instance;
-        req.session.botId = instance.getName();
-        req.session.authBotId = instance.getName();
-        return next();
-    }
 
 
     const botWithPermissions = (required: boolean = false, setDefault: boolean = false) => async (req: express.Request, res: express.Response, next: Function) => {
@@ -830,33 +866,6 @@ const webClient = async (options: OperatorConfig) => {
         next();
     }
 
-    const instancesViewData = async (req: express.Request, res: express.Response, next: Function) => {
-
-        const user = req.user as Express.User;
-        const instance = req.instance as CMInstance;
-
-        const shownInstances = cmInstances.reduce((acc: CMInstance[], curr) => {
-            const isBotOperator = user?.isInstanceOperator(curr);
-            if(user?.clientData?.webOperator) {
-                // @ts-ignore
-                return acc.concat({...curr.getData(), canAccessLocation: true, isOperator: isBotOperator});
-            }
-            if(!isBotOperator && !req.user?.canAccessInstance(curr)) {
-                return acc;
-            }
-            // @ts-ignore
-            return acc.concat({...curr.getData(), canAccessLocation: isBotOperator, isOperator: isBotOperator, botId: curr.getName()});
-        },[]);
-
-        // @ts-ignore
-        req.instancesViewData = {
-            instances: shownInstances,
-            instanceId: instance.getName()
-        };
-
-        next();
-    }
-
     const migrationRedirect = async (req: express.Request, res: express.Response, next: Function) => {
         const user = req.user as Express.User;
         const instance = req.instance as CMInstance;
@@ -883,7 +892,16 @@ const webClient = async (options: OperatorConfig) => {
         return next();
     };
 
-    app.getAsync('/', [initHeartbeat, redirectBotsNotAuthed, ensureAuthenticated, defaultSession, defaultInstance, instanceWithPermissions, instancesViewData, migrationRedirect, botWithPermissions(false, true), createUserToken], async (req: express.Request, res: express.Response) => {
+    const redirectNoBots = async (req: express.Request, res: express.Response, next: Function) => {
+        const i = req.instance as CMInstance;
+        if (i.bots.length === 0) {
+            // assuming user is doing first-time setup and this is the default localhost bot
+            return res.redirect(`/auth/helper?instance=${i.getName()}`);
+        }
+        next();
+    }
+
+    app.getAsync('/', [initHeartbeat, redirectBotsNotAuthed, ensureAuthenticated, defaultSession, defaultInstance, instanceWithPermissions, instancesViewData, migrationRedirect, redirectNoBots, botWithPermissions(false, true), createUserToken], async (req: express.Request, res: express.Response) => {
 
         const user = req.user as Express.User;
         const instance = req.instance as CMInstance;

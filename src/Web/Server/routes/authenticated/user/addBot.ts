@@ -90,7 +90,7 @@ const addBot = () => {
                     req.botApp.logger.error(err);
                 }
             });
-            if(invite !== undefined && invite.guests !== undefined && invite.guests.length > 0) {
+            if(invite !== undefined && invite.guests !== undefined && invite.guests !== null && invite.guests.length > 0) {
                 await newBot.addGuest(invite.guests, dayjs().add(1, 'day'));
             }
         } catch (err: any) {

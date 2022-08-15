@@ -2,7 +2,7 @@
 <%- include('partials/head', {title: 'CM OAuth Helper'}) %>
 <body class="bg-gray-900 text-white font-sans">
 <div class="min-w-screen min-h-screen">
-    <%- include('partials/title', {title: ' OAuth Helper'}) %>
+    <%- include('partials/header') %>
     <div class="container mx-auto">
         <div class="grid">
             <div class="bg-gray-600">
@@ -65,10 +65,8 @@
       ease-in-out
       m-0
       focus:text-gray-700 focus:bg-white focus:border-blue-600 focus:outline-none" aria-label="Default select example">
-                                <% instances.forEach(function (name, index){ %>
-                                    <option selected="<%= index === 0 ? 'true' : 'false' %>" value="<%= name %>"><%= name %></option>
-                                    <%= name %>
-                                <% }) %>
+                                <option selected="true" value="<%= instanceId %>"><%= instanceId %></option>
+                                <%= instanceId %>
                             </select>
                         </div>
                     </div>
@@ -248,6 +246,7 @@
         </div>
     </div>
 </div>
+<%- include('partials/footer') %>
 <script>
     if (document.querySelector('#redirectUri').value === '') {
         document.querySelector('#redirectUri').value = `${document.location.origin}/callback`;
