@@ -765,10 +765,10 @@
             const isDryun = e.target.classList.contains('dryRunCheck');
 
             const subSection = e.target.closest('div.sub');
-            bot = subSection.dataset.bot;
+            const botSection = subSection.dataset.bot;
             const url = urlInput.value;
 
-            const fetchUrl = `/api/check?instance=<%= instanceId %>&bot=${bot}&url=${url}&dryRun=${isDryun ? 1 : 0}&subreddit=${subreddit}&delayOption=${delayOpt}`;
+            const fetchUrl = `/api/check?instance=<%= instanceId %>&bot=${botSection}&url=${url}&dryRun=${isDryun ? 1 : 0}&subreddit=${subreddit}&delayOption=${delayOpt}`;
             fetch(fetchUrl);
 
             urlInput.value = '';
