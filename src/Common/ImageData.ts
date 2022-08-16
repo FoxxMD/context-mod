@@ -273,7 +273,7 @@ class ImageData {
     static fromSubmission(sub: Submission, aggressive = false): ImageData {
         const url = new URL(sub.url);
         const data: any = {
-            url,
+            path: url,
         };
         let variants = [];
         if (sub.preview !== undefined && sub.preview.enabled && sub.preview.images.length > 0) {
