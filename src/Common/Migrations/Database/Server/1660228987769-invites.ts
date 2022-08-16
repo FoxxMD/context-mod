@@ -65,9 +65,7 @@ export class invites1660228987769 implements MigrationInterface {
                 })
             ]);
 
-            if((await tableHasData(queryRunner, 'BotInvite')) === true) {
-                queryRunner.connection.logger.logSchemaBuild(`Table 'Invite' has been renamed 'BotInvite'. There are existing rows on this table while will need to be recreated.`);
-            }
+            queryRunner.connection.logger.logSchemaBuild(`Table 'Invite' has been renamed 'BotInvite'. If there are existing rows on this table they will need to be recreated.`);
 
         } else {
 
