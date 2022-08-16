@@ -51,16 +51,19 @@ export class invites1660228987769 implements MigrationInterface {
 
             await queryRunner.renameTable('Invite', 'BotInvite');
             const table = await queryRunner.getTable('BotInvite') as Table;
-            table.addColumn(new TableColumn({
-                name: 'initialConfig',
-                type: 'text',
-                isNullable: true
-            }));
-            table.addColumn(new TableColumn({
-                name: 'guests',
-                type: 'text',
-                isNullable: true
-            }));
+
+            await queryRunner.addColumns(table, [
+                new TableColumn({
+                    name: 'initialConfig',
+                    type: 'text',
+                    isNullable: true
+                }),
+                new TableColumn({
+                    name: 'guests',
+                    type: 'text',
+                    isNullable: true
+                })
+            ]);
 
             if((await tableHasData(queryRunner, 'BotInvite')) === true) {
                 queryRunner.connection.logger.logSchemaBuild(`Table 'Invite' has been renamed 'BotInvite'. There are existing rows on this table while will need to be recreated.`);
