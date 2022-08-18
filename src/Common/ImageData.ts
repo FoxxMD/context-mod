@@ -42,8 +42,8 @@ class ImageData {
         return await (await this.sharp()).clone().toFormat(format).toBuffer();
     }
 
-    async hash(bits: number = 16, useVariantIfPossible = true): Promise<Required<ImageHashCacheData>> {
-        if (this.hashResult === undefined || this.hashResultFlipped === undefined) {
+    async hash(bits: number = 16, useVariantIfPossible = true, force = false): Promise<Required<ImageHashCacheData>> {
+        if (force || (this.hashResult === undefined || this.hashResultFlipped === undefined)) {
             let ref: ImageData | undefined;
             if (useVariantIfPossible && this.preferredResolution !== undefined) {
                 ref = this.getSimilarResolutionVariant(this.preferredResolution[0], this.preferredResolution[1]);
@@ -182,6 +182,25 @@ class ImageData {
         return this.width === otherImage.width && this.height === otherImage.height;
     }
 
+    isMaybeCropped(otherImage: ImageData, allowDiff = 10): boolean {
+        if (!this.hasDimensions || !otherImage.hasDimensions) {
+            return false;
+        }
+
+        const refWidth = this.width as number;
+        const refHeight = this.height as number;
+        const oWidth = otherImage.width as number;
+        const oHeight = otherImage.height as number;
+
+        const sWidth = refWidth <= oWidth ? refWidth : oWidth;
+        const sHeight = refHeight <= oHeight ? refHeight : oHeight;
+
+        const widthDiff = sWidth / (sWidth === refWidth ? oWidth : refWidth);
+        const heightDiff = sHeight / (sHeight === refHeight ? oHeight : refHeight);
+
+        return widthDiff <= allowDiff || heightDiff <= allowDiff;
+    }
+
     async sameAspectRatio(otherImage: ImageData) {
         let thisRes = this.actualResolution;
         let otherRes = otherImage.actualResolution;
@@ -207,12 +226,12 @@ class ImageData {
         return {width: width as number, height: height as number};
     }
 
-    async normalizeImagesForComparison(compareLibrary: ('pixel' | 'resemble'), imgToCompare: ImageData): Promise<[Sharp, Sharp, number, number]> {
+    async normalizeImagesForComparison(compareLibrary: ('pixel' | 'resemble'), imgToCompare: ImageData, usePreferredResolution = true): Promise<[Sharp, Sharp, number, number]> {
         const sFunc = await getSharpAsync();
 
         let refImage = this as ImageData;
         let compareImage = imgToCompare;
-        if (this.preferredResolution !== undefined) {
+        if (usePreferredResolution && this.preferredResolution !== undefined) {
             const matchingVariant = compareImage.getSimilarResolutionVariant(this.preferredResolution[0], this.preferredResolution[1]);
             if (matchingVariant !== undefined) {
                 compareImage = matchingVariant;
