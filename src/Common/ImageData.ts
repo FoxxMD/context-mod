@@ -23,8 +23,8 @@ class ImageData {
     variants: ImageData[] = []
     preferredResolution?: [number, number]
     sharpImg!: Sharp
-    hashResult!: string
-    hashResultFlipped!: string
+    hashResult?: string
+    hashResultFlipped?: string
     actualResolution?: [number, number]
 
     constructor(data: ImageDataOptions, aggressive = false) {
@@ -42,8 +42,8 @@ class ImageData {
         return await (await this.sharp()).clone().toFormat(format).toBuffer();
     }
 
-    async hash(bits: number, useVariantIfPossible = true): Promise<string> {
-        if (this.hashResult === undefined) {
+    async hash(bits: number = 16, useVariantIfPossible = true): Promise<Required<ImageHashCacheData>> {
+        if (this.hashResult === undefined || this.hashResultFlipped === undefined) {
             let ref: ImageData | undefined;
             if (useVariantIfPossible && this.preferredResolution !== undefined) {
                 ref = this.getSimilarResolutionVariant(this.preferredResolution[0], this.preferredResolution[1]);
@@ -55,7 +55,7 @@ class ImageData {
             this.hashResult = hash;
             this.hashResultFlipped = hashFlipped;
         }
-        return this.hashResult;
+        return {original: this.hashResult, flipped: this.hashResultFlipped};
     }
 
     async sharp(): Promise<Sharp> {
@@ -268,6 +268,12 @@ class ImageData {
             original: this.hashResult,
             flipped: this.hashResultFlipped
         }
+    }
+
+    setFromHashCache(data: ImageHashCacheData) {
+        const {original, flipped} = data;
+        this.hashResult = original;
+        this.hashResultFlipped = flipped;
     }
 
     static fromSubmission(sub: Submission, aggressive = false): ImageData {

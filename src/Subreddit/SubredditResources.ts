@@ -58,7 +58,7 @@ import {
     filterByTimeRequirement,
     asSubreddit,
     modActionCriteriaSummary,
-    parseRedditFullname
+    parseRedditFullname, asStrongImageHashCache
 } from "../util";
 import LoggedError from "../Utils/LoggedError";
 import {
@@ -3353,7 +3353,12 @@ export class SubredditResources {
         return he.decode(Mustache.render(footerRawContent, {subName, permaLink, modmailLink, botLink: BOT_LINK}));
     }
 
-    async getImageHash(img: ImageData): Promise<ImageHashCacheData|undefined> {
+    async getImageHash(img: ImageData): Promise<Required<ImageHashCacheData>|undefined> {
+
+        if(img.hashResult !== undefined && img.hashResultFlipped !== undefined) {
+            return img.toHashCache() as Required<ImageHashCacheData>;
+        }
+
         const hash = `imgHash-${img.basePath}`;
         const result = await this.cache.get(hash) as string | undefined | null;
         this.stats.cache.imageHash.requests++
@@ -3361,10 +3366,12 @@ export class SubredditResources {
         await this.stats.cache.imageHash.identifierRequestCount.set(hash, (await this.stats.cache.imageHash.identifierRequestCount.wrap(hash, () => 0) as number) + 1);
         if(result !== undefined && result !== null) {
             try {
-                return JSON.parse(result) as ImageHashCacheData
+                const data =  JSON.parse(result);
+                if(asStrongImageHashCache(data)) {
+                    return data;
+                }
             } catch (e) {
-                // may have old values, fallback to only original
-                return {original: result};
+                // had old values, just drop it
             }
         }
         this.stats.cache.commentCheck.miss++;
@@ -3377,7 +3384,7 @@ export class SubredditResources {
     }
 
     async setImageHash(img: ImageData, ttl: number): Promise<void> {
-        await this.cache.set(`imgHash-${img.basePath}`, img.toHashCache(), {ttl});
+        await this.cache.set(`imgHash-${img.basePath}`, img.toHashCache() as Required<ImageHashCacheData>, {ttl});
         // const hash = await this.cache.wrap(img.baseUrl, async () => await img.hash(true), { ttl }) as string;
         // if(img.hashResult === undefined) {
         //     img.hashResult = hash;

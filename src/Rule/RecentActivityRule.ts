@@ -196,7 +196,7 @@ export class RecentActivityRule extends Rule {
                 let filteredActivity: (Submission|Comment)[] = [];
                 let analysisTimes: number[] = [];
                 let referenceImage: ImageData | undefined;
-                let refHash: ImageHashCacheData | undefined;
+                let refHash: Required<ImageHashCacheData> | undefined;
                 if (this.imageDetection.enable) {
                     try {
                         referenceImage = ImageData.fromSubmission(item);
@@ -205,16 +205,15 @@ export class RecentActivityRule extends Rule {
                             if(this.imageDetection.hash.ttl !== undefined) {
                                 refHash = await this.resources.getImageHash(referenceImage);
                                 if(refHash === undefined) {
-                                    await referenceImage.hash(this.imageDetection.hash.bits);
+                                    refHash = await referenceImage.hash(this.imageDetection.hash.bits);
                                     await this.resources.setImageHash(referenceImage, this.imageDetection.hash.ttl);
-                                } else if(referenceImage.hashResult.length !== bitsToHexLength(this.imageDetection.hash.bits)) {
+                                } else if(refHash.original.length !== bitsToHexLength(this.imageDetection.hash.bits)) {
                                     this.logger.warn('Reference image hash length did not correspond to bits specified in config. Recomputing...');
                                     await referenceImage.hash(this.imageDetection.hash.bits);
                                     await this.resources.setImageHash(referenceImage, this.imageDetection.hash.ttl);
                                 }
                             } else {
-                                await referenceImage.hash(this.imageDetection.hash.bits);
-                                refHash = referenceImage.toHashCache();
+                                refHash = await referenceImage.hash(this.imageDetection.hash.bits);
                             }
                         }
                         //await referenceImage.sharp();
@@ -251,7 +250,7 @@ export class RecentActivityRule extends Rule {
                             let imgData =  ImageData.fromSubmission(x);
                             imgData.setPreferredResolutionByWidth(800);
                             if(this.imageDetection.hash.enable) {
-                                let compareHash: ImageHashCacheData | undefined;
+                                let compareHash: Required<ImageHashCacheData> | undefined;
                                 if(this.imageDetection.hash.ttl !== undefined) {
                                     compareHash = await this.resources.getImageHash(imgData);
                                 }
@@ -260,8 +259,7 @@ export class RecentActivityRule extends Rule {
                                     if(compareHash !== undefined) {
                                         this.logger.debug(`Hash lengths were not the same! Will need to recompute compare hash to match reference.\n\nReference: ${referenceImage.basePath} has is ${refHash.original.length} char long | Comparing: ${imgData.basePath} has is ${compareHash} ${compareHash.original.length} long`);
                                     }
-                                    await imgData.hash(this.imageDetection.hash.bits);
-                                    compareHash = imgData.toHashCache();
+                                    compareHash = await imgData.hash(this.imageDetection.hash.bits);
                                     if(this.imageDetection.hash.ttl !== undefined) {
                                         await this.resources.setImageHash(imgData, this.imageDetection.hash.ttl);
                                     }

@@ -279,6 +279,6 @@ export interface UrlContext {
 }
 
 export interface ImageHashCacheData {
-    original: string
+    original?: string
     flipped?: string
 }

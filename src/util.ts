@@ -74,7 +74,7 @@ import {
     ActivitySourceTypes,
     CacheProvider,
     ConfigFormat,
-    DurationVal, ExternalUrlContext,
+    DurationVal, ExternalUrlContext, ImageHashCacheData,
     ModUserNoteLabel,
     modUserNoteLabels,
     RedditEntity,
@@ -2951,4 +2951,8 @@ export const generateRandomName = () => {
         style: 'capital',
         separator: ''
     });
+}
+
+export const asStrongImageHashCache = (data: ImageHashCacheData): data is Required<ImageHashCacheData> => {
+    return data.original !== undefined && data.flipped !== undefined;
 }
