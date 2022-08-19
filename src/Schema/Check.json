@@ -1199,6 +1199,20 @@
                 "sticky": {
                     "description": "Stick the comment after creation?",
                     "type": "boolean"
+                },
+                "targets": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "string"
+                        }
+                    ],
+                    "description": "Specify where this comment should be made\n\nValid values: 'self' | 'parent' | [reddit permalink]\n\n'self' and 'parent' are special targets that are relative to the Activity being processed:\n* When Activity is Submission => 'parent' does nothing\n* When Activity is Comment\n   * 'self' => reply to Activity\n   * 'parent' => make a top-level comment in the Submission the Comment is in\n\nIf target is not self/parent then CM assumes the value is a reddit permalink and will attempt to make a comment to that Activity"
                 }
             },
             "required": [

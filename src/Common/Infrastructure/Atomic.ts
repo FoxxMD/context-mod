@@ -148,6 +148,7 @@ export type RecordOutputOption = boolean | RecordOutputType | RecordOutputType[]
 export type PostBehaviorType = 'next' | 'stop' | 'nextRun' | string;
 export type onExistingFoundBehavior = 'replace' | 'skip' | 'ignore';
 export type ActionTarget = 'self' | 'parent';
+export type ArbitraryActionTarget = ActionTarget | string;
 export type InclusiveActionTarget = ActionTarget | 'any';
 export type DispatchSource = 'dispatch' | `dispatch:${string}`;
 export type NonDispatchActivitySource = 'poll' | `poll:${PollOn}` | 'user' | `user:${string}`;

@@ -994,7 +994,7 @@ export class SubredditResources {
                 hash = `sub-${item.name}`;
                 if (tryToFetch && item instanceof Submission) {
                     // @ts-ignore
-                    const itemToCache = await item.fetch();
+                    const itemToCache = await item.refresh();
                     await this.cache.set(hash, itemToCache, {ttl: this.submissionTTL});
                     return itemToCache;
                 } else {
@@ -1006,7 +1006,7 @@ export class SubredditResources {
                 hash = `comm-${item.name}`;
                 if (tryToFetch && item instanceof Comment) {
                     // @ts-ignore
-                    const itemToCache = await item.fetch();
+                    const itemToCache = await item.refresh();
                     await this.cache.set(hash, itemToCache, {ttl: this.commentTTL});
                     return itemToCache;
                 } else {
@@ -1016,8 +1016,12 @@ export class SubredditResources {
                 }
             }
             return item;
-        } catch (e) {
-            throw new ErrorWithCause('Error occurred while trying to add Activity to cache', {cause: e});
+        } catch (e: any) {
+            if(e.message !== undefined && e.message.includes('Cannot read properties of undefined (reading \'constructor\')')) {
+                throw new ErrorWithCause('Error occurred while trying to add Activity to cache (Comment likely does not exist)', {cause: e});
+            } else {
+                throw new ErrorWithCause('Error occurred while trying to add Activity to cache', {cause: e});
+            }
         }
     }
 

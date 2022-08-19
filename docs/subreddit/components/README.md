@@ -494,10 +494,25 @@ actions:
 
 ### Comment
 
-Reply to the Activity being processed with a comment. [Schema Documentation](https://json-schema.app/view/%23/%23%2Fdefinitions%2FSubmissionCheckJson/%23%2Fdefinitions%2FCommentActionJson?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Freddit-context-bot%2Fmaster%2Fsrc%2FSchema%2FApp.json)
+Reply to an Activity with a comment. [Schema Documentation](https://json-schema.app/view/%23/%23%2Fdefinitions%2FSubmissionCheckJson/%23%2Fdefinitions%2FCommentActionJson?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Freddit-context-bot%2Fmaster%2Fsrc%2FSchema%2FApp.json)
 
 * If the Activity is a Submission the comment is a top-level reply
 * If the Activity is a Comment the comment is a child reply
+
+#### Targets
+
+Optionally, specify the Activity CM should reply to. **When not specified CM replies to the Activity being processed using `self`**
+
+Valid values: `self`, `parent`, or a Reddit permalink.
+
+`self` and `parent` are special targets that are relative to the Activity being processed:
+
+* When the Activity being processed is a **Submission** => `parent` logs a warning and does nothing
+* When the Activity being processed is a  **Comment**
+  * `self` => reply to Comment
+  * `parent` => make a top-level Comment in the **Submission** the Comment belong to
+
+If target is not self/parent then CM assumes the value is a **reddit permalink** and will attempt to make a Comment to that Activity
 
 ```yaml
 actions:
@@ -506,7 +521,7 @@ actions:
     distinguish: boolean # distinguish as a mod
     sticky: boolean # sticky comment
     lock: boolean # lock the comment after creation
-
+    targets: string # 'self' or 'parent' or 'https://reddit.com/r/someSubreddit/21nfdi....'
 ```
 
 ### Contributor
