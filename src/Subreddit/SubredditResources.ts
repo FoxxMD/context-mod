@@ -1106,8 +1106,9 @@ export class SubredditResources {
                 return subreddit as Subreddit;
             }
         } catch (err: any) {
-            this.logger.error('Error while trying to fetch a cached subreddit', err);
-            throw err.logged;
+            const cmError = new CMError('Error while trying to fetch a cached subreddit', {cause: err, logged: true});
+            this.logger.error(cmError);
+            throw cmError;
         }
     }
 

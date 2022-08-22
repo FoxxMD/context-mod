@@ -29,6 +29,7 @@ This list is not exhaustive. [For complete documentation on a subreddit's config
   * [List of Actions](#list-of-actions)
     * [Approve](#approve)
     * [Ban](#ban)
+    * [Submission](#submission)
     * [Comment](#comment)
     * [Contributor (Add/Remove)](#contributor)
     * [Dispatch/Delay](#dispatch)
@@ -499,6 +500,10 @@ Reply to an Activity with a comment. [Schema Documentation](https://json-schema.
 * If the Activity is a Submission the comment is a top-level reply
 * If the Activity is a Comment the comment is a child reply
 
+#### Templating
+
+`content` can be [templated](#templating) and use [URL Tokens](#url-tokens)
+
 #### Targets
 
 Optionally, specify the Activity CM should reply to. **When not specified CM replies to the Activity being processed using `self`**
@@ -522,6 +527,70 @@ actions:
     sticky: boolean # sticky comment
     lock: boolean # lock the comment after creation
     targets: string # 'self' or 'parent' or 'https://reddit.com/r/someSubreddit/21nfdi....'
+```
+
+### Submission
+
+Create a Submission [Schema Documentation](https://json-schema.app/view/%23/%23%2Fdefinitions%2FSubmissionCheckJson/%23%2Fdefinitions%2FSubmissionActionJson?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Freddit-context-bot%2Fmaster%2Fsrc%2FSchema%2FApp.json)
+
+The Submission type, Link or Self-Post, is determined based on the presence of `url` in the action's configuration.
+
+```yaml
+actions:
+  - kind: submission
+    title: string # required, the title of the submission. can be templated.
+    content: string # the body of the submission. can be templated
+    url: string # if specified the submission will be a Link Submission. can be templated
+    distinguish: boolean # distinguish as a mod
+    sticky: boolean # sticky comment
+    lock: boolean # lock the comment after creation
+    nsfw: boolean # mark submission as NSFW
+    spoiler: boolean # mark submission as a spoiler
+    flairId: string # flair template id for submission
+    flairText: string # flair text for submission
+    targets: string # 'self' or a subreddit name IE mealtimevideos
+```
+
+#### Templating
+
+`content`,`url`, and `title` can be [templated](#templating) and use [URL Tokens](#url-tokens)
+
+TIP: To create a Link Submission pointing to the Activity currently being processed use
+
+```yaml
+actions:
+  - kind: submission
+    url: {{item.permalink}}
+    # ...
+```
+
+#### Targets
+
+Optionally, specify the Subreddit the Submission should be made in. **When not specified CM uses `self`**
+
+Valid values: `self` or Subreddit Name
+
+* `self` => (**Default**) Create Submission in the same Subreddit of the Activity being processed
+* Subreddit Name => Create Submission in given subreddit IE `mealtimevideos`
+  * Your bot must be able to access and be able to post in the given subreddit
+
+Example: 
+
+```yaml
+actions:
+  - kind: comment
+    targets: mealtimevideos
+```
+
+To post to multiple subreddits use a list:
+
+```yaml
+actions:
+  - kind: comment
+    targets:
+      - self
+      - mealtimevideos
+      - anotherSubreddit 
 ```
 
 ### Contributor

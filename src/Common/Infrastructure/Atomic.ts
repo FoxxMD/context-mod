@@ -175,6 +175,7 @@ export type ActivitySource = NonDispatchActivitySource | DispatchSource;
 export type ConfigFormat = 'json' | 'yaml';
 export type ActionTypes =
     'comment'
+    | 'submission'
     | 'lock'
     | 'remove'
     | 'report'

@@ -163,7 +163,8 @@ export class CommentAction extends Action {
             lock: this.lock,
             sticky: this.sticky,
             distinguish: this.distinguish,
-            footer: this.footer
+            footer: this.footer,
+            targets: this.targets,
         }
     }
 }

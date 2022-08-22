@@ -1282,6 +1282,9 @@
                                 "$ref": "#/definitions/ModNoteActionJson"
                             },
                             {
+                                "$ref": "#/definitions/SubmissionActionJson"
+                            },
+                            {
                                 "type": "string"
                             }
                         ]
@@ -5246,6 +5249,160 @@
             ],
             "type": "object"
         },
+        "SubmissionActionJson": {
+            "description": "Reply to the Activity. For a submission the reply will be a top-level comment.",
+            "properties": {
+                "authorIs": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "anyOf": [
+                                    {
+                                        "$ref": "#/definitions/AuthorCriteria"
+                                    },
+                                    {
+                                        "$ref": "#/definitions/NamedCriteria<AuthorCriteria>"
+                                    },
+                                    {
+                                        "type": "string"
+                                    }
+                                ]
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "$ref": "#/definitions/FilterOptionsJson<AuthorCriteria>"
+                        }
+                    ],
+                    "description": "If present then these Author criteria are checked before running the Check. If criteria fails then the Check will fail."
+                },
+                "content": {
+                    "description": "The Content to submit for this Action. Content is interpreted as reddit-flavored Markdown.\n\nIf value starts with `wiki:` then the proceeding value will be used to get a wiki page from the current subreddit\n\n * EX `wiki:botconfig/mybot` tries to get `https://reddit.com/r/currentSubreddit/wiki/botconfig/mybot`\n\nIf the value starts with `wiki:` and ends with `|someValue` then `someValue` will be used as the base subreddit for the wiki page\n\n* EX `wiki:replytemplates/test|ContextModBot` tries to get `https://reddit.com/r/ContextModBot/wiki/replytemplates/test`\n\nIf the value starts with `url:` then the value is fetched as an external url and expects raw text returned\n\n* EX `url:https://pastebin.com/raw/38qfL7mL` tries to get the text response of `https://pastebin.com/raw/38qfL7mL`\n\nIf none of the above is used the value is treated as the raw context\n\n * EX `this is **bold** markdown text` => \"this is **bold** markdown text\"\n\nAll Content is rendered using [mustache](https://github.com/janl/mustache.js/#templates) to enable [Action Templating](https://github.com/FoxxMD/context-mod#action-templating).\n\nThe following properties are always available in the template (view individual Rules to see rule-specific template data):\n```\nitem.kind      => The type of Activity that was checked (comment/submission)\nitem.author    => The name of the Author of the Activity EX FoxxMD\nitem.permalink => A permalink URL to the Activity EX https://reddit.com/r/yourSub/comments/o1h0i0/title_name/1v3b7x\nitem.url       => If the Activity is Link Sumbission then the external URL\nitem.title     => If the Activity is a Submission then the title of that Submission\nrules          => An object containing RuleResults of all the rules run for this check. See Action Templating for more details on naming\n```",
+                    "examples": [
+                        "This is the content of a comment/report/usernote",
+                        "this is **bold** markdown text",
+                        "wiki:botconfig/acomment"
+                    ],
+                    "type": "string"
+                },
+                "distinguish": {
+                    "description": "Distinguish as Mod after creation?",
+                    "type": "boolean"
+                },
+                "dryRun": {
+                    "default": false,
+                    "description": "If `true` the Action will not make the API request to Reddit to perform its action.",
+                    "examples": [
+                        false,
+                        true
+                    ],
+                    "type": "boolean"
+                },
+                "enable": {
+                    "default": true,
+                    "description": "If set to `false` the Action will not be run",
+                    "examples": [
+                        true
+                    ],
+                    "type": "boolean"
+                },
+                "flairId": {
+                    "description": "Flair template to apply to this Submission",
+                    "type": "string"
+                },
+                "flairText": {
+                    "description": "Flair text to apply to this Submission",
+                    "type": "string"
+                },
+                "footer": {
+                    "anyOf": [
+                        {
+                            "enum": [
+                                false
+                            ],
+                            "type": "boolean"
+                        },
+                        {
+                            "type": "string"
+                        }
+                    ],
+                    "description": "Customize the footer for Actions that send replies (Comment/Ban)\n\nIf `false` no footer is appended\n\nIf `string` the value is rendered as markdown or will use `wiki:` parser the same way `content` properties on Actions are rendered with [templating](https://github.com/FoxxMD/context-mod#action-templating).\n\nIf footer is `undefined` (not set) the default footer will be used:\n\n> *****\n> This action was performed by [a bot.] Mention a moderator or [send a modmail] if you any ideas, questions, or concerns about this action.\n\n*****\n\nThe following properties are available for [templating](https://github.com/FoxxMD/context-mod#action-templating):\n```\nsubName    => name of subreddit Action was performed in (EX 'mealtimevideos')\npermaLink  => The permalink for the Activity the Action was performed on EX https://reddit.com/r/yourSub/comments/o1h0i0/title_name/1v3b7x\nmodmaiLink => An encoded URL that will open a new message to your subreddit with the Action permalink appended to the body\nbotLink    => A permalink to the FAQ for this bot.\n```\nIf you use your own footer or no footer **please link back to the bot FAQ** using the `{{botLink}}` property in your content :)"
+                },
+                "itemIs": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "anyOf": [
+                                    {
+                                        "$ref": "#/definitions/SubmissionState"
+                                    },
+                                    {
+                                        "$ref": "#/definitions/CommentState"
+                                    },
+                                    {
+                                        "$ref": "#/definitions/NamedCriteria<TypedActivityState>"
+                                    },
+                                    {
+                                        "type": "string"
+                                    }
+                                ]
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "$ref": "#/definitions/FilterOptionsJson<TypedActivityState>"
+                        }
+                    ],
+                    "description": "A list of criteria to test the state of the `Activity` against before running the check.\n\nIf any set of criteria passes the Check will be run. If the criteria fails then the Check will fail.\n\n* @examples [[{\"over_18\": true, \"removed': false}]]"
+                },
+                "kind": {
+                    "description": "The type of action that will be performed",
+                    "enum": [
+                        "submission"
+                    ],
+                    "type": "string"
+                },
+                "lock": {
+                    "description": "Lock the Submission after creation?",
+                    "type": "boolean"
+                },
+                "name": {
+                    "description": "An optional, but highly recommended, friendly name for this Action. If not present will default to `kind`.\n\nCan only contain letters, numbers, underscore, spaces, and dashes",
+                    "examples": [
+                        "myDescriptiveAction"
+                    ],
+                    "pattern": "^[a-zA-Z]([\\w -]*[\\w])?$",
+                    "type": "string"
+                },
+                "nsfw": {
+                    "type": "boolean"
+                },
+                "spoiler": {
+                    "type": "boolean"
+                },
+                "sticky": {
+                    "description": "Sticky the Submission after creation?",
+                    "type": "boolean"
+                },
+                "targets": {
+                    "description": "Specify where this Submission should be made\n\nValid values: 'self' | [subreddit]\n\n* 'self' -- DEFAULT. Post Submission to same subreddit of Activity being processed\n* [subreddit] -- The name of a subreddit to post Submission to. EX mealtimevideos",
+                    "type": "string"
+                },
+                "title": {
+                    "description": "The title of this Submission.\n\nTemplated the same as **content**",
+                    "type": "string"
+                },
+                "url": {
+                    "description": "If Submission should be a Link, the URL to use\n\nTemplated the same as **content**\n\nPROTIP: To make a Link Submission pointing to the Activity being processed use `{{item.permalink}}` as the URL value",
+                    "type": "string"
+                }
+            },
+            "required": [
+                "kind",
+                "title"
+            ],
+            "type": "object"
+        },
         "SubmissionCheckConfigData": {
             "properties": {
                 "actions": {
@@ -5308,6 +5465,9 @@
                             },
                             {
                                 "$ref": "#/definitions/ModNoteActionJson"
+                            },
+                            {
+                                "$ref": "#/definitions/SubmissionActionJson"
                             },
                             {
                                 "type": "string"
