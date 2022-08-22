@@ -2030,6 +2030,14 @@
                 },
                 "name": {
                     "type": "string"
+                },
+                "wikiConfig": {
+                    "default": "botconfig/contextbot",
+                    "description": "The relative URL to the ContextMod wiki page EX `https://reddit.com/r/subreddit/wiki/<path>`\n\nThis will override the default relative URL as well as any URL set at the bot-level",
+                    "examples": [
+                        "botconfig/contextbot"
+                    ],
+                    "type": "string"
                 }
             },
             "required": [

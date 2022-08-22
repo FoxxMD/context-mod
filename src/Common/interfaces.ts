@@ -1060,6 +1060,16 @@ export interface SubredditOverrides {
          * */
         retention?: EventRetentionPolicyRange
     }
+
+    /**
+     * The relative URL to the ContextMod wiki page EX `https://reddit.com/r/subreddit/wiki/<path>`
+     *
+     * This will override the default relative URL as well as any URL set at the bot-level
+     *
+     * @default "botconfig/contextbot"
+     * @examples ["botconfig/contextbot"]
+     * */
+    wikiConfig?: string
 }
 
 /**

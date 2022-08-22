@@ -680,6 +680,7 @@ class Bot implements BotInstanceFunctions {
             databaseConfig: {
                 retention = undefined
             } = {},
+            wikiConfig = this.wikiLocation,
         } = override || {};
 
         const subRepo = this.database.getRepository(SubredditEntity)
@@ -717,7 +718,7 @@ class Bot implements BotInstanceFunctions {
         const manager = new Manager(sub, this.client, this.logger, this.cacheManager, {
             dryRun: this.dryRun,
             sharedStreams: this.sharedStreams,
-            wikiLocation: this.wikiLocation,
+            wikiLocation: wikiConfig,
             botName: this.botName as string,
             maxWorkers: this.maxWorkers,
             filterCriteriaDefaults: this.filterCriteriaDefaults,
