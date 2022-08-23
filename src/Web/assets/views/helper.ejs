@@ -2,7 +2,7 @@
 <%- include('partials/head', {title: 'CM OAuth Helper'}) %>
 <body class="bg-gray-900 text-white font-sans">
 <div class="min-w-screen min-h-screen">
-    <%- include('partials/title', {title: ' OAuth Helper'}) %>
+    <%- include('partials/header') %>
     <div class="container mx-auto">
         <div class="grid">
             <div class="bg-gray-600">
@@ -65,24 +65,34 @@
       ease-in-out
       m-0
       focus:text-gray-700 focus:bg-white focus:border-blue-600 focus:outline-none" aria-label="Default select example">
-                                <% instances.forEach(function (name, index){ %>
-                                    <option selected="<%= index === 0 ? 'true' : 'false' %>" value="<%= name %>"><%= name %></option>
-                                    <%= name %>
-                                <% }) %>
+                                <option selected="true" value="<%= instanceId %>"><%= instanceId %></option>
+                                <%= instanceId %>
                             </select>
                         </div>
                     </div>
                     <div class="text-lg text-semibold my-3">4. Optionally, restrict to Subreddits</div>
                     <div class="my-2 ml-5">
                         <div class="space-y-3">
-                        <div>Specify which subreddits, out of all the subreddits the bot moderates, CM should run on.</div>
-                        <div>Subreddits should be seperated with a comma. Leave blank to run on all moderated subreddits</div>
+                            <div>Specify which subreddits, out of all the subreddits the bot account already moderates, CM should run on.</div>
+                            <div>Subreddits should be seperated with a comma. Leave blank to run on all moderated subreddits.</div>
                         <input id="subreddits" style="max-width:800px; display: block;"
                                class="text-black placeholder-gray-500 rounded mt-2 mb-3 p-2 w-full"
                                placeholder="aSubreddit,aSecondSubreddit,aThirdSubreddit">
                         </div>
                     </div>
-                    <div class="text-lg text-semibold my-3">5. Select permissions</div>
+                    <div class="text-lg text-semibold my-3">5. Optionally, specify initial Guest Access</div>
+                    <div class="my-2 ml-5">
+                        <div class="space-y-3">
+                            <div>Specify Reddit users who should be automatically added as <b>Guest Mods</b> to any subreddits found by the bot once authorization is complete.</div>
+                            <div>If you are already a moderator on all of the subreddits being added you can skip this step.</div>
+                            <div>Adding initial Guest Mods is useful when you (the operator) want to setup configs for subreddits you are not a moderator of. This step reduces friction for onboarding as it eliminates the need for moderators to login to the dashboard and manually add you as a Guest Mod.</div>
+                            <input id="guestMods" style="max-width:800px; display: block;"
+                                   class="text-black placeholder-gray-500 rounded mt-2 mb-3 p-2 w-full"
+                                   placeholder="RedditUser1,RedditUser2">
+                            <div><strong>Note:</strong> The user completing authorization will be able to opt-out of initial Guest Mods <strong>and</strong> change which users will be used. This step is a convenience for autofilling this information for the authorization process.</div>
+                        </div>
+                    </div>
+                    <div class="text-lg text-semibold my-3">6. Select permissions</div>
                     <div class="my-2 ml-5">
                         <div class="space-y-3">
                             <div>These are permissions to allow the bot account to perform these actions, <b>in
@@ -222,11 +232,9 @@
                             </div>
                         </div>
                     </div>
-                    <div class="text-lg text-semibold my-3">4. <a id="doAuth" href="">Create Authorization Invite</a>
+                    <div class="text-lg text-semibold my-3">7. <a id="doAuth" href="">Create Authorization Invite</a>
                     </div>
                     <div class="ml-5 mb-4">
-                        <input id="inviteCode" style="min-width:500px;"
-                               class="text-black placeholder-gray-500 rounded mt-2 mb-3 p-2" placeholder="Invite code value to use. Leave blank to generate a random one."/>
                         <div class="space-y-3">
                             <div>A unique link will be generated that you (or someone) will use to authorize a Reddit account with this application.</div>
                             <div id="inviteLink"></div>
@@ -238,6 +246,7 @@
         </div>
     </div>
 </div>
+<%- include('partials/footer') %>
 <script>
     if (document.querySelector('#redirectUri').value === '') {
         document.querySelector('#redirectUri').value = `${document.location.origin}/callback`;
@@ -259,10 +268,10 @@
                 redirect: document.querySelector('#redirectUri').value,
                 clientId: document.querySelector('#clientId').value,
                 clientSecret: document.querySelector('#clientSecret').value,
-                code: document.querySelector("#inviteCode").value === '' ? undefined : document.querySelector("#inviteCode").value,
                 permissions,
                 instance: document.querySelector('#instanceSelect').value,
-                subreddits: document.querySelector('#subreddits').value
+                subreddits: document.querySelector('#subreddits').value,
+                guests: document.querySelector('#guestMods').value.split(',')
             })
         }).then((resp) => {
             if(!resp.ok) {
@@ -272,9 +281,9 @@
                 });
             } else {
                 document.querySelector("#errorWrapper").classList.add('hidden');
-                document.querySelector("#inviteCode").value = '';
+                document.querySelector('#subreddits').value = '';
                 resp.text().then(t => {
-                    document.querySelector("#inviteLink").innerHTML = `Invite Link: <a class="font-semibold" href="${document.location.origin}/auth/invite?invite=${t}">${document.location.origin}/auth/invite?invite=${t}</a>`;
+                    document.querySelector("#inviteLink").innerHTML = `Invite Link: <a class="font-semibold" href="${document.location.origin}/auth/invite/${t}">${document.location.origin}/auth/invite/${t}</a>`;
                 });
             }
         });

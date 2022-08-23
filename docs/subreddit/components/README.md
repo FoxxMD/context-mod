@@ -29,6 +29,7 @@ This list is not exhaustive. [For complete documentation on a subreddit's config
   * [List of Actions](#list-of-actions)
     * [Approve](#approve)
     * [Ban](#ban)
+    * [Submission](#submission)
     * [Comment](#comment)
     * [Contributor (Add/Remove)](#contributor)
     * [Dispatch/Delay](#dispatch)
@@ -494,10 +495,29 @@ actions:
 
 ### Comment
 
-Reply to the Activity being processed with a comment. [Schema Documentation](https://json-schema.app/view/%23/%23%2Fdefinitions%2FSubmissionCheckJson/%23%2Fdefinitions%2FCommentActionJson?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Freddit-context-bot%2Fmaster%2Fsrc%2FSchema%2FApp.json)
+Reply to an Activity with a comment. [Schema Documentation](https://json-schema.app/view/%23/%23%2Fdefinitions%2FSubmissionCheckJson/%23%2Fdefinitions%2FCommentActionJson?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Freddit-context-bot%2Fmaster%2Fsrc%2FSchema%2FApp.json)
 
 * If the Activity is a Submission the comment is a top-level reply
 * If the Activity is a Comment the comment is a child reply
+
+#### Templating
+
+`content` can be [templated](#templating) and use [URL Tokens](#url-tokens)
+
+#### Targets
+
+Optionally, specify the Activity CM should reply to. **When not specified CM replies to the Activity being processed using `self`**
+
+Valid values: `self`, `parent`, or a Reddit permalink.
+
+`self` and `parent` are special targets that are relative to the Activity being processed:
+
+* When the Activity being processed is a **Submission** => `parent` logs a warning and does nothing
+* When the Activity being processed is a  **Comment**
+  * `self` => reply to Comment
+  * `parent` => make a top-level Comment in the **Submission** the Comment belong to
+
+If target is not self/parent then CM assumes the value is a **reddit permalink** and will attempt to make a Comment to that Activity
 
 ```yaml
 actions:
@@ -506,7 +526,71 @@ actions:
     distinguish: boolean # distinguish as a mod
     sticky: boolean # sticky comment
     lock: boolean # lock the comment after creation
+    targets: string # 'self' or 'parent' or 'https://reddit.com/r/someSubreddit/21nfdi....'
+```
 
+### Submission
+
+Create a Submission [Schema Documentation](https://json-schema.app/view/%23/%23%2Fdefinitions%2FSubmissionCheckJson/%23%2Fdefinitions%2FSubmissionActionJson?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Freddit-context-bot%2Fmaster%2Fsrc%2FSchema%2FApp.json)
+
+The Submission type, Link or Self-Post, is determined based on the presence of `url` in the action's configuration.
+
+```yaml
+actions:
+  - kind: submission
+    title: string # required, the title of the submission. can be templated.
+    content: string # the body of the submission. can be templated
+    url: string # if specified the submission will be a Link Submission. can be templated
+    distinguish: boolean # distinguish as a mod
+    sticky: boolean # sticky comment
+    lock: boolean # lock the comment after creation
+    nsfw: boolean # mark submission as NSFW
+    spoiler: boolean # mark submission as a spoiler
+    flairId: string # flair template id for submission
+    flairText: string # flair text for submission
+    targets: string # 'self' or a subreddit name IE mealtimevideos
+```
+
+#### Templating
+
+`content`,`url`, and `title` can be [templated](#templating) and use [URL Tokens](#url-tokens)
+
+TIP: To create a Link Submission pointing to the Activity currently being processed use
+
+```yaml
+actions:
+  - kind: submission
+    url: {{item.permalink}}
+    # ...
+```
+
+#### Targets
+
+Optionally, specify the Subreddit the Submission should be made in. **When not specified CM uses `self`**
+
+Valid values: `self` or Subreddit Name
+
+* `self` => (**Default**) Create Submission in the same Subreddit of the Activity being processed
+* Subreddit Name => Create Submission in given subreddit IE `mealtimevideos`
+  * Your bot must be able to access and be able to post in the given subreddit
+
+Example: 
+
+```yaml
+actions:
+  - kind: comment
+    targets: mealtimevideos
+```
+
+To post to multiple subreddits use a list:
+
+```yaml
+actions:
+  - kind: comment
+    targets:
+      - self
+      - mealtimevideos
+      - anotherSubreddit 
 ```
 
 ### Contributor
@@ -623,15 +707,18 @@ actions:
 
 Remove the Activity being processed. [Schema Documentation](https://json-schema.app/view/%23/%23%2Fdefinitions%2FSubmissionCheckJson/%23%2Fdefinitions%2FRemoveActionJson?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Freddit-context-bot%2Fedge%2Fsrc%2FSchema%2FApp.json)
 
+* **note** can be [templated](#templating)
+* **reasonId** IDs can be found in the [editor](/docs/webInterface.md) using the **Removal Reasons** popup
+
+If neither note nor reasonId are included then no removal reason is added.
+
 ```yaml
 actions:
   - kind: remove
-    spam: boolean # optional, mark as spam on removal
+    spam: false # optional, mark as spam on removal
+    note: 'a moderator-readable note' # optional, a note only visible to moderators (new reddit only)
+    reasonId: '2n0f4674-365e-46d2-8fc7-a337d85d5340' # optional, the ID of a removal reason to add to the removal action (new reddit only)
 ```
-
-#### What About Removal Reason?
-
-Reddit does not support setting a removal reason through the API. Please complain in [r/modsupport](https://www.reddit.com/r/modsupport) or [r/redditdev](https://www.reddit.com/r/redditdev) to help get this added :)
 
 ### Report
 

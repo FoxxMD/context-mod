@@ -107,8 +107,7 @@ var bmvbhash_even = function(data: BlockImageData, bits: number) {
     return bits_to_hexhash(result);
 };
 
-var bmvbhash = function(data: BlockImageData, bits: number) {
-    var result = [];
+var bmvbhash = function(data: BlockImageData, bits: number, calculateFlipped: boolean = false): string | [string, string] {
 
     var i, j, x, y;
     var block_width, block_height;
@@ -198,30 +197,51 @@ var bmvbhash = function(data: BlockImageData, bits: number) {
         }
     }
 
-    for (i = 0; i < bits; i++) {
-        for (j = 0; j < bits; j++) {
-            result.push(blocks[i][j]);
+    const blocksFlipped: number[][] | undefined = calculateFlipped ? [] : undefined;
+    if(blocksFlipped !== undefined) {
+        for(const row of blocks) {
+            const flippedRow = [...row];
+            flippedRow.reverse();
+            blocksFlipped.push(flippedRow);
         }
     }
 
-    translate_blocks_to_bits(result, block_width * block_height);
-    return bits_to_hexhash(result);
+    if(blocksFlipped !== undefined) {
+        const result = [];
+        const resultFlip = [];
+        for (i = 0; i < bits; i++) {
+            for (j = 0; j < bits; j++) {
+                result.push(blocks[i][j]);
+                resultFlip.push(blocksFlipped[i][j])
+            }
+        }
+
+        translate_blocks_to_bits(result, block_width * block_height);
+        translate_blocks_to_bits(resultFlip, block_width * block_height);
+        return [bits_to_hexhash(result), bits_to_hexhash(resultFlip)];
+    } else {
+        const result = [];
+        for (i = 0; i < bits; i++) {
+            for (j = 0; j < bits; j++) {
+                result.push(blocks[i][j]);
+            }
+        }
+
+        translate_blocks_to_bits(result, block_width * block_height);
+        return bits_to_hexhash(result);
+    }
 };
 
-var blockhashData = function(imgData: BlockImageData, bits: number, method: number) {
-    var hash;
+var blockhashData = function(imgData: BlockImageData, bits: number, method: number, calculateFlipped: boolean): string | [string, string] {
 
     if (method === 1) {
-        hash = bmvbhash_even(imgData, bits);
+        return bmvbhash_even(imgData, bits);
     }
     else if (method === 2) {
-        hash = bmvbhash(imgData, bits);
-    }
-    else {
-        throw new Error("Bad hashing method");
+        return bmvbhash(imgData, bits, calculateFlipped);
     }
 
-    return hash;
+    throw new Error("Bad hashing method");
 };
 
 export const blockhash = async function(src: Sharp, bits: number, method: number = 2): Promise<string> {
@@ -230,5 +250,14 @@ export const blockhash = async function(src: Sharp, bits: number, method: number
         width: info.width,
         height: info.height,
         data: buff,
-    }, bits, method);
+    }, bits, method, false) as string;
+};
+
+export const blockhashAndFlipped = async function(src: Sharp, bits: number, method: number = 2): Promise<[string, string]> {
+    const {data: buff, info} = await src.ensureAlpha().raw().toBuffer({resolveWithObject: true});
+    return blockhashData({
+        width: info.width,
+        height: info.height,
+        data: buff,
+    }, bits, method, true) as [string, string];
 };

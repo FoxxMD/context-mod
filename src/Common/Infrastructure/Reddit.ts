@@ -75,3 +75,16 @@ export const activityReports = (activity: SnoowrapActivity): Report[] => {
     }
     return reports;
 }
+
+export interface RawSubredditRemovalReasonData {
+    data: {
+        [key: string]: SubredditRemovalReason
+    },
+    order: [string]
+}
+
+export interface SubredditRemovalReason {
+    message: string
+    id: string,
+    title: string
+}

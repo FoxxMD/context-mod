@@ -18,6 +18,9 @@ abstract class CMUser<Instance, Bot, SubredditEntity> implements IUser {
     public abstract accessibleBots(bots: Bot[]): Bot[]
     public abstract canAccessSubreddit(val: Bot, name: string): boolean;
     public abstract accessibleSubreddits(bot: Bot): SubredditEntity[]
+    public abstract isSubredditGuest(val: Bot, name: string): boolean;
+    public abstract isSubredditMod(val: Bot, name: string): boolean;
+    public abstract getModeratedSubreddits(val: Bot): SubredditEntity[]
 }
 
 export default CMUser;

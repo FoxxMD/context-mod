@@ -5,6 +5,7 @@ import {DatabaseMigrationOptions} from "./interfaces";
 import {copyFile} from "fs/promises";
 import {constants} from "fs";
 import {ErrorWithCause} from "pony-cause";
+import {CMError} from "../Utils/Errors";
 
 export interface ExistingTable {
     table: Table
@@ -118,9 +119,10 @@ export class MigrationService {
                 try {
                     await this.backupDatabase();
                     continueBCBackedup = true;
-                } catch (err) {
-                    // @ts-ignore
-                    this.dbLogger.error(err, {leaf: 'Backup'});
+                } catch (err: any) {
+                    if(!(err instanceof CMError) || !err.logged) {
+                        this.dbLogger.error(err, {leaf: 'Backup'});
+                    }
                 }
             } else {
                 this.dbLogger.info('Configuration DID NOT specify migrations may be executed if automated backup is successful. Will not try to create a backup.');
@@ -154,25 +156,34 @@ YOU SHOULD BACKUP YOUR EXISTING DATABASE BEFORE CONTINUING WITH MIGRATIONS.`);
 
     async backupDatabase() {
         try {
-            if (this.database.options.type === 'sqljs' && this.database.options.location !== undefined) {
+            let location: string | undefined;
+            const canBackup = ['sqljs','better-sqlite3'].includes(this.database.options.type);
+            if(canBackup) {
+                if(this.database.options.type === 'sqljs') {
+                    location = this.database.options.location === ':memory:' ? undefined : this.database.options.location;
+                } else {
+                    location = this.database.options.database === ':memory:' || (typeof this.database.options.database !== 'string') ? undefined : this.database.options.database;
+                }
+            }
+            if (canBackup && location !== undefined) {
                 try {
                     const ts = Date.now();
-                    const backupLocation = `${this.database.options.location}.${ts}.bak`
+                    const backupLocation = `${location}.${ts}.bak`
                     this.dbLogger.info(`Detected sqljs (sqlite) database. Will try to make a backup at ${backupLocation}`, {leaf: 'Backup'});
-                    await copyFile(this.database.options.location, backupLocation, constants.COPYFILE_EXCL);
+                    await copyFile(location, backupLocation, constants.COPYFILE_EXCL);
                     this.dbLogger.info('Successfully created backup!', {leaf: 'Backup'});
                 } catch (err: any) {
                     throw new ErrorWithCause('Cannot make an automated backup of your configured database.', {cause: err});
                 }
             } else {
                 let msg = 'Cannot make an automated backup of your configured database.';
-                if (this.database.options.type !== 'sqljs') {
-                    msg += ' Only SQlite (sqljs database type) is implemented for automated backups right now, sorry :( You will need to manually backup your database.';
+                if (!canBackup) {
+                    msg += ' Only SQlite (sqljs or better-sqlite3 database type) is implemented for automated backups right now, sorry :( You will need to manually backup your database.';
                 } else {
                     // TODO don't throw for this??
                     msg += ' Database location is not defined (probably in-memory).';
                 }
-                throw new Error(msg);
+                throw new CMError(msg, {logged: true});
             }
         } catch (e: any) {
             this.dbLogger.error(e, {leaf: 'Backup'});

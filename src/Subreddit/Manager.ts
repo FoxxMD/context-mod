@@ -99,6 +99,8 @@ import {parseFromJsonOrYamlToObject} from "../Common/Config/ConfigUtil";
 import {FilterCriteriaDefaults} from "../Common/Infrastructure/Filters/FilterShapes";
 import {InfluxClient} from "../Common/Influx/InfluxClient";
 import { Point } from "@influxdata/influxdb-client";
+import {NormalizedManagerResponse} from "../Web/Common/interfaces";
+import {guestEntityToApiGuest} from "../Common/Entities/Guest/GuestEntity";
 
 export interface RunningState {
     state: RunState,
@@ -1493,6 +1495,11 @@ export class Manager extends EventEmitter implements RunningStates {
 
     async startQueue(causedBy: Invokee = 'system', options?: ManagerStateChangeOption) {
 
+        if(!this.validConfigLoaded) {
+            this.logger.warn('Cannot start queue while manager has an invalid configuration');
+            return;
+        }
+
         if(this.activityRepo === undefined) {
             this.activityRepo = this.resources.database.getRepository(Activity);
         }
@@ -1789,6 +1796,15 @@ export class Manager extends EventEmitter implements RunningStates {
             for (const client of this.influxClients) {
                 await client.writePoint(metric);
             }
+        }
+    }
+
+    toNormalizedManager(): NormalizedManagerResponse {
+        return {
+            name: this.displayLabel,
+            subreddit: this.subreddit.display_name,
+            subredditNormal: parseRedditEntity(this.subreddit.display_name).name,
+            guests: this.managerEntity.getGuests().map(x => guestEntityToApiGuest(x))
         }
     }
 }

@@ -1,8 +1,8 @@
 import {App} from "../../../App";
 import Bot from "../../../Bot";
-import {BotInstance, CMInstanceInterface} from "../../interfaces";
 import {Manager} from "../../../Subreddit/Manager";
 import CMUser from "../../Common/User/CMUser";
+import {BotInstance, CMInstanceInterface} from "../../Common/interfaces";
 
 declare global {
     declare namespace Express {

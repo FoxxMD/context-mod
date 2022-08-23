@@ -74,7 +74,7 @@ import {
     ActivitySourceTypes,
     CacheProvider,
     ConfigFormat,
-    DurationVal, ExternalUrlContext,
+    DurationVal, ExternalUrlContext, ImageHashCacheData,
     ModUserNoteLabel,
     modUserNoteLabels,
     RedditEntity,
@@ -116,6 +116,7 @@ import {
 } from "./Common/Infrastructure/ActivityWindow";
 import {RunnableBaseJson} from "./Common/Infrastructure/Runnable";
 import Snoowrap from "snoowrap";
+import { uniqueNamesGenerator, adjectives, colors, animals } from 'unique-names-generator';
 
 
 //import {ResembleSingleCallbackComparisonResult} from "resemblejs";
@@ -2830,6 +2831,11 @@ export const resolvePath = (pathVal: string, relativeRoot: string) => {
     return pathUtil.resolve(relativeRoot, pathVal);
 }
 
+export const getExtension = (pathVal: string) => {
+    const pathInfo = pathUtil.parse(pathVal);
+    return pathInfo.ext;
+}
+
 export const resolvePathFromEnvWithRelative = (pathVal: any, relativeRoot: string, defaultVal?: string) => {
     if (pathVal === undefined || pathVal === null) {
         return defaultVal;
@@ -2937,4 +2943,16 @@ export function partition<T>(array: T[], callback: (element: T, index: number, a
             return result;
         }, [[], []]
     );
+}
+
+export const generateRandomName = () => {
+    return uniqueNamesGenerator({
+        dictionaries: [colors, adjectives, animals],
+        style: 'capital',
+        separator: ''
+    });
+}
+
+export const asStrongImageHashCache = (data: ImageHashCacheData): data is Required<ImageHashCacheData> => {
+    return data.original !== undefined && data.flipped !== undefined;
 }

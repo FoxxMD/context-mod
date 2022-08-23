@@ -176,3 +176,17 @@ a {
 li > ul {
     padding: revert;
 }
+
+.cancellable {
+    display:inline;
+/*    margin-left: 10px*/
+}
+
+.smallLi:before {
+    margin-left: -10px;
+    content: ""
+}
+
+.introjs-tooltip-title,.introjs-tooltiptext {
+    color: black;
+}

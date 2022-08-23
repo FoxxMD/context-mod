@@ -1,13 +1,18 @@
 import {URL} from "url";
 import {Logger} from "winston";
-import {BotInstance, CMInstanceInterface, CMInstanceInterface as CMInterface} from "../interfaces";
 import dayjs from 'dayjs';
 import {BotConnection, LogInfo} from "../../Common/interfaces";
 import normalizeUrl from "normalize-url";
-import {HeartbeatResponse} from "../Common/interfaces";
+import {
+    BotInstance,
+    CMInstanceInterface as CMInterface,
+    CMInstanceInterface,
+    HeartbeatResponse
+} from "../Common/interfaces";
 import jwt from "jsonwebtoken";
 import got from "got";
 import {ErrorWithCause} from "pony-cause";
+import ClientBotInstance from "./ClientBotInstance";
 
 export class CMInstance implements CMInterface {
     friendly?: string;
@@ -24,6 +29,7 @@ export class CMInstance implements CMInterface {
     migrationBlocker?: string
     host: string;
     secret: string;
+    invites: string[] = [];
 
     logger: Logger;
     logs: LogInfo[] = [];
@@ -72,6 +78,7 @@ export class CMInstance implements CMInterface {
             secret: this.secret,
             ranMigrations: this.ranMigrations,
             migrationBlocker: this.migrationBlocker,
+            invites: this.invites,
         }
     }
 
@@ -84,6 +91,16 @@ export class CMInstance implements CMInterface {
 
     matchesHost = (val: string) => {
         return normalizeUrl(val) == this.normalUrl;
+    }
+
+    getToken() {
+        return jwt.sign({
+            data: {
+                machine: true,
+            },
+        }, this.secret, {
+            expiresIn: '1m'
+        });
     }
 
     updateFromHeartbeat = (resp: HeartbeatResponse, otherFriendlies: string[] = []) => {
@@ -101,9 +118,10 @@ export class CMInstance implements CMInterface {
             }
         }
 
-        this.subreddits = resp.subreddits;
-        //@ts-ignore
-        this.bots = resp.bots.map(x => ({...x, instance: this}));
+        this.bots = resp.bots.map(x => new ClientBotInstance(x, this));
+        this.subreddits = this.bots.map(x => x.getSubreddits()).flat(3);
+        this.invites = resp.invites;
+
     }
 
     checkHeartbeat = async (force = false, otherFriendlies: string[] = []) => {
@@ -125,13 +143,7 @@ export class CMInstance implements CMInterface {
         if (shouldCheck) {
             this.logger.debug('Starting Heartbeat check');
             this.lastCheck = dayjs().unix();
-            const machineToken = jwt.sign({
-                data: {
-                    machine: true,
-                },
-            }, this.secret, {
-                expiresIn: '1m'
-            });
+            const machineToken = this.getToken();
 
             try {
                 const resp = await got.get(`${this.normalUrl}/heartbeat`, {

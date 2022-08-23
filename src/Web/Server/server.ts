@@ -16,13 +16,11 @@ import status from './routes/authenticated/user/status';
 import liveStats from './routes/authenticated/user/liveStats';
 import {
     actionedEventsRoute,
-    actionRoute,
-    addInviteRoute,
+    actionRoute, addGuestModRoute,
     cancelDelayedRoute,
     configLocationRoute,
     configRoute,
-    deleteInviteRoute,
-    getInvitesRoute
+    removeGuestModRoute, saveGuestWikiEditRoute, removalReasonsRoute
 } from "./routes/authenticated/user";
 import action from "./routes/authenticated/user/action";
 import {authUserCheck, botRoute} from "./middleware";
@@ -37,6 +35,13 @@ import dayjs from "dayjs";
 import { sleep } from '../../util';
 import {Invokee} from "../../Common/Infrastructure/Atomic";
 import {Point} from "@influxdata/influxdb-client";
+import {
+    addBotInviteRoute,
+    addSubredditInviteRoute,
+    deleteSubredditInviteRoute,
+    getBotInviteRoute,
+    getSubredditInvitesRoute
+} from "./routes/authenticated/user/invites";
 
 const server = addAsync(express());
 server.use(bodyParser.json());
@@ -204,6 +209,10 @@ const rcbServer = async function (options: OperatorConfigWithFileContext) {
 
     server.getAsync('/config/location', ...configLocationRoute);
 
+    server.postAsync('/config', ...saveGuestWikiEditRoute);
+
+    server.getAsync('/reasons', ...removalReasonsRoute);
+
     server.getAsync('/events', ...actionedEventsRoute);
 
     server.getAsync('/action', ...action);
@@ -212,13 +221,21 @@ const rcbServer = async function (options: OperatorConfigWithFileContext) {
 
     server.postAsync('/bot', ...addBot());
 
-    server.getAsync('/bot/invite', ...getInvitesRoute);
+    server.getAsync('/bot/invite', ...getSubredditInvitesRoute);
 
-    server.postAsync('/bot/invite', ...addInviteRoute);
+    server.postAsync('/bot/invite', ...addSubredditInviteRoute);
 
-    server.deleteAsync('/bot/invite', ...deleteInviteRoute);
+    server.deleteAsync('/bot/invite', ...deleteSubredditInviteRoute);
 
     server.deleteAsync('/delayed', ...cancelDelayedRoute);
+
+    server.deleteAsync('/guests', ...removeGuestModRoute);
+
+    server.postAsync('/guests', ...addGuestModRoute);
+
+    server.getAsync('/invites/:id', ...getBotInviteRoute);
+
+    server.postAsync('/invites', ...addBotInviteRoute);
 
     app = new App(options);
 

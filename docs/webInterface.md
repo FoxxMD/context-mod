@@ -20,6 +20,7 @@
 
 ## Web Dashboard Tips
 
+* Click the **Help** button at the top of the page to get a **guided tour of the dashboard**
 * Use the [**Overview** section](/docs/images/botOperations.png) to control the bot at a high-level
 * You can **manually run** the bot on any activity (comment/submission) by pasting its permalink into the [input field below the Overview section](/docs/images/runInput.png) and hitting one of the **run buttons**
     * **Dry run** will make the bot run on the activity but it will only **pretend** to run actions, if triggered. This is super useful for testing your config without consequences

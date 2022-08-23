@@ -58,7 +58,7 @@ import {
     filterByTimeRequirement,
     asSubreddit,
     modActionCriteriaSummary,
-    parseRedditFullname
+    parseRedditFullname, asStrongImageHashCache
 } from "../util";
 import LoggedError from "../Utils/LoggedError";
 import {
@@ -120,7 +120,7 @@ import {
 } from "../Common/Infrastructure/Filters/FilterCriteria";
 import {
     ActivitySource, ConfigFragmentValidationFunc, DurationVal,
-    EventRetentionPolicyRange,
+    EventRetentionPolicyRange, ImageHashCacheData,
     JoinOperands,
     ModActionType,
     ModeratorNameCriteria, ModUserNoteLabel, statFrequencies, StatisticFrequency,
@@ -146,7 +146,7 @@ import {
     ActivityType,
     AuthorHistorySort,
     CachedFetchedActivitiesResult, FetchedActivitiesResult,
-    SnoowrapActivity
+    SnoowrapActivity, SubredditRemovalReason
 } from "../Common/Infrastructure/Reddit";
 import {AuthorCritPropHelper} from "../Common/Infrastructure/Filters/AuthorCritPropHelper";
 import {NoopLogger} from "../Utils/loggerFactory";
@@ -994,7 +994,7 @@ export class SubredditResources {
                 hash = `sub-${item.name}`;
                 if (tryToFetch && item instanceof Submission) {
                     // @ts-ignore
-                    const itemToCache = await item.fetch();
+                    const itemToCache = await item.refresh();
                     await this.cache.set(hash, itemToCache, {ttl: this.submissionTTL});
                     return itemToCache;
                 } else {
@@ -1006,7 +1006,7 @@ export class SubredditResources {
                 hash = `comm-${item.name}`;
                 if (tryToFetch && item instanceof Comment) {
                     // @ts-ignore
-                    const itemToCache = await item.fetch();
+                    const itemToCache = await item.refresh();
                     await this.cache.set(hash, itemToCache, {ttl: this.commentTTL});
                     return itemToCache;
                 } else {
@@ -1016,8 +1016,12 @@ export class SubredditResources {
                 }
             }
             return item;
-        } catch (e) {
-            throw new ErrorWithCause('Error occurred while trying to add Activity to cache', {cause: e});
+        } catch (e: any) {
+            if(e.message !== undefined && e.message.includes('Cannot read properties of undefined (reading \'constructor\')')) {
+                throw new ErrorWithCause('Error occurred while trying to add Activity to cache (Comment likely does not exist)', {cause: e});
+            } else {
+                throw new ErrorWithCause('Error occurred while trying to add Activity to cache', {cause: e});
+            }
         }
     }
 
@@ -1102,8 +1106,9 @@ export class SubredditResources {
                 return subreddit as Subreddit;
             }
         } catch (err: any) {
-            this.logger.error('Error while trying to fetch a cached subreddit', err);
-            throw err.logged;
+            const cmError = new CMError('Error while trying to fetch a cached subreddit', {cause: err, logged: true});
+            this.logger.error(cmError);
+            throw cmError;
         }
     }
 
@@ -3353,14 +3358,26 @@ export class SubredditResources {
         return he.decode(Mustache.render(footerRawContent, {subName, permaLink, modmailLink, botLink: BOT_LINK}));
     }
 
-    async getImageHash(img: ImageData): Promise<string|undefined> {
-        const hash = `imgHash-${img.baseUrl}`;
+    async getImageHash(img: ImageData): Promise<Required<ImageHashCacheData>|undefined> {
+
+        if(img.hashResult !== undefined && img.hashResultFlipped !== undefined) {
+            return img.toHashCache() as Required<ImageHashCacheData>;
+        }
+
+        const hash = `imgHash-${img.basePath}`;
         const result = await this.cache.get(hash) as string | undefined | null;
         this.stats.cache.imageHash.requests++
         this.stats.cache.imageHash.requestTimestamps.push(Date.now());
         await this.stats.cache.imageHash.identifierRequestCount.set(hash, (await this.stats.cache.imageHash.identifierRequestCount.wrap(hash, () => 0) as number) + 1);
         if(result !== undefined && result !== null) {
-            return result;
+            try {
+                const data =  JSON.parse(result);
+                if(asStrongImageHashCache(data)) {
+                    return data;
+                }
+            } catch (e) {
+                // had old values, just drop it
+            }
         }
         this.stats.cache.commentCheck.miss++;
         return undefined;
@@ -3371,8 +3388,8 @@ export class SubredditResources {
         // return hash;
     }
 
-    async setImageHash(img: ImageData, hash: string, ttl: number): Promise<void> {
-        await this.cache.set(`imgHash-${img.baseUrl}`, hash, {ttl});
+    async setImageHash(img: ImageData, ttl: number): Promise<void> {
+        await this.cache.set(`imgHash-${img.basePath}`, img.toHashCache() as Required<ImageHashCacheData>, {ttl});
         // const hash = await this.cache.wrap(img.baseUrl, async () => await img.hash(true), { ttl }) as string;
         // if(img.hashResult === undefined) {
         //     img.hashResult = hash;
@@ -3385,6 +3402,21 @@ export class SubredditResources {
             return this.thirdPartyCredentials[name];
         }
         return undefined;
+    }
+
+    async getSubredditRemovalReasons(): Promise<SubredditRemovalReason[]> {
+        if(this.wikiTTL !== false) {
+            return await this.cache.wrap(`removalReasons`, async () => {
+                const res = await this.client.getSubredditRemovalReasons(this.subreddit.display_name);
+                return Object.values(res.data);
+            }, { ttl: this.wikiTTL }) as SubredditRemovalReason[];
+        }
+        const res = await this.client.getSubredditRemovalReasons(this.subreddit.display_name);
+        return Object.values(res.data);
+    }
+
+    async getSubredditRemovalReasonById(id: string): Promise<SubredditRemovalReason | undefined> {
+        return (await this.getSubredditRemovalReasons()).find(x => x.id === id);
     }
 }
 

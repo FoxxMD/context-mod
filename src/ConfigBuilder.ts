@@ -2,7 +2,7 @@ import winston, {Logger} from "winston";
 import {
     asNamedCriteria, asWikiContext,
     buildCachePrefix, buildFilter, castToBool,
-    createAjvFactory, fileOrDirectoryIsWriteable,
+    createAjvFactory, fileOrDirectoryIsWriteable, generateRandomName,
     mergeArr, mergeFilters,
     normalizeName,
     overwriteMerge,
@@ -98,6 +98,7 @@ import {SubredditResources} from "./Subreddit/SubredditResources";
 import {asIncludesData, IncludesData, IncludesString} from "./Common/Infrastructure/Includes";
 import ConfigParseError from "./Utils/ConfigParseError";
 import {InfluxClient} from "./Common/Influx/InfluxClient";
+import {BotInvite} from "./Common/Entities/BotInvite";
 
 export interface ConfigBuilderOptions {
     logger: Logger,
@@ -1224,9 +1225,6 @@ export const buildOperatorConfigWithDefaults = async (data: OperatorJsonConfig):
                 maxAge: sessionMaxAge = 86400,
                 storage: sessionStorage = undefined,
             } = {},
-            invites: {
-                maxAge: inviteMaxAge = 0,
-            } = {},
             clients,
             credentials: webCredentials,
             operators,
@@ -1331,12 +1329,36 @@ export const buildOperatorConfigWithDefaults = async (data: OperatorJsonConfig):
     }
     const webDbConfig = createDatabaseConfig(realdbConnectionWeb);
 
+    const appDataSource = await createAppDatabaseConnection(dbConfig, appLogger);
+
     let influx: InfluxClient | undefined = undefined;
     if(influxConfig !== undefined) {
         const tags = friendly !== undefined ? {server: friendly} : undefined;
         influx = new InfluxClient(influxConfig, appLogger, tags);
         await influx.isReady();
     }
+
+/*    let friendlyId: string;
+    if (friendly === undefined) {
+        let randFriendly: string = generateRandomName();
+        // see if we can get invites to check for unique name
+        // if this is a new instance will not be able to get it but try anyway
+        try {
+            const inviteRepo = appDataSource.getRepository(BotInvite);
+            const exists = async (name: string) => {
+                const existing = await inviteRepo.findBy({instance: name});
+                return existing.length > 0;
+            }
+            while (await exists(randFriendly)) {
+                randFriendly = generateRandomName();
+            }
+        } catch (e: any) {
+            // something went wrong, just ignore this
+        }
+        friendlyId = randFriendly;
+    } else {
+        friendlyId = friendly;
+    }*/
 
     const config: OperatorConfig = {
         mode,
@@ -1351,7 +1373,7 @@ export const buildOperatorConfigWithDefaults = async (data: OperatorJsonConfig):
             frequency,
             minFrequency
         },
-        database: await createAppDatabaseConnection(dbConfig, appLogger),
+        database: appDataSource,
         databaseConfig: {
             connection: dbConfig,
             migrations,
@@ -1371,9 +1393,6 @@ export const buildOperatorConfigWithDefaults = async (data: OperatorJsonConfig):
             },
             port,
             storage: webStorage,
-            invites: {
-                maxAge: inviteMaxAge,
-            },
             session: {
                 secret: sessionSecretFromConfig,
                 maxAge: sessionMaxAge,
@@ -1387,7 +1406,7 @@ export const buildOperatorConfigWithDefaults = async (data: OperatorJsonConfig):
         api: {
             port: apiPort,
             secret: apiSecret,
-            friendly
+            friendly,
         },
         bots: [],
         credentials,

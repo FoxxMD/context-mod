@@ -13,7 +13,7 @@ import {
     CheckSummary,
     RunResult,
     ActionedEvent,
-    ActionResult, RuleResult, EventActivity
+    ActionResult, RuleResult, EventActivity, OperatorConfigWithFileContext
 } from "../../Common/interfaces";
 import {
     buildCachePrefix,
@@ -38,7 +38,6 @@ import sharedSession from "express-socket.io-session";
 import dayjs from "dayjs";
 import httpProxy from 'http-proxy';
 import {arrayMiddle, booleanMiddle} from "../Common/middleware";
-import {BotInstance, CMInstanceInterface} from "../interfaces";
 import { URL } from "url";
 import {MESSAGE} from "triple-beam";
 import Autolinker from "autolinker";
@@ -57,6 +56,8 @@ import {MigrationService} from "../../Common/MigrationService";
 import {RuleResultEntity} from "../../Common/Entities/RuleResultEntity";
 import {RuleSetResultEntity} from "../../Common/Entities/RuleSetResultEntity";
 import { PaginationAwareObject } from "../Common/util";
+import {BotInstance, BotStatusResponse, CMInstanceInterface, InviteData} from "../Common/interfaces";
+import {open} from "fs/promises";
 
 const emitter = new EventEmitter();
 
@@ -151,10 +152,10 @@ const availableLevels = ['error', 'warn', 'info', 'verbose', 'debug'];
 
 let webLogs: LogInfo[] = [];
 
-const webClient = async (options: OperatorConfig) => {
+const webClient = async (options: OperatorConfigWithFileContext) => {
     const {
         operator: {
-            name,
+            name: operatorName,
             display,
         },
         userAgent: uaFragment,
@@ -169,9 +170,6 @@ const webClient = async (options: OperatorConfig) => {
             port,
             storage: webStorage = 'database',
             caching,
-            invites: {
-              maxAge: invitesMaxAge,
-            },
             session: {
                 secret: sessionSecretFromConfig,
                 maxAge: sessionMaxAge,
@@ -179,15 +177,13 @@ const webClient = async (options: OperatorConfig) => {
             },
             maxLogs,
             clients,
-            credentials: {
-                clientId,
-                clientSecret,
-                redirectUri
-            },
+            credentials,
             operators = [],
         },
         //database
     } = options;
+
+    let clientCredentials = credentials;
 
     let sessionSecretSynced = false;
 
@@ -237,7 +233,7 @@ const webClient = async (options: OperatorConfig) => {
         }
     });
 
-    const storage = webStorage === 'database' ? new DatabaseStorageProvider({database, invitesMaxAge, logger}) : new CacheStorageProvider({...caching, invitesMaxAge, logger});
+    const storage = webStorage === 'database' ? new DatabaseStorageProvider({database, logger}) : new CacheStorageProvider({...caching, logger});
 
     let sessionSecret: string;
     if (sessionSecretFromConfig !== undefined) {
@@ -297,9 +293,9 @@ const webClient = async (options: OperatorConfig) => {
             }
             const client = await ExtendedSnoowrap.fromAuthCode({
                 userAgent,
-                clientId,
-                clientSecret,
-                redirectUri: redirectUri as string,
+                clientId: clientCredentials.clientId,
+                clientSecret: clientCredentials.clientSecret,
+                redirectUri: clientCredentials.redirectUri as string,
                 code: code as string,
             });
             const user = await client.getMe().name as string;
@@ -315,7 +311,7 @@ const webClient = async (options: OperatorConfig) => {
 
     let sessionStoreProvider = storage;
     if(sessionStorage !== webStorage) {
-        sessionStoreProvider = sessionStorage === 'database' ? new DatabaseStorageProvider({database, invitesMaxAge, logger, loggerLabels: ['Session']}) : new CacheStorageProvider({...caching, invitesMaxAge, logger, loggerLabels: ['Session']});
+        sessionStoreProvider = sessionStorage === 'database' ? new DatabaseStorageProvider({database, logger, loggerLabels: ['Session']}) : new CacheStorageProvider({...caching, logger, loggerLabels: ['Session']});
     }
     const sessionObj = session({
         cookie: {
@@ -349,10 +345,50 @@ const webClient = async (options: OperatorConfig) => {
         }
     }
 
+    app.postAsync('/init', async (req, res, next) => {
+        if (clientCredentials.clientId === undefined || clientCredentials.clientSecret === undefined) {
+            const {
+                redirect = '',
+                clientId = '',
+                clientSecret = '',
+                operator = '',
+            } = req.body as any;
+            if (redirect === null || redirect.trim() === '') {
+                return res.status(400).send('redirect cannot be empty');
+            }
+            if (clientId === null || clientId.trim() === '') {
+                return res.status(400).send('clientId cannot be empty');
+            }
+            if (clientSecret === null || clientSecret.trim() === '') {
+                return res.status(400).send('clientSecret cannot be empty');
+            }
+            if(operatorName === undefined) {
+                return res.status(400).send('operator cannot be empty');
+            }
+            options.fileConfig.document.setWebCredentials({redirectUri: redirect.trim(), clientId: clientId.trim(), clientSecret: clientSecret.trim()});
+            if(operators.length === 0 && operator !== '') {
+                options.fileConfig.document.setOperator(parseRedditEntity(operator, 'user').name);
+            }
+            const handle = await open(options.fileConfig.document.location as string, 'w');
+            await handle.writeFile(options.fileConfig.document.toString());
+            await handle.close();
+
+            clientCredentials = {
+                clientId,
+                clientSecret,
+                redirectUri: redirect
+            }
+
+            return res.status(200).send();
+        } else {
+            return res.status(400).send('Can only do init setup when client credentials do not already exist.');
+        }
+    });
+
     const scopeMiddle = arrayMiddle(['scope']);
     const successMiddle = booleanMiddle([{name: 'closeOnSuccess', defaultVal: undefined, required: false}]);
     app.getAsync('/login', scopeMiddle, successMiddle, async (req, res, next) => {
-        if (redirectUri === undefined) {
+        if (clientCredentials.redirectUri === undefined) {
             return res.render('error', {error: `No <b>redirectUri</b> was specified through environmental variables or program argument. This must be provided in order to use the web interface.`});
         }
         const {query: { scope: reqScopes = [], closeOnSuccess } } = req;
@@ -364,10 +400,13 @@ const webClient = async (options: OperatorConfig) => {
             // @ts-ignore
             req.session.closeOnSuccess = closeOnSuccess;
         }
+        if(clientCredentials.clientId === undefined) {
+            return res.render('init', { operators: operators.join(',') });
+        }
         const authUrl = Snoowrap.getAuthUrl({
-            clientId,
+            clientId: clientCredentials.clientId,
             scope: scope,
-            redirectUri: redirectUri as string,
+            redirectUri: clientCredentials.redirectUri as string,
             permanent: false,
             state: req.session.state,
         });
@@ -394,10 +433,10 @@ const webClient = async (options: OperatorConfig) => {
                 return res.render('error', {error: errContent});
             }
             // @ts-ignore
-            const invite = await storage.inviteGet(req.session.inviteId);
+            const invite = req.session.invite as InviteData; //await storage.inviteGet(req.session.inviteId);
             if(invite === undefined) {
                 // @ts-ignore
-                return res.render('error', {error: `Could not find invite with id ${req.session.inviteId}?? This should happen!`});
+                return res.render('error', {error: `Could not find invite in session?? This should happen!`});
             }
             const client = await Snoowrap.fromAuthCode({
                 userAgent,
@@ -409,40 +448,36 @@ const webClient = async (options: OperatorConfig) => {
             // @ts-ignore
             const user = await client.getMe();
             const userName = `u/${user.name}`;
+
             // @ts-ignore
-            await storage.inviteDelete(req.session.inviteId);
+            //await storage.inviteDelete(req.session.inviteId);
             let data: any = {
                 accessToken: client.accessToken,
                 refreshToken: client.refreshToken,
                 userName,
             };
-            if(invite.instance !== undefined) {
-                const bot = cmInstances.find(x => x.getName() === invite.instance);
-                if(bot !== undefined) {
-                    const botPayload: any = {
-                        overwrite: invite.overwrite === true,
-                        name: userName,
-                        credentials: {
-                            reddit: {
-                                accessToken: client.accessToken,
-                                refreshToken: client.refreshToken,
-                                clientId: invite.clientId,
-                                clientSecret: invite.clientSecret,
-                            }
-                        }
-                    };
-                    if(invite.subreddits !== undefined && invite.subreddits.length > 0) {
-                        botPayload.subreddits =  {names: invite.subreddits};
+
+            // @ts-ignore
+            const inviteId = invite.id as string;
+
+            // @ts-ignore
+            const botAddResult: any = await addBot(inviteId, {
+                invite: inviteId,
+                credentials: {
+                    reddit: {
+                        accessToken: client.accessToken,
+                        refreshToken: client.refreshToken,
+                        clientId: invite.clientId,
+                        clientSecret: invite.clientSecret,
                     }
-                    const botAddResult: any = await addBot(bot, {name: invite.creator}, botPayload);
-                    // stored
-                    // success
-                    data = {...data, ...botAddResult};
-                    // @ts-ignore
-                    req.session.destroy();
-                    req.logout();
-                }
-            }
+                },
+                name: userName,
+            });
+            data = {...data, ...botAddResult};
+
+            // @ts-ignore
+            req.session.destroy();
+            req.logout();
             return res.render('callback', data);
         } else {
             return next();
@@ -503,31 +538,100 @@ const webClient = async (options: OperatorConfig) => {
         }
     }
 
-    app.getAsync('/auth/helper', helperAuthed, (req, res) => {
+    const createUserToken = async (req: express.Request, res: express.Response, next: Function) => {
+        req.token = createToken(req.instance as CMInstanceInterface, req.user);
+        next();
+    }
+
+    const instanceWithPermissions = async (req: express.Request, res: express.Response, next: Function) => {
+        delete req.session.botId;
+        delete req.session.authBotId;
+
+        const msg = 'Bot does not exist or you do not have permission to access it';
+        const instance = cmInstances.find(x => x.getName() === req.query.instance);
+        if (instance === undefined) {
+            return res.status(404).render('error', {error: msg});
+        }
+
+        if (!req.user?.clientData?.webOperator && !req.user?.canAccessInstance(instance)) {
+            return res.status(404).render('error', {error: msg});
+        }
+
+        if (req.params.subreddit !== undefined && !req.user?.canAccessSubreddit(instance,req.params.subreddit)) {
+            return res.status(404).render('error', {error: msg});
+        }
+        req.instance = instance;
+        req.session.botId = instance.getName();
+        req.session.authBotId = instance.getName();
+        return next();
+    }
+
+    const instancesViewData = async (req: express.Request, res: express.Response, next: Function) => {
+
+        const user = req.user as Express.User;
+        const instance = req.instance as CMInstance;
+
+        const shownInstances = cmInstances.reduce((acc: CMInstance[], curr) => {
+            const isBotOperator = user?.isInstanceOperator(curr);
+            if(user?.clientData?.webOperator) {
+                // @ts-ignore
+                return acc.concat({...curr.getData(), canAccessLocation: true, isOperator: isBotOperator});
+            }
+            if(!isBotOperator && !req.user?.canAccessInstance(curr)) {
+                return acc;
+            }
+            // @ts-ignore
+            return acc.concat({...curr.getData(), canAccessLocation: isBotOperator, isOperator: isBotOperator, botId: curr.getName()});
+        },[]);
+
+        // @ts-ignore
+        req.instancesViewData = {
+            instances: shownInstances,
+            instanceId: instance.getName()
+        };
+
+        next();
+    }
+
+    app.getAsync('/auth/helper', helperAuthed, instanceWithPermissions, instancesViewData, (req, res) => {
         return res.render('helper', {
-            redirectUri,
-            clientId,
-            clientSecret,
+            redirectUri: clientCredentials.redirectUri,
+            clientId: clientCredentials.clientId,
+            clientSecret: clientCredentials.clientSecret,
             token: req.isAuthenticated() && req.user?.clientData?.webOperator ? token : undefined,
-            instances: cmInstances.filter(x => req.user?.isInstanceOperator(x)).map(x => x.getName()),
+            // @ts-ignore
+            ...req.instancesViewData,
         });
     });
 
-    app.getAsync('/auth/invite', async (req, res) => {
-        const {invite: inviteId} = req.query;
+    app.getAsync('/auth/invite/:inviteId', async (req, res) => {
+        const {inviteId} = req.params;
 
-        if(inviteId === undefined) {
+        if (inviteId === undefined) {
             return res.render('error', {error: '`invite` param is missing from URL'});
         }
-        const invite = await storage.inviteGet(inviteId as string);
-        if(invite === undefined || invite === null) {
+
+        const cmInstance = cmInstances.find(x => x.invites.includes(inviteId));
+        if (cmInstance === undefined) {
             return res.render('error', {error: 'Invite with the given id does not exist'});
         }
 
-        return res.render('invite', {
-            permissions: JSON.stringify(invite.permissions || []),
-            invite: inviteId,
-        });
+        try {
+            const invite = await got.get(`${cmInstance.normalUrl}/invites/${inviteId}`, {
+                headers: {
+                    'Authorization': `Bearer ${cmInstance.getToken()}`,
+                }
+            }).json() as InviteData;
+
+            return res.render('invite', {
+                guests: invite.guests !== undefined && invite.guests !== null && invite.guests.length > 0 ? invite.guests.join(',') : '',
+                permissions: JSON.stringify(invite.permissions || []),
+                invite: inviteId,
+            });
+        } catch (err: any) {
+            cmInstance.logger.error(new ErrorWithCause(`Retrieving invite failed`, {cause: err}));
+            return res.render('error', {error: 'An error occurred while validating your invite and has been logged. Let the person who gave you this invite know! Sorry about that.'})
+        }
     });
 
     app.postAsync('/auth/create', helperAuthed, async (req: express.Request, res: express.Response) => {
@@ -538,15 +642,15 @@ const webClient = async (options: OperatorConfig) => {
             redirect: redir,
             instance,
             subreddits,
-            code,
+            guests: guestsVal,
         } = req.body as any;
 
-        const cid = ci || clientId;
+        const cid = ci || clientCredentials.clientId;
         if(cid === undefined || cid.trim() === '') {
             return res.status(400).send('clientId is required');
         }
 
-        const ced = ce || clientSecret;
+        const ced = ce || clientCredentials.clientSecret;
         if(ced === undefined || ced.trim() === '') {
             return res.status(400).send('clientSecret is required');
         }
@@ -555,32 +659,74 @@ const webClient = async (options: OperatorConfig) => {
             return res.status(400).send('redirectUrl is required');
         }
 
-        const inviteId = code || nanoid(20);
-        await storage.inviteCreate(inviteId, {
+        let guestArr = [];
+        if(typeof guestsVal === 'string') {
+            guestArr = guestsVal.split(',');
+        } else if(Array.isArray(guestsVal)) {
+            guestArr = guestsVal;
+        }
+        guestArr = guestArr.filter(x => x.trim() !== '').map(x => parseRedditEntity(x, 'user').name);
+
+        const inviteData = {
             permissions,
-            clientId: (ci || clientId).trim(),
-            clientSecret: (ce || clientSecret).trim(),
+            clientId: (ci || clientCredentials.clientId).trim(),
+            clientSecret: (ce || clientCredentials.clientSecret).trim(),
             redirectUri: redir.trim(),
             instance,
             subreddits: subreddits.trim() === '' ? [] : subreddits.split(',').map((x: string) => parseRedditEntity(x).name),
             creator: (req.user as Express.User).name,
-        });
-        return res.send(inviteId);
+            guests: guestArr.length > 0 ? guestArr : undefined
+        };
+        const cmInstance = cmInstances.find(x => x.friendly === instance);
+        if(cmInstance === undefined) {
+            return res.status(400).send(`No instance found with name "${instance}"`);
+        }
+
+        const token = createToken(cmInstance, req.user);
+
+        try {
+            const resp = await got.post(`${cmInstance.normalUrl}/invites`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                },
+                json: inviteData,
+            }).json() as any;
+            cmInstance.invites.push(resp.id);
+            return res.send(resp.id);
+        } catch (err: any) {
+            cmInstance.logger.error(new ErrorWithCause(`Could not create bot invite.`, {cause: err}));
+            return res.status(400).send(`Error while creating invite: ${err.message}`);
+        }
     });
 
-    app.getAsync('/auth/init', async (req: express.Request, res: express.Response) => {
-        const {invite: inviteId} = req.query;
+    app.getAsync('/auth/init/:inviteId', async (req: express.Request, res: express.Response) => {
+        const { inviteId } = req.params;
         if(inviteId === undefined) {
             return res.render('error', {error: '`invite` param is missing from URL'});
         }
-        const invite = await storage.inviteGet(inviteId as string);
-        if(invite === undefined || invite === null) {
+
+        const cmInstance = cmInstances.find(x => x.invites.includes(inviteId));
+        if (cmInstance === undefined) {
             return res.render('error', {error: 'Invite with the given id does not exist'});
+        }
+
+        let invite: InviteData;
+
+        try {
+            invite = await got.get(`${cmInstance.normalUrl}/invites/${inviteId}`, {
+                headers: {
+                    'Authorization': `Bearer ${cmInstance.getToken()}`,
+                }
+            }).json() as InviteData;
+
+        } catch (err: any) {
+            cmInstance.logger.error(new ErrorWithCause(`Retrieving invite failed`, {cause: err}));
+            return res.render('error', {error: 'An error occurred while validating your invite and has been logged. Let the person who gave you this invite know! Sorry about that.'})
         }
 
         req.session.state = `bot_${randomId()}`;
         // @ts-ignore
-        req.session.inviteId = inviteId;
+        req.session.invite = invite;
 
         const scope = Object.entries(invite.permissions).reduce((acc: string[], curr) => {
             const [k, v] = curr as unknown as [string, boolean];
@@ -620,31 +766,6 @@ const webClient = async (options: OperatorConfig) => {
     }
     logger.info(`Web UI started: http://localhost:${port}`, {label: ['Web']});
 
-    const instanceWithPermissions = async (req: express.Request, res: express.Response, next: Function) => {
-        delete req.session.botId;
-        delete req.session.authBotId;
-
-        const msg = 'Bot does not exist or you do not have permission to access it';
-        const instance = cmInstances.find(x => x.getName() === req.query.instance);
-        if (instance === undefined) {
-            return res.status(404).render('error', {error: msg});
-        }
-
-        if (!req.user?.clientData?.webOperator && !req.user?.canAccessInstance(instance)) {
-            return res.status(404).render('error', {error: msg});
-        }
-
-        if (req.params.subreddit !== undefined && !req.user?.isInstanceOperator(instance) && !req.user?.subreddits.includes(req.params.subreddit)) {
-            return res.status(404).render('error', {error: msg});
-        }
-        req.instance = instance;
-        req.session.botId = instance.getName();
-        if(req.user?.canAccessInstance(instance)) {
-            req.session.authBotId = instance.getName();
-        }
-        return next();
-    }
-
 
     const botWithPermissions = (required: boolean = false, setDefault: boolean = false) => async (req: express.Request, res: express.Response, next: Function) => {
 
@@ -680,17 +801,12 @@ const webClient = async (options: OperatorConfig) => {
                 return res.status(404).render('error', {error: msg});
             }
 
-            if (req.params.subreddit !== undefined && !req.user?.isInstanceOperator(instance) && !req.user?.subreddits.includes(req.params.subreddit)) {
+            if (req.params.subreddit !== undefined && !req.user?.canAccessSubreddit(instance,req.params.subreddit)) {
                 return res.status(404).render('error', {error: msg});
             }
             req.bot = botInstance;
         }
 
-        next();
-    }
-
-    const createUserToken = async (req: express.Request, res: express.Response, next: Function) => {
-        req.token = createToken(req.instance as CMInstanceInterface, req.user);
         next();
     }
 
@@ -750,7 +866,7 @@ const webClient = async (options: OperatorConfig) => {
                 if(x.operators.includes(user.name)) {
                     return true;
                 }
-                return intersect(user.subreddits, x.subreddits).length > 0;
+                return x.bots.some(y => y.canUserAccessBot(user.name, user.subreddits));
             });
 
             if(accessibleInstance === undefined) {
@@ -765,13 +881,13 @@ const webClient = async (options: OperatorConfig) => {
         next();
     }
 
-    const defaultSubreddit = async (req: express.Request, res: express.Response, next: Function) => {
+/*    const defaultSubreddit = async (req: express.Request, res: express.Response, next: Function) => {
         if(req.bot !== undefined && req.query.subreddit === undefined) {
-            const firstAccessibleSub = req.bot.subreddits.find(x => req.user?.isInstanceOperator(req.instance) || req.user?.subreddits.includes(x));
+            const firstAccessibleSub = req.bot.managers.find(x => req.user?.isInstanceOperator(req.instance) || req.user?.subreddits.includes(x));
             req.query.subreddit = firstAccessibleSub;
         }
         next();
-    }
+    }*/
 
     const initHeartbeat = async (req: express.Request, res: express.Response, next: Function) => {
         if(!init) {
@@ -793,19 +909,41 @@ const webClient = async (options: OperatorConfig) => {
     }
 
     const migrationRedirect = async (req: express.Request, res: express.Response, next: Function) => {
+        const user = req.user as Express.User;
         const instance = req.instance as CMInstance;
+
         if(instance.bots.length === 0 && instance?.ranMigrations === false && instance?.migrationBlocker !== undefined) {
+
+            if(!user.isInstanceOperator(instance)) {
+                return res.render('error-authenticated', {
+                    error: `A database migration, which requires manual confirmation by its <strong>Operator</strong>, is required before this CM instance can finish starting up.`,
+                    // @ts-ignore
+                    ...req.instancesViewData
+                })
+            }
+
             return res.render('migrations', {
                 type: 'app',
                 ranMigrations: instance.ranMigrations,
                 migrationBlocker: instance.migrationBlocker,
-                instance: instance.friendly
+                instance: instance.friendly,
+                // @ts-ignore
+                ...req.instancesViewData
             });
         }
         return next();
     };
 
-    app.getAsync('/', [initHeartbeat, redirectBotsNotAuthed, ensureAuthenticated, defaultSession, defaultInstance, instanceWithPermissions, migrationRedirect, botWithPermissions(false, true), createUserToken], async (req: express.Request, res: express.Response) => {
+    const redirectNoBots = async (req: express.Request, res: express.Response, next: Function) => {
+        const i = req.instance as CMInstance;
+        if (i.bots.length === 0) {
+            // assuming user is doing first-time setup and this is the default localhost bot
+            return res.redirect(`/auth/helper?instance=${i.getName()}`);
+        }
+        next();
+    }
+
+    app.getAsync('/', [initHeartbeat, redirectBotsNotAuthed, ensureAuthenticated, defaultSession, defaultInstance, instanceWithPermissions, instancesViewData, migrationRedirect, redirectNoBots, botWithPermissions(false, true), createUserToken], async (req: express.Request, res: express.Response) => {
 
         const user = req.user as Express.User;
         const instance = req.instance as CMInstance;
@@ -813,19 +951,6 @@ const webClient = async (options: OperatorConfig) => {
         const limit = req.session.limit;
         const sort = req.session.sort;
         const level = req.session.level;
-
-        const shownInstances = cmInstances.reduce((acc: CMInstance[], curr) => {
-            const isBotOperator = req.user?.isInstanceOperator(curr);
-            if(user?.clientData?.webOperator) {
-                // @ts-ignore
-                return acc.concat({...curr.getData(), canAccessLocation: true, isOperator: isBotOperator});
-            }
-            if(!isBotOperator && !req.user?.canAccessInstance(curr)) {
-                return acc;
-            }
-            // @ts-ignore
-            return acc.concat({...curr.getData(), canAccessLocation: isBotOperator, isOperator: isBotOperator, botId: curr.getName()});
-        },[]);
 
         let resp;
         try {
@@ -848,8 +973,8 @@ const webClient = async (options: OperatorConfig) => {
             refreshClient({host: instance.host, secret: instance.secret});
             const isOp = req.user?.isInstanceOperator(instance);
             return res.render('offline', {
-                instances: shownInstances,
-                instanceId: (req.instance as CMInstance).getName(),
+                // @ts-ignore
+                ...req.instancesViewData,
                 isOperator: isOp,
                 // @ts-ignore
                 logs: filterLogs((isOp ? instance.logs : instance.logs.filter(x => x.user === undefined || x.user.includes(req.user.name))), {limit, sort, level}),
@@ -880,11 +1005,31 @@ const webClient = async (options: OperatorConfig) => {
 
         const isOp = req.user?.isInstanceOperator(instance);
 
+        // const bots = resp.bots.map((x: BotStatusResponse) => {
+        //     return {
+        //         ...x,
+        //         subreddits: x.subreddits.map(y => {
+        //            return {
+        //                ...y,
+        //                guests: y.guests.map(z => {
+        //                    const d = z.expiresAt === undefined ? undefined : dayjs(z.expiresAt);
+        //                    return {
+        //                        ...z,
+        //                        relative: d === undefined ? 'Never' : dayjs.duration(d.diff(dayjs())).humanize(),
+        //                        date: d === undefined ? 'Never' : d.format('YYYY-MM-DD HH:mm:ssZ')
+        //                    }
+        //                })
+        //            }
+        //         })
+        //     }
+        // });
+
         res.render('status', {
-            instances: shownInstances,
+            // @ts-ignore
+            ...req.instancesViewData,
             bots: resp.bots,
+            now: dayjs().add(1, 'minute').format('YYYY-MM-DDTHH:mm'),
             botId: (req.instance as CMInstance).getName(),
-            instanceId: (req.instance as CMInstance).getName(),
             isOperator: isOp,
             system: isOp ? {
                 // @ts-ignore
@@ -915,14 +1060,19 @@ const webClient = async (options: OperatorConfig) => {
         });
     });
 
+    app.getAsync('/guest', [ensureAuthenticatedApi, defaultSession, instanceWithPermissions, botWithPermissions(true)], async (req: express.Request, res: express.Response) => {
+        const {subreddit} = req.query as any;
+        return res.status(req.user?.isSubredditGuest(req.bot, subreddit) ? 200 : 403).send();
+    });
+
     app.postAsync('/config', [ensureAuthenticatedApi, defaultSession, instanceWithPermissions, botWithPermissions(true)], async (req: express.Request, res: express.Response) => {
         const {subreddit} = req.query as any;
         const {location, data, reason = 'Updated through CM Web', create = false} = req.body as any;
 
         const client = new ExtendedSnoowrap({
             userAgent,
-            clientId,
-            clientSecret,
+            clientId: clientCredentials.clientId,
+            clientSecret: clientCredentials.clientSecret,
             accessToken: req.user?.clientData?.token
         });
 
@@ -1353,14 +1503,18 @@ const webClient = async (options: OperatorConfig) => {
         }
     }
 
-    const addBot = async (bot: CMInstanceInterface, userPayload: any, botPayload: any) => {
+    const addBot = async (inviteId: string, botPayload: any) => {
+
+        const cmInstance = cmInstances.find(x => x.invites.includes(inviteId));
+        if(cmInstance === undefined) {
+            return {success: false, error: 'Could not determine CM instance to add bot to based on invite id (invite id was not found)'};
+        }
+
         try {
-            const token = createToken(bot, userPayload);
-            const resp = await got.post(`${bot.normalUrl}/bot`, {
-                body: JSON.stringify(botPayload),
+            const resp = await got.post(`${cmInstance.normalUrl}/bot`, {
+                json: botPayload,
                 headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`,
+                    'Authorization': `Bearer ${cmInstance.getToken()}`,
                 }
             }).json() as object;
             return {success: true, ...resp};

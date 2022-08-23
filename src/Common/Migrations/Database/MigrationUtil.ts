@@ -1,4 +1,4 @@
-import {TableIndex} from "typeorm";
+import {QueryRunner, TableIndex} from "typeorm";
 
 /**
  * Boilerplate for creating generic index
@@ -77,4 +77,16 @@ export const filterIndices = (prefix: string) => {
         authorIsIndex(prefix),
         itemIsIndex(prefix)
     ]
+}
+
+export const tableHasData = async (runner: QueryRunner, name: string): Promise<boolean | null> => {
+    const countRes = await runner.query(`select count(*) from ${name}`);
+    let hasRows = null;
+    if (Array.isArray(countRes) && countRes[0] !== null) {
+        const {
+            'count(*)': count
+        } = countRes[0] || {};
+        hasRows = count !== 0;
+    }
+    return hasRows;
 }

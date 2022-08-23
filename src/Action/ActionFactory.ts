@@ -18,12 +18,15 @@ import {CancelDispatchAction, CancelDispatchActionJson} from "./CancelDispatchAc
 import ContributorAction, {ContributorActionJson} from "./ContributorAction";
 import {StructuredFilter} from "../Common/Infrastructure/Filters/FilterShapes";
 import {ModNoteAction, ModNoteActionJson} from "./ModNoteAction";
+import {SubmissionAction, SubmissionActionJson} from "./SubmissionAction";
 
 export function actionFactory
 (config: StructuredActionJson, logger: Logger, subredditName: string, resources: SubredditResources, client: ExtendedSnoowrap, emitter: EventEmitter): Action {
     switch (config.kind) {
         case 'comment':
             return new CommentAction({...config as StructuredFilter<CommentActionJson>, logger, subredditName, resources, client, emitter});
+        case 'submission':
+            return new SubmissionAction({...config as StructuredFilter<SubmissionActionJson>, logger, subredditName, resources, client, emitter});
         case 'lock':
             return new LockAction({...config as StructuredFilter<LockActionJson>, logger, subredditName, resources, client, emitter});
         case 'remove':

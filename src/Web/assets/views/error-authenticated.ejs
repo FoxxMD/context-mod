@@ -1,0 +1,41 @@
+<html lang="en">
+<%- include('partials/head', {title: 'CM'}) %>
+<body class="bg-gray-900 text-white font-sans">
+<div class="min-w-screen min-h-screen">
+    <%- include('partials/header') %>
+    <div class="container mx-auto">
+        <div class="grid">
+            <div class="bg-gray-600">
+                <div class="p-6 md:px-10 md:py-6">
+                    <div class="text-xl mb-4">Oops 😬</div>
+                    <div class="space-y-3">
+                        <div>Something went wrong while processing that last request:</div>
+                        <div class="space-y-3"><%- error %></div>
+                        <% if(locals.operatorDisplay !== undefined && locals.operatorDisplay !== 'Anonymous') { %>
+                            <div>Operated By: <%= operatorDisplay %></div>
+                        <% } %>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <%- include('partials/footer') %>
+</div>
+<script>
+    const instanceSearchParams = new URLSearchParams(window.location.search);
+
+    const instance = instanceSearchParams.get('instance');
+
+    document.querySelectorAll(`[data-instance].instanceSelectWrapper`).forEach((el) => {
+        if(el.dataset.instance === instance) {
+            el.classList.add('border-2');
+            el.querySelector('a.instanceSelect').classList.add('pointer-events-none','no-underline','font-bold');
+        } else {
+            el.classList.add('border');
+            el.querySelector('a.instanceSelect').classList.add('font-normal','pointer');
+        }
+
+    });
+</script>
+</body>
+</html>

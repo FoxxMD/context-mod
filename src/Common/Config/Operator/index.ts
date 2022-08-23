@@ -1,11 +1,14 @@
 import YamlConfigDocument from "../YamlConfigDocument";
 import JsonConfigDocument from "../JsonConfigDocument";
 import {YAMLMap, YAMLSeq, Pair, Scalar} from "yaml";
-import {BotInstanceJsonConfig, OperatorJsonConfig} from "../../interfaces";
+import {BotInstanceJsonConfig, OperatorJsonConfig, WebCredentials} from "../../interfaces";
 import {assign} from 'comment-json';
 
 export interface OperatorConfigDocumentInterface {
     addBot(botData: BotInstanceJsonConfig): void;
+    setFriendlyName(name: string): void;
+    setWebCredentials(data: Required<WebCredentials>): void;
+    setOperator(name: string): void;
     toJS(): OperatorJsonConfig;
 }
 
@@ -27,6 +30,18 @@ export class YamlOperatorConfigDocument extends YamlConfigDocument implements Op
         } else {
             this.parsed.addIn(['bots'], botData);
         }
+    }
+
+    setFriendlyName(name: string) {
+        this.parsed.addIn(['api', 'friendly'], name);
+    }
+
+    setWebCredentials(data: Required<WebCredentials>) {
+        this.parsed.addIn(['web', 'credentials'], data);
+    }
+
+    setOperator(name: string) {
+        this.parsed.addIn(['operator', 'name'], name);
     }
 
     toJS(): OperatorJsonConfig  {
@@ -66,6 +81,23 @@ export class JsonOperatorConfigDocument extends JsonConfigDocument implements Op
         } else {
             this.parsed.bots.push(botData);
         }
+    }
+
+    setFriendlyName(name: string) {
+        const api = this.parsed.api || {};
+        this.parsed.api = {...api, friendly: name};
+    }
+
+    setWebCredentials(data: Required<WebCredentials>) {
+        const {
+            web = {},
+        } = this.parsed;
+
+        this.parsed.web = {...web, credentials: data};
+    }
+
+    setOperator(name: string) {
+        this.parsed.operator = { name };
     }
 
     toJS(): OperatorJsonConfig {

@@ -148,6 +148,7 @@ export type RecordOutputOption = boolean | RecordOutputType | RecordOutputType[]
 export type PostBehaviorType = 'next' | 'stop' | 'nextRun' | string;
 export type onExistingFoundBehavior = 'replace' | 'skip' | 'ignore';
 export type ActionTarget = 'self' | 'parent';
+export type ArbitraryActionTarget = ActionTarget | string;
 export type InclusiveActionTarget = ActionTarget | 'any';
 export type DispatchSource = 'dispatch' | `dispatch:${string}`;
 export type NonDispatchActivitySource = 'poll' | `poll:${PollOn}` | 'user' | `user:${string}`;
@@ -174,6 +175,7 @@ export type ActivitySource = NonDispatchActivitySource | DispatchSource;
 export type ConfigFormat = 'json' | 'yaml';
 export type ActionTypes =
     'comment'
+    | 'submission'
     | 'lock'
     | 'remove'
     | 'report'
@@ -276,4 +278,9 @@ export interface ExternalUrlContext {
 export interface UrlContext {
     value: string
     context: WikiContext | ExternalUrlContext
+}
+
+export interface ImageHashCacheData {
+    original?: string
+    flipped?: string
 }

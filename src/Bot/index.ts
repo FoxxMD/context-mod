@@ -19,7 +19,7 @@ import {
     parseBool,
     parseDuration, parseMatchMessage, parseRedditEntity,
     parseSubredditName, partition, RetryOptions,
-    sleep
+    sleep, intersect
 } from "../util";
 import {Manager} from "../Subreddit/Manager";
 import {ExtendedSnoowrap, ProxiedSnoowrap} from "../Utils/SnoowrapClients";
@@ -43,8 +43,12 @@ import {FilterCriteriaDefaults} from "../Common/Infrastructure/Filters/FilterSha
 import {snooLogWrapper} from "../Utils/loggerFactory";
 import {InfluxClient} from "../Common/Influx/InfluxClient";
 import {Point} from "@influxdata/influxdb-client";
+import {BotInstanceFunctions, NormalizedManagerResponse} from "../Web/Common/interfaces";
+import {AuthorEntity} from "../Common/Entities/AuthorEntity";
+import {Guest, GuestEntityData} from "../Common/Entities/Guest/GuestInterfaces";
+import {guestEntitiesToAll, guestEntityToApiGuest} from "../Common/Entities/Guest/GuestEntity";
 
-class Bot {
+class Bot implements BotInstanceFunctions {
 
     client!: ExtendedSnoowrap;
     logger!: Logger;
@@ -99,6 +103,8 @@ class Bot {
     database: DataSource
     invokeeRepo: Repository<InvokeeType>;
     runTypeRepo: Repository<RunStateType>;
+    managerRepo: Repository<ManagerEntity>;
+    authorRepo: Repository<AuthorEntity>;
     botEntity!: BotEntity
 
     getBotName = () => {
@@ -160,6 +166,8 @@ class Bot {
         this.database = database;
         this.invokeeRepo = this.database.getRepository(InvokeeType);
         this.runTypeRepo = this.database.getRepository(RunStateType);
+        this.managerRepo = this.database.getRepository(ManagerEntity);
+        this.authorRepo = this.database.getRepository(AuthorEntity);
         this.config = config;
         this.dryRun = parseBool(dryRun) === true ? true : undefined;
         this.softLimit = softLimit;
@@ -672,15 +680,15 @@ class Bot {
             databaseConfig: {
                 retention = undefined
             } = {},
+            wikiConfig = this.wikiLocation,
         } = override || {};
 
-        const managerRepo = this.database.getRepository(ManagerEntity);
         const subRepo = this.database.getRepository(SubredditEntity)
         let subreddit = await subRepo.findOne({where: {id: sub.name}});
         if(subreddit === null) {
             subreddit = await subRepo.save(new SubredditEntity({id: sub.name, name: sub.display_name}))
         }
-        let managerEntity = await managerRepo.findOne({
+        let managerEntity = await this.managerRepo.findOne({
             where: {
                 bot: {
                     id: this.botEntity.id
@@ -689,12 +697,15 @@ class Bot {
                     id: subreddit.id
                 }
             },
+            relations: {
+                guests: true
+            }
         });
         if(managerEntity === undefined || managerEntity === null) {
             const invokee = await this.invokeeRepo.findOneBy({name: SYSTEM}) as InvokeeType;
             const runType = await this.runTypeRepo.findOneBy({name: STOPPED}) as RunStateType;
 
-            managerEntity = await managerRepo.save(new ManagerEntity({
+            managerEntity = await this.managerRepo.save(new ManagerEntity({
                 name: sub.display_name,
                 bot: this.botEntity,
                 subreddit: subreddit as SubredditEntity,
@@ -707,7 +718,7 @@ class Bot {
         const manager = new Manager(sub, this.client, this.logger, this.cacheManager, {
             dryRun: this.dryRun,
             sharedStreams: this.sharedStreams,
-            wikiLocation: this.wikiLocation,
+            wikiLocation: wikiConfig,
             botName: this.botName as string,
             maxWorkers: this.maxWorkers,
             filterCriteriaDefaults: this.filterCriteriaDefaults,
@@ -816,6 +827,7 @@ class Bot {
             await sleep(5000);
             const time = dayjs().valueOf()
             await this.apiHealthCheck(time);
+            await this.guestModCleanup();
             if (!this.running) {
                 break;
             }
@@ -908,6 +920,19 @@ class Bot {
             }
         }
 
+    }
+
+    async guestModCleanup() {
+        const now = dayjs();
+
+        for(const m of this.subManagers) {
+            const expiredGuests = m.managerEntity.getGuests().filter(x => x.expiresAt.isBefore(now));
+            if(expiredGuests.length > 0) {
+                m.managerEntity.removeGuestById(expiredGuests.map(x => x.id));
+                m.logger.info(`Removed expired Guest Mods: ${expiredGuests.map(x => x.author.name).join(', ')}`);
+                await this.managerRepo.save(m.managerEntity);
+            }
+        }
     }
 
     async retentionCleanup() {
@@ -1099,6 +1124,117 @@ class Bot {
             this.logger.error(`Error occurred during nanny loop: ${err.message}`);
             throw err;
         }
+    }
+
+    getManagerNames(): string[] {
+        return this.subManagers.map(x => x.displayLabel);
+    }
+
+    getSubreddits(normalized = true): string[] {
+        return normalized ? this.subManagers.map(x => parseRedditEntity(x.subreddit.display_name).name) : this.subManagers.map(x => x.subreddit.display_name);
+    }
+
+    getGuestManagers(user: string): NormalizedManagerResponse[] {
+        return this.subManagers.filter(x => x.managerEntity.getGuests().map(y => y.author.name).includes(user)).map(x => x.toNormalizedManager());
+    }
+
+    getGuestSubreddits(user: string): string[] {
+        return this.getGuestManagers(user).map(x => x.subredditNormal);
+    }
+
+    getAccessibleSubreddits(user: string, subreddits: string[] = []): string[] {
+        const normalSubs = subreddits.map(x => parseRedditEntity(x).name);
+        const moderatedSubs = intersect(normalSubs, this.getSubreddits());
+        const guestSubs = this.getGuestSubreddits(user);
+        return Array.from(new Set([...guestSubs, ...moderatedSubs]));
+    }
+
+    canUserAccessBot(user: string, subreddits: string[] = []) {
+        return this.getAccessibleSubreddits(user, subreddits).length > 0;
+    }
+
+    canUserAccessSubreddit(subreddit: string, user: string, subreddits: string[] = []): boolean {
+        return this.getAccessibleSubreddits(user, subreddits).includes(parseRedditEntity(subreddit).name);
+    }
+
+    async addGuest(userVal: string | string[], expiresAt: Dayjs, managerVal?: string | string[]) {
+        let managerNames: string[];
+        if(typeof managerVal === 'string') {
+            managerNames = [managerVal];
+        } else if(Array.isArray(managerVal)) {
+            managerNames = managerVal;
+        } else {
+            managerNames = this.subManagers.map(x => x.subreddit.display_name);
+        }
+
+        const cleanSubredditNames = managerNames.map(x => parseRedditEntity(x).name);
+        const userNames = typeof userVal === 'string' ? [userVal] : userVal;
+        const cleanUsers = userNames.map(x => parseRedditEntity(x.trim(), 'user').name);
+
+        const users: AuthorEntity[] = [];
+
+        for(const uName of cleanUsers) {
+            let user = await this.authorRepo.findOne({
+                where: {
+                    name: uName,
+                }
+            });
+
+            if(user === null) {
+                users.push(await this.authorRepo.save(new AuthorEntity({name: uName})));
+            } else {
+                users.push(user);
+            }
+        }
+
+        const newGuestData = users.map(x => ({author: x, expiresAt})) as GuestEntityData[];
+
+        let newGuests = new Map<string, Guest[]>();
+        const updatedManagerEntities: ManagerEntity[] = [];
+        for(const m of this.subManagers) {
+            if(!cleanSubredditNames.includes(m.subreddit.display_name)) {
+                continue;
+            }
+            const filteredGuests = m.managerEntity.addGuest(newGuestData);
+            updatedManagerEntities.push(m.managerEntity);
+            newGuests.set(m.displayLabel, filteredGuests.map(x => guestEntityToApiGuest(x)));
+            m.logger.info(`Added ${cleanUsers.join(', ')} as Guest`);
+        }
+
+        await this.managerRepo.save(updatedManagerEntities);
+
+        return newGuests;
+    }
+
+    async removeGuest(userVal: string | string[], managerVal?: string | string[]) {
+        let managerNames: string[];
+        if(typeof managerVal === 'string') {
+            managerNames = [managerVal];
+        } else if(Array.isArray(managerVal)) {
+            managerNames = managerVal;
+        } else {
+            managerNames = this.subManagers.map(x => x.subreddit.display_name);
+        }
+
+        const cleanSubredditNames = managerNames.map(x => parseRedditEntity(x).name);
+        const userNames = typeof userVal === 'string' ? [userVal] : userVal;
+        const cleanUsers = userNames.map(x => parseRedditEntity(x.trim(), 'user').name);
+
+        let newGuests = new Map<string, Guest[]>();
+        const updatedManagerEntities: ManagerEntity[] = [];
+        for(const m of this.subManagers) {
+            if(!cleanSubredditNames.includes(m.subreddit.display_name)) {
+                continue;
+            }
+            const filteredGuests = m.managerEntity.removeGuestByUser(cleanUsers);
+            updatedManagerEntities.push(m.managerEntity);
+            newGuests.set(m.displayLabel, filteredGuests.map(x => guestEntityToApiGuest(x)));
+            m.logger.info(`Removed ${cleanUsers.join(', ')} from Guests`);
+        }
+
+        await this.managerRepo.save(updatedManagerEntities);
+
+        return newGuests;
     }
 }
 

@@ -1,6 +1,6 @@
-import {BotInstance, CMInstanceInterface} from "../../interfaces";
 import CMUser from "./CMUser";
 import {intersect, parseRedditEntity} from "../../../util";
+import {BotInstance, CMInstanceInterface} from "../interfaces";
 
 class ClientUser extends CMUser<CMInstanceInterface, BotInstance, string> {
 
@@ -9,15 +9,15 @@ class ClientUser extends CMUser<CMInstanceInterface, BotInstance, string> {
     }
 
     canAccessInstance(val: CMInstanceInterface): boolean {
-        return this.isInstanceOperator(val) || intersect(this.subreddits, val.subreddits.map(x => parseRedditEntity(x).name)).length > 0;
+        return this.isInstanceOperator(val) || val.bots.filter(x => x.canUserAccessBot(this.name, this.subreddits)).length > 0;
     }
 
     canAccessBot(val: BotInstance): boolean {
-        return this.isInstanceOperator(val.instance) || intersect(this.subreddits, val.subreddits.map(x => parseRedditEntity(x).name)).length > 0;
+        return this.isInstanceOperator(val.instance) || val.canUserAccessBot(this.name, this.subreddits);
     }
 
     canAccessSubreddit(val: BotInstance, name: string): boolean {
-        return this.isInstanceOperator(val.instance) || this.subreddits.map(x => x.toLowerCase()).includes(parseRedditEntity(name).name.toLowerCase());
+        return this.isInstanceOperator(val.instance) || val.canUserAccessSubreddit(name, this.name, this.subreddits);
     }
 
     accessibleBots(bots: BotInstance[]): BotInstance[] {
@@ -28,12 +28,32 @@ class ClientUser extends CMUser<CMInstanceInterface, BotInstance, string> {
             if (this.isInstanceOperator(x.instance)) {
                 return true;
             }
-            return intersect(this.subreddits, x.subreddits.map(y => parseRedditEntity(y).name)).length > 0
+            return x.canUserAccessBot(this.name, this.subreddits);
+            //return intersect(this.subreddits, x.managers.map(y => parseRedditEntity(y).name)).length > 0
         });
     }
 
     accessibleSubreddits(bot: BotInstance): string[] {
-        return this.isInstanceOperator(bot.instance) ? bot.subreddits.map(x => parseRedditEntity(x).name) : intersect(this.subreddits, bot.subreddits.map(x => parseRedditEntity(x).name));
+        return this.isInstanceOperator(bot.instance) ? bot.getSubreddits() :  bot.getAccessibleSubreddits(this.name, this.subreddits);
+    }
+
+    isSubredditGuest(val: BotInstance, name: string): boolean {
+        const normalName = parseRedditEntity(name).name;
+        const manager = val.managers.find(x => x.subredditNormal === normalName);
+        if(manager !== undefined) {
+            return manager.guests.some(y => y.name.toLowerCase() === this.name.toLowerCase());
+        }
+        return false;
+    }
+
+    isSubredditMod(val: BotInstance, name: string): boolean {
+        const normalName = parseRedditEntity(name).name;
+        return this.canAccessSubreddit(val, name) && this.subreddits.map(x => parseRedditEntity(name).name).includes(normalName);
+    }
+
+    getModeratedSubreddits(val: BotInstance): string[] {
+        const normalSubs = this.subreddits.map(x => parseRedditEntity(x).name);
+        return val.managers.filter(x => normalSubs.includes(x.subredditNormal)).map(x => x.subredditNormal);
     }
 
 }

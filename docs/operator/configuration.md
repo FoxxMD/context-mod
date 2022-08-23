@@ -136,6 +136,8 @@ You will need have this information available:
 
 See the [**example minimum configuration** below.](#minimum-config)
 
+This configuration can also be **generated** by CM if you start CM with **no configuration defined** and visit the web interface.
+
 # Bots
 
 Configured using the `bots` top-level property. Bot configuration can override and specify many more options than are available at the operator-level. Many of these can also set the defaults for each subreddit the bot runs:

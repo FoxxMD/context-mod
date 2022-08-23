@@ -27,7 +27,7 @@
             <% if(locals.isOperator === true && locals.instanceId !== undefined) { %>
                     <li class="my-3 px-3">
                         <span class="rounded-md py-2 px-3 border">
-                        <a class="font-normal pointer hover:font-bold" href="/auth/helper">
+                        <a class="font-normal pointer hover:font-bold" href="/auth/helper?instance=<%= locals.instanceId %>">
                             Add Bot +
                         </a>
                         </span>

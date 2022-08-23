@@ -1,12 +1,16 @@
 import {Request, Response} from 'express';
 import {authUserCheck, botRoute, subredditRoute} from "../../../middleware";
-import Submission from "snoowrap/dist/objects/Submission";
 import winston from 'winston';
-import {COMMENT_URL_ID, parseLinkIdentifier, parseRedditThingsFromLink, SUBMISSION_URL_ID} from "../../../../../util";
+import {
+    COMMENT_URL_ID,
+    parseLinkIdentifier,
+    parseRedditEntity,
+    parseRedditThingsFromLink,
+    SUBMISSION_URL_ID
+} from "../../../../../util";
 import {booleanMiddle} from "../../../../Common/middleware";
 import {Manager} from "../../../../../Subreddit/Manager";
-import {ActionedEvent} from "../../../../../Common/interfaces";
-import {CMEvent, CMEvent as ActionedEventEntity} from "../../../../../Common/Entities/CMEvent";
+import {CMEvent} from "../../../../../Common/Entities/CMEvent";
 import {nanoid} from "nanoid";
 import dayjs from "dayjs";
 import {
@@ -16,11 +20,11 @@ import {
     getFullEventsById,
     paginateRequest
 } from "../../../../Common/util";
-import {filterResultsBuilder} from "../../../../../Utils/typeormUtils";
-import {Brackets} from "typeorm";
 import {Activity} from "../../../../../Common/Entities/Activity";
-import {RedditThing} from "../../../../../Common/Infrastructure/Reddit";
-import {CMError} from "../../../../../Utils/Errors";
+import {Guest} from "../../../../../Common/Entities/Guest/GuestInterfaces";
+import {guestEntitiesToAll, guestEntityToApiGuest} from "../../../../../Common/Entities/Guest/GuestEntity";
+import {ManagerEntity} from "../../../../../Common/Entities/ManagerEntity";
+import {AuthorEntity} from "../../../../../Common/Entities/AuthorEntity";
 
 const commentReg = parseLinkIdentifier([COMMENT_URL_ID]);
 const submissionReg = parseLinkIdentifier([SUBMISSION_URL_ID]);
@@ -42,46 +46,13 @@ const configLocation = async (req: Request, res: Response) => {
 
 export const configLocationRoute = [authUserCheck(), botRoute(), subredditRoute(), configLocation];
 
-const getInvites = async (req: Request, res: Response) => {
-
-    return res.json(await req.serverBot.cacheManager.getPendingSubredditInvites());
+const removalReasons = async (req: Request, res: Response) => {
+    const manager = req.manager as Manager;
+    const reasons = await manager.resources.getSubredditRemovalReasons()
+    return res.json(reasons);
 };
 
-export const getInvitesRoute = [authUserCheck(), botRoute(), getInvites];
-
-const addInvite = async (req: Request, res: Response) => {
-
-    const {subreddit} = req.body as any;
-    if (subreddit === undefined || subreddit === null || subreddit === '') {
-        return res.status(400).send('subreddit must be defined');
-    }
-    try {
-        await req.serverBot.cacheManager.addPendingSubredditInvite(subreddit);
-    } catch (e: any) {
-        if(e instanceof CMError) {
-            req.logger.warn(e);
-            return res.status(400).send(e.message);
-        } else {
-            req.logger.error(e);
-            return res.status(500).send(e.message);
-        }
-    }
-    return res.status(200).send();
-};
-
-export const addInviteRoute = [authUserCheck(), botRoute(), addInvite];
-
-const deleteInvite = async (req: Request, res: Response) => {
-
-    const {subreddit} = req.query as any;
-    if (subreddit === undefined || subreddit === null || subreddit === '') {
-        return res.status(400).send('subreddit must be defined');
-    }
-    await req.serverBot.cacheManager.deletePendingSubredditInvite(subreddit);
-    return res.status(200).send();
-};
-
-export const deleteInviteRoute = [authUserCheck(), botRoute(), deleteInvite];
+export const removalReasonsRoute = [authUserCheck(), botRoute(), subredditRoute(), removalReasons];
 
 const actionedEvents = async (req: Request, res: Response) => {
 
@@ -227,3 +198,72 @@ const cancelDelayed = async (req: Request, res: Response) => {
 };
 
 export const cancelDelayedRoute = [authUserCheck(), botRoute(), subredditRoute(true), cancelDelayed];
+
+const removeGuestMod = async (req: Request, res: Response) => {
+
+    const {name} = req.query as any;
+
+    const isAll = req.manager === undefined;
+    const managers = (isAll ? req.user?.getModeratedSubreddits(req.serverBot) : [req.manager as Manager]) as Manager[];
+
+    const newGuests = await req.serverBot.removeGuest(name, managers.map(x => x.subreddit.display_name));
+
+    const guests = isAll ? guestEntitiesToAll(newGuests) : Array.from(newGuests.values()).flat(3);
+
+    return res.json(guests);
+};
+
+export const removeGuestModRoute = [authUserCheck(), botRoute(), subredditRoute(true, true), removeGuestMod];
+
+const addGuestMod = async (req: Request, res: Response) => {
+
+    const {name, time} = req.query as any;
+
+    const isAll = req.manager === undefined;
+    const managers = (isAll ? req.user?.getModeratedSubreddits(req.serverBot) : [req.manager as Manager]) as Manager[];
+
+    const expiresAt = dayjs(Number.parseInt(time));
+
+    const newGuests = await req.serverBot.addGuest(name, expiresAt, managers.map(x => x.subreddit.display_name));
+
+    const guests = isAll ? guestEntitiesToAll(newGuests) : Array.from(newGuests.values()).flat(3);
+
+    return res.status(200).json(guests);
+};
+
+export const addGuestModRoute = [authUserCheck(), botRoute(), subredditRoute(true, true), addGuestMod];
+
+const saveGuestWikiEdit = async (req: Request, res: Response) => {
+    const {location, data, reason = 'Updated through CM Web', create = false} = req.body as any;
+
+    try {
+        // @ts-ignore
+        const wiki = await req.manager?.subreddit.getWikiPage(location) as WikiPage;
+        await wiki.edit({
+            text: data,
+            reason: `${reason} by Guest Mod ${req.user?.name}`,
+        });
+    } catch (err: any) {
+        res.status(500);
+        return res.send(err.message);
+    }
+
+    if(create) {
+        try {
+            // @ts-ignore
+            await req.manager.subreddit.getWikiPage(location).editSettings({
+                permissionLevel: 2,
+                // don't list this page on r/[subreddit]/wiki/pages
+                listed: false,
+            });
+        } catch (err: any) {
+            res.status(500);
+            return res.send(`Successfully created wiki page for configuration but encountered error while setting visibility. You should manually set the wiki page visibility on reddit. \r\n Error: ${err.message}`);
+        }
+    }
+
+    res.status(200);
+    return res.send();
+}
+
+export const saveGuestWikiEditRoute = [authUserCheck(), botRoute(), subredditRoute(true, false, true), saveGuestWikiEdit];

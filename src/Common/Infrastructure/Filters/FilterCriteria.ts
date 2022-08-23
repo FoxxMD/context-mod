@@ -454,7 +454,7 @@ export interface ActivityState {
     dispatched?: boolean | string | string[]
 
 
-    // can use ActivitySource | ActivitySource[] here because of issues with generating json schema, see ActivitySource comments
+    // cant use ActivitySource | ActivitySource[] here because of issues with generating json schema, see ActivitySource comments
     /**
      * Test where the current activity was sourced from.
      *
