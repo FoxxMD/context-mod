@@ -4,9 +4,7 @@ This getting started guide is for **Operators** -- that is, someone who wants to
 
 * [Installation](#installation)
 * [Create a Reddit Client](#create-a-reddit-client)
-* [Create a Minimum Configuration](#create-a-minimum-configuration)
-  * [Local Installation](#local-installation)
-  * [Docker Installation](#docker-installation)
+* [Start ContextMod](#start-contextmod)
 * [Add a Bot to CM](#add-a-bot-to-cm)
 * [Access The Dashboard](#access-the-dashboard)
 * [What's Next?](#whats-next)
@@ -19,29 +17,25 @@ Follow the [installation](/docs/operator/installation.md) documentation. It is r
 
 [Create a reddit client](/docs/operator/README.md#provisioning-a-reddit-client)
 
-# Create a Minimum Configuration
+# Start ContextMod 
 
-Using the information you received in the previous step [create a minimum file configuration](/docs/operator/configuration.md#minimum-configuration) save it as `config.yaml` somewhere.
+Start CM using the example command from your [installation](#installation) and visit http://localhost:8085
 
-# Start ContextMod With Configuration
+The First Time Setup page will ask you to input:
 
-## Local Installation
+* Client ID (from [Create a Reddit Client](#create-a-reddit-client))
+* Client Secret (from [Create a Reddit Client](#create-a-reddit-client))
+* Operator -- this is the username of your main Reddit account.
 
-If you [installed CM locally](/docs/installation.md#locally) move your configuration file `config.yaml` to the root of the project directory (where `package.json`) is located.
-
-From the root directory run this command to start CM
-
-```
-node src/index.js run
-```
-
-## Docker Installation
-
-If you [installed CM using Docker](/docs/installation.md#docker-recommended) make note of the directory you saved your minimum configuration to and substitute its full path for `host/path/folder` in the docker command show in the [docker install directions](/docs/operator/installation.md#docker-recommended)
+**Write Config** and then restart CM. You have now created the [minimum configuration](/docs/operator/configuration.md#minimum-configuration) required to run CM.
 
 # Add A Bot to CM
 
-Once CM is up and running use the [CM OAuth Helper](/docs/operator/addingBot.md#cm-oauth-helper-recommended) to add authorize and add a Bot to your CM instance.
+You should automatically be directed to the [Bot Invite Helper](/docs/operator/addingBot.md#cm-oauth-helper-recommended) used to authorize and add a Bot to your CM instance.
+
+Follow the directions here and **create an Authorization Invite** at the bottom of the page. 
+
+Next, login to Reddit with the account you will be using as the Bot and then visit the **Authorization Invite** link you created. Follow the steps there to finish adding the Bot to your CM instance.
 
 # Access The Dashboard
 
@@ -57,4 +51,4 @@ As an operator you should familiarize yourself with how the [operator configurat
 
 If you are also the moderator of the subreddit the bot will be running you should check out the [moderator getting started guide.](/docs/subreddit/gettingStarted.md#setup-wiki-page)
 
-You might also be interested in these [quick tips for using the web interface](/docs/webInterface.md)
+You might also be interested in these [quick tips for using the web interface](/docs/webInterface.md). Additionally, on the dashboard click the **Help** button at the top of the page to get a guided tour of the dashboard.

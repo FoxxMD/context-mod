@@ -13,6 +13,7 @@ PROTIP: Using a container management tool like [Portainer.io CE](https://www.por
 An example of starting the container using the [minimum configuration](/docs/operator/configuration.md#minimum-config):
 
 * Bind the directory where your config file, logs, and database are located on your host machine into the container's default `DATA_DIR` by using `-v /host/path/folder:/config`
+  * Note: **You must do this** or else your configuration will be lost next time your container is updated.
 * Expose the web interface using the container port `8085`
 
 ```

@@ -21,7 +21,7 @@ They are responsible for configuring the software at a high-level and managing a
 
 # Overview
 
-CM is composed of two applications that operate indepedently but are packaged together such that they act as one piece of software:
+CM is composed of two applications that operate independently but are packaged together such that they act as one piece of software:
 
 * **Server** -- Responsible for **running the bot(s)** and providing an API to retrieve information on and interact with them EX start/stop bot, reload config, retrieve operational status, etc.
 * **Client** -- Responsible for serving the **web interface** and handling the bot oauth authentication flow between operators and subreddits/bots.
