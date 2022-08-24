@@ -21,7 +21,11 @@
     "circular-graph": "madge --image graph.svg --circular --extensions ts src/index.ts",
     "postinstall": "patch-package",
     "typeorm": "node --require ts-node/register ./node_modules/typeorm/cli.js",
-    "initMigration": "npm run typeorm -- migration:generate -t 1642180264563 -d ormconfig.js \"src/Common/Migrations/Database/init\""
+    "initMigration": "npm run typeorm -- migration:generate -t 1642180264563 -d ormconfig.js \"src/Common/Migrations/Database/init\"",
+    "cv-install-ubuntu-prebuild": "build-opencv --incDir /usr/include/opencv4/ --libDir /lib/x86_64-linux-gnu/ --binDir=/usr/bin/ --nobuild rebuild",
+    "cv-install-docker-prebuild": "build-opencv --incDir /usr/include/opencv4/ --libDir /usr/lib/ --binDir=/usr/bin/ --nobuild rebuild",
+    "cv-autoinstall-cuda": "build-opencv --version 4.5.5 --flags=\"-DWITH_CUDA=ON -DWITH_CUDNN=ON -DOPENCV_DNN_CUDA=ON -DCUDA_FAST_MATH=ON\" build",
+    "cv-autoinstall": "build-opencv build"
   },
   "engines": {
     "node": ">=16"
@@ -42,6 +46,7 @@
     "@nlpjs/language": "^4.22.7",
     "@nlpjs/nlp": "^4.23.5",
     "@stdlib/regexp-regexp": "^0.0.6",
+    "@u4/opencv4nodejs": "^6.2.1",
     "ajv": "^7.2.4",
     "ansi-regex": ">=5.0.1",
     "async": "^3.2.0",
@@ -160,6 +165,7 @@
     "better-sqlite3": "^7.5.0",
     "mongo": "^3.6.0",
     "mysql": "^2.18.1",
+    "opencv-build": "^0.1.9",
     "pg": "^8.7.1",
     "sharp": "^0.29.1"
   }

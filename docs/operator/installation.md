@@ -60,6 +60,65 @@ An example of running CM using the [minimum configuration](/docs/operator/config
 node src/index.js run
 ```
 
+### Dependencies
+
+Note: All below dependencies are automatically included in the [Docker](#docker-recommended) image.
+
+#### Sharp
+
+For basic [Image Comparisons](/docs/imageComparison.md) and image data CM uses [sharp](https://sharp.pixelplumbing.com/) which depends on [libvips](https://www.libvips.org/)
+
+Binaries for Sharp and libvips ship with the `sharp` npm package for all major operating systems and should require no additional steps to use -- installing CM with the above script should be sufficient.
+
+See more about Sharp dependencies in the [image comparison prerequisites.](/docs/imageComparison.md#prerequisites)
+
+
+#### OpenCV
+
+For advanced image comparison CM uses [OpenCV.](https://opencv.org/) OpenCV is an **optional** dependency that is only utilized if CM is configured to run these advanced image operations so if you are NOT doing any image-related operations you can safely ignore this section/dependency.
+
+**NOTE:** Depending on the image being compared (resolution) and operations being performed this can be a **CPU heavy resource.** TODO: Add rules that are cpu heavy...
+
+##### Installation
+
+Installation is not an automatic process. The below instructions are a summary of "easy" paths for installation but are not exhaustive. DO reference the detailed instructions (including additional details for windows installs) at [opencv4nodejs How to Install](https://github.com/UrielCh/opencv4nodejs#how-to-install).
+
+###### Build From Source
+
+This may take **some time** since openCV will be built from scratch.
+
+On windows you must first install build tools: `npm install --global windows-build-tools`
+
+Otherwise, run one of the following commands from the CM project directory:
+
+* For CUDA (Nvidia GPU acceleration): `npm run cv-autoinstall-cuda`
+* Normal: `npm run cv-autoinstall`
+
+###### Build from Prebuilt
+
+In this use-case you already have openCV built OR are using a distro prebuilt package. This method is much faster than building from source as only bindings need to be built.
+
+[More information on prebuild installation](https://github.com/UrielCh/opencv4nodejs#installing-opencv-manually)
+
+Prerequisites:
+
+* Windows `choco install OpenCV -y -version 4.1.0`
+* MacOS `brew install opencv@4; brew link --force opencv@4`
+* Linux -- varies, check your package manager for `opencv` and `opencv-dev`
+
+A script for building on **Ubuntu** is already included in CM:
+
+* `sudo apt install opencv-dev`
+* `npm run cv-install-ubuntu-prebuild`
+
+Otherwise, you will need to modify `scripts` in CM's `package.json`, use the script `cv-install-ubuntu-prebuild` as an example. Your command must include:
+
+* `--incDir [path/to/opencv/dev-files]` (on linux, usually `/usr/include/opencv4/`)
+* `--libDir [path/to/opencv/shared-files]` (on linux usually `/lib/x86_64-linux-gnu/` or `/usr/lib/`)
+* `--binDir=[path/to/openv/binaries]` (on linux usually `/usr/bin/`)
+
+After you have modified/added a script for your operating system run it with `npm run yourScriptName`
+
 ## [Heroku Quick Deploy](https://heroku.com/about)
 
 **NOTE:** This is still experimental and requires more testing.

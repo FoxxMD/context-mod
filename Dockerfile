@@ -81,8 +81,9 @@ RUN apk add --no-cache \
 #
 
 # vips required to run sharp library for image comparison
+# opencv required for other image processing
 RUN echo "http://dl-4.alpinelinux.org/alpine/v3.14/community" >> /etc/apk/repositories \
-    && apk --no-cache add vips
+    && apk --no-cache add vips opencv opencv-dev
 
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
@@ -114,6 +115,15 @@ RUN npm install --production \
     && chown abc:abc node_modules \
     && rm -rf node_modules/ts-node \
     && rm -rf node_modules/typescript
+
+# build bindings for opencv
+RUN apk add --no-cache --virtual .build-deps \
+    make \
+    g++ \
+    gcc \
+    libgcc \
+    && npm run cv-install-docker-prebuild \
+    && apk del .build-deps
 
 ENV NPM_CONFIG_LOGLEVEL debug
 
