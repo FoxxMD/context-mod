@@ -417,7 +417,11 @@ export const getAuthorHistoryAPIOptions = (val: any) => {
     return opts;
 }
 
-export const getSubredditBreakdown = (activities: SnoowrapActivity[]): SubredditActivityBreakdown[] => {
+export const getSubredditBreakdown = (activities: SnoowrapActivity[] = []): SubredditActivityBreakdown[] => {
+    if(activities.length === 0) {
+        return [];
+    }
+
     const total = activities.length;
 
     const countBd = activities.reduce((acc: { [key: string]: number }, curr) => {
