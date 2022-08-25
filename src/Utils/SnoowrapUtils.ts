@@ -453,7 +453,10 @@ export const getSubredditBreakdownByActivityType = (activities: SnoowrapActivity
     }
 }
 
-export const formatSubredditBreakdownAsMarkdownList = (data: SubredditActivityBreakdown[]): string => {
+export const formatSubredditBreakdownAsMarkdownList = (data: SubredditActivityBreakdown[] = []): string => {
+    if(data.length === 0) {
+        return '';
+    }
     data.sort((a, b) => b.count - a.count);
 
     const bd = data.map(x => {
