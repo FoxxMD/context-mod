@@ -15,6 +15,7 @@ import {
     asStrongSubredditState,
     asSubmission,
     convertSubredditsRawToStrong,
+    formatNumber,
     getActivityAuthorName,
     getActivitySubredditName,
     isStrongSubredditState, isSubmission,
@@ -36,6 +37,11 @@ import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
 import {StrongSubredditCriteria, SubredditCriteria} from "../Common/Infrastructure/Filters/FilterCriteria";
 import {DurationVal} from "../Common/Infrastructure/Atomic";
 import {ActivityWindowCriteria} from "../Common/Infrastructure/ActivityWindow";
+import {
+    SnoowrapActivity,
+    SubredditActivityAbsoluteBreakdown,
+    SubredditActivityBreakdown, SubredditActivityBreakdownByType
+} from "../Common/Infrastructure/Reddit";
 
 export const BOT_LINK = 'https://www.reddit.com/r/ContextModBot/comments/otz396/introduction_to_contextmodbot';
 
@@ -185,6 +191,25 @@ export const renderContent = async (template: string, data: (Submission | Commen
         const kind = ruleResult.premise.kind.name;
         if(name === undefined || name === null) {
             name = kind;
+        }
+        if (data.subredditBreakdown !== undefined) {
+            // format breakdown for markdown
+            if (Array.isArray(data.subredditBreakdown)) {
+                const bdArr = data.subredditBreakdown as SubredditActivityBreakdown[];
+                data.subredditBreakdownFormatted = formatSubredditBreakdownAsMarkdownList(bdArr);
+            } else {
+                const bd = data.subredditBreakdown as SubredditActivityBreakdownByType;
+
+                // default to total
+                data.subredditBreakdownFormatted = formatSubredditBreakdownAsMarkdownList(bd.total);
+
+                const formatted = Object.entries((bd)).reduce((acc: { [key: string]: string }, curr) => {
+                    const [name, breakdownData] = curr;
+                    acc[`${name}Formatted`] = formatSubredditBreakdownAsMarkdownList(breakdownData);
+                    return acc;
+                }, {});
+                data.subredditBreakdown = {...bd, ...formatted};
+            }
         }
         // remove all non-alphanumeric characters (spaces, dashes, underscore) and set to lowercase
         // we will set this as the rule property name to make it easy to access results from mustache template
@@ -390,4 +415,52 @@ export const getAuthorHistoryAPIOptions = (val: any) => {
     });
 
     return opts;
+}
+
+export const getSubredditBreakdown = (activities: SnoowrapActivity[]): SubredditActivityBreakdown[] => {
+    const total = activities.length;
+
+    const countBd = activities.reduce((acc: { [key: string]: number }, curr) => {
+        const subName = curr.subreddit.display_name;
+        if (acc[subName] === undefined) {
+            acc[subName] = 0;
+        }
+        acc[subName]++;
+
+        return acc;
+    }, {});
+
+    const breakdown: SubredditActivityBreakdown[] = Object.entries(countBd).reduce((acc, curr) => {
+        const [name, count] = curr;
+        return acc.concat(
+            {
+                name,
+                count,
+                percent: Number.parseFloat(formatNumber((count / total) * 100))
+            }
+        );
+    }, ([] as SubredditActivityBreakdown[]));
+
+    return breakdown;
+}
+
+export const getSubredditBreakdownByActivityType = (activities: SnoowrapActivity[]): SubredditActivityBreakdownByType => {
+
+    return {
+        total: getSubredditBreakdown(activities),
+        submission: getSubredditBreakdown(activities.filter(x => x instanceof Submission)),
+        comment: getSubredditBreakdown(activities.filter(x => x instanceof Comment)),
+    }
+}
+
+export const formatSubredditBreakdownAsMarkdownList = (data: SubredditActivityBreakdown[]): string => {
+    data.sort((a, b) => b.count - a.count);
+
+    const bd = data.map(x => {
+        const entity = parseRedditEntity(x.name);
+        const prefixedName = entity.type === 'subreddit' ? `r/${entity.name}` : `u/${entity.name}`;
+        return `* ${prefixedName} - ${x.count} (${x.percent}%)`
+    }).join('\n');
+
+    return `${bd}\n`;
 }

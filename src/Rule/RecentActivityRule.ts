@@ -43,6 +43,7 @@ import {
 import {ActivityWindow, ActivityWindowConfig} from "../Common/Infrastructure/ActivityWindow";
 import {comparisonTextOp, parseGenericValueOrPercentComparison} from "../Common/Infrastructure/Comparisons";
 import {ImageHashCacheData} from "../Common/Infrastructure/Atomic";
+import {getSubredditBreakdownByActivityType} from "../Utils/SnoowrapUtils";
 
 const parseLink = parseUsableLinkIdentifier();
 
@@ -508,6 +509,7 @@ export class RecentActivityRule extends Rule {
                 testValue,
                 karmaThreshold,
                 combinedKarma,
+                subredditBreakdown: getSubredditBreakdownByActivityType(activities)
             }
         };
     }
