@@ -181,7 +181,10 @@ export const renderContent = async (template: string, data: (Submission | Commen
         const {
             //name,
             triggered,
-            data = {},
+            data:{
+                subredditBreakdown,
+                ...restData
+            } = {},
             result,
             // premise: {
             //     kind
@@ -192,23 +195,24 @@ export const renderContent = async (template: string, data: (Submission | Commen
         if(name === undefined || name === null) {
             name = kind;
         }
-        if (data.subredditBreakdown !== undefined) {
+        let formattedData: any = {};
+        if (subredditBreakdown !== undefined) {
             // format breakdown for markdown
-            if (Array.isArray(data.subredditBreakdown)) {
-                const bdArr = data.subredditBreakdown as SubredditActivityBreakdown[];
-                data.subredditBreakdownFormatted = formatSubredditBreakdownAsMarkdownList(bdArr);
+            if (Array.isArray(subredditBreakdown)) {
+                const bdArr = subredditBreakdown as SubredditActivityBreakdown[];
+                formattedData.subredditBreakdownFormatted = formatSubredditBreakdownAsMarkdownList(bdArr);
             } else {
-                const bd = data.subredditBreakdown as SubredditActivityBreakdownByType;
+                const bd = subredditBreakdown as SubredditActivityBreakdownByType;
 
                 // default to total
-                data.subredditBreakdownFormatted = formatSubredditBreakdownAsMarkdownList(bd.total);
+                formattedData.subredditBreakdownFormatted = formatSubredditBreakdownAsMarkdownList(bd.total);
 
                 const formatted = Object.entries((bd)).reduce((acc: { [key: string]: string }, curr) => {
                     const [name, breakdownData] = curr;
                     acc[`${name}Formatted`] = formatSubredditBreakdownAsMarkdownList(breakdownData);
                     return acc;
                 }, {});
-                data.subredditBreakdown = {...bd, ...formatted};
+                formattedData.subredditBreakdown = {...bd, ...formatted};
             }
         }
         // remove all non-alphanumeric characters (spaces, dashes, underscore) and set to lowercase
@@ -219,7 +223,10 @@ export const renderContent = async (template: string, data: (Submission | Commen
                 kind,
                 triggered,
                 result,
-                ...data,
+                data: {
+                    ...restData,
+                    ...formattedData,
+                },
             }
         };
     }, {});
