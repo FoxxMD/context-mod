@@ -223,10 +223,8 @@ export const renderContent = async (template: string, data: (Submission | Commen
                 kind,
                 triggered,
                 result,
-                data: {
-                    ...restData,
-                    ...formattedData,
-                },
+                ...restData,
+                ...formattedData,
             }
         };
     }, {});
