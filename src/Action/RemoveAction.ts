@@ -44,7 +44,7 @@ export class RemoveAction extends Action {
             removeSummary.push('Marked as SPAM');
             this.logger.verbose('Marking as spam on removal');
         }
-        const renderedNote = this.note === undefined ? undefined : await this.resources.renderContent(this.note, item, ruleResults);
+        const renderedNote = await this.renderContent(this.note, item, ruleResults);
         let foundReasonId: string | undefined;
         let foundReason: string | undefined;
 

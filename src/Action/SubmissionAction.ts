@@ -70,18 +70,18 @@ export class SubmissionAction extends Action {
     async process(item: Comment | Submission, ruleResults: RuleResultEntity[], options: runCheckOptions): Promise<ActionProcessResult> {
         const dryRun = this.getRuntimeAwareDryrun(options);
 
-        const title = await this.resources.renderContent(this.title, item, ruleResults);
+        const title = await this.renderContent(this.title, item, ruleResults) as string;
         this.logger.verbose(`Title: ${title}`);
 
-        const url = this.url !== undefined ? await this.resources.renderContent(this.url, item, ruleResults) : undefined;
+        const url = await this.renderContent(this.url, item, ruleResults);
 
         this.logger.verbose(`URL: ${url !== undefined ? url : '[No URL]'}`);
 
-        const body = this.content !== undefined ? await this.resources.renderContent(this.content, item, ruleResults) : undefined;
+        const body = await this.renderContent(this.content, item, ruleResults);
 
         let renderedContent: string | undefined = undefined;
         if(body !== undefined) {
-            const footer = await this.resources.generateFooter(item, this.footer);
+            const footer = await this.resources.renderFooter(item, this.footer);
             renderedContent = `${body}${footer}`;
             this.logger.verbose(`Contents:\r\n${renderedContent.length > 100 ? `\r\n${renderedContent}` : renderedContent}`);
         } else {

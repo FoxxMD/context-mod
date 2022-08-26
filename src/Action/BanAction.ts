@@ -11,6 +11,13 @@ import {truncateStringToLength} from "../util";
 const truncate = truncateStringToLength(100);
 const truncateLongMessage = truncateStringToLength(200);
 
+const truncateIfNotUndefined = (val: string | undefined) => {
+    if(val === undefined) {
+        return undefined;
+    }
+    return truncate(val);
+}
+
 export class BanAction extends Action {
 
     message?: string;
@@ -41,11 +48,11 @@ export class BanAction extends Action {
 
     async process(item: Comment | Submission, ruleResults: RuleResultEntity[], options: runCheckOptions): Promise<ActionProcessResult> {
         const dryRun = this.getRuntimeAwareDryrun(options);
-        const renderedBody = this.message === undefined ? undefined : await this.resources.renderContent(this.message, item, ruleResults);
-        const renderedContent = renderedBody === undefined ? undefined : `${renderedBody}${await this.resources.generateFooter(item, this.footer)}`;
+        const renderedBody = await this.renderContent(this.message, item, ruleResults);
+        const renderedContent = renderedBody === undefined ? undefined : `${renderedBody}${await this.resources.renderFooter(item, this.footer)}`;
 
-        const renderedReason = this.reason === undefined ? undefined : truncate(await this.resources.renderContent(this.reason, item, ruleResults));
-        const renderedNote = this.note === undefined ? undefined : truncate(await this.resources.renderContent(this.note, item, ruleResults));
+        const renderedReason = truncateIfNotUndefined(await this.renderContent(this.reason, item, ruleResults) as string);
+        const renderedNote = truncateIfNotUndefined(await this.renderContent(this.note, item, ruleResults) as string);
 
         const touchedEntities = [];
         let banPieces = [];

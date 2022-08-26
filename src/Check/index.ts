@@ -222,7 +222,14 @@ export abstract class Check extends RunnableBase implements Omit<ICheck, 'postTr
                     this.actions.push(actionFactory({
                         ...aj,
                         dryRun: this.dryRun || aj.dryRun
-                    }, this.logger, subredditName, this.resources, this.client, this.emitter));
+                    }, {
+                        logger: this.logger,
+                        subredditName,
+                        resources: this.resources,
+                        client: this.client,
+                        emitter: this.emitter,
+                        checkName: this.name
+                    }));
                     // @ts-ignore
                     a.logger = this.logger;
                 } else {

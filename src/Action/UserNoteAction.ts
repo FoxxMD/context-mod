@@ -29,8 +29,7 @@ export class UserNoteAction extends Action {
 
     async process(item: Comment | Submission, ruleResults: RuleResultEntity[], options: runCheckOptions): Promise<ActionProcessResult> {
         const dryRun = this.getRuntimeAwareDryrun(options);
-        const content = await this.resources.getContent(this.content, item.subreddit);
-        const renderedContent = await renderContent(content, item, ruleResults, this.resources.userNotes);
+        const renderedContent = (await this.renderContent(this.content, item, ruleResults) as string);
         this.logger.verbose(`Note:\r\n(${this.type}) ${renderedContent}`);
 
         if (!this.allowDuplicate) {

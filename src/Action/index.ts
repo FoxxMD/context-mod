@@ -19,6 +19,8 @@ import {ActionResultEntity} from "../Common/Entities/ActionResultEntity";
 import {FindOptionsWhere} from "typeorm/find-options/FindOptionsWhere";
 import {ActionTypes} from "../Common/Infrastructure/Atomic";
 import {RunnableBaseJson, RunnableBaseOptions, StructuredRunnableBase} from "../Common/Infrastructure/Runnable";
+import { SubredditResources } from "../Subreddit/SubredditResources";
+import {SnoowrapActivity} from "../Common/Infrastructure/Reddit";
 
 export abstract class Action extends RunnableBase {
     name?: string;
@@ -29,6 +31,8 @@ export abstract class Action extends RunnableBase {
     managerEmitter: EventEmitter;
     // actionEntity: ActionEntity | null = null;
     actionPremiseEntity: ActionPremise | null = null;
+    checkName: string;
+    subredditName: string;
 
     constructor(options: ActionOptions) {
         super(options);
@@ -40,6 +44,7 @@ export abstract class Action extends RunnableBase {
             subredditName,
             dryRun = false,
             emitter,
+            checkName,
         } = options;
 
         this.name = name;
@@ -48,6 +53,8 @@ export abstract class Action extends RunnableBase {
         this.client = client;
         this.logger = logger.child({labels: [`Action ${this.getActionUniqueName()}`]}, mergeArr);
         this.managerEmitter = emitter;
+        this.checkName = checkName;
+        this.subredditName = subredditName;
     }
 
     abstract getKind(): ActionTypes;
@@ -172,14 +179,25 @@ export abstract class Action extends RunnableBase {
         const {dryRun: runtimeDryrun} = options;
         return runtimeDryrun || this.dryRun;
     }
+
+    async renderContent(template: string | undefined, item: SnoowrapActivity, ruleResults: RuleResultEntity[]): Promise<string | undefined> {
+        if(template === undefined) {
+            return undefined;
+        }
+        return await this.resources.renderContent(template, item, ruleResults, {manager: this.subredditName, check: this.checkName});
+    }
 }
 
-export interface ActionOptions extends Omit<ActionConfig, 'authorIs' | 'itemIs'>, RunnableBaseOptions {
-    //logger: Logger;
-    subredditName: string;
-    //resources: SubredditResources;
+export interface ActionRuntimeOptions {
+    checkName: string
+    subredditName: string
     client: ExtendedSnoowrap;
-    emitter: EventEmitter
+    emitter: EventEmitter;
+    resources: SubredditResources;
+    logger: Logger;
+}
+
+export interface ActionOptions extends Omit<ActionConfig, 'authorIs' | 'itemIs'>, RunnableBaseOptions, ActionRuntimeOptions {
 }
 
 export interface ActionConfig extends RunnableBaseJson {

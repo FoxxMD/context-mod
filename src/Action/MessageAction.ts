@@ -51,10 +51,11 @@ export class MessageAction extends Action {
     async process(item: Comment | Submission, ruleResults: RuleResultEntity[], options: runCheckOptions): Promise<ActionProcessResult> {
         const dryRun = this.getRuntimeAwareDryrun(options);
 
-        const body = await this.resources.renderContent(this.content, item, ruleResults);
-        const subject = this.title === undefined ? `Concerning your ${isSubmission(item) ? 'Submission' : 'Comment'}` : await this.resources.renderContent(this.title, item, ruleResults);
+        const body = await this.renderContent(this.content, item, ruleResults);
+        const titleTemplate = this.title ?? `Concerning your ${isSubmission(item) ? 'Submission' : 'Comment'}`;
+        const subject = await this.renderContent(titleTemplate, item, ruleResults) as string;
 
-        const footer = await this.resources.generateFooter(item, this.footer);
+        const footer = await this.resources.renderFooter(item, this.footer);
 
         const renderedContent = `${body}${footer}`;
 

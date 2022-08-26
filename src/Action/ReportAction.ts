@@ -27,8 +27,7 @@ export class ReportAction extends Action {
 
     async process(item: Comment | Submission, ruleResults: RuleResultEntity[], options: runCheckOptions): Promise<ActionProcessResult> {
         const dryRun = this.getRuntimeAwareDryrun(options);
-        const content = await this.resources.getContent(this.content, item.subreddit);
-        const renderedContent = await renderContent(content, item, ruleResults, this.resources.userNotes);
+        const renderedContent = (await this.renderContent(this.content, item, ruleResults) as string);
         this.logger.verbose(`Contents:\r\n${renderedContent}`);
         const truncatedContent = reportTrunc(renderedContent);
         const touchedEntities = [];

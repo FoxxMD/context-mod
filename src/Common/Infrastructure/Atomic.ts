@@ -1,3 +1,5 @@
+import {ActivityType} from "./Reddit";
+
 /**
  * A duration and how to compare it against a value
  *
@@ -283,4 +285,71 @@ export interface UrlContext {
 export interface ImageHashCacheData {
     original?: string
     flipped?: string
+}
+
+// https://www.reddit.com/message/compose?to=/r/mealtimevideos&message=https://www.reddit.com/r/ContextModBot/comments/otz396/introduction_to_contextmodbot
+
+export interface BaseTemplateData {
+    botLink: string
+    modmailLink?: string
+    manager?: string
+    check?: string
+    //[key: string]: any
+}
+
+export interface ActivityTemplateData {
+    kind: ActivityType
+    author: string
+    votes: number
+    age: string
+    permalink: string
+    id: string
+    subreddit: string
+    title: string
+    shortTitle: string
+}
+
+export interface ModdedActivityTemplateData {
+    reports: number
+    modReports: number
+    userReports: number
+}
+
+export interface SubmissionTemplateData extends ActivityTemplateData, Partial<ModdedActivityTemplateData> {
+    nsfw: boolean
+    spoiler: boolean
+    op: boolean
+    upvoteRatio: string
+    url: string
+}
+
+export interface CommentTemplateData extends ActivityTemplateData, Partial<ModdedActivityTemplateData> {
+    op: boolean
+}
+
+export interface SubredditTemplateData {
+    subredditBreakdownFormatted: string
+    subredditBreakdown?: {
+        totalFormatted: string
+        submissionFormatted: string
+        commentFormatted: string
+    }
+}
+
+export interface RuleResultTemplateData {
+    kind: string
+    triggered: boolean
+    result: string
+    [key: string]: any
+}
+
+export interface RuleResultsTemplateData {
+    ruleSummary: string
+    rules: {
+        [key: string]: RuleResultTemplateData
+    }
+}
+
+export interface GenericContentTemplateData extends BaseTemplateData, Partial<RuleResultsTemplateData> {
+    item?: (SubmissionTemplateData | CommentTemplateData)
 }

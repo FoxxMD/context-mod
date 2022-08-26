@@ -4,9 +4,29 @@ See here for a [cheatsheet](https://gist.github.com/FoxxMD/d365707cf99fdb526a504
 
 # Template Data
 
+Some data can always be accessed at the top-level. Example
+
+```
+This action was run from {{manager}} in Check {{check}}.
+
+The bot intro post is {{botLink}}
+
+Message the moderators of this subreddit using this [compose link]({{modmailLink}})
+```
+
+
+
+|     Name      |                                         Description                                         |                                                                         Example                                                                          |
+|---------------|---------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `manager`     | The name of the subreddit the bot is running in                                             | mealtimevideos                                                                                                                                           |
+| `check`       | The name of the Check that was triggered                                                    | myCheck                                                                                                                                                  |
+| `botLink`     | A link to the bot introduction                                                              | https://www.reddit.com/r/ContextModBot/comments/otz396/introduction_to_contextmodbot                                                                     |
+| `modmailLink` | A link that opens reddit's DM compose with the subject line as the Activity being processed | https://www.reddit.com/message/compose?to=/r/mealtimevideos&message=https://www.reddit.com/r/ContextModBot/comments/otz396/introduction_to_contextmodbot |
+
+
 ## Activity Data
 
-Activity data can be accessed using the `item` variable. Example
+**Activity data can be accessed using the `item` variable.** Example
 
 ```
 This activity is a {{item.kind}} with {{item.votes}} votes, created {{item.age}} ago.
@@ -19,14 +39,17 @@ Produces:
 
 All Actions with `content` have access to this data:
 
-| Name        | Description                                                                                         | Example                                                                              |
-|-------------|-----------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------|
-| `kind`      | The Activity type (submission or comment)                                                           | submission                                                                           |
-| `author`    | Name of the Author of the Activity being processed                                                  | FoxxMD                                                                               |
-| `permalink` | URL to the Activity                                                                                 | https://reddit.com/r/mySuibreddit/comments/ab23f/my_post                             |
-| `votes`     | Number of upvotes                                                                                   | 69                                                                                   |
-| `age`       | The age of the Activity in a [human friendly format](https://day.js.org/docs/en/durations/humanize) | 5 minutes                                                                            |
-| `botLink`   | A URL to CM's introduction thread                                                                   | https://www.reddit.com/r/ContextModBot/comments/otz396/introduction_to_contextmodbot |
+|     Name     |                                             Description                                             |                         Example                          |
+|--------------|-----------------------------------------------------------------------------------------------------|----------------------------------------------------------|
+| `kind`       | The Activity type (submission or comment)                                                           | submission                                               |
+| `author`     | Name of the Author of the Activity being processed                                                  | FoxxMD                                                   |
+| `permalink`  | URL to the Activity                                                                                 | https://reddit.com/r/mySuibreddit/comments/ab23f/my_post |
+| `votes`      | Number of upvotes                                                                                   | 69                                                       |
+| `age`        | The age of the Activity in a [human friendly format](https://day.js.org/docs/en/durations/humanize) | 5 minutes                                                |
+| `subreddit`  | The name of the subreddit the Activity is from                                                      | mealtimevideos                                           |
+| `id`         | The `Reddit Thing` ID for the Activity                                                              | t3_0tin1                                                 |
+| `title`      | As comments => the body of the comment. As Submission => title                                      | Test post please ignore                                  |
+| `shortTitle` | The same as `title` but truncated to 15 characters                                                  | test post pleas...                                       |
 
 ### Submissions
 

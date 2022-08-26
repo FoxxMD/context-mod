@@ -35,7 +35,7 @@ import {URL} from "url";
 import {isStatusError, MaybeSeriousErrorWithCause, SimpleError} from "./Errors";
 import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
 import {StrongSubredditCriteria, SubredditCriteria} from "../Common/Infrastructure/Filters/FilterCriteria";
-import {DurationVal} from "../Common/Infrastructure/Atomic";
+import {DurationVal, GenericContentTemplateData} from "../Common/Infrastructure/Atomic";
 import {ActivityWindowCriteria} from "../Common/Infrastructure/ActivityWindow";
 import {
     SnoowrapActivity,
@@ -125,56 +125,102 @@ export const isSubreddit = async (subreddit: Subreddit, stateCriteria: Subreddit
 const renderContentCommentTruncate = truncateStringToLength(50);
 const shortTitleTruncate = truncateStringToLength(15);
 
-export const renderContent = async (template: string, data: (Submission | Comment), ruleResults: RuleResultEntity[] = [], usernotes: UserNotes) => {
-    const conditional: any = {};
-    if(data.can_mod_post) {
-        conditional.reports = data.num_reports;
-        conditional.modReports = data.mod_reports.length;
-        conditional.userReports = data.user_reports.length;
-    }
-    if(asSubmission(data)) {
-        conditional.nsfw = data.over_18;
-        conditional.spoiler = data.spoiler;
-        conditional.op = true;
-        conditional.upvoteRatio = `${data.upvote_ratio * 100}%`;
-    } else {
-        conditional.op = data.is_submitter;
-    }
-    const templateData: any = {
-        kind: data instanceof Submission ? 'submission' : 'comment',
-        // @ts-ignore
-        author: getActivityAuthorName(await data.author),
-        votes: data.score,
-        age: dayjs.duration(dayjs().diff(dayjs.unix(data.created))).humanize(),
-        permalink: `https://reddit.com${data.permalink}`,
+export interface TemplateContext {
+    usernotes?: UserNotes
+    check?: string
+    manager?: string
+    ruleResults?: RuleResultEntity[]
+    activity?: SnoowrapActivity
+    [key: string]: any
+}
+
+export const renderContent = async (template: string, data: TemplateContext = {}) => {
+    const {
+        usernotes,
+        ruleResults,
+        activity,
+        ...restContext
+    } = data;
+
+    let view: GenericContentTemplateData = {
         botLink: BOT_LINK,
-        id: data.name,
-        ...conditional
+        ...restContext
+    };
+
+    if(activity !== undefined) {
+        const conditional: any = {};
+        if (activity.can_mod_post) {
+            conditional.reports = activity.num_reports;
+            conditional.modReports = activity.mod_reports.length;
+            conditional.userReports = activity.user_reports.length;
+        }
+        if (asSubmission(activity)) {
+            conditional.nsfw = activity.over_18;
+            conditional.spoiler = activity.spoiler;
+            conditional.op = true;
+            conditional.upvoteRatio = `${activity.upvote_ratio * 100}%`;
+        } else {
+            conditional.op = activity.is_submitter;
+        }
+
+        const subreddit = activity.subreddit.display_name;
+        const permalink =  `https://reddit.com${activity.permalink}`;
+
+        view.modmailLink = `https://www.reddit.com/message/compose?to=%2Fr%2F${subreddit}&message=${encodeURIComponent(permalink)}`;
+
+        const templateData: any = {
+            kind: activity instanceof Submission ? 'submission' : 'comment',
+            // @ts-ignore
+            author: getActivityAuthorName(await activity.author),
+            votes: activity.score,
+            age: dayjs.duration(dayjs().diff(dayjs.unix(activity.created))).humanize(),
+            permalink,
+            id: activity.name,
+            subreddit,
+            ...conditional
+        }
+        if (template.includes('{{item.notes') && usernotes !== undefined) {
+            // we need to get notes
+            const notesData = await usernotes.getUserNotes(activity.author);
+            // return usable notes data with some stats
+            const current = notesData.length > 0 ? notesData[notesData.length - 1] : undefined;
+            // group by type
+            const grouped = notesData.reduce((acc: any, x) => {
+                const {[x.noteType]: nt = []} = acc;
+                return Object.assign(acc, {[x.noteType]: nt.concat(x)});
+            }, {});
+            templateData.notes = {
+                data: notesData,
+                current,
+                ...grouped,
+            };
+        }
+        if (activity instanceof Submission) {
+            templateData.url = activity.url;
+            templateData.title = activity.title;
+            templateData.shortTitle = shortTitleTruncate(activity.title);
+        } else {
+            templateData.title = renderContentCommentTruncate(activity.body);
+            templateData.shortTitle = shortTitleTruncate(activity.body);
+        }
+
+        view.item = templateData;
     }
-    if (template.includes('{{item.notes')) {
-        // we need to get notes
-        const notesData = await usernotes.getUserNotes(data.author);
-        // return usable notes data with some stats
-        const current = notesData.length > 0 ? notesData[notesData.length - 1] : undefined;
-        // group by type
-        const grouped = notesData.reduce((acc: any, x) => {
-            const {[x.noteType]: nt = []} = acc;
-            return Object.assign(acc, {[x.noteType]: nt.concat(x)});
-        }, {});
-        templateData.notes = {
-            data: notesData,
-            current,
-            ...grouped,
-        };
+
+
+    if(ruleResults !== undefined) {
+        view = {
+            ...view,
+            ...parseRuleResultForTemplate(ruleResults)
+        }
     }
-    if (data instanceof Submission) {
-        templateData.url = data.url;
-        templateData.title = data.title;
-        templateData.shortTitle = shortTitleTruncate(data.title);
-    } else {
-        templateData.title = renderContentCommentTruncate(data.body);
-        templateData.shortTitle = shortTitleTruncate(data.body);
-    }
+
+    const rendered = Mustache.render(template, view) as string;
+    return he.decode(rendered);
+}
+
+export const parseRuleResultForTemplate = (ruleResults: RuleResultEntity[] = []) => {
+
     // normalize rule names and map context data
     // NOTE: we are relying on users to use unique names for rules. If they don't only the last rule run of kind X will have its results here
     const normalizedRuleResults = ruleResults.reduce((acc: object, ruleResult) => {
@@ -229,9 +275,10 @@ export const renderContent = async (template: string, data: (Submission | Commen
         };
     }, {});
 
-    const view = {item: templateData, ruleSummary: parseRuleResultsToMarkdownSummary(ruleResults), rules: normalizedRuleResults};
-    const rendered = Mustache.render(template, view) as string;
-    return he.decode(rendered);
+    return {
+        ruleSummary: parseRuleResultsToMarkdownSummary(ruleResults),
+        rules: normalizedRuleResults
+    };
 }
 
 export interface ItemContent {

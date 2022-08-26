@@ -44,8 +44,7 @@ export class ModNoteAction extends Action {
 
         const modLabel = this.type !== undefined ? toModNoteLabel(this.type) : undefined;
 
-        const content = await this.resources.getContent(this.content, item.subreddit);
-        const renderedContent = await renderContent(content, item, ruleResults, this.resources.userNotes);
+        const renderedContent = await this.renderContent(this.content, item, ruleResults);
         this.logger.verbose(`Note:\r\n(${this.type}) ${renderedContent}`);
 
         // TODO see what changes are made for bulk fetch of notes before implementing this
