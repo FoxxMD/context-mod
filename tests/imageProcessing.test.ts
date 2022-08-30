@@ -103,8 +103,8 @@ describe('Hash Comparisons', function () {
         });
         await compareImg.hash(32);
 
-        const distanceNormal = leven(original.hashResult, compareImg.hashResult);
-        const diffNormal = (distanceNormal/original.hashResult.length)*100;
+        const distanceNormal = leven(original.hashResult as string, compareImg.hashResult as string);
+        const diffNormal = (distanceNormal/(original.hashResult as string).length)*100;
 
         assert.equal(diffNormal, 0);
     });
@@ -116,8 +116,8 @@ describe('Hash Comparisons', function () {
         });
         await compareImg.hash(32);
 
-        const distanceNormal = leven(original.hashResult, compareImg.hashResult);
-        const diffNormal = (distanceNormal/original.hashResult.length)*100;
+        const distanceNormal = leven(original.hashResult as string, compareImg.hashResult as string);
+        const diffNormal = (distanceNormal/(original.hashResult as string).length)*100;
 
         assert.isAtMost(diffNormal, 4);
     });
@@ -129,8 +129,8 @@ describe('Hash Comparisons', function () {
         });
         await compareImg.hash(32);
 
-        const distanceNormal = leven(original.hashResult, compareImg.hashResult);
-        const diffNormal = (distanceNormal/original.hashResult.length)*100;
+        const distanceNormal = leven(original.hashResult as string, compareImg.hashResult as string);
+        const diffNormal = (distanceNormal/(original.hashResult as string).length)*100;
 
         assert.equal(diffNormal, 0);
     });
@@ -142,13 +142,13 @@ describe('Hash Comparisons', function () {
         });
         await flipped.hash(32);
 
-        const distanceNormal = leven(original.hashResult, flipped.hashResult);
-        const diffNormal = (distanceNormal/original.hashResult.length)*100;
+        const distanceNormal = leven(original.hashResult as string, flipped.hashResult as string);
+        const diffNormal = (distanceNormal/(original.hashResult as string).length)*100;
 
         assert.isAtLeast(diffNormal, 50);
 
-        const distanceFlipped = leven(original.hashResult, flipped.hashResultFlipped);
-        const diffFlipped = (distanceFlipped/original.hashResult.length)*100;
+        const distanceFlipped = leven(original.hashResult as string, flipped.hashResultFlipped as string);
+        const diffFlipped = (distanceFlipped/(original.hashResult as string).length)*100;
 
         assert.isAtMost(diffFlipped, 4);
     });
@@ -160,8 +160,8 @@ describe('Hash Comparisons', function () {
         });
         await compareImg.hash(32);
 
-        const distanceNormal = leven(original.hashResult, compareImg.hashResult);
-        const diffNormal = (distanceNormal/original.hashResult.length)*100;
+        const distanceNormal = leven(original.hashResult as string, compareImg.hashResult as string);
+        const diffNormal = (distanceNormal/(original.hashResult as string).length)*100;
 
         assert.isAtMost(diffNormal, 10);
     });
@@ -173,8 +173,8 @@ describe('Hash Comparisons', function () {
         });
         await compareImg.hash(32);
 
-        const distanceNormal = leven(original.hashResult, compareImg.hashResult);
-        const diffNormal = (distanceNormal/original.hashResult.length)*100;
+        const distanceNormal = leven(original.hashResult as string, compareImg.hashResult as string);
+        const diffNormal = (distanceNormal/(original.hashResult as string).length)*100;
 
         assert.isAtLeast(diffNormal, 50);
     });
