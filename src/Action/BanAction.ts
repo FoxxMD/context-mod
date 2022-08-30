@@ -7,6 +7,7 @@ import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
 import {runCheckOptions} from "../Subreddit/Manager";
 import {ActionTypes} from "../Common/Infrastructure/Atomic";
 import {truncateStringToLength} from "../util";
+import {ActionResultEntity} from "../Common/Entities/ActionResultEntity";
 
 const truncate = truncateStringToLength(100);
 const truncateLongMessage = truncateStringToLength(200);
@@ -46,13 +47,13 @@ export class BanAction extends Action {
         return 'ban';
     }
 
-    async process(item: Comment | Submission, ruleResults: RuleResultEntity[], options: runCheckOptions): Promise<ActionProcessResult> {
+    async process(item: Comment | Submission, ruleResults: RuleResultEntity[], actionResults: ActionResultEntity[], options: runCheckOptions): Promise<ActionProcessResult> {
         const dryRun = this.getRuntimeAwareDryrun(options);
-        const renderedBody = await this.renderContent(this.message, item, ruleResults);
+        const renderedBody = await this.renderContent(this.message, item, ruleResults, actionResults);
         const renderedContent = renderedBody === undefined ? undefined : `${renderedBody}${await this.resources.renderFooter(item, this.footer)}`;
 
-        const renderedReason = truncateIfNotUndefined(await this.renderContent(this.reason, item, ruleResults) as string);
-        const renderedNote = truncateIfNotUndefined(await this.renderContent(this.note, item, ruleResults) as string);
+        const renderedReason = truncateIfNotUndefined(await this.renderContent(this.reason, item, ruleResults, actionResults) as string);
+        const renderedNote = truncateIfNotUndefined(await this.renderContent(this.note, item, ruleResults, actionResults) as string);
 
         const touchedEntities = [];
         let banPieces = [];
@@ -79,7 +80,13 @@ export class BanAction extends Action {
             dryRun,
             success: true,
             result: `Banned ${item.author.name} ${durText}${renderedReason !== undefined ? ` (${renderedReason})` : ''}`,
-            touchedEntities
+            touchedEntities,
+            data: {
+                message: renderedContent === undefined ? undefined : renderedContent,
+                reason: renderedReason,
+                note: renderedNote,
+                duration: durText
+            }
         };
     }
 

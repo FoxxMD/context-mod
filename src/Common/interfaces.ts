@@ -1730,6 +1730,7 @@ export interface ActionProcessResult {
     dryRun: boolean,
     result?: string
     touchedEntities?: (Submission | Comment | RedditUser | string)[]
+    data?: any
 }
 
 export interface EventActivity {

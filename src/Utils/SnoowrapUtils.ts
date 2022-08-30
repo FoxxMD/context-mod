@@ -23,7 +23,7 @@ import {
     normalizeName,
     parseDurationValToDuration,
     parseRedditEntity,
-    parseRuleResultsToMarkdownSummary, removeUndefinedKeys,
+    parseResultsToMarkdownSummary, removeUndefinedKeys,
     subredditStateIsNameOnly,
     toStrongSubredditState,
     truncateStringToLength,
@@ -42,6 +42,7 @@ import {
     SubredditActivityAbsoluteBreakdown,
     SubredditActivityBreakdown, SubredditActivityBreakdownByType
 } from "../Common/Infrastructure/Reddit";
+import {ActionResultEntity} from "../Common/Entities/ActionResultEntity";
 
 export const BOT_LINK = 'https://www.reddit.com/r/ContextModBot/comments/otz396/introduction_to_contextmodbot';
 
@@ -130,6 +131,7 @@ export interface TemplateContext {
     check?: string
     manager?: string
     ruleResults?: RuleResultEntity[]
+    actionResults?: ActionResultEntity[]
     activity?: SnoowrapActivity
     [key: string]: any
 }
@@ -138,6 +140,7 @@ export const renderContent = async (template: string, data: TemplateContext = {}
     const {
         usernotes,
         ruleResults,
+        actionResults,
         activity,
         ...restContext
     } = data;
@@ -215,8 +218,52 @@ export const renderContent = async (template: string, data: TemplateContext = {}
         }
     }
 
+    if(actionResults !== undefined) {
+        view = {
+            ...view,
+            ...parseActionResultForTemplate(actionResults)
+        }
+    }
+
     const rendered = Mustache.render(template, view) as string;
     return he.decode(rendered);
+}
+
+export const parseActionResultForTemplate = (actionResults: ActionResultEntity[] = []) => {
+    // normalize rule names and map context data
+    // NOTE: we are relying on users to use unique names for action. If they don't only the last action run of kind X will have its results here
+    const normalizedActionResults = actionResults.reduce((acc: object, actionResult) => {
+        const {
+            success,
+            data:{
+                ...restData
+            } = {},
+            result,
+        } = actionResult;
+        let name = actionResult.premise.name;
+        const kind = actionResult.premise.kind.name;
+        if(name === undefined || name === null) {
+            name = kind;
+        }
+        let formattedData: any = {};
+        // remove all non-alphanumeric characters (spaces, dashes, underscore) and set to lowercase
+        // we will set this as the rule property name to make it easy to access results from mustache template
+        const normalName = normalizeName(name);
+        return {
+            ...acc, [normalName]: {
+                kind,
+                success,
+                result,
+                ...restData,
+                ...formattedData,
+            }
+        };
+    }, {});
+
+    return {
+        actionSummary: parseResultsToMarkdownSummary(actionResults),
+        actions: normalizedActionResults
+    };
 }
 
 export const parseRuleResultForTemplate = (ruleResults: RuleResultEntity[] = []) => {
@@ -225,16 +272,12 @@ export const parseRuleResultForTemplate = (ruleResults: RuleResultEntity[] = [])
     // NOTE: we are relying on users to use unique names for rules. If they don't only the last rule run of kind X will have its results here
     const normalizedRuleResults = ruleResults.reduce((acc: object, ruleResult) => {
         const {
-            //name,
             triggered,
             data:{
                 subredditBreakdown,
                 ...restData
             } = {},
             result,
-            // premise: {
-            //     kind
-            // }
         } = ruleResult;
         let name = ruleResult.premise.name;
         const kind = ruleResult.premise.kind.name;
@@ -276,7 +319,7 @@ export const parseRuleResultForTemplate = (ruleResults: RuleResultEntity[] = [])
     }, {});
 
     return {
-        ruleSummary: parseRuleResultsToMarkdownSummary(ruleResults),
+        ruleSummary: parseResultsToMarkdownSummary(ruleResults),
         rules: normalizedRuleResults
     };
 }

@@ -56,6 +56,11 @@ export class ActionResultEntity extends TimeAwareRandomBaseEntity {
     @JoinColumn({name: 'premiseId'})
     premise!: ActionPremise;
 
+    /**
+     * Ephemeral -- only added during actual run time and used for action templating. Is not available after loading from DB.
+     * */
+    data?: any;
+
     touchedEntities: (Submission | Comment | RedditUser | string)[] = []
 
     set itemIs(data: ActivityStateFilterResult | IFilterResult<TypedActivityState> | undefined) {

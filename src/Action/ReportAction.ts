@@ -7,6 +7,7 @@ import {ActionProcessResult, RichContent, RuleResult} from "../Common/interfaces
 import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
 import {runCheckOptions} from "../Subreddit/Manager";
 import {ActionTypes} from "../Common/Infrastructure/Atomic";
+import {ActionResultEntity} from "../Common/Entities/ActionResultEntity";
 
 // https://www.reddit.com/dev/api/oauth#POST_api_report
 // denotes 100 characters maximum
@@ -25,9 +26,9 @@ export class ReportAction extends Action {
         return 'report';
     }
 
-    async process(item: Comment | Submission, ruleResults: RuleResultEntity[], options: runCheckOptions): Promise<ActionProcessResult> {
+    async process(item: Comment | Submission, ruleResults: RuleResultEntity[], actionResults: ActionResultEntity[], options: runCheckOptions): Promise<ActionProcessResult> {
         const dryRun = this.getRuntimeAwareDryrun(options);
-        const renderedContent = (await this.renderContent(this.content, item, ruleResults) as string);
+        const renderedContent = (await this.renderContent(this.content, item, ruleResults, actionResults) as string);
         this.logger.verbose(`Contents:\r\n${renderedContent}`);
         const truncatedContent = reportTrunc(renderedContent);
         const touchedEntities = [];

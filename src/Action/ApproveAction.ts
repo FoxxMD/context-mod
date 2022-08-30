@@ -8,6 +8,7 @@ import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
 import {runCheckOptions} from "../Subreddit/Manager";
 import {ActionTarget, ActionTypes} from "../Common/Infrastructure/Atomic";
 import {asComment, asSubmission} from "../util";
+import {ActionResultEntity} from "../Common/Entities/ActionResultEntity";
 
 export class ApproveAction extends Action {
 
@@ -26,7 +27,7 @@ export class ApproveAction extends Action {
         this.targets = targets;
     }
 
-    async process(item: Comment | Submission, ruleResults: RuleResultEntity[], options: runCheckOptions): Promise<ActionProcessResult> {
+    async process(item: Comment | Submission, ruleResults: RuleResultEntity[], actionResults: ActionResultEntity[], options: runCheckOptions): Promise<ActionProcessResult> {
         const dryRun = this.getRuntimeAwareDryrun(options);
         const touchedEntities = [];
 

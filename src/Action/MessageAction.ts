@@ -16,6 +16,7 @@ import {ErrorWithCause} from "pony-cause";
 import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
 import {runCheckOptions} from "../Subreddit/Manager";
 import {ActionTypes} from "../Common/Infrastructure/Atomic";
+import {ActionResultEntity} from "../Common/Entities/ActionResultEntity";
 
 export class MessageAction extends Action {
     content: string;
@@ -48,12 +49,12 @@ export class MessageAction extends Action {
         return 'message';
     }
 
-    async process(item: Comment | Submission, ruleResults: RuleResultEntity[], options: runCheckOptions): Promise<ActionProcessResult> {
+    async process(item: Comment | Submission, ruleResults: RuleResultEntity[], actionResults: ActionResultEntity[], options: runCheckOptions): Promise<ActionProcessResult> {
         const dryRun = this.getRuntimeAwareDryrun(options);
 
-        const body = await this.renderContent(this.content, item, ruleResults);
+        const body = await this.renderContent(this.content, item, ruleResults, actionResults);
         const titleTemplate = this.title ?? `Concerning your ${isSubmission(item) ? 'Submission' : 'Comment'}`;
-        const subject = await this.renderContent(titleTemplate, item, ruleResults) as string;
+        const subject = await this.renderContent(titleTemplate, item, ruleResults, actionResults) as string;
 
         const footer = await this.resources.renderFooter(item, this.footer);
 

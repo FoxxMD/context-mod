@@ -119,7 +119,7 @@ export abstract class Action extends RunnableBase {
         }
     }
 
-    async handle(item: Comment | Submission, ruleResults: RuleResultEntity[], options: runCheckOptions): Promise<ActionResultEntity> {
+    async handle(item: Comment | Submission, ruleResults: RuleResultEntity[], actionResults: ActionResultEntity[], options: runCheckOptions): Promise<ActionResultEntity> {
         const {dryRun: runtimeDryrun} = options;
         const dryRun = runtimeDryrun || this.dryRun;
 
@@ -155,10 +155,11 @@ export abstract class Action extends RunnableBase {
                 actRes.runReason = runReason;
                 return actRes;
             }
-            const results = await this.process(item, ruleResults, options);
+            const results = await this.process(item, ruleResults, actionResults, options);
             actRes.success = results.success;
             actRes.dryRun = results.dryRun;
             actRes.result = results.result;
+            actRes.data = results.data;
             actRes.touchedEntities = results.touchedEntities ?? [];
 
             return actRes;
@@ -173,18 +174,18 @@ export abstract class Action extends RunnableBase {
         }
     }
 
-    abstract process(item: Comment | Submission, ruleResults: RuleResultEntity[], options: runCheckOptions): Promise<ActionProcessResult>;
+    abstract process(item: Comment | Submission, ruleResults: RuleResultEntity[], actionResults: ActionResultEntity[], options: runCheckOptions): Promise<ActionProcessResult>;
 
     getRuntimeAwareDryrun(options: runCheckOptions): boolean {
         const {dryRun: runtimeDryrun} = options;
         return runtimeDryrun || this.dryRun;
     }
 
-    async renderContent(template: string | undefined, item: SnoowrapActivity, ruleResults: RuleResultEntity[]): Promise<string | undefined> {
+    async renderContent(template: string | undefined, item: SnoowrapActivity, ruleResults: RuleResultEntity[], actionResults: ActionResultEntity[]): Promise<string | undefined> {
         if(template === undefined) {
             return undefined;
         }
-        return await this.resources.renderContent(template, item, ruleResults, {manager: this.subredditName, check: this.checkName});
+        return await this.resources.renderContent(template, item, ruleResults, actionResults, {manager: this.subredditName, check: this.checkName});
     }
 }
 

@@ -117,6 +117,7 @@ import {
 import {RunnableBaseJson} from "./Common/Infrastructure/Runnable";
 import Snoowrap from "snoowrap";
 import { uniqueNamesGenerator, adjectives, colors, animals } from 'unique-names-generator';
+import {ActionResultEntity} from "./Common/Entities/ActionResultEntity";
 
 
 //import {ResembleSingleCallbackComparisonResult} from "resemblejs";
@@ -1934,21 +1935,28 @@ export function findLastIndex<T>(array: Array<T>, predicate: (value: T, index: n
     return -1;
 }
 
-export const parseRuleResultsToMarkdownSummary = (ruleResults: RuleResultEntity[]): string => {
+export const parseResultsToMarkdownSummary = (ruleResults: (RuleResultEntity | ActionResultEntity)[]): string => {
     const results = ruleResults.map((y) => {
         let name = y.premise.name;
         const kind = y.premise.kind.name;
         if(name === undefined) {
             name = kind;
         }
-        const {triggered, result, ...restY} = y;
+        let runIndicator = null;
+        if(y instanceof RuleResultEntity) {
+            runIndicator = y.triggered;
+        } else {
+            runIndicator = y.success;
+        }
+        const {result, ...restY} = y;
+
         let t = triggeredIndicator(false);
-        if(triggered === null) {
+        if(runIndicator === null) {
             t = 'Skipped';
-        } else if(triggered === true) {
+        } else if(runIndicator === true) {
             t = triggeredIndicator(true);
         }
-        return `* ${name} - ${t} - ${result || '-'}`;
+        return `* ${name} - ${t}${result !== undefined ? ` - ${result}` : ''}`;
     });
     return results.join('\r\n');
 }

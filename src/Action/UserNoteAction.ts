@@ -8,6 +8,7 @@ import {ActionProcessResult, RuleResult} from "../Common/interfaces";
 import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
 import {runCheckOptions} from "../Subreddit/Manager";
 import {ActionTypes, UserNoteType} from "../Common/Infrastructure/Atomic";
+import {ActionResultEntity} from "../Common/Entities/ActionResultEntity";
 
 
 export class UserNoteAction extends Action {
@@ -27,9 +28,9 @@ export class UserNoteAction extends Action {
         return 'usernote';
     }
 
-    async process(item: Comment | Submission, ruleResults: RuleResultEntity[], options: runCheckOptions): Promise<ActionProcessResult> {
+    async process(item: Comment | Submission, ruleResults: RuleResultEntity[], actionResults: ActionResultEntity[], options: runCheckOptions): Promise<ActionProcessResult> {
         const dryRun = this.getRuntimeAwareDryrun(options);
-        const renderedContent = (await this.renderContent(this.content, item, ruleResults) as string);
+        const renderedContent = (await this.renderContent(this.content, item, ruleResults, actionResults) as string);
         this.logger.verbose(`Note:\r\n(${this.type}) ${renderedContent}`);
 
         if (!this.allowDuplicate) {

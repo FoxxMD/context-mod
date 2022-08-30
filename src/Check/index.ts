@@ -571,7 +571,7 @@ export abstract class Check extends RunnableBase implements Omit<ICheck, 'postTr
             const dr = dryRun || this.dryRun;
             this.logger.debug(`${dr ? 'DRYRUN - ' : ''}Running Actions`);
             for (const a of this.actions) {
-                const res = await a.handle(item, ruleResults, options);
+                const res = await a.handle(item, ruleResults, runActions, options);
                 runActions.push(res);
             }
             this.logger.info(`${dr ? 'DRYRUN - ' : ''}Ran Actions: ${runActions.map(x => x.premise.getFriendlyIdentifier()).join(' | ')}`);

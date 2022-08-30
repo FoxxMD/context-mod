@@ -4,6 +4,7 @@ import {ActionProcessResult, RuleResult} from '../Common/interfaces';
 import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
 import {runCheckOptions} from "../Subreddit/Manager";
 import {ActionTypes} from "../Common/Infrastructure/Atomic";
+import {ActionResultEntity} from "../Common/Entities/ActionResultEntity";
 
 export class UserFlairAction extends Action {
   text?: string;
@@ -22,7 +23,7 @@ export class UserFlairAction extends Action {
     return 'userflair';
   }
 
-  async process(item: Comment | Submission, ruleResults: RuleResultEntity[], options: runCheckOptions): Promise<ActionProcessResult> {
+  async process(item: Comment | Submission, ruleResults: RuleResultEntity[], actionResults: ActionResultEntity[], options: runCheckOptions): Promise<ActionProcessResult> {
     const dryRun = this.getRuntimeAwareDryrun(options);
     let flairParts = [];
 

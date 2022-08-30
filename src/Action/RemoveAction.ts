@@ -8,6 +8,7 @@ import {isSubmission, truncateStringToLength} from "../util";
 import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
 import {runCheckOptions} from "../Subreddit/Manager";
 import {ActionTypes} from "../Common/Infrastructure/Atomic";
+import {ActionResultEntity} from "../Common/Entities/ActionResultEntity";
 
 const truncate = truncateStringToLength(100);
 export class RemoveAction extends Action {
@@ -31,7 +32,7 @@ export class RemoveAction extends Action {
         this.reasonId = reasonId;
     }
 
-    async process(item: Comment | Submission, ruleResults: RuleResultEntity[], options: runCheckOptions): Promise<ActionProcessResult> {
+    async process(item: Comment | Submission, ruleResults: RuleResultEntity[], actionResults: ActionResultEntity[], options: runCheckOptions): Promise<ActionProcessResult> {
         const dryRun = this.getRuntimeAwareDryrun(options);
         const touchedEntities = [];
         let removeSummary = [];
@@ -44,7 +45,7 @@ export class RemoveAction extends Action {
             removeSummary.push('Marked as SPAM');
             this.logger.verbose('Marking as spam on removal');
         }
-        const renderedNote = await this.renderContent(this.note, item, ruleResults);
+        const renderedNote = await this.renderContent(this.note, item, ruleResults, actionResults);
         let foundReasonId: string | undefined;
         let foundReason: string | undefined;
 
@@ -99,7 +100,8 @@ export class RemoveAction extends Action {
         return {
             dryRun,
             success: true,
-            touchedEntities
+            touchedEntities,
+            result: removeSummary.join(' | ')
         }
     }
 

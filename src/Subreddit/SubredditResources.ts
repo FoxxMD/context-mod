@@ -161,6 +161,7 @@ import {IncludesData} from "../Common/Infrastructure/Includes";
 import {parseFromJsonOrYamlToObject} from "../Common/Config/ConfigUtil";
 import ConfigParseError from "../Utils/ConfigParseError";
 import {ActivityReport} from "../Common/Entities/ActivityReport";
+import {ActionResultEntity} from "../Common/Entities/ActionResultEntity";
 
 export const DEFAULT_FOOTER = '\r\n*****\r\nThis action was performed by [a bot.]({{botLink}}) Mention a moderator or [send a modmail]({{modmailLink}}) if you any ideas, questions, or concerns about this action.';
 
@@ -1769,7 +1770,7 @@ export class SubredditResources {
     /**
      * Convenience method for using getContent and SnoowrapUtils@renderContent in one method
      * */
-    async renderContent(contentStr: string, activity: SnoowrapActivity, ruleResults: RuleResultEntity[] = [], templateData: TemplateContext = {}) {
+    async renderContent(contentStr: string, activity: SnoowrapActivity, ruleResults: RuleResultEntity[] = [], actionResults: ActionResultEntity[] = [], templateData: TemplateContext = {}) {
         const content = await this.getContent(contentStr);
 
         const {usernotes = this.userNotes, ...restData} = templateData;
@@ -1778,6 +1779,7 @@ export class SubredditResources {
             activity,
             usernotes,
             ruleResults,
+            actionResults,
         });
     }
 

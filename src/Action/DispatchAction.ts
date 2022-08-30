@@ -8,6 +8,7 @@ import {activityDispatchConfigToDispatch, isSubmission, parseDurationValToDurati
 import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
 import {runCheckOptions} from "../Subreddit/Manager";
 import {ActionTarget, ActionTypes} from "../Common/Infrastructure/Atomic";
+import {ActionResultEntity} from "../Common/Entities/ActionResultEntity";
 
 export class DispatchAction extends Action {
     dispatchData: ActivityDispatchConfig;
@@ -39,7 +40,7 @@ export class DispatchAction extends Action {
         this.targets = !Array.isArray(target) ? [target] : target;
     }
 
-    async process(item: Comment | Submission, ruleResults: RuleResultEntity[], options: runCheckOptions): Promise<ActionProcessResult> {
+    async process(item: Comment | Submission, ruleResults: RuleResultEntity[], actionResults: ActionResultEntity[], options: runCheckOptions): Promise<ActionProcessResult> {
         // ignore runtimeDryrun here because "real run" isn't causing any reddit api calls to happen
         // -- basically if bot is in dryrun this should still run since we want the "full effect" of the bot
         // BUT if the action explicitly sets 'dryRun: true' then do not dispatch as they probably don't want to it actually going (intention?)

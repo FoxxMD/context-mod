@@ -9,6 +9,7 @@ import {runCheckOptions} from "../Subreddit/Manager";
 import {ActionTarget, ActionTypes, ArbitraryActionTarget} from "../Common/Infrastructure/Atomic";
 import {CMError} from "../Utils/Errors";
 import {SnoowrapActivity} from "../Common/Infrastructure/Reddit";
+import {ActionResultEntity} from "../Common/Entities/ActionResultEntity";
 
 export class CommentAction extends Action {
     content: string;
@@ -44,9 +45,9 @@ export class CommentAction extends Action {
         return 'comment';
     }
 
-    async process(item: Comment | Submission, ruleResults: RuleResultEntity[], options: runCheckOptions): Promise<ActionProcessResult> {
+    async process(item: Comment | Submission, ruleResults: RuleResultEntity[], actionResults: ActionResultEntity[], options: runCheckOptions): Promise<ActionProcessResult> {
         const dryRun = this.getRuntimeAwareDryrun(options);
-        const body =  await this.renderContent(this.content, item, ruleResults) as string;
+        const body =  await this.renderContent(this.content, item, ruleResults, actionResults) as string;
 
         const footer = await this.resources.renderFooter(item, this.footer);
 
@@ -153,6 +154,12 @@ export class CommentAction extends Action {
             success: !allErrors,
             result: `${targetResults.join('\n')}${truncateStringToLength(100)(body)}`,
             touchedEntities,
+            data: {
+                body,
+                bodyShort: truncateStringToLength(100)(body),
+                comments: targetResults,
+                commentsFormatted: targetResults.map(x => `* ${x}`).join('\n')
+            }
         };
     }
 

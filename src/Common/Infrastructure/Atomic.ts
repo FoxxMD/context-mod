@@ -343,6 +343,20 @@ export interface RuleResultTemplateData {
     [key: string]: any
 }
 
+export interface ActionResultTemplateData {
+    kind: string
+    success: boolean
+    result: string
+    [key: string]: any
+}
+
+export interface ActionResultsTemplateData {
+    actionSummary: string
+    actions: {
+        [key: string]: ActionResultTemplateData
+    }
+}
+
 export interface RuleResultsTemplateData {
     ruleSummary: string
     rules: {
@@ -350,6 +364,6 @@ export interface RuleResultsTemplateData {
     }
 }
 
-export interface GenericContentTemplateData extends BaseTemplateData, Partial<RuleResultsTemplateData> {
+export interface GenericContentTemplateData extends BaseTemplateData, Partial<RuleResultsTemplateData>, Partial<ActionResultsTemplateData> {
     item?: (SubmissionTemplateData | CommentTemplateData)
 }
