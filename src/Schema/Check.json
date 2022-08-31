@@ -3049,13 +3049,13 @@
                     "type": "string"
                 },
                 "to": {
-                    "description": "Entity to send message to.\n\nIf not present Message be will sent to the Author of the Activity being checked.\n\nValid formats:\n\n* `aUserName` -- send to /u/aUserName\n* `u/aUserName` -- send to /u/aUserName\n* `r/aSubreddit` -- sent to modmail of /r/aSubreddit\n\n**Note:** Reddit does not support sending a message AS a subreddit TO another subreddit",
+                    "description": "Entity to send message to. It can be templated.\n\nIf not present Message be will sent to the Author of the Activity being checked.\n\nValid formats:\n\n* `aUserName` -- send to /u/aUserName\n* `u/aUserName` -- send to /u/aUserName\n* `r/aSubreddit` -- sent to modmail of /r/aSubreddit\n\n**Note:** Reddit does not support sending a message AS a subreddit TO another subreddit\n\n**Tip:** To send a message to the subreddit of the Activity us `to: 'r/{{item.subreddit}}'`",
                     "examples": [
                         "aUserName",
                         "u/aUserName",
-                        "r/aSubreddit"
+                        "r/aSubreddit",
+                        "r/{{item.subreddit}}"
                     ],
-                    "pattern": "^\\s*(\\/[ru]\\/|[ru]\\/)*(\\w+)*\\s*$",
                     "type": "string"
                 }
             },

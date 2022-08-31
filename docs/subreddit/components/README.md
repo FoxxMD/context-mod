@@ -692,15 +692,16 @@ Some other things to note:
 * If the `to` property is not specified then the message is sent to the Author of the Activity being processed
   * `to` may be a **User** (u/aUser) or a **Subreddit** (r/aSubreddit)
   * `to` **cannot** be a Subreddit when `asSubreddit: true` -- IE cannot send subreddit-to-subreddit messages
-* `content` can be [templated](#templating) and use [URL Tokens](#url-tokens)
+  * TIP: `to` can be templated -- to send a message to the subreddit the Activity being processed is in use `'r/{{item.subreddit}}'`
+* `content` and `title` can be [templated](#templating) and use [URL Tokens](#url-tokens)
 
 ```yaml
 actions:
   - kind: message
     asSubreddit: true
-    content: 'A message sent as the subreddit'
-    title: 'Title of the message'
-    to: 'u/aUser' # do not specify 'to' in order default to sending to Author of Activity being processed
+    content: 'A message sent as the subreddit' # can be templated
+    title: 'Title of the message' # can be templated
+    to: 'u/aUser' # do not specify 'to' in order default to sending to Author of Activity being processed. Can also be templated
 ```
 
 ### Remove
