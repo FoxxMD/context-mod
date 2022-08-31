@@ -315,7 +315,7 @@ export interface SubmissionActionConfig extends RichContent, Footer {
      * * 'self' -- DEFAULT. Post Submission to same subreddit of Activity being processed
      * * [subreddit] -- The name of a subreddit to post Submission to. EX mealtimevideos
      * */
-    targets?: 'self' | string
+    targets?: ('self' | string) | ('self' | string)[]
 }
 
 export interface SubmissionActionOptions extends SubmissionActionConfig, ActionOptions {

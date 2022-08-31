@@ -5385,8 +5385,18 @@
                     "type": "boolean"
                 },
                 "targets": {
-                    "description": "Specify where this Submission should be made\n\nValid values: 'self' | [subreddit]\n\n* 'self' -- DEFAULT. Post Submission to same subreddit of Activity being processed\n* [subreddit] -- The name of a subreddit to post Submission to. EX mealtimevideos",
-                    "type": "string"
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "string"
+                        }
+                    ],
+                    "description": "Specify where this Submission should be made\n\nValid values: 'self' | [subreddit]\n\n* 'self' -- DEFAULT. Post Submission to same subreddit of Activity being processed\n* [subreddit] -- The name of a subreddit to post Submission to. EX mealtimevideos"
                 },
                 "title": {
                     "description": "The title of this Submission.\n\nTemplated the same as **content**",
