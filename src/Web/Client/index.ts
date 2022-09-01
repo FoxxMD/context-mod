@@ -1462,27 +1462,6 @@ const webClient = async (options: OperatorConfigWithFileContext) => {
                     }
                     emitter.on('log', botWebLogListener);
                     socketListeners.set(socket.id, [...(socketListeners.get(socket.id) || []), botWebLogListener]);
-
-                    // only setup streams if the user can actually access them (not just a web operator)
-                    if(session.authBotId !== undefined) {
-                        // streaming stats from client
-                        const newStreams: (AbortController | NodeJS.Timeout)[] = [];
-                        const interval = setInterval(async () => {
-                            try {
-                                const resp = await got.get(`${bot.normalUrl}/stats`, {
-                                    headers: {
-                                        'Authorization': `Bearer ${createToken(bot, user)}`,
-                                    }
-                                }).json() as object;
-                                io.to(session.id).emit('opStats', resp);
-                            } catch (err: any) {
-                                bot.logger.error(new ErrorWithCause('Could not retrieve stats', {cause: err}));
-                                clearInterval(interval);
-                            }
-                        }, 5000);
-                        newStreams.push(interval);
-                        sockStreams.set(socket.id, newStreams);
-                    }
                 }
             }
         }

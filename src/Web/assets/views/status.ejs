@@ -1095,6 +1095,44 @@
 
     const delayedItemsMap = new Map();
     let lastSeenIdentifier = null;
+    const subIndicators = ['red', 'green', 'yellow'];
+
+    function updateOpStats(resp, responseType) {
+        for (const b of resp) {
+            const {
+                name,
+                data: {
+                    running,
+                    indicator,
+                    subreddits = [],
+                } = {},
+            } = b;
+            const botTab = document.querySelector(`[data-bot="${name}"] .botTabStatus`);
+            if (botTab !== null) {
+                if (running !== undefined) {
+                    const currentStatusClass = `bg-${running ? 'green' : 'red'}-400`;
+                    const oppositeStatusClass = `bg-${running ? 'red' : 'green'}-400`;
+                    if (!botTab.classList.contains(currentStatusClass)) {
+                        botTab.classList.remove(oppositeStatusClass);
+                        botTab.classList.add(currentStatusClass);
+                    }
+                }
+            }
+            for (const subData of subreddits) {
+                const subredditTab = document.querySelector(`[data-bot="${name}"] [data-subreddit="${subData.name}"] .subredditTabStatus`);
+                if (subredditTab !== null) {
+                    const currentSubIndicatorClass = `bg-${subData.indicator}-400`;
+                    const nonSubIndicatorClasses = subIndicators.filter(x => x !== subData.indicator).map(x => `bg-${x}-400`);
+                    if (!subredditTab.classList.contains(currentSubIndicatorClass)) {
+                        for (const nonIndicator of nonSubIndicatorClasses) {
+                            subredditTab.classList.remove(nonIndicator);
+                        }
+                        subredditTab.classList.add(currentSubIndicatorClass);
+                    }
+                }
+            }
+        }
+    }
 
     function updateLiveStats(resp, sub, bot, responseType) {
         let el;
@@ -1360,30 +1398,32 @@
 
         const now = dayjs();
 
-        el.innerHTML = '';
-        if(data.length === 0) {
-            const node = document.createElement("LI");
-            node.classList.add('smallLi');
-            node.appendChild(document.createTextNode('None'));
-            el.appendChild(node);
-        } else {
-            for(const g of data) {
+        if(el !== null) {
+            el.innerHTML = '';
+            if(data.length === 0) {
                 const node = document.createElement("LI");
                 node.classList.add('smallLi');
-                let relTime = g.expiresAt === undefined ? 'Never' : dayjs.duration(dayjs(g.expiresAt).diff(now)).humanize();
-                let guestText = g.name;
-                if(isAll) {
-                    guestText += ` (${g.subreddits.length} Subs, at least ${relTime})`;
-                } else {
-                    guestText += ` (${relTime})`;
-                }
-                node.appendChild(document.createTextNode(guestText));
-                node.insertAdjacentHTML('beforeend', `<a href="" class="remove ml-1" data-name="${g.name}"><span class="cancellable iconify-inline" data-icon="icons8:cancel"></span></a>`);
-                node.addEventListener('click', e => {
-                    e.preventDefault();
-                    removeGuestMod(bot, sub, g.name);
-                });
+                node.appendChild(document.createTextNode('None'));
                 el.appendChild(node);
+            } else {
+                for(const g of data) {
+                    const node = document.createElement("LI");
+                    node.classList.add('smallLi');
+                    let relTime = g.expiresAt === undefined ? 'Never' : dayjs.duration(dayjs(g.expiresAt).diff(now)).humanize();
+                    let guestText = g.name;
+                    if(isAll) {
+                        guestText += ` (${g.subreddits.length} Subs, at least ${relTime})`;
+                    } else {
+                        guestText += ` (${relTime})`;
+                    }
+                    node.appendChild(document.createTextNode(guestText));
+                    node.insertAdjacentHTML('beforeend', `<a href="" class="remove ml-1" data-name="${g.name}"><span class="cancellable iconify-inline" data-icon="icons8:cancel"></span></a>`);
+                    node.addEventListener('click', e => {
+                        e.preventDefault();
+                        removeGuestMod(bot, sub, g.name);
+                    });
+                    el.appendChild(node);
+                }
             }
         }
     }
@@ -1409,6 +1449,23 @@
             addGuestMod(bot, sub, user, time)
         });
     });
+
+    function getOpStats(responseType = 'full') {
+        console.debug(`Getting op live stats for <%= instanceId %>`)
+        return fetch(`/api/stats?instance=<%= instanceId %>&type=${responseType}`)
+            .then(response => {
+                if(response.status === 304) {
+                    return Promise.resolve(false);
+                }
+                return response.json();
+            })
+            .then(resp => {
+                if(resp === false) {
+                    return;
+                }
+                updateOpStats(resp, responseType);
+            });
+    }
 
     function getLiveStats(bot, sub, responseType = 'full') {
         console.debug(`Getting live stats for ${bot} ${sub}`)
@@ -1515,6 +1572,19 @@
         onVisible(el, () => onSubVisible(bot, sub));
     });
 
+    //window.init = true;
+    let opTimeoutId = null;
+    let opTimeout = () => {
+        getOpStats('full').then(() => {
+            opTimeoutId = setInterval(() => {
+                getOpStats('delta').catch((err) => {
+                    console.error(err);
+                    clearInterval(opTimeoutId);
+                })
+        }, 10000);
+        });
+    }
+
     let backgroundTimeout = null;
 
     document.addEventListener("visibilitychange", (e) => {
@@ -1531,6 +1601,9 @@
                     controller.abort();
                 }
                 backgroundTimeout = null;
+                clearInterval(opTimeoutId);
+                opTimeoutId = null;
+                window.init = true;
             }, 15000);
         } else {
             // cancel real-time data timeout because page is visible again
@@ -1547,9 +1620,14 @@
                     recentlySeen.delete(lastSeenIdentifier);
                     onSubVisible(bot, sub);
                 }
+                if(opTimeoutId === null) {
+                    opTimeout();
+                }
             }
         }
     });
+
+    opTimeout();
 
     var searchParams = new URLSearchParams(window.location.search);
     const shownSub = searchParams.get('sub') || 'All'
@@ -1619,43 +1697,6 @@
 
     socket.on("connect", () => {
         document.body.classList.add('connected')
-
-        const shownSub = searchParams.get('sub') || 'All'
-        let shownBot = searchParams.get('bot');
-        window.socket.emit('viewing', {bot: shownBot, subreddit: shownSub});
-
-        // TODO web logging
-        // socket.on('log')
-
-        const subIndicators = ['red', 'green', 'yellow'];
-        socket.on('opStats', (resp) => {
-            for(const b of resp) {
-                const {name, data} = b;
-                const botTab = document.querySelector(`[data-bot="${name}"] .botTabStatus`);
-                if(botTab !== null) {
-                    const currentStatusClass = `bg-${data.running ? 'green' : 'red'}-400`;
-                    const oppositeStatusClass = `bg-${data.running ? 'red' : 'green'}-400`;
-                    if(!botTab.classList.contains(currentStatusClass)) {
-                        botTab.classList.remove(oppositeStatusClass);
-                        botTab.classList.add(currentStatusClass);
-                    }
-                }
-                for (const subData of data.subreddits) {
-                    const subredditTab = document.querySelector(`[data-bot="${name}"] [data-subreddit="${subData.name}"] .subredditTabStatus`);
-                    if(subredditTab !== null) {
-                        const currentSubIndicatorClass = `bg-${subData.indicator}-400`;
-                        const nonSubIndicatorClasses = subIndicators.filter(x => x !== subData.indicator).map(x => `bg-${x}-400`);
-                        if(!subredditTab.classList.contains(currentSubIndicatorClass)) {
-                            for(const nonIndicator of nonSubIndicatorClasses) {
-                                subredditTab.classList.remove(nonIndicator);
-                            }
-                            subredditTab.classList.add(currentSubIndicatorClass);
-                        }
-                    }
-                }
-            }
-
-        });
     });
 
     socket.on('disconnect', () => {

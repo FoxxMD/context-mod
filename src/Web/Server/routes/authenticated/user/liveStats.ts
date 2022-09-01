@@ -86,6 +86,24 @@ const generateDeltaResponse = (data: Record<string, any>, hash: string, response
                     // delta[k] = {new: newGuestItems, removed: removedGuestItems};
                     delta[k] = v;
                     break;
+                case 'subreddits':
+                    // only used by opStats!
+                    const refSubs = reference[k].map((x: any) => `${x.name}-${x.indicator}`);
+                    const lastestSubs = v.map((x: any) => `${x.name}-${x.indicator}`);
+
+                    if(symmetricalDifference(refSubs, lastestSubs).length === 0) {
+                        continue;
+                    }
+
+                    const changedSubs = v.reduce((acc: any[], curr: any) => {
+                        if(!reference[k].some((x: any) => x.name === curr.name && x.indicator === curr.indicator)) {
+                            acc.push(curr);
+                        }
+                        return acc;
+                    }, []);
+
+                    delta[k] = changedSubs;
+                    break
                 default:
                     if(!deepEqual(v, reference[k])) {
                         if(v !== null && typeof v === 'object' && reference[k] !== null && typeof reference[k] === 'object') {
@@ -102,6 +120,67 @@ const generateDeltaResponse = (data: Record<string, any>, hash: string, response
     }
     lastFullResponse.set(hash, data);
     return resp;
+}
+
+export const opStatResponse = () => {
+    const middleware = [
+        authUserCheck(),
+        botRoute(false)
+    ];
+
+    const response = async(req: Request, res: Response) =>
+    {
+        const responseType = req.query.type === 'delta' ? 'delta' : 'full';
+
+        let bots: Bot[] = [];
+        if(req.serverBot !== undefined) {
+            bots = [req.serverBot];
+        } else if(req.user !== undefined) {
+            bots = req.user.accessibleBots(req.botApp.bots);
+        }
+        const resp = [];
+        let index = 1;
+        for(const b of bots) {
+            resp.push({name: b.botName ?? `Bot ${index}`, data: {
+                    status: b.running ? 'RUNNING' : 'NOT RUNNING',
+                    indicator: b.running ? 'green' : 'red',
+                    running: b.running,
+                    startedAt: b.startedAt.local().format('MMMM D, YYYY h:mm A Z'),
+                    error: b.error,
+                    subreddits: req.user?.accessibleSubreddits(b).map((manager: Manager) => {
+                        let indicator;
+                        if (manager.managerState.state === RUNNING && manager.queueState.state === RUNNING && manager.eventsState.state === RUNNING) {
+                            indicator = 'green';
+                        } else if (manager.managerState.state === STOPPED && manager.queueState.state === STOPPED && manager.eventsState.state === STOPPED) {
+                            indicator = 'red';
+                        } else {
+                            indicator = 'yellow';
+                        }
+                        return {
+                            name: manager.displayLabel,
+                            indicator,
+                        };
+                    }),
+                }});
+            index++;
+        }
+
+        const deltaResp = [];
+        for(const bResp of resp) {
+            const hash = `${req.user?.name}-opstats-${bResp.name}`;
+            const respData = generateDeltaResponse(bResp.data, hash, responseType);
+            if(Object.keys(respData).length !== 0) {
+                deltaResp.push({data: respData, name: bResp.name});
+            }
+        }
+
+        if(deltaResp.length === 0) {
+            return res.status(304).send();
+        }
+        return res.json(deltaResp);
+    }
+
+    return [...middleware, response];
 }
 
 const liveStats = () => {
