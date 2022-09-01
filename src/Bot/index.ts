@@ -386,7 +386,7 @@ class Bot implements BotInstanceFunctions {
     async testClient(initial = true) {
         try {
             // @ts-ignore
-            const user = this.client.getMe().fetch();
+            const user = await this.client.getMe().fetch();
             this.logger.info('Test API call successful');
             return user;
         } catch (err: any) {

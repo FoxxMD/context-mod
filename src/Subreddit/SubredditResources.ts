@@ -3,7 +3,7 @@ import objectHash from 'object-hash';
 import {
     activityIsDeleted, activityIsFiltered,
     activityIsRemoved,
-    AuthorTypedActivitiesOptions, BOT_LINK,
+    AuthorTypedActivitiesOptions, BOT_LINK, TemplateContext,
     getAuthorHistoryAPIOptions, renderContent
 } from "../Utils/SnoowrapUtils";
 import {map as mapAsync} from 'async';
@@ -161,6 +161,7 @@ import {IncludesData} from "../Common/Infrastructure/Includes";
 import {parseFromJsonOrYamlToObject} from "../Common/Config/ConfigUtil";
 import ConfigParseError from "../Utils/ConfigParseError";
 import {ActivityReport} from "../Common/Entities/ActivityReport";
+import {ActionResultEntity} from "../Common/Entities/ActionResultEntity";
 
 export const DEFAULT_FOOTER = '\r\n*****\r\nThis action was performed by [a bot.]({{botLink}}) Mention a moderator or [send a modmail]({{modmailLink}}) if you any ideas, questions, or concerns about this action.';
 
@@ -1769,9 +1770,24 @@ export class SubredditResources {
     /**
      * Convenience method for using getContent and SnoowrapUtils@renderContent in one method
      * */
-    async renderContent(contentStr: string, data: SnoowrapActivity, ruleResults: RuleResultEntity[] = [], usernotes?: UserNotes) {
+    async renderContent(contentStr: string, activity: SnoowrapActivity, ruleResults: RuleResultEntity[] = [], actionResults: ActionResultEntity[] = [], templateData: TemplateContext = {}) {
         const content = await this.getContent(contentStr);
-        return await renderContent(content, data, ruleResults, usernotes ?? this.userNotes);
+
+        const {usernotes = this.userNotes, ...restData} = templateData;
+        return await renderContent(content, {
+            ...restData,
+            activity,
+            usernotes,
+            ruleResults,
+            actionResults,
+        });
+    }
+
+    async renderFooter(item: Submission | Comment, footer: false | string | undefined = this.footer) {
+        if (footer === false) {
+            return '';
+        }
+        return this.renderContent(footer, item);
     }
 
     async getConfigFragment<T>(includesData: IncludesData, validateFunc?: ConfigFragmentValidationFunc): Promise<T> {
@@ -3343,19 +3359,6 @@ export class SubredditResources {
         const hash = `commentUserResult-${userName}-${item.link_id}-${objectHash.sha1(checkConfig)}`
         await this.cache.set(hash, {id: result.id, results: result.results, triggered: result.triggered}, { ttl });
         this.logger.debug(`Cached check result '${result.check.name}' for User ${userName} on Submission ${item.link_id} for ${ttl} seconds (Hash ${hash})`);
-    }
-
-    async generateFooter(item: Submission | Comment, actionFooter?: false | string) {
-        let footer = actionFooter !== undefined ? actionFooter : this.footer;
-        if (footer === false) {
-            return '';
-        }
-        const subName = await item.subreddit.display_name;
-        const permaLink = `https://reddit.com${await item.permalink}`
-        const modmailLink = `https://www.reddit.com/message/compose?to=%2Fr%2F${subName}&message=${encodeURIComponent(permaLink)}`
-
-        const footerRawContent = await this.getContent(footer, item.subreddit);
-        return he.decode(Mustache.render(footerRawContent, {subName, permaLink, modmailLink, botLink: BOT_LINK}));
     }
 
     async getImageHash(img: ImageData): Promise<Required<ImageHashCacheData>|undefined> {

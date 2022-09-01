@@ -3,7 +3,7 @@ import LockAction, {LockActionJson} from "./LockAction";
 import {RemoveAction, RemoveActionJson} from "./RemoveAction";
 import {ReportAction, ReportActionJson} from "./ReportAction";
 import {FlairAction, FlairActionJson} from "./SubmissionAction/FlairAction";
-import Action, {ActionJson, StructuredActionJson} from "./index";
+import Action, {ActionJson, ActionRuntimeOptions, StructuredActionJson} from "./index";
 import {Logger} from "winston";
 import {UserNoteAction, UserNoteActionJson} from "./UserNoteAction";
 import ApproveAction, {ApproveActionConfig} from "./ApproveAction";
@@ -21,38 +21,38 @@ import {ModNoteAction, ModNoteActionJson} from "./ModNoteAction";
 import {SubmissionAction, SubmissionActionJson} from "./SubmissionAction";
 
 export function actionFactory
-(config: StructuredActionJson, logger: Logger, subredditName: string, resources: SubredditResources, client: ExtendedSnoowrap, emitter: EventEmitter): Action {
+(config: StructuredActionJson, runtimeOptions: ActionRuntimeOptions): Action {
     switch (config.kind) {
         case 'comment':
-            return new CommentAction({...config as StructuredFilter<CommentActionJson>, logger, subredditName, resources, client, emitter});
+            return new CommentAction({...config as StructuredFilter<CommentActionJson>, ...runtimeOptions});
         case 'submission':
-            return new SubmissionAction({...config as StructuredFilter<SubmissionActionJson>, logger, subredditName, resources, client, emitter});
+            return new SubmissionAction({...config as StructuredFilter<SubmissionActionJson>, ...runtimeOptions});
         case 'lock':
-            return new LockAction({...config as StructuredFilter<LockActionJson>, logger, subredditName, resources, client, emitter});
+            return new LockAction({...config as StructuredFilter<LockActionJson>, ...runtimeOptions});
         case 'remove':
-            return new RemoveAction({...config as StructuredFilter<RemoveActionJson>, logger, subredditName, resources, client, emitter});
+            return new RemoveAction({...config as StructuredFilter<RemoveActionJson>, ...runtimeOptions});
         case 'report':
-            return new ReportAction({...config as StructuredFilter<ReportActionJson>, logger, subredditName, resources, client, emitter});
+            return new ReportAction({...config as StructuredFilter<ReportActionJson>, ...runtimeOptions});
         case 'flair':
-            return new FlairAction({...config as StructuredFilter<FlairActionJson>, logger, subredditName, resources, client, emitter});
+            return new FlairAction({...config as StructuredFilter<FlairActionJson>, ...runtimeOptions});
         case 'userflair':
-            return new UserFlairAction({...config as StructuredFilter<UserFlairActionJson>, logger, subredditName, resources, client, emitter});
+            return new UserFlairAction({...config as StructuredFilter<UserFlairActionJson>, ...runtimeOptions});
         case 'approve':
-            return new ApproveAction({...config as StructuredFilter<ApproveActionConfig>, logger, subredditName, resources, client, emitter});
+            return new ApproveAction({...config as StructuredFilter<ApproveActionConfig>, ...runtimeOptions});
         case 'usernote':
-            return new UserNoteAction({...config as StructuredFilter<UserNoteActionJson>, logger, subredditName, resources, client, emitter});
+            return new UserNoteAction({...config as StructuredFilter<UserNoteActionJson>, ...runtimeOptions});
         case 'ban':
-            return new BanAction({...config as StructuredFilter<BanActionJson>, logger, subredditName, resources, client, emitter});
+            return new BanAction({...config as StructuredFilter<BanActionJson>, ...runtimeOptions});
         case 'message':
-            return new MessageAction({...config as StructuredFilter<MessageActionJson>, logger, subredditName, resources, client, emitter});
+            return new MessageAction({...config as StructuredFilter<MessageActionJson>, ...runtimeOptions});
         case 'dispatch':
-            return new DispatchAction({...config as StructuredFilter<DispatchActionJson>, logger, subredditName, resources, client, emitter});
+            return new DispatchAction({...config as StructuredFilter<DispatchActionJson>, ...runtimeOptions});
         case 'cancelDispatch':
-            return new CancelDispatchAction({...config as StructuredFilter<CancelDispatchActionJson>, logger, subredditName, resources, client, emitter})
+            return new CancelDispatchAction({...config as StructuredFilter<CancelDispatchActionJson>, ...runtimeOptions})
         case 'contributor':
-            return new ContributorAction({...config as StructuredFilter<ContributorActionJson>, logger, subredditName, resources, client, emitter})
+            return new ContributorAction({...config as StructuredFilter<ContributorActionJson>, ...runtimeOptions})
         case 'modnote':
-            return new ModNoteAction({...config as StructuredFilter<ModNoteActionJson>, logger, subredditName, resources, client, emitter})
+            return new ModNoteAction({...config as StructuredFilter<ModNoteActionJson>, ...runtimeOptions})
         default:
             throw new Error('rule "kind" was not recognized.');
     }

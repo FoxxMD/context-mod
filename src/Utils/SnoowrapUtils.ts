@@ -15,6 +15,7 @@ import {
     asStrongSubredditState,
     asSubmission,
     convertSubredditsRawToStrong,
+    formatNumber,
     getActivityAuthorName,
     getActivitySubredditName,
     isStrongSubredditState, isSubmission,
@@ -22,7 +23,7 @@ import {
     normalizeName,
     parseDurationValToDuration,
     parseRedditEntity,
-    parseRuleResultsToMarkdownSummary, removeUndefinedKeys,
+    parseResultsToMarkdownSummary, removeUndefinedKeys,
     subredditStateIsNameOnly,
     toStrongSubredditState,
     truncateStringToLength,
@@ -34,8 +35,14 @@ import {URL} from "url";
 import {isStatusError, MaybeSeriousErrorWithCause, SimpleError} from "./Errors";
 import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
 import {StrongSubredditCriteria, SubredditCriteria} from "../Common/Infrastructure/Filters/FilterCriteria";
-import {DurationVal} from "../Common/Infrastructure/Atomic";
+import {DurationVal, GenericContentTemplateData} from "../Common/Infrastructure/Atomic";
 import {ActivityWindowCriteria} from "../Common/Infrastructure/ActivityWindow";
+import {
+    SnoowrapActivity,
+    SubredditActivityAbsoluteBreakdown,
+    SubredditActivityBreakdown, SubredditActivityBreakdownByType
+} from "../Common/Infrastructure/Reddit";
+import {ActionResultEntity} from "../Common/Entities/ActionResultEntity";
 
 export const BOT_LINK = 'https://www.reddit.com/r/ContextModBot/comments/otz396/introduction_to_contextmodbot';
 
@@ -119,72 +126,183 @@ export const isSubreddit = async (subreddit: Subreddit, stateCriteria: Subreddit
 const renderContentCommentTruncate = truncateStringToLength(50);
 const shortTitleTruncate = truncateStringToLength(15);
 
-export const renderContent = async (template: string, data: (Submission | Comment), ruleResults: RuleResultEntity[] = [], usernotes: UserNotes) => {
-    const conditional: any = {};
-    if(data.can_mod_post) {
-        conditional.reports = data.num_reports;
-        conditional.modReports = data.mod_reports.length;
-        conditional.userReports = data.user_reports.length;
-    }
-    if(asSubmission(data)) {
-        conditional.nsfw = data.over_18;
-        conditional.spoiler = data.spoiler;
-        conditional.op = true;
-        conditional.upvoteRatio = `${data.upvote_ratio * 100}%`;
-    } else {
-        conditional.op = data.is_submitter;
-    }
-    const templateData: any = {
-        kind: data instanceof Submission ? 'submission' : 'comment',
-        // @ts-ignore
-        author: getActivityAuthorName(await data.author),
-        votes: data.score,
-        age: dayjs.duration(dayjs().diff(dayjs.unix(data.created))).humanize(),
-        permalink: `https://reddit.com${data.permalink}`,
+export interface TemplateContext {
+    usernotes?: UserNotes
+    check?: string
+    manager?: string
+    ruleResults?: RuleResultEntity[]
+    actionResults?: ActionResultEntity[]
+    activity?: SnoowrapActivity
+    [key: string]: any
+}
+
+export const renderContent = async (template: string, data: TemplateContext = {}) => {
+    const {
+        usernotes,
+        ruleResults,
+        actionResults,
+        activity,
+        ...restContext
+    } = data;
+
+    let view: GenericContentTemplateData = {
         botLink: BOT_LINK,
-        id: data.name,
-        ...conditional
+        ...restContext
+    };
+
+    if(activity !== undefined) {
+        const conditional: any = {};
+        if (activity.can_mod_post) {
+            conditional.reports = activity.num_reports;
+            conditional.modReports = activity.mod_reports.length;
+            conditional.userReports = activity.user_reports.length;
+        }
+        if (asSubmission(activity)) {
+            conditional.nsfw = activity.over_18;
+            conditional.spoiler = activity.spoiler;
+            conditional.op = true;
+            conditional.upvoteRatio = `${activity.upvote_ratio * 100}%`;
+        } else {
+            conditional.op = activity.is_submitter;
+        }
+
+        const subreddit = activity.subreddit.display_name;
+        const permalink =  `https://reddit.com${activity.permalink}`;
+
+        view.modmailLink = `https://www.reddit.com/message/compose?to=%2Fr%2F${subreddit}&message=${encodeURIComponent(permalink)}`;
+
+        const templateData: any = {
+            kind: activity instanceof Submission ? 'submission' : 'comment',
+            // @ts-ignore
+            author: getActivityAuthorName(await activity.author),
+            votes: activity.score,
+            age: dayjs.duration(dayjs().diff(dayjs.unix(activity.created))).humanize(),
+            permalink,
+            id: activity.name,
+            subreddit,
+            ...conditional
+        }
+        if (template.includes('{{item.notes') && usernotes !== undefined) {
+            // we need to get notes
+            const notesData = await usernotes.getUserNotes(activity.author);
+            // return usable notes data with some stats
+            const current = notesData.length > 0 ? notesData[notesData.length - 1] : undefined;
+            // group by type
+            const grouped = notesData.reduce((acc: any, x) => {
+                const {[x.noteType]: nt = []} = acc;
+                return Object.assign(acc, {[x.noteType]: nt.concat(x)});
+            }, {});
+            templateData.notes = {
+                data: notesData,
+                current,
+                ...grouped,
+            };
+        }
+        if (activity instanceof Submission) {
+            templateData.url = activity.url;
+            templateData.title = activity.title;
+            templateData.shortTitle = shortTitleTruncate(activity.title);
+        } else {
+            templateData.title = renderContentCommentTruncate(activity.body);
+            templateData.shortTitle = shortTitleTruncate(activity.body);
+        }
+
+        view.item = templateData;
     }
-    if (template.includes('{{item.notes')) {
-        // we need to get notes
-        const notesData = await usernotes.getUserNotes(data.author);
-        // return usable notes data with some stats
-        const current = notesData.length > 0 ? notesData[notesData.length - 1] : undefined;
-        // group by type
-        const grouped = notesData.reduce((acc: any, x) => {
-            const {[x.noteType]: nt = []} = acc;
-            return Object.assign(acc, {[x.noteType]: nt.concat(x)});
-        }, {});
-        templateData.notes = {
-            data: notesData,
-            current,
-            ...grouped,
+
+
+    if(ruleResults !== undefined) {
+        view = {
+            ...view,
+            ...parseRuleResultForTemplate(ruleResults)
+        }
+    }
+
+    if(actionResults !== undefined) {
+        view = {
+            ...view,
+            ...parseActionResultForTemplate(actionResults)
+        }
+    }
+
+    const rendered = Mustache.render(template, view) as string;
+    return he.decode(rendered);
+}
+
+export const parseActionResultForTemplate = (actionResults: ActionResultEntity[] = []) => {
+    // normalize rule names and map context data
+    // NOTE: we are relying on users to use unique names for action. If they don't only the last action run of kind X will have its results here
+    const normalizedActionResults = actionResults.reduce((acc: object, actionResult) => {
+        const {
+            success,
+            data:{
+                ...restData
+            } = {},
+            result,
+        } = actionResult;
+        let name = actionResult.premise.name;
+        const kind = actionResult.premise.kind.name;
+        if(name === undefined || name === null) {
+            name = kind;
+        }
+        let formattedData: any = {};
+        // remove all non-alphanumeric characters (spaces, dashes, underscore) and set to lowercase
+        // we will set this as the rule property name to make it easy to access results from mustache template
+        const normalName = normalizeName(name);
+        return {
+            ...acc, [normalName]: {
+                kind,
+                success,
+                result,
+                ...restData,
+                ...formattedData,
+            }
         };
-    }
-    if (data instanceof Submission) {
-        templateData.url = data.url;
-        templateData.title = data.title;
-        templateData.shortTitle = shortTitleTruncate(data.title);
-    } else {
-        templateData.title = renderContentCommentTruncate(data.body);
-        templateData.shortTitle = shortTitleTruncate(data.body);
-    }
+    }, {});
+
+    return {
+        actionSummary: parseResultsToMarkdownSummary(actionResults),
+        actions: normalizedActionResults
+    };
+}
+
+export const parseRuleResultForTemplate = (ruleResults: RuleResultEntity[] = []) => {
+
     // normalize rule names and map context data
     // NOTE: we are relying on users to use unique names for rules. If they don't only the last rule run of kind X will have its results here
     const normalizedRuleResults = ruleResults.reduce((acc: object, ruleResult) => {
         const {
-            //name,
             triggered,
-            data = {},
+            data:{
+                subredditBreakdown,
+                ...restData
+            } = {},
             result,
-            // premise: {
-            //     kind
-            // }
         } = ruleResult;
         let name = ruleResult.premise.name;
         const kind = ruleResult.premise.kind.name;
         if(name === undefined || name === null) {
             name = kind;
+        }
+        let formattedData: any = {};
+        if (subredditBreakdown !== undefined) {
+            // format breakdown for markdown
+            if (Array.isArray(subredditBreakdown)) {
+                const bdArr = subredditBreakdown as SubredditActivityBreakdown[];
+                formattedData.subredditBreakdownFormatted = formatSubredditBreakdownAsMarkdownList(bdArr);
+            } else {
+                const bd = subredditBreakdown as SubredditActivityBreakdownByType;
+
+                // default to total
+                formattedData.subredditBreakdownFormatted = formatSubredditBreakdownAsMarkdownList(bd.total);
+
+                const formatted = Object.entries((bd)).reduce((acc: { [key: string]: string }, curr) => {
+                    const [name, breakdownData] = curr;
+                    acc[`${name}Formatted`] = formatSubredditBreakdownAsMarkdownList(breakdownData);
+                    return acc;
+                }, {});
+                formattedData.subredditBreakdown = {...bd, ...formatted};
+            }
         }
         // remove all non-alphanumeric characters (spaces, dashes, underscore) and set to lowercase
         // we will set this as the rule property name to make it easy to access results from mustache template
@@ -194,14 +312,16 @@ export const renderContent = async (template: string, data: (Submission | Commen
                 kind,
                 triggered,
                 result,
-                ...data,
+                ...restData,
+                ...formattedData,
             }
         };
     }, {});
 
-    const view = {item: templateData, ruleSummary: parseRuleResultsToMarkdownSummary(ruleResults), rules: normalizedRuleResults};
-    const rendered = Mustache.render(template, view) as string;
-    return he.decode(rendered);
+    return {
+        ruleSummary: parseResultsToMarkdownSummary(ruleResults),
+        rules: normalizedRuleResults
+    };
 }
 
 export interface ItemContent {
@@ -390,4 +510,59 @@ export const getAuthorHistoryAPIOptions = (val: any) => {
     });
 
     return opts;
+}
+
+export const getSubredditBreakdown = (activities: SnoowrapActivity[] = []): SubredditActivityBreakdown[] => {
+    if(activities.length === 0) {
+        return [];
+    }
+
+    const total = activities.length;
+
+    const countBd = activities.reduce((acc: { [key: string]: number }, curr) => {
+        const subName = curr.subreddit.display_name;
+        if (acc[subName] === undefined) {
+            acc[subName] = 0;
+        }
+        acc[subName]++;
+
+        return acc;
+    }, {});
+
+    const breakdown: SubredditActivityBreakdown[] = Object.entries(countBd).reduce((acc, curr) => {
+        const [name, count] = curr;
+        return acc.concat(
+            {
+                name,
+                count,
+                percent: Number.parseFloat(formatNumber((count / total) * 100))
+            }
+        );
+    }, ([] as SubredditActivityBreakdown[]));
+
+    return breakdown;
+}
+
+export const getSubredditBreakdownByActivityType = (activities: SnoowrapActivity[]): SubredditActivityBreakdownByType => {
+
+    return {
+        total: getSubredditBreakdown(activities),
+        submission: getSubredditBreakdown(activities.filter(x => x instanceof Submission)),
+        comment: getSubredditBreakdown(activities.filter(x => x instanceof Comment)),
+    }
+}
+
+export const formatSubredditBreakdownAsMarkdownList = (data: SubredditActivityBreakdown[] = []): string => {
+    if(data.length === 0) {
+        return '';
+    }
+    data.sort((a, b) => b.count - a.count);
+
+    const bd = data.map(x => {
+        const entity = parseRedditEntity(x.name);
+        const prefixedName = entity.type === 'subreddit' ? `r/${entity.name}` : `u/${entity.name}`;
+        return `* ${prefixedName} - ${x.count} (${x.percent}%)`
+    }).join('\n');
+
+    return `${bd}\n`;
 }

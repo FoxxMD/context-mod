@@ -9,6 +9,7 @@ import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
 import {runCheckOptions} from "../Subreddit/Manager";
 import {ActionTypes, ModUserNoteLabel} from "../Common/Infrastructure/Atomic";
 import {ModNote} from "../Subreddit/ModNotes/ModNote";
+import {ActionResultEntity} from "../Common/Entities/ActionResultEntity";
 
 
 export class ModNoteAction extends Action {
@@ -39,13 +40,12 @@ export class ModNoteAction extends Action {
         }
     }
 
-    async process(item: Comment | Submission, ruleResults: RuleResultEntity[], options: runCheckOptions): Promise<ActionProcessResult> {
+    async process(item: Comment | Submission, ruleResults: RuleResultEntity[], actionResults: ActionResultEntity[], options: runCheckOptions): Promise<ActionProcessResult> {
         const dryRun = this.getRuntimeAwareDryrun(options);
 
         const modLabel = this.type !== undefined ? toModNoteLabel(this.type) : undefined;
 
-        const content = await this.resources.getContent(this.content, item.subreddit);
-        const renderedContent = await renderContent(content, item, ruleResults, this.resources.userNotes);
+        const renderedContent = await this.renderContent(this.content, item, ruleResults, actionResults);
         this.logger.verbose(`Note:\r\n(${this.type}) ${renderedContent}`);
 
         // TODO see what changes are made for bulk fetch of notes before implementing this

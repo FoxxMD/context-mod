@@ -7,9 +7,10 @@ import {Rule, RuleJSONConfig, RuleOptions} from "./index";
 import Submission from "snoowrap/dist/objects/Submission";
 import dayjs from "dayjs";
 import {
+    asComment,
     asSubmission,
     FAIL,
-    formatNumber, getActivitySubredditName, historyFilterConfigToOptions, isSubmission,
+    formatNumber, getActivitySubredditName, historyFilterConfigToOptions, isComment, isSubmission,
     parseSubredditName,
     PASS,
     percentFromString, removeUndefinedKeys, toStrongSubredditState, windowConfigToWindowCriteria
@@ -20,6 +21,7 @@ import {CompareValueOrPercent} from "../Common/Infrastructure/Atomic";
 import {ActivityWindowConfig, ActivityWindowCriteria} from "../Common/Infrastructure/ActivityWindow";
 import {ErrorWithCause} from "pony-cause";
 import {comparisonTextOp, parseGenericValueOrPercentComparison} from "../Common/Infrastructure/Comparisons";
+import {getSubredditBreakdownByActivityType} from "../Utils/SnoowrapUtils";
 
 export interface CommentThresholdCriteria extends ThresholdCriteria {
     /**
@@ -206,10 +208,11 @@ export class HistoryRule extends Rule {
                 fOpTotal = filteredCounts.opTotal;
             }
 
+            let asOp = false;
             let commentTrigger = undefined;
             if(comment !== undefined) {
                 const {operator, value, isPercent, extra = ''} = parseGenericValueOrPercentComparison(comment);
-                const asOp = extra.toLowerCase().includes('op');
+                 asOp = extra.toLowerCase().includes('op');
                 if(isPercent) {
                     const per = value / 100;
                     if(asOp) {
@@ -264,7 +267,8 @@ export class HistoryRule extends Rule {
                 submissionTrigger,
                 commentTrigger,
                 totalTrigger,
-                triggered: (submissionTrigger === undefined || submissionTrigger === true) && (commentTrigger === undefined || commentTrigger === true) && (totalTrigger === undefined || totalTrigger === true)
+                triggered: (submissionTrigger === undefined || submissionTrigger === true) && (commentTrigger === undefined || commentTrigger === true) && (totalTrigger === undefined || totalTrigger === true),
+                subredditBreakdown: getSubredditBreakdownByActivityType(!asOp ? filteredActivities :  filteredActivities.filter(x => asSubmission(x) || x.is_submitter))
             });
         }
 
@@ -320,6 +324,7 @@ export class HistoryRule extends Rule {
             submissionTrigger,
             commentTrigger,
             totalTrigger,
+            subredditBreakdown,
         } = results;
 
         const data: any = {
@@ -338,6 +343,7 @@ export class HistoryRule extends Rule {
             submissionTrigger,
             commentTrigger,
             totalTrigger,
+            subredditBreakdown
         };
 
         let thresholdSummary = [];

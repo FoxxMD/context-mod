@@ -10,6 +10,7 @@ import {ActionTarget, ActionTypes, ArbitraryActionTarget} from "../Common/Infras
 import {CMError} from "../Utils/Errors";
 import {SnoowrapActivity} from "../Common/Infrastructure/Reddit";
 import Subreddit from "snoowrap/dist/objects/Subreddit";
+import {ActionResultEntity} from "../Common/Entities/ActionResultEntity";
 
 export class SubmissionAction extends Action {
     content?: string;
@@ -67,21 +68,21 @@ export class SubmissionAction extends Action {
         return 'submission';
     }
 
-    async process(item: Comment | Submission, ruleResults: RuleResultEntity[], options: runCheckOptions): Promise<ActionProcessResult> {
+    async process(item: Comment | Submission, ruleResults: RuleResultEntity[], actionResults: ActionResultEntity[], options: runCheckOptions): Promise<ActionProcessResult> {
         const dryRun = this.getRuntimeAwareDryrun(options);
 
-        const title = await this.resources.renderContent(this.title, item, ruleResults);
+        const title = await this.renderContent(this.title, item, ruleResults, actionResults) as string;
         this.logger.verbose(`Title: ${title}`);
 
-        const url = this.url !== undefined ? await this.resources.renderContent(this.url, item, ruleResults) : undefined;
+        const url = await this.renderContent(this.url, item, ruleResults, actionResults);
 
         this.logger.verbose(`URL: ${url !== undefined ? url : '[No URL]'}`);
 
-        const body = this.content !== undefined ? await this.resources.renderContent(this.content, item, ruleResults) : undefined;
+        const body = await this.renderContent(this.content, item, ruleResults, actionResults);
 
         let renderedContent: string | undefined = undefined;
         if(body !== undefined) {
-            const footer = await this.resources.generateFooter(item, this.footer);
+            const footer = await this.resources.renderFooter(item, this.footer);
             renderedContent = `${body}${footer}`;
             this.logger.verbose(`Contents:\r\n${renderedContent.length > 100 ? `\r\n${renderedContent}` : renderedContent}`);
         } else {
@@ -204,6 +205,11 @@ export class SubmissionAction extends Action {
             success: !allErrors,
             result: `${targetResults.join('\n')}${this.url !== undefined ? `\nURL: ${this.url}` : ''}${body !== undefined ? truncateStringToLength(100)(body) : ''}`,
             touchedEntities,
+            data: {
+                body,
+                bodyShort: body !== undefined ? truncateStringToLength(100)(body) : '',
+                submissions: targetResults.map(x => `* ${x}`).join('\n')
+            }
         };
     }
 
@@ -309,7 +315,7 @@ export interface SubmissionActionConfig extends RichContent, Footer {
      * * 'self' -- DEFAULT. Post Submission to same subreddit of Activity being processed
      * * [subreddit] -- The name of a subreddit to post Submission to. EX mealtimevideos
      * */
-    targets?: 'self' | string
+    targets?: ('self' | string) | ('self' | string)[]
 }
 
 export interface SubmissionActionOptions extends SubmissionActionConfig, ActionOptions {

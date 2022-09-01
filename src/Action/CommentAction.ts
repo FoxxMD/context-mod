@@ -9,6 +9,7 @@ import {runCheckOptions} from "../Subreddit/Manager";
 import {ActionTarget, ActionTypes, ArbitraryActionTarget} from "../Common/Infrastructure/Atomic";
 import {CMError} from "../Utils/Errors";
 import {SnoowrapActivity} from "../Common/Infrastructure/Reddit";
+import {ActionResultEntity} from "../Common/Entities/ActionResultEntity";
 
 export class CommentAction extends Action {
     content: string;
@@ -44,12 +45,11 @@ export class CommentAction extends Action {
         return 'comment';
     }
 
-    async process(item: Comment | Submission, ruleResults: RuleResultEntity[], options: runCheckOptions): Promise<ActionProcessResult> {
+    async process(item: Comment | Submission, ruleResults: RuleResultEntity[], actionResults: ActionResultEntity[], options: runCheckOptions): Promise<ActionProcessResult> {
         const dryRun = this.getRuntimeAwareDryrun(options);
-        const content = await this.resources.getContent(this.content, item.subreddit);
-        const body = await renderContent(content, item, ruleResults, this.resources.userNotes);
+        const body =  await this.renderContent(this.content, item, ruleResults, actionResults) as string;
 
-        const footer = await this.resources.generateFooter(item, this.footer);
+        const footer = await this.resources.renderFooter(item, this.footer);
 
         const renderedContent = `${body}${footer}`;
         this.logger.verbose(`Contents:\r\n${renderedContent.length > 100 ? `\r\n${renderedContent}` : renderedContent}`);
@@ -154,6 +154,12 @@ export class CommentAction extends Action {
             success: !allErrors,
             result: `${targetResults.join('\n')}${truncateStringToLength(100)(body)}`,
             touchedEntities,
+            data: {
+                body,
+                bodyShort: truncateStringToLength(100)(body),
+                comments: targetResults,
+                commentsFormatted: targetResults.map(x => `* ${x}`).join('\n')
+            }
         };
     }
 

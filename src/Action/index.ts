@@ -19,6 +19,8 @@ import {ActionResultEntity} from "../Common/Entities/ActionResultEntity";
 import {FindOptionsWhere} from "typeorm/find-options/FindOptionsWhere";
 import {ActionTypes} from "../Common/Infrastructure/Atomic";
 import {RunnableBaseJson, RunnableBaseOptions, StructuredRunnableBase} from "../Common/Infrastructure/Runnable";
+import { SubredditResources } from "../Subreddit/SubredditResources";
+import {SnoowrapActivity} from "../Common/Infrastructure/Reddit";
 
 export abstract class Action extends RunnableBase {
     name?: string;
@@ -29,6 +31,8 @@ export abstract class Action extends RunnableBase {
     managerEmitter: EventEmitter;
     // actionEntity: ActionEntity | null = null;
     actionPremiseEntity: ActionPremise | null = null;
+    checkName: string;
+    subredditName: string;
 
     constructor(options: ActionOptions) {
         super(options);
@@ -40,6 +44,7 @@ export abstract class Action extends RunnableBase {
             subredditName,
             dryRun = false,
             emitter,
+            checkName,
         } = options;
 
         this.name = name;
@@ -48,6 +53,8 @@ export abstract class Action extends RunnableBase {
         this.client = client;
         this.logger = logger.child({labels: [`Action ${this.getActionUniqueName()}`]}, mergeArr);
         this.managerEmitter = emitter;
+        this.checkName = checkName;
+        this.subredditName = subredditName;
     }
 
     abstract getKind(): ActionTypes;
@@ -112,7 +119,7 @@ export abstract class Action extends RunnableBase {
         }
     }
 
-    async handle(item: Comment | Submission, ruleResults: RuleResultEntity[], options: runCheckOptions): Promise<ActionResultEntity> {
+    async handle(item: Comment | Submission, ruleResults: RuleResultEntity[], actionResults: ActionResultEntity[], options: runCheckOptions): Promise<ActionResultEntity> {
         const {dryRun: runtimeDryrun} = options;
         const dryRun = runtimeDryrun || this.dryRun;
 
@@ -148,10 +155,11 @@ export abstract class Action extends RunnableBase {
                 actRes.runReason = runReason;
                 return actRes;
             }
-            const results = await this.process(item, ruleResults, options);
+            const results = await this.process(item, ruleResults, actionResults, options);
             actRes.success = results.success;
             actRes.dryRun = results.dryRun;
             actRes.result = results.result;
+            actRes.data = results.data;
             actRes.touchedEntities = results.touchedEntities ?? [];
 
             return actRes;
@@ -166,20 +174,31 @@ export abstract class Action extends RunnableBase {
         }
     }
 
-    abstract process(item: Comment | Submission, ruleResults: RuleResultEntity[], options: runCheckOptions): Promise<ActionProcessResult>;
+    abstract process(item: Comment | Submission, ruleResults: RuleResultEntity[], actionResults: ActionResultEntity[], options: runCheckOptions): Promise<ActionProcessResult>;
 
     getRuntimeAwareDryrun(options: runCheckOptions): boolean {
         const {dryRun: runtimeDryrun} = options;
         return runtimeDryrun || this.dryRun;
     }
+
+    async renderContent(template: string | undefined, item: SnoowrapActivity, ruleResults: RuleResultEntity[], actionResults: ActionResultEntity[]): Promise<string | undefined> {
+        if(template === undefined) {
+            return undefined;
+        }
+        return await this.resources.renderContent(template, item, ruleResults, actionResults, {manager: this.subredditName, check: this.checkName});
+    }
 }
 
-export interface ActionOptions extends Omit<ActionConfig, 'authorIs' | 'itemIs'>, RunnableBaseOptions {
-    //logger: Logger;
-    subredditName: string;
-    //resources: SubredditResources;
+export interface ActionRuntimeOptions {
+    checkName: string
+    subredditName: string
     client: ExtendedSnoowrap;
-    emitter: EventEmitter
+    emitter: EventEmitter;
+    resources: SubredditResources;
+    logger: Logger;
+}
+
+export interface ActionOptions extends Omit<ActionConfig, 'authorIs' | 'itemIs'>, RunnableBaseOptions, ActionRuntimeOptions {
 }
 
 export interface ActionConfig extends RunnableBaseJson {

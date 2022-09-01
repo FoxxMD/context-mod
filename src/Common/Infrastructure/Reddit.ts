@@ -88,3 +88,18 @@ export interface SubredditRemovalReason {
     id: string,
     title: string
 }
+
+export interface SubredditActivityAbsoluteBreakdown {
+    count: number
+    name: string
+}
+
+export interface SubredditActivityBreakdown extends SubredditActivityAbsoluteBreakdown {
+    percent: number
+}
+
+export interface SubredditActivityBreakdownByType {
+    total: SubredditActivityBreakdown[]
+    submission: SubredditActivityBreakdown[]
+    comment: SubredditActivityBreakdown[]
+}

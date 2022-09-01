@@ -3165,13 +3165,13 @@
                     "type": "string"
                 },
                 "to": {
-                    "description": "Entity to send message to.\n\nIf not present Message be will sent to the Author of the Activity being checked.\n\nValid formats:\n\n* `aUserName` -- send to /u/aUserName\n* `u/aUserName` -- send to /u/aUserName\n* `r/aSubreddit` -- sent to modmail of /r/aSubreddit\n\n**Note:** Reddit does not support sending a message AS a subreddit TO another subreddit",
+                    "description": "Entity to send message to. It can be templated.\n\nIf not present Message be will sent to the Author of the Activity being checked.\n\nValid formats:\n\n* `aUserName` -- send to /u/aUserName\n* `u/aUserName` -- send to /u/aUserName\n* `r/aSubreddit` -- sent to modmail of /r/aSubreddit\n\n**Note:** Reddit does not support sending a message AS a subreddit TO another subreddit\n\n**Tip:** To send a message to the subreddit of the Activity us `to: 'r/{{item.subreddit}}'`",
                     "examples": [
                         "aUserName",
                         "u/aUserName",
-                        "r/aSubreddit"
+                        "r/aSubreddit",
+                        "r/{{item.subreddit}}"
                     ],
-                    "pattern": "^\\s*(\\/[ru]\\/|[ru]\\/)*(\\w+)*\\s*$",
                     "type": "string"
                 }
             },
@@ -5385,8 +5385,18 @@
                     "type": "boolean"
                 },
                 "targets": {
-                    "description": "Specify where this Submission should be made\n\nValid values: 'self' | [subreddit]\n\n* 'self' -- DEFAULT. Post Submission to same subreddit of Activity being processed\n* [subreddit] -- The name of a subreddit to post Submission to. EX mealtimevideos",
-                    "type": "string"
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "string"
+                        }
+                    ],
+                    "description": "Specify where this Submission should be made\n\nValid values: 'self' | [subreddit]\n\n* 'self' -- DEFAULT. Post Submission to same subreddit of Activity being processed\n* [subreddit] -- The name of a subreddit to post Submission to. EX mealtimevideos"
                 },
                 "title": {
                     "description": "The title of this Submission.\n\nTemplated the same as **content**",

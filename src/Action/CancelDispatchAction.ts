@@ -12,6 +12,7 @@ import {isSubmission, parseDurationValToDuration} from "../util";
 import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
 import {runCheckOptions} from "../Subreddit/Manager";
 import {ActionTarget, ActionTypes, InclusiveActionTarget} from "../Common/Infrastructure/Atomic";
+import {ActionResultEntity} from "../Common/Entities/ActionResultEntity";
 
 export class CancelDispatchAction extends Action {
     identifiers?: (string | null)[];
@@ -35,7 +36,7 @@ export class CancelDispatchAction extends Action {
         this.targets = !Array.isArray(target) ? [target] : target;
     }
 
-    async process(item: Comment | Submission, ruleResults: RuleResultEntity[], options: runCheckOptions): Promise<ActionProcessResult> {
+    async process(item: Comment | Submission, ruleResults: RuleResultEntity[], actionResults: ActionResultEntity[], options: runCheckOptions): Promise<ActionProcessResult> {
         // see note in DispatchAction about missing runtimeDryrun
         const dryRun = this.dryRun;
 
