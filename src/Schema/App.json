@@ -665,10 +665,11 @@
                     "type": "array"
                 },
                 "name": {
-                    "description": "A list of reddit usernames (case-insensitive) to match against. Do not include the \"u/\" prefix\n\n EX to match against /u/FoxxMD and /u/AnotherUser use [\"FoxxMD\",\"AnotherUser\"]",
+                    "description": "A list of reddit usernames (case-insensitive) or regular expressions to match against. Do not include the \"u/\" prefix\n\n\n EX to match against /u/FoxxMD and /u/AnotherUser use [\"FoxxMD\",\"AnotherUser\"]",
                     "examples": [
                         "FoxxMD",
-                        "AnotherUser"
+                        "AnotherUser",
+                        "/.*Foxx./*i"
                     ],
                     "items": {
                         "type": "string"
