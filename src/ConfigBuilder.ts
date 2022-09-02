@@ -642,7 +642,7 @@ const getNamedOrReturn = <T>(namedFilters: Map<string, NamedCriteria<T>>, filter
         if(!namedFilters.has(x.toLocaleLowerCase())) {
             throw new Error(`No named ${filterName} criteria with the name "${x}"`);
         }
-        return namedFilters.get(x) as NamedCriteria<T>;
+        return namedFilters.get(x.toLocaleLowerCase()) as NamedCriteria<T>;
     }
     if(asNamedCriteria(x)) {
         return x;
