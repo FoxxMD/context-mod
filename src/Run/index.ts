@@ -24,7 +24,7 @@ import {RunResultEntity} from "../Common/Entities/RunResultEntity";
 import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
 import {RunnableBase} from "../Common/RunnableBase";
 import {RunnableBaseJson, RunnableBaseOptions, StructuredRunnableBase} from "../Common/Infrastructure/Runnable";
-import {FilterCriteriaDefaults} from "../Common/Infrastructure/Filters/FilterShapes";
+import {FilterCriteriaDefaults, FilterCriteriaDefaultsJson} from "../Common/Infrastructure/Filters/FilterShapes";
 import {IncludesData} from "../Common/Infrastructure/Includes";
 
 export class Run extends RunnableBase {
@@ -284,7 +284,7 @@ export interface IRun extends PostBehavior, RunnableBaseJson {
      *
      * Default behavior is to exclude all mods and automoderator from checks
      * */
-    filterCriteriaDefaults?: FilterCriteriaDefaults
+    filterCriteriaDefaults?: FilterCriteriaDefaultsJson
 
     /**
      * Use this option to override the `dryRun` setting for all Actions of all Checks in this Run
@@ -326,4 +326,5 @@ export interface RunConfigHydratedData extends IRun {
 
 export interface RunConfigObject extends Omit<RunConfigHydratedData, 'authorIs' | 'itemIs'>, StructuredRunnableBase {
     checks: ActivityCheckObject[]
+    filterCriteriaDefaults?: FilterCriteriaDefaults
 }

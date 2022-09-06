@@ -418,6 +418,7 @@ export class ConfigBuilder {
             }
             structuredRuns.push({
                 ...r,
+                filterCriteriaDefaults: configFilterDefaultsFromRun,
                 checks: structuredChecks,
                 authorIs: derivedRunAuthorIs,
                 itemIs: derivedRunItemIs
