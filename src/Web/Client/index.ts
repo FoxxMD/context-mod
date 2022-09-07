@@ -1029,6 +1029,7 @@ const webClient = async (options: OperatorConfigWithFileContext) => {
             ...req.instancesViewData,
             bots: resp.bots,
             now: dayjs().add(1, 'minute').format('YYYY-MM-DDTHH:mm'),
+            defaultExpire: dayjs().add(1, 'day').format('YYYY-MM-DDTHH:mm'),
             botId: (req.instance as CMInstance).getName(),
             isOperator: isOp,
             system: isOp ? {

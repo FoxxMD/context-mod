@@ -190,3 +190,8 @@ li > ul {
 .introjs-tooltip-title,.introjs-tooltiptext {
     color: black;
 }
+
+.guestAdd {
+    border-top: 1px solid white;
+    padding-top: 0.5em;
+}

@@ -288,10 +288,25 @@
                                                                                style="width:200px;"
                                                                                class="guestAddName border-gray-50 placeholder-gray-500 rounded mr-1 p-1 text-black"
                                                         placeholder="userName"/>
+                                                        <div class="mt-2">
+                                                            <span class="has-tooltip">
+                                                       <span style="margin-top:55px" class='tooltip rounded shadow-lg p-1 bg-gray-100 text-black space-y-3 p-2 text-left'>
+                                                            When should Guest Access expire for this user?
+                                                        </span>
+                                                        <span>
+                                                            Expires At<svg xmlns="http://www.w3.org/2000/svg"
+                                                                       class="h-4 w-4 inline-block cursor-help"
+                                                                       fill="none"
+                                                                       viewBox="0 0 24 24" stroke="currentColor">
+                                                                <use xlink:href="public/questionsymbol.svg#q" />
+                                                            </svg>
+                                                        </span>
+                                                    </span>
                                                         <input type="datetime-local"
-                                                                                         class="guestAddTime border-gray-50 placeholder-gray-500 mt-2 mr-2 rounded text-black"
-                                                                                         value="<%= now %>"
+                                                                                         class="guestAddTime border-gray-50 placeholder-gray-500 mr-2 rounded text-black"
+                                                                                         value="<%= defaultExpire %>"
                                                                                          min="<%= now %>"/>
+                                                            </div>
 
                                                     </div>
                                                     <a href="" class="addGuest">Add</a>
