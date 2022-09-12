@@ -162,3 +162,7 @@ export interface SubredditInviteData {
     initialConfig?: string
     expiresAt?: number | Dayjs
 }
+
+export interface SubredditInviteDataPersisted extends SubredditInviteData {
+    id: string
+}

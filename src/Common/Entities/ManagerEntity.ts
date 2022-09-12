@@ -43,7 +43,7 @@ export class ManagerEntity extends RandomIdBaseEntity implements RunningStateEnt
     @Column("varchar", {length: 200})
     name!: string;
 
-    @ManyToOne(type => Bot, sub => sub.managers, {cascade: ['insert'], eager: true})
+    @ManyToOne(type => Bot, sub => sub.managers, {eager: true})
     bot!: Bot;
 
     @ManyToOne(type => Subreddit, sub => sub.activities, {cascade: ['insert'], eager: true})

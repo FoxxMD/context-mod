@@ -1,0 +1,150 @@
+<html lang="en">
+<%- include('partials/head', {title: 'Subreddit Onboarding Helper'}) %>
+<body class="bg-gray-900 text-white font-sans">
+<div class="min-w-screen min-h-screen">
+    <%- include('partials/header') %>
+    <div class="container mx-auto mt-5">
+        <div class="grid grid-cols-1 gap-5">
+            <div class="bg-gray-600">
+                <div class="bg-gray-700">
+                    <div class="text-xl px-4 p-2">Choose subreddit(s) to onboard</div>
+                </div>
+                <div class="p-6 md:px-10 md:py-6">
+                    <div class="my-2 ml-5">
+                        <div class="space-y-3">
+                            <div>Specify which subreddits this bot should recognize moderator invites from.</div>
+                            <div>CM will NOT recognize (or accept) moderator invites from Subreddits you have not created an Onboarding invite for.</div>
+                            <div>Subreddits should be seperated with a comma.</div>
+                            <input id="subreddits" style="max-width:800px; display: block;"
+                                   class="text-black placeholder-gray-500 rounded mt-2 mb-3 p-2 w-full"
+                                   placeholder="aSubreddit,aSecondSubreddit,aThirdSubreddit">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-gray-600">
+                <div class="bg-gray-700">
+                    <div class="text-xl px-4 p-2">Settings that require Subreddit approval</div>
+                </div>
+                <div class="p-6 md:px-10 md:py-6">
+                    <div class="space-y-3 mb-6">
+                    <div><strong>If any of these settings are specified then a moderator will need to login to CM to complete the onboarding process even after sending the moderator invite to the bot.</strong> If none of these settings are specified CM will automatically accept the moderator invite.</div>
+                        <div>The moderator completing onboarding will also be able to opt-out or change any of these settings.</div>
+                    </div>
+                    <div class="text-lg text-semibold my-3">(Optional) Specify initial Guest Access</div>
+                    <div class="my-2 ml-5">
+                        <div class="space-y-3">
+                            <div>Specify Reddit users who should be automatically added with <b>Guest Access</b> to these subreddits once onboarding is complete.</div>
+                            <div>If you are already a moderator on all of the subreddits being added you can skip this step.</div>
+                            <div>Adding initial Guest Access is useful when you (the operator) want to setup configs for subreddits you are not a moderator of. This step reduces friction for onboarding as it eliminates the need for moderators to login to the dashboard and manually give you Guest Access.</div>
+                            <input id="guestMods" style="max-width:800px; display: block;"
+                                   class="text-black placeholder-gray-500 rounded mt-2 mb-3 p-2 w-full"
+                                   placeholder="RedditUser1,RedditUser2">
+                        </div>
+                    </div>
+                    <div class="text-lg text-semibold my-3">(Optional) Set initial Config
+                    </div>
+                    <div class="ml-5">
+                        <div class="space-y-2">
+                            <div>If specified, this is a normal URL or <a target="_blank" href="https://github.com/FoxxMD/context-mod/tree/master/docs/subreddit/components#url-tokens"><span class="font-mono">wiki:</span> token</a> pointing to a configuration that CM should automatically write to the Subreddit's config during onboarding.</div>
+                            <input id="initialConfig" style="max-width:800px; display: block;"
+                                   class="text-black placeholder-gray-500 rounded mt-2 mb-3 p-2 w-full"
+                                   placeholder="https://...">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-gray-600">
+                <div class="bg-gray-700">
+                    <div class="text-xl px-4 p-2">Create Onboaring Invites</div>
+                </div>
+                <div class="p-6 md:px-10 md:py-6">
+                        <div class="space-y-3">
+                            <div class="text-lg text-semibold my-3"><a id="doAuth" href="">Click to generate Onboarding Invites</a></div>
+                            <div>Unique links will be generated for each subreddit.</div>
+                            <ul class="list-inside list-disc" id="inviteLinks"></ul>
+                            <div id="errorWrapper" class="font-semibold hidden">Errors:
+                                <ul id="errorList" class="list-inside list-disc"></ul>
+                            </div>
+                        </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<%- include('partials/footer') %>
+<script>
+    function setError(val) {
+        if(val === null) {
+            document.querySelector("#errorWrapper").classList.add('hidden');
+            document.querySelector('#errorList').innerHTML = '';
+        } else {
+            document.querySelector("#errorWrapper").classList.remove('hidden');
+            const node = document.createElement("LI");
+            node.appendChild(document.createTextNode(val));
+            document.querySelector("#errorList").appendChild(node);
+        }
+    }
+
+    function addLink(sub, val) {
+        if(val === null) {
+            document.querySelector('#inviteLinks').innerHTML = '';
+        } else {
+            const node = document.createElement("LI");
+            node.appendChild(document.createTextNode(`${sub}: `));
+            node.insertAdjacentHTML('beforeend', `<a class="font-semibold" href="${document.location.origin}/bot/invite/${val}${document.location.search}">${document.location.origin}/bot/invite/${val}${document.location.search}</a>`);
+            document.querySelector("#inviteLinks").appendChild(node);
+        }
+    }
+
+    document.querySelector('#doAuth').addEventListener('click', e => {
+        e.preventDefault();
+        const subredditVal = document.querySelector('#subreddits').value.trim();
+
+        if(subredditVal === '') {
+            setError('Subreddits cannot be empty!');
+            return;
+        } else {
+            setError(null);
+        }
+
+        const subreddits = subredditVal.split(',').map(x => x.trim());
+
+        const body = {};
+        const config = document.querySelector('#initialConfig').value.trim();
+        if(config !== '') {
+            body.initialConfig = config;
+        }
+        const guests = document.querySelector('#guestMods').value.trim();
+        if(guests !== '') {
+            body.guests = guests.split(',').map(x => x.trim());
+        }
+
+        for(const sub of subreddits) {
+            fetch(`/api/bot/invite${document.location.search}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify({...body, subreddit: sub})
+            }).then((resp) => {
+                if(!resp.ok) {
+
+                    document.querySelector("#errorWrapper").classList.remove('hidden');
+                    resp.text().then(t => {
+                        setError(`${sub}: ${t}`);
+                    });
+                } else {
+                    document.querySelector("#errorWrapper").classList.add('hidden');
+                    document.querySelector('#subreddits').value = '';
+                    resp.text().then(t => {
+                        addLink(sub, t);
+                    });
+                }
+            });
+        }
+    })
+</script>
+</body>
+</html>

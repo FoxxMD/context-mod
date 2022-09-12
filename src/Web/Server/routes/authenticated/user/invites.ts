@@ -4,17 +4,22 @@ import {CMError} from "../../../../../Utils/Errors";
 
 const getSubredditInvites = async (req: Request, res: Response) => {
 
-    return res.json(await req.serverBot.cacheManager.getPendingSubredditInvites());
+    return res.json(await req.serverBot.getSubredditInvites());
 };
 export const getSubredditInvitesRoute = [authUserCheck(), botRoute(), getSubredditInvites];
 const addSubredditInvite = async (req: Request, res: Response) => {
 
-    const {subreddit} = req.body as any;
+    const {subreddit, initialConfig, guests} = req.body as any;
     if (subreddit === undefined || subreddit === null || subreddit === '') {
         return res.status(400).send('subreddit must be defined');
     }
     try {
-        await req.serverBot.cacheManager.addPendingSubredditInvite(subreddit);
+        const invite = await req.serverBot.addSubredditInvite({
+            subreddit,
+            initialConfig,
+            guests,
+        });
+        return res.status(200).send(invite.id);
     } catch (e: any) {
         if (e instanceof CMError) {
             req.logger.warn(e);
@@ -24,16 +29,15 @@ const addSubredditInvite = async (req: Request, res: Response) => {
             return res.status(500).send(e.message);
         }
     }
-    return res.status(200).send();
 };
 export const addSubredditInviteRoute = [authUserCheck(), botRoute(), addSubredditInvite];
 const deleteSubredditInvite = async (req: Request, res: Response) => {
 
-    const {subreddit} = req.query as any;
+    const {subreddit, id} = req.query as any;
     if (subreddit === undefined || subreddit === null || subreddit === '') {
         return res.status(400).send('subreddit must be defined');
     }
-    await req.serverBot.cacheManager.deletePendingSubredditInvite(subreddit);
+    await req.serverBot.deleteSubredditInvite(subreddit);
     return res.status(200).send();
 };
 export const deleteSubredditInviteRoute = [authUserCheck(), botRoute(), deleteSubredditInvite];

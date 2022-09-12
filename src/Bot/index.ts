@@ -43,10 +43,16 @@ import {FilterCriteriaDefaults} from "../Common/Infrastructure/Filters/FilterSha
 import {snooLogWrapper} from "../Utils/loggerFactory";
 import {InfluxClient} from "../Common/Influx/InfluxClient";
 import {Point} from "@influxdata/influxdb-client";
-import {BotInstanceFunctions, NormalizedManagerResponse} from "../Web/Common/interfaces";
+import {
+    BotInstanceFunctions,
+    NormalizedManagerResponse,
+    SubredditInviteData,
+    SubredditInviteDataPersisted
+} from "../Web/Common/interfaces";
 import {AuthorEntity} from "../Common/Entities/AuthorEntity";
 import {Guest, GuestEntityData} from "../Common/Entities/Guest/GuestInterfaces";
 import {guestEntitiesToAll, guestEntityToApiGuest} from "../Common/Entities/Guest/GuestEntity";
+import {SubredditInvite} from "../Common/Entities/SubredditInvite";
 
 class Bot implements BotInstanceFunctions {
 
@@ -105,6 +111,8 @@ class Bot implements BotInstanceFunctions {
     runTypeRepo: Repository<RunStateType>;
     managerRepo: Repository<ManagerEntity>;
     authorRepo: Repository<AuthorEntity>;
+    subredditInviteRepo: Repository<SubredditInvite>
+    botRepo: Repository<BotEntity>
     botEntity!: BotEntity
 
     getBotName = () => {
@@ -168,6 +176,8 @@ class Bot implements BotInstanceFunctions {
         this.runTypeRepo = this.database.getRepository(RunStateType);
         this.managerRepo = this.database.getRepository(ManagerEntity);
         this.authorRepo = this.database.getRepository(AuthorEntity);
+        this.subredditInviteRepo = this.database.getRepository(SubredditInvite)
+        this.botRepo = this.database.getRepository(BotEntity)
         this.config = config;
         this.dryRun = parseBool(dryRun) === true ? true : undefined;
         this.softLimit = softLimit;
@@ -760,20 +770,27 @@ class Bot implements BotInstanceFunctions {
     }
 
     async checkModInvites() {
-        const subs: string[] = await this.cacheManager.getPendingSubredditInvites();
-        for (const name of subs) {
-            try {
-                // @ts-ignore
-                await this.client.getSubreddit(name).acceptModeratorInvite();
-                this.logger.info(`Accepted moderator invite for r/${name}!`);
-                await this.cacheManager.deletePendingSubredditInvite(name);
-            } catch (err: any) {
-                if (err.message.includes('NO_INVITE_FOUND')) {
-                    this.logger.warn(`No pending moderation invite for r/${name} was found`);
-                } else if (isStatusError(err) && err.statusCode === 403) {
-                    this.logger.error(`Error occurred while checking r/${name} for a pending moderation invite. It is likely that this bot does not have the 'modself' oauth permission. Error: ${err.message}`);
-                } else {
-                    this.logger.error(`Error occurred while checking r/${name} for a pending moderation invite. Error: ${err.message}`);
+        const expired = this.botEntity.subredditInvites.filter(x => x.expiresAt !== undefined && x.expiresAt.isSameOrBefore(dayjs()));
+        for (const exp of expired) {
+            await this.deleteSubredditInvite(exp);
+        }
+
+        for (const subInvite of this.botEntity.subredditInvites) {
+            if (subInvite.canAutomaticallyAccept()) {
+                const {subreddit: name} = subInvite;
+                try {
+                    // @ts-ignore
+                    await this.client.getSubreddit(name).acceptModeratorInvite();
+                    this.logger.info(`Accepted moderator invite for r/${name}!`);
+                    await this.deleteSubredditInvite(subInvite);
+                } catch (err: any) {
+                    if (err.message.includes('NO_INVITE_FOUND')) {
+                        this.logger.warn(`No pending moderation invite for r/${name} was found`);
+                    } else if (isStatusError(err) && err.statusCode === 403) {
+                        this.logger.error(`Error occurred while checking r/${name} for a pending moderation invite. It is likely that this bot does not have the 'modself' oauth permission. Error: ${err.message}`);
+                    } else {
+                        this.logger.error(`Error occurred while checking r/${name} for a pending moderation invite. Error: ${err.message}`);
+                    }
                 }
             }
         }
@@ -1235,6 +1252,41 @@ class Bot implements BotInstanceFunctions {
         await this.managerRepo.save(updatedManagerEntities);
 
         return newGuests;
+    }
+
+    async addSubredditInvite(data: SubredditInviteData){
+        if((await this.subredditInviteRepo.findOneBy({subreddit: data.subreddit}))) {
+            throw new CMError(`Invite for ${data.subreddit} already exists`);
+        }
+        const invite = new SubredditInvite({
+            subreddit: data.subreddit,
+            initialConfig: data.initialConfig,
+            guests: data.guests,
+            bot: this.botEntity
+        })
+        await this.subredditInviteRepo.save(invite);
+        this.botEntity.subredditInvites.push(invite);
+        return invite;
+    }
+
+     getSubredditInvites(): SubredditInviteDataPersisted[] {
+        return this.botEntity.subredditInvites.map(x => x.toSubredditInviteData());
+    }
+
+    async deleteSubredditInvite(val: string | SubredditInvite) {
+        let invite: SubredditInvite;
+        if(val instanceof SubredditInvite) {
+            invite = val;
+        } else {
+            const maybeInvite = this.botEntity.subredditInvites.find(x => x.subreddit === val);
+            if(maybeInvite === undefined) {
+                throw new CMError(`No invite for subreddit ${val} exists for this Bot`);
+            }
+            invite = maybeInvite;
+        }
+        await this.subredditInviteRepo.delete({id: invite.id});
+        const index = this.botEntity.subredditInvites.findIndex(x => x.id === invite.id);
+        this.botEntity.subredditInvites.splice(index, 1);
     }
 }
 

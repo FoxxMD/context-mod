@@ -1046,6 +1046,12 @@ const webClient = async (options: OperatorConfigWithFileContext) => {
         });
     });
 
+    app.getAsync('/bot/invites/subreddit', defaultSession, instanceWithPermissions, botWithPermissions(true), async (req: express.Request, res: express.Response) => {
+        res.render('subredditHelper', {
+            title: `Create Subreddit Invite`,
+        });
+    });
+
     app.getAsync('/bot/invites', defaultSession, async (req: express.Request, res: express.Response) => {
         res.render('modInvites', {
             title: `Pending Moderation Invites`,
