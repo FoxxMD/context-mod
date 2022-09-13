@@ -13,7 +13,7 @@ coverage
 *.json5
 *.yaml
 *.yml
-
+*.env
 
 # exceptions
 !heroku.yml
