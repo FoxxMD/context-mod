@@ -770,12 +770,12 @@ class Bot implements BotInstanceFunctions {
     }
 
     async checkModInvites() {
-        const expired = this.botEntity.subredditInvites.filter(x => x.expiresAt !== undefined && x.expiresAt.isSameOrBefore(dayjs()));
+        const expired = this.botEntity.getSubredditInvites().filter(x => x.expiresAt !== undefined && x.expiresAt.isSameOrBefore(dayjs()));
         for (const exp of expired) {
             await this.deleteSubredditInvite(exp);
         }
 
-        for (const subInvite of this.botEntity.subredditInvites) {
+        for (const subInvite of this.botEntity.getSubredditInvites()) {
             if (subInvite.canAutomaticallyAccept()) {
                 const {subreddit: name} = subInvite;
                 try {
@@ -1265,12 +1265,12 @@ class Bot implements BotInstanceFunctions {
             bot: this.botEntity
         })
         await this.subredditInviteRepo.save(invite);
-        this.botEntity.subredditInvites.push(invite);
+        this.botEntity.addSubredditInvite(invite);
         return invite;
     }
 
      getSubredditInvites(): SubredditInviteDataPersisted[] {
-        return this.botEntity.subredditInvites.map(x => x.toSubredditInviteData());
+        return this.botEntity.getSubredditInvites().map(x => x.toSubredditInviteData());
     }
 
     async deleteSubredditInvite(val: string | SubredditInvite) {
@@ -1278,15 +1278,14 @@ class Bot implements BotInstanceFunctions {
         if(val instanceof SubredditInvite) {
             invite = val;
         } else {
-            const maybeInvite = this.botEntity.subredditInvites.find(x => x.subreddit === val);
+            const maybeInvite = this.botEntity.getSubredditInvites().find(x => x.subreddit === val);
             if(maybeInvite === undefined) {
                 throw new CMError(`No invite for subreddit ${val} exists for this Bot`);
             }
             invite = maybeInvite;
         }
         await this.subredditInviteRepo.delete({id: invite.id});
-        const index = this.botEntity.subredditInvites.findIndex(x => x.id === invite.id);
-        this.botEntity.subredditInvites.splice(index, 1);
+        this.botEntity.removeSubredditInvite(invite);
     }
 }
 
