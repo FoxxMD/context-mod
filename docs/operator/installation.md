@@ -8,7 +8,10 @@ ContextMod can be run on almost any operating system but it is recommended to us
 
 PROTIP: Using a container management tool like [Portainer.io CE](https://www.portainer.io/products/community-edition) will help with setup/configuration tremendously.
 
-### [Dockerhub](https://hub.docker.com/r/foxxmd/context-mod)
+Images available from these registeries:
+
+* [Dockerhub](https://hub.docker.com/r/foxxmd/context-mod) - `docker.io/foxxmd/context-mod`
+* [GHCR](https://github.com/foxxmd/context-mod/pkgs/container/context-mod) - `ghcr.io/foxxmd/context-mod`
 
 An example of starting the container using the [minimum configuration](/docs/operator/configuration.md#minimum-config):
 
@@ -17,7 +20,7 @@ An example of starting the container using the [minimum configuration](/docs/ope
 * Expose the web interface using the container port `8085`
 
 ```
-docker run -d -v /host/path/folder:/config -p 8085:8085 foxxmd/context-mod
+docker run -d -v /host/path/folder:/config -p 8085:8085 ghcr.io/foxxmd/context-mod:latest
 ```
 
 The location of `DATA_DIR` in the container can be changed by passing it as an environmental variable EX `-e "DATA_DIR=/home/abc/config`
@@ -34,7 +37,7 @@ To get the UID and GID for the current user run these commands from a terminal:
 * `id -g` -- prints GID
 
 ```
-docker run -d -v /host/path/folder:/config -p 8085:8085 -e PUID=1000 -e PGID=1000 foxxmd/context-mod
+docker run -d -v /host/path/folder:/config -p 8085:8085 -e PUID=1000 -e PGID=1000 ghcr.io/foxxmd/context-mod:latest
 ```
 
 ## Locally
