@@ -33,7 +33,7 @@ import tcpUsed from "tcp-port-used";
 import http from "http";
 import jwt from 'jsonwebtoken';
 import {Server as SocketServer} from "socket.io";
-import got from 'got';
+import got, {HTTPError} from 'got';
 import sharedSession from "express-socket.io-session";
 import dayjs from "dayjs";
 import httpProxy from 'http-proxy';
@@ -1112,7 +1112,7 @@ const webClient = async (options: OperatorConfigWithFileContext) => {
         const {inviteId} = req.params;
 
         if (inviteId === undefined) {
-            return res.render('error', {error: '`invite` param is missing from URL'});
+            return res.status(400).send('`invite` param is missing from URL')
         }
 
         let validInstance: CMInstance | undefined = undefined;
@@ -1130,14 +1130,14 @@ const webClient = async (options: OperatorConfigWithFileContext) => {
         }
 
         if(validInvite === undefined || validInstance === undefined || validBot === undefined) {
-            return res.render('error', {error: 'Either no invite exists with the given ID or you are not a moderator of the subreddit this invite is for.'});
+            return res.status(400).send('Either no invite exists with the given ID or you are not a moderator of the subreddit this invite is for.')
         }
 
         const user = req.user as Express.User;
 
         // @ts-ignore
         if(!user.subreddits.some(x => x.toLowerCase() === validInvite.subreddit.toLowerCase())) {
-            return res.render('error', {error: 'Either no invite exists with the given ID or you are not a moderator of the subreddit this invite is for.'});
+            return res.status(400).send('Either no invite exists with the given ID or you are not a moderator of the subreddit this invite is for.')
         }
 
         try {
@@ -1152,9 +1152,12 @@ const webClient = async (options: OperatorConfigWithFileContext) => {
 
         } catch (err: any) {
             logger.error(err);
-            throw err;
             res.status(500)
-            return res.send(err.message);
+            let msg = err.message;
+            if(err instanceof HTTPError && typeof err.response.body === 'string') {
+                msg = err.response.body
+            }
+            return res.send(msg);
         }
     });
 

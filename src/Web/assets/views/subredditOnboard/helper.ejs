@@ -92,7 +92,7 @@
         } else {
             const node = document.createElement("LI");
             node.appendChild(document.createTextNode(`${sub}: `));
-            node.insertAdjacentHTML('beforeend', `<a class="font-semibold" href="${document.location.origin}/bot/invite/${val}">${document.location.origin}/bot/invite/${val}</a>`);
+            node.insertAdjacentHTML('beforeend', `<a class="font-semibold" href="${document.location.origin}/bot/invites/subreddit/${val}">${document.location.origin}/bot/invites/subreddit/${val}</a>`);
             document.querySelector("#inviteLinks").appendChild(node);
         }
     }

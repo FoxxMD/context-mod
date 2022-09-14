@@ -13,8 +13,9 @@ const getSubredditInvite = async (req: Request, res: Response) => {
     const {id} = req.params;
     const invite = await req.serverBot.getInvite(id);
     if(invite !== undefined) {
+        const {bot, ...inviteRest} = invite;
         const readiness = req.serverBot.getOnboardingReadiness(invite);
-        return res.json({...invite, ...readiness});
+        return res.json({...inviteRest, ...readiness});
     }
     return res.status(404);
 };

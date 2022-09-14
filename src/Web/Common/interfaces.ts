@@ -3,6 +3,7 @@ import {BotConnection, LogInfo, ManagerStats} from "../../Common/interfaces";
 import {Guest, GuestAll} from "../../Common/Entities/Guest/GuestInterfaces";
 import {URL} from "url";
 import {Dayjs} from "dayjs";
+import {Subreddit} from "snoowrap/dist/objects";
 
 export interface BotStats {
     startedAtHuman: string,
@@ -172,6 +173,10 @@ export interface SubredditInviteData {
     guests?: string[]
     initialConfig?: string
     expiresAt?: number | Dayjs
+}
+
+export interface HydratedSubredditInviteData extends Omit<SubredditInviteData, 'subreddit'>{
+    subreddit: string | Subreddit
 }
 
 export interface SubredditInviteDataPersisted extends SubredditInviteData {

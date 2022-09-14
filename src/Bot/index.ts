@@ -1,4 +1,5 @@
-import Snoowrap, {Comment, ConfigOptions, RedditUser, Submission, Subreddit} from "snoowrap";
+import Snoowrap, {Comment, ConfigOptions, RedditUser, Submission} from "snoowrap";
+import {Subreddit} from "snoowrap/dist/objects"
 import {Logger} from "winston";
 import dayjs, {Dayjs} from "dayjs";
 import {Duration} from "dayjs/plugin/duration";
@@ -52,7 +53,7 @@ import {snooLogWrapper} from "../Utils/loggerFactory";
 import {InfluxClient} from "../Common/Influx/InfluxClient";
 import {Point} from "@influxdata/influxdb-client";
 import {
-    BotInstanceFunctions,
+    BotInstanceFunctions, HydratedSubredditInviteData,
     NormalizedManagerResponse,
     SubredditInviteData,
     SubredditInviteDataPersisted, SubredditOnboardingReadiness
@@ -799,7 +800,7 @@ class Bot implements BotInstanceFunctions {
                     await this.acceptModInvite(subInvite);
                     await this.deleteSubredditInvite(subInvite);
                 } catch (err: any) {
-                    if(err(definesSeriousError) && !err.isSerious) {
+                    if(definesSeriousError(err) && !err.isSerious) {
                         this.logger.warn(err);
                     } else {
                         this.logger.error(err);
@@ -818,8 +819,14 @@ class Bot implements BotInstanceFunctions {
         } catch (err: any) {
             if (err.message.includes('NO_INVITE_FOUND')) {
                 throw new SimpleError(`No pending moderation invite for r/${name} was found`, {isSerious: false});
-            } else if (isStatusError(err) && err.statusCode === 403 && !this.client.scope.includes('modself')) {
-                throw new CMError(`Error occurred while checking r/${name} for a pending moderation invite. It is likely that this bot does not have the 'modself' oauth permission.`, {cause: err})
+            } else if (isStatusError(err) && err.statusCode === 403) {
+                let msg = `Error occurred while checking r/${name} for a pending moderation invite.`;
+                if(!this.client.scope.includes('modself')) {
+                    msg = `${msg} This bot must have the 'modself' oauth permission in order to accept invites.`;
+                } else {
+                    msg = `${msg} If this subreddit is private it is likely no moderation invite exists.`;
+                }
+                throw new CMError(msg, {cause: err})
             } else {
                 throw new CMError(`Error occurred while checking r/${name} for a pending moderation invite.`, {cause: err});
             }
@@ -1284,12 +1291,33 @@ class Bot implements BotInstanceFunctions {
         return newGuests;
     }
 
-    async addSubredditInvite(data: SubredditInviteData){
-        if((await this.subredditInviteRepo.findOneBy({subreddit: data.subreddit}))) {
-            throw new CMError(`Invite for ${data.subreddit} already exists`);
+    async addSubredditInvite(data: HydratedSubredditInviteData){
+        let sub: Subreddit;
+        let name: string;
+        if (data.subreddit instanceof Subreddit) {
+            sub = data.subreddit;
+            name = sub.display_name;
+        } else {
+            try {
+                const maybeName = parseRedditEntity(data.subreddit);
+                name = maybeName.name;
+            } catch (e: any) {
+                throw new SimpleError(`Value '${data.subreddit}' is not a valid subreddit name`);
+            }
+            try {
+
+                // @ts-ignore
+                sub = await this.client.getSubreddit(name).fetch();
+            } catch (e: any) {
+                throw e;
+            }
+        }
+
+        if((await this.subredditInviteRepo.findOneBy({subreddit: sub.display_name}))) {
+            throw new CMError(`Invite for ${sub.display_name} already exists`);
         }
         const invite = new SubredditInvite({
-            subreddit: data.subreddit,
+            subreddit: sub.display_name,
             initialConfig: data.initialConfig,
             guests: data.guests,
             bot: this.botEntity
