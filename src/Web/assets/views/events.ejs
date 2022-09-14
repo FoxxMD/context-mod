@@ -21,6 +21,7 @@
         <div class="container mx-auto">
             <div class="flex items-center justify-between">
                 <div class="flex items-center flex-grow pr-4">
+                    <a href="/"><img src="/public/logo.png" style="max-height:40px; padding-right: 0.75rem;"/></a>
                     <% if(locals.title !== undefined) { %>
                         <a href="/events?instance=<%= instance %>&bot=<%= bot %><%= subreddit !== undefined ? `&subreddit=${subreddit}` : '' %>"><%= title %></a>
                     <% } %>

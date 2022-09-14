@@ -2780,7 +2780,7 @@ export class SubredditResources {
                             const authPass = () => {
 
                                 for (const n of nameVal) {
-                                    if (n.toLowerCase() === authorName.toLowerCase()) {
+                                    if (testMaybeStringRegex(n, authorName)[0]) {
                                         return true;
                                     }
                                 }

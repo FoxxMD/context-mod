@@ -665,10 +665,11 @@
                     "type": "array"
                 },
                 "name": {
-                    "description": "A list of reddit usernames (case-insensitive) to match against. Do not include the \"u/\" prefix\n\n EX to match against /u/FoxxMD and /u/AnotherUser use [\"FoxxMD\",\"AnotherUser\"]",
+                    "description": "A list of reddit usernames (case-insensitive) or regular expressions to match against. Do not include the \"u/\" prefix\n\n\n EX to match against /u/FoxxMD and /u/AnotherUser use [\"FoxxMD\",\"AnotherUser\"]",
                     "examples": [
                         "FoxxMD",
-                        "AnotherUser"
+                        "AnotherUser",
+                        "/.*Foxx./*i"
                     ],
                     "items": {
                         "type": "string"
@@ -2180,69 +2181,6 @@
             },
             "type": "object"
         },
-        "FilterCriteriaDefaults": {
-            "properties": {
-                "authorIs": {
-                    "anyOf": [
-                        {
-                            "$ref": "#/definitions/FilterOptions<AuthorCriteria>"
-                        },
-                        {
-                            "items": {
-                                "anyOf": [
-                                    {
-                                        "$ref": "#/definitions/AuthorCriteria"
-                                    },
-                                    {
-                                        "$ref": "#/definitions/NamedCriteria<AuthorCriteria>"
-                                    }
-                                ]
-                            },
-                            "type": "array"
-                        }
-                    ]
-                },
-                "authorIsBehavior": {
-                    "enum": [
-                        "merge",
-                        "replace"
-                    ],
-                    "type": "string"
-                },
-                "itemIs": {
-                    "anyOf": [
-                        {
-                            "$ref": "#/definitions/FilterOptions<TypedActivityState>"
-                        },
-                        {
-                            "items": {
-                                "anyOf": [
-                                    {
-                                        "$ref": "#/definitions/SubmissionState"
-                                    },
-                                    {
-                                        "$ref": "#/definitions/CommentState"
-                                    },
-                                    {
-                                        "$ref": "#/definitions/NamedCriteria<TypedActivityState>"
-                                    }
-                                ]
-                            },
-                            "type": "array"
-                        }
-                    ]
-                },
-                "itemIsBehavior": {
-                    "description": "Determine how itemIs defaults behave when itemIs is present on the check\n\n* merge => adds defaults to check's itemIs\n* replace => check itemIs will replace defaults (no defaults used)",
-                    "enum": [
-                        "merge",
-                        "replace"
-                    ],
-                    "type": "string"
-                }
-            },
-            "type": "object"
-        },
         "FilterCriteriaDefaultsJson": {
             "properties": {
                 "authorIs": {
@@ -2309,62 +2247,6 @@
                         "replace"
                     ],
                     "type": "string"
-                }
-            },
-            "type": "object"
-        },
-        "FilterOptions<AuthorCriteria>": {
-            "properties": {
-                "exclude": {
-                    "description": "Only runs if `include` is not present. Each Criteria is comprised of conditions that the filter (Author/Item) being checked must \"not\" pass. See excludeCondition for set behavior\n\nEX: `isMod: true, name: Automoderator` => Will pass if the Author IS NOT a mod and IS NOT named Automoderator",
-                    "items": {
-                        "$ref": "#/definitions/NamedCriteria<AuthorCriteria>"
-                    },
-                    "type": "array"
-                },
-                "excludeCondition": {
-                    "default": "OR",
-                    "description": "* OR => if ANY exclude condition \"does not\" pass then the exclude test passes\n* AND => if ALL exclude conditions \"do not\" pass then the exclude test passes\n\nDefaults to OR",
-                    "enum": [
-                        "AND",
-                        "OR"
-                    ],
-                    "type": "string"
-                },
-                "include": {
-                    "description": "Will \"pass\" if any set of Criteria passes",
-                    "items": {
-                        "$ref": "#/definitions/NamedCriteria<AuthorCriteria>"
-                    },
-                    "type": "array"
-                }
-            },
-            "type": "object"
-        },
-        "FilterOptions<TypedActivityState>": {
-            "properties": {
-                "exclude": {
-                    "description": "Only runs if `include` is not present. Each Criteria is comprised of conditions that the filter (Author/Item) being checked must \"not\" pass. See excludeCondition for set behavior\n\nEX: `isMod: true, name: Automoderator` => Will pass if the Author IS NOT a mod and IS NOT named Automoderator",
-                    "items": {
-                        "$ref": "#/definitions/NamedCriteria<TypedActivityState>"
-                    },
-                    "type": "array"
-                },
-                "excludeCondition": {
-                    "default": "OR",
-                    "description": "* OR => if ANY exclude condition \"does not\" pass then the exclude test passes\n* AND => if ALL exclude conditions \"do not\" pass then the exclude test passes\n\nDefaults to OR",
-                    "enum": [
-                        "AND",
-                        "OR"
-                    ],
-                    "type": "string"
-                },
-                "include": {
-                    "description": "Will \"pass\" if any set of Criteria passes",
-                    "items": {
-                        "$ref": "#/definitions/NamedCriteria<TypedActivityState>"
-                    },
-                    "type": "array"
                 }
             },
             "type": "object"
@@ -5362,7 +5244,7 @@
                     "type": "boolean"
                 },
                 "filterCriteriaDefaults": {
-                    "$ref": "#/definitions/FilterCriteriaDefaults",
+                    "$ref": "#/definitions/FilterCriteriaDefaultsJson",
                     "description": "Set the default filter criteria for all checks. If this property is specified it will override any defaults passed from the bot's config\n\nDefault behavior is to exclude all mods and automoderator from checks"
                 },
                 "itemIs": {

@@ -245,10 +245,11 @@ export const authorCriteriaProperties = ['name', 'flairCssClass', 'flairText', '
  * */
 export interface AuthorCriteria {
     /**
-     * A list of reddit usernames (case-insensitive) to match against. Do not include the "u/" prefix
+     * A list of reddit usernames (case-insensitive) or regular expressions to match against. Do not include the "u/" prefix
+     *
      *
      *  EX to match against /u/FoxxMD and /u/AnotherUser use ["FoxxMD","AnotherUser"]
-     * @examples ["FoxxMD","AnotherUser"]
+     * @examples ["FoxxMD","AnotherUser", "/.*Foxx.\/*i"]
      * */
     name?: string[],
     /**
