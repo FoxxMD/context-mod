@@ -7,6 +7,44 @@ const getSubredditInvites = async (req: Request, res: Response) => {
     return res.json(await req.serverBot.getSubredditInvites());
 };
 export const getSubredditInvitesRoute = [authUserCheck(), botRoute(), getSubredditInvites];
+
+const getSubredditInvite = async (req: Request, res: Response) => {
+
+    const {id} = req.params;
+    const invite = await req.serverBot.getInvite(id);
+    if(invite !== undefined) {
+        const readiness = req.serverBot.getOnboardingReadiness(invite);
+        return res.json({...invite, ...readiness});
+    }
+    return res.status(404);
+};
+export const getSubredditInviteRoute = [authUserCheck(['operator', 'machine']), botRoute(), getSubredditInvite];
+
+const acceptSubredditInvite = async (req: Request, res: Response) => {
+
+    const {id} = req.params;
+    const invite = await req.serverBot.getInvite(id);
+    if(invite !== undefined) {
+        const {initialConfig, guests} = req.body as any;
+        invite.initialConfig = initialConfig;
+        invite.guests = guests;
+
+        try {
+            await req.serverBot.finishOnboarding(invite);
+            return res.status(200);
+        } catch(e: any) {
+            const errorParts = [e.message];
+            if(e instanceof CMError && e.cause !== undefined) {
+                errorParts.push(e.cause?.message);
+            }
+            res.status(500)
+            return res.send(e.message);
+        }
+    }
+    return res.status(404);
+};
+export const acceptSubredditInviteRoute = [authUserCheck(['operator', 'machine']), botRoute(), acceptSubredditInvite];
+
 const addSubredditInvite = async (req: Request, res: Response) => {
 
     const {subreddit, initialConfig, guests} = req.body as any;

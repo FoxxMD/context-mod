@@ -56,7 +56,13 @@ import {MigrationService} from "../../Common/MigrationService";
 import {RuleResultEntity} from "../../Common/Entities/RuleResultEntity";
 import {RuleSetResultEntity} from "../../Common/Entities/RuleSetResultEntity";
 import { PaginationAwareObject } from "../Common/util";
-import {BotInstance, BotStatusResponse, CMInstanceInterface, InviteData} from "../Common/interfaces";
+import {
+    BotInstance,
+    BotStatusResponse,
+    BotSubredditInviteResponse,
+    CMInstanceInterface, HeartbeatResponse,
+    InviteData, SubredditInviteDataPersisted
+} from "../Common/interfaces";
 import {open} from "fs/promises";
 
 const emitter = new EventEmitter();
@@ -1046,14 +1052,120 @@ const webClient = async (options: OperatorConfigWithFileContext) => {
         });
     });
 
-    app.getAsync('/bot/invites/subreddit', defaultSession, instanceWithPermissions, botWithPermissions(true), async (req: express.Request, res: express.Response) => {
-        res.render('subredditHelper', {
+    app.getAsync('/bot/invites/subreddit/:inviteId', ensureAuthenticated, defaultSession, async (req: express.Request, res: express.Response) => {
+
+        const {inviteId} = req.params;
+
+        if (inviteId === undefined) {
+            return res.render('error', {error: '`invite` param is missing from URL'});
+        }
+
+        let validInstance: CMInstance | undefined = undefined;
+        let validInvite: BotSubredditInviteResponse | undefined = undefined;
+        let validBot: BotInstance | undefined = undefined;
+        for(const instance of cmInstances) {
+            for(const bot of instance.bots) {
+                validInvite  = bot.getInvite(inviteId);
+                if(validInvite !== undefined) {
+                    validInstance = instance;
+                    validBot = bot;
+                    break;
+                }
+            }
+        }
+
+        if(validInvite === undefined || validInstance === undefined || validBot === undefined) {
+            return res.render('error', {error: 'Either no invite exists with the given ID or you are not a moderator of the subreddit this invite is for.'});
+        }
+
+        const user = req.user as Express.User;
+
+        // @ts-ignore
+        if(!user.subreddits.some(x => x.toLowerCase() === validInvite.subreddit.toLowerCase())) {
+            return res.render('error', {error: 'Either no invite exists with the given ID or you are not a moderator of the subreddit this invite is for.'});
+        }
+
+        try {
+            const invite = await got.get(`${validInstance.normalUrl}/bot/invite/${validInvite.id}?bot=${validBot.botName}`, {
+                headers: {
+                    'Authorization': `Bearer ${validInstance.getToken()}`,
+                }
+            }).json() as SubredditInviteDataPersisted;
+
+            const {guests, ...rest} = invite;
+            const guestStr = guests !== undefined && guests !== null && guests.length > 0 ? guests.join(',') : '';
+
+            return res.render('subredditOnboard/onboard', {
+                invite: {...rest, guests: guestStr},
+                bot: validBot.botName,
+                title: `Subreddit Onboarding`,
+            });
+
+        } catch (err: any) {
+            logger.error(err);
+            return res.render('error', {error: `Error occurred while retriving invite data: ${err.message}`});
+        }
+    });
+
+    app.postAsync('/bot/invites/subreddit/:inviteId', ensureAuthenticated, defaultSession, async (req: express.Request, res: express.Response) => {
+
+        const {inviteId} = req.params;
+
+        if (inviteId === undefined) {
+            return res.render('error', {error: '`invite` param is missing from URL'});
+        }
+
+        let validInstance: CMInstance | undefined = undefined;
+        let validInvite: BotSubredditInviteResponse | undefined = undefined;
+        let validBot: BotInstance | undefined = undefined;
+        for(const instance of cmInstances) {
+            for(const bot of instance.bots) {
+                validInvite  = bot.getInvite(inviteId);
+                if(validInvite !== undefined) {
+                    validInstance = instance;
+                    validBot = bot;
+                    break;
+                }
+            }
+        }
+
+        if(validInvite === undefined || validInstance === undefined || validBot === undefined) {
+            return res.render('error', {error: 'Either no invite exists with the given ID or you are not a moderator of the subreddit this invite is for.'});
+        }
+
+        const user = req.user as Express.User;
+
+        // @ts-ignore
+        if(!user.subreddits.some(x => x.toLowerCase() === validInvite.subreddit.toLowerCase())) {
+            return res.render('error', {error: 'Either no invite exists with the given ID or you are not a moderator of the subreddit this invite is for.'});
+        }
+
+        try {
+            await got.post(`${validInstance.normalUrl}/bot/invite/${validInvite.id}?bot=${validBot.botName}`, {
+                json: req.body,
+                headers: {
+                    'Authorization': `Bearer ${validInstance.getToken()}`,
+                }
+            })
+
+            return res.status(200);
+
+        } catch (err: any) {
+            logger.error(err);
+            throw err;
+            res.status(500)
+            return res.send(err.message);
+        }
+    });
+
+    app.getAsync('/bot/invites/subreddit', ensureAuthenticated, defaultSession, instanceWithPermissions, botWithPermissions(true), async (req: express.Request, res: express.Response) => {
+        res.render('subredditOnboard/helper', {
             title: `Create Subreddit Invite`,
         });
     });
 
-    app.getAsync('/bot/invites', defaultSession, async (req: express.Request, res: express.Response) => {
-        res.render('modInvites', {
+    app.getAsync('/bot/invites', ensureAuthenticated, defaultSession, async (req: express.Request, res: express.Response) => {
+        res.render('subredditOnboard/manager', {
             title: `Pending Moderation Invites`,
         });
     });

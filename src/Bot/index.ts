@@ -27,7 +27,15 @@ import {CommentStream, ModQueueStream, SPoll, SubmissionStream, UnmoderatedStrea
 import {BotResourcesManager} from "../Subreddit/SubredditResources";
 import LoggedError from "../Utils/LoggedError";
 import pEvent from "p-event";
-import {SimpleError, isRateLimitError, isRequestError, isScopeError, isStatusError, CMError} from "../Utils/Errors";
+import {
+    SimpleError,
+    isRateLimitError,
+    isRequestError,
+    isScopeError,
+    isStatusError,
+    CMError,
+    ISeriousError, definesSeriousError
+} from "../Utils/Errors";
 import {ErrorWithCause} from "pony-cause";
 import {DataSource, Repository} from "typeorm";
 import {Bot as BotEntity} from '../Common/Entities/Bot';
@@ -47,7 +55,7 @@ import {
     BotInstanceFunctions,
     NormalizedManagerResponse,
     SubredditInviteData,
-    SubredditInviteDataPersisted
+    SubredditInviteDataPersisted, SubredditOnboardingReadiness
 } from "../Web/Common/interfaces";
 import {AuthorEntity} from "../Common/Entities/AuthorEntity";
 import {Guest, GuestEntityData} from "../Common/Entities/Guest/GuestInterfaces";
@@ -67,6 +75,7 @@ class Bot implements BotInstanceFunctions {
     excludeSubreddits: string[];
     filterCriteriaDefaults?: FilterCriteriaDefaults
     subManagers: Manager[] = [];
+    moderatedSubreddits: Subreddit[] = []
     heartbeatInterval: number;
     nextHeartbeat: Dayjs = dayjs();
     heartBeating: boolean = false;
@@ -416,18 +425,27 @@ class Bot implements BotInstanceFunctions {
         }
     }
 
+    async getModeratedSubreddits(refresh = false) {
+
+        if(this.moderatedSubreddits.length > 0 && !refresh) {
+            return this.moderatedSubreddits;
+        }
+
+        let subListing = await this.client.getModeratedSubreddits({count: 100});
+        while (!subListing.isFinished) {
+            subListing = await subListing.fetchMore({amount: 100});
+        }
+        const availSubs = subListing.filter(x => x.display_name !== `u_${this.botUser?.name}`);
+        this.moderatedSubreddits = availSubs;
+        return availSubs;
+    }
+
     async buildManagers(subreddits: string[] = []) {
         await this.init();
 
         this.logger.verbose('Syncing subreddits to moderate with managers...');
 
-        let availSubs: Subreddit[] = [];
-
-        let subListing = await this.client.getModeratedSubreddits({count: 100});
-        while(!subListing.isFinished) {
-            subListing = await subListing.fetchMore({amount: 100});
-        }
-        availSubs = subListing.filter(x => x.display_name !== `u_${this.botUser?.name}`);
+        const availSubs = await this.getModeratedSubreddits(true);
 
         this.logger.verbose(`${this.botAccount} is a moderator of these subreddits: ${availSubs.map(x => x.display_name_prefixed).join(', ')}`);
 
@@ -777,21 +795,33 @@ class Bot implements BotInstanceFunctions {
 
         for (const subInvite of this.botEntity.getSubredditInvites()) {
             if (subInvite.canAutomaticallyAccept()) {
-                const {subreddit: name} = subInvite;
                 try {
-                    // @ts-ignore
-                    await this.client.getSubreddit(name).acceptModeratorInvite();
-                    this.logger.info(`Accepted moderator invite for r/${name}!`);
+                    await this.acceptModInvite(subInvite);
                     await this.deleteSubredditInvite(subInvite);
                 } catch (err: any) {
-                    if (err.message.includes('NO_INVITE_FOUND')) {
-                        this.logger.warn(`No pending moderation invite for r/${name} was found`);
-                    } else if (isStatusError(err) && err.statusCode === 403) {
-                        this.logger.error(`Error occurred while checking r/${name} for a pending moderation invite. It is likely that this bot does not have the 'modself' oauth permission. Error: ${err.message}`);
+                    if(err(definesSeriousError) && !err.isSerious) {
+                        this.logger.warn(err);
                     } else {
-                        this.logger.error(`Error occurred while checking r/${name} for a pending moderation invite. Error: ${err.message}`);
+                        this.logger.error(err);
                     }
                 }
+            }
+        }
+    }
+
+    async acceptModInvite(invite: SubredditInvite) {
+        const {subreddit: name} = invite;
+        try {
+            // @ts-ignore
+            await this.client.getSubreddit(name).acceptModeratorInvite();
+            this.logger.info(`Accepted moderator invite for r/${name}!`);
+        } catch (err: any) {
+            if (err.message.includes('NO_INVITE_FOUND')) {
+                throw new SimpleError(`No pending moderation invite for r/${name} was found`, {isSerious: false});
+            } else if (isStatusError(err) && err.statusCode === 403 && !this.client.scope.includes('modself')) {
+                throw new CMError(`Error occurred while checking r/${name} for a pending moderation invite. It is likely that this bot does not have the 'modself' oauth permission.`, {cause: err})
+            } else {
+                throw new CMError(`Error occurred while checking r/${name} for a pending moderation invite.`, {cause: err});
             }
         }
     }
@@ -1271,6 +1301,65 @@ class Bot implements BotInstanceFunctions {
 
      getSubredditInvites(): SubredditInviteDataPersisted[] {
         return this.botEntity.getSubredditInvites().map(x => x.toSubredditInviteData());
+    }
+
+    getInvite(id: string): SubredditInvite | undefined {
+        return this.botEntity.getSubredditInvites().find(x => x.id === id);
+    }
+
+    getOnboardingReadiness(invite: SubredditInvite): SubredditOnboardingReadiness {
+        const hasManager = this.subManagers.some(x => x.subreddit.display_name.toLowerCase() === invite.subreddit.toLowerCase());
+        const isMod = this.moderatedSubreddits.some(x => x.display_name.toLowerCase() === invite.subreddit.toLowerCase());
+        return {
+            hasManager,
+            isMod
+        };
+    }
+
+    async finishOnboarding(invite: SubredditInvite) {
+        const readiness = this.getOnboardingReadiness(invite);
+        if (readiness.hasManager || readiness.isMod) {
+            this.logger.info(`Bot is already a mod of ${invite.subreddit}. Finishing onboarding early.`);
+            await this.deleteSubredditInvite(invite);
+        }
+        try {
+            await this.acceptModInvite(invite);
+        } catch (e: any) {
+            throw e;
+        }
+        try {
+            // rebuild managers to get new subreddit
+            await this.buildManagers();
+            const manager = this.subManagers.find(x => x.subreddit.display_name.toLowerCase() === invite.subreddit.toLowerCase());
+            if (manager === undefined) {
+                throw new CMError('Accepted moderator invitation but could not find manager after rebuilding??');
+            }
+            const {guests = [], initialConfig} = invite;
+
+            // add guests
+            if (guests.length > 0) {
+                await this.addGuest(guests, dayjs().add(1, 'day'), manager.subreddit.display_name);
+            }
+
+            // set initial config
+            if (initialConfig !== undefined) {
+                let data: string;
+                try {
+                    const res = await manager.resources.getExternalResource(initialConfig);
+                    data = res.val;
+                } catch (e: any) {
+                    throw new CMError(`Accepted moderator invitation but error occurred while trying to fetch config from Initial Config value (${initialConfig})`, {cause: e});
+                }
+                try {
+                    await manager.writeConfig(data, 'Generated by Initial Config during onboarding')
+                } catch (e: any) {
+                    throw new CMError(`Accepted moderator invitation but error occurred while trying to set wiki config value from initial config (${initialConfig})`, {cause: e});
+                }
+                manager.parseConfiguration('system', true);
+            }
+        } finally {
+            await this.deleteSubredditInvite(invite);
+        }
     }
 
     async deleteSubredditInvite(val: string | SubredditInvite) {

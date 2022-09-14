@@ -1,8 +1,8 @@
 <html lang="en">
-<%- include('partials/head', {title: 'CM Manage Subreddit Onboarding'}) %>
+<%- include('../partials/head', {title: 'CM Manage Subreddit Onboarding'}) %>
 <body class="bg-gray-900 text-white">
 <div class="min-w-screen min-h-screen font-sans">
-    <%- include('partials/title', {title: 'Manage Subreddit Onboarding'}) %>
+    <%- include('../partials/title', {title: 'Manage Subreddit Onboarding'}) %>
     <div class="container mx-auto">
         <div class="grid">
             <div class="bg-gray-600">
@@ -70,12 +70,12 @@
             node.insertAdjacentHTML('beforeend', `<a href="" class="removeSub" id="removeSub-${sub}" data-subreddit="${sub}"><span style="display:inline; margin-left: 10px" class="iconify-inline" data-icon="icons8:cancel"></span></a>`);
 
             const parts = [
-                `<li><a href="${document.location.origin}/bot/invite/${id}${document.location.search}">${document.location.origin}/bot/invite/${id}${document.location.search}</a></li>`
+                `<li><a href="${document.location.origin}/bot/invites/subreddit/${id}">${document.location.origin}/bot/invites/subreddit/${id}</a></li>`
             ];
-            if(guests !== null) {
+            if(guests !== null && guests !== undefined) {
                 parts.push(`<li>Guests: ${guests.join(', ')}`);
             }
-            if(initialConfig !== null) {
+            if(initialConfig !== null && initialConfig !== undefined) {
                 parts.push(`<li>Initial Config: <a href="${initialConfig}">${initialConfig}</a>`);
             }
 

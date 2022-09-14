@@ -90,6 +90,10 @@ export interface NormalizedManagerResponse extends ManagerResponse {
     subredditNormal: string
 }
 
+export interface BotSubredditInviteResponse {
+    subreddit: string
+    id: string
+}
 
 export interface BotInstanceResponse {
     botName: string
@@ -98,6 +102,12 @@ export interface BotInstanceResponse {
     managers: ManagerResponse[]
     nanny?: string
     running: boolean
+    invites: BotSubredditInviteResponse[]
+}
+
+export interface SubredditOnboardingReadiness {
+    hasManager: boolean
+    isMod: boolean
 }
 
 export interface BotInstanceFunctions {
@@ -108,6 +118,7 @@ export interface BotInstanceFunctions {
     getGuestSubreddits: (user: string) => string[]
     canUserAccessBot: (user: string, subreddits: string[]) => boolean
     canUserAccessSubreddit: (subreddit: string, user: string, subreddits: string[]) => boolean
+    getInvite(val: string): BotSubredditInviteResponse | undefined
 }
 
 export interface BotInstance extends BotInstanceResponse, BotInstanceFunctions {

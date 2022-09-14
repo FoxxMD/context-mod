@@ -237,12 +237,7 @@ const saveGuestWikiEdit = async (req: Request, res: Response) => {
     const {location, data, reason = 'Updated through CM Web', create = false} = req.body as any;
 
     try {
-        // @ts-ignore
-        const wiki = await req.manager?.subreddit.getWikiPage(location) as WikiPage;
-        await wiki.edit({
-            text: data,
-            reason: `${reason} by Guest Mod ${req.user?.name}`,
-        });
+        await req.manager?.writeConfig(data, `${reason} by Guest Mod ${req.user?.name}`)
     } catch (err: any) {
         res.status(500);
         return res.send(err.message);

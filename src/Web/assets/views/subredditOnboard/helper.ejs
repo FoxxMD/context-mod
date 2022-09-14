@@ -1,8 +1,8 @@
 <html lang="en">
-<%- include('partials/head', {title: 'Subreddit Onboarding Helper'}) %>
+<%- include('../partials/head', {title: 'Subreddit Onboarding Helper'}) %>
 <body class="bg-gray-900 text-white font-sans">
 <div class="min-w-screen min-h-screen">
-    <%- include('partials/header') %>
+    <%- include('../partials/header') %>
     <div class="container mx-auto mt-5">
         <div class="grid grid-cols-1 gap-5">
             <div class="bg-gray-600">
@@ -72,7 +72,7 @@
         </div>
     </div>
 </div>
-<%- include('partials/footer') %>
+<%- include('../partials/footer') %>
 <script>
     function setError(val) {
         if(val === null) {
@@ -92,7 +92,7 @@
         } else {
             const node = document.createElement("LI");
             node.appendChild(document.createTextNode(`${sub}: `));
-            node.insertAdjacentHTML('beforeend', `<a class="font-semibold" href="${document.location.origin}/bot/invite/${val}${document.location.search}">${document.location.origin}/bot/invite/${val}${document.location.search}</a>`);
+            node.insertAdjacentHTML('beforeend', `<a class="font-semibold" href="${document.location.origin}/bot/invite/${val}">${document.location.origin}/bot/invite/${val}</a>`);
             document.querySelector("#inviteLinks").appendChild(node);
         }
     }

@@ -1,0 +1,142 @@
+<html lang="en">
+<%- include('../partials/head', {title: 'Subreddit Onboarding Helper'}) %>
+<body class="bg-gray-900 text-white font-sans">
+<div class="min-w-screen min-h-screen">
+    <%- include('../partials/title', {title: 'Subreddit Onboarding'}) %>
+    <div class="container mx-auto mt-5">
+        <div class="grid grid-cols-1 gap-5">
+            <div class="bg-gray-600">
+                <div class="bg-gray-700">
+                    <div class="text-xl px-4 p-2">Hello 👋</div>
+                </div>
+                <div class="p-6 md:px-10 md:py-6">
+                    <div class="my-2 ml-5">
+                        <div class="space-y-3">
+                            <div>This is the onboarding invitation to setup
+                                <strong><a href="https://reddit.com/<%= bot %>"><%= bot %></a></strong> as a
+                                <a taget="_blank" href="https://github.com/FoxxMD/context-mod">Context Mod</a> (CM) bot on the subreddit
+                                <strong><a href="https://reddit.com/r/<%= invite.subreddit %>">r/<%= invite.subreddit %></a></strong>.
+
+                                <% if (invite.isMod || invite.hasManager) { %>
+                                    <div> <strong>Good news!</strong> <%= bot %> is already a moderator of this subreddit. "Finishing" onboarding below will have no effect on your bot. If you want to set Guest Access or a Config please do so from the <a href="/">Dashboard</a>.</div>
+                                <% } %>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-gray-600">
+                <div class="bg-gray-700">
+                    <div class="text-xl px-4 p-2">Initial Settings</div>
+                </div>
+                <div class="p-6 md:px-10 md:py-6">
+                    <div class="space-y-3 mb-6">
+                    <div>The settings below, if specified, will automatically be applied when you finish onboarding.</div>
+                    </div>
+                    <div class="text-lg text-semibold my-3">Guest Access</div>
+                    <div class="my-2 ml-5">
+                        <div class="space-y-3">
+                            <div><strong>Guest Access</strong> allows Reddit Users who are not moderators of this subreddit to access the bot's dashboard and edit its configuration.
+                                This is useful when you want help from outside your mod team with setting up CM but don't want to set the user as Moderator of your subreddit.</div>
+                            <div>Separate multiple users with commas. Users listed will have Guest Access for 24 hours.</div>
+                            <input id="guestMods" style="max-width:800px; display: block;"
+                                   class="text-black placeholder-gray-500 rounded mt-2 mb-3 p-2 w-full"
+                                   placeholder="RedditUser1,RedditUser2" value="<%= invite.guests %>">
+                        </div>
+                    </div>
+                    <div class="text-lg text-semibold my-3">Initial Config
+                    </div>
+                    <div class="ml-5">
+                        <div class="space-y-2">
+                            <div>A normal URL or <a target="_blank" href="https://github.com/FoxxMD/context-mod/tree/master/docs/subreddit/components#url-tokens"><span class="font-mono">wiki:</span> token</a> pointing to a configuration that CM should automatically write to the Subreddit's config during onboarding.</div>
+                            <input id="initialConfig" style="max-width:800px; display: block;"
+                                   class="text-black placeholder-gray-500 rounded mt-2 mb-3 p-2 w-full"
+                                   placeholder="https://..."
+                                    value="<%= invite.initialConfig %>">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-gray-600">
+                <div class="bg-gray-700">
+                    <div class="text-xl px-4 p-2">Finish Onboaring</div>
+                </div>
+                <div class="p-6 md:px-10 md:py-6">
+                        <div class="space-y-3">
+                            <div>Some things to know:</div>
+                            <ul class="list-disc list-inside">
+                                <li>Like Automoderator, CM will NOT RUN if it does not have a configuration set.</li>
+                                <li>To run correctly <%= bot %> must at least have the <strong>Manage Wiki Pages</strong> Mod permission.</li>
+                                <li>Click the <strong>Help</strong> link on the top-right of the Dashboard, after finishing onboarding, to get a guided tour of the bot's interface or check out the Dashboard <a href="https://github.com/FoxxMD/context-mod/blob/master/docs/webInterface.md">Tips and Tricks</a> documentation.</li>
+                            </ul>
+                            <div id="finishOnboarding" class="text-lg text-semibold my-3"><a id="doOnboarding" href="">Click to finish Onboarding</a></div>
+                            <div id="errorWrapper" class="font-semibold hidden">Errors:
+                                <ul id="errorList" class="list-inside list-disc"></ul>
+                            </div>
+                        </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<%- include('../partials/footer') %>
+<script>
+    function setError(val) {
+        if(val === null) {
+            document.querySelector("#errorWrapper").classList.add('hidden');
+            document.querySelector('#errorList').innerHTML = '';
+        } else {
+            document.querySelector("#errorWrapper").classList.remove('hidden');
+            const node = document.createElement("LI");
+            node.appendChild(document.createTextNode(val));
+            document.querySelector("#errorList").appendChild(node);
+        }
+    }
+
+    document.querySelector('#doOnboarding').addEventListener('click', e => {
+        e.preventDefault();
+
+        const body = {};
+        const config = document.querySelector('#initialConfig').value.trim();
+        if(config !== '') {
+            body.initialConfig = config;
+        }
+        const guests = document.querySelector('#guestMods').value.trim();
+        if(guests !== '') {
+            body.guests = guests.split(',').map(x => x.trim());
+        }
+
+        fetch(`/bot/invites/subreddit/<%= invite.id%>`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+            },
+            body: JSON.stringify(body)
+        }).then((resp) => {
+            if(!resp.ok) {
+                document.querySelector("#errorWrapper").classList.remove('hidden');
+                resp.text().then(t => {
+                    let msg = t;
+                    if(t.toLowerCase().includes('accepted moderator')) {
+                        msg = `${t}<br/><br/>CM is now running but not all Initial Settings were applied. Please finish applying them using the dashboard. Redirecting now...`;
+                        setError(msg);
+                        setTimeout(() => {
+                            window.location.href = window.location.origin;
+                        }, 2500);
+                    } else {
+                        setError(msg);
+                    }
+                });
+            } else {
+                document.querySelector("#errorWrapper").classList.add('hidden');
+                document.querySelector('#finishOnboarding').innerHTML = 'Onboarding complete! Redirecting you to the Dashboard...';
+                setTimeout(() => {
+                    window.location.href = window.location.origin;
+                }, 2000);
+            }
+        });
+    })
+</script>
+</body>
+</html>

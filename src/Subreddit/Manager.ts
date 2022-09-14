@@ -780,40 +780,9 @@ export class Manager extends EventEmitter implements RunningStates {
             try {
                 try {
                     // @ts-ignore
-                    wiki = await this.subreddit.getWikiPage(this.wikiLocation).fetch();
+                    wiki = await this.getWikiPage();
                 } catch (err: any) {
-                    if(isStatusError(err) && err.statusCode === 404) {
-                        // see if we can create the page
-                        if (!this.client.scope.includes('wikiedit')) {
-                            throw new ErrorWithCause(`Page does not exist and could not be created because Bot does not have oauth permission 'wikiedit'`, {cause: err});
-                        }
-                        const modPermissions = await this.getModPermissions();
-                        if (!modPermissions.includes('all') && !modPermissions.includes('wiki')) {
-                            throw new ErrorWithCause(`Page does not exist and could not be created because Bot not have mod permissions for creating wiki pages. Must have 'all' or 'wiki'`, {cause: err});
-                        }
-                        if(!this.client.scope.includes('modwiki')) {
-                            throw new ErrorWithCause(`Bot COULD create wiki config page but WILL NOT because it does not have the oauth permissions 'modwiki' which is required to set page visibility and editing permissions. Safety first!`, {cause: err});
-                        }
-                        // @ts-ignore
-                        wiki = await this.subreddit.getWikiPage(this.wikiLocation).edit({
-                            text: '',
-                            reason: 'Empty configuration created for ContextMod'
-                        });
-                        this.logger.info(`Wiki page at ${this.wikiLocation} did not exist so bot created it!`);
-
-                        // 0 = use subreddit wiki permissions
-                        // 1 = only approved wiki contributors
-                        // 2 = only mods may edit and view
-                        // @ts-ignore
-                        await this.subreddit.getWikiPage(this.wikiLocation).editSettings({
-                            permissionLevel: 2,
-                            // don't list this page on r/[subreddit]/wiki/pages
-                            listed: false,
-                        });
-                        this.logger.info('Bot set wiki page visibility to MODS ONLY');
-                    } else {
-                        throw err;
-                    }
+                    throw err;
                 }
                 const revisionDate = dayjs.unix(wiki.revision_date);
                 if (!force && this.validConfigLoaded && (this.lastWikiRevision !== undefined && this.lastWikiRevision.isSame(revisionDate))) {
@@ -1797,6 +1766,68 @@ export class Manager extends EventEmitter implements RunningStates {
                 await client.writePoint(metric);
             }
         }
+    }
+
+    async writeConfig(data: string, reason?: string) {
+        let wiki: WikiPage;
+        try {
+            wiki = await this.getWikiPage();
+        } catch (e: any) {
+            throw new CMError('Could not read wiki page', {cause: e});
+        }
+
+        try {
+            // @ts-ignore
+            await wiki.edit({
+                text: data,
+                reason: reason,
+            });
+        } catch (e: any) {
+            throw new CMError('Could not write to wiki page', {cause: e});
+        }
+    }
+
+    // @ts-ignore
+    async getWikiPage(location: string = this.wikiLocation) {
+        let wiki: WikiPage;
+        try {
+            // @ts-ignore
+            wiki = await this.subreddit.getWikiPage(location).fetch();
+        } catch (err: any) {
+            if (isStatusError(err) && err.statusCode === 404) {
+                // see if we can create the page
+                if (!this.client.scope.includes('wikiedit')) {
+                    throw new ErrorWithCause(`Page does not exist and could not be created because Bot does not have oauth permission 'wikiedit'`, {cause: err});
+                }
+                const modPermissions = await this.getModPermissions();
+                if (!modPermissions.includes('all') && !modPermissions.includes('wiki')) {
+                    throw new ErrorWithCause(`Page does not exist and could not be created because Bot not have mod permissions for creating wiki pages. Must have 'all' or 'wiki'`, {cause: err});
+                }
+                if (!this.client.scope.includes('modwiki')) {
+                    throw new ErrorWithCause(`Bot COULD create wiki config page but WILL NOT because it does not have the oauth permissions 'modwiki' which is required to set page visibility and editing permissions. Safety first!`, {cause: err});
+                }
+                // @ts-ignore
+                wiki = await this.subreddit.getWikiPage(location).edit({
+                    text: '',
+                    reason: 'Empty configuration created for ContextMod'
+                });
+                this.logger.info(`Wiki page at ${location} did not exist so bot created it!`);
+
+                // 0 = use subreddit wiki permissions
+                // 1 = only approved wiki contributors
+                // 2 = only mods may edit and view
+                // @ts-ignore
+                await this.subreddit.getWikiPage(location).editSettings({
+                    permissionLevel: 2,
+                    // don't list this page on r/[subreddit]/wiki/pages
+                    listed: false,
+                });
+                this.logger.info('Bot set wiki page visibility to MODS ONLY');
+            } else {
+                throw err;
+            }
+        }
+        return wiki;
     }
 
     toNormalizedManager(): NormalizedManagerResponse {
