@@ -2457,7 +2457,7 @@ export class SubredditResources {
                                 }
                             }
                         } catch(err: any) {
-                            propResultsMap.title!.reason = err.message;
+                            propResultsMap.createdAt!.reason = err.message;
                         }
                         break;
                     case 'title':
