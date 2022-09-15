@@ -2443,21 +2443,21 @@ export class SubredditResources {
                         propResultsMap.age!.passed = criteriaPassWithIncludeBehavior(ageTest, include);
                         propResultsMap.age!.found = created.format('MMMM D, YYYY h:mm A Z');
                         break;
-                    case 'createdAt':
+                    case 'createdOn':
                         const createdAt = dayjs.unix(await item.created);
-                        propResultsMap.createdAt!.found = createdAt.format('MMMM D, YYYY h:mm A Z');
-                        propResultsMap.createdAt!.passed = false;
+                        propResultsMap.createdOn!.found = createdAt.format('MMMM D, YYYY h:mm A Z');
+                        propResultsMap.createdOn!.passed = false;
 
                         const expressions = Array.isArray(itemOptVal) ? itemOptVal as RelativeDateTimeMatch[] : [itemOptVal] as RelativeDateTimeMatch[];
                         try {
                             for (const expr of expressions) {
                                 if (matchesRelativeDateTime(expr, createdAt)) {
-                                    propResultsMap.createdAt!.passed = true;
+                                    propResultsMap.createdOn!.passed = true;
                                     break;
                                 }
                             }
                         } catch(err: any) {
-                            propResultsMap.createdAt!.reason = err.message;
+                            propResultsMap.createdOn!.reason = err.message;
                         }
                         break;
                     case 'title':

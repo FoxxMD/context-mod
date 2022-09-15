@@ -455,7 +455,7 @@ export interface ActivityState {
      * https://regexr.com/6u3cc
      *
      * */
-    createdAt?: RelativeDateTimeMatch | RelativeDateTimeMatch[]
+    createdOn?: RelativeDateTimeMatch | RelativeDateTimeMatch[]
     /**
      * Test whether the activity is present in dispatched/delayed activities
      *

@@ -60,7 +60,7 @@
                     ],
                     "description": "* true/false => test whether Activity is approved or not\n* string or list of strings => test which moderator approved this Activity"
                 },
-                "createdAt": {
+                "createdOn": {
                     "anyOf": [
                         {
                             "items": {
@@ -778,7 +778,7 @@
                     ],
                     "description": "* true/false => test whether Activity is approved or not\n* string or list of strings => test which moderator approved this Activity"
                 },
-                "createdAt": {
+                "createdOn": {
                     "anyOf": [
                         {
                             "items": {
@@ -3270,7 +3270,7 @@
                     ],
                     "description": "* true/false => test whether Activity is approved or not\n* string or list of strings => test which moderator approved this Activity"
                 },
-                "createdAt": {
+                "createdOn": {
                     "anyOf": [
                         {
                             "items": {
