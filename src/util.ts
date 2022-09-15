@@ -1,13 +1,14 @@
 import winston, {Logger} from "winston";
 import dayjs, {Dayjs} from 'dayjs';
 import {Duration} from 'dayjs/plugin/duration.js';
+import * as cronjs from '@datasert/cronjs-matcher';
 import Ajv from "ajv";
 import {InvalidOptionArgumentError} from "commander";
 import {deflateSync, inflateSync} from "zlib";
 import pixelmatch from 'pixelmatch';
 import os from 'os';
 import pathUtil from 'path';
-import {Response} from 'node-fetch';
+import fetch, {Response} from 'node-fetch';
 import crypto, {createHash} from 'crypto';
 import {
     ActionResult,
@@ -17,7 +18,8 @@ import {
     CheckSummary,
     ImageComparisonResult,
     ItemCritPropHelper,
-    LogInfo, NamedGroup,
+    LogInfo,
+    NamedGroup,
     PollingOptionsStrong,
     PostBehaviorOptionConfig,
     RegExResult,
@@ -41,7 +43,6 @@ import {create as createMemoryStore} from './Utils/memoryStore';
 import {LEVEL, MESSAGE} from "triple-beam";
 import {Comment, PrivateMessage, RedditUser, Submission, Subreddit} from "snoowrap/dist/objects";
 import reRegExp from '@stdlib/regexp-regexp';
-import fetch from "node-fetch";
 import ImageData from "./Common/ImageData";
 import {Sharp, SharpOptions} from "sharp";
 import {ErrorWithCause, stackWithCauses} from "pony-cause";
@@ -74,14 +75,17 @@ import {
     ActivitySourceTypes,
     CacheProvider,
     ConfigFormat,
-    DurationVal, ExternalUrlContext, ImageHashCacheData,
+    DurationVal,
+    ExternalUrlContext,
+    ImageHashCacheData,
     ModUserNoteLabel,
     modUserNoteLabels,
     RedditEntity,
-    RedditEntityType,
+    RedditEntityType, RelativeDateTimeMatch,
     statFrequencies,
     StatisticFrequency,
-    StatisticFrequencyOption, UrlContext,
+    StatisticFrequencyOption,
+    UrlContext,
     WikiContext
 } from "./Common/Infrastructure/Atomic";
 import {
@@ -116,7 +120,7 @@ import {
 } from "./Common/Infrastructure/ActivityWindow";
 import {RunnableBaseJson} from "./Common/Infrastructure/Runnable";
 import Snoowrap from "snoowrap";
-import { uniqueNamesGenerator, adjectives, colors, animals } from 'unique-names-generator';
+import {adjectives, animals, colors, uniqueNamesGenerator} from 'unique-names-generator';
 import {ActionResultEntity} from "./Common/Entities/ActionResultEntity";
 
 
@@ -709,8 +713,7 @@ export const deflateUserNotes = (usersObject: object) => {
     const binaryData = deflateSync(jsonString);
 
     // Convert binary data to a base64 string with a Buffer
-    const blob = Buffer.from(binaryData).toString('base64');
-    return blob;
+    return Buffer.from(binaryData).toString('base64');
 }
 
 export const isActivityWindowConfig = (val: any): val is FullActivityWindowConfig => {
@@ -764,6 +767,34 @@ export const parseDuration = (val: string, strict = true): Duration => {
         throw new SimpleError(`Must only have one Duration value, found ${res.length} in: ${val}`);
     }
     return res[0].duration;
+}
+
+// https://stackoverflow.com/a/63729682
+const RELATIVE_DATETIME_REGEX: RegExp = /(?<cron>(?:(?:(?:(?:\d+,)+\d+|(?:\d+(?:\/|-|#)\d+)|\d+L?|\*(?:\/\d+)?|L(?:-\d+)?|\?|[A-Z]{3}(?:-[A-Z]{3})?) ?){5,7})$)|(?<dayofweek>mon|tues|wed|thurs|fri|sat|sun){1}/i;
+const RELATIVE_DATETIME_REGEX_URL = 'https://regexr.com/6u3cc';
+
+// https://day.js.org/docs/en/get-set/day
+const dayOfWeekMap: Record<string, number> = {
+    sun: 0,
+    mon: 1,
+    tues: 2,
+    wed: 3,
+    thurs: 4,
+    fri: 5,
+    sat: 6,
+};
+
+export const matchesRelativeDateTime = (expr: RelativeDateTimeMatch, dt: Dayjs) => {
+    const res = parseRegexSingleOrFail(RELATIVE_DATETIME_REGEX, expr);
+    if (res === undefined) {
+        throw new InvalidRegexError(RELATIVE_DATETIME_REGEX, expr, RELATIVE_DATETIME_REGEX_URL);
+    }
+    if (res.named.dayofweek !== undefined) {
+        return dayOfWeekMap[res.named.dayofweek] === dt.day();
+    }
+    // assume 5-point cron expression
+    // the matcher requires datetime second field to be 0 https://github.com/datasert/cronjs/issues/31
+    return cronjs.isTimeMatches(res.named.cron, dt.set('second', 0).toISOString());
 }
 
 const SUBREDDIT_NAME_REGEX: RegExp = /^\s*(?:\/r\/|r\/)*(\w+)*\s*$/;

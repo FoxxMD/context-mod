@@ -18,6 +18,22 @@ import {ActivityType} from "./Reddit";
 export type DurationComparor = string;
 
 /**
+ * A relative datetime description
+ *
+ * May be either:
+ *
+ * * day of the week (monday, tuesday, etc...)
+ * * cron expression IE `* * 15 *`
+ *
+ * See https://crontab.guru/ for generating expressions
+ *
+ * https://regexr.com/6u3cc
+ *
+ * @pattern ((?:(?:(?:(?:\d+,)+\d+|(?:\d+(?:\/|-|#)\d+)|\d+L?|\*(?:\/\d+)?|L(?:-\d+)?|\?|[A-Z]{3}(?:-[A-Z]{3})?) ?){5,7})$)|(mon|tues|wed|thurs|fri|sat|sun){1}
+ * */
+export type RelativeDateTimeMatch = string;
+
+/**
  * A string containing a comparison operator and a value to compare against
  *
  * The syntax is `(< OR > OR <= OR >=) <number>[percent sign]`

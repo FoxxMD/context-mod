@@ -58,7 +58,7 @@ import {
     filterByTimeRequirement,
     asSubreddit,
     modActionCriteriaSummary,
-    parseRedditFullname, asStrongImageHashCache
+    parseRedditFullname, asStrongImageHashCache, matchesRelativeDateTime
 } from "../util";
 import LoggedError from "../Utils/LoggedError";
 import {
@@ -123,7 +123,7 @@ import {
     EventRetentionPolicyRange, ImageHashCacheData,
     JoinOperands,
     ModActionType,
-    ModeratorNameCriteria, ModUserNoteLabel, statFrequencies, StatisticFrequency,
+    ModeratorNameCriteria, ModUserNoteLabel, RelativeDateTimeMatch, statFrequencies, StatisticFrequency,
     StatisticFrequencyOption
 } from "../Common/Infrastructure/Atomic";
 import {
@@ -2442,6 +2442,23 @@ export class SubredditResources {
                         const ageTest = compareDurationValue(parseDurationComparison(itemOptVal as string), created);
                         propResultsMap.age!.passed = criteriaPassWithIncludeBehavior(ageTest, include);
                         propResultsMap.age!.found = created.format('MMMM D, YYYY h:mm A Z');
+                        break;
+                    case 'createdAt':
+                        const createdAt = dayjs.unix(await item.created);
+                        propResultsMap.createdAt!.found = createdAt.format('MMMM D, YYYY h:mm A Z');
+                        propResultsMap.createdAt!.passed = false;
+
+                        const expressions = Array.isArray(itemOptVal) ? itemOptVal as RelativeDateTimeMatch[] : [itemOptVal] as RelativeDateTimeMatch[];
+                        try {
+                            for (const expr of expressions) {
+                                if (matchesRelativeDateTime(expr, createdAt)) {
+                                    propResultsMap.createdAt!.passed = true;
+                                    break;
+                                }
+                            }
+                        } catch(err: any) {
+                            propResultsMap.title!.reason = err.message;
+                        }
                         break;
                     case 'title':
                         if(asComment(item)) {

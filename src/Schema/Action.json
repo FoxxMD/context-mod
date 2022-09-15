@@ -764,6 +764,20 @@
                     ],
                     "description": "* true/false => test whether Activity is approved or not\n* string or list of strings => test which moderator approved this Activity"
                 },
+                "createdAt": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "string"
+                        }
+                    ],
+                    "description": "A relative datetime description to match the date the Activity was created\n\nMay be either:\n\n* day of the week (monday, tuesday, etc...)\n* cron expression IE `* * 15 *`\n\nSee https://crontab.guru/ for generating expressions\n\nhttps://regexr.com/6u3cc"
+                },
                 "deleted": {
                     "type": "boolean"
                 },
@@ -2507,6 +2521,20 @@
                         }
                     ],
                     "description": "* true/false => test whether Activity is approved or not\n* string or list of strings => test which moderator approved this Activity"
+                },
+                "createdAt": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "string"
+                        }
+                    ],
+                    "description": "A relative datetime description to match the date the Activity was created\n\nMay be either:\n\n* day of the week (monday, tuesday, etc...)\n* cron expression IE `* * 15 *`\n\nSee https://crontab.guru/ for generating expressions\n\nhttps://regexr.com/6u3cc"
                 },
                 "deleted": {
                     "type": "boolean"
