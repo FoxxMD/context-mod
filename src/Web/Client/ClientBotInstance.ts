@@ -25,7 +25,7 @@ export class ClientBotInstance implements BotInstance {
         this.managers = data.managers.map(x => ({...x, subredditNormal: parseRedditEntity(x.subreddit).name}));
         this.nanny = data.nanny;
         this.running = data.running;
-        this.invites = data.invites;
+        this.invites = data.invites === undefined || data.invites === null ? [] : data.invites;
     }
 
     getManagerNames(): string[] {
