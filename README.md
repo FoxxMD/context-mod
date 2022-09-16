@@ -134,6 +134,10 @@ Moderator view/invite and authorization:
 
 ![Invite View](docs/images/oauth-invite.jpg)
 
+A similar helper and invitation experience is available for adding **subreddits to an existing bot.**
+
+![Subreddit Invite View](docs/images/subredditInvite.jpg)
+
 ### Configuration Editor
 
 A built-in editor using [monaco-editor](https://microsoft.github.io/monaco-editor/) makes editing configurations easy:
