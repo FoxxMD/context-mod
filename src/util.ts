@@ -221,8 +221,26 @@ const errorAwareFormat = {
     }
 }
 
-const isProbablyError = (val: any, errName = 'error') => {
-    return typeof val === 'object' && val.name !== undefined && val.name.toLowerCase().includes(errName);
+const isProbablyError = (val: any, explicitErrorName?: string) => {
+    if(typeof val !== 'object' || val === null) {
+        return false;
+    }
+    const {name, stack} = val;
+    if(explicitErrorName !== undefined) {
+        if(name !== undefined && name.toLowerCase().includes(explicitErrorName)) {
+            return true;
+        }
+        if(stack !== undefined && stack.trim().toLowerCase().indexOf(explicitErrorName.toLowerCase()) === 0) {
+            return true;
+        }
+        return false;
+    } else if(stack !== undefined) {
+        return true;
+    } else if(name !== undefined && name.toLowerCase().includes('error')) {
+        return true;
+    }
+
+    return false;
 }
 
 export const PASS = '✓';
@@ -2994,4 +3012,9 @@ export const generateRandomName = () => {
 
 export const asStrongImageHashCache = (data: ImageHashCacheData): data is Required<ImageHashCacheData> => {
     return data.original !== undefined && data.flipped !== undefined;
+}
+
+export const generateFullWikiUrl = (subreddit: Subreddit | string, location: string) => {
+    const subName = subreddit instanceof Subreddit ? subreddit.url : `r/${subreddit}/`;
+    return `https://reddit.com${subName}wiki/${location}`
 }

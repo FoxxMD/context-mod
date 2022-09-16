@@ -1,5 +1,5 @@
-import {Column, Entity, JoinColumn, ManyToOne, PrimaryColumn} from "typeorm";
-import {InviteData, SubredditInviteData} from "../../Web/Common/interfaces";
+import {AfterLoad, Column, Entity, JoinColumn, ManyToOne, PrimaryColumn} from "typeorm";
+import {InviteData, SubredditInviteData, SubredditInviteDataPersisted} from "../../Web/Common/interfaces";
 import dayjs, {Dayjs} from "dayjs";
 import {TimeAwareRandomBaseEntity} from "./Base/TimeAwareRandomBaseEntity";
 import {AuthorEntity} from "./AuthorEntity";
@@ -8,6 +8,7 @@ import {Bot} from "./Bot";
 @Entity()
 export class SubredditInvite extends TimeAwareRandomBaseEntity implements SubredditInviteData {
 
+    @PrimaryColumn("varchar", {length: 255})
     subreddit!: string;
 
     @Column("simple-json", {nullable: true})
@@ -15,6 +16,9 @@ export class SubredditInvite extends TimeAwareRandomBaseEntity implements Subred
 
     @Column("text")
     initialConfig?: string
+
+    @PrimaryColumn("varchar", {length: 200})
+    messageId?: string
 
     @ManyToOne(type => Bot, bot => bot.subredditInvites, {nullable: false, orphanedRowAction: 'delete'})
     @JoinColumn({name: 'botId', referencedColumnName: 'id'})
@@ -38,12 +42,13 @@ export class SubredditInvite extends TimeAwareRandomBaseEntity implements Subred
         }
     }
 
-    constructor(data?: SubredditInviteData & { expiresIn?: number }) {
+    constructor(data?: SubredditInviteData & { expiresIn?: number, bot: Bot }) {
         super();
         if (data !== undefined) {
             this.subreddit = data.subreddit;
-            this.initialConfig = data.initialConfig;
-            this.guests = data.guests;
+            this.initialConfig = data.initialConfig === null ? undefined : data.initialConfig;
+            this.guests = data.guests === null || data.guests === undefined ? [] : data.guests;
+            this.bot = data.bot;
 
 
             if (data.expiresIn !== undefined && data.expiresIn !== 0) {
@@ -51,4 +56,44 @@ export class SubredditInvite extends TimeAwareRandomBaseEntity implements Subred
             }
         }
     }
+
+    toSubredditInviteData(): SubredditInviteDataPersisted {
+        return {
+            id: this.id,
+            subreddit: this.subreddit,
+            initialConfig: this.getInitialConfig(),
+            guests: this.getGuests(),
+            expiresAt: this.expiresAt !== undefined ? this.expiresAt.unix() : undefined,
+        }
+    }
+
+    getGuests(): string[] {
+        if(this.guests === null || this.guests === undefined) {
+            return [];
+        }
+        return this.guests;
+    }
+
+    getInitialConfig(): string | undefined {
+        if(this.initialConfig === null) {
+            return undefined;
+        }
+        return this.initialConfig;
+    }
+
+    canAutomaticallyAccept() {
+        return this.getGuests().length === 0 && this.getInitialConfig() === undefined;
+        // TODO setup inbox checking to look for reply to messageId (eventually!)
+    }
+
+    @AfterLoad()
+    fixNullable() {
+        if(this.guests === null) {
+            this.guests = undefined;
+        }
+        if(this.initialConfig === null) {
+            this.initialConfig = undefined;
+        }
+    }
+
 }

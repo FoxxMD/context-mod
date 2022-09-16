@@ -29,6 +29,7 @@ export const heartbeat = (opData: OperatorData) => {
                     guests: y.managerEntity.getGuests().map(x => guestEntityToApiGuest(x)),
                 })),
                 running: x.running,
+                invites: x.getSubredditInvites().map(y => ({subreddit: y.subreddit, id: y.id}))
             })),
             operators: opData.name,
             operatorDisplay: opData.display,

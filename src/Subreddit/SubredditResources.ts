@@ -124,7 +124,7 @@ import {
     JoinOperands,
     ModActionType,
     ModeratorNameCriteria, ModUserNoteLabel, RelativeDateTimeMatch, statFrequencies, StatisticFrequency,
-    StatisticFrequencyOption
+    StatisticFrequencyOption, WikiContext
 } from "../Common/Infrastructure/Atomic";
 import {
     AuthorOptions, FilterCriteriaPropertyResult,
@@ -1141,6 +1141,18 @@ export class SubredditResources {
         return mods;
     }
 
+    async getSubredditModeratorPermissions(rawUserVal: RedditUser | string, rawSubredditVal?: Subreddit | string): Promise<string[]> {
+        const mods = await this.getSubredditModerators(rawSubredditVal);
+        const user = rawUserVal instanceof RedditUser ? rawUserVal.name : rawUserVal;
+
+        const mod = mods.find(x => x.name.toLowerCase() === user.toLowerCase());
+        if(mod === undefined) {
+            return [];
+        }
+        // @ts-ignore
+        return mod.mod_permissions as string[];
+    }
+
     async getSubredditContributors(): Promise<RedditUser[]> {
         const subName = this.subreddit.display_name;
         const hash = `sub-${subName}-contributors`;
@@ -1685,21 +1697,31 @@ export class SubredditResources {
         return filteredListing;
     }
 
-    async getExternalResource(val: string, subredditArg?: Subreddit): Promise<{val: string, fromCache: boolean, response?: Response, hash?: string}> {
-        const subreddit = subredditArg || this.subreddit;
-        let cacheKey;
-        const wikiContext = parseWikiContext(val);
-        if (wikiContext !== undefined) {
-            cacheKey = `${subreddit.display_name}-content-${wikiContext.wiki}${wikiContext.subreddit !== undefined ? `|${wikiContext.subreddit}` : ''}`;
-        }
-        const extUrl = wikiContext === undefined ? parseExternalUrl(val) : undefined;
-        if (extUrl !== undefined) {
-            cacheKey = extUrl;
+    async getExternalResource(val: string, subredditArg?: Subreddit, defaultTo: 'url' | 'wiki' | undefined = undefined): Promise<{ val: string, fromCache: boolean, response?: Response, hash?: string }> {
+        let wikiContext = parseWikiContext(val);
+
+        let extUrl = wikiContext === undefined ? parseExternalUrl(val) : undefined;
+
+        if (extUrl === undefined && wikiContext === undefined) {
+            if (defaultTo === 'url') {
+                extUrl = val;
+            } else if (defaultTo === 'wiki') {
+                wikiContext = {wiki: val};
+            }
         }
 
-        if (cacheKey === undefined) {
-            return {val, fromCache: false, hash: cacheKey};
+        if (wikiContext !== undefined) {
+            return await this.getWikiPage(wikiContext, subredditArg !== undefined ? subredditArg.display_name : undefined);
         }
+        if (extUrl !== undefined) {
+            return await this.getCachedUrlResult(extUrl);
+        }
+
+        return {val, fromCache: false};
+    }
+
+    async getCachedUrlResult(extUrl: string): Promise<{ val: string, fromCache: boolean, response?: Response, hash?: string }> {
+        const cacheKey = extUrl;
 
         // try to get cached value first
         if (this.wikiTTL !== false) {
@@ -1715,46 +1737,60 @@ export class SubredditResources {
             }
         }
 
-        let wikiContent: string;
-        let response: Response | undefined;
+        try {
+            const [wikiContentVal, responseVal] = await fetchExternalResult(extUrl as string, this.logger);
+            return {val: wikiContentVal, fromCache: false, response: responseVal, hash: cacheKey};
+        } catch (err: any) {
+            throw new CMError(`Error occurred while trying to fetch the url ${extUrl}`, {cause: err});
+        }
+    }
 
-        // no cache hit, get from source
-        if (wikiContext !== undefined) {
-            let sub;
-            if (wikiContext.subreddit === undefined || wikiContext.subreddit.toLowerCase() === subreddit.display_name) {
-                sub = subreddit;
+    async getWikiPage(data: WikiContext, subredditArg?: string): Promise<{ val: string, fromCache: boolean, response?: Response, hash?: string }> {
+        const {
+            subreddit = subredditArg ?? this.subreddit.display_name,
+            wiki
+        } = data;
+
+        const cacheKey = `${subreddit}-content-${wiki}${data.subreddit !== undefined ? `|${data.subreddit}` : ''}`;
+
+        if (this.wikiTTL !== false) {
+            await this.stats.cache.content.identifierRequestCount.set(cacheKey, (await this.stats.cache.content.identifierRequestCount.wrap(cacheKey, () => 0) as number) + 1);
+            this.stats.cache.content.requestTimestamps.push(Date.now());
+            this.stats.cache.content.requests++;
+            const cachedContent = await this.cache.get(cacheKey);
+            if (cachedContent !== undefined && cachedContent !== null) {
+                this.logger.debug(`Content Cache Hit: ${cacheKey}`);
+                return {val: cachedContent as string, fromCache: true, hash: cacheKey};
             } else {
-                sub = this.client.getSubreddit(wikiContext.subreddit);
-            }
-            try {
-                // @ts-ignore
-                const wikiPage = sub.getWikiPage(wikiContext.wiki);
-                wikiContent = await wikiPage.content_md;
-            } catch (err: any) {
-                let msg = `Could not read wiki page for an unknown reason. Please ensure the page 'https://reddit.com${sub.display_name_prefixed}/wiki/${wikiContext.wiki}' exists and is readable`;
-                if(err.statusCode !== undefined) {
-                    if(err.statusCode === 404) {
-                        msg = `Could not find a wiki page at https://reddit.com${sub.display_name_prefixed}/wiki/${wikiContext.wiki} -- Reddit returned a 404`;
-                    } else if(err.statusCode === 403 || err.statusCode === 401) {
-                        msg = `Bot either does not have permission visibility permissions for the wiki page at https://reddit.com${sub.display_name_prefixed}wiki/${wikiContext.wiki} (due to subreddit restrictions) or the bot does have have oauth permissions to read wiki pages (operator error). Reddit returned a ${err.statusCode}`;
-                    }
-                }
-                this.logger.error(msg, err);
-                throw new LoggedError(msg);
-            }
-        } else {
-            try {
-                const [wikiContentVal, responseVal] = await fetchExternalResult(extUrl as string, this.logger);
-                wikiContent = wikiContentVal;
-                response = responseVal;
-            } catch (err: any) {
-                const msg = `Error occurred while trying to fetch the url ${extUrl}`;
-                this.logger.error(msg, err);
-                throw new LoggedError(msg);
+                this.stats.cache.content.miss++;
             }
         }
 
-        return {val: wikiContent, fromCache: false, response, hash: cacheKey};
+        let sub = this.client.getSubreddit(subreddit);
+
+        try {
+            // @ts-ignore
+            const wikiPage = sub.getWikiPage(wikiContext.wiki);
+            const wikiContent = await wikiPage.content_md;
+            return {val: wikiContent, fromCache: false, hash: cacheKey};
+        } catch (err: any) {
+            if (isStatusError(err)) {
+                const error = err.statusCode === 404 ? 'does not exist' : 'is not accessible';
+                let reasons = [];
+                if (!this.client.scope.includes('wikiread')) {
+                    reasons.push(`Bot does not have 'wikiread' oauth permission`);
+                } else {
+                    const modPermissions = await this.getSubredditModeratorPermissions(this.botName, subreddit);
+                    if (!modPermissions.includes('all') && !modPermissions.includes('wiki')) {
+                        reasons.push(`Bot does not have required mod permissions ('all'  or 'wiki') to read restricted wiki pages`);
+                    }
+                }
+
+                throw new CMError(`Wiki page ${location} ${error} (${err.statusCode})${reasons.length > 0 ? `because: ${reasons.join(' | ')}` : '.'}`, {cause: err});
+            } else {
+                throw new CMError(`Wiki page ${location} could not be read`, {cause: err});
+            }
+        }
     }
 
     async getContent(val: string, subredditArg?: Subreddit): Promise<string> {

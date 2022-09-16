@@ -65,4 +65,26 @@ export class Bot extends RandomIdBaseEntity implements HasGuests {
         this.guests = []
         return [];
     }
+
+    getSubredditInvites(): SubredditInvite[] {
+        if(this.subredditInvites === undefined) {
+            return [];
+        }
+        return this.subredditInvites;
+    }
+
+    addSubredditInvite(invite: SubredditInvite) {
+        if(this.subredditInvites === undefined) {
+            this.subredditInvites = [];
+        }
+        this.subredditInvites.push(invite);
+    }
+
+    removeSubredditInvite(invite: SubredditInvite) {
+        if(this.subredditInvites === undefined) {
+            return;
+        }
+        const index = this.subredditInvites.findIndex(x => x.id === invite.id);
+        this.subredditInvites.splice(index, 1);
+    }
 }
