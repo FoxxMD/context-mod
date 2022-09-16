@@ -152,6 +152,7 @@ An **Action** is some action the bot can take against the checked Activity (comm
 
 * For **Operator/Bot maintainers** see **[Operation Guide](/docs/operator/README.md)**
 * For **Moderators** 
+  * Start with the [Subreddit/Moderator docs](/docs/subreddit/README.md) or [Moderator Getting Started guide](/docs/subreddit/gettingStarted.md)
   * Refer to the [Subreddit Components Documentation](/docs/subreddit/components) or the [subreddit-ready examples](/docs/subreddit/components/subredditReady)
   * as well as the [schema](https://json-schema.app/view/%23?url=https%3A%2F%2Fraw.githubusercontent.com%2FFoxxMD%2Fcontext-mod%2Fmaster%2Fsrc%2FSchema%2FApp.json) which has
     * fully annotated configuration data/structure
