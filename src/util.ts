@@ -2982,3 +2982,8 @@ export const generateRandomName = () => {
 export const asStrongImageHashCache = (data: ImageHashCacheData): data is Required<ImageHashCacheData> => {
     return data.original !== undefined && data.flipped !== undefined;
 }
+
+export const generateFullWikiUrl = (subreddit: Subreddit | string, location: string) => {
+    const subName = subreddit instanceof Subreddit ? subreddit.url : `r/${subreddit}/`;
+    return `https://reddit.com${subName}wiki/${location}`
+}
