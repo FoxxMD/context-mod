@@ -1337,11 +1337,19 @@ class Bot implements BotInstanceFunctions {
     }
 
      getSubredditInvites(): SubredditInviteDataPersisted[] {
-        return this.botEntity.getSubredditInvites().map(x => x.toSubredditInviteData());
+        if(this.botEntity !== undefined) {
+            return this.botEntity.getSubredditInvites().map(x => x.toSubredditInviteData());
+        }
+        this.logger.warn('No bot entity found');
+        return [];
     }
 
     getInvite(id: string): SubredditInvite | undefined {
-        return this.botEntity.getSubredditInvites().find(x => x.id === id);
+        if(this.botEntity !== undefined) {
+            return this.botEntity.getSubredditInvites().find(x => x.id === id);
+        }
+        this.logger.warn('No bot entity found');
+        return undefined;
     }
 
     getOnboardingReadiness(invite: SubredditInvite): SubredditOnboardingReadiness {
