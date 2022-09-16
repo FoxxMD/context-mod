@@ -88,7 +88,7 @@
         } else {
             document.querySelector("#errorWrapper").classList.remove('hidden');
             const node = document.createElement("LI");
-            node.appendChild(document.createTextNode(val));
+            node.innerHTML = val;
             document.querySelector("#errorList").appendChild(node);
         }
     }
@@ -119,11 +119,8 @@
                 resp.text().then(t => {
                     let msg = t;
                     if(t.toLowerCase().includes('accepted moderator')) {
-                        msg = `${t}<br/><br/>CM is now running but not all Initial Settings were applied. Please finish applying them using the dashboard. Redirecting now...`;
+                        msg = `${t}<br/><br/>CM is now running but not all Initial Settings were applied. Please finish applying them using the dashboard. <a href="/">Click here</a> to go to the dashboard.`;
                         setError(msg);
-                        setTimeout(() => {
-                            window.location.href = window.location.origin;
-                        }, 2500);
                     } else {
                         setError(msg);
                     }
@@ -133,7 +130,7 @@
                 document.querySelector('#finishOnboarding').innerHTML = 'Onboarding complete! Redirecting you to the Dashboard...';
                 setTimeout(() => {
                     window.location.href = window.location.origin;
-                }, 2000);
+                }, 5000);
             }
         });
     })
