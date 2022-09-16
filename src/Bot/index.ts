@@ -62,6 +62,7 @@ import {AuthorEntity} from "../Common/Entities/AuthorEntity";
 import {Guest, GuestEntityData} from "../Common/Entities/Guest/GuestInterfaces";
 import {guestEntitiesToAll, guestEntityToApiGuest} from "../Common/Entities/Guest/GuestEntity";
 import {SubredditInvite} from "../Common/Entities/SubredditInvite";
+import {dayjsDTFormat} from "../Common/defaults";
 
 class Bot implements BotInstanceFunctions {
 
@@ -664,7 +665,7 @@ class Bot implements BotInstanceFunctions {
             await manager.parseConfiguration('system', true, {suppressNotification: true, suppressChangeEvent: true});
         } catch (err: any) {
             if(err.logged !== true) {
-                const normalizedError = new ErrorWithCause(`Bot could not initialize manager because config was not valid`, {cause: err});
+                const normalizedError = new ErrorWithCause(`Bot could not initialize manager`, {cause: err});
                 // @ts-ignore
                 this.logger.error(normalizedError, {subreddit: manager.subreddit.display_name_prefixed});
             } else {
@@ -789,8 +790,10 @@ class Bot implements BotInstanceFunctions {
     }
 
     async checkModInvites() {
+        this.logger.debug('Checking onboarding invites...');
         const expired = this.botEntity.getSubredditInvites().filter(x => x.expiresAt !== undefined && x.expiresAt.isSameOrBefore(dayjs()));
         for (const exp of expired) {
+            this.logger.debug(`Onboarding invite for ${exp.subreddit} expired at ${exp.expiresAt?.format(dayjsDTFormat)}`);
             await this.deleteSubredditInvite(exp);
         }
 
@@ -806,6 +809,8 @@ class Bot implements BotInstanceFunctions {
                         this.logger.error(err);
                     }
                 }
+            } else {
+              this.logger.debug(`Cannot try to automatically accept mod invite for ${subInvite.subreddit} because it has additional settings that require moderator approval`);
             }
         }
     }
@@ -1305,19 +1310,23 @@ class Bot implements BotInstanceFunctions {
                 throw new SimpleError(`Value '${data.subreddit}' is not a valid subreddit name`);
             }
             try {
-
-                // @ts-ignore
-                sub = await this.client.getSubreddit(name).fetch();
+                const [exists, foundSub] = await this.client.subredditExists(name);
+                if (!exists) {
+                    throw new SimpleError(`No subreddit with the name ${name} exists`);
+                }
+                if (foundSub !== undefined) {
+                    name = foundSub.display_name;
+                }
             } catch (e: any) {
                 throw e;
             }
         }
 
-        if((await this.subredditInviteRepo.findOneBy({subreddit: sub.display_name}))) {
-            throw new CMError(`Invite for ${sub.display_name} already exists`);
+        if((await this.subredditInviteRepo.findOneBy({subreddit: name}))) {
+            throw new CMError(`Invite for ${name} already exists`);
         }
         const invite = new SubredditInvite({
-            subreddit: sub.display_name,
+            subreddit: name,
             initialConfig: data.initialConfig,
             guests: data.guests,
             bot: this.botEntity
@@ -1383,8 +1392,16 @@ class Bot implements BotInstanceFunctions {
                 } catch (e: any) {
                     throw new CMError(`Accepted moderator invitation but error occurred while trying to set wiki config value from initial config (${initialConfig})`, {cause: e});
                 }
-                manager.parseConfiguration('system', true);
+
+                // it's ok if this fails because we've already done all the onboarding steps. user can still access the dashboard and all settings have been applied (even if they were invalid IE config)
+                manager.parseConfiguration('system', true).catch((err: any) => {
+                    if(err.logged !== true) {
+                        this.logger.error(err, {subreddit: manager.displayLabel});
+                    }
+                })
             }
+        } catch(e: any) {
+            throw e;
         } finally {
             await this.deleteSubredditInvite(invite);
         }

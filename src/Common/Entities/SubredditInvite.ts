@@ -46,8 +46,8 @@ export class SubredditInvite extends TimeAwareRandomBaseEntity implements Subred
         super();
         if (data !== undefined) {
             this.subreddit = data.subreddit;
-            this.initialConfig = data.initialConfig;
-            this.guests = data.guests;
+            this.initialConfig = data.initialConfig === null ? undefined : data.initialConfig;
+            this.guests = data.guests === null || data.guests === undefined ? [] : data.guests;
             this.bot = data.bot;
 
 
@@ -61,16 +61,28 @@ export class SubredditInvite extends TimeAwareRandomBaseEntity implements Subred
         return {
             id: this.id,
             subreddit: this.subreddit,
-            initialConfig: this.initialConfig,
-            guests: this.guests,
+            initialConfig: this.getInitialConfig(),
+            guests: this.getGuests(),
             expiresAt: this.expiresAt !== undefined ? this.expiresAt.unix() : undefined,
         }
     }
 
+    getGuests(): string[] {
+        if(this.guests === null || this.guests === undefined) {
+            return [];
+        }
+        return this.guests;
+    }
+
+    getInitialConfig(): string | undefined {
+        if(this.initialConfig === null) {
+            return undefined;
+        }
+        return this.initialConfig;
+    }
+
     canAutomaticallyAccept() {
-        return (this.guests === undefined
-            || this.guests.length === 0)
-            && this.initialConfig === undefined;
+        return this.getGuests().length === 0 && this.getInitialConfig() === undefined;
         // TODO setup inbox checking to look for reply to messageId (eventually!)
     }
 
