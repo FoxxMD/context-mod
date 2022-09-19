@@ -1474,6 +1474,9 @@
                                 "$ref": "#/definitions/SentimentRuleJSONConfig"
                             },
                             {
+                                "$ref": "#/definitions/MHSRuleJSONConfig"
+                            },
+                            {
                                 "$ref": "#/definitions/RuleSetConfigData"
                             },
                             {
@@ -2496,6 +2499,55 @@
             },
             "type": "object"
         },
+        "HistoricalMHSConfig": {
+            "description": "Test the content of Activities from the Author history against MHS criteria\n\nIf this is defined then the `totalMatching` threshold must pass for the Rule to trigger\n\nIf `criteria` is defined here it overrides the top-level `criteria` value",
+            "properties": {
+                "criteria": {
+                    "$ref": "#/definitions/MHSCriteriaConfig",
+                    "description": "Criteria used to trigger based on MHS results\n\nIf both `flagged` and `confidence` are specified then both conditions must pass.\n\nBy default, only `flagged` is defined as `true`"
+                },
+                "mustMatchCurrent": {
+                    "default": false,
+                    "description": "When `true` the original Activity being checked MUST pass its criteria before the Rule considers any history",
+                    "type": "boolean"
+                },
+                "totalMatching": {
+                    "default": "> 0",
+                    "description": "A string containing a comparison operator and a value to compare Activities from history that pass the given `criteria` test\n\nThe syntax is `(< OR > OR <= OR >=) <number>[percent sign]`\n\n* EX `> 12`  => greater than 12 activities passed given `criteria` test\n* EX `<= 10%` => less than 10% of all Activities from history passed given `criteria` test",
+                    "examples": [
+                        "> 0",
+                        "> 10%"
+                    ],
+                    "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
+                    "type": "string"
+                },
+                "window": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/definitions/DurationObject"
+                        },
+                        {
+                            "$ref": "#/definitions/FullActivityWindowConfig"
+                        },
+                        {
+                            "type": [
+                                "string",
+                                "number"
+                            ]
+                        }
+                    ],
+                    "description": "A value to define the range of Activities to retrieve.\n\nAcceptable values:\n\n**`ActivityWindowCriteria` object**\n\nAllows specify multiple range properties and more specific behavior\n\n**A `number` of Activities to retrieve**\n\n* EX `100` => 100 Activities\n\n*****\n\nAny of the below values that specify the amount of time to subtract from `NOW` to create a time range IE `NOW <---> [duration] ago`\n\nAcceptable values:\n\n**A `string` consisting of a value and a [Day.js](https://day.js.org/docs/en/durations/creating#list-of-all-available-units) time UNIT**\n\n* EX `9 days` => Range is `NOW <---> 9 days ago`\n\n**A [Day.js](https://day.js.org/docs/en/durations/creating) `object`**\n\n* EX `{\"days\": 90, \"minutes\": 15}` => Range is `NOW <---> 90 days and 15 minutes ago`\n\n**An [ISO 8601 duration](https://en.wikipedia.org/wiki/ISO_8601#Durations) `string`**\n\n* EX `PT15M` => 15 minutes => Range is `NOW <----> 15 minutes ago`",
+                    "examples": [
+                        "90 days"
+                    ]
+                }
+            },
+            "required": [
+                "totalMatching",
+                "window"
+            ],
+            "type": "object"
+        },
         "HistoricalSentimentConfig": {
             "description": "Test the Sentiment of Activities from the Author history\n\nIf this is defined then the `totalMatching` threshold must pass for the Rule to trigger\n\nIf `sentiment` is defined here it overrides the top-level `sentiment` value",
             "properties": {
@@ -2955,6 +3007,126 @@
                     "description": "An optional, but highly recommended, friendly name for this Action. If not present will default to `kind`.\n\nCan only contain letters, numbers, underscore, spaces, and dashes",
                     "examples": [
                         "myDescriptiveAction"
+                    ],
+                    "pattern": "^[a-zA-Z]([\\w -]*[\\w])?$",
+                    "type": "string"
+                }
+            },
+            "required": [
+                "kind"
+            ],
+            "type": "object"
+        },
+        "MHSCriteriaConfig": {
+            "description": "Criteria used to trigger based on MHS results\n\nIf both `flagged` and `confidence` are specified then both conditions must pass.\n\nBy default, only `flagged` is defined as `true`",
+            "properties": {
+                "confidence": {
+                    "description": "A string containing a comparison operator and a value to compare against the confidence returned from MHS\n\nThe syntax is `(< OR > OR <= OR >=) <number>`\n\n* EX `> 50`  => MHS confidence is greater than 50%",
+                    "examples": [
+                        "> 50"
+                    ],
+                    "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
+                    "type": "string"
+                },
+                "flagged": {
+                    "default": true,
+                    "description": "Test if MHS considers content flagged as toxic or not",
+                    "type": "boolean"
+                },
+                "testOn": {
+                    "default": [
+                        "body"
+                    ],
+                    "description": "Which content from an Activity to send to MHS\n\nOnly used if the Activity being tested is a Submission -- Comments can be only tested against their body\n\nIf more than one type of content is specified then all text is tested together as one string",
+                    "items": {
+                        "enum": [
+                            "body",
+                            "title"
+                        ],
+                        "type": "string"
+                    },
+                    "type": "array"
+                }
+            },
+            "type": "object"
+        },
+        "MHSRuleJSONConfig": {
+            "description": "Test content of an Activity against the MHS toxicity model for reddit content\n\nRunning this Rule with no configuration will use a default configuration that will cause the Rule to trigger if MHS flags the content of the Activity as toxic.\n\nMore info:\n\n* https://moderatehatespeech.com/docs/\n* https://moderatehatespeech.com/",
+            "properties": {
+                "authorIs": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "anyOf": [
+                                    {
+                                        "$ref": "#/definitions/AuthorCriteria"
+                                    },
+                                    {
+                                        "$ref": "#/definitions/NamedCriteria<AuthorCriteria>"
+                                    },
+                                    {
+                                        "type": "string"
+                                    }
+                                ]
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "$ref": "#/definitions/FilterOptionsJson<AuthorCriteria>"
+                        }
+                    ],
+                    "description": "If present then these Author criteria are checked before running the Check. If criteria fails then the Check will fail."
+                },
+                "criteria": {
+                    "$ref": "#/definitions/MHSCriteriaConfig",
+                    "description": "Criteria used to trigger based on MHS results\n\nIf both `flagged` and `confidence` are specified then both conditions must pass.\n\nBy default, only `flagged` is defined as `true`"
+                },
+                "historical": {
+                    "$ref": "#/definitions/HistoricalMHSConfig",
+                    "description": "run MHS on Activities from the Author history\n\nIf this is defined then the `totalMatching` threshold must pass for the Rule to trigger\n\nIf `criteria` is defined here it overrides the top-level `criteria` value"
+                },
+                "itemIs": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "anyOf": [
+                                    {
+                                        "$ref": "#/definitions/SubmissionState"
+                                    },
+                                    {
+                                        "$ref": "#/definitions/CommentState"
+                                    },
+                                    {
+                                        "$ref": "#/definitions/NamedCriteria<TypedActivityState>"
+                                    },
+                                    {
+                                        "type": "string"
+                                    }
+                                ]
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "$ref": "#/definitions/FilterOptionsJson<TypedActivityState>"
+                        }
+                    ],
+                    "description": "A list of criteria to test the state of the `Activity` against before running the check.\n\nIf any set of criteria passes the Check will be run. If the criteria fails then the Check will fail.\n\n* @examples [[{\"over_18\": true, \"removed': false}]]"
+                },
+                "kind": {
+                    "default": "mhs",
+                    "description": "The kind of rule to run",
+                    "enum": [
+                        "mhs"
+                    ],
+                    "examples": [
+                        "mhs"
+                    ],
+                    "type": "string"
+                },
+                "name": {
+                    "description": "An optional, but highly recommended, friendly name for this rule. If not present will default to `kind`.\n\nCan only contain letters, numbers, underscore, spaces, and dashes\n\nname is used to reference Rule result data during Action content templating. See CommentAction or ReportAction for more details.",
+                    "examples": [
+                        "myNewRule"
                     ],
                     "pattern": "^[a-zA-Z]([\\w -]*[\\w])?$",
                     "type": "string"
@@ -4771,6 +4943,9 @@
                                 "$ref": "#/definitions/SentimentRuleJSONConfig"
                             },
                             {
+                                "$ref": "#/definitions/MHSRuleJSONConfig"
+                            },
+                            {
                                 "type": "string"
                             }
                         ]
@@ -5432,6 +5607,9 @@
                             },
                             {
                                 "$ref": "#/definitions/SentimentRuleJSONConfig"
+                            },
+                            {
+                                "$ref": "#/definitions/MHSRuleJSONConfig"
                             },
                             {
                                 "$ref": "#/definitions/RuleSetConfigData"

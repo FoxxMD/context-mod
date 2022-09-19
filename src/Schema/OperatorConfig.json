@@ -187,6 +187,17 @@
         },
         "BotCredentialsJsonConfig": {
             "properties": {
+                "mhs": {
+                    "properties": {
+                        "apiKey": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "apiKey"
+                    ],
+                    "type": "object"
+                },
                 "reddit": {
                     "$ref": "#/definitions/RedditCredentials"
                 },
@@ -949,7 +960,7 @@
                 "file": {
                     "allOf": [
                         {
-                            "$ref": "#/definitions/Omit<DailyRotateFileTransportOptions,\"stream\"|\"log\"|\"dirname\"|\"options\"|\"handleRejections\"|\"format\"|\"handleExceptions\"|\"logv\"|\"close\">"
+                            "$ref": "#/definitions/Omit<DailyRotateFileTransportOptions,\"stream\"|\"log\"|\"options\"|\"dirname\"|\"handleRejections\"|\"format\"|\"handleExceptions\"|\"logv\"|\"close\">"
                         },
                         {
                             "properties": {
@@ -1396,7 +1407,7 @@
             ],
             "type": "object"
         },
-        "Omit<DailyRotateFileTransportOptions,\"stream\"|\"log\"|\"dirname\"|\"options\"|\"handleRejections\"|\"format\"|\"handleExceptions\"|\"logv\"|\"close\">": {
+        "Omit<DailyRotateFileTransportOptions,\"stream\"|\"log\"|\"options\"|\"dirname\"|\"handleRejections\"|\"format\"|\"handleExceptions\"|\"logv\"|\"close\">": {
             "properties": {
                 "auditFile": {
                     "description": "A string representing the name of the name of the audit file. (default: './hash-audit.json')",
@@ -2077,6 +2088,17 @@
         "ThirdPartyCredentialsJsonConfig": {
             "additionalProperties": {},
             "properties": {
+                "mhs": {
+                    "properties": {
+                        "apiKey": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "apiKey"
+                    ],
+                    "type": "object"
+                },
                 "youtube": {
                     "properties": {
                         "apiKey": {

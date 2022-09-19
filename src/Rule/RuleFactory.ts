@@ -12,6 +12,7 @@ import {RepostRule, RepostRuleJSONConfig} from "./RepostRule";
 import {StructuredFilter} from "../Common/Infrastructure/Filters/FilterShapes";
 import {SentimentRule, SentimentRuleJSONConfig} from "./SentimentRule";
 import {StructuredRuleConfigObject} from "../Common/Infrastructure/RuleShapes";
+import {MHSRuleJSONConfig, MHSRule} from "./MHSRule";
 
 export function ruleFactory
 (config: StructuredRuleConfigObject, logger: Logger, subredditName: string, resources: SubredditResources, client: Snoowrap): Rule {
@@ -42,6 +43,9 @@ export function ruleFactory
         case 'sentiment':
             cfg = config as StructuredFilter<SentimentRuleJSONConfig>;
             return new SentimentRule({...cfg, logger, subredditName, resources, client});
+        case 'mhs':
+            cfg = config as StructuredFilter<MHSRuleJSONConfig>;
+            return new MHSRule({...cfg, logger, subredditName, resources, client});
         default:
             throw new Error(`Rule with kind '${config.kind}' was not recognized.`);
     }

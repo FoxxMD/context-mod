@@ -1585,6 +1585,9 @@ export interface ThirdPartyCredentialsJsonConfig {
     youtube?: {
         apiKey: string
     }
+    mhs?: {
+        apiKey: string
+    }
     [key: string]: any
 }
 

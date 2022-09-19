@@ -223,7 +223,7 @@ export class SubredditResources {
     protected useSubredditAuthorCache!: boolean;
     protected authorTTL: number | false = cacheTTLDefaults.authorTTL;
     protected subredditTTL: number | false = cacheTTLDefaults.subredditTTL;
-    protected wikiTTL: number | false = cacheTTLDefaults.wikiTTL;
+    public wikiTTL: number | false = cacheTTLDefaults.wikiTTL;
     protected submissionTTL: number | false = cacheTTLDefaults.submissionTTL;
     protected commentTTL: number | false = cacheTTLDefaults.commentTTL;
     protected filterCriteriaTTL: number | false = cacheTTLDefaults.filterCriteriaTTL;
