@@ -1945,6 +1945,11 @@ export class SubredditResources {
             includeIdentifier = false,
         } = options || {};
 
+        // return early if there are no states to filter by!
+        if(states.length === 0) {
+            return items;
+        }
+
         let passedItems: (Comment | Submission)[] = [];
         let unpassedItems: (Comment | Submission)[] = [];
 
