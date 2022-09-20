@@ -22,6 +22,7 @@ This list is not exhaustive. [For complete documentation on a subreddit's config
     * [Regex](#regex)
     * [Repost](#repost)
     * [Sentiment Analysis](#sentiment-analysis)
+    * [Toxic Content Prediction](#moderatehatespeechcom-predictions)
 * [Rule Sets](#rule-sets)
 * [Actions](#actions)
   * [Named Actions](#named-actions)
@@ -376,6 +377,12 @@ This rule is for searching **all of Reddit** for reposts, as opposed to just the
 [**Full Documentation**](/docs/subreddit/components/sentiment)
 
 The **Sentiment Rule** is used to determine the overall emotional intent (negative, neutral, positive) of a Submission or Comment by analyzing the actual text content of the Activity.
+
+### ModerateHateSpeech.com Predictions
+
+[**Full Documentation**](/docs/subreddit/components/mhs)
+
+ContextMod integrates with [moderatehatespeech.com](https://moderatehatespeech.com/) (MHS) [toxic content machine learning model](https://moderatehatespeech.com/framework/) through their API. This rule sends an Activity's content (title or body) to MHS which returns a prediction on whether the content is toxic and actionable by a moderator. Their model is [specifically trained for reddit content.](https://www.reddit.com/r/redditdev/comments/xdscbo/updated_bot_backed_by_moderationoriented_ml_for/)
 
 # Rule Sets
 
