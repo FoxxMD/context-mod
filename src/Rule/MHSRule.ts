@@ -52,7 +52,7 @@ export class MHSRule extends Rule {
 
         const {
             flagged = true,
-            confidence,
+            confidence = '>= 70',
             testOn = ['body']
         } = criteria || {};
 
