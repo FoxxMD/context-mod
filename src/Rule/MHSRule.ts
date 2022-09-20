@@ -52,7 +52,7 @@ export class MHSRule extends Rule {
 
         const {
             flagged = true,
-            confidence = '>= 70',
+            confidence = '>= 90',
             testOn = ['body']
         } = criteria || {};
 
@@ -76,7 +76,7 @@ export class MHSRule extends Rule {
             } else {
                 const {
                     flagged: historyFlagged = true,
-                    confidence: historyConfidence,
+                    confidence: historyConfidence = '>= 90',
                     testOn: historyTestOn = ['body']
                 } = historyCriteria || {};
                 usedCriteria = {

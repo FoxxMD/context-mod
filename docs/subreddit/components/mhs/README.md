@@ -67,7 +67,7 @@ runs:
 ContextMod provides a reasonable default configuration for the MHS Rule if you do not wish to configure it yourself. The default configuration will trigger the rule if the MHS prediction:
 
 * flags as `toxic`
-* with `70% or greater` confidence
+* with `90% or greater` confidence
 
 Example
 
@@ -84,7 +84,7 @@ rules:
 |   Property   |  Type   |                                        Description                                        | Default |
 |--------------|---------|-------------------------------------------------------------------------------------------|---------|
 | `flagged`    | boolean | Test whether content is flagged as toxic (true) or normal (false)                         | `true`  |
-| `confidence` | string  | Comparison against a number 0 to 100 representing  how confident MHS is in the prediction | `>= 70` |
+| `confidence` | string  | Comparison against a number 0 to 100 representing  how confident MHS is in the prediction | `>= 90` |
 | `testOn`     | array   | Which parts of the Activity to send to MHS. Options: `title` and/or `body`                | `body`  |
 
 Example
