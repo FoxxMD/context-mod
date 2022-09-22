@@ -163,7 +163,7 @@ import ConfigParseError from "../Utils/ConfigParseError";
 import {ActivityReport} from "../Common/Entities/ActivityReport";
 import {ActionResultEntity} from "../Common/Entities/ActionResultEntity";
 
-export const DEFAULT_FOOTER = '\r\n*****\r\nThis action was performed by [a bot.]({{botLink}}) Mention a moderator or [send a modmail]({{modmailLink}}) if you any ideas, questions, or concerns about this action.';
+export const DEFAULT_FOOTER = '\r\n*****\r\nThis action was performed by [a bot.]({{botLink}}) Mention a moderator or [send a modmail]({{modmailLink}}) if you have any ideas, questions, or concerns about this action.';
 
 /**
  * Only used for migrating stats from cache to db
