@@ -22,7 +22,7 @@ runs:
             # if the nested rules pass the condition then the Rule Set triggers the Check
             #
             # AND = all nested rules must be triggered to make the Rule Set trigger
-            # AND = any of the nested Rules will be the Rule Set trigger
+            # OR = any of the nested Rules will be the Rule Set trigger
           - condition: AND
             # in this check we use an Attribution >10% on ONLY submissions, which is a lower requirement then the above attribution rule
             # and combine it with a History rule looking for low comment engagement

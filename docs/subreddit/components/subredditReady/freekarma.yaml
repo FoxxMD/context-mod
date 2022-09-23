@@ -25,7 +25,7 @@ runs:
         actions:
           - kind: report
             enable: true
-            content: 'Remove=> {{rules.newtube.totalCount}} activities in freekarma subs'
+            content: 'Remove=> {{rules.freekarma.totalCount}} activities in freekarma subs'
           - kind: remove
             enable: true
           - kind: comment
