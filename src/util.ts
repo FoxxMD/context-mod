@@ -71,7 +71,7 @@ import {
     UserNoteCriteria
 } from "./Common/Infrastructure/Filters/FilterCriteria";
 import {
-    ActivitySource,
+    ActivitySourceValue,
     ActivitySourceTypes,
     CacheProvider,
     ConfigFormat,
@@ -86,7 +86,8 @@ import {
     StatisticFrequency,
     StatisticFrequencyOption,
     UrlContext,
-    WikiContext
+    WikiContext,
+    ActivitySourceData
 } from "./Common/Infrastructure/Atomic";
 import {
     AuthorOptions,
@@ -2723,17 +2724,30 @@ export const isCommentState = (state: TypedActivityState): state is CommentState
 const DISPATCH_REGEX: RegExp = /^dispatch:/i;
 const POLL_REGEX: RegExp = /^poll:/i;
 const USER_REGEX: RegExp = /^user:/i;
-export const asActivitySource = (val: string): val is ActivitySource => {
+const ACTIVITY_SOURCE_REGEX: RegExp = /^(?<type>dispatch|poll|user)(?:$|:(?<identifier>[^\s\r\n]+)$)/i
+const ACTIVITY_SOURCE_REGEX_URL = 'https://regexr.com/6uqn6';
+export const asActivitySourceValue = (val: string): val is ActivitySourceValue => {
     if(['dispatch','poll','user'].some(x => x === val)) {
         return true;
     }
     return DISPATCH_REGEX.test(val) || POLL_REGEX.test(val) || USER_REGEX.test(val);
 }
 
-export const strToActivitySource = (val: string): ActivitySource => {
+export const asActivitySource = (val: any): val is ActivitySourceData => {
+    return null !== val && typeof val === 'object' && 'type' in val;
+}
+
+export const strToActivitySourceData = (val: string): ActivitySourceData => {
     const cleanStr = val.trim();
-    if (asActivitySource(cleanStr)) {
-        return cleanStr;
+    if (asActivitySourceValue(cleanStr)) {
+        const res = parseRegexSingleOrFail(ACTIVITY_SOURCE_REGEX, cleanStr);
+        if (res === undefined) {
+            throw new InvalidRegexError(ACTIVITY_SOURCE_REGEX, cleanStr, ACTIVITY_SOURCE_REGEX_URL, 'Could not parse activity source');
+        }
+        return {
+            type: res.named.type,
+            identifier: res.named.identifier
+        }
     }
     throw new SimpleError(`'${cleanStr}' is not a valid ActivitySource. Must be one of: dispatch, dispatch:[identifier], poll, poll:[identifier], user, or user:[identifier]`);
 }

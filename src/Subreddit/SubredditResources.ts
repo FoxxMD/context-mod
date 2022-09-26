@@ -41,7 +41,6 @@ import {
     redisScanIterator,
     removeUndefinedKeys,
     shouldCacheSubredditStateCriteriaResult,
-    strToActivitySource,
     subredditStateIsNameOnly,
     testMaybeStringRegex,
     toStrongSubredditState,
@@ -119,7 +118,7 @@ import {
     UserNoteCriteria
 } from "../Common/Infrastructure/Filters/FilterCriteria";
 import {
-    ActivitySource, ConfigFragmentValidationFunc, DurationVal,
+    ActivitySourceValue, ConfigFragmentValidationFunc, DurationVal,
     EventRetentionPolicyRange, ImageHashCacheData,
     JoinOperands,
     ModActionType,
@@ -162,6 +161,7 @@ import {parseFromJsonOrYamlToObject} from "../Common/Config/ConfigUtil";
 import ConfigParseError from "../Utils/ConfigParseError";
 import {ActivityReport} from "../Common/Entities/ActivityReport";
 import {ActionResultEntity} from "../Common/Entities/ActionResultEntity";
+import {ActivitySource} from "../Common/ActivitySource";
 
 export const DEFAULT_FOOTER = '\r\n*****\r\nThis action was performed by [a bot.]({{botLink}}) Mention a moderator or [send a modmail]({{modmailLink}}) if you have any ideas, questions, or concerns about this action.';
 
@@ -2090,7 +2090,7 @@ export class SubredditResources {
         return res;
     }
 
-    async testItemCriteria(i: (Comment | Submission), activityStateObj: NamedCriteria<TypedActivityState>, logger: Logger, include = true, source?: ActivitySource): Promise<FilterCriteriaResult<TypedActivityState>> {
+    async testItemCriteria(i: (Comment | Submission), activityStateObj: NamedCriteria<TypedActivityState>, logger: Logger, include = true, source?: ActivitySourceValue): Promise<FilterCriteriaResult<TypedActivityState>> {
         const {criteria: activityState} = activityStateObj;
         if(Object.keys(activityState).length === 0) {
             return {
@@ -2254,7 +2254,7 @@ export class SubredditResources {
         })() as boolean;
     }
 
-    async isItem (item: Submission | Comment, stateCriteria: TypedActivityState, logger: Logger, include: boolean, source?: ActivitySource): Promise<FilterCriteriaResult<(SubmissionState & CommentState)>> {
+    async isItem (item: Submission | Comment, stateCriteria: TypedActivityState, logger: Logger, include: boolean, source?: ActivitySourceValue): Promise<FilterCriteriaResult<(SubmissionState & CommentState)>> {
 
         //const definedStateCriteria = (removeUndefinedKeys(stateCriteria) as RequiredItemCrit);
 
@@ -2345,10 +2345,12 @@ export class SubredditResources {
                         } else {
                             propResultsMap.source!.found = source;
 
-                            const requestedSourcesVal: string[] = !Array.isArray(itemOptVal) ? [itemOptVal] as string[] : itemOptVal as string[];
-                            const requestedSources = requestedSourcesVal.map(x => strToActivitySource(x).toLowerCase());
+                            const itemSource = new ActivitySource(source);
 
-                            propResultsMap.source!.passed = criteriaPassWithIncludeBehavior(requestedSources.some(x => source.toLowerCase().trim() === x.toLowerCase().trim()), include);
+                            const requestedSourcesVal: string[] = !Array.isArray(itemOptVal) ? [itemOptVal] as string[] : itemOptVal as string[];
+                            const requestedSources = requestedSourcesVal.map(x => new ActivitySource(x));
+
+                            propResultsMap.source!.passed = criteriaPassWithIncludeBehavior(requestedSources.some(x => x.matches(itemSource)), include);
                             break;
                         }
                     case 'score':
@@ -3786,7 +3788,7 @@ export const checkAuthorFilter = async (item: (Submission | Comment), filter: Au
     return [true, undefined, {criteriaResults: allCritResults, join: 'OR', passed: true}];
 }
 
-export const checkItemFilter = async (item: (Submission | Comment), filter: ItemOptions, resources: SubredditResources, options?: {logger?: Logger, source?: ActivitySource, includeIdentifier?: boolean}): Promise<[boolean, ('inclusive' | 'exclusive' | undefined), FilterResult<TypedActivityState>]> => {
+export const checkItemFilter = async (item: (Submission | Comment), filter: ItemOptions, resources: SubredditResources, options?: {logger?: Logger, source?: ActivitySourceValue, includeIdentifier?: boolean}): Promise<[boolean, ('inclusive' | 'exclusive' | undefined), FilterResult<TypedActivityState>]> => {
 
     const {
         logger: parentLogger = NoopLogger,
@@ -3944,7 +3946,7 @@ export const checkItemFilter = async (item: (Submission | Comment), filter: Item
     return [true, undefined, {criteriaResults: allCritResults, join: 'OR', passed: true}];
 }
 
-export const checkCommentSubmissionStates = async (item: Comment, submissionStates: SubmissionState[], resources: SubredditResources, logger: Logger, source?: ActivitySource, excludeCondition?: JoinOperands): Promise<[boolean, FilterCriteriaPropertyResult<CommentState>]> => {
+export const checkCommentSubmissionStates = async (item: Comment, submissionStates: SubmissionState[], resources: SubredditResources, logger: Logger, source?: ActivitySourceValue, excludeCondition?: JoinOperands): Promise<[boolean, FilterCriteriaPropertyResult<CommentState>]> => {
     // test submission state first since it's more likely(??) we have crit results or cache data for this submission than for the comment
 
     // get submission

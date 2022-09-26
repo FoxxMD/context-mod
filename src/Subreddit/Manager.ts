@@ -94,8 +94,7 @@ import {InvokeeType} from "../Common/Entities/InvokeeType";
 import {RunStateType} from "../Common/Entities/RunStateType";
 import {EntityRunState} from "../Common/Entities/EntityRunState/EntityRunState";
 import {
-    ActivitySource,
-    DispatchSource,
+    ActivitySourceValue,
     EventRetentionPolicyRange,
     Invokee,
     PollOn,
@@ -128,7 +127,7 @@ export interface runCheckOptions {
     force?: boolean,
     gotoContext?: string
     maxGotoDepth?: number
-    source: ActivitySource
+    source: ActivitySourceValue
     initialGoto?: string
     activitySource: ActivitySourceData
     disableDispatchDelays?: boolean

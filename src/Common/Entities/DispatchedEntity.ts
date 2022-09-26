@@ -21,7 +21,7 @@ import Submission from "snoowrap/dist/objects/Submission";
 import Comment from "snoowrap/dist/objects/Comment";
 import {ColumnDurationTransformer} from "./Transformers";
 import { RedditUser } from "snoowrap/dist/objects";
-import {ActivitySourceTypes, DurationVal, NonDispatchActivitySource, onExistingFoundBehavior} from "../Infrastructure/Atomic";
+import {ActivitySourceTypes, DurationVal, NonDispatchActivitySourceValue, onExistingFoundBehavior} from "../Infrastructure/Atomic";
 
 @Entity({name: 'DispatchedAction'})
 export class DispatchedEntity extends TimeAwareRandomBaseEntity {
@@ -53,7 +53,7 @@ export class DispatchedEntity extends TimeAwareRandomBaseEntity {
     identifier?: string
 
     @Column("varchar", {nullable: true, length: 200})
-    cancelIfQueued?: boolean | NonDispatchActivitySource | NonDispatchActivitySource[]
+    cancelIfQueued?: boolean | NonDispatchActivitySourceValue | NonDispatchActivitySourceValue[]
 
     @Column({nullable: true})
     onExistingFound?: onExistingFoundBehavior
@@ -127,7 +127,7 @@ export class DispatchedEntity extends TimeAwareRandomBaseEntity {
             } else if (cVal === 'false') {
                 this.cancelIfQueued = false;
             } else if (cVal.includes('[')) {
-                this.cancelIfQueued = JSON.parse(cVal) as NonDispatchActivitySource[];
+                this.cancelIfQueued = JSON.parse(cVal) as NonDispatchActivitySourceValue[];
             }
         }
         if(this.goto === null) {
