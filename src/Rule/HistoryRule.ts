@@ -300,6 +300,12 @@ export class HistoryRule extends Rule {
 
             this.logger.verbose(`${PASS} ${resultData.result}`);
             return Promise.resolve([true, this.getResult(true, resultData)]);
+        } else {
+            // log failures for easier debugging
+            for(const res of criteriaResults) {
+                const resultData = this.generateResultDataFromCriteria(res);
+                this.logger.verbose(`${FAIL} ${resultData.result}`);
+            }
         }
 
         return Promise.resolve([false, this.getResult(false, {result: failCriteriaResult})]);
