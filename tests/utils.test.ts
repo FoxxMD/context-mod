@@ -1,11 +1,18 @@
 import {describe, it} from 'mocha';
 import {assert} from 'chai';
 import {
-    COMMENT_URL_ID, GH_BLOB_REGEX, GIST_RAW_REGEX,
+    COMMENT_URL_ID,
+    GH_BLOB_REGEX,
+    GIST_RAW_REGEX,
     GIST_REGEX,
     parseDurationFromString,
     parseLinkIdentifier,
-    parseRedditEntity, parseRegexSingleOrFail, REGEXR_REGEX, removeUndefinedKeys, SUBMISSION_URL_ID
+    parseRedditEntity,
+    parseRegexSingleOrFail,
+    REGEXR_REGEX,
+    removeUndefinedKeys,
+    strToActivitySourceData,
+    SUBMISSION_URL_ID
 } from "../src/util";
 import dayjs from "dayjs";
 import dduration, {Duration, DurationUnitType} from 'dayjs/plugin/duration.js';
@@ -15,6 +22,7 @@ import {
     parseGenericValueOrPercentComparison, parseReportComparison
 } from "../src/Common/Infrastructure/Comparisons";
 import {RegExResult} from "../src/Common/interfaces";
+import {SOURCE_DISPATCH, SOURCE_POLL, SOURCE_USER} from "../src/Common/Infrastructure/Atomic";
 
 dayjs.extend(dduration);
 
@@ -356,4 +364,20 @@ describe('Link Recognition', function () {
             assert.exists(res);
         });
     })
+})
+
+describe('Activity Source Parsing', function () {
+    it('should parse all activity types', function () {
+        for (const type of [SOURCE_DISPATCH, SOURCE_POLL, SOURCE_USER]) {
+            const source = strToActivitySourceData(type);
+            assert.equal(source.type, type);
+        }
+    });
+    it('should throw if invalid activity source type', function () {
+        assert.throws(() => strToActivitySourceData('jflksdf'));
+    });
+    it('should parse identifier from activity source', function () {
+        const source = strToActivitySourceData('dispatch:test');
+        assert.equal(source.identifier, 'test');
+    });
 })

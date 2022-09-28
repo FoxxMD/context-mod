@@ -33,7 +33,7 @@ import tcpUsed from "tcp-port-used";
 import http from "http";
 import jwt from 'jsonwebtoken';
 import {Server as SocketServer} from "socket.io";
-import got from 'got';
+import got, {HTTPError} from 'got';
 import sharedSession from "express-socket.io-session";
 import dayjs from "dayjs";
 import httpProxy from 'http-proxy';
@@ -56,7 +56,13 @@ import {MigrationService} from "../../Common/MigrationService";
 import {RuleResultEntity} from "../../Common/Entities/RuleResultEntity";
 import {RuleSetResultEntity} from "../../Common/Entities/RuleSetResultEntity";
 import { PaginationAwareObject } from "../Common/util";
-import {BotInstance, BotStatusResponse, CMInstanceInterface, InviteData} from "../Common/interfaces";
+import {
+    BotInstance,
+    BotStatusResponse,
+    BotSubredditInviteResponse,
+    CMInstanceInterface, HeartbeatResponse,
+    InviteData, SubredditInviteDataPersisted
+} from "../Common/interfaces";
 import {open} from "fs/promises";
 
 const emitter = new EventEmitter();
@@ -593,7 +599,18 @@ const webClient = async (options: OperatorConfigWithFileContext) => {
         next();
     }
 
-    app.getAsync('/auth/helper', helperAuthed, instanceWithPermissions, instancesViewData, (req, res) => {
+    const initHeartbeat = async (req: express.Request, res: express.Response, next: Function) => {
+        if(!init) {
+            for(const c of clients) {
+                await refreshClient(c);
+            }
+            init = true;
+            loopHeartbeat();
+        }
+        next();
+    };
+
+    app.getAsync('/auth/helper', initHeartbeat, helperAuthed, instanceWithPermissions, instancesViewData, (req, res) => {
         return res.render('helper', {
             redirectUri: clientCredentials.redirectUri,
             clientId: clientCredentials.clientId,
@@ -604,7 +621,7 @@ const webClient = async (options: OperatorConfigWithFileContext) => {
         });
     });
 
-    app.getAsync('/auth/invite/:inviteId', async (req, res) => {
+    app.getAsync('/auth/invite/:inviteId', initHeartbeat, async (req, res) => {
         const {inviteId} = req.params;
 
         if (inviteId === undefined) {
@@ -699,7 +716,7 @@ const webClient = async (options: OperatorConfigWithFileContext) => {
         }
     });
 
-    app.getAsync('/auth/init/:inviteId', async (req: express.Request, res: express.Response) => {
+    app.getAsync('/auth/init/:inviteId', initHeartbeat, async (req: express.Request, res: express.Response) => {
         const { inviteId } = req.params;
         if(inviteId === undefined) {
             return res.render('error', {error: '`invite` param is missing from URL'});
@@ -822,6 +839,8 @@ const webClient = async (options: OperatorConfigWithFileContext) => {
         next();
     }
 
+
+
     // const authenticatedRouter = Router();
     // authenticatedRouter.use([ensureAuthenticated, defaultSession]);
     // app.use(authenticatedRouter);
@@ -837,7 +856,7 @@ const webClient = async (options: OperatorConfigWithFileContext) => {
     //     logger.debug(`Got proxy response: ${res.statusCode} for ${req.url}`);
     // });
 
-    app.useAsync('/api/', [ensureAuthenticatedApi, defaultSession, instanceWithPermissions, botWithPermissions(false), createUserToken], (req: express.Request, res: express.Response) => {
+    app.useAsync('/api/', [ensureAuthenticatedApi, initHeartbeat, defaultSession, instanceWithPermissions, botWithPermissions(false), createUserToken], (req: express.Request, res: express.Response) => {
         req.headers.Authorization = `Bearer ${req.token}`
 
         const instance = req.instance as CMInstanceInterface;
@@ -888,17 +907,6 @@ const webClient = async (options: OperatorConfigWithFileContext) => {
         }
         next();
     }*/
-
-    const initHeartbeat = async (req: express.Request, res: express.Response, next: Function) => {
-        if(!init) {
-            for(const c of clients) {
-                await refreshClient(c);
-            }
-            init = true;
-            loopHeartbeat();
-        }
-        next();
-    };
 
     const redirectBotsNotAuthed = async (req: express.Request, res: express.Response, next: Function) => {
         if(cmInstances.length === 1 && cmInstances[0].error === 'Missing credentials: refreshToken, accessToken') {
@@ -1046,8 +1054,139 @@ const webClient = async (options: OperatorConfigWithFileContext) => {
         });
     });
 
-    app.getAsync('/bot/invites', defaultSession, async (req: express.Request, res: express.Response) => {
-        res.render('modInvites', {
+    app.getAsync('/bot/invites/subreddit/:inviteId', initHeartbeat, ensureAuthenticated, defaultSession, async (req: express.Request, res: express.Response) => {
+
+        const {inviteId} = req.params;
+
+        if (inviteId === undefined) {
+            return res.render('error', {error: '`invite` param is missing from URL'});
+        }
+
+        let validInstance: CMInstance | undefined = undefined;
+        let validInvite: BotSubredditInviteResponse | undefined = undefined;
+        let validBot: BotInstance | undefined = undefined;
+        for(const instance of cmInstances) {
+            for(const bot of instance.bots) {
+                validInvite  = bot.getInvite(inviteId);
+                if(validInvite !== undefined) {
+                    validInstance = instance;
+                    validBot = bot;
+                    break;
+                }
+            }
+        }
+
+        if(validInvite === undefined) {
+            // try refreshing clients first
+            await refreshClients(true);
+        }
+
+        for(const instance of cmInstances) {
+            for(const bot of instance.bots) {
+                validInvite  = bot.getInvite(inviteId);
+                if(validInvite !== undefined) {
+                    validInstance = instance;
+                    validBot = bot;
+                    break;
+                }
+            }
+        }
+
+        if(validInvite === undefined || validInstance === undefined || validBot === undefined) {
+            return res.render('error', {error: 'Either no invite exists with the given ID or you are not a moderator of the subreddit this invite is for.'});
+        }
+
+        const user = req.user as Express.User;
+
+        // @ts-ignore
+        if(!user.subreddits.some(x => x.toLowerCase() === validInvite.subreddit.toLowerCase())) {
+            return res.render('error', {error: 'Either no invite exists with the given ID or you are not a moderator of the subreddit this invite is for.'});
+        }
+
+        try {
+            const invite = await got.get(`${validInstance.normalUrl}/bot/invite/${validInvite.id}?bot=${validBot.botName}`, {
+                headers: {
+                    'Authorization': `Bearer ${validInstance.getToken()}`,
+                }
+            }).json() as SubredditInviteDataPersisted;
+
+            const {guests, ...rest} = invite;
+            const guestStr = guests !== undefined && guests !== null && guests.length > 0 ? guests.join(',') : '';
+
+            return res.render('subredditOnboard/onboard', {
+                invite: {...rest, guests: guestStr},
+                bot: validBot.botName,
+                title: `Subreddit Onboarding`,
+            });
+
+        } catch (err: any) {
+            logger.error(err);
+            return res.render('error', {error: `Error occurred while retriving invite data: ${err.message}`});
+        }
+    });
+
+    app.postAsync('/bot/invites/subreddit/:inviteId', ensureAuthenticated, defaultSession, async (req: express.Request, res: express.Response) => {
+
+        const {inviteId} = req.params;
+
+        if (inviteId === undefined) {
+            return res.status(400).send('`invite` param is missing from URL')
+        }
+
+        let validInstance: CMInstance | undefined = undefined;
+        let validInvite: BotSubredditInviteResponse | undefined = undefined;
+        let validBot: BotInstance | undefined = undefined;
+        for(const instance of cmInstances) {
+            for(const bot of instance.bots) {
+                validInvite  = bot.getInvite(inviteId);
+                if(validInvite !== undefined) {
+                    validInstance = instance;
+                    validBot = bot;
+                    break;
+                }
+            }
+        }
+
+        if(validInvite === undefined || validInstance === undefined || validBot === undefined) {
+            return res.status(400).send('Either no invite exists with the given ID or you are not a moderator of the subreddit this invite is for.')
+        }
+
+        const user = req.user as Express.User;
+
+        // @ts-ignore
+        if(!user.subreddits.some(x => x.toLowerCase() === validInvite.subreddit.toLowerCase())) {
+            return res.status(400).send('Either no invite exists with the given ID or you are not a moderator of the subreddit this invite is for.')
+        }
+
+        try {
+            await got.post(`${validInstance.normalUrl}/bot/invite/${validInvite.id}?bot=${validBot.botName}`, {
+                json: req.body,
+                headers: {
+                    'Authorization': `Bearer ${validInstance.getToken()}`,
+                }
+            })
+
+            return res.status(200);
+
+        } catch (err: any) {
+            logger.error(err);
+            res.status(500)
+            let msg = err.message;
+            if(err instanceof HTTPError && typeof err.response.body === 'string') {
+                msg = err.response.body
+            }
+            return res.send(msg);
+        }
+    });
+
+    app.getAsync('/bot/invites/subreddit', initHeartbeat, ensureAuthenticated, defaultSession, instanceWithPermissions, botWithPermissions(true), async (req: express.Request, res: express.Response) => {
+        res.render('subredditOnboard/helper', {
+            title: `Create Subreddit Invite`,
+        });
+    });
+
+    app.getAsync('/bot/invites', initHeartbeat, ensureAuthenticated, defaultSession, async (req: express.Request, res: express.Response) => {
+        res.render('subredditOnboard/manager', {
             title: `Pending Moderation Invites`,
         });
     });
@@ -1061,7 +1200,7 @@ const webClient = async (options: OperatorConfigWithFileContext) => {
         });
     });
 
-    app.getAsync('/guest', [ensureAuthenticatedApi, defaultSession, instanceWithPermissions, botWithPermissions(true)], async (req: express.Request, res: express.Response) => {
+    app.getAsync('/guest', [ensureAuthenticatedApi, initHeartbeat, defaultSession, instanceWithPermissions, botWithPermissions(true)], async (req: express.Request, res: express.Response) => {
         const {subreddit} = req.query as any;
         return res.status(req.user?.isSubredditGuest(req.bot, subreddit) ? 200 : 403).send();
     });
@@ -1107,7 +1246,7 @@ const webClient = async (options: OperatorConfigWithFileContext) => {
         return res.send();
     });
 
-    app.getAsync('/events', [ensureAuthenticatedApi, defaultSession, instanceWithPermissions, botWithPermissions(true), createUserToken], async (req: express.Request, res: express.Response) => {
+    app.getAsync('/events', [ensureAuthenticatedApi, initHeartbeat, defaultSession, instanceWithPermissions, botWithPermissions(true), createUserToken], async (req: express.Request, res: express.Response) => {
         const {subreddit, page = 1, permalink, related, author} = req.query as any;
         const resp = await got.get(`${(req.instance as CMInstanceInterface).normalUrl}/events`, {
             headers: {
@@ -1475,11 +1614,15 @@ const webClient = async (options: OperatorConfigWithFileContext) => {
 
     const loopHeartbeat = async () => {
         while(true) {
-            for(const c of clients) {
-                await refreshClient(c);
-            }
+            await refreshClients();
             // sleep for 10 seconds then do heartbeat check again
             await sleep(10000);
+        }
+    }
+
+    const refreshClients = async (force = false) => {
+        for(const c of clients) {
+            await refreshClient(c, force);
         }
     }
 

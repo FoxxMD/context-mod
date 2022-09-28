@@ -1,6 +1,6 @@
 import {
     BotInstance,
-    BotInstanceResponse,
+    BotInstanceResponse, BotSubredditInviteResponse,
     CMInstanceInterface,
     ManagerResponse,
     NormalizedManagerResponse
@@ -15,6 +15,7 @@ export class ClientBotInstance implements BotInstance {
     managers: NormalizedManagerResponse[];
     nanny?: string | undefined;
     running: boolean;
+    invites: BotSubredditInviteResponse[]
 
     constructor(data: BotInstanceResponse, instance: CMInstanceInterface) {
         this.instance = instance;
@@ -24,6 +25,7 @@ export class ClientBotInstance implements BotInstance {
         this.managers = data.managers.map(x => ({...x, subredditNormal: parseRedditEntity(x.subreddit).name}));
         this.nanny = data.nanny;
         this.running = data.running;
+        this.invites = data.invites === undefined || data.invites === null ? [] : data.invites;
     }
 
     getManagerNames(): string[] {
@@ -54,6 +56,14 @@ export class ClientBotInstance implements BotInstance {
 
     canUserAccessSubreddit(subreddit: string, user: string, subreddits: string[] = []): boolean {
        return this.getAccessibleSubreddits(user, subreddits).includes(parseRedditEntity(subreddit).name);
+    }
+
+    getInvites() {
+        return this.invites;
+    }
+
+    getInvite(val: string) {
+        return this.invites.find(x => x.id === val);
     }
 
 }

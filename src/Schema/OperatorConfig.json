@@ -187,6 +187,17 @@
         },
         "BotCredentialsJsonConfig": {
             "properties": {
+                "mhs": {
+                    "properties": {
+                        "apiKey": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "apiKey"
+                    ],
+                    "type": "object"
+                },
                 "reddit": {
                     "$ref": "#/definitions/RedditCredentials"
                 },
@@ -522,6 +533,20 @@
                         }
                     ],
                     "description": "* true/false => test whether Activity is approved or not\n* string or list of strings => test which moderator approved this Activity"
+                },
+                "createdOn": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "string"
+                        }
+                    ],
+                    "description": "A relative datetime description to match the date the Activity was created\n\nMay be either:\n\n* day of the week (monday, tuesday, etc...)\n* cron expression IE `* * 15 *`\n\nSee https://crontab.guru/ for generating expressions\n\nhttps://regexr.com/6u3cc"
                 },
                 "deleted": {
                     "type": "boolean"
@@ -935,7 +960,7 @@
                 "file": {
                     "allOf": [
                         {
-                            "$ref": "#/definitions/Omit<DailyRotateFileTransportOptions,\"stream\"|\"log\"|\"dirname\"|\"options\"|\"handleRejections\"|\"format\"|\"handleExceptions\"|\"logv\"|\"close\">"
+                            "$ref": "#/definitions/Omit<DailyRotateFileTransportOptions,\"stream\"|\"log\"|\"options\"|\"dirname\"|\"handleRejections\"|\"format\"|\"handleExceptions\"|\"logv\"|\"close\">"
                         },
                         {
                             "properties": {
@@ -1382,7 +1407,7 @@
             ],
             "type": "object"
         },
-        "Omit<DailyRotateFileTransportOptions,\"stream\"|\"log\"|\"dirname\"|\"options\"|\"handleRejections\"|\"format\"|\"handleExceptions\"|\"logv\"|\"close\">": {
+        "Omit<DailyRotateFileTransportOptions,\"stream\"|\"log\"|\"options\"|\"dirname\"|\"handleRejections\"|\"format\"|\"handleExceptions\"|\"logv\"|\"close\">": {
             "properties": {
                 "auditFile": {
                     "description": "A string representing the name of the name of the audit file. (default: './hash-audit.json')",
@@ -1835,6 +1860,20 @@
                     ],
                     "description": "* true/false => test whether Activity is approved or not\n* string or list of strings => test which moderator approved this Activity"
                 },
+                "createdOn": {
+                    "anyOf": [
+                        {
+                            "items": {
+                                "type": "string"
+                            },
+                            "type": "array"
+                        },
+                        {
+                            "type": "string"
+                        }
+                    ],
+                    "description": "A relative datetime description to match the date the Activity was created\n\nMay be either:\n\n* day of the week (monday, tuesday, etc...)\n* cron expression IE `* * 15 *`\n\nSee https://crontab.guru/ for generating expressions\n\nhttps://regexr.com/6u3cc"
+                },
                 "deleted": {
                     "type": "boolean"
                 },
@@ -2049,6 +2088,17 @@
         "ThirdPartyCredentialsJsonConfig": {
             "additionalProperties": {},
             "properties": {
+                "mhs": {
+                    "properties": {
+                        "apiKey": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "apiKey"
+                    ],
+                    "type": "object"
+                },
                 "youtube": {
                     "properties": {
                         "apiKey": {

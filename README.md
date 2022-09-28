@@ -31,6 +31,8 @@ Feature Highlights for **Moderators:**
 * [**Web interface**](#web-ui-and-screenshots) for monitoring, administration, and oauth bot authentication
 * [**Placeholders**](/docs/subreddit/actionTemplating.md) (like automoderator) can be configured via a wiki page or raw text and supports [mustache](https://mustache.github.io) templating
 * [**Partial Configurations**](/docs/subreddit/components/README.md#partial-configurations) -- offload parts of your configuration to shared locations to consolidate logic between multiple subreddits
+* [Guest Access](/docs/subreddit/README.md#guest-access) enables collaboration and easier setup by allowing temporary access
+* [Toxic content prediction](/docs/subreddit/components/README.md#moderatehatespeechcom-predictions) using [moderatehatespeech.com](https://moderatehatespeech.com) machine learning model
 
 Feature highlights for **Developers and Hosting (Operators):**
 
@@ -133,6 +135,10 @@ Operator view/invite link generation:
 Moderator view/invite and authorization:
 
 ![Invite View](docs/images/oauth-invite.jpg)
+
+A similar helper and invitation experience is available for adding **subreddits to an existing bot.**
+
+![Subreddit Invite View](docs/images/subredditInvite.jpg)
 
 ### Configuration Editor
 

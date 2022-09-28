@@ -21,7 +21,7 @@ import {
     DurationVal,
     EventRetentionPolicyRange,
     JoinOperands,
-    NonDispatchActivitySource,
+    NonDispatchActivitySourceValue,
     NotificationEventType,
     NotificationProvider,
     onExistingFoundBehavior,
@@ -1585,6 +1585,9 @@ export interface ThirdPartyCredentialsJsonConfig {
     youtube?: {
         apiKey: string
     }
+    mhs?: {
+        apiKey: string
+    }
     [key: string]: any
 }
 
@@ -1964,7 +1967,7 @@ export type RequiredItemCrit = Required<(CommentState & SubmissionState)>;
 
 export interface ActivityDispatchConfig {
     identifier?: string
-    cancelIfQueued?: boolean | NonDispatchActivitySource | NonDispatchActivitySource[]
+    cancelIfQueued?: boolean | NonDispatchActivitySourceValue | NonDispatchActivitySourceValue[]
     goto?: string
     onExistingFound?: onExistingFoundBehavior
     tardyTolerant?: boolean | DurationVal

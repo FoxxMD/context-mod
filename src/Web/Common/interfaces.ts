@@ -3,6 +3,7 @@ import {BotConnection, LogInfo, ManagerStats} from "../../Common/interfaces";
 import {Guest, GuestAll} from "../../Common/Entities/Guest/GuestInterfaces";
 import {URL} from "url";
 import {Dayjs} from "dayjs";
+import {Subreddit} from "snoowrap/dist/objects";
 
 export interface BotStats {
     startedAtHuman: string,
@@ -90,6 +91,10 @@ export interface NormalizedManagerResponse extends ManagerResponse {
     subredditNormal: string
 }
 
+export interface BotSubredditInviteResponse {
+    subreddit: string
+    id: string
+}
 
 export interface BotInstanceResponse {
     botName: string
@@ -98,6 +103,12 @@ export interface BotInstanceResponse {
     managers: ManagerResponse[]
     nanny?: string
     running: boolean
+    invites: BotSubredditInviteResponse[]
+}
+
+export interface SubredditOnboardingReadiness {
+    hasManager: boolean
+    isMod: boolean
 }
 
 export interface BotInstanceFunctions {
@@ -108,6 +119,7 @@ export interface BotInstanceFunctions {
     getGuestSubreddits: (user: string) => string[]
     canUserAccessBot: (user: string, subreddits: string[]) => boolean
     canUserAccessSubreddit: (subreddit: string, user: string, subreddits: string[]) => boolean
+    getInvite(val: string): BotSubredditInviteResponse | undefined
 }
 
 export interface BotInstance extends BotInstanceResponse, BotInstanceFunctions {
@@ -161,4 +173,12 @@ export interface SubredditInviteData {
     guests?: string[]
     initialConfig?: string
     expiresAt?: number | Dayjs
+}
+
+export interface HydratedSubredditInviteData extends Omit<SubredditInviteData, 'subreddit'>{
+    subreddit: string | Subreddit
+}
+
+export interface SubredditInviteDataPersisted extends SubredditInviteData {
+    id: string
 }

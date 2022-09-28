@@ -43,7 +43,7 @@
             // remove this after confirming behavior is acceptable
             {
               "kind": "report",
-              "content": "Remove=> {{rules.newtube.totalCount}} activities in freekarma subs"
+              "content": "Remove=> {{rules.freekarma.totalCount}} activities in freekarma subs"
             },
             //
             //

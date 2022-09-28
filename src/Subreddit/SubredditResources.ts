@@ -41,7 +41,6 @@ import {
     redisScanIterator,
     removeUndefinedKeys,
     shouldCacheSubredditStateCriteriaResult,
-    strToActivitySource,
     subredditStateIsNameOnly,
     testMaybeStringRegex,
     toStrongSubredditState,
@@ -58,7 +57,7 @@ import {
     filterByTimeRequirement,
     asSubreddit,
     modActionCriteriaSummary,
-    parseRedditFullname, asStrongImageHashCache
+    parseRedditFullname, asStrongImageHashCache, matchesRelativeDateTime
 } from "../util";
 import LoggedError from "../Utils/LoggedError";
 import {
@@ -119,12 +118,12 @@ import {
     UserNoteCriteria
 } from "../Common/Infrastructure/Filters/FilterCriteria";
 import {
-    ActivitySource, ConfigFragmentValidationFunc, DurationVal,
+    ActivitySourceValue, ConfigFragmentValidationFunc, DurationVal,
     EventRetentionPolicyRange, ImageHashCacheData,
     JoinOperands,
     ModActionType,
-    ModeratorNameCriteria, ModUserNoteLabel, statFrequencies, StatisticFrequency,
-    StatisticFrequencyOption
+    ModeratorNameCriteria, ModUserNoteLabel, RelativeDateTimeMatch, statFrequencies, StatisticFrequency,
+    StatisticFrequencyOption, WikiContext
 } from "../Common/Infrastructure/Atomic";
 import {
     AuthorOptions, FilterCriteriaPropertyResult,
@@ -162,8 +161,9 @@ import {parseFromJsonOrYamlToObject} from "../Common/Config/ConfigUtil";
 import ConfigParseError from "../Utils/ConfigParseError";
 import {ActivityReport} from "../Common/Entities/ActivityReport";
 import {ActionResultEntity} from "../Common/Entities/ActionResultEntity";
+import {ActivitySource} from "../Common/ActivitySource";
 
-export const DEFAULT_FOOTER = '\r\n*****\r\nThis action was performed by [a bot.]({{botLink}}) Mention a moderator or [send a modmail]({{modmailLink}}) if you any ideas, questions, or concerns about this action.';
+export const DEFAULT_FOOTER = '\r\n*****\r\nThis action was performed by [a bot.]({{botLink}}) Mention a moderator or [send a modmail]({{modmailLink}}) if you have any ideas, questions, or concerns about this action.';
 
 /**
  * Only used for migrating stats from cache to db
@@ -223,7 +223,7 @@ export class SubredditResources {
     protected useSubredditAuthorCache!: boolean;
     protected authorTTL: number | false = cacheTTLDefaults.authorTTL;
     protected subredditTTL: number | false = cacheTTLDefaults.subredditTTL;
-    protected wikiTTL: number | false = cacheTTLDefaults.wikiTTL;
+    public wikiTTL: number | false = cacheTTLDefaults.wikiTTL;
     protected submissionTTL: number | false = cacheTTLDefaults.submissionTTL;
     protected commentTTL: number | false = cacheTTLDefaults.commentTTL;
     protected filterCriteriaTTL: number | false = cacheTTLDefaults.filterCriteriaTTL;
@@ -1141,6 +1141,18 @@ export class SubredditResources {
         return mods;
     }
 
+    async getSubredditModeratorPermissions(rawUserVal: RedditUser | string, rawSubredditVal?: Subreddit | string): Promise<string[]> {
+        const mods = await this.getSubredditModerators(rawSubredditVal);
+        const user = rawUserVal instanceof RedditUser ? rawUserVal.name : rawUserVal;
+
+        const mod = mods.find(x => x.name.toLowerCase() === user.toLowerCase());
+        if(mod === undefined) {
+            return [];
+        }
+        // @ts-ignore
+        return mod.mod_permissions as string[];
+    }
+
     async getSubredditContributors(): Promise<RedditUser[]> {
         const subName = this.subreddit.display_name;
         const hash = `sub-${subName}-contributors`;
@@ -1685,21 +1697,31 @@ export class SubredditResources {
         return filteredListing;
     }
 
-    async getExternalResource(val: string, subredditArg?: Subreddit): Promise<{val: string, fromCache: boolean, response?: Response, hash?: string}> {
-        const subreddit = subredditArg || this.subreddit;
-        let cacheKey;
-        const wikiContext = parseWikiContext(val);
-        if (wikiContext !== undefined) {
-            cacheKey = `${subreddit.display_name}-content-${wikiContext.wiki}${wikiContext.subreddit !== undefined ? `|${wikiContext.subreddit}` : ''}`;
-        }
-        const extUrl = wikiContext === undefined ? parseExternalUrl(val) : undefined;
-        if (extUrl !== undefined) {
-            cacheKey = extUrl;
+    async getExternalResource(val: string, subredditArg?: Subreddit, defaultTo: 'url' | 'wiki' | undefined = undefined): Promise<{ val: string, fromCache: boolean, response?: Response, hash?: string }> {
+        let wikiContext = parseWikiContext(val);
+
+        let extUrl = wikiContext === undefined ? parseExternalUrl(val) : undefined;
+
+        if (extUrl === undefined && wikiContext === undefined) {
+            if (defaultTo === 'url') {
+                extUrl = val;
+            } else if (defaultTo === 'wiki') {
+                wikiContext = {wiki: val};
+            }
         }
 
-        if (cacheKey === undefined) {
-            return {val, fromCache: false, hash: cacheKey};
+        if (wikiContext !== undefined) {
+            return await this.getWikiPage(wikiContext, subredditArg !== undefined ? subredditArg.display_name : undefined);
         }
+        if (extUrl !== undefined) {
+            return await this.getCachedUrlResult(extUrl);
+        }
+
+        return {val, fromCache: false};
+    }
+
+    async getCachedUrlResult(extUrl: string): Promise<{ val: string, fromCache: boolean, response?: Response, hash?: string }> {
+        const cacheKey = extUrl;
 
         // try to get cached value first
         if (this.wikiTTL !== false) {
@@ -1715,46 +1737,60 @@ export class SubredditResources {
             }
         }
 
-        let wikiContent: string;
-        let response: Response | undefined;
+        try {
+            const [wikiContentVal, responseVal] = await fetchExternalResult(extUrl as string, this.logger);
+            return {val: wikiContentVal, fromCache: false, response: responseVal, hash: cacheKey};
+        } catch (err: any) {
+            throw new CMError(`Error occurred while trying to fetch the url ${extUrl}`, {cause: err});
+        }
+    }
 
-        // no cache hit, get from source
-        if (wikiContext !== undefined) {
-            let sub;
-            if (wikiContext.subreddit === undefined || wikiContext.subreddit.toLowerCase() === subreddit.display_name) {
-                sub = subreddit;
+    async getWikiPage(data: WikiContext, subredditArg?: string): Promise<{ val: string, fromCache: boolean, response?: Response, hash?: string }> {
+        const {
+            subreddit = subredditArg ?? this.subreddit.display_name,
+            wiki
+        } = data;
+
+        const cacheKey = `${subreddit}-content-${wiki}${data.subreddit !== undefined ? `|${data.subreddit}` : ''}`;
+
+        if (this.wikiTTL !== false) {
+            await this.stats.cache.content.identifierRequestCount.set(cacheKey, (await this.stats.cache.content.identifierRequestCount.wrap(cacheKey, () => 0) as number) + 1);
+            this.stats.cache.content.requestTimestamps.push(Date.now());
+            this.stats.cache.content.requests++;
+            const cachedContent = await this.cache.get(cacheKey);
+            if (cachedContent !== undefined && cachedContent !== null) {
+                this.logger.debug(`Content Cache Hit: ${cacheKey}`);
+                return {val: cachedContent as string, fromCache: true, hash: cacheKey};
             } else {
-                sub = this.client.getSubreddit(wikiContext.subreddit);
-            }
-            try {
-                // @ts-ignore
-                const wikiPage = sub.getWikiPage(wikiContext.wiki);
-                wikiContent = await wikiPage.content_md;
-            } catch (err: any) {
-                let msg = `Could not read wiki page for an unknown reason. Please ensure the page 'https://reddit.com${sub.display_name_prefixed}/wiki/${wikiContext.wiki}' exists and is readable`;
-                if(err.statusCode !== undefined) {
-                    if(err.statusCode === 404) {
-                        msg = `Could not find a wiki page at https://reddit.com${sub.display_name_prefixed}/wiki/${wikiContext.wiki} -- Reddit returned a 404`;
-                    } else if(err.statusCode === 403 || err.statusCode === 401) {
-                        msg = `Bot either does not have permission visibility permissions for the wiki page at https://reddit.com${sub.display_name_prefixed}wiki/${wikiContext.wiki} (due to subreddit restrictions) or the bot does have have oauth permissions to read wiki pages (operator error). Reddit returned a ${err.statusCode}`;
-                    }
-                }
-                this.logger.error(msg, err);
-                throw new LoggedError(msg);
-            }
-        } else {
-            try {
-                const [wikiContentVal, responseVal] = await fetchExternalResult(extUrl as string, this.logger);
-                wikiContent = wikiContentVal;
-                response = responseVal;
-            } catch (err: any) {
-                const msg = `Error occurred while trying to fetch the url ${extUrl}`;
-                this.logger.error(msg, err);
-                throw new LoggedError(msg);
+                this.stats.cache.content.miss++;
             }
         }
 
-        return {val: wikiContent, fromCache: false, response, hash: cacheKey};
+        let sub = this.client.getSubreddit(subreddit);
+
+        try {
+            // @ts-ignore
+            const wikiPage = sub.getWikiPage(wikiContext.wiki);
+            const wikiContent = await wikiPage.content_md;
+            return {val: wikiContent, fromCache: false, hash: cacheKey};
+        } catch (err: any) {
+            if (isStatusError(err)) {
+                const error = err.statusCode === 404 ? 'does not exist' : 'is not accessible';
+                let reasons = [];
+                if (!this.client.scope.includes('wikiread')) {
+                    reasons.push(`Bot does not have 'wikiread' oauth permission`);
+                } else {
+                    const modPermissions = await this.getSubredditModeratorPermissions(this.botName, subreddit);
+                    if (!modPermissions.includes('all') && !modPermissions.includes('wiki')) {
+                        reasons.push(`Bot does not have required mod permissions ('all'  or 'wiki') to read restricted wiki pages`);
+                    }
+                }
+
+                throw new CMError(`Wiki page ${location} ${error} (${err.statusCode})${reasons.length > 0 ? `because: ${reasons.join(' | ')}` : '.'}`, {cause: err});
+            } else {
+                throw new CMError(`Wiki page ${location} could not be read`, {cause: err});
+            }
+        }
     }
 
     async getContent(val: string, subredditArg?: Subreddit): Promise<string> {
@@ -1909,6 +1945,11 @@ export class SubredditResources {
             includeIdentifier = false,
         } = options || {};
 
+        // return early if there are no states to filter by!
+        if(states.length === 0) {
+            return items;
+        }
+
         let passedItems: (Comment | Submission)[] = [];
         let unpassedItems: (Comment | Submission)[] = [];
 
@@ -2049,7 +2090,7 @@ export class SubredditResources {
         return res;
     }
 
-    async testItemCriteria(i: (Comment | Submission), activityStateObj: NamedCriteria<TypedActivityState>, logger: Logger, include = true, source?: ActivitySource): Promise<FilterCriteriaResult<TypedActivityState>> {
+    async testItemCriteria(i: (Comment | Submission), activityStateObj: NamedCriteria<TypedActivityState>, logger: Logger, include = true, source?: ActivitySourceValue): Promise<FilterCriteriaResult<TypedActivityState>> {
         const {criteria: activityState} = activityStateObj;
         if(Object.keys(activityState).length === 0) {
             return {
@@ -2213,7 +2254,7 @@ export class SubredditResources {
         })() as boolean;
     }
 
-    async isItem (item: Submission | Comment, stateCriteria: TypedActivityState, logger: Logger, include: boolean, source?: ActivitySource): Promise<FilterCriteriaResult<(SubmissionState & CommentState)>> {
+    async isItem (item: Submission | Comment, stateCriteria: TypedActivityState, logger: Logger, include: boolean, source?: ActivitySourceValue): Promise<FilterCriteriaResult<(SubmissionState & CommentState)>> {
 
         //const definedStateCriteria = (removeUndefinedKeys(stateCriteria) as RequiredItemCrit);
 
@@ -2304,10 +2345,12 @@ export class SubredditResources {
                         } else {
                             propResultsMap.source!.found = source;
 
-                            const requestedSourcesVal: string[] = !Array.isArray(itemOptVal) ? [itemOptVal] as string[] : itemOptVal as string[];
-                            const requestedSources = requestedSourcesVal.map(x => strToActivitySource(x).toLowerCase());
+                            const itemSource = new ActivitySource(source);
 
-                            propResultsMap.source!.passed = criteriaPassWithIncludeBehavior(requestedSources.some(x => source.toLowerCase().trim() === x.toLowerCase().trim()), include);
+                            const requestedSourcesVal: string[] = !Array.isArray(itemOptVal) ? [itemOptVal] as string[] : itemOptVal as string[];
+                            const requestedSources = requestedSourcesVal.map(x => new ActivitySource(x));
+
+                            propResultsMap.source!.passed = criteriaPassWithIncludeBehavior(requestedSources.some(x => x.matches(itemSource)), include);
                             break;
                         }
                     case 'score':
@@ -2442,6 +2485,23 @@ export class SubredditResources {
                         const ageTest = compareDurationValue(parseDurationComparison(itemOptVal as string), created);
                         propResultsMap.age!.passed = criteriaPassWithIncludeBehavior(ageTest, include);
                         propResultsMap.age!.found = created.format('MMMM D, YYYY h:mm A Z');
+                        break;
+                    case 'createdOn':
+                        const createdAt = dayjs.unix(await item.created);
+                        propResultsMap.createdOn!.found = createdAt.format('MMMM D, YYYY h:mm A Z');
+                        propResultsMap.createdOn!.passed = false;
+
+                        const expressions = Array.isArray(itemOptVal) ? itemOptVal as RelativeDateTimeMatch[] : [itemOptVal] as RelativeDateTimeMatch[];
+                        try {
+                            for (const expr of expressions) {
+                                if (matchesRelativeDateTime(expr, createdAt)) {
+                                    propResultsMap.createdOn!.passed = true;
+                                    break;
+                                }
+                            }
+                        } catch(err: any) {
+                            propResultsMap.createdOn!.reason = err.message;
+                        }
                         break;
                     case 'title':
                         if(asComment(item)) {
@@ -3728,7 +3788,7 @@ export const checkAuthorFilter = async (item: (Submission | Comment), filter: Au
     return [true, undefined, {criteriaResults: allCritResults, join: 'OR', passed: true}];
 }
 
-export const checkItemFilter = async (item: (Submission | Comment), filter: ItemOptions, resources: SubredditResources, options?: {logger?: Logger, source?: ActivitySource, includeIdentifier?: boolean}): Promise<[boolean, ('inclusive' | 'exclusive' | undefined), FilterResult<TypedActivityState>]> => {
+export const checkItemFilter = async (item: (Submission | Comment), filter: ItemOptions, resources: SubredditResources, options?: {logger?: Logger, source?: ActivitySourceValue, includeIdentifier?: boolean}): Promise<[boolean, ('inclusive' | 'exclusive' | undefined), FilterResult<TypedActivityState>]> => {
 
     const {
         logger: parentLogger = NoopLogger,
@@ -3886,7 +3946,7 @@ export const checkItemFilter = async (item: (Submission | Comment), filter: Item
     return [true, undefined, {criteriaResults: allCritResults, join: 'OR', passed: true}];
 }
 
-export const checkCommentSubmissionStates = async (item: Comment, submissionStates: SubmissionState[], resources: SubredditResources, logger: Logger, source?: ActivitySource, excludeCondition?: JoinOperands): Promise<[boolean, FilterCriteriaPropertyResult<CommentState>]> => {
+export const checkCommentSubmissionStates = async (item: Comment, submissionStates: SubmissionState[], resources: SubredditResources, logger: Logger, source?: ActivitySourceValue, excludeCondition?: JoinOperands): Promise<[boolean, FilterCriteriaPropertyResult<CommentState>]> => {
     // test submission state first since it's more likely(??) we have crit results or cache data for this submission than for the comment
 
     // get submission

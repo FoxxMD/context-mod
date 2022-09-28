@@ -4,7 +4,7 @@ import {
     DurationComparor,
     ModeratorNameCriteria,
     ModeratorNames, ModActionType,
-    ModUserNoteLabel
+    ModUserNoteLabel, RelativeDateTimeMatch
 } from "../Atomic";
 import {ActivityType} from "../Reddit";
 import {GenericComparison, parseGenericValueComparison} from "../Comparisons";
@@ -441,6 +441,21 @@ export interface ActivityState {
      * */
     reports?: string
     age?: DurationComparor
+
+    /**
+     * A relative datetime description to match the date the Activity was created
+     *
+     * May be either:
+     *
+     * * day of the week (monday, tuesday, etc...)
+     * * cron expression IE `* * 15 *`
+     *
+     * See https://crontab.guru/ for generating expressions
+     *
+     * https://regexr.com/6u3cc
+     *
+     * */
+    createdOn?: RelativeDateTimeMatch | RelativeDateTimeMatch[]
     /**
      * Test whether the activity is present in dispatched/delayed activities
      *

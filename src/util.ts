@@ -1,13 +1,14 @@
 import winston, {Logger} from "winston";
 import dayjs, {Dayjs} from 'dayjs';
 import {Duration} from 'dayjs/plugin/duration.js';
+import * as cronjs from '@datasert/cronjs-matcher';
 import Ajv from "ajv";
 import {InvalidOptionArgumentError} from "commander";
 import {deflateSync, inflateSync} from "zlib";
 import pixelmatch from 'pixelmatch';
 import os from 'os';
 import pathUtil from 'path';
-import {Response} from 'node-fetch';
+import fetch, {Response} from 'node-fetch';
 import crypto, {createHash} from 'crypto';
 import {
     ActionResult,
@@ -17,7 +18,8 @@ import {
     CheckSummary,
     ImageComparisonResult,
     ItemCritPropHelper,
-    LogInfo, NamedGroup,
+    LogInfo,
+    NamedGroup,
     PollingOptionsStrong,
     PostBehaviorOptionConfig,
     RegExResult,
@@ -41,7 +43,6 @@ import {create as createMemoryStore} from './Utils/memoryStore';
 import {LEVEL, MESSAGE} from "triple-beam";
 import {Comment, PrivateMessage, RedditUser, Submission, Subreddit} from "snoowrap/dist/objects";
 import reRegExp from '@stdlib/regexp-regexp';
-import fetch from "node-fetch";
 import ImageData from "./Common/ImageData";
 import {Sharp, SharpOptions} from "sharp";
 import {ErrorWithCause, stackWithCauses} from "pony-cause";
@@ -70,19 +71,23 @@ import {
     UserNoteCriteria
 } from "./Common/Infrastructure/Filters/FilterCriteria";
 import {
-    ActivitySource,
+    ActivitySourceValue,
     ActivitySourceTypes,
     CacheProvider,
     ConfigFormat,
-    DurationVal, ExternalUrlContext, ImageHashCacheData,
+    DurationVal,
+    ExternalUrlContext,
+    ImageHashCacheData,
     ModUserNoteLabel,
     modUserNoteLabels,
     RedditEntity,
-    RedditEntityType,
+    RedditEntityType, RelativeDateTimeMatch,
     statFrequencies,
     StatisticFrequency,
-    StatisticFrequencyOption, UrlContext,
-    WikiContext
+    StatisticFrequencyOption,
+    UrlContext,
+    WikiContext,
+    ActivitySourceData
 } from "./Common/Infrastructure/Atomic";
 import {
     AuthorOptions,
@@ -116,7 +121,7 @@ import {
 } from "./Common/Infrastructure/ActivityWindow";
 import {RunnableBaseJson} from "./Common/Infrastructure/Runnable";
 import Snoowrap from "snoowrap";
-import { uniqueNamesGenerator, adjectives, colors, animals } from 'unique-names-generator';
+import {adjectives, animals, colors, uniqueNamesGenerator} from 'unique-names-generator';
 import {ActionResultEntity} from "./Common/Entities/ActionResultEntity";
 
 
@@ -217,8 +222,26 @@ const errorAwareFormat = {
     }
 }
 
-const isProbablyError = (val: any, errName = 'error') => {
-    return typeof val === 'object' && val.name !== undefined && val.name.toLowerCase().includes(errName);
+const isProbablyError = (val: any, explicitErrorName?: string) => {
+    if(typeof val !== 'object' || val === null) {
+        return false;
+    }
+    const {name, stack} = val;
+    if(explicitErrorName !== undefined) {
+        if(name !== undefined && name.toLowerCase().includes(explicitErrorName)) {
+            return true;
+        }
+        if(stack !== undefined && stack.trim().toLowerCase().indexOf(explicitErrorName.toLowerCase()) === 0) {
+            return true;
+        }
+        return false;
+    } else if(stack !== undefined) {
+        return true;
+    } else if(name !== undefined && name.toLowerCase().includes('error')) {
+        return true;
+    }
+
+    return false;
 }
 
 export const PASS = '✓';
@@ -709,8 +732,7 @@ export const deflateUserNotes = (usersObject: object) => {
     const binaryData = deflateSync(jsonString);
 
     // Convert binary data to a base64 string with a Buffer
-    const blob = Buffer.from(binaryData).toString('base64');
-    return blob;
+    return Buffer.from(binaryData).toString('base64');
 }
 
 export const isActivityWindowConfig = (val: any): val is FullActivityWindowConfig => {
@@ -764,6 +786,34 @@ export const parseDuration = (val: string, strict = true): Duration => {
         throw new SimpleError(`Must only have one Duration value, found ${res.length} in: ${val}`);
     }
     return res[0].duration;
+}
+
+// https://stackoverflow.com/a/63729682
+const RELATIVE_DATETIME_REGEX: RegExp = /(?<cron>(?:(?:(?:(?:\d+,)+\d+|(?:\d+(?:\/|-|#)\d+)|\d+L?|\*(?:\/\d+)?|L(?:-\d+)?|\?|[A-Z]{3}(?:-[A-Z]{3})?) ?){5,7})$)|(?<dayofweek>mon|tues|wed|thurs|fri|sat|sun){1}/i;
+const RELATIVE_DATETIME_REGEX_URL = 'https://regexr.com/6u3cc';
+
+// https://day.js.org/docs/en/get-set/day
+const dayOfWeekMap: Record<string, number> = {
+    sun: 0,
+    mon: 1,
+    tues: 2,
+    wed: 3,
+    thurs: 4,
+    fri: 5,
+    sat: 6,
+};
+
+export const matchesRelativeDateTime = (expr: RelativeDateTimeMatch, dt: Dayjs) => {
+    const res = parseRegexSingleOrFail(RELATIVE_DATETIME_REGEX, expr);
+    if (res === undefined) {
+        throw new InvalidRegexError(RELATIVE_DATETIME_REGEX, expr, RELATIVE_DATETIME_REGEX_URL);
+    }
+    if (res.named.dayofweek !== undefined) {
+        return dayOfWeekMap[res.named.dayofweek] === dt.day();
+    }
+    // assume 5-point cron expression
+    // the matcher requires datetime second field to be 0 https://github.com/datasert/cronjs/issues/31
+    return cronjs.isTimeMatches(res.named.cron, dt.set('second', 0).toISOString());
 }
 
 const SUBREDDIT_NAME_REGEX: RegExp = /^\s*(?:\/r\/|r\/)*(\w+)*\s*$/;
@@ -2674,17 +2724,30 @@ export const isCommentState = (state: TypedActivityState): state is CommentState
 const DISPATCH_REGEX: RegExp = /^dispatch:/i;
 const POLL_REGEX: RegExp = /^poll:/i;
 const USER_REGEX: RegExp = /^user:/i;
-export const asActivitySource = (val: string): val is ActivitySource => {
+const ACTIVITY_SOURCE_REGEX: RegExp = /^(?<type>dispatch|poll|user)(?:$|:(?<identifier>[^\s\r\n]+)$)/i
+const ACTIVITY_SOURCE_REGEX_URL = 'https://regexr.com/6uqn6';
+export const asActivitySourceValue = (val: string): val is ActivitySourceValue => {
     if(['dispatch','poll','user'].some(x => x === val)) {
         return true;
     }
     return DISPATCH_REGEX.test(val) || POLL_REGEX.test(val) || USER_REGEX.test(val);
 }
 
-export const strToActivitySource = (val: string): ActivitySource => {
+export const asActivitySource = (val: any): val is ActivitySourceData => {
+    return null !== val && typeof val === 'object' && 'type' in val;
+}
+
+export const strToActivitySourceData = (val: string): ActivitySourceData => {
     const cleanStr = val.trim();
-    if (asActivitySource(cleanStr)) {
-        return cleanStr;
+    if (asActivitySourceValue(cleanStr)) {
+        const res = parseRegexSingleOrFail(ACTIVITY_SOURCE_REGEX, cleanStr);
+        if (res === undefined) {
+            throw new InvalidRegexError(ACTIVITY_SOURCE_REGEX, cleanStr, ACTIVITY_SOURCE_REGEX_URL, 'Could not parse activity source');
+        }
+        return {
+            type: res.named.type,
+            identifier: res.named.identifier
+        }
     }
     throw new SimpleError(`'${cleanStr}' is not a valid ActivitySource. Must be one of: dispatch, dispatch:[identifier], poll, poll:[identifier], user, or user:[identifier]`);
 }
@@ -2963,4 +3026,9 @@ export const generateRandomName = () => {
 
 export const asStrongImageHashCache = (data: ImageHashCacheData): data is Required<ImageHashCacheData> => {
     return data.original !== undefined && data.flipped !== undefined;
+}
+
+export const generateFullWikiUrl = (subreddit: Subreddit | string, location: string) => {
+    const subName = subreddit instanceof Subreddit ? subreddit.url : `r/${subreddit}/`;
+    return `https://reddit.com${subName}wiki/${location}`
 }

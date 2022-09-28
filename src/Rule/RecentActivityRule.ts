@@ -188,8 +188,10 @@ export class RecentActivityRule extends Rule {
         if (inferredSubmissionAsRef) {
             if (!asSubmission(item)) {
                 this.logger.warn('Cannot use post as reference because triggered item is not a Submission');
+                viableActivity = [];
             } else if (item.is_self) {
                 this.logger.warn('Cannot use post as reference because triggered Submission is not a link type');
+                viableActivity = [];
             } else {
                 const itemId = item.id;
                 const referenceUrl = await item.url;

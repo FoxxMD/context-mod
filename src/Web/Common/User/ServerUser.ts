@@ -16,24 +16,24 @@ class ServerUser extends CMUser<App, Bot, Manager> {
     }
 
     canAccessInstance(val: App): boolean {
-        return this.isOperator || val.bots.filter(x => x.canUserAccessBot(this.name, this.subreddits)).length > 0;
+        return this.isOperator || this.machine || val.bots.filter(x => x.canUserAccessBot(this.name, this.subreddits)).length > 0;
     }
 
     canAccessBot(val: Bot): boolean {
-        return this.isOperator || val.canUserAccessBot(this.name, this.subreddits);
+        return this.isOperator || this.machine || val.canUserAccessBot(this.name, this.subreddits);
     }
 
     accessibleBots(bots: Bot[]): Bot[] {
-        return this.isOperator ? bots : bots.filter(x => x.canUserAccessBot(this.name, this.subreddits));
+        return (this.isOperator || this.machine) ? bots : bots.filter(x => x.canUserAccessBot(this.name, this.subreddits));
     }
 
     canAccessSubreddit(val: Bot, name: string): boolean {
         const normalName = parseRedditEntity(name).name;
-        return this.isOperator || this.accessibleSubreddits(val).some(x => x.toNormalizedManager().subredditNormal === normalName);
+        return this.isOperator || this.machine || this.accessibleSubreddits(val).some(x => x.toNormalizedManager().subredditNormal === normalName);
     }
 
     accessibleSubreddits(bot: Bot): Manager[] {
-        if(this.isOperator) {
+        if(this.isOperator || this.machine) {
             return bot.subManagers;
         }
 

@@ -18,6 +18,22 @@ import {ActivityType} from "./Reddit";
 export type DurationComparor = string;
 
 /**
+ * A relative datetime description
+ *
+ * May be either:
+ *
+ * * day of the week (monday, tuesday, etc...)
+ * * cron expression IE `* * 15 *`
+ *
+ * See https://crontab.guru/ for generating expressions
+ *
+ * https://regexr.com/6u3cc
+ *
+ * @pattern ((?:(?:(?:(?:\d+,)+\d+|(?:\d+(?:\/|-|#)\d+)|\d+L?|\*(?:\/\d+)?|L(?:-\d+)?|\?|[A-Z]{3}(?:-[A-Z]{3})?) ?){5,7})$)|(mon|tues|wed|thurs|fri|sat|sun){1}
+ * */
+export type RelativeDateTimeMatch = string;
+
+/**
  * A string containing a comparison operator and a value to compare against
  *
  * The syntax is `(< OR > OR <= OR >=) <number>[percent sign]`
@@ -152,9 +168,16 @@ export type onExistingFoundBehavior = 'replace' | 'skip' | 'ignore';
 export type ActionTarget = 'self' | 'parent';
 export type ArbitraryActionTarget = ActionTarget | string;
 export type InclusiveActionTarget = ActionTarget | 'any';
-export type DispatchSource = 'dispatch' | `dispatch:${string}`;
-export type NonDispatchActivitySource = 'poll' | `poll:${PollOn}` | 'user' | `user:${string}`;
-export type ActivitySourceTypes = 'poll' | 'dispatch' | 'user'; // TODO
+export const SOURCE_POLL = 'poll';
+export type SourcePollStr = 'poll';
+export const SOURCE_DISPATCH = 'dispatch';
+export type SourceDispatchStr = 'dispatch';
+export const SOURCE_USER = 'user';
+export type SourceUserStr = 'user';
+
+export type DispatchSourceValue = SourceDispatchStr | `dispatch:${string}`;
+export type NonDispatchActivitySourceValue = SourcePollStr | `poll:${PollOn}` | SourceUserStr | `user:${string}`;
+export type ActivitySourceTypes = SourcePollStr | SourceDispatchStr | SourceUserStr; // TODO
 // https://github.com/YousefED/typescript-json-schema/issues/426
 // https://github.com/YousefED/typescript-json-schema/issues/425
 // @pattern ^(((poll|dispatch)(:\w+)?)|user)$
@@ -172,7 +195,12 @@ export type ActivitySourceTypes = 'poll' | 'dispatch' | 'user'; // TODO
  *
  *
  * */
-export type ActivitySource = NonDispatchActivitySource | DispatchSource;
+export type ActivitySourceValue = NonDispatchActivitySourceValue | DispatchSourceValue;
+
+export interface ActivitySourceData {
+    type: ActivitySourceTypes
+    identifier?: string
+}
 
 export type ConfigFormat = 'json' | 'yaml';
 export type ActionTypes =

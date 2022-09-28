@@ -31,6 +31,7 @@
   "license": "ISC",
   "dependencies": {
     "@awaitjs/express": "^0.8.0",
+    "@datasert/cronjs-matcher": "^1.2.0",
     "@googleapis/youtube": "^2.0.0",
     "@influxdata/influxdb-client": "^1.27.0",
     "@influxdata/influxdb-client-apis": "^1.27.0",

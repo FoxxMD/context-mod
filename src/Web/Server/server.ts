@@ -36,10 +36,12 @@ import { sleep } from '../../util';
 import {Invokee} from "../../Common/Infrastructure/Atomic";
 import {Point} from "@influxdata/influxdb-client";
 import {
+    acceptSubredditInviteRoute,
     addBotInviteRoute,
     addSubredditInviteRoute,
     deleteSubredditInviteRoute,
     getBotInviteRoute,
+    getSubredditInviteRoute,
     getSubredditInvitesRoute
 } from "./routes/authenticated/user/invites";
 
@@ -189,6 +191,10 @@ const rcbServer = async function (options: OperatorConfigWithFileContext) {
     server.postAsync('/bot', ...addBot());
 
     server.getAsync('/bot/invite', ...getSubredditInvitesRoute);
+
+    server.getAsync('/bot/invite/:id', ...getSubredditInviteRoute);
+
+    server.postAsync('/bot/invite/:id', ...acceptSubredditInviteRoute);
 
     server.postAsync('/bot/invite', ...addSubredditInviteRoute);
 

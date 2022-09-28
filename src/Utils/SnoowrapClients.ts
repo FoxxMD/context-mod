@@ -3,7 +3,7 @@ import {Submission, Subreddit, Comment} from "snoowrap/dist/objects";
 import {parseSubredditName} from "../util";
 import {ModUserNoteLabel} from "../Common/Infrastructure/Atomic";
 import {CreateModNoteData, ModNote, ModNoteRaw, ModNoteSnoowrapPopulated} from "../Subreddit/ModNotes/ModNote";
-import {CMError, SimpleError} from "./Errors";
+import {CMError, isStatusError, SimpleError} from "./Errors";
 import {RawSubredditRemovalReasonData, SnoowrapActivity} from "../Common/Infrastructure/Reddit";
 
 // const proxyFactory = (endpoint: string) => {
@@ -64,6 +64,28 @@ export class ExtendedSnoowrap extends Snoowrap {
         });
 
         return await this.oauthRequest({uri: '/api/info', method: 'get', qs: { sr_name: names.join(',')}}) as Listing<Subreddit>;
+    }
+
+    async subredditExists(name: string): Promise<[boolean, Subreddit?]> {
+        try {
+            // @ts-ignore
+            const sub = await this.getSubreddit(name).fetch();
+            return [true, sub];
+        } catch (e: any) {
+            if (isStatusError(e)) {
+                switch (e.statusCode) {
+                    case 403:
+                        // we know that the sub exists but it is private
+                        return [true, undefined];
+                    case 404:
+                        return [false, undefined];
+                    default:
+                        throw e;
+                }
+            } else {
+                throw e;
+            }
+        }
     }
 
     async assignUserFlairByTemplateId(options: { flairTemplateId: string, username: string, subredditName: string }): Promise<any> {
