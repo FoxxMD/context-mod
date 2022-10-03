@@ -41,7 +41,7 @@ export type RelativeDateTimeMatch = string;
  * * EX `> 100`  => greater than 100
  * * EX `<= 75%` => less than or equal to 75%
  *
- * @pattern ^\s*(>|>=|<|<=)\s*(\d+)\s*(%?)(.*)$
+ * @pattern ^\s*(>|>=|<|<=)\s*((?:\d+)(?:(?:(?:.|,)\d+)+)?)\s*(%?)(.*)$
  * */
 export type CompareValueOrPercent = string;
 export type StringOperator = '>' | '>=' | '<' | '<=';

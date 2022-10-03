@@ -2685,6 +2685,40 @@
                 "name": {
                     "type": "string"
                 },
+                "ratio": {
+                    "properties": {
+                        "threshold": {
+                            "description": "A string containing a comparison operator and a value to compare number of parent criteria activities against number of \"ratio\" activities\n\nThis comparison is always done as (number of parent criteria activities) / (number of ratio activities)\n\nThe syntax is `(< OR > OR <= OR >=) <number>[percent sign]`\n\n* EX `> 1.2`  => There are 1.2 activities from parent criteria for every 1 ratio activities\n* EX `<= 75%` => There are equal to or less than 0.75 activities from parent criteria for every 1 ratio activities",
+                            "pattern": "^\\s*(>|>=|<|<=)\\s*((?:\\d+)(?:(?:(?:.|,)\\d+)+)?)\\s*(%?)(.*)$",
+                            "type": "string"
+                        },
+                        "window": {
+                            "anyOf": [
+                                {
+                                    "$ref": "#/definitions/DurationObject"
+                                },
+                                {
+                                    "$ref": "#/definitions/FullActivityWindowConfig"
+                                },
+                                {
+                                    "type": [
+                                        "string",
+                                        "number"
+                                    ]
+                                }
+                            ],
+                            "description": "A value to define the range of Activities to retrieve.\n\nAcceptable values:\n\n**`ActivityWindowCriteria` object**\n\nAllows specify multiple range properties and more specific behavior\n\n**A `number` of Activities to retrieve**\n\n* EX `100` => 100 Activities\n\n*****\n\nAny of the below values that specify the amount of time to subtract from `NOW` to create a time range IE `NOW <---> [duration] ago`\n\nAcceptable values:\n\n**A `string` consisting of a value and a [Day.js](https://day.js.org/docs/en/durations/creating#list-of-all-available-units) time UNIT**\n\n* EX `9 days` => Range is `NOW <---> 9 days ago`\n\n**A [Day.js](https://day.js.org/docs/en/durations/creating) `object`**\n\n* EX `{\"days\": 90, \"minutes\": 15}` => Range is `NOW <---> 90 days and 15 minutes ago`\n\n**An [ISO 8601 duration](https://en.wikipedia.org/wiki/ISO_8601#Durations) `string`**\n\n* EX `PT15M` => 15 minutes => Range is `NOW <----> 15 minutes ago`",
+                            "examples": [
+                                "90 days"
+                            ]
+                        }
+                    },
+                    "required": [
+                        "threshold",
+                        "window"
+                    ],
+                    "type": "object"
+                },
                 "submission": {
                     "description": "A string containing a comparison operator and a value to compare **filtered** (using `include` or `exclude`, if present) submissions against\n\nThe syntax is `(< OR > OR <= OR >=) <number>[percent sign]`\n\n* EX `> 100`  => greater than 100 filtered submissions\n* EX `<= 75%` => filtered submissions are equal to or less than 75% of unfiltered Activities",
                     "pattern": "^\\s*(>|>=|<|<=)\\s*(\\d+)\\s*(%?)(.*)$",
