@@ -9,6 +9,7 @@ import {
 import {ActivityType} from "../Reddit";
 import {GenericComparison, parseGenericValueComparison} from "../Comparisons";
 import {parseStringToRegexOrLiteralSearch} from "../../../util";
+import { Submission, Comment } from "snoowrap";
 
 /**
  * Different attributes a `Subreddit` can be in. Only include a property if you want to check it.
@@ -485,6 +486,33 @@ export interface ActivityState {
      *
      * */
     source?: string | string[]
+
+    /**
+     * * If `true` then passes if ANY flair
+     * * If `false` then passes if NO flair
+     * * If string or list of strings then text is matched, case-insensitive. String may also be a regular expression enclosed in forward slashes.
+     * */
+    authorFlairText?: boolean | string | string[]
+    /**
+     * * If `true` then passes if ANY flair
+     * * If `false` then passes if NO flair
+     * * If string or list of strings then template id is matched, case-insensitive. String may also be a regular expression enclosed in forward slashes.
+     * */
+    authorFlairTemplateId?: boolean | string | string[]
+
+    /**
+     * * If `true` then passes if ANY class
+     * * If `false` then passes if NO class
+     * * If string or list of strings then class is matched, case-insensitive. String may also be a regular expression enclosed in forward slashes.
+     * */
+    authorFlairCssClass?: boolean | string | string[]
+
+    /**
+     * * If `true` then passes if ANY color
+     * * If `false` then passes if NO color
+     * * If string or list of strings then color is matched, case-insensitive, without #. String may also be a regular expression enclosed in forward slashes.
+     * */
+    authorFlairBackgroundColor?: boolean | string | string[]
 }
 
 /**
@@ -507,13 +535,22 @@ export interface SubmissionState extends ActivityState {
     /**
      * * If `true` then passes if flair has ANY text
      * * If `false` then passes if flair has NO text
+     * * If string or list of strings then text is matched, case-insensitive. String may also be a regular expression enclosed in forward slashes.
      * */
     link_flair_text?: boolean | string | string[]
     /**
      * * If `true` then passes if flair has ANY css
      * * If `false` then passes if flair has NO css
+     * * If string or list of strings then class is matched, case-insensitive. String may also be a regular expression enclosed in forward slashes.
      * */
     link_flair_css_class?: boolean | string | string[]
+
+    /**
+     * * If `true` then passes if ANY color
+     * * If `false` then passes if NO color
+     * * If string or list of strings then color is matched, case-insensitive, without #. String may also be a regular expression enclosed in forward slashes.
+     * */
+    link_flair_background_color?: boolean | string | string[]
     /**
      * * If `true` then passes if there is ANY flair template id
      * * If `false` then passes if there is NO flair template id
@@ -535,6 +572,14 @@ export interface SubmissionState extends ActivityState {
      * * 45 => greater than or equal to 45% upvoted
      * */
     upvoteRatio?: number | CompareValue
+}
+
+export const cmToSnoowrapActivityMap: Record<string, keyof (Submission & Comment)> = {
+    authorFlairText: 'author_flair_text',
+    authorFlairTemplateId: 'author_flair_template_id',
+    authorFlairCssClass: 'author_flair_css_class',
+    authorFlairBackgroundColor: 'author_flair_background_color',
+    flairTemplate: 'link_flair_template_id'
 }
 
 export const cmActivityProperties = ['submissionState', 'score', 'reports', 'removed', 'deleted', 'filtered', 'age', 'title'];

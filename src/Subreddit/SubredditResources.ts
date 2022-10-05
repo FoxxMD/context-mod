@@ -112,9 +112,20 @@ import cloneDeep from "lodash/cloneDeep";
 import {
     asModLogCriteria,
     asModNoteCriteria,
-    AuthorCriteria, CommentState, ModLogCriteria, ModNoteCriteria, orderedAuthorCriteriaProps, RequiredAuthorCrit,
-    StrongSubredditCriteria, SubmissionState,
-    SubredditCriteria, toFullModLogCriteria, toFullModNoteCriteria, TypedActivityState, TypedActivityStates,
+    AuthorCriteria,
+    cmToSnoowrapActivityMap,
+    CommentState,
+    ModLogCriteria,
+    ModNoteCriteria,
+    orderedAuthorCriteriaProps,
+    RequiredAuthorCrit,
+    StrongSubredditCriteria,
+    SubmissionState,
+    SubredditCriteria,
+    toFullModLogCriteria,
+    toFullModNoteCriteria,
+    TypedActivityState,
+    TypedActivityStates,
     UserNoteCriteria
 } from "../Common/Infrastructure/Filters/FilterCriteria";
 import {
@@ -2654,13 +2665,22 @@ export class SubredditResources {
                     case 'flairTemplate':
                     case 'link_flair_text':
                     case 'link_flair_css_class':
-                        if(asSubmission(item)) {
-                            let propertyValue: string | null;
-                            if(k === 'flairTemplate') {
-                                propertyValue = await item.link_flair_template_id;
-                            } else {
-                                propertyValue = await item[k];
-                            }
+                    case 'link_flair_background_color':
+                    case 'authorFlairText':
+                    case 'authorFlairCssClass':
+                    case 'authorFlairTemplateId':
+                    case 'authorFlairBackgroundColor':
+
+                        let actualPropName = cmToSnoowrapActivityMap[k] ?? k;
+
+                        if(!asSubmission(item) && (actualPropName as string).includes('link_flair')) {
+                            propResultsMap[k]!.passed = true;
+                            propResultsMap[k]!.reason = `Cannot test for ${k} on Comment`;
+                            log.warn(`Cannot test for ${k} on Comment`);
+                            break;
+                        } else {
+                            // @ts-ignore
+                            let propertyValue: string | null = await item[actualPropName];
 
                             propResultsMap[k]!.found = propertyValue;
 
@@ -2674,14 +2694,37 @@ export class SubredditResources {
                                 // if crit is not a boolean but property is "empty" then it'll never pass anyway
                                 propResultsMap[k]!.passed = !include;
                             } else {
-                                const expectedValues = typeof itemOptVal === 'string' ? [itemOptVal] : (itemOptVal as string[]);
-                                propResultsMap[k]!.passed = criteriaPassWithIncludeBehavior(expectedValues.some(x => x.trim().toLowerCase() === propertyValue?.trim().toLowerCase()), include);
+                                // remove # if comparing hex values
+                                const isHex = k.toLowerCase().includes('background');
+
+                                const expectedValues = (typeof itemOptVal === 'string' ? [itemOptVal] : (itemOptVal as string[])).map(x => isHex ? x.replace('#','').trim() : x.trim());
+                                const cleanProp = isHex ? propertyValue.replace('#','').trim() : propertyValue.trim();
+                                let anyPassed = false;
+                                const errorReasons = [];
+                                for(const expectedVal of expectedValues) {
+                                    try {
+                                        const [regPassed] = testMaybeStringRegex(expectedVal,cleanProp);
+                                        if(regPassed) {
+                                            anyPassed = true;
+                                        }
+                                    } catch (err: any) {
+                                        if(err.message.includes('Could not convert test value')) {
+                                            errorReasons.push(`Could not convert ${expectedVal} to Regex, fallback to simple case-insenstive comparison`);
+                                            // fallback to simple comparison
+                                            anyPassed = expectedVal.toLowerCase() === cleanProp.toLowerCase();
+                                        } else {
+                                            errorReasons.push(err.message);
+                                        }
+                                    }
+                                    if(anyPassed) {
+                                        break;
+                                    }
+                                }
+                                if(errorReasons.length > 0) {
+                                    propResultsMap[k]!.reason = `Some errors occurred while testing: ${errorReasons.join(' | ')}`;
+                                }
+                                propResultsMap[k]!.passed = criteriaPassWithIncludeBehavior(anyPassed, include);
                             }
-                            break;
-                        } else {
-                            propResultsMap[k]!.passed = true;
-                            propResultsMap[k]!.reason = `Cannot test for ${k} on Comment`;
-                            log.warn(`Cannot test for ${k} on Comment`);
                             break;
                         }
                     default:
