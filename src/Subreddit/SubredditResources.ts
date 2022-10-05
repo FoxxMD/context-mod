@@ -57,7 +57,7 @@ import {
     filterByTimeRequirement,
     asSubreddit,
     modActionCriteriaSummary,
-    parseRedditFullname, asStrongImageHashCache, matchesRelativeDateTime
+    parseRedditFullname, asStrongImageHashCache, matchesRelativeDateTime, generateFullWikiUrl
 } from "../util";
 import LoggedError from "../Utils/LoggedError";
 import {
@@ -1770,7 +1770,7 @@ export class SubredditResources {
 
         try {
             // @ts-ignore
-            const wikiPage = sub.getWikiPage(wikiContext.wiki);
+            const wikiPage = sub.getWikiPage(wiki);
             const wikiContent = await wikiPage.content_md;
             return {val: wikiContent, fromCache: false, hash: cacheKey};
         } catch (err: any) {
@@ -1786,9 +1786,9 @@ export class SubredditResources {
                     }
                 }
 
-                throw new CMError(`Wiki page ${location} ${error} (${err.statusCode})${reasons.length > 0 ? `because: ${reasons.join(' | ')}` : '.'}`, {cause: err});
+                throw new CMError(`Wiki page ${generateFullWikiUrl(subreddit, wiki)} ${error} (${err.statusCode})${reasons.length > 0 ? `because: ${reasons.join(' | ')}` : '.'}`, {cause: err});
             } else {
-                throw new CMError(`Wiki page ${location} could not be read`, {cause: err});
+                throw new CMError(`Wiki page ${generateFullWikiUrl(subreddit, wiki)} could not be read`, {cause: err});
             }
         }
     }

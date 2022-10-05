@@ -35,8 +35,8 @@ export const asGenericComparison = (val: any): val is GenericComparison => {
     return typeof val === 'object' && 'value' in val;
 }
 
-export const GENERIC_VALUE_COMPARISON = /^\s*(?<opStr>>|>=|<|<=)\s*(?<value>-?\d?\.?\d+)(?<extra>\s+.*)*$/
-export const GENERIC_VALUE_COMPARISON_URL = 'https://regexr.com/60dq4';
+export const GENERIC_VALUE_COMPARISON = /^\s*(?<opStr>>|>=|<|<=)\s*(?<value>-?(?:\d+)(?:(?:(?:.|,)\d+)+)?)(?<extra>\s+.*)*$/
+export const GENERIC_VALUE_COMPARISON_URL = 'https://regexr.com/6vama';
 export const parseGenericValueComparison = (val: string, options?: {
     requireDuration?: boolean,
     reg?: RegExp
@@ -107,8 +107,8 @@ export const parseGenericValueComparison = (val: string, options?: {
         durationText,
     }
 }
-const GENERIC_VALUE_PERCENT_COMPARISON = /^\s*(?<opStr>>|>=|<|<=)\s*(?<value>\d+)\s*(?<percent>%)?(?<extra>.*)$/
-const GENERIC_VALUE_PERCENT_COMPARISON_URL = 'https://regexr.com/60a16';
+const GENERIC_VALUE_PERCENT_COMPARISON = /^\s*(?<opStr>>|>=|<|<=)\s*(?<value>(?:\d+)(?:(?:(?:.|,)\d+)+)?)\s*(?<percent>%)?(?<extra>.*)$/
+const GENERIC_VALUE_PERCENT_COMPARISON_URL = 'https://regexr.com/6valr';
 export const parseGenericValueOrPercentComparison = (val: string, options?: {requireDuration: boolean}): GenericComparison => {
     return parseGenericValueComparison(val, {...(options ?? {}), reg: GENERIC_VALUE_PERCENT_COMPARISON});
 }
