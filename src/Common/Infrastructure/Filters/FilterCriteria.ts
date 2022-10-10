@@ -576,10 +576,12 @@ export interface SubmissionState extends ActivityState {
 
 export const cmToSnoowrapActivityMap: Record<string, keyof (Submission & Comment)> = {
     authorFlairText: 'author_flair_text',
+    flairText: 'author_flair_text',
     authorFlairTemplateId: 'author_flair_template_id',
     authorFlairCssClass: 'author_flair_css_class',
     authorFlairBackgroundColor: 'author_flair_background_color',
-    flairTemplate: 'link_flair_template_id'
+    flairTemplate: 'link_flair_template_id',
+    flairCssClass: 'author_flair_css_class',
 }
 
 export const cmActivityProperties = ['submissionState', 'score', 'reports', 'removed', 'deleted', 'filtered', 'age', 'title'];

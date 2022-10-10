@@ -79,6 +79,12 @@ export const getBot = async () => {
         bot = new Bot(config.bots[0], NoopLogger);
         await bot.cacheManager.set('test', {
             logger: NoopLogger,
+            caching: {
+              authorTTL: false,
+              submissionTTL: false,
+              commentTTL: false,
+              provider: 'memory'
+            },
             subreddit: bot.client.getSubreddit('test'),
             client: bot.client,
             statFrequency: 'minute',
