@@ -3187,7 +3187,7 @@ export class SubredditResources {
 
                                     let actionsToUse: ModNote[] = [];
                                     if(asModNoteCriteria(actionCriteria)) {
-                                        actionsToUse = actionsToUse.filter(x => x.type === 'NOTE');
+                                        actionsToUse = modActions.filter(x => x.type === 'NOTE');
                                     } else {
                                         actionsToUse = modActions;
                                     }
