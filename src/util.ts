@@ -2489,18 +2489,22 @@ export const mergeFilters = (objectConfig: RunnableBaseJson, filterDefs: FilterC
     let derivedAuthorIs: AuthorOptions = buildFilter(authorIsDefault);
     if (authorIsBehavior === 'merge') {
         derivedAuthorIs = merge.all([authorIs, authorIsDefault], {arrayMerge: removeFromSourceIfKeysExistsInDestination});
-    } else if (Object.keys(authorIs).length > 0) {
+    } else if (!filterIsEmpty(authorIs)) {
         derivedAuthorIs = authorIs;
     }
 
     let derivedItemIs: ItemOptions = buildFilter(itemIsDefault);
     if (itemIsBehavior === 'merge') {
         derivedItemIs = merge.all([itemIs, itemIsDefault], {arrayMerge: removeFromSourceIfKeysExistsInDestination});
-    } else if (Object.keys(itemIs).length > 0) {
+    } else if (!filterIsEmpty(itemIs)) {
         derivedItemIs = itemIs;
     }
 
     return [derivedAuthorIs, derivedItemIs];
+}
+
+export const filterIsEmpty = (obj: FilterOptions<any>): boolean => {
+    return (obj.include === undefined || obj.include.length === 0) && (obj.exclude === undefined || obj.exclude.length === 0);
 }
 
 export const buildFilter = (filterVal: MinimalOrFullMaybeAnonymousFilter<AuthorCriteria | TypedActivityState | ActivityState>): FilterOptions<AuthorCriteria | TypedActivityState | ActivityState> => {
