@@ -689,7 +689,13 @@
                                 </div>
                                 <%- include('partials/logSettings') %>
                             </div>
+                            <div class="liveLogIndicator">
                             <%- include('partials/loadingIcon') %>
+                                <span class="liveLogErrorWrapper invisible">
+                                    <span class="iconify-inline red" style="display: inline;" data-icon="ci:error-outline"></span>
+                                    <span class="liveLogError"></span><a class="restartLogs ml-3" href="#">Restart Live Logs</a>
+                                </span>
+                            </div>
                             <div data-subreddit="<%= data.name %>" class="logs font-mono text-sm">
                                 <% data.logs.forEach(function (logEntry){ %>
                                     <%- logEntry %>
@@ -750,6 +756,17 @@
             fetch(`/api/action?${actionParams.toString()}`);
         });
     })
+
+    document.querySelectorAll('.restartLogs').forEach(el => {
+        el.addEventListener('click', e => {
+            e.preventDefault();
+            const subSection = e.target.closest('div.sub');
+
+            if (subSection !== null) {
+                getStreamingLogs(subSection.dataset.subreddit, subSection.dataset.bot);
+            }
+        });
+    });
 
     document.querySelectorAll(".checkUrl").forEach(el => {
         const toggleButtons = (e) => {
@@ -962,7 +979,7 @@
         }).observe(element);
     }
 
-    function getStreamingLogs(sub, bot) {
+    function getStreamingLogs(sub, bot, restarts = 0) {
 
         console.debug(`Getting stream for ${bot} ${sub}`);
 
@@ -1018,38 +1035,49 @@
             bufferedLogs = [];
         }
 
+        setLiveLogIndicator(bot, sub, true);
         const fetchPromise = fetch(`/api/logs?instance=<%= instanceId %>&bot=${bot}&subreddit=${sub}&level=${level}&sort=${sort}&limit=${limitSel}&stream=true&streamObjects=true&formatted=false`, {signal})
-            .then(response => response.body)
-            .then(rs =>
-                rs.pipeThrough(new TextDecoderStream())
-                    .pipeThrough(new TransformStream({
-                        transform(chunk, controller) {
-                            textBuffer += chunk;
-                            const lines = textBuffer.split('\n');
-                            for (const line of lines.slice(0, -1)) {
-                                controller.enqueue(line);
+            .then(response => {
+                return response.body;
+            })
+            .then(rs => {
+                return rs.pipeThrough(new TextDecoderStream())
+                        .pipeThrough(new TransformStream({
+                            transform(chunk, controller) {
+                                textBuffer += chunk;
+                                const lines = textBuffer.split('\n');
+                                for (const line of lines.slice(0, -1)) {
+                                    controller.enqueue(line);
+                                }
+                                textBuffer = lines.slice(-1)[0];
+                            },
+                            flush(controller) {
+                                if (textBuffer) {
+                                    controller.enqueue(textBuffer);
+                                }
                             }
-                            textBuffer = lines.slice(-1)[0];
-                        },
-                        flush(controller) {
-                            if (textBuffer) {
-                                controller.enqueue(textBuffer);
-                            }
-                        }
-                    }))
+                        }))
 
-                    // Parse JSON objects
-                    .pipeThrough(new TransformStream({
-                        transform(line, controller) {
-                            if (line) {
-                                controller.enqueue(
-                                    JSON.parse(line)
-                                );
+                        // Parse JSON objects
+                        .pipeThrough(new TransformStream({
+                            transform(line, controller) {
+                                if (line) {
+                                    controller.enqueue(
+                                        JSON.parse(line)
+                                    );
+                                }
                             }
-                        }
-                    }))
-            ).catch((e) => {
-                console.warn(e);
+                        }));
+                }
+            )
+            .catch((e) => {
+                if(e.name === 'AbortError') {
+                    setLiveLogIndicator(bot, sub, false);
+                    console.debug(`Log streaming for ${bot} ${sub} aborted`);
+                } else {
+                    setLiveLogIndicator(bot, sub, false, `Live Log encountered an error: ${e.message}`);
+                    console.warn(e);
+                }
             });
 
         fetchPromise.then(async res => {
@@ -1064,6 +1092,11 @@
                 if(done) {
                     keepReading = false;
                     console.debug(`${bot}.${sub} log stream reader signalled it is done`);
+                    if(restarts < 3) {
+                        getStreamingLogs(sub, bot, restarts + 1);
+                    } else {
+                        setLiveLogIndicator(bot, sub, false, `Tried to automatically restart stream too many times (${restarts +1}) which indicates something may be wrong with communication.`);
+                    }
                 }
                 if(value) {
                     //console.log(`((Logged For ${bot} ${sub})) ${value.message}`);
@@ -1098,14 +1131,46 @@
         }).catch((e) => {
             if(e.name !== 'AbortError') {
                 console.debug(`Non-abort error occurred while streaming logs for ${bot} ${sub}`);
-                console.error(e);
+                console.warn(e);
+                setLiveLogIndicator(bot, sub, false, `Live Log encountered an error: ${e.message}`);
             } else {
                 console.debug(`Log streaming for ${bot} ${sub} aborted`);
+                setLiveLogIndicator(bot, sub, false);
             }
         });
 
         const existing = recentlySeen.get(`${bot}.${sub}`) || {};
         recentlySeen.set(`${bot}.${sub}`, {...existing, fetch: fetchPromise, controller, streamStart: Date.now()});
+    }
+
+    function setLiveLogIndicator(bot, sub, live, error = undefined) {
+        const liveIndicator = document.querySelector(`[data-bot="${bot}"][data-subreddit="${sub}"] .liveLogIndicator .loading`);
+        if(null !== liveIndicator) {
+            if(live) {
+                if(liveIndicator.classList.contains('invisible')) {
+                    liveIndicator.classList.remove('invisible');
+                }
+                // if(!liveIndicator.classList.contains('show')) {
+                //     liveIndicator.classList.add('show');
+                // }
+            } else {
+                if(!liveIndicator.classList.contains('invisible')) {
+                    liveIndicator.classList.add('invisible');
+                }
+            }
+        }
+        const liveErrorWrapper = document.querySelector(`[data-bot="${bot}"][data-subreddit="${sub}"] .liveLogIndicator .liveLogErrorWrapper`);
+        if(null !== liveErrorWrapper) {
+            if(live && !liveErrorWrapper.classList.contains('invisible')) {
+                liveErrorWrapper.classList.add('invisible');
+            }
+            if(!live && error !== undefined) {
+                if(liveErrorWrapper.classList.contains('invisible')) {
+                    liveErrorWrapper.classList.remove('invisible');
+                }
+                document.querySelector(`[data-bot="${bot}"][data-subreddit="${sub}"] .liveLogIndicator .liveLogError`).innerHTML = error;
+            }
+        }
     }
 
     const delayedItemsMap = new Map();
