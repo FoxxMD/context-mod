@@ -73,8 +73,10 @@ const logs = () => {
             const requestedBots = bots.map(x => x.botName);
 
             const origin = req.header('X-Forwarded-For') ?? req.header('host');
+            const stream = logger.stream();
             try {
-                logger.stream().on('log', (log: LogInfo) => {
+
+                stream.on('log', (log: LogInfo) => {
                     if (isLogLineMinLevel(log, level as string)) {
                         const {subreddit: subName, bot, user} = log;
                         let canAccess = false;
@@ -105,13 +107,13 @@ const logs = () => {
                 logger.info(`${userName} from ${origin} => CONNECTED`);
                 await pEvent(req, 'close');
                 //logger.debug('Request closed detected with "close" listener');
-                res.destroy();
                 return;
             } catch (e: any) {
                 if (e.code !== 'ECONNRESET') {
                     logger.error(e);
                 }
             } finally {
+                stream.removeAllListeners();
                 logger.info(`${userName} from ${origin} => DISCONNECTED`);
                 res.destroy();
             }
