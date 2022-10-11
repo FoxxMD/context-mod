@@ -1,0 +1,23 @@
+version: '3.7'
+
+services:
+  app:
+    build:
+      context: .
+    environment:
+      DB_DRIVER: 'mariadb'
+    volumes:
+      - './cmAppData/config:/config'
+
+  cache:
+    image: 'redis:7-alpine'
+
+  database:
+    image: 'mariadb:10.9.3'
+    environment:
+      MYSQL_ROOT_PASSWORD: CHANGE_THIS
+      MYSQL_USER: cmuser
+      MYSQL_PASSWORD: CHANGE_THIS
+      MYSQL_DATABASE: ContextMod
+    volumes:
+      - './cmAppData/db:/var/lib/mysql'
