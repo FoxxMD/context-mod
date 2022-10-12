@@ -1,30 +1,32 @@
 import {ActionJson, ActionConfig, ActionOptions} from "./index";
 import Action from "./index";
 import {Comment} from "snoowrap";
-import {renderContent} from "../Utils/SnoowrapUtils";
 import Submission from "snoowrap/dist/objects/Submission";
 import {ActionProcessResult, RichContent} from "../Common/interfaces";
-import {toModNoteLabel} from "../util";
+import {buildFilterCriteriaSummary, normalizeModActionCriteria, toModNoteLabel} from "../util";
 import {RuleResultEntity} from "../Common/Entities/RuleResultEntity";
 import {runCheckOptions} from "../Subreddit/Manager";
-import {ActionTypes, ModUserNoteLabel} from "../Common/Infrastructure/Atomic";
-import {ModNote} from "../Subreddit/ModNotes/ModNote";
+import {
+    ActionTypes,
+    ModUserNoteLabel,
+} from "../Common/Infrastructure/Atomic";
 import {ActionResultEntity} from "../Common/Entities/ActionResultEntity";
+import {ModNoteCriteria} from "../Common/Infrastructure/Filters/FilterCriteria";
 
 
 export class ModNoteAction extends Action {
     content: string;
     type?: string;
-    allowDuplicate: boolean;
+    existingNoteCheck?: ModNoteCriteria
     referenceActivity: boolean
 
     constructor(options: ModNoteActionOptions) {
         super(options);
-        const {type, content = '', allowDuplicate = false, referenceActivity = true} = options;
+        const {type, content = '', existingNoteCheck = true, referenceActivity = true} = options;
         this.type = type;
         this.content = content;
-        this.allowDuplicate = allowDuplicate;
         this.referenceActivity = referenceActivity;
+        this.existingNoteCheck = typeof existingNoteCheck === 'boolean' ? this.generateModLogCriteriaFromDuplicateConvenience(existingNoteCheck) : normalizeModActionCriteria(existingNoteCheck);
     }
 
     getKind(): ActionTypes {
@@ -35,7 +37,7 @@ export class ModNoteAction extends Action {
         return {
             content: this.content,
             type: this.type,
-            allowDuplicate: this.allowDuplicate,
+            existingNoteCheck: this.existingNoteCheck,
             referenceActivity: this.referenceActivity,
         }
     }
@@ -48,27 +50,30 @@ export class ModNoteAction extends Action {
         const renderedContent = await this.renderContent(this.content, item, ruleResults, actionResults);
         this.logger.verbose(`Note:\r\n(${this.type}) ${renderedContent}`);
 
-        // TODO see what changes are made for bulk fetch of notes before implementing this
-        // https://www.reddit.com/r/redditdev/comments/t8w861/new_mod_notes_api/
-        // if (!this.allowDuplicate) {
-        //     const notes = await this.resources.userNotes.getUserNotes(item.author);
-        //     let existingNote = notes.find((x) => x.link !== null && x.link.includes(item.id));
-        //     if(existingNote === undefined && notes.length > 0) {
-        //         const lastNote = notes[notes.length - 1];
-        //         // possibly notes don't have a reference link so check if last one has same text
-        //         if(lastNote.link === null && lastNote.text === renderedContent) {
-        //             existingNote = lastNote;
-        //         }
-        //     }
-        //     if (existingNote !== undefined && existingNote.noteType === this.type) {
-        //         this.logger.info(`Will not add note because one already exists for this Activity (${existingNote.time.local().format()}) and allowDuplicate=false`);
-        //         return {
-        //             dryRun,
-        //             success: false,
-        //             result: `Will not add note because one already exists for this Activity (${existingNote.time.local().format()}) and allowDuplicate=false`
-        //         };
-        //     }
-        // }
+        let noteCheckPassed: boolean = true;
+        let noteCheckResult: undefined | string;
+
+        if(this.existingNoteCheck === undefined) {
+            // nothing to do!
+            noteCheckResult = 'existingNoteCheck=false so no existing note checks were performed.';
+        } else {
+            const noteCheckCriteriaResult = await this.resources.isAuthor(item, {
+                modActions: [this.existingNoteCheck]
+            });
+            noteCheckPassed = noteCheckCriteriaResult.passed;
+            const {details} = buildFilterCriteriaSummary(noteCheckCriteriaResult);
+            noteCheckResult = `${noteCheckPassed ? 'Existing note check condition succeeded' : 'Will not add note because existing note check condition failed'} -- ${details.join(' ')}`;
+        }
+
+        this.logger.info(noteCheckResult);
+        if (!noteCheckPassed) {
+            return {
+                dryRun,
+                success: false,
+                result: noteCheckResult
+            };
+        }
+
         if (!dryRun) {
             await this.resources.addModNote({
                 label: modLabel,
@@ -84,15 +89,36 @@ export class ModNoteAction extends Action {
             result: `${modLabel !== undefined ? `(${modLabel})` : ''} ${renderedContent}`
         }
     }
+
+    generateModLogCriteriaFromDuplicateConvenience(val: boolean): ModNoteCriteria | undefined {
+        if(val) {
+            return {
+                noteType: this.type !== undefined ? [toModNoteLabel(this.type)] : undefined,
+                note: this.content !== '' ? [this.content] : undefined,
+                referencesCurrentActivity: this.referenceActivity ? true : undefined,
+                search: 'current',
+                count: '< 1'
+            }
+        }
+        return undefined;
+    }
 }
 
 export interface ModNoteActionConfig extends ActionConfig, RichContent {
     /**
-     * Add Note even if a Note already exists for this Activity
-     * @examples [false]
-     * @default false
+     * Check if there is an existing Note matching some criteria before adding the Note.
+     *
+     * If this check passes then the Note is added. The value may be a boolean or ModNoteCriteria.
+     *
+     * Boolean convenience:
+     *
+     * * If `true` or undefined then CM generates a ModNoteCriteria that passes only if there is NO existing note matching note criteria
+     * * If `false` then no check is performed and Note is always added
+     *
+     * @examples [true]
+     * @default true
      * */
-    allowDuplicate?: boolean,
+    existingNoteCheck?: boolean | ModNoteCriteria,
     type?: ModUserNoteLabel
     referenceActivity?: boolean
 }

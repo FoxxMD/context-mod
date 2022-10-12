@@ -3525,18 +3525,18 @@
                             "items": {
                                 "enum": [
                                     "comment",
+                                    false,
                                     "submission"
-                                ],
-                                "type": "string"
+                                ]
                             },
                             "type": "array"
                         },
                         {
                             "enum": [
                                 "comment",
+                                false,
                                 "submission"
-                            ],
-                            "type": "string"
+                            ]
                         }
                     ]
                 },
@@ -3574,6 +3574,9 @@
                             "type": "string"
                         }
                     ]
+                },
+                "referencesCurrentActivity": {
+                    "type": "boolean"
                 },
                 "search": {
                     "default": "current",
@@ -3621,14 +3624,6 @@
         "ModNoteActionJson": {
             "description": "Add a Toolbox User Note to the Author of this Activity",
             "properties": {
-                "allowDuplicate": {
-                    "default": false,
-                    "description": "Add Note even if a Note already exists for this Activity",
-                    "examples": [
-                        false
-                    ],
-                    "type": "boolean"
-                },
                 "authorIs": {
                     "anyOf": [
                         {
@@ -3678,6 +3673,21 @@
                         true
                     ],
                     "type": "boolean"
+                },
+                "existingNoteCheck": {
+                    "anyOf": [
+                        {
+                            "$ref": "#/definitions/ModNoteCriteria"
+                        },
+                        {
+                            "type": "boolean"
+                        }
+                    ],
+                    "default": true,
+                    "description": "Check if there is an existing Note matching some criteria before adding the Note.\n\nIf this check passes then the Note is added. The value may be a boolean or ModNoteCriteria.\n\nBoolean convenience:\n\n* If `true` or undefined then CM generates a ModNoteCriteria that passes only if there is NO existing note matching note criteria\n* If `false` then no check is performed and Note is always added",
+                    "examples": [
+                        true
+                    ]
                 },
                 "itemIs": {
                     "anyOf": [
@@ -3751,18 +3761,18 @@
                             "items": {
                                 "enum": [
                                     "comment",
+                                    false,
                                     "submission"
-                                ],
-                                "type": "string"
+                                ]
                             },
                             "type": "array"
                         },
                         {
                             "enum": [
                                 "comment",
+                                false,
                                 "submission"
-                            ],
-                            "type": "string"
+                            ]
                         }
                     ]
                 },
@@ -3820,6 +3830,9 @@
                             "type": "string"
                         }
                     ]
+                },
+                "referencesCurrentActivity": {
+                    "type": "boolean"
                 },
                 "search": {
                     "default": "current",

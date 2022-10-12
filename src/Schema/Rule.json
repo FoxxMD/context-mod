@@ -2085,18 +2085,18 @@
                             "items": {
                                 "enum": [
                                     "comment",
+                                    false,
                                     "submission"
-                                ],
-                                "type": "string"
+                                ]
                             },
                             "type": "array"
                         },
                         {
                             "enum": [
                                 "comment",
+                                false,
                                 "submission"
-                            ],
-                            "type": "string"
+                            ]
                         }
                     ]
                 },
@@ -2134,6 +2134,9 @@
                             "type": "string"
                         }
                     ]
+                },
+                "referencesCurrentActivity": {
+                    "type": "boolean"
                 },
                 "search": {
                     "default": "current",
@@ -2186,18 +2189,18 @@
                             "items": {
                                 "enum": [
                                     "comment",
+                                    false,
                                     "submission"
-                                ],
-                                "type": "string"
+                                ]
                             },
                             "type": "array"
                         },
                         {
                             "enum": [
                                 "comment",
+                                false,
                                 "submission"
-                            ],
-                            "type": "string"
+                            ]
                         }
                     ]
                 },
@@ -2255,6 +2258,9 @@
                             "type": "string"
                         }
                     ]
+                },
+                "referencesCurrentActivity": {
+                    "type": "boolean"
                 },
                 "search": {
                     "default": "current",
