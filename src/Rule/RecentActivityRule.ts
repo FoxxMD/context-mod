@@ -44,6 +44,7 @@ import {ActivityWindow, ActivityWindowConfig} from "../Common/Infrastructure/Act
 import {comparisonTextOp, parseGenericValueOrPercentComparison} from "../Common/Infrastructure/Comparisons";
 import {ImageHashCacheData} from "../Common/Infrastructure/Atomic";
 import {getSubredditBreakdownByActivityType} from "../Utils/SnoowrapUtils";
+import {CMError} from "../Utils/Errors";
 
 const parseLink = parseUsableLinkIdentifier();
 
@@ -315,7 +316,7 @@ export class RecentActivityRule extends Rule {
                             }
                         } catch (err: any) {
                             if(!err.message.includes('did not end with a valid image extension')) {
-                                this.logger.warn(`Will not compare image from Submission ${x.id} due to error while parsing image URL => ${err.message}`);
+                                this.logger.warn(new CMError(`Will not compare image from Submission ${x.id} due to error while parsing image URL`, {cause: err}));
                             }
                         }
                     }
