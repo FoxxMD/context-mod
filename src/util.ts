@@ -2610,28 +2610,7 @@ export const normalizeCriteria = <T extends AuthorCriteria | TypedActivityState 
             criteria.description = Array.isArray(criteria.description) ? criteria.description : [criteria.description];
         }
         if(criteria.modActions !== undefined) {
-            criteria.modActions.map((x, index) => {
-                const common = {
-                    ...x,
-                    type: x.type === undefined ? undefined : (Array.isArray(x.type) ? x.type : [x.type])
-                }
-                if(asModNoteCriteria(x)) {
-                    return {
-                        ...common,
-                        noteType: x.noteType === undefined ? undefined : (Array.isArray(x.noteType) ? x.noteType : [x.noteType]),
-                        note: x.note === undefined ? undefined : (Array.isArray(x.note) ? x.note : [x.note]),
-                    }
-                } else if(asModLogCriteria(x)) {
-                    return {
-                        ...common,
-                        action: x.action === undefined ? undefined : (Array.isArray(x.action) ? x.action : [x.action]),
-                        details: x.details === undefined ? undefined : (Array.isArray(x.details) ? x.details : [x.details]),
-                        description: x.description === undefined ? undefined : (Array.isArray(x.description) ? x.description : [x.description]),
-                        activityType: x.activityType === undefined ? undefined : (Array.isArray(x.activityType) ? x.activityType : [x.activityType]),
-                    }
-                }
-                return common;
-            })
+            criteria.modActions.map((x, index) => normalizeModActionCriteria(x));
         }
     }
 
@@ -2639,6 +2618,29 @@ export const normalizeCriteria = <T extends AuthorCriteria | TypedActivityState 
         name,
         criteria
     };
+}
+
+export const normalizeModActionCriteria = (x: (ModNoteCriteria | ModLogCriteria)): (ModNoteCriteria | ModLogCriteria) => {
+    const common = {
+        ...x,
+        type: x.type === undefined ? undefined : (Array.isArray(x.type) ? x.type : [x.type])
+    }
+    if(asModNoteCriteria(x)) {
+        return {
+            ...common,
+            noteType: x.noteType === undefined ? undefined : (Array.isArray(x.noteType) ? x.noteType : [x.noteType]),
+            note: x.note === undefined ? undefined : (Array.isArray(x.note) ? x.note : [x.note]),
+        }
+    } else if(asModLogCriteria(x)) {
+        return {
+            ...common,
+            action: x.action === undefined ? undefined : (Array.isArray(x.action) ? x.action : [x.action]),
+            details: x.details === undefined ? undefined : (Array.isArray(x.details) ? x.details : [x.details]),
+            description: x.description === undefined ? undefined : (Array.isArray(x.description) ? x.description : [x.description]),
+            activityType: x.activityType === undefined ? undefined : (Array.isArray(x.activityType) ? x.activityType : [x.activityType]),
+        }
+    }
+    return common;
 }
 
 export const asNamedCriteria = <T>(val: MaybeAnonymousCriteria<T> | undefined): val is NamedCriteria<T> => {

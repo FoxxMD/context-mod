@@ -6,7 +6,7 @@ import {
     ModeratorNames, ModActionType,
     ModUserNoteLabel, RelativeDateTimeMatch
 } from "../Atomic";
-import {ActivityType} from "../Reddit";
+import {ActivityType, MaybeActivityType} from "../Reddit";
 import {GenericComparison, parseGenericValueComparison} from "../Comparisons";
 import {parseStringToRegexOrLiteralSearch} from "../../../util";
 import { Submission, Comment } from "snoowrap";
@@ -123,13 +123,14 @@ export interface UserNoteCriteria extends UserSubredditHistoryCriteria {
 
 export interface ModActionCriteria extends UserSubredditHistoryCriteria {
     type?: ModActionType | ModActionType[]
-    activityType?: ActivityType | ActivityType[]
+    activityType?: MaybeActivityType | MaybeActivityType[]
+    referencesCurrentActivity?: boolean
 }
 
 export interface FullModActionCriteria extends Omit<ModActionCriteria, 'count'> {
     type?: ModActionType[]
     count?: GenericComparison
-    activityType?: ActivityType[]
+    activityType?: MaybeActivityType[]
 }
 
 export interface ModNoteCriteria extends ModActionCriteria {
@@ -168,6 +169,7 @@ export const toFullModNoteCriteria = (val: ModNoteCriteria): FullModNoteCriteria
                 break;
             case 'activityType':
             case 'noteType':
+            case 'referencesCurrentActivity':
                 acc[k] = rawVal;
                 break;
             case 'note':
@@ -220,6 +222,7 @@ export const toFullModLogCriteria = (val: ModLogCriteria): FullModLogCriteria =>
                 break;
             case 'activityType':
             case 'type':
+            case 'referencesCurrentActivity':
                 acc[k as keyof FullModLogCriteria] = rawVal;
                 break;
             case 'action':
