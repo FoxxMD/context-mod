@@ -654,10 +654,6 @@ export class Manager extends EventEmitter implements RunningStates {
 
             this.displayLabel = nickname || `${this.subreddit.display_name_prefixed}`;
 
-            if (footer !== undefined && this.resources !== undefined) {
-                this.resources.footer = footer;
-            }
-
             this.subMaxWorkers = maxWorkers;
             const realMax = this.getMaxWorkers(this.subMaxWorkers);
             if(realMax !== this.queue.concurrency) {
@@ -696,6 +692,10 @@ export class Manager extends EventEmitter implements RunningStates {
             };
             await this.setResourceManager(resourceConfig);
             this.resources.setLogger(this.logger);
+
+            if (footer !== undefined && this.resources !== undefined) {
+                this.resources.footer = footer;
+            }
 
             this.logger.info('Subreddit-specific options updated');
             this.logger.info('Building Runs and Checks...');
