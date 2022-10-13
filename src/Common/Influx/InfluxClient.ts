@@ -28,7 +28,7 @@ const extendLogger = (logger: Logger, suppressWriteWarnings = true): InfluxLogge
         warn: (message: string, err?: any) => {
             if(suppressWriteWarnings && !message.includes('Write to InfluxDB failed (attempt')) {
                 logger.warn(message, err);
-            } else {
+            } else if(!suppressWriteWarnings) {
                 logger.warn(message, err);
             }
         }
