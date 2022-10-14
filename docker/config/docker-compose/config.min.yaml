@@ -1,0 +1,34 @@
+operator:
+  name: #YOUR REDDIT USERNAME HERE
+  botName: ContextModMain
+logging:
+  # default level for all transports
+  level: debug
+  file:
+    # override default level
+    level: warn
+    # true -> log folder at projectDir/log
+    dirname: true
+caching:
+  provider:
+    store: redis
+    host: cache
+    port: 6379
+    prefix: prod
+databaseConfig:
+  migrations:
+    continueOnAutomatedBackup: true
+    #force: true # uncomment this to make cm run new migrations without confirmation
+  #logging: ['query', 'error', 'warn', 'log'] # uncomment this to get typeorm to log EVERYTHING
+  connection:
+    type: 'mariadb'
+    host: 'database'
+    username: 'cmuser'
+    password: 'CHANGE_THIS'
+    database: 'ContextMod'
+web:
+  credentials:
+    redirectUri: 'http://localhost:8085/callback'
+  session:
+    storage: cache
+  port: 8085

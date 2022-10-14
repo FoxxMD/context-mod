@@ -4,10 +4,10 @@ services:
   app:
     build:
       context: .
-    environment:
-      DB_DRIVER: 'mariadb'
     volumes:
       - './cmAppData/config:/config'
+    ports:
+      - "${CM_WEB-8085}:8085"
 
   cache:
     image: 'redis:7-alpine'
@@ -21,3 +21,25 @@ services:
       MYSQL_DATABASE: ContextMod
     volumes:
       - './cmAppData/db:/var/lib/mysql'
+
+  influx:
+    image: 'influxdb:latest'
+    volumes:
+      - './cmAppData/influx:/var/lib/influxdb2'
+    ports:
+      - "${INFLUX_WEB:-8086}:8086"
+    profiles:
+      - full
+
+  grafana:
+    image: 'grafana/grafana'
+    volumes:
+      - './cmAppData/grafana:/var/lib/grafana'
+    ports:
+      - "${GRAFANA_WEB:-3000}:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: CHANGE_THIS
+    depends_on:
+      - influx
+    profiles:
+      - full

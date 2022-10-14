@@ -396,3 +396,4 @@ dist
 !docs/**/*.json5
 !docs/**/*.yaml
 !docs/**/*.json
+!docker/config/**
